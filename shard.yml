@@ -1,0 +1,17 @@
+name: hwaro
+version: 0.1.0
+
+authors:
+  - HAHWUL <hahwul@gmail.com>
+
+dependencies:
+  markd:
+    github: icyleaf/markd
+
+targets:
+  hwaro:
+    main: src/hwaro.cr
+
+crystal: ">= 1.19.0"
+
+license: MIT
