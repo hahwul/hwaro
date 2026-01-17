@@ -1,6 +1,7 @@
 require "../schemas/config"
 require "../schemas/page"
 require "../logger/logger"
+require "../processor/markdown"
 
 module Hwaro
   module Core
@@ -36,9 +37,9 @@ module Hwaro
         # Generate feed content based on type
         feed_content = case feed_type
                       when "atom"
-                        generate_atom(feed_pages, config)
+                        generate_atom(feed_pages, config, filename)
                       else
-                        generate_rss(feed_pages, config)
+                        generate_rss(feed_pages, config, filename)
                       end
 
         # Write feed file
@@ -48,7 +49,7 @@ module Hwaro
         Logger.info "  Generated #{feed_type.upcase} feed with #{feed_pages.size} items."
       end
 
-      private def self.generate_rss(pages : Array(Schemas::Page), config : Schemas::Config) : String
+      private def self.generate_rss(pages : Array(Schemas::Page), config : Schemas::Config, filename : String) : String
         String.build do |str|
           str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
           str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
@@ -58,7 +59,7 @@ module Hwaro
           str << "    <description>#{escape_xml(config.description)}</description>\n"
           
           # Self-referencing link
-          feed_url = "#{config.base_url.rstrip('/')}/rss.xml"
+          feed_url = "#{config.base_url.rstrip('/')}/#{filename}"
           str << "    <atom:link href=\"#{escape_xml(feed_url)}\" rel=\"self\" type=\"application/rss+xml\" />\n"
           
           pages.each do |page|
@@ -91,7 +92,7 @@ module Hwaro
         end
       end
 
-      private def self.generate_atom(pages : Array(Schemas::Page), config : Schemas::Config) : String
+      private def self.generate_atom(pages : Array(Schemas::Page), config : Schemas::Config, filename : String) : String
         now = Time.utc
         
         String.build do |str|
@@ -101,7 +102,7 @@ module Hwaro
           str << "  <link href=\"#{escape_xml(config.base_url)}\" />\n"
           
           # Self-referencing link
-          feed_url = "#{config.base_url.rstrip('/')}/atom.xml"
+          feed_url = "#{config.base_url.rstrip('/')}/#{filename}"
           str << "  <link href=\"#{escape_xml(feed_url)}\" rel=\"self\" />\n"
           
           str << "  <updated>#{now.to_rfc3339}</updated>\n"
