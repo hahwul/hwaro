@@ -47,7 +47,7 @@ module Hwaro
             config.feeds.generate = feeds_section["generate"]?.try(&.as_bool) || config.feeds.generate
             config.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.feeds.filename
             config.feeds.type = feeds_section["type"]?.try(&.as_s) || config.feeds.type
-            config.feeds.truncate = feeds_section["truncate"]?.try(&.as_i).try(&.to_i) || config.feeds.truncate
+            config.feeds.truncate = feeds_section["truncate"]?.try(&.as_i) || config.feeds.truncate
           end
         end
         config

@@ -151,14 +151,18 @@ module Hwaro
         
         # Truncate if needed
         if truncate > 0 && html_content.size > truncate
-          # Strip HTML tags before truncating to avoid breaking tags
+          # For simplicity, truncate HTML content by stripping tags first to get text,
+          # truncate the text, then return the plain truncated text with ellipsis.
+          # This avoids broken HTML tags in the feed.
           text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
           if text_content.size > truncate
-            html_content = text_content[0...truncate] + "..."
+            text_content[0...truncate] + "..."
+          else
+            html_content
           end
+        else
+          html_content
         end
-        
-        html_content
       end
 
       private def self.escape_xml(text : String) : String
