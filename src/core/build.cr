@@ -1,8 +1,7 @@
-require "yaml"
 require "file_utils"
-require "markd"
 require "toml"
 require "../options/build_options"
+require "../processor/markdown"
 
 module Hwaro
   module Core
@@ -148,7 +147,7 @@ module Hwaro
           relative_path = Path[file_path].relative_to("content").to_s
           raw_content = File.read(file_path)
 
-          parsed = parse_front_matter(raw_content, file_path)
+          parsed = Processor::Markdown.parse(raw_content, file_path)
           next unless parsed
 
           title, markdown_content, draft, layout_name = parsed
@@ -232,7 +231,7 @@ module Hwaro
 
       private def render_page(page : Page, config : SiteConfig, layouts : Hash(String, String), output_dir : String, minify : Bool)
         # Convert Markdown
-        html_content = Markd.to_html(page.raw_content)
+        html_content = Processor::Markdown.render(page.raw_content)
 
         # Select Layout
         layout_name = determine_layout(page, layouts)
@@ -321,41 +320,6 @@ module Hwaro
           .gsub(/<%=\s*site_description\s*%>/, config.description)
           .gsub(/<%=\s*base_url\s*%>/, config.base_url)
           .gsub(/<%=\s*content\s*%>/, content)
-      end
-
-      private def parse_front_matter(raw_content : String, file_path : String) : Tuple(String, String, Bool, String?)?
-        markdown_content = raw_content
-        title = "Untitled"
-        is_draft = false
-        layout = nil
-
-        # Try TOML Front Matter (+++)
-        if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
-          begin
-            toml_fm = TOML.parse(match[1])
-            title = toml_fm["title"]?.try(&.as_s) || title
-            is_draft = toml_fm["draft"]?.try(&.as_bool) || false
-            layout = toml_fm["layout"]?.try(&.as_s)
-          rescue ex
-            puts "  [WARN] Invalid TOML in #{file_path}: #{ex.message}"
-          end
-          markdown_content = match[2]
-        # Try YAML Front Matter (---)
-        elsif match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
-          begin
-            yaml_fm = YAML.parse(match[1])
-            if yaml_fm.as_h?
-              title = yaml_fm["title"]?.try(&.as_s?) || title
-              is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
-              layout = yaml_fm["layout"]?.try(&.as_s?)
-            end
-          rescue ex
-            puts "  [WARN] Invalid YAML in #{file_path}: #{ex.message}"
-          end
-          markdown_content = match[2]
-        end
-
-        {title, markdown_content, is_draft, layout}
       end
 
       private def minify_html(html : String) : String

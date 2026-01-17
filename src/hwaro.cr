@@ -22,6 +22,9 @@ require "./options/init_options"
 require "./options/build_options"
 require "./options/serve_options"
 
+# Load processors
+require "./processor/markdown"
+
 # Load core modules
 require "./core/init"
 require "./core/build"
