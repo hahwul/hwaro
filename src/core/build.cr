@@ -7,13 +7,13 @@ require "../schemas/config"
 require "../schemas/page"
 require "../schemas/section"
 require "../schemas/toc"
+require "../schemas/site"
 
 module Hwaro
   module Core
     class Build
-      @config : Schemas::Config?
+      @site : Schemas::Site?
       @templates : Hash(String, String)?
-      @pages : Array(Schemas::Page)?
 
       def run(options : Options::BuildOptions)
         run(options.output_dir, options.drafts, options.minify, options.parallel)
@@ -24,9 +24,8 @@ module Hwaro
         start_time = Time.instant
 
         # Reset caches
-        @config = nil
+        @site = nil
         @templates = nil
-        @pages = nil
 
         # Setup output directory
         setup_output_dir(output_dir)
@@ -34,37 +33,39 @@ module Hwaro
         # Copy static files
         copy_static_files(output_dir)
 
-        # Load config (cached)
-        config = load_config
+        # Initialize site
+        config = Schemas::Config.load
+        @site = Schemas::Site.new(config)
+        site = @site.not_nil!
 
         # Load templates (cached)
         templates = load_templates
 
         # Collect and parse all content files
-        all_pages = collect_pages(config, drafts)
-        @pages = all_pages
+        collect_content(site, drafts)
+        all_pages = (site.pages + site.sections).as(Array(Schemas::Page))
 
         Logger.info "  Found #{all_pages.size} pages."
 
         # Process files
         count = if parallel && all_pages.size > 1
-                  process_files_parallel(all_pages, config, templates, output_dir, minify)
+                  process_files_parallel(all_pages, site, templates, output_dir, minify)
                 else
-                  process_files_sequential(all_pages, config, templates, output_dir, minify)
+                  process_files_sequential(all_pages, site, templates, output_dir, minify)
                 end
 
         # Generate sitemap if enabled
-        if config.sitemap
-          generate_sitemap(all_pages, config, output_dir)
+        if site.config.sitemap
+          generate_sitemap(all_pages, site, output_dir)
         end
 
         # Generate feeds if enabled
-        if config.feeds.generate
-          Feeds.generate(all_pages, config, output_dir)
+        if site.config.feeds.generate
+          Feeds.generate(all_pages, site.config, output_dir)
         end
 
         # Generate 404 page
-        generate_404_page(config, templates, output_dir, minify)
+        generate_404_page(site, templates, output_dir, minify)
 
         elapsed = Time.instant - start_time
         Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
@@ -82,10 +83,6 @@ module Hwaro
           FileUtils.cp_r("static/.", "#{output_dir}/")
           Logger.action :copy, "static files", :blue
         end
-      end
-
-      private def load_config : Schemas::Config
-        @config ||= Schemas::Config.load
       end
 
       private def load_templates : Hash(String, String)
@@ -111,9 +108,7 @@ module Hwaro
         @templates = templates
       end
 
-      private def collect_pages(config : Schemas::Config, include_drafts : Bool) : Array(Schemas::Page)
-        pages = [] of Schemas::Page
-
+      private def collect_content(site : Schemas::Site, include_drafts : Bool)
         Dir.glob("content/**/*.md") do |file_path|
           relative_path = Path[file_path].relative_to("content").to_s
           raw_content = File.read(file_path)
@@ -131,7 +126,13 @@ module Hwaro
           is_index = Path[relative_path].basename == "index.md"
 
           # Instantiate Page or Section
-          page = is_index ? Schemas::Section.new(relative_path) : Schemas::Page.new(relative_path)
+          if is_index
+            page = Schemas::Section.new(relative_path)
+            site.sections << page
+          else
+            page = Schemas::Page.new(relative_path)
+            site.pages << page
+          end
 
           page.title = title
           page.raw_content = markdown_content
@@ -139,8 +140,6 @@ module Hwaro
           page.template = layout_name
           page.in_sitemap = in_sitemap
           page.toc = toc
-          # Note: tags, weight, date are not yet returned by Processor::Markdown.parse
-          # They will need to be populated once the processor is updated.
 
           # Calculate path metadata
           path_parts = Path[relative_path].parts
@@ -166,14 +165,10 @@ module Hwaro
                 page.url = "/#{dir}/#{stem}/"
             end
           end
-
-          pages << page
         end
-
-        pages
       end
 
-      private def process_files_parallel(pages : Array(Schemas::Page), config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_parallel(pages : Array(Schemas::Page), site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         cpu_count = System.cpu_count || 1
         max_workers = Math.min(pages.size, cpu_count.to_i * 2)
         max_workers = Math.max(max_workers, 1)
@@ -187,7 +182,7 @@ module Hwaro
         max_workers.times do
           spawn do
             while page = work_queue.receive?
-              render_page(page, config, templates, output_dir, minify)
+              render_page(page, site, templates, output_dir, minify)
               results.send(true)
             end
           end
@@ -200,16 +195,16 @@ module Hwaro
         count
       end
 
-      private def process_files_sequential(pages : Array(Schemas::Page), config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_sequential(pages : Array(Schemas::Page), site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         count = 0
         pages.each do |page|
-          render_page(page, config, templates, output_dir, minify)
+          render_page(page, site, templates, output_dir, minify)
           count += 1
         end
         count
       end
 
-      private def render_page(page : Schemas::Page, config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
+      private def render_page(page : Schemas::Page, site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
         # Process Shortcodes in Content
         processed_content = process_shortcodes(page.raw_content, templates)
 
@@ -230,13 +225,13 @@ module Hwaro
         # Generate variables
         section_list_html = ""
         if template_name == "section" || page.template == "section"
-             section_list_html = generate_section_list(page, config)
+             section_list_html = generate_section_list(page, site)
         end
 
         # Render
         final_html = if template_content
                        full_template = resolve_includes(template_content, templates)
-                       apply_template(full_template, html_content, page, config, section_list_html, toc_html, templates)
+                       apply_template(full_template, html_content, page, site.config, section_list_html, toc_html, templates)
                      else
                        Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                        html_content
@@ -265,11 +260,9 @@ module Hwaro
         "page"
       end
 
-      private def generate_section_list(current_page : Schemas::Page, config : Schemas::Config) : String
-        return "" unless @pages
-
+      private def generate_section_list(current_page : Schemas::Page, site : Schemas::Site) : String
         # Find pages in the same section, excluding the index itself
-        section_pages = @pages.not_nil!.select do |p|
+        section_pages = site.pages.select do |p|
           p.section == current_page.section && !p.is_index
         end
 
@@ -278,7 +271,7 @@ module Hwaro
 
         String.build do |str|
           section_pages.each do |p|
-             full_url = "#{config.base_url}#{p.url}"
+             full_url = "#{site.config.base_url}#{p.url}"
              str << "<li><a href=\"#{full_url}\">#{p.title}</a></li>\n"
           end
         end
@@ -407,7 +400,7 @@ module Hwaro
         end
       end
 
-      private def generate_sitemap(pages : Array(Schemas::Page), config : Schemas::Config, output_dir : String)
+      private def generate_sitemap(pages : Array(Schemas::Page), site : Schemas::Site, output_dir : String)
         # Filter pages that should be included in sitemap
         sitemap_pages = pages.select { |p| p.in_sitemap }
 
@@ -417,7 +410,7 @@ module Hwaro
         end
 
         # Warn if base_url is empty
-        if config.base_url.empty?
+        if site.config.base_url.empty?
           Logger.warn "  [WARN] base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
         end
 
@@ -427,7 +420,7 @@ module Hwaro
 
           sitemap_pages.each do |page|
             # Properly join base_url and page.url
-            base = config.base_url.rstrip('/')
+            base = site.config.base_url.rstrip('/')
             path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
             full_url = base.empty? ? path : base + path
 
@@ -448,7 +441,7 @@ module Hwaro
         Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
       end
 
-      private def generate_404_page(config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
+      private def generate_404_page(site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
         return unless templates.has_key?("404")
 
         template = templates["404"]
@@ -460,7 +453,7 @@ module Hwaro
         toc = ""
 
         full_template = resolve_includes(template, templates)
-        final_html = apply_template(full_template, content, page, config, section_list, toc, templates)
+        final_html = apply_template(full_template, content, page, site.config, section_list, toc, templates)
 
         final_html = minify_html(final_html) if minify
 
