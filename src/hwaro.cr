@@ -4,10 +4,17 @@
 # The codebase is organized as follows:
 #
 # - options/   : Option structs for each command (BuildOptions, ServeOptions, etc.)
-# - core/      : Core functionality modules (Build, Serve, Init)
+# - core/      : Core functionality modules
+#   - build/   : Build-related modules (builder, cache, parallel)
+#   - init/    : Project initialization
+#   - serve/   : Development server
+# - plugins/   : Extensible plugin system
+#   - processors/ : Content processors (markdown, html, etc.)
 # - cli/       : Command-line interface handling
 #   - commands/: Individual command implementations
-#   - runner.cr: Main CLI runner
+#   - runner.cr: Main CLI runner with command registry
+# - utils/     : Utility modules (logger, etc.)
+# - schemas/   : Data structures for config, pages, etc.
 
 require "option_parser"
 require "yaml"
@@ -17,18 +24,32 @@ require "http/server"
 require "markd"
 require "toml"
 
+# Load utilities
+require "./utils/logger"
+
 # Load options
 require "./options/init_options"
 require "./options/build_options"
 require "./options/serve_options"
 
-# Load processors
-require "./processor/markdown"
+# Load schemas
+require "./schemas/config"
+require "./schemas/page"
+require "./schemas/section"
+require "./schemas/site"
+require "./schemas/toc"
+
+# Load plugins
+require "./plugins/processors/base"
+require "./plugins/processors/markdown"
+require "./plugins/processors/html"
 
 # Load core modules
-require "./core/init"
-require "./core/build"
-require "./core/serve"
+require "./core/build/cache"
+require "./core/build/parallel"
+require "./core/build/builder"
+require "./core/init/initializer"
+require "./core/serve/server"
 require "./core/feeds"
 
 # Load CLI

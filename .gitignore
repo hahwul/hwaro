@@ -7,3 +7,6 @@
 
 # For me
 testapp
+
+# Hwaro build cache
+.hwaro_cache.json

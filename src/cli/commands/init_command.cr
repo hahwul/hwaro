@@ -1,7 +1,7 @@
 require "option_parser"
 require "../../options/init_options"
-require "../../core/init"
-require "../../logger/logger"
+require "../../core/init/initializer"
+require "../../utils/logger"
 
 module Hwaro
   module CLI
@@ -9,7 +9,7 @@ module Hwaro
       class InitCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Init.new.run(options)
+          Core::Init::Initializer.new.run(options)
         end
 
         private def parse_options(args : Array(String)) : Options::InitOptions

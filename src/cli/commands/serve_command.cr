@@ -1,7 +1,7 @@
 require "option_parser"
 require "../../options/serve_options"
-require "../../core/serve"
-require "../../logger/logger"
+require "../../core/serve/server"
+require "../../utils/logger"
 
 module Hwaro
   module CLI
@@ -9,7 +9,7 @@ module Hwaro
       class ServeCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Serve.new.run(options)
+          Core::Serve::Server.new.run(options)
         end
 
         private def parse_options(args : Array(String)) : Options::ServeOptions

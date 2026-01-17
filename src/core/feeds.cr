@@ -1,7 +1,7 @@
 require "../schemas/config"
 require "../schemas/page"
-require "../logger/logger"
-require "../processor/markdown"
+require "../utils/logger"
+require "../plugins/processors/markdown"
 
 module Hwaro
   module Core
