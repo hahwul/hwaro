@@ -32,6 +32,9 @@ module Hwaro
         create_file(File.join(target_path, "templates", "section.ecr"), sample_section_layout)
         create_file(File.join(target_path, "templates", "404.ecr"), sample_404)
 
+        create_directory(File.join(target_path, "templates", "shortcodes"))
+        create_file(File.join(target_path, "templates", "shortcodes", "alert.ecr"), sample_shortcode_alert)
+
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)
 
@@ -167,6 +170,14 @@ module Hwaro
           </footer>
         </body>
         </html>
+        HTML
+      end
+
+      private def sample_shortcode_alert
+        <<-HTML
+        <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
+          <strong><%= type.upcase %>:</strong> <%= message %>
+        </div>
         HTML
       end
 

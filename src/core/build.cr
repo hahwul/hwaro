@@ -93,8 +93,9 @@ module Hwaro
 
         templates = {} of String => String
         if Dir.exists?("templates")
-          Dir.glob("templates/*.ecr") do |path|
-            name = File.basename(path, ".ecr")
+          Dir.glob("templates/**/*.ecr") do |path|
+            relative = Path[path].relative_to("templates")
+            name = relative.to_s.gsub(/\.ecr$/, "")
             templates[name] = File.read(path)
           end
         end
@@ -209,8 +210,11 @@ module Hwaro
       end
 
       private def render_page(page : Schemas::Page, config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
+        # Process Shortcodes in Content
+        processed_content = process_shortcodes(page.raw_content, templates)
+
         # Convert Markdown
-        html_content, toc_headers = Processor::Markdown.render(page.raw_content)
+        html_content, toc_headers = Processor::Markdown.render(processed_content)
 
         # Generate ToC HTML if enabled
         toc_html = if page.toc && !toc_headers.empty?
@@ -232,7 +236,7 @@ module Hwaro
         # Render
         final_html = if template_content
                        full_template = resolve_includes(template_content, templates)
-                       apply_template(full_template, html_content, page, config, section_list_html, toc_html)
+                       apply_template(full_template, html_content, page, config, section_list_html, toc_html, templates)
                      else
                        Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                        html_content
@@ -310,8 +314,8 @@ module Hwaro
         end
       end
 
-      private def apply_template(template : String, content : String, page : Schemas::Page, config : Schemas::Config, section_list : String, toc : String) : String
-        template
+      private def apply_template(template : String, content : String, page : Schemas::Page, config : Schemas::Config, section_list : String, toc : String, templates : Hash(String, String)) : String
+        result = template
           .gsub(/<%=\s*page_title\s*%>/, page.title)
           .gsub(/<%=\s*page_section\s*%>/, page.section)
           .gsub(/<%=\s*section_list\s*%>/, section_list)
@@ -320,6 +324,54 @@ module Hwaro
           .gsub(/<%=\s*site_description\s*%>/, config.description || "")
           .gsub(/<%=\s*base_url\s*%>/, config.base_url)
           .gsub(/<%=\s*content\s*%>/, content)
+
+        process_shortcodes(result, templates)
+      end
+
+      private def process_shortcodes(content : String, templates : Hash(String, String)) : String
+        content.gsub(/<%=\s*shortcode\s+"([^"]+)"(?:\s*,\s*(.*?))?\s*%>/) do |match|
+          name = $1
+          args_str = $2
+
+          template_key = "shortcodes/#{name}"
+          if template = templates[template_key]?
+            # Parse args
+            args = parse_args(args_str)
+
+            # Apply args to template
+            render_shortcode(template, args)
+          else
+            Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
+            match # Return original string if not found
+          end
+        end
+      end
+
+      private def parse_args(args_str : String?) : Hash(String, String)
+        args = {} of String => String
+        return args unless args_str
+
+        # Simple parser for key: "value" or key: value
+        args_str.scan(/(\w+):\s*(?:"([^"]*)"|([^,\s]+))/) do |match|
+          key = match[1]
+          value = match[2]? || match[3]
+          args[key] = value
+        end
+        args
+      end
+
+      private def render_shortcode(template : String, args : Hash(String, String)) : String
+        result = template
+        args.each do |key, value|
+          result = result.gsub(/<%=\s*#{key}(\.upcase)?\s*%>/) do |m|
+            if $1? == ".upcase"
+              value.upcase
+            else
+              value
+            end
+          end
+        end
+        result
       end
 
       private def minify_html(html : String) : String
@@ -408,7 +460,7 @@ module Hwaro
         toc = ""
 
         full_template = resolve_includes(template, templates)
-        final_html = apply_template(full_template, content, page, config, section_list, toc)
+        final_html = apply_template(full_template, content, page, config, section_list, toc, templates)
 
         final_html = minify_html(final_html) if minify
 
