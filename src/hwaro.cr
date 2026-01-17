@@ -18,17 +18,17 @@ require "markd"
 require "toml"
 
 # Load options
-require "./hwaro/options/init_options"
-require "./hwaro/options/build_options"
-require "./hwaro/options/serve_options"
+require "./options/init_options"
+require "./options/build_options"
+require "./options/serve_options"
 
 # Load core modules
-require "./hwaro/core/init"
-require "./hwaro/core/build"
-require "./hwaro/core/serve"
+require "./core/init"
+require "./core/build"
+require "./core/serve"
 
 # Load CLI
-require "./hwaro/cli/runner"
+require "./cli/runner"
 
 module Hwaro
   VERSION = "0.1.0"
