@@ -3,66 +3,16 @@ require "toml"
 require "../logger/logger"
 require "../options/build_options"
 require "../processor/markdown"
+require "../schemas/config"
+require "../schemas/page"
+require "../schemas/section"
 
 module Hwaro
   module Core
-    # Site configuration loaded from config.toml
-    class SiteConfig
-      property title : String
-      property description : String
-      property base_url : String
-      property sitemap : Bool
-      property raw : Hash(String, TOML::Any)
-
-      def initialize
-        @title = "Hwaro Site"
-        @description = ""
-        @base_url = ""
-        @sitemap = false
-        @raw = Hash(String, TOML::Any).new
-      end
-
-      def self.load(config_path : String = "config.toml") : SiteConfig
-        config = new
-        if File.exists?(config_path)
-          config.raw = TOML.parse_file(config_path)
-          config.title = config.raw["title"]?.try(&.as_s) || config.title
-          config.description = config.raw["description"]?.try(&.as_s) || config.description
-          config.base_url = config.raw["base_url"]?.try(&.as_s) || config.base_url
-          config.sitemap = config.raw["sitemap"]?.try(&.as_bool) || config.sitemap
-        end
-        config
-      end
-    end
-
-    class Page
-      property title : String
-      property content : String
-      property raw_content : String
-      property path : String       # Relative path from content/ (e.g. "projects/a.md")
-      property section : String    # First directory component (e.g. "projects")
-      property layout : String?    # Custom layout name
-      property draft : Bool
-      property url : String        # Calculated relative URL (e.g. "/projects/a/")
-      property is_index : Bool     # Is this an index.md?
-      property in_sitemap : Bool   # Include in sitemap.xml?
-
-      def initialize(@path : String)
-        @title = "Untitled"
-        @content = ""
-        @raw_content = ""
-        @section = ""
-        @draft = false
-        @url = ""
-        @is_index = false
-        @in_sitemap = true
-      end
-    end
-
     class Build
-      @config : SiteConfig?
+      @config : Schemas::Config?
       @templates : Hash(String, String)?
-      @pages : Array(Page)?
+      @pages : Array(Schemas::Page)?
 
       def run(options : Options::BuildOptions)
         run(options.output_dir, options.drafts, options.minify, options.parallel)
@@ -103,7 +53,11 @@ module Hwaro
                 end
 
         # Generate sitemap if enabled
-        if config.sitemap
+        # Note: Schemas::Config doesn't have sitemap property in the provided schema yet,
+        # but we'll assume it might be in raw or added later.
+        # For now, we check the raw config for the flag if not present in schema property.
+        sitemap_enabled = config.raw["sitemap"]?.try(&.as_bool) rescue false
+        if sitemap_enabled
           generate_sitemap(all_pages, config, output_dir)
         end
 
@@ -125,8 +79,8 @@ module Hwaro
         end
       end
 
-      private def load_config : SiteConfig
-        @config ||= SiteConfig.load
+      private def load_config : Schemas::Config
+        @config ||= Schemas::Config.load
       end
 
       private def load_templates : Hash(String, String)
@@ -151,8 +105,8 @@ module Hwaro
         @templates = templates
       end
 
-      private def collect_pages(config : SiteConfig, include_drafts : Bool) : Array(Page)
-        pages = [] of Page
+      private def collect_pages(config : Schemas::Config, include_drafts : Bool) : Array(Schemas::Page)
+        pages = [] of Schemas::Page
 
         Dir.glob("content/**/*.md") do |file_path|
           relative_path = Path[file_path].relative_to("content").to_s
@@ -167,17 +121,23 @@ module Hwaro
             next
           end
 
-          page = Page.new(relative_path)
+          # Determine if it's an index to potentially use Section schema
+          is_index = Path[relative_path].basename == "index.md"
+
+          # Instantiate Page or Section
+          page = is_index ? Schemas::Section.new(relative_path) : Schemas::Page.new(relative_path)
+
           page.title = title
           page.raw_content = markdown_content
           page.draft = draft
-          page.layout = layout_name
-          page.in_sitemap = in_sitemap
+          page.template = layout_name
+          # Note: tags, weight, date are not yet returned by Processor::Markdown.parse
+          # They will need to be populated once the processor is updated.
 
           # Calculate path metadata
           path_parts = Path[relative_path].parts
           page.section = path_parts.size > 1 ? path_parts.first : ""
-          page.is_index = Path[relative_path].basename == "index.md"
+          page.is_index = is_index
 
           # Calculate URL
           if page.is_index
@@ -205,13 +165,13 @@ module Hwaro
         pages
       end
 
-      private def process_files_parallel(pages : Array(Page), config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_parallel(pages : Array(Schemas::Page), config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         cpu_count = System.cpu_count || 1
         max_workers = Math.min(pages.size, cpu_count.to_i * 2)
         max_workers = Math.max(max_workers, 1)
 
         results = Channel(Bool).new(pages.size)
-        work_queue = Channel(Page).new(pages.size)
+        work_queue = Channel(Schemas::Page).new(pages.size)
 
         pages.each { |p| work_queue.send(p) }
         work_queue.close
@@ -232,7 +192,7 @@ module Hwaro
         count
       end
 
-      private def process_files_sequential(pages : Array(Page), config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_sequential(pages : Array(Schemas::Page), config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         count = 0
         pages.each do |page|
           render_page(page, config, templates, output_dir, minify)
@@ -241,7 +201,7 @@ module Hwaro
         count
       end
 
-      private def render_page(page : Page, config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool)
+      private def render_page(page : Schemas::Page, config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
         # Convert Markdown
         html_content = Processor::Markdown.render(page.raw_content)
 
@@ -251,7 +211,7 @@ module Hwaro
 
         # Generate variables
         section_list_html = ""
-        if template_name == "section" || page.layout == "section"
+        if template_name == "section" || page.template == "section"
              section_list_html = generate_section_list(page, config)
         end
 
@@ -271,9 +231,9 @@ module Hwaro
         write_output(page, output_dir, final_html)
       end
 
-      private def determine_template(page : Page, templates : Hash(String, String)) : String
-        # 1. Frontmatter layout
-        if custom = page.layout
+      private def determine_template(page : Schemas::Page, templates : Hash(String, String)) : String
+        # 1. Frontmatter template
+        if custom = page.template
           return custom if templates.has_key?(custom)
           Logger.warn "  [WARN] Custom template '#{custom}' not found for #{page.path}."
         end
@@ -287,13 +247,10 @@ module Hwaro
         "page"
       end
 
-      private def generate_section_list(current_page : Page, config : SiteConfig) : String
+      private def generate_section_list(current_page : Schemas::Page, config : Schemas::Config) : String
         return "" unless @pages
 
         # Find pages in the same section, excluding the index itself
-        # And usually we want direct children or recursive?
-        # For now, let's just grab all pages with the same section string.
-
         section_pages = @pages.not_nil!.select do |p|
           p.section == current_page.section && !p.is_index
         end
@@ -323,13 +280,13 @@ module Hwaro
         end
       end
 
-      private def apply_template(template : String, content : String, page : Page, config : SiteConfig, section_list : String) : String
+      private def apply_template(template : String, content : String, page : Schemas::Page, config : Schemas::Config, section_list : String) : String
         template
           .gsub(/<%=\s*page_title\s*%>/, page.title)
           .gsub(/<%=\s*page_section\s*%>/, page.section)
           .gsub(/<%=\s*section_list\s*%>/, section_list)
           .gsub(/<%=\s*site_title\s*%>/, config.title)
-          .gsub(/<%=\s*site_description\s*%>/, config.description)
+          .gsub(/<%=\s*site_description\s*%>/, config.description || "")
           .gsub(/<%=\s*base_url\s*%>/, config.base_url)
           .gsub(/<%=\s*content\s*%>/, content)
       end
@@ -338,7 +295,7 @@ module Hwaro
         html.gsub(/\n\s*/, "")
       end
 
-      private def write_output(page : Page, output_dir : String, content : String)
+      private def write_output(page : Schemas::Page, output_dir : String, content : String)
         if page.is_index
              # content/projects/index.md -> public/projects/index.html
              # content/index.md -> public/index.html
@@ -367,9 +324,10 @@ module Hwaro
         end
       end
 
-      private def generate_sitemap(pages : Array(Page), config : SiteConfig, output_dir : String)
-        # Filter pages that should be included in sitemap
-        sitemap_pages = pages.select { |p| p.in_sitemap }
+      private def generate_sitemap(pages : Array(Schemas::Page), config : Schemas::Config, output_dir : String)
+        # Use all valid pages (drafts already filtered in collect_pages)
+        # In the future, we might check an in_sitemap property if added to Schema
+        sitemap_pages = pages
 
         if sitemap_pages.empty?
           Logger.info "  No pages to include in sitemap."
@@ -390,10 +348,10 @@ module Hwaro
             base = config.base_url.rstrip('/')
             path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
             full_url = base.empty? ? path : base + path
-            
+
             # Escape XML special characters
             escaped_url = escape_xml(full_url)
-            
+
             str << "  <url>\n"
             str << "    <loc>#{escaped_url}</loc>\n"
             str << "  </url>\n"
