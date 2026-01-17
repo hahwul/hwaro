@@ -1,11 +1,17 @@
 module Hwaro
   class Init
-    def run(target_path : String)
-      puts "Initializing new Hwaro project in #{target_path}..."
-
+    def run(target_path : String, force : Bool = false)
       unless Dir.exists?(target_path)
         Dir.mkdir_p(target_path)
       end
+
+      unless force || Dir.empty?(target_path)
+        puts "Directory '#{target_path}' is not empty."
+        puts "Use --force to overwrite."
+        exit(1)
+      end
+
+      puts "Initializing new Hwaro project in #{target_path}..."
 
       create_directory(File.join(target_path, "content"))
       create_file(File.join(target_path, "content", "index.md"), sample_content)

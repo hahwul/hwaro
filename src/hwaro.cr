@@ -19,8 +19,14 @@ module Hwaro
 
       case command
       when "init"
+        force = false
+        if ARGV.includes?("-f") || ARGV.includes?("--force")
+          force = true
+          ARGV.delete("-f")
+          ARGV.delete("--force")
+        end
         path = ARGV.shift? || "."
-        Init.new.run(path)
+        Init.new.run(path, force)
       when "build"
         Build.new.run
       when "serve"
@@ -47,7 +53,7 @@ module Hwaro
       puts "Usage: hwaro <command> [options]"
       puts
       puts "Commands:"
-      puts "  init [path]  Initialize a new project"
+      puts "  init [path]  Initialize a new project (use -f/--force to overwrite)"
       puts "  build        Build the project"
       puts "  serve  Serve the project and watch for changes"
     end
