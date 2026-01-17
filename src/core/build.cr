@@ -11,12 +11,14 @@ module Hwaro
       property title : String
       property description : String
       property base_url : String
+      property sitemap : Bool
       property raw : Hash(String, TOML::Any)
 
       def initialize
         @title = "Hwaro Site"
         @description = ""
         @base_url = ""
+        @sitemap = false
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -27,6 +29,7 @@ module Hwaro
           config.title = config.raw["title"]?.try(&.as_s) || config.title
           config.description = config.raw["description"]?.try(&.as_s) || config.description
           config.base_url = config.raw["base_url"]?.try(&.as_s) || config.base_url
+          config.sitemap = config.raw["sitemap"]?.try(&.as_bool) || config.sitemap
         end
         config
       end
@@ -42,6 +45,7 @@ module Hwaro
       property draft : Bool
       property url : String        # Calculated relative URL (e.g. "/projects/a/")
       property is_index : Bool     # Is this an index.md?
+      property in_sitemap : Bool   # Include in sitemap.xml?
 
       def initialize(@path : String)
         @title = "Untitled"
@@ -51,6 +55,7 @@ module Hwaro
         @draft = false
         @url = ""
         @is_index = false
+        @in_sitemap = true
       end
     end
 
@@ -96,6 +101,11 @@ module Hwaro
                 else
                   process_files_sequential(all_pages, config, templates, output_dir, minify)
                 end
+
+        # Generate sitemap if enabled
+        if config.sitemap
+          generate_sitemap(all_pages, config, output_dir)
+        end
 
         elapsed = Time.instant - start_time
         Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
@@ -151,7 +161,7 @@ module Hwaro
           parsed = Processor::Markdown.parse(raw_content, file_path)
           next unless parsed
 
-          title, markdown_content, draft, layout_name = parsed
+          title, markdown_content, draft, layout_name, in_sitemap = parsed
 
           if draft && !include_drafts
             next
@@ -162,6 +172,7 @@ module Hwaro
           page.raw_content = markdown_content
           page.draft = draft
           page.layout = layout_name
+          page.in_sitemap = in_sitemap
 
           # Calculate path metadata
           path_parts = Path[relative_path].parts
@@ -341,6 +352,60 @@ module Hwaro
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
         Logger.action :create, output_path
+      end
+
+      private def escape_xml(text : String) : String
+        text.gsub(/[&<>"']/) do |match|
+          case match
+          when "&"  then "&amp;"
+          when "<"  then "&lt;"
+          when ">"  then "&gt;"
+          when "\"" then "&quot;"
+          when "'"  then "&apos;"
+          else           match
+          end
+        end
+      end
+
+      private def generate_sitemap(pages : Array(Page), config : SiteConfig, output_dir : String)
+        # Filter pages that should be included in sitemap
+        sitemap_pages = pages.select { |p| p.in_sitemap }
+
+        if sitemap_pages.empty?
+          Logger.info "  No pages to include in sitemap."
+          return
+        end
+
+        # Warn if base_url is empty
+        if config.base_url.empty?
+          Logger.warn "  [WARN] base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
+        end
+
+        xml_content = String.build do |str|
+          str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+          str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+
+          sitemap_pages.each do |page|
+            # Properly join base_url and page.url
+            base = config.base_url.rstrip('/')
+            path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+            full_url = base.empty? ? path : base + path
+            
+            # Escape XML special characters
+            escaped_url = escape_xml(full_url)
+            
+            str << "  <url>\n"
+            str << "    <loc>#{escaped_url}</loc>\n"
+            str << "  </url>\n"
+          end
+
+          str << "</urlset>\n"
+        end
+
+        sitemap_path = Path[output_dir, "sitemap.xml"].to_s
+        File.write(sitemap_path, xml_content)
+        Logger.action :create, sitemap_path
+        Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
       end
     end
   end

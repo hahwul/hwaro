@@ -62,6 +62,123 @@ describe Hwaro do
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
+      config.sitemap.should eq(false)
+    end
+  end
+
+  describe Hwaro::Processor::Markdown do
+    describe "parse" do
+      it "parses TOML frontmatter with in_sitemap" do
+        content = <<-MARKDOWN
+        +++
+        title = "Test Page"
+        draft = false
+        in_sitemap = false
+        +++
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          title.should eq("Test Page")
+          draft.should eq(false)
+          in_sitemap.should eq(false)
+        end
+      end
+
+      it "defaults in_sitemap to true when not specified in TOML" do
+        content = <<-MARKDOWN
+        +++
+        title = "Test Page"
+        +++
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
+
+      it "parses YAML frontmatter with in_sitemap" do
+        content = <<-MARKDOWN
+        ---
+        title: Test Page
+        draft: false
+        in_sitemap: false
+        ---
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          title.should eq("Test Page")
+          draft.should eq(false)
+          in_sitemap.should eq(false)
+        end
+      end
+
+      it "defaults in_sitemap to true when not specified in YAML" do
+        content = <<-MARKDOWN
+        ---
+        title: Test Page
+        ---
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
+
+      it "handles in_sitemap explicitly set to true in TOML" do
+        content = <<-MARKDOWN
+        +++
+        title = "Test Page"
+        in_sitemap = true
+        +++
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
+
+      it "handles in_sitemap explicitly set to true in YAML" do
+        content = <<-MARKDOWN
+        ---
+        title: Test Page
+        in_sitemap: true
+        ---
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
     end
   end
 end
