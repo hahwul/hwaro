@@ -26,11 +26,16 @@ module Hwaro
         feed_pages = pages.reject(&.draft)
         
         # Sort by date if available, otherwise keep original order
+        # Pages with dates come first (most recent first), then pages without dates
         feed_pages.sort! { |a, b| 
           if a.date && b.date
             b.date.not_nil! <=> a.date.not_nil!  # Most recent first
+          elsif a.date
+            -1  # a has date, b doesn't - a comes first
+          elsif b.date
+            1   # b has date, a doesn't - b comes first
           else
-            0
+            0   # Neither has date - maintain order
           end
         }
 
@@ -146,7 +151,11 @@ module Hwaro
         
         # Truncate if needed
         if truncate > 0 && html_content.size > truncate
-          html_content = html_content[0...truncate] + "..."
+          # Strip HTML tags before truncating to avoid breaking tags
+          text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+          if text_content.size > truncate
+            html_content = text_content[0...truncate] + "..."
+          end
         end
         
         html_content
