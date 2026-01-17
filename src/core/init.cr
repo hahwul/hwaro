@@ -162,6 +162,12 @@ module Hwaro
         title = "My Hwaro Site"
         description = "Welcome to my new Hwaro site."
         base_url = "http://localhost:3000"
+
+        [feeds]
+        generate = false
+        filename = ""
+        type = "rss"
+        truncate = 0
         CONTENT
       end
     end

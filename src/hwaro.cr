@@ -29,6 +29,7 @@ require "./processor/markdown"
 require "./core/init"
 require "./core/build"
 require "./core/serve"
+require "./core/feeds"
 
 # Load CLI
 require "./cli/runner"

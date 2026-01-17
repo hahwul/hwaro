@@ -58,6 +58,11 @@ module Hwaro
           generate_sitemap(all_pages, config, output_dir)
         end
 
+        # Generate feeds if enabled
+        if config.feeds.generate
+          Feeds.generate(all_pages, config, output_dir)
+        end
+
         elapsed = Time.instant - start_time
         Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
       end
