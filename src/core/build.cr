@@ -354,6 +354,19 @@ module Hwaro
         Logger.action :create, output_path
       end
 
+      private def escape_xml(text : String) : String
+        text.gsub(/[&<>"']/) do |match|
+          case match
+          when "&"  then "&amp;"
+          when "<"  then "&lt;"
+          when ">"  then "&gt;"
+          when "\"" then "&quot;"
+          when "'"  then "&apos;"
+          else           match
+          end
+        end
+      end
+
       private def generate_sitemap(pages : Array(Page), config : SiteConfig, output_dir : String)
         # Filter pages that should be included in sitemap
         sitemap_pages = pages.select { |p| p.in_sitemap }
@@ -370,16 +383,11 @@ module Hwaro
           sitemap_pages.each do |page|
             # Properly join base_url and page.url
             base = config.base_url.rstrip('/')
-            path = page.url
+            path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
             full_url = base + path
             
             # Escape XML special characters
-            escaped_url = full_url
-              .gsub("&", "&amp;")
-              .gsub("<", "&lt;")
-              .gsub(">", "&gt;")
-              .gsub("'", "&apos;")
-              .gsub("\"", "&quot;")
+            escaped_url = escape_xml(full_url)
             
             str << "  <url>\n"
             str << "    <loc>#{escaped_url}</loc>\n"
