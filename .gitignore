@@ -1,5 +1,9 @@
+# Crystal
 /docs/
 /lib/
 /bin/
 /.shards/
 *.dwarf
+
+# For me
+testapp

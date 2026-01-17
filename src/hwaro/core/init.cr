@@ -25,7 +25,10 @@ module Hwaro
         create_file(File.join(target_path, "content", "about.md"), sample_about_content)
 
         create_directory(File.join(target_path, "layouts"))
-        create_file(File.join(target_path, "layouts", "default.ecr"), sample_layout)
+        create_file(File.join(target_path, "layouts", "header.ecr"), sample_header)
+        create_file(File.join(target_path, "layouts", "footer.ecr"), sample_footer)
+        create_file(File.join(target_path, "layouts", "page.ecr"), sample_page_layout)
+        create_file(File.join(target_path, "layouts", "section.ecr"), sample_section_layout)
 
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)
@@ -85,7 +88,28 @@ module Hwaro
         CONTENT
       end
 
-      private def sample_layout
+      private def sample_page_layout
+        <<-HTML
+        <%= render "header" %>
+        <%= content %>
+        <%= render "footer" %>
+        HTML
+      end
+
+      private def sample_section_layout
+        <<-HTML
+        <%= render "header" %>
+        <h1><%= page_title %></h1>
+        <%= content %>
+
+        <ul class="section-list">
+          <%= section_list %>
+        </ul>
+        <%= render "footer" %>
+        HTML
+      end
+
+      private def sample_header
         <<-HTML
         <!DOCTYPE html>
         <html lang="en">
@@ -102,6 +126,8 @@ module Hwaro
             nav a:hover { text-decoration: underline; }
             footer { margin-top: 3rem; border-top: 1px solid #eaeaea; padding-top: 1rem; color: #666; font-size: 0.9rem; text-align: center; }
             code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; font-size: 0.9em; }
+            ul.section-list { list-style: none; padding: 0; }
+            ul.section-list li { margin-bottom: 0.5rem; }
           </style>
         </head>
         <body data-section="<%= page_section %>">
@@ -114,7 +140,11 @@ module Hwaro
           </header>
 
           <main>
-            <%= content %>
+        HTML
+      end
+
+      private def sample_footer
+        <<-HTML
           </main>
 
           <footer>
