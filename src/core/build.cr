@@ -376,6 +376,11 @@ module Hwaro
           return
         end
 
+        # Warn if base_url is empty
+        if config.base_url.empty?
+          Logger.warn "  [WARN] base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
+        end
+
         xml_content = String.build do |str|
           str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
           str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
@@ -384,7 +389,7 @@ module Hwaro
             # Properly join base_url and page.url
             base = config.base_url.rstrip('/')
             path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-            full_url = base + path
+            full_url = base.empty? ? path : base + path
             
             # Escape XML special characters
             escaped_url = escape_xml(full_url)
