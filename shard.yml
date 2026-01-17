@@ -7,6 +7,8 @@ authors:
 dependencies:
   markd:
     github: icyleaf/markd
+  toml:
+    github: crystal-community/toml.cr
 
 targets:
   hwaro:

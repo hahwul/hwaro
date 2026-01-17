@@ -14,6 +14,9 @@ module Hwaro
       create_directory(File.join(target_path, "layouts"))
       create_file(File.join(target_path, "layouts", "default.ecr"), sample_layout)
 
+      create_directory(File.join(target_path, "static"))
+      create_file(File.join(target_path, "config.toml"), sample_config)
+
       puts "Done! Run `hwaro build` to generate the site."
       unless target_path == "."
         puts "  cd #{target_path}"
@@ -40,9 +43,9 @@ module Hwaro
 
     private def sample_content
       <<-CONTENT
-      ---
-      title: Welcome to Hwaro
-      ---
+      +++
+      title = "Welcome to Hwaro"
+      +++
 
       # Hello, Hwaro!
 
@@ -59,9 +62,9 @@ module Hwaro
 
     private def sample_about_content
       <<-CONTENT
-      ---
-      title: About
-      ---
+      +++
+      title = "About"
+      +++
 
       # About Us
 
@@ -105,6 +108,13 @@ module Hwaro
       </body>
       </html>
       HTML
+    end
+
+    private def sample_config
+      <<-CONTENT
+      title = "My Hwaro Site"
+      base_url = "http://localhost:3000"
+      CONTENT
     end
   end
 end

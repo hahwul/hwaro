@@ -40,7 +40,7 @@ module Hwaro
     end
 
     private def watch_for_changes
-      puts "Watching for changes in content/ and layouts/..."
+      puts "Watching for changes in content/, layouts/, static/ and config.toml..."
       last_mtimes = scan_mtimes
 
       loop do
@@ -62,7 +62,7 @@ module Hwaro
 
     private def scan_mtimes
       mtimes = {} of String => Time
-      dirs_to_watch = ["content", "layouts"]
+      dirs_to_watch = ["content", "layouts", "static"]
 
       dirs_to_watch.each do |dir|
         next unless Dir.exists?(dir)
@@ -73,6 +73,13 @@ module Hwaro
           rescue
             # Handle case where file might be deleted during scan
           end
+        end
+      end
+
+      if File.exists?("config.toml")
+        begin
+          mtimes["config.toml"] = File.info("config.toml").modification_time
+        rescue
         end
       end
 

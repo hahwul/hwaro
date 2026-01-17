@@ -1,6 +1,7 @@
 require "yaml"
 require "file_utils"
 require "markd"
+require "toml"
 
 module Hwaro
   class Build
@@ -14,9 +15,21 @@ module Hwaro
       end
       FileUtils.mkdir_p("public")
 
+      # Copy static files
+      if Dir.exists?("static")
+        FileUtils.cp_r("static/.", "public/")
+        puts "  -> Copied static files"
+      end
+
+      # Load config
+      config = Hash(String, TOML::Any).new
+      if File.exists?("config.toml")
+        config = TOML.parse_file("config.toml")
+      end
+
       count = 0
       Dir.glob("content/**/*.md") do |file_path|
-        process_file(file_path)
+        process_file(file_path, config)
         count += 1
       end
 
@@ -24,24 +37,31 @@ module Hwaro
       puts "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
     end
 
-    private def process_file(file_path : String)
+    private def process_file(file_path : String, config : Hash(String, TOML::Any))
       raw_content = File.read(file_path)
 
       # Parse Front Matter and Markdown content
-      # Checks for YAML block bounded by "---" at the start of the file
-      front_matter = YAML::Any.new(Hash(YAML::Any, YAML::Any).new)
       markdown_content = raw_content
+      title = "Untitled"
 
-      # Regex to match Front Matter:
-      # \A start of string
-      # ---\s*\n start delimiter
-      # (.*?\n?) non-greedy match for YAML content
-      # ^---\s*$ end delimiter (multiline mode handles start of line)
-      # \n? optional newline after delimiter
-      # (.*)\z rest of file is content
-      if match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+      # Try TOML Front Matter (+++)
+      if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
         begin
-          front_matter = YAML.parse(match[1])
+          toml_fm = TOML.parse(match[1])
+          if toml_fm["title"]?
+            title = toml_fm["title"].as_s
+          end
+        rescue ex
+          puts "  [WARN] Invalid TOML in #{file_path}: #{ex.message}"
+        end
+        markdown_content = match[2]
+      # Try YAML Front Matter (---)
+      elsif match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+        begin
+          yaml_fm = YAML.parse(match[1])
+          if yaml_fm.as_h? && yaml_fm["title"]?
+            title = yaml_fm["title"].as_s? || "Untitled"
+          end
         rescue ex
           puts "  [WARN] Invalid YAML in #{file_path}: #{ex.message}"
         end
@@ -50,12 +70,6 @@ module Hwaro
 
       # Convert Markdown to HTML
       html_content = Markd.to_html(markdown_content)
-
-      # Extract metadata
-      title = "Untitled"
-      if front_matter.as_h? && front_matter["title"]?
-        title = front_matter["title"].as_s? || "Untitled"
-      end
 
       # Render Layout
       # Since we are a CLI tool, we simulate ECR runtime behavior for simple variables
