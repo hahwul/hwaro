@@ -91,7 +91,9 @@ module Hwaro
       private def sample_page_layout
         <<-HTML
         <%= render "header" %>
-        <%= content %>
+        <main>
+          <%= content %>
+        </main>
         <%= render "footer" %>
         HTML
       end
@@ -99,12 +101,14 @@ module Hwaro
       private def sample_section_layout
         <<-HTML
         <%= render "header" %>
-        <h1><%= page_title %></h1>
-        <%= content %>
+        <main>
+          <h1><%= page_title %></h1>
+          <%= content %>
 
-        <ul class="section-list">
-          <%= section_list %>
-        </ul>
+          <ul class="section-list">
+            <%= section_list %>
+          </ul>
+        </main>
         <%= render "footer" %>
         HTML
       end
@@ -139,14 +143,11 @@ module Hwaro
             </nav>
           </header>
 
-          <main>
         HTML
       end
 
       private def sample_footer
         <<-HTML
-          </main>
-
           <footer>
             <p>Powered by Hwaro</p>
           </footer>
