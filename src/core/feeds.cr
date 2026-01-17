@@ -12,7 +12,7 @@ module Hwaro
         # Determine feed type and filename
         feed_type = config.feeds.type.downcase
         unless ["rss", "atom"].includes?(feed_type)
-          Logger.warn "  [WARN] Invalid feed type '#{feed_type}'. Defaulting to 'rss'."
+          Logger.warn "Invalid feed type '#{feed_type}'. Defaulting to 'rss'."
           feed_type = "rss"
         end
 
@@ -42,9 +42,9 @@ module Hwaro
         # Generate feed content based on type
         feed_content = case feed_type
                       when "atom"
-                        generate_atom(feed_pages, config, filename)
+                        generate_atom(feed_pages, config, filename, config.feeds.truncate > 0)
                       else
-                        generate_rss(feed_pages, config, filename)
+                        generate_rss(feed_pages, config, filename, config.feeds.truncate > 0)
                       end
 
         # Write feed file
@@ -54,7 +54,7 @@ module Hwaro
         Logger.info "  Generated #{feed_type.upcase} feed with #{feed_pages.size} items."
       end
 
-      private def self.generate_rss(pages : Array(Schemas::Page), config : Schemas::Config, filename : String) : String
+      private def self.generate_rss(pages : Array(Schemas::Page), config : Schemas::Config, filename : String, is_text : Bool) : String
         String.build do |str|
           str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
           str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
@@ -97,7 +97,7 @@ module Hwaro
         end
       end
 
-      private def self.generate_atom(pages : Array(Schemas::Page), config : Schemas::Config, filename : String) : String
+      private def self.generate_atom(pages : Array(Schemas::Page), config : Schemas::Config, filename : String, is_text : Bool) : String
         now = Time.utc
         
         String.build do |str|
@@ -134,9 +134,10 @@ module Hwaro
             entry_date = page.date || now
             str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
             
-            # Add content
+            # Add content with appropriate type
             content = get_content_for_feed(page, config.feeds.truncate)
-            str << "    <content type=\"html\">#{escape_xml(content)}</content>\n"
+            content_type = is_text ? "text" : "html"
+            str << "    <content type=\"#{content_type}\">#{escape_xml(content)}</content>\n"
             
             str << "  </entry>\n"
           end
@@ -150,18 +151,16 @@ module Hwaro
         html_content, _ = Processor::Markdown.render(page.raw_content)
         
         # Truncate if needed
-        if truncate > 0 && html_content.size > truncate
-          # For simplicity, truncate HTML content by stripping tags first to get text,
-          # truncate the text, then return the plain truncated text with ellipsis.
-          # This avoids broken HTML tags in the feed.
+        if truncate > 0
+          # Strip HTML tags to get plain text for safe truncation
           text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
           if text_content.size > truncate
             text_content[0...truncate] + "..."
           else
-            html_content
+            text_content  # Return plain text even if not truncated for consistency
           end
         else
-          html_content
+          html_content  # No truncation - return full HTML
         end
       end
 
