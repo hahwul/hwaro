@@ -5,19 +5,19 @@ require "toml"
 
 module Hwaro
   class Build
-    def run
+    def run(output_dir : String = "public", drafts : Bool = false, minify : Bool = false)
       puts "Building site..."
       start_time = Time.instant
 
-      # Setup public directory
-      if Dir.exists?("public")
-        FileUtils.rm_rf("public")
+      # Setup output directory
+      if Dir.exists?(output_dir)
+        FileUtils.rm_rf(output_dir)
       end
-      FileUtils.mkdir_p("public")
+      FileUtils.mkdir_p(output_dir)
 
       # Copy static files
       if Dir.exists?("static")
-        FileUtils.cp_r("static/.", "public/")
+        FileUtils.cp_r("static/.", "#{output_dir}/")
         puts "  -> Copied static files"
       end
 
@@ -29,20 +29,22 @@ module Hwaro
 
       count = 0
       Dir.glob("content/**/*.md") do |file_path|
-        process_file(file_path, config)
-        count += 1
+        if process_file(file_path, config, output_dir, drafts, minify)
+          count += 1
+        end
       end
 
       elapsed = Time.instant - start_time
       puts "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
     end
 
-    private def process_file(file_path : String, config : Hash(String, TOML::Any))
+    private def process_file(file_path : String, config : Hash(String, TOML::Any), output_dir : String, include_drafts : Bool, minify : Bool) : Bool
       raw_content = File.read(file_path)
 
       # Parse Front Matter and Markdown content
       markdown_content = raw_content
       title = "Untitled"
+      is_draft = false
 
       # Try TOML Front Matter (+++)
       if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
@@ -50,6 +52,9 @@ module Hwaro
           toml_fm = TOML.parse(match[1])
           if toml_fm["title"]?
             title = toml_fm["title"].as_s
+          end
+          if toml_fm["draft"]?
+            is_draft = toml_fm["draft"].as_bool rescue false
           end
         rescue ex
           puts "  [WARN] Invalid TOML in #{file_path}: #{ex.message}"
@@ -62,10 +67,17 @@ module Hwaro
           if yaml_fm.as_h? && yaml_fm["title"]?
             title = yaml_fm["title"].as_s? || "Untitled"
           end
+          if yaml_fm.as_h? && yaml_fm["draft"]?
+            is_draft = yaml_fm["draft"].as_bool? || false
+          end
         rescue ex
           puts "  [WARN] Invalid YAML in #{file_path}: #{ex.message}"
         end
         markdown_content = match[2]
+      end
+
+      if is_draft && !include_drafts
+        return false
       end
 
       # Convert Markdown to HTML
@@ -96,16 +108,22 @@ module Hwaro
         puts "  [WARN] Layout file not found: #{layout_path}. Using raw content."
       end
 
+      # Minify
+      if minify
+        final_html = final_html.gsub(/\n\s*/, "")
+      end
+
       # Calculate output path
       # content/subdir/page.md -> public/subdir/page.html
       relative_path = Path[file_path].relative_to("content")
       output_filename = relative_path.to_s.gsub(/\.md$/, ".html")
-      output_path = Path["public", output_filename]
+      output_path = Path[output_dir, output_filename]
 
       # Write file
       FileUtils.mkdir_p(output_path.dirname)
       File.write(output_path, final_html)
       puts "  -> #{output_path}"
+      true
     end
   end
 end

@@ -59,19 +59,33 @@ module Hwaro
     end
 
     private def run_build
+      output_dir = "public"
+      drafts = false
+      minify = false
+
       OptionParser.parse do |parser|
         parser.banner = "Usage: hwaro build [options]"
+        parser.on("-o DIR", "--output-dir DIR", "Output directory (default: public)") { |dir| output_dir = dir }
+        parser.on("-d", "--drafts", "Include draft content") { drafts = true }
+        parser.on("--minify", "Minify HTML output") { minify = true }
         parser.on("-h", "--help", "Show this help") { puts parser; exit }
       end
-      Build.new.run
+      Build.new.run(output_dir, drafts, minify)
     end
 
     private def run_serve
+      host = "0.0.0.0"
+      port = 3000
+      drafts = false
+
       OptionParser.parse do |parser|
         parser.banner = "Usage: hwaro serve [options]"
+        parser.on("-b HOST", "--bind HOST", "Bind address (default: 0.0.0.0)") { |h| host = h }
+        parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
+        parser.on("-d", "--drafts", "Include draft content") { drafts = true }
         parser.on("-h", "--help", "Show this help") { puts parser; exit }
       end
-      Serve.new.run
+      Serve.new.run(host, port, drafts)
     end
 
     private def print_help

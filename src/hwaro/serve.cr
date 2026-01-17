@@ -14,19 +14,18 @@ module Hwaro
   end
 
   class Serve
-    def run
+    def run(host : String = "0.0.0.0", port : Int32 = 3000, drafts : Bool = false)
       # Ensure site is built first
       puts "Performing initial build..."
-      Build.new.run
+      Build.new.run(drafts: drafts)
 
       # Start watcher in a background fiber
       spawn do
-        watch_for_changes
+        watch_for_changes(drafts)
       end
 
       # Start server
-      port = 3000
-      puts "Serving site at http://localhost:#{port}"
+      puts "Serving site at http://#{host}:#{port}"
       puts "Press Ctrl+C to stop."
 
       server = HTTP::Server.new([
@@ -35,11 +34,11 @@ module Hwaro
         HTTP::StaticFileHandler.new("public", directory_listing: false, fallthrough: false)
       ])
 
-      address = server.bind_tcp "0.0.0.0", port
+      address = server.bind_tcp host, port
       server.listen
     end
 
-    private def watch_for_changes
+    private def watch_for_changes(drafts : Bool)
       puts "Watching for changes in content/, layouts/, static/ and config.toml..."
       last_mtimes = scan_mtimes
 
@@ -51,7 +50,7 @@ module Hwaro
         if current_mtimes != last_mtimes
           puts "\n[Watch] Change detected. Rebuilding..."
           begin
-            Build.new.run
+            Build.new.run(drafts: drafts)
           rescue ex
             puts "[Watch] Build failed: #{ex.message}"
           end
