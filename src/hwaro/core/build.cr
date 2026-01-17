@@ -150,11 +150,16 @@ module Hwaro
           return false
         end
 
+        # Determine section from directory structure
+        relative_path = Path[file_path].relative_to("content")
+        parts = relative_path.parts
+        section = parts.size > 1 ? parts.first : ""
+
         # Convert Markdown to HTML
         html_content = Markd.to_html(markdown_content)
 
         # Render with layout
-        final_html = render_with_layout(html_content, title, config, layout)
+        final_html = render_with_layout(html_content, title, section, config, layout)
 
         # Minify if requested
         if minify
@@ -198,10 +203,11 @@ module Hwaro
         {title, markdown_content, is_draft}
       end
 
-      private def render_with_layout(content : String, title : String, config : SiteConfig, layout : String?) : String
+      private def render_with_layout(content : String, title : String, section : String, config : SiteConfig, layout : String?) : String
         if layout
           layout
             .gsub(/<%=\s*page_title\s*%>/, title)
+            .gsub(/<%=\s*page_section\s*%>/, section)
             .gsub(/<%=\s*site_title\s*%>/, config.title)
             .gsub(/<%=\s*site_description\s*%>/, config.description)
             .gsub(/<%=\s*base_url\s*%>/, config.base_url)
@@ -218,7 +224,14 @@ module Hwaro
 
       private def write_output(file_path : String, output_dir : String, content : String)
         relative_path = Path[file_path].relative_to("content")
-        output_filename = relative_path.to_s.gsub(/\.md$/, ".html")
+
+        if relative_path.basename == "index.md"
+          output_filename = relative_path.to_s.gsub(/\.md$/, ".html")
+        else
+          # Create clean URL structure: path/to/file.md -> path/to/file/index.html
+          output_filename = Path[relative_path.dirname, relative_path.stem, "index.html"].to_s
+        end
+
         output_path = Path[output_dir, output_filename]
 
         FileUtils.mkdir_p(output_path.dirname)

@@ -8,10 +8,27 @@ module Hwaro
     class IndexRewriteHandler
       include HTTP::Handler
 
+      def initialize(@public_dir : String)
+      end
+
       def call(context)
-        if context.request.path.ends_with?("/")
+        path = context.request.path
+
+        if path.ends_with?("/")
           context.request.path += "index.html"
+        elsif File.extname(path).empty?
+          # Check if it's a directory and redirect if so (to add trailing slash)
+          # remove leading slash
+          local_path = path.sub(/^\//, "")
+          fs_path = Path[@public_dir, local_path]
+
+          if Dir.exists?(fs_path)
+            context.response.status_code = 301
+            context.response.headers["Location"] = path + "/"
+            return
+          end
         end
+
         call_next(context)
       end
     end
@@ -62,7 +79,7 @@ module Hwaro
 
         server = HTTP::Server.new([
           HTTP::LogHandler.new,
-          IndexRewriteHandler.new,
+          IndexRewriteHandler.new(output_dir),
           HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: false),
         ])
 

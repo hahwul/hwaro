@@ -104,7 +104,7 @@ module Hwaro
             code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; font-size: 0.9em; }
           </style>
         </head>
-        <body>
+        <body data-section="<%= page_section %>">
           <header>
             <h3><%= site_title %></h3>
             <nav>
