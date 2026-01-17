@@ -6,6 +6,9 @@
 module Hwaro
   module Core
     module Build
+      # Maximum number of concurrent workers to prevent resource exhaustion
+      MAX_PARALLEL_WORKERS = 64
+
       # Configuration for parallel processing
       struct ParallelConfig
         property enabled : Bool
@@ -28,7 +31,7 @@ module Hwaro
           default_workers = cpu_count * 2
 
           workers = @max_workers > 0 ? @max_workers : default_workers
-          Math.min(workers, item_count).clamp(1, 64)
+          Math.min(workers, item_count).clamp(1, MAX_PARALLEL_WORKERS)
         end
       end
 

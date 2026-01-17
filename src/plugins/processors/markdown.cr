@@ -11,6 +11,7 @@ require "toml"
 require "xml"
 require "./base"
 require "../../schemas/toc"
+require "../../utils/logger"
 
 module Hwaro
   module Plugins
@@ -71,7 +72,7 @@ module Hwaro
               in_sitemap = toml_fm["in_sitemap"]?.try(&.as_bool) || true
               toc = toml_fm["toc"]?.try(&.as_bool) || false
             rescue ex
-              puts "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
+              Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
             end
             markdown_content = match[2]
           # Try YAML Front Matter (---)
@@ -86,7 +87,7 @@ module Hwaro
                 toc = yaml_fm["toc"]?.try(&.as_bool?) || false
               end
             rescue ex
-              puts "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
+              Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
             end
             markdown_content = match[2]
           end

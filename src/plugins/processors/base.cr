@@ -79,10 +79,12 @@ module Hwaro
       # Registry for managing processor instances
       class Registry
         @@processors = {} of String => Base
+        @@sorted_processors : Array(Base)? = nil
 
         # Register a processor instance
         def self.register(processor : Base)
           @@processors[processor.name] = processor
+          @@sorted_processors = nil  # Invalidate cache
         end
 
         # Get a processor by name
@@ -90,19 +92,20 @@ module Hwaro
           @@processors[name]?
         end
 
-        # Get all registered processors
+        # Get all registered processors (cached and sorted by priority)
         def self.all : Array(Base)
-          @@processors.values
+          @@sorted_processors ||= @@processors.values.sort_by(&.priority).reverse
         end
 
         # Get processors that can handle a specific file
         def self.for_file(file_path : String) : Array(Base)
-          all.select(&.can_process?(file_path)).sort_by(&.priority).reverse
+          all.select(&.can_process?(file_path))
         end
 
         # Clear all registered processors
         def self.clear
           @@processors.clear
+          @@sorted_processors = nil
         end
 
         # Check if a processor is registered

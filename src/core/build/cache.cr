@@ -25,6 +25,8 @@ module Hwaro
 
       # Build cache manager for tracking file changes
       class Cache
+        # Default cache filename - uses dot prefix to hide from directory listings
+        # and 'hwaro_' prefix to identify it as project-specific cache
         CACHE_FILE = ".hwaro_cache.json"
 
         @entries : Hash(String, CacheEntry)
