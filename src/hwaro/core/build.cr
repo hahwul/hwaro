@@ -6,17 +6,6 @@ require "../options/build_options"
 
 module Hwaro
   module Core
-    # Represents a processed content file
-    struct ContentFile
-      property file_path : String
-      property title : String
-      property is_draft : Bool
-      property markdown_content : String
-
-      def initialize(@file_path, @title, @is_draft, @markdown_content)
-      end
-    end
-
     # Site configuration loaded from config.toml
     class SiteConfig
       property title : String
