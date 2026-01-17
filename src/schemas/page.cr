@@ -9,6 +9,7 @@ module Hwaro
       property draft : Bool
       property tags : Array(String)
       property weight : Int32
+      property in_sitemap : Bool
 
       # Runtime / Computed Properties
       property content : String
@@ -28,6 +29,7 @@ module Hwaro
         @section = ""
         @url = ""
         @is_index = false
+        @in_sitemap = true
       end
     end
   end

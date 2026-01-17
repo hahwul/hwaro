@@ -53,11 +53,7 @@ module Hwaro
                 end
 
         # Generate sitemap if enabled
-        # Note: Schemas::Config doesn't have sitemap property in the provided schema yet,
-        # but we'll assume it might be in raw or added later.
-        # For now, we check the raw config for the flag if not present in schema property.
-        sitemap_enabled = config.raw["sitemap"]?.try(&.as_bool) rescue false
-        if sitemap_enabled
+        if config.sitemap
           generate_sitemap(all_pages, config, output_dir)
         end
 
@@ -131,6 +127,7 @@ module Hwaro
           page.raw_content = markdown_content
           page.draft = draft
           page.template = layout_name
+          page.in_sitemap = in_sitemap
           # Note: tags, weight, date are not yet returned by Processor::Markdown.parse
           # They will need to be populated once the processor is updated.
 
@@ -325,9 +322,8 @@ module Hwaro
       end
 
       private def generate_sitemap(pages : Array(Schemas::Page), config : Schemas::Config, output_dir : String)
-        # Use all valid pages (drafts already filtered in collect_pages)
-        # In the future, we might check an in_sitemap property if added to Schema
-        sitemap_pages = pages
+        # Filter pages that should be included in sitemap
+        sitemap_pages = pages.select { |p| p.in_sitemap }
 
         if sitemap_pages.empty?
           Logger.info "  No pages to include in sitemap."
