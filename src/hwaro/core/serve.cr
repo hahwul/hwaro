@@ -57,14 +57,28 @@ module Hwaro
           end
         end
 
+        # Validate and sanitize output directory
+        output_dir = sanitize_output_dir(build_options.output_dir)
+
         server = HTTP::Server.new([
           HTTP::LogHandler.new,
           IndexRewriteHandler.new,
-          HTTP::StaticFileHandler.new(build_options.output_dir, directory_listing: false, fallthrough: false),
+          HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: false),
         ])
 
         address = server.bind_tcp host, port
         server.listen
+      end
+
+      private def sanitize_output_dir(dir : String) : String
+        # Normalize path and ensure it doesn't escape the current directory
+        normalized = Path[dir].normalize.to_s
+        # Remove any leading ../ or / to prevent directory traversal
+        if normalized.starts_with?("..") || normalized.starts_with?("/")
+          puts "[WARN] Invalid output directory: #{dir}. Using 'public' instead."
+          return "public"
+        end
+        normalized
       end
 
       private def watch_for_changes(build_options : Options::BuildOptions)

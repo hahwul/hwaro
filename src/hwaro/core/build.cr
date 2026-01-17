@@ -101,7 +101,8 @@ module Hwaro
 
       private def process_files_parallel(files : Array(String), config : SiteConfig, layout : String?, output_dir : String, drafts : Bool, minify : Bool) : Int32
         # Limit concurrency to prevent resource exhaustion
-        max_workers = Math.min(files.size, System.cpu_count.to_i * 2)
+        cpu_count = System.cpu_count || 1
+        max_workers = Math.min(files.size, cpu_count.to_i * 2)
         max_workers = Math.max(max_workers, 1)
 
         results = Channel(Bool).new(files.size)
