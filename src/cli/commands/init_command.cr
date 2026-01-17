@@ -1,6 +1,7 @@
 require "option_parser"
 require "../../options/init_options"
 require "../../core/init"
+require "../../logger/logger"
 
 module Hwaro
   module CLI
@@ -18,7 +19,7 @@ module Hwaro
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
-            parser.on("-h", "--help", "Show this help") { puts parser; exit }
+            parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?
             end

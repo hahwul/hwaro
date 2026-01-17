@@ -1,5 +1,6 @@
 require "file_utils"
 require "toml"
+require "../logger/logger"
 require "../options/build_options"
 require "../processor/markdown"
 
@@ -63,7 +64,7 @@ module Hwaro
       end
 
       def run(output_dir : String = "public", drafts : Bool = false, minify : Bool = false, parallel : Bool = true)
-        puts "Building site..."
+        Logger.info "Building site..."
         start_time = Time.instant
 
         # Reset caches
@@ -87,7 +88,7 @@ module Hwaro
         all_pages = collect_pages(config, drafts)
         @pages = all_pages
 
-        puts "  Found #{all_pages.size} pages."
+        Logger.info "  Found #{all_pages.size} pages."
 
         # Process files
         count = if parallel && all_pages.size > 1
@@ -97,7 +98,7 @@ module Hwaro
                 end
 
         elapsed = Time.instant - start_time
-        puts "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
+        Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
       end
 
       private def setup_output_dir(output_dir : String)
@@ -110,7 +111,7 @@ module Hwaro
       private def copy_static_files(output_dir : String)
         if Dir.exists?("static")
           FileUtils.cp_r("static/.", "#{output_dir}/")
-          puts "  -> Copied static files"
+          Logger.action :copy, "static files", :blue
         end
       end
 
@@ -248,7 +249,7 @@ module Hwaro
                        full_layout = resolve_includes(layout_template, layouts)
                        apply_layout(full_layout, html_content, page, config, section_list_html)
                      else
-                       puts "  [WARN] No layout found for #{page.path}. Using raw content."
+                       Logger.warn "  [WARN] No layout found for #{page.path}. Using raw content."
                        html_content
                      end
 
@@ -263,7 +264,7 @@ module Hwaro
         # 1. Frontmatter layout
         if custom = page.layout
           return custom if layouts.has_key?(custom)
-          puts "  [WARN] Custom layout '#{custom}' not found for #{page.path}."
+          Logger.warn "  [WARN] Custom layout '#{custom}' not found for #{page.path}."
         end
 
         # 2. Section layout (for index pages in subdirectories)
@@ -305,7 +306,7 @@ module Hwaro
           if partial = layouts[name]?
             resolve_includes(partial, layouts, depth + 1)
           else
-            puts "  [WARN] Partial layout '#{name}' not found."
+            Logger.warn "  [WARN] Partial layout '#{name}' not found."
             ""
           end
         end
@@ -339,7 +340,7 @@ module Hwaro
 
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
-        puts "  -> #{output_path}"
+        Logger.action :create, output_path
       end
     end
   end

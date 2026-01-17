@@ -1,6 +1,7 @@
 require "option_parser"
 require "../../options/build_options"
 require "../../core/build"
+require "../../logger/logger"
 
 module Hwaro
   module CLI
@@ -23,7 +24,7 @@ module Hwaro
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--minify", "Minify HTML output") { minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
-            parser.on("-h", "--help", "Show this help") { puts parser; exit }
+            parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
           Options::BuildOptions.new(

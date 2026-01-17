@@ -1,5 +1,6 @@
 require "http/server"
 require "./build"
+require "../logger/logger"
 require "../options/serve_options"
 require "../options/build_options"
 
@@ -53,7 +54,7 @@ module Hwaro
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, build_options : Options::BuildOptions)
         # Ensure site is built first
-        puts "Performing initial build..."
+        Logger.info "Performing initial build..."
         @build.run(build_options)
 
         # Start watcher in a background fiber
@@ -63,8 +64,8 @@ module Hwaro
 
         # Start server
         url = "http://#{host}:#{port}"
-        puts "Serving site at #{url}"
-        puts "Press Ctrl+C to stop."
+        Logger.success "Serving site at #{url}"
+        Logger.info "Press Ctrl+C to stop."
 
         # Open browser if requested
         if open_browser
@@ -92,14 +93,14 @@ module Hwaro
         normalized = Path[dir].normalize.to_s
         # Remove any leading ../ or / to prevent directory traversal
         if normalized.starts_with?("..") || normalized.starts_with?("/")
-          puts "[WARN] Invalid output directory: #{dir}. Using 'public' instead."
+          Logger.warn "Invalid output directory: #{dir}. Using 'public' instead."
           return "public"
         end
         normalized
       end
 
       private def watch_for_changes(build_options : Options::BuildOptions)
-        puts "Watching for changes in content/, layouts/, static/ and config.toml..."
+        Logger.info "Watching for changes in content/, layouts/, static/ and config.toml..."
         last_mtimes = scan_mtimes
 
         loop do
@@ -107,11 +108,11 @@ module Hwaro
 
           current_mtimes = scan_mtimes
           if current_mtimes != last_mtimes
-            puts "\n[Watch] Change detected. Rebuilding..."
+            Logger.info "\n[Watch] Change detected. Rebuilding..."
             begin
               @build.run(build_options)
             rescue ex
-              puts "[Watch] Build failed: #{ex.message}"
+              Logger.error "[Watch] Build failed: #{ex.message}"
             end
             last_mtimes = current_mtimes
           end

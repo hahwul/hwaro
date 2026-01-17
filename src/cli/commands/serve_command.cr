@@ -1,6 +1,7 @@
 require "option_parser"
 require "../../options/serve_options"
 require "../../core/serve"
+require "../../logger/logger"
 
 module Hwaro
   module CLI
@@ -23,7 +24,7 @@ module Hwaro
             parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--open", "Open browser after starting server") { open_browser = true }
-            parser.on("-h", "--help", "Show this help") { puts parser; exit }
+            parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
           Options::ServeOptions.new(

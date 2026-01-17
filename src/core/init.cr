@@ -1,4 +1,5 @@
 require "../options/init_options"
+require "../logger/logger"
 
 module Hwaro
   module Core
@@ -13,12 +14,12 @@ module Hwaro
         end
 
         unless force || Dir.empty?(target_path)
-          puts "Directory '#{target_path}' is not empty."
-          puts "Use --force to overwrite."
+          Logger.error "Directory '#{target_path}' is not empty."
+          Logger.error "Use --force to overwrite."
           exit(1)
         end
 
-        puts "Initializing new Hwaro project in #{target_path}..."
+        Logger.info "Initializing new Hwaro project in #{target_path}..."
 
         create_directory(File.join(target_path, "content"))
         create_file(File.join(target_path, "content", "index.md"), sample_content)
@@ -33,27 +34,27 @@ module Hwaro
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)
 
-        puts "Done! Run `hwaro build` to generate the site."
+        Logger.success "Done! Run `hwaro build` to generate the site."
         unless target_path == "."
-          puts "  cd #{target_path}"
+          Logger.info "  cd #{target_path}"
         end
       end
 
       private def create_directory(path : String)
         unless Dir.exists?(path)
           Dir.mkdir_p(path)
-          puts "Created directory: #{path}"
+          Logger.action :create, path
         else
-          puts "Skipped directory: #{path} (already exists)"
+          Logger.action :exist, path, :blue
         end
       end
 
       private def create_file(path : String, content : String)
         unless File.exists?(path)
           File.write(path, content)
-          puts "Created file: #{path}"
+          Logger.action :create, path
         else
-          puts "Skipped file: #{path} (already exists)"
+          Logger.action :exist, path, :blue
         end
       end
 
