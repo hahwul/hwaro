@@ -30,6 +30,7 @@ module Hwaro
         create_file(File.join(target_path, "templates", "footer.ecr"), sample_footer)
         create_file(File.join(target_path, "templates", "page.ecr"), sample_page_layout)
         create_file(File.join(target_path, "templates", "section.ecr"), sample_section_layout)
+        create_file(File.join(target_path, "templates", "404.ecr"), sample_404)
 
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)
@@ -109,6 +110,18 @@ module Hwaro
           <ul class="section-list">
             <%= section_list %>
           </ul>
+        </main>
+        <%= render "footer" %>
+        HTML
+      end
+
+      private def sample_404
+        <<-HTML
+        <%= render "header" %>
+        <main>
+          <h1>404 Not Found</h1>
+          <p>The page you are looking for does not exist.</p>
+          <p><a href="<%= base_url %>/">Return to Home</a></p>
         </main>
         <%= render "footer" %>
         HTML

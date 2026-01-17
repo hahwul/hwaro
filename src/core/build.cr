@@ -63,6 +63,9 @@ module Hwaro
           Feeds.generate(all_pages, config, output_dir)
         end
 
+        # Generate 404 page
+        generate_404_page(config, templates, output_dir, minify)
+
         elapsed = Time.instant - start_time
         Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
       end
@@ -391,6 +394,28 @@ module Hwaro
         File.write(sitemap_path, xml_content)
         Logger.action :create, sitemap_path
         Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
+      end
+
+      private def generate_404_page(config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
+        return unless templates.has_key?("404")
+
+        template = templates["404"]
+        page = Schemas::Page.new("404.html")
+        page.title = "404 Not Found"
+
+        content = ""
+        section_list = ""
+        toc = ""
+
+        full_template = resolve_includes(template, templates)
+        final_html = apply_template(full_template, content, page, config, section_list, toc)
+
+        final_html = minify_html(final_html) if minify
+
+        output_path = File.join(output_dir, "404.html")
+        FileUtils.mkdir_p(File.dirname(output_path))
+        File.write(output_path, final_html)
+        Logger.action :create, output_path
       end
     end
   end

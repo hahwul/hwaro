@@ -34,6 +34,25 @@ module Hwaro
       end
     end
 
+    class NotFoundHandler
+      include HTTP::Handler
+
+      def initialize(@public_dir : String)
+      end
+
+      def call(context)
+        context.response.status_code = 404
+        context.response.content_type = "text/html"
+
+        path_404 = File.join(@public_dir, "404.html")
+        if File.exists?(path_404)
+          context.response.print File.read(path_404)
+        else
+          context.response.print "404 Not Found"
+        end
+      end
+    end
+
     class Serve
       @build : Build
 
@@ -81,7 +100,8 @@ module Hwaro
         server = HTTP::Server.new([
           HTTP::LogHandler.new,
           IndexRewriteHandler.new(output_dir),
-          HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: false),
+          HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true),
+          NotFoundHandler.new(output_dir),
         ])
 
         address = server.bind_tcp host, port
