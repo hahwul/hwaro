@@ -368,9 +368,21 @@ module Hwaro
           str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
 
           sitemap_pages.each do |page|
-            full_url = "#{config.base_url}#{page.url}"
+            # Properly join base_url and page.url
+            base = config.base_url.rstrip('/')
+            path = page.url
+            full_url = base + path
+            
+            # Escape XML special characters
+            escaped_url = full_url
+              .gsub("&", "&amp;")
+              .gsub("<", "&lt;")
+              .gsub(">", "&gt;")
+              .gsub("'", "&apos;")
+              .gsub("\"", "&quot;")
+            
             str << "  <url>\n"
-            str << "    <loc>#{full_url}</loc>\n"
+            str << "    <loc>#{escaped_url}</loc>\n"
             str << "  </url>\n"
           end
 

@@ -143,6 +143,42 @@ describe Hwaro do
           in_sitemap.should eq(true)
         end
       end
+
+      it "handles in_sitemap explicitly set to true in TOML" do
+        content = <<-MARKDOWN
+        +++
+        title = "Test Page"
+        in_sitemap = true
+        +++
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
+
+      it "handles in_sitemap explicitly set to true in YAML" do
+        content = <<-MARKDOWN
+        ---
+        title: Test Page
+        in_sitemap: true
+        ---
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result.should_not be_nil
+        if result
+          title, markdown, draft, layout, in_sitemap = result
+          in_sitemap.should eq(true)
+        end
+      end
     end
   end
 end
