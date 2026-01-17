@@ -25,11 +25,11 @@ module Hwaro
         create_file(File.join(target_path, "content", "index.md"), sample_content)
         create_file(File.join(target_path, "content", "about.md"), sample_about_content)
 
-        create_directory(File.join(target_path, "layouts"))
-        create_file(File.join(target_path, "layouts", "header.ecr"), sample_header)
-        create_file(File.join(target_path, "layouts", "footer.ecr"), sample_footer)
-        create_file(File.join(target_path, "layouts", "page.ecr"), sample_page_layout)
-        create_file(File.join(target_path, "layouts", "section.ecr"), sample_section_layout)
+        create_directory(File.join(target_path, "templates"))
+        create_file(File.join(target_path, "templates", "header.ecr"), sample_header)
+        create_file(File.join(target_path, "templates", "footer.ecr"), sample_footer)
+        create_file(File.join(target_path, "templates", "page.ecr"), sample_page_layout)
+        create_file(File.join(target_path, "templates", "section.ecr"), sample_section_layout)
 
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)

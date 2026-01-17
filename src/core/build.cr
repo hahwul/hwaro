@@ -56,7 +56,7 @@ module Hwaro
 
     class Build
       @config : SiteConfig?
-      @layouts : Hash(String, String)?
+      @templates : Hash(String, String)?
       @pages : Array(Page)?
 
       def run(options : Options::BuildOptions)
@@ -69,7 +69,7 @@ module Hwaro
 
         # Reset caches
         @config = nil
-        @layouts = nil
+        @templates = nil
         @pages = nil
 
         # Setup output directory
@@ -81,8 +81,8 @@ module Hwaro
         # Load config (cached)
         config = load_config
 
-        # Load layouts (cached)
-        layouts = load_layouts
+        # Load templates (cached)
+        templates = load_templates
 
         # Collect and parse all content files
         all_pages = collect_pages(config, drafts)
@@ -92,9 +92,9 @@ module Hwaro
 
         # Process files
         count = if parallel && all_pages.size > 1
-                  process_files_parallel(all_pages, config, layouts, output_dir, minify)
+                  process_files_parallel(all_pages, config, templates, output_dir, minify)
                 else
-                  process_files_sequential(all_pages, config, layouts, output_dir, minify)
+                  process_files_sequential(all_pages, config, templates, output_dir, minify)
                 end
 
         elapsed = Time.instant - start_time
@@ -119,26 +119,26 @@ module Hwaro
         @config ||= SiteConfig.load
       end
 
-      private def load_layouts : Hash(String, String)
-        return @layouts.not_nil! if @layouts
+      private def load_templates : Hash(String, String)
+        return @templates.not_nil! if @templates
 
-        layouts = {} of String => String
-        if Dir.exists?("layouts")
-          Dir.glob("layouts/*.ecr") do |path|
+        templates = {} of String => String
+        if Dir.exists?("templates")
+          Dir.glob("templates/*.ecr") do |path|
             name = File.basename(path, ".ecr")
-            layouts[name] = File.read(path)
+            templates[name] = File.read(path)
           end
         end
 
         # Ensure we have at least defaults if not provided
-        unless layouts.has_key?("page")
+        unless templates.has_key?("page")
              # Fallback if user deleted page.ecr or it's an old project
-             if layouts.has_key?("default")
-                 layouts["page"] = layouts["default"]
+             if templates.has_key?("default")
+                 templates["page"] = templates["default"]
              end
         end
 
-        @layouts = layouts
+        @templates = templates
       end
 
       private def collect_pages(config : SiteConfig, include_drafts : Bool) : Array(Page)
@@ -194,7 +194,7 @@ module Hwaro
         pages
       end
 
-      private def process_files_parallel(pages : Array(Page), config : SiteConfig, layouts : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_parallel(pages : Array(Page), config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         cpu_count = System.cpu_count || 1
         max_workers = Math.min(pages.size, cpu_count.to_i * 2)
         max_workers = Math.max(max_workers, 1)
@@ -208,7 +208,7 @@ module Hwaro
         max_workers.times do
           spawn do
             while page = work_queue.receive?
-              render_page(page, config, layouts, output_dir, minify)
+              render_page(page, config, templates, output_dir, minify)
               results.send(true)
             end
           end
@@ -221,35 +221,35 @@ module Hwaro
         count
       end
 
-      private def process_files_sequential(pages : Array(Page), config : SiteConfig, layouts : Hash(String, String), output_dir : String, minify : Bool) : Int32
+      private def process_files_sequential(pages : Array(Page), config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool) : Int32
         count = 0
         pages.each do |page|
-          render_page(page, config, layouts, output_dir, minify)
+          render_page(page, config, templates, output_dir, minify)
           count += 1
         end
         count
       end
 
-      private def render_page(page : Page, config : SiteConfig, layouts : Hash(String, String), output_dir : String, minify : Bool)
+      private def render_page(page : Page, config : SiteConfig, templates : Hash(String, String), output_dir : String, minify : Bool)
         # Convert Markdown
         html_content = Processor::Markdown.render(page.raw_content)
 
-        # Select Layout
-        layout_name = determine_layout(page, layouts)
-        layout_template = layouts[layout_name]? || layouts["page"]?
+        # Select Template
+        template_name = determine_template(page, templates)
+        template_content = templates[template_name]? || templates["page"]?
 
         # Generate variables
         section_list_html = ""
-        if layout_name == "section" || page.layout == "section"
+        if template_name == "section" || page.layout == "section"
              section_list_html = generate_section_list(page, config)
         end
 
         # Render
-        final_html = if layout_template
-                       full_layout = resolve_includes(layout_template, layouts)
-                       apply_layout(full_layout, html_content, page, config, section_list_html)
+        final_html = if template_content
+                       full_template = resolve_includes(template_content, templates)
+                       apply_template(full_template, html_content, page, config, section_list_html)
                      else
-                       Logger.warn "  [WARN] No layout found for #{page.path}. Using raw content."
+                       Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                        html_content
                      end
 
@@ -260,19 +260,19 @@ module Hwaro
         write_output(page, output_dir, final_html)
       end
 
-      private def determine_layout(page : Page, layouts : Hash(String, String)) : String
+      private def determine_template(page : Page, templates : Hash(String, String)) : String
         # 1. Frontmatter layout
         if custom = page.layout
-          return custom if layouts.has_key?(custom)
-          Logger.warn "  [WARN] Custom layout '#{custom}' not found for #{page.path}."
+          return custom if templates.has_key?(custom)
+          Logger.warn "  [WARN] Custom template '#{custom}' not found for #{page.path}."
         end
 
-        # 2. Section layout (for index pages in subdirectories)
-        if page.is_index && !page.section.empty? && layouts.has_key?("section")
+        # 2. Section template (for index pages in subdirectories)
+        if page.is_index && !page.section.empty? && templates.has_key?("section")
           return "section"
         end
 
-        # 3. Default page layout
+        # 3. Default page template
         "page"
       end
 
@@ -298,22 +298,22 @@ module Hwaro
         end
       end
 
-      private def resolve_includes(content : String, layouts : Hash(String, String), depth : Int32 = 0) : String
+      private def resolve_includes(content : String, templates : Hash(String, String), depth : Int32 = 0) : String
         return content if depth > 10
 
         content.gsub(/<%=\s*render\s+"([^"]+)"\s*%>/) do |match|
           name = $1
-          if partial = layouts[name]?
-            resolve_includes(partial, layouts, depth + 1)
+          if partial = templates[name]?
+            resolve_includes(partial, templates, depth + 1)
           else
-            Logger.warn "  [WARN] Partial layout '#{name}' not found."
+            Logger.warn "  [WARN] Partial template '#{name}' not found."
             ""
           end
         end
       end
 
-      private def apply_layout(layout : String, content : String, page : Page, config : SiteConfig, section_list : String) : String
-        layout
+      private def apply_template(template : String, content : String, page : Page, config : SiteConfig, section_list : String) : String
+        template
           .gsub(/<%=\s*page_title\s*%>/, page.title)
           .gsub(/<%=\s*page_section\s*%>/, page.section)
           .gsub(/<%=\s*section_list\s*%>/, section_list)

@@ -100,7 +100,7 @@ module Hwaro
       end
 
       private def watch_for_changes(build_options : Options::BuildOptions)
-        Logger.info "Watching for changes in content/, layouts/, static/ and config.toml..."
+        Logger.info "Watching for changes in content/, templates/, static/ and config.toml..."
         last_mtimes = scan_mtimes
 
         loop do
@@ -143,7 +143,7 @@ module Hwaro
 
       private def scan_mtimes : Hash(String, Time)
         mtimes = {} of String => Time
-        dirs_to_watch = ["content", "layouts", "static"]
+        dirs_to_watch = ["content", "templates", "static"]
 
         dirs_to_watch.each do |dir|
           next unless Dir.exists?(dir)

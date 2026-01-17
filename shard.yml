@@ -4,16 +4,25 @@ version: 0.1.0
 authors:
   - HAHWUL <hahwul@gmail.com>
 
+crystal: ">= 1.19.0"
+
+license: MIT
+
+targets:
+  hwaro:
+    main: src/hwaro.cr
+
 dependencies:
   markd:
     github: icyleaf/markd
   toml:
     github: crystal-community/toml.cr
 
-targets:
-  hwaro:
-    main: src/hwaro.cr
-
-crystal: ">= 1.19.0"
-
-license: MIT
+# Development Dependencies
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    branch: master
+  cyclonedx-cr:
+    github: hahwul/cyclonedx-cr
+    branch: main
