@@ -10,6 +10,7 @@ module Hwaro
       property tags : Array(String)
       property weight : Int32
       property in_sitemap : Bool
+      property toc : Bool
 
       # Runtime / Computed Properties
       property content : String
@@ -30,6 +31,7 @@ module Hwaro
         @url = ""
         @is_index = false
         @in_sitemap = true
+        @toc = false
       end
     end
   end

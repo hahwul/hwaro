@@ -6,6 +6,7 @@ require "../processor/markdown"
 require "../schemas/config"
 require "../schemas/page"
 require "../schemas/section"
+require "../schemas/toc"
 
 module Hwaro
   module Core
@@ -111,7 +112,7 @@ module Hwaro
           parsed = Processor::Markdown.parse(raw_content, file_path)
           next unless parsed
 
-          title, markdown_content, draft, layout_name, in_sitemap = parsed
+          title, markdown_content, draft, layout_name, in_sitemap, toc = parsed
 
           if draft && !include_drafts
             next
@@ -128,6 +129,7 @@ module Hwaro
           page.draft = draft
           page.template = layout_name
           page.in_sitemap = in_sitemap
+          page.toc = toc
           # Note: tags, weight, date are not yet returned by Processor::Markdown.parse
           # They will need to be populated once the processor is updated.
 
@@ -200,7 +202,14 @@ module Hwaro
 
       private def render_page(page : Schemas::Page, config : Schemas::Config, templates : Hash(String, String), output_dir : String, minify : Bool)
         # Convert Markdown
-        html_content = Processor::Markdown.render(page.raw_content)
+        html_content, toc_headers = Processor::Markdown.render(page.raw_content)
+
+        # Generate ToC HTML if enabled
+        toc_html = if page.toc && !toc_headers.empty?
+                     generate_toc_html(toc_headers)
+                   else
+                     ""
+                   end
 
         # Select Template
         template_name = determine_template(page, templates)
@@ -215,7 +224,7 @@ module Hwaro
         # Render
         final_html = if template_content
                        full_template = resolve_includes(template_content, templates)
-                       apply_template(full_template, html_content, page, config, section_list_html)
+                       apply_template(full_template, html_content, page, config, section_list_html, toc_html)
                      else
                        Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                        html_content
@@ -263,6 +272,22 @@ module Hwaro
         end
       end
 
+      private def generate_toc_html(headers : Array(Schemas::TocHeader)) : String
+        return "" if headers.empty?
+
+        String.build do |str|
+          str << "<ul>"
+          headers.each do |header|
+            str << "<li><a href=\"#{header.permalink}\">#{header.title}</a>"
+            unless header.children.empty?
+              str << generate_toc_html(header.children)
+            end
+            str << "</li>"
+          end
+          str << "</ul>"
+        end
+      end
+
       private def resolve_includes(content : String, templates : Hash(String, String), depth : Int32 = 0) : String
         return content if depth > 10
 
@@ -277,11 +302,12 @@ module Hwaro
         end
       end
 
-      private def apply_template(template : String, content : String, page : Schemas::Page, config : Schemas::Config, section_list : String) : String
+      private def apply_template(template : String, content : String, page : Schemas::Page, config : Schemas::Config, section_list : String, toc : String) : String
         template
           .gsub(/<%=\s*page_title\s*%>/, page.title)
           .gsub(/<%=\s*page_section\s*%>/, page.section)
           .gsub(/<%=\s*section_list\s*%>/, section_list)
+          .gsub(/<%=\s*toc\s*%>/, toc)
           .gsub(/<%=\s*site_title\s*%>/, config.title)
           .gsub(/<%=\s*site_description\s*%>/, config.description || "")
           .gsub(/<%=\s*base_url\s*%>/, config.base_url)
