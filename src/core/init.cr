@@ -162,6 +162,13 @@ module Hwaro
         title = "My Hwaro Site"
         description = "Welcome to my new Hwaro site."
         base_url = "http://localhost:3000"
+
+        # RSS/Atom Feed Configuration
+        [feeds]
+        generate = false  # Set to true to generate feeds
+        filename = ""     # Custom filename (default: rss.xml or atom.xml based on type)
+        type = "rss"      # Feed type: "rss" or "atom"
+        truncate = 0      # Truncate content to N characters (0 = no truncation)
         CONTENT
       end
     end
