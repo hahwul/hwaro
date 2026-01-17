@@ -18,7 +18,6 @@ module Hwaro
 
     class Serve
       @build : Build
-      @build_options : Options::BuildOptions?
 
       def initialize
         @build = Build.new
@@ -26,18 +25,16 @@ module Hwaro
 
       def run(options : Options::ServeOptions)
         # Convert serve options to build options for consistency
-        @build_options = options.to_build_options
-        run_with_options(options.host, options.port, options.open_browser)
+        build_options = options.to_build_options
+        run_with_options(options.host, options.port, options.open_browser, build_options)
       end
 
       def run(host : String = "0.0.0.0", port : Int32 = 3000, drafts : Bool = false)
-        @build_options = Options::BuildOptions.new(drafts: drafts)
-        run_with_options(host, port, false)
+        build_options = Options::BuildOptions.new(drafts: drafts)
+        run_with_options(host, port, false, build_options)
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool)
-        build_options = @build_options.not_nil!
-
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, build_options : Options::BuildOptions)
         # Ensure site is built first
         puts "Performing initial build..."
         @build.run(build_options)
@@ -91,6 +88,16 @@ module Hwaro
       end
 
       private def open_browser_url(url : String)
+        # Validate URL to prevent command injection
+        unless url.starts_with?("http://") || url.starts_with?("https://")
+          return
+        end
+
+        # Ensure URL only contains safe characters
+        unless url.matches?(/\Ahttps?:\/\/[a-zA-Z0-9.:\/\-_]+\z/)
+          return
+        end
+
         {% if flag?(:darwin) %}
           Process.run("open", [url])
         {% elsif flag?(:linux) %}

@@ -100,12 +100,24 @@ module Hwaro
       end
 
       private def process_files_parallel(files : Array(String), config : SiteConfig, layout : String?, output_dir : String, drafts : Bool, minify : Bool) : Int32
-        results = Channel(Bool).new(files.size)
+        # Limit concurrency to prevent resource exhaustion
+        max_workers = Math.min(files.size, System.cpu_count.to_i * 2)
+        max_workers = Math.max(max_workers, 1)
 
-        files.each do |file_path|
+        results = Channel(Bool).new(files.size)
+        work_queue = Channel(String).new(files.size)
+
+        # Queue all work
+        files.each { |f| work_queue.send(f) }
+        work_queue.close
+
+        # Spawn limited number of workers
+        max_workers.times do
           spawn do
-            result = process_file(file_path, config, layout, output_dir, drafts, minify)
-            results.send(result)
+            while file_path = work_queue.receive?
+              result = process_file(file_path, config, layout, output_dir, drafts, minify)
+              results.send(result)
+            end
           end
         end
 
