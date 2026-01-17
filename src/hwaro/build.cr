@@ -71,6 +71,11 @@ module Hwaro
       # Convert Markdown to HTML
       html_content = Markd.to_html(markdown_content)
 
+      # Extract site config
+      site_title = config["title"]? ? config["title"].as_s : "Hwaro Site"
+      site_description = config["description"]? ? config["description"].as_s : ""
+      base_url = config["base_url"]? ? config["base_url"].as_s : ""
+
       # Render Layout
       # Since we are a CLI tool, we simulate ECR runtime behavior for simple variables
       layout_path = "layouts/default.ecr"
@@ -83,6 +88,9 @@ module Hwaro
         # This matches the "simple template" requirement without a heavy engine
         final_html = layout
           .gsub(/<%=\s*page_title\s*%>/, title)
+          .gsub(/<%=\s*site_title\s*%>/, site_title)
+          .gsub(/<%=\s*site_description\s*%>/, site_description)
+          .gsub(/<%=\s*base_url\s*%>/, base_url)
           .gsub(/<%=\s*content\s*%>/, html_content)
       else
         puts "  [WARN] Layout file not found: #{layout_path}. Using raw content."

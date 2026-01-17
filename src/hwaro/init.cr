@@ -79,7 +79,8 @@ module Hwaro
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title><%= page_title %></title>
+        <meta name="description" content="<%= site_description %>">
+        <title><%= page_title %> - <%= site_title %></title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2rem; color: #333; }
           header { margin-bottom: 2rem; border-bottom: 1px solid #eaeaea; padding-bottom: 1rem; }
@@ -92,9 +93,10 @@ module Hwaro
       </head>
       <body>
         <header>
+          <h3><%= site_title %></h3>
           <nav>
-            <a href="/">Home</a>
-            <a href="/about.html">About</a>
+            <a href="<%= base_url %>/">Home</a>
+            <a href="<%= base_url %>/about.html">About</a>
           </nav>
         </header>
 
@@ -113,6 +115,7 @@ module Hwaro
     private def sample_config
       <<-CONTENT
       title = "My Hwaro Site"
+      description = "Welcome to my new Hwaro site."
       base_url = "http://localhost:3000"
       CONTENT
     end
