@@ -199,6 +199,16 @@ module Hwaro
             end
           end
 
+          # Load search configuration
+          if search_section = config.raw["search"]?.try(&.as_h?)
+            config.search.enabled = search_section["enabled"]?.try(&.as_bool?) || config.search.enabled
+            config.search.format = search_section["format"]?.try(&.as_s?) || config.search.format
+            config.search.filename = search_section["filename"]?.try(&.as_s?) || config.search.filename
+            if fields = search_section["fields"]?.try(&.as_a?)
+              config.search.fields = fields.compact_map(&.as_s?)
+            end
+          end
+
           # Load plugins configuration
           if plugins_section = config.raw["plugins"]?.try(&.as_h?)
             if processors = plugins_section["processors"]?.try(&.as_a?)
