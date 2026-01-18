@@ -54,6 +54,7 @@ require "./core/build/seo/feeds"
 require "./core/build/seo/sitemap"
 require "./core/build/seo/robots"
 require "./core/build/seo/llms"
+require "./core/build/search"
 
 # Load CLI
 require "./cli/runner"
