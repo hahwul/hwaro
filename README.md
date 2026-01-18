@@ -1,4 +1,4 @@
-# hwaro
+# hwaro (화로)
 
 ## Development
 
