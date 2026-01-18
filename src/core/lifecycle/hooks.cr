@@ -11,9 +11,9 @@ module Hwaro
     module Lifecycle
       # Result of hook execution
       enum HookResult
-        Continue  # Proceed to next hook/phase
-        Skip      # Skip remaining hooks in current phase
-        Abort     # Stop the entire build
+        Continue # Proceed to next hook/phase
+        Skip     # Skip remaining hooks in current phase
+        Abort    # Stop the entire build
       end
 
       # Hook handler type - receives context, returns result
@@ -22,8 +22,8 @@ module Hwaro
       # Registered hook with metadata
       struct RegisteredHook
         property handler : HookHandler
-        property priority : Int32  # Higher = runs first
-        property name : String     # For debugging/logging
+        property priority : Int32 # Higher = runs first
+        property name : String    # For debugging/logging
 
         def initialize(@handler : HookHandler, @priority : Int32 = 0, @name : String = "anonymous")
         end

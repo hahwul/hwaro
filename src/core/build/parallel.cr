@@ -17,8 +17,8 @@ module Hwaro
 
         def initialize(
           @enabled : Bool = true,
-          @max_workers : Int32 = 0,  # 0 = auto-detect based on CPU count
-          @batch_size : Int32 = 10
+          @max_workers : Int32 = 0, # 0 = auto-detect based on CPU count
+          @batch_size : Int32 = 10,
         )
         end
 

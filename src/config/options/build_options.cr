@@ -13,7 +13,7 @@ module Hwaro
           @drafts : Bool = false,
           @minify : Bool = false,
           @parallel : Bool = true,
-          @cache : Bool = false
+          @cache : Bool = false,
         )
         end
       end

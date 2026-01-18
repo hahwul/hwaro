@@ -8,14 +8,14 @@ module Hwaro
     module Lifecycle
       # Build phases executed in order
       enum Phase
-        Initialize    # Setup cache, output directory, load config
-        ReadContent   # Collect content files from filesystem
-        ParseContent  # Parse front matter and extract metadata
-        Transform     # Content transformation (e.g., Markdown → HTML)
-        Render        # Apply templates to transformed content
-        Generate      # Generate SEO files, search index, etc.
-        Write         # Write rendered pages to filesystem
-        Finalize      # Cleanup, save cache, final operations
+        Initialize   # Setup cache, output directory, load config
+        ReadContent  # Collect content files from filesystem
+        ParseContent # Parse front matter and extract metadata
+        Transform    # Content transformation (e.g., Markdown → HTML)
+        Render       # Apply templates to transformed content
+        Generate     # Generate SEO files, search index, etc.
+        Write        # Write rendered pages to filesystem
+        Finalize     # Cleanup, save cache, final operations
       end
 
       # Hook points - before/after each phase

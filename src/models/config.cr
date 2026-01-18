@@ -89,7 +89,7 @@ module Hwaro
       property processors : Array(String)
 
       def initialize
-        @processors = ["markdown"]  # Default processor
+        @processors = ["markdown"] # Default processor
       end
     end
 

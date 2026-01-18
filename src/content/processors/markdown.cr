@@ -120,7 +120,7 @@ module Hwaro
               Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
             end
             markdown_content = match[2]
-          # Try YAML Front Matter (---)
+            # Try YAML Front Matter (---)
           elsif match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
             begin
               yaml_fm = YAML.parse(match[1])
@@ -181,23 +181,23 @@ module Hwaro
           end
 
           {
-            title: title,
-            content: markdown_content,
-            draft: is_draft,
-            layout: layout,
-            in_sitemap: in_sitemap,
-            toc: toc,
-            date: date,
-            updated: updated,
-            render: render,
-            slug: slug,
-            custom_path: custom_path,
-            aliases: aliases,
-            tags: tags,
-            transparent: transparent,
-            generate_feeds: generate_feeds,
-            paginate: paginate,
-            pagination_enabled: pagination_enabled
+            title:              title,
+            content:            markdown_content,
+            draft:              is_draft,
+            layout:             layout,
+            in_sitemap:         in_sitemap,
+            toc:                toc,
+            date:               date,
+            updated:            updated,
+            render:             render,
+            slug:               slug,
+            custom_path:        custom_path,
+            aliases:            aliases,
+            tags:               tags,
+            transparent:        transparent,
+            generate_feeds:     generate_feeds,
+            paginate:           paginate,
+            pagination_enabled: pagination_enabled,
           }
         end
 
@@ -260,7 +260,7 @@ module Hwaro
           formats = [
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d"
+            "%Y-%m-%d",
           ]
 
           formats.each do |fmt|
@@ -273,17 +273,17 @@ module Hwaro
 
           # Try ISO 8601 parsing as last resort
           begin
-             return Time.parse_rfc3339(time_str)
+            return Time.parse_rfc3339(time_str)
           rescue
-             nil
+            nil
           end
         end
 
         private def slugify(text : String) : String
           text.downcase
-              .gsub(/[^a-z0-9\s-]/, "") # Remove non-alphanumeric chars except space and hyphen
-              .gsub(/\s+/, "-")         # Replace spaces with hyphens
-              .strip("-")               # Trim leading/trailing hyphens
+            .gsub(/[^a-z0-9\s-]/, "") # Remove non-alphanumeric chars except space and hyphen
+            .gsub(/\s+/, "-")         # Replace spaces with hyphens
+            .strip("-")               # Trim leading/trailing hyphens
         end
       end
 

@@ -37,7 +37,7 @@ module Hwaro
           @prev_url : String?,
           @next_url : String?,
           @first_url : String,
-          @last_url : String
+          @last_url : String,
         )
         end
       end
@@ -51,7 +51,7 @@ module Hwaro
         def initialize(
           @paginated_pages : Array(PaginatedPage),
           @enabled : Bool,
-          @per_page : Int32
+          @per_page : Int32,
         )
         end
       end
@@ -168,15 +168,15 @@ module Hwaro
 
           sorted.sort! do |a, b|
             result = case sort_by
-            when "date"
-              compare_by_date(a, b)
-            when "title"
-              compare_by_title(a, b)
-            when "weight"
-              compare_by_weight(a, b)
-            else
-              compare_by_date(a, b)
-            end
+                     when "date"
+                       compare_by_date(a, b)
+                     when "title"
+                       compare_by_title(a, b)
+                     when "weight"
+                       compare_by_weight(a, b)
+                     else
+                       compare_by_date(a, b)
+                     end
             reverse ? -result : result
           end
 

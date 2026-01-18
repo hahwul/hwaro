@@ -42,10 +42,10 @@ module Hwaro
 
       private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Hash(String, String | Array(String)))
         fields = config.search.fields
-        
+
         pages.map do |page|
           data = {} of String => String | Array(String)
-          
+
           fields.each do |field|
             case field.downcase
             when "title"
@@ -66,10 +66,10 @@ module Hwaro
               data["description"] = page.description || ""
             end
           end
-          
+
           # Always include URL even if not in fields list
           data["url"] = page.url unless data.has_key?("url")
-          
+
           data
         end
       end

@@ -7,7 +7,7 @@ module Hwaro
 
         def initialize(
           @path : String = ".",
-          @force : Bool = false
+          @force : Bool = false,
         )
         end
       end

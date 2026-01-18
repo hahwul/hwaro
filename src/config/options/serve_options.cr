@@ -11,7 +11,7 @@ module Hwaro
           @host : String = "0.0.0.0",
           @port : Int32 = 3000,
           @drafts : Bool = false,
-          @open_browser : Bool = false
+          @open_browser : Bool = false,
         )
         end
 

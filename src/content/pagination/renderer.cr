@@ -49,11 +49,11 @@ module Hwaro
             # Page numbers
             (1..paginated_page.total_pages).each do |page_num|
               page_url = if page_num == 1
-                          HTML.escape("#{@base_url}#{paginated_page.first_url}")
-                        else
-                          base = paginated_page.first_url.rstrip("/")
-                          HTML.escape("#{@base_url}#{base}/page/#{page_num}/")
-                        end
+                           HTML.escape("#{@base_url}#{paginated_page.first_url}")
+                         else
+                           base = paginated_page.first_url.rstrip("/")
+                           HTML.escape("#{@base_url}#{base}/page/#{page_num}/")
+                         end
 
               if page_num == paginated_page.page_number
                 str << "    <li class=\"pagination-page pagination-current\"><span>#{page_num}</span></li>\n"

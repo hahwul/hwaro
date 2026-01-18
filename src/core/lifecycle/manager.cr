@@ -114,7 +114,7 @@ module Hwaro
         end
 
         # Run all phases in sequence
-        def run_all_phases(context : BuildContext, &phase_action : Phase -> ) : HookResult
+        def run_all_phases(context : BuildContext, &phase_action : Phase ->) : HookResult
           Phase.each do |phase|
             result = run_phase(phase, context) do
               phase_action.call(phase)

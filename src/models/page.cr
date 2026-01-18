@@ -20,10 +20,10 @@ module Hwaro
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
-      property path : String       # Relative path from content/ (e.g. "projects/a.md")
-      property section : String    # First directory component (e.g. "projects")
-      property url : String        # Calculated relative URL (e.g. "/projects/a/")
-      property is_index : Bool     # Is this an index file?
+      property path : String    # Relative path from content/ (e.g. "projects/a.md")
+      property section : String # First directory component (e.g. "projects")
+      property url : String     # Calculated relative URL (e.g. "/projects/a/")
+      property is_index : Bool  # Is this an index file?
 
       def initialize(@path : String)
         @title = "Untitled"

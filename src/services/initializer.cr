@@ -14,61 +14,61 @@ module Hwaro
       end
 
       def run(target_path : String, force : Bool = false)
-          unless Dir.exists?(target_path)
-            Dir.mkdir_p(target_path)
-          end
-
-          unless force || Dir.empty?(target_path)
-            Logger.error "Directory '#{target_path}' is not empty."
-            Logger.error "Use --force to overwrite."
-            exit(1)
-          end
-
-          Logger.info "Initializing new Hwaro project in #{target_path}..."
-
-          create_directory(File.join(target_path, "content"))
-          create_file(File.join(target_path, "content", "index.md"), sample_content)
-          create_file(File.join(target_path, "content", "about.md"), sample_about_content)
-
-          create_directory(File.join(target_path, "templates"))
-          create_file(File.join(target_path, "templates", "header.ecr"), sample_header)
-          create_file(File.join(target_path, "templates", "footer.ecr"), sample_footer)
-          create_file(File.join(target_path, "templates", "page.ecr"), sample_page_layout)
-          create_file(File.join(target_path, "templates", "section.ecr"), sample_section_layout)
-          create_file(File.join(target_path, "templates", "404.ecr"), sample_404)
-
-          create_directory(File.join(target_path, "templates", "shortcodes"))
-          create_file(File.join(target_path, "templates", "shortcodes", "alert.ecr"), sample_shortcode_alert)
-
-          create_directory(File.join(target_path, "static"))
-          create_file(File.join(target_path, "config.toml"), sample_config)
-
-          Logger.success "Done! Run `hwaro build` to generate the site."
-          unless target_path == "."
-            Logger.info "  cd #{target_path}"
-          end
+        unless Dir.exists?(target_path)
+          Dir.mkdir_p(target_path)
         end
 
-        private def create_directory(path : String)
-          unless Dir.exists?(path)
-            Dir.mkdir_p(path)
-            Logger.action :create, path
-          else
-            Logger.action :exist, path, :blue
-          end
+        unless force || Dir.empty?(target_path)
+          Logger.error "Directory '#{target_path}' is not empty."
+          Logger.error "Use --force to overwrite."
+          exit(1)
         end
 
-        private def create_file(path : String, content : String)
-          unless File.exists?(path)
-            File.write(path, content)
-            Logger.action :create, path
-          else
-            Logger.action :exist, path, :blue
-          end
-        end
+        Logger.info "Initializing new Hwaro project in #{target_path}..."
 
-        private def sample_content
-          <<-CONTENT
+        create_directory(File.join(target_path, "content"))
+        create_file(File.join(target_path, "content", "index.md"), sample_content)
+        create_file(File.join(target_path, "content", "about.md"), sample_about_content)
+
+        create_directory(File.join(target_path, "templates"))
+        create_file(File.join(target_path, "templates", "header.ecr"), sample_header)
+        create_file(File.join(target_path, "templates", "footer.ecr"), sample_footer)
+        create_file(File.join(target_path, "templates", "page.ecr"), sample_page_layout)
+        create_file(File.join(target_path, "templates", "section.ecr"), sample_section_layout)
+        create_file(File.join(target_path, "templates", "404.ecr"), sample_404)
+
+        create_directory(File.join(target_path, "templates", "shortcodes"))
+        create_file(File.join(target_path, "templates", "shortcodes", "alert.ecr"), sample_shortcode_alert)
+
+        create_directory(File.join(target_path, "static"))
+        create_file(File.join(target_path, "config.toml"), sample_config)
+
+        Logger.success "Done! Run `hwaro build` to generate the site."
+        unless target_path == "."
+          Logger.info "  cd #{target_path}"
+        end
+      end
+
+      private def create_directory(path : String)
+        unless Dir.exists?(path)
+          Dir.mkdir_p(path)
+          Logger.action :create, path
+        else
+          Logger.action :exist, path, :blue
+        end
+      end
+
+      private def create_file(path : String, content : String)
+        unless File.exists?(path)
+          File.write(path, content)
+          Logger.action :create, path
+        else
+          Logger.action :exist, path, :blue
+        end
+      end
+
+      private def sample_content
+        <<-CONTENT
           +++
           title = "Welcome to Hwaro"
           +++
@@ -84,10 +84,10 @@ module Hwaro
           3. Run `hwaro build` to regenerate the site.
           4. Run `hwaro serve` to preview changes locally.
           CONTENT
-        end
+      end
 
-        private def sample_about_content
-          <<-CONTENT
+      private def sample_about_content
+        <<-CONTENT
           +++
           title = "About"
           +++
@@ -96,20 +96,20 @@ module Hwaro
 
           This is an about page to demonstrate multiple pages.
           CONTENT
-        end
+      end
 
-        private def sample_page_layout
-          <<-HTML
+      private def sample_page_layout
+        <<-HTML
           <%= render "header" %>
           <main>
             <%= content %>
           </main>
           <%= render "footer" %>
           HTML
-        end
+      end
 
-        private def sample_section_layout
-          <<-HTML
+      private def sample_section_layout
+        <<-HTML
           <%= render "header" %>
           <main>
             <h1><%= page_title %></h1>
@@ -121,10 +121,10 @@ module Hwaro
           </main>
           <%= render "footer" %>
           HTML
-        end
+      end
 
-        private def sample_404
-          <<-HTML
+      private def sample_404
+        <<-HTML
           <%= render "header" %>
           <main>
             <h1>404 Not Found</h1>
@@ -133,10 +133,10 @@ module Hwaro
           </main>
           <%= render "footer" %>
           HTML
-        end
+      end
 
-        private def sample_header
-          <<-HTML
+      private def sample_header
+        <<-HTML
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -166,28 +166,28 @@ module Hwaro
             </header>
 
           HTML
-        end
+      end
 
-        private def sample_footer
-          <<-HTML
+      private def sample_footer
+        <<-HTML
             <footer>
               <p>Powered by Hwaro</p>
             </footer>
           </body>
           </html>
           HTML
-        end
+      end
 
-        private def sample_shortcode_alert
-          <<-HTML
+      private def sample_shortcode_alert
+        <<-HTML
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
             <strong><%= type.upcase %>:</strong> <%= message %>
           </div>
           HTML
-        end
+      end
 
-        private def sample_config
-          <<-CONTENT
+      private def sample_config
+        <<-CONTENT
           title = "My Hwaro Site"
           description = "Welcome to my new Hwaro site."
           base_url = "http://localhost:3000"
@@ -229,7 +229,7 @@ module Hwaro
           [plugins]
           processors = ["markdown"]  # List of enabled processors
           CONTENT
-        end
       end
     end
+  end
 end

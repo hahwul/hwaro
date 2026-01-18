@@ -41,9 +41,9 @@ module Hwaro
         # Simple HTML minification - removes excess whitespace
         private def minify_html(html : String) : String
           html
-            .gsub(/>\s+</, "><")           # Remove whitespace between tags
-            .gsub(/\n\s*/, " ")            # Replace newlines with single space
-            .gsub(/\s{2,}/, " ")           # Collapse multiple spaces
+            .gsub(/>\s+</, "><") # Remove whitespace between tags
+            .gsub(/\n\s*/, " ")  # Replace newlines with single space
+            .gsub(/\s{2,}/, " ") # Collapse multiple spaces
             .strip
         end
       end

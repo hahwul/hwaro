@@ -163,13 +163,13 @@ describe Hwaro do
 
     it "respects section-level pagination override" do
       config = Hwaro::Models::Config.new
-      config.pagination.enabled = false  # Globally disabled
+      config.pagination.enabled = false # Globally disabled
       config.pagination.per_page = 10
 
       section = Hwaro::Models::Section.new("wiki/index.md")
       section.section = "wiki"
-      section.pagination_enabled = true  # Section-level override
-      section.paginate = 1               # Section-level per_page
+      section.pagination_enabled = true # Section-level override
+      section.paginate = 1              # Section-level per_page
 
       pages = [
         Hwaro::Models::Page.new("wiki/1.md"),
@@ -239,7 +239,7 @@ describe Hwaro do
 
       html.should contain("<nav class=\"pagination\"")
       html.should contain("Next")
-      html.should contain("pagination-disabled")  # Previous is disabled on page 1
+      html.should contain("pagination-disabled") # Previous is disabled on page 1
     end
 
     it "returns empty string for single page" do

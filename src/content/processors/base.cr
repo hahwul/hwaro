@@ -28,7 +28,7 @@ module Hwaro
         def initialize(
           @file_path : String = "",
           @output_path : String = "",
-          @config : Hash(String, String) = {} of String => String
+          @config : Hash(String, String) = {} of String => String,
         )
         end
       end
@@ -44,7 +44,7 @@ module Hwaro
           @content : String,
           @success : Bool = true,
           @metadata : Hash(String, String) = {} of String => String,
-          @error : String? = nil
+          @error : String? = nil,
         )
         end
 
@@ -84,7 +84,7 @@ module Hwaro
         # Register a processor instance
         def self.register(processor : Base)
           @@processors[processor.name] = processor
-          @@sorted_processors = nil  # Invalidate cache
+          @@sorted_processors = nil # Invalidate cache
         end
 
         # Get a processor by name

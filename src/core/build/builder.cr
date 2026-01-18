@@ -71,7 +71,7 @@ module Hwaro
           drafts : Bool = false,
           minify : Bool = false,
           parallel : Bool = true,
-          cache : Bool = false
+          cache : Bool = false,
         )
           Logger.info "Building site..."
           start_time = Time.instant
@@ -112,7 +112,7 @@ module Hwaro
           drafts : Bool,
           minify : Bool,
           parallel : Bool,
-          cache_enabled : Bool
+          cache_enabled : Bool,
         ) : Lifecycle::HookResult
           output_dir = ctx.output_dir
 
@@ -363,7 +363,7 @@ module Hwaro
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool,
-          cache : Cache
+          cache : Cache,
         ) : Int32
           config = ParallelConfig.new(enabled: true)
           processor = Parallel(Models::Page, Bool).new(config)
@@ -385,7 +385,7 @@ module Hwaro
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool,
-          cache : Cache
+          cache : Cache,
         ) : Int32
           count = 0
           pages.each do |page|
@@ -403,7 +403,7 @@ module Hwaro
           site : Models::Site,
           templates : Hash(String, String),
           output_dir : String,
-          minify : Bool
+          minify : Bool,
         )
           return unless page.render
 
@@ -450,7 +450,7 @@ module Hwaro
           output_dir : String,
           minify : Bool,
           html_content : String,
-          toc_html : String
+          toc_html : String,
         )
           # Get pages in this section
           section_pages = site.pages.select do |p|
@@ -513,10 +513,10 @@ module Hwaro
           decoded = URI.decode(path)
           # Remove any parent directory references, null bytes, and normalize slashes
           decoded
-            .gsub(/\.\./, "")           # Remove parent directory references
-            .gsub(/\0/, "")             # Remove null bytes
-            .gsub(/\/+/, "/")           # Normalize multiple slashes
-            .gsub(/^\/+|\/+$/, "")      # Strip leading/trailing slashes
+            .gsub(/\.\./, "")      # Remove parent directory references
+            .gsub(/\0/, "")        # Remove null bytes
+            .gsub(/\/+/, "/")      # Normalize multiple slashes
+            .gsub(/^\/+|\/+$/, "") # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
@@ -610,7 +610,7 @@ module Hwaro
           config : Models::Config,
           section_list : String,
           toc : String,
-          templates : Hash(String, String)
+          templates : Hash(String, String),
         ) : String
           result = template
             .gsub(/<%=\s*page_title\s*%>/, page.title)

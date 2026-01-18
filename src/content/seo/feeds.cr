@@ -50,7 +50,7 @@ module Hwaro
           output_dir : String,
           custom_filename : String,
           feed_title : String,
-          base_path : String = ""
+          base_path : String = "",
         )
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
@@ -105,7 +105,7 @@ module Hwaro
           filename : String,
           is_text : Bool,
           feed_title : String,
-          base_path : String
+          base_path : String,
         ) : String
           String.build do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -155,7 +155,7 @@ module Hwaro
           filename : String,
           is_text : Bool,
           feed_title : String,
-          base_path : String
+          base_path : String,
         ) : String
           now = Time.utc
 
@@ -216,10 +216,10 @@ module Hwaro
             if text_content.size > truncate
               text_content[0...truncate] + "..."
             else
-              text_content  # Return plain text even if not truncated for consistency
+              text_content # Return plain text even if not truncated for consistency
             end
           else
-            html_content  # No truncation - return full HTML
+            html_content # No truncation - return full HTML
           end
         end
 
