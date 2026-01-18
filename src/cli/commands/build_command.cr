@@ -1,6 +1,7 @@
 require "option_parser"
-require "../../options/build_options"
+require "../../config/options/build_options"
 require "../../core/build/builder"
+require "../../content/hooks"
 require "../../utils/logger"
 
 module Hwaro
@@ -9,10 +10,17 @@ module Hwaro
       class BuildCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Build::Builder.new.run(options)
+          builder = Core::Build::Builder.new
+
+          # Register content hooks with lifecycle
+          Content::Hooks.all.each do |hookable|
+            builder.register(hookable)
+          end
+
+          builder.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Options::BuildOptions
+        private def parse_options(args : Array(String)) : Config::Options::BuildOptions
           output_dir = "public"
           drafts = false
           minify = false
@@ -29,7 +37,7 @@ module Hwaro
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
-          Options::BuildOptions.new(
+          Config::Options::BuildOptions.new(
             output_dir: output_dir,
             drafts: drafts,
             minify: minify,

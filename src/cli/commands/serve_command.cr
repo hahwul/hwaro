@@ -1,6 +1,6 @@
 require "option_parser"
-require "../../options/serve_options"
-require "../../core/serve/server"
+require "../../config/options/serve_options"
+require "../../services/server/server"
 require "../../utils/logger"
 
 module Hwaro
@@ -9,10 +9,10 @@ module Hwaro
       class ServeCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Serve::Server.new.run(options)
+          Services::Server.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Options::ServeOptions
+        private def parse_options(args : Array(String)) : Config::Options::ServeOptions
           host = "0.0.0.0"
           port = 3000
           drafts = false
@@ -27,7 +27,7 @@ module Hwaro
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
-          Options::ServeOptions.new(
+          Config::Options::ServeOptions.new(
             host: host,
             port: port,
             drafts: drafts,

@@ -1,6 +1,6 @@
 require "option_parser"
-require "../../options/init_options"
-require "../../core/init/initializer"
+require "../../config/options/init_options"
+require "../../services/initializer"
 require "../../utils/logger"
 
 module Hwaro
@@ -9,10 +9,10 @@ module Hwaro
       class InitCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Init::Initializer.new.run(options)
+          Services::Initializer.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Options::InitOptions
+        private def parse_options(args : Array(String)) : Config::Options::InitOptions
           path = "."
           force = false
 
@@ -25,7 +25,7 @@ module Hwaro
             end
           end
 
-          Options::InitOptions.new(path: path, force: force)
+          Config::Options::InitOptions.new(path: path, force: force)
         end
       end
     end
