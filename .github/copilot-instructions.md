@@ -111,8 +111,9 @@ class MyProcessor < Hwaro::Content::Processors::Base
   end
 
   def process(content : String, context : ProcessorContext) : ProcessorResult
-    # Process content
-    ProcessorResult.new(content: transformed_content)
+    # Process content - example: convert to uppercase
+    transformed = content.upcase
+    ProcessorResult.new(content: transformed)
   end
 end
 
