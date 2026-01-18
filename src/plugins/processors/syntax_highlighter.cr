@@ -69,7 +69,7 @@ module Hwaro
                 # Remove existing content
                 code_node.children.each(&.unlink)
                 
-                # Parse highlighted HTML and add as child
+                # Parse highlighted HTML and add as child nodes
                 highlighted_doc = XML.parse_html(highlighted_html)
                 highlighted_body = highlighted_doc.xpath_node("//body")
                 
@@ -103,17 +103,15 @@ module Hwaro
 
         # Highlights code with the specified language and theme
         private def highlight_code(code : String, language : String) : String?
-          # Use Tartrazine to highlight code
-          lexer = Tartrazine.lexer(name: language)
-          theme = Tartrazine.theme(name: @theme)
-          
-          formatter = Tartrazine::Html.new(
+          # Use Tartrazine high-level API
+          html = Tartrazine.to_html(
+            code,
+            language: language,
+            theme: @theme,
             standalone: false,
-            classes: true
+            line_numbers: false
           )
-          
-          highlighted = formatter.format(code, lexer, theme)
-          highlighted
+          html
         rescue ex
           Logger.warn "  [WARN] Failed to highlight #{language} code: #{ex.message}"
           nil

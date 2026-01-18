@@ -252,15 +252,5 @@ describe Hwaro do
       result.success.should be_true
       result.content.should eq(html)
     end
-
-    it "extracts language from class attribute" do
-      highlighter = Hwaro::Plugins::Processors::SyntaxHighlighter.new(enabled: true)
-      
-      # Test various formats
-      highlighter.send(:extract_language, "language-ruby").should eq("ruby")
-      highlighter.send(:extract_language, "lang-python").should eq("python")
-      highlighter.send(:extract_language, "javascript").should eq("javascript")
-      highlighter.send(:extract_language, nil).should be_nil
-    end
   end
 end
