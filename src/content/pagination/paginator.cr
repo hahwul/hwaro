@@ -59,6 +59,9 @@ module Hwaro
       class Paginator
         @config : Models::Config
 
+        # Default fallback date used when a page has no date set
+        FALLBACK_DATE = Time.utc(1970, 1, 1)
+
         def initialize(@config : Models::Config)
         end
 
@@ -181,8 +184,8 @@ module Hwaro
         end
 
         private def compare_by_date(a : Models::Page, b : Models::Page) : Int32
-          a_date = a.date || Time.utc(1970, 1, 1)
-          b_date = b.date || Time.utc(1970, 1, 1)
+          a_date = a.date || FALLBACK_DATE
+          b_date = b.date || FALLBACK_DATE
           # Default: newest first (descending)
           b_date <=> a_date
         end

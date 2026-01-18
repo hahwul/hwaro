@@ -488,12 +488,27 @@ module Hwaro
         end
 
         private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String)
-          url_path = page.url.sub(/^\//, "").rstrip("/")
+          # Sanitize URL to prevent path traversal
+          url_path = sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
           output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
+
+          # Ensure output path is within output directory
+          canonical_output = File.expand_path(output_path)
+          canonical_output_dir = File.expand_path(output_dir)
+          unless canonical_output.starts_with?(canonical_output_dir)
+            Logger.warn "  [WARN] Skipping output outside output directory: #{output_path}"
+            return
+          end
 
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, content)
           Logger.action :create, output_path
+        end
+
+        # Sanitize path to prevent directory traversal
+        private def sanitize_path(path : String) : String
+          # Remove any parent directory references and normalize
+          path.gsub(/\.\./, "").gsub(/\/+/, "/").strip("/")
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String

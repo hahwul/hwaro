@@ -4,6 +4,7 @@
 # - Section list HTML with paginated pages
 # - Pagination navigation HTML (prev/next, page numbers)
 
+require "html"
 require "./paginator"
 require "../../models/config"
 
@@ -22,8 +23,9 @@ module Hwaro
         def render_section_list(paginated_page : PaginatedPage) : String
           String.build do |str|
             paginated_page.pages.each do |page|
-              full_url = "#{@base_url}#{page.url}"
-              str << "<li><a href=\"#{full_url}\">#{page.title}</a></li>\n"
+              escaped_url = HTML.escape("#{@base_url}#{page.url}")
+              escaped_title = HTML.escape(page.title)
+              str << "<li><a href=\"#{escaped_url}\">#{escaped_title}</a></li>\n"
             end
           end
         end
@@ -38,7 +40,7 @@ module Hwaro
 
             # Previous button
             if paginated_page.has_prev
-              prev_full_url = "#{@base_url}#{paginated_page.prev_url}"
+              prev_full_url = HTML.escape("#{@base_url}#{paginated_page.prev_url}")
               str << "    <li class=\"pagination-prev\"><a href=\"#{prev_full_url}\" rel=\"prev\">Previous</a></li>\n"
             else
               str << "    <li class=\"pagination-prev pagination-disabled\"><span>Previous</span></li>\n"
@@ -47,10 +49,10 @@ module Hwaro
             # Page numbers
             (1..paginated_page.total_pages).each do |page_num|
               page_url = if page_num == 1
-                          "#{@base_url}#{paginated_page.first_url}"
+                          HTML.escape("#{@base_url}#{paginated_page.first_url}")
                         else
                           base = paginated_page.first_url.rstrip("/")
-                          "#{@base_url}#{base}/page/#{page_num}/"
+                          HTML.escape("#{@base_url}#{base}/page/#{page_num}/")
                         end
 
               if page_num == paginated_page.page_number
@@ -62,7 +64,7 @@ module Hwaro
 
             # Next button
             if paginated_page.has_next
-              next_full_url = "#{@base_url}#{paginated_page.next_url}"
+              next_full_url = HTML.escape("#{@base_url}#{paginated_page.next_url}")
               str << "    <li class=\"pagination-next\"><a href=\"#{next_full_url}\" rel=\"next\">Next</a></li>\n"
             else
               str << "    <li class=\"pagination-next pagination-disabled\"><span>Next</span></li>\n"
