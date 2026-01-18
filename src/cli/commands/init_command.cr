@@ -15,17 +15,19 @@ module Hwaro
         private def parse_options(args : Array(String)) : Config::Options::InitOptions
           path = "."
           force = false
+          skip_agents_md = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
+            parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?
             end
           end
 
-          Config::Options::InitOptions.new(path: path, force: force)
+          Config::Options::InitOptions.new(path: path, force: force, skip_agents_md: skip_agents_md)
         end
       end
     end
