@@ -106,35 +106,35 @@ module Hwaro
         config = new
         if File.exists?(config_path)
           config.raw = TOML.parse_file(config_path)
-          config.title = config.raw["title"]?.try(&.as_s) || config.title
-          config.description = config.raw["description"]?.try(&.as_s) || config.description
-          config.base_url = config.raw["base_url"]?.try(&.as_s) || config.base_url
+          config.title = config.raw["title"]?.try(&.as_s?) || config.title
+          config.description = config.raw["description"]?.try(&.as_s?) || config.description
+          config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url
 
           # Load Sitemap configuration
           # Handle backward compatibility where sitemap was just a boolean
-          if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool)
+          if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
             config.sitemap.enabled = sitemap_bool
-          elsif sitemap_section = config.raw["sitemap"]?.try(&.as_h)
-            config.sitemap.enabled = sitemap_section["enabled"]?.try(&.as_bool) || config.sitemap.enabled
-            config.sitemap.filename = sitemap_section["filename"]?.try(&.as_s) || config.sitemap.filename
-            config.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s) || config.sitemap.changefreq
+          elsif sitemap_section = config.raw["sitemap"]?.try(&.as_h?)
+            config.sitemap.enabled = sitemap_section["enabled"]?.try(&.as_bool?) || config.sitemap.enabled
+            config.sitemap.filename = sitemap_section["filename"]?.try(&.as_s?) || config.sitemap.filename
+            config.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
             config.sitemap.priority = sitemap_section["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
           end
 
           # Load Robots configuration
-          if robots_section = config.raw["robots"]?.try(&.as_h)
-            config.robots.enabled = robots_section["enabled"]?.try(&.as_bool) || config.robots.enabled
-            config.robots.filename = robots_section["filename"]?.try(&.as_s) || config.robots.filename
+          if robots_section = config.raw["robots"]?.try(&.as_h?)
+            config.robots.enabled = robots_section["enabled"]?.try(&.as_bool?) || config.robots.enabled
+            config.robots.filename = robots_section["filename"]?.try(&.as_s?) || config.robots.filename
 
-            if rules = robots_section["rules"]?.try(&.as_a)
+            if rules = robots_section["rules"]?.try(&.as_a?)
               config.robots.rules = rules.compact_map do |rule_any|
                 if rule_h = rule_any.as_h?
-                  user_agent = rule_h["user_agent"]?.try(&.as_s) || "*"
+                  user_agent = rule_h["user_agent"]?.try(&.as_s?) || "*"
                   rule = RobotsRule.new(user_agent)
 
                   if allow = rule_h["allow"]?
                     if allow_arr = allow.as_a?
-                      rule.allow = allow_arr.map(&.as_s)
+                      rule.allow = allow_arr.compact_map(&.as_s?)
                     elsif allow_str = allow.as_s?
                       rule.allow = [allow_str]
                     end
@@ -142,7 +142,7 @@ module Hwaro
 
                   if disallow = rule_h["disallow"]?
                     if disallow_arr = disallow.as_a?
-                      rule.disallow = disallow_arr.map(&.as_s)
+                      rule.disallow = disallow_arr.compact_map(&.as_s?)
                     elsif disallow_str = disallow.as_s?
                       rule.disallow = [disallow_str]
                     end
@@ -156,17 +156,17 @@ module Hwaro
           end
 
           # Load LLMs configuration
-          if llms_section = config.raw["llms"]?.try(&.as_h)
-            config.llms.enabled = llms_section["enabled"]?.try(&.as_bool) || config.llms.enabled
-            config.llms.filename = llms_section["filename"]?.try(&.as_s) || config.llms.filename
-            config.llms.instructions = llms_section["instructions"]?.try(&.as_s) || config.llms.instructions
+          if llms_section = config.raw["llms"]?.try(&.as_h?)
+            config.llms.enabled = llms_section["enabled"]?.try(&.as_bool?) || config.llms.enabled
+            config.llms.filename = llms_section["filename"]?.try(&.as_s?) || config.llms.filename
+            config.llms.instructions = llms_section["instructions"]?.try(&.as_s?) || config.llms.instructions
           end
 
           # Load Feeds configuration
-          if feeds_section = config.raw["feeds"]?.try(&.as_h)
+          if feeds_section = config.raw["feeds"]?.try(&.as_h?)
             # Backward compatibility for 'generate' property
-            enabled = feeds_section["enabled"]?.try(&.as_bool)
-            generate = feeds_section["generate"]?.try(&.as_bool)
+            enabled = feeds_section["enabled"]?.try(&.as_bool?)
+            generate = feeds_section["generate"]?.try(&.as_bool?)
 
             if !enabled.nil?
               config.feeds.enabled = enabled
@@ -174,19 +174,19 @@ module Hwaro
               config.feeds.enabled = generate
             end
 
-            config.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.feeds.filename
-            config.feeds.type = feeds_section["type"]?.try(&.as_s) || config.feeds.type
+            config.feeds.filename = feeds_section["filename"]?.try(&.as_s?) || config.feeds.filename
+            config.feeds.type = feeds_section["type"]?.try(&.as_s?) || config.feeds.type
             config.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
             config.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
-            if sections = feeds_section["sections"]?.try(&.as_a)
-              config.feeds.sections = sections.map(&.as_s)
+            if sections = feeds_section["sections"]?.try(&.as_a?)
+              config.feeds.sections = sections.compact_map(&.as_s?)
             end
           end
 
           # Load plugins configuration
-          if plugins_section = config.raw["plugins"]?.try(&.as_h)
-            if processors = plugins_section["processors"]?.try(&.as_a)
-              config.plugins.processors = processors.map(&.as_s)
+          if plugins_section = config.raw["plugins"]?.try(&.as_h?)
+            if processors = plugins_section["processors"]?.try(&.as_a?)
+              config.plugins.processors = processors.compact_map(&.as_s?)
             end
           end
         end
