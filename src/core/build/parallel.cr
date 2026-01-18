@@ -136,14 +136,14 @@ module Hwaro
         extend self
 
         # Process pages in parallel with automatic worker configuration
-        def process_pages(T)(pages : Array(T), parallel : Bool = true, &block : T, Int32 -> Bool) : Int32
+        def process_pages(pages : Array(T), parallel : Bool = true, &block : T, Int32 -> Bool) : Int32 forall T
           config = ParallelConfig.new(enabled: parallel)
           processor = Parallel(T, Bool).new(config)
           processor.count_success(pages, &block)
         end
 
         # Parallel map with default configuration
-        def map(T, R)(items : Array(T), parallel : Bool = true, &block : T -> R) : Array(R)
+        def map(items : Array(T), parallel : Bool = true, &block : T -> R) : Array(R) forall T, R
           config = ParallelConfig.new(enabled: parallel)
           processor = Parallel(T, R).new(config)
           processor.map(items, &block)

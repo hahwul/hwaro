@@ -185,24 +185,3 @@ module Hwaro
     end
   end
 end
-
-# Backward compatibility alias
-module Hwaro
-  module Core
-    class Serve
-      def initialize
-        @server = Serve::Server.new
-      end
-
-      def run(options : Options::ServeOptions)
-        @server.run(options)
-      end
-
-      def run(host : String = "0.0.0.0", port : Int32 = 3000, drafts : Bool = false)
-        @server.run(host, port, drafts)
-      end
-
-      @server : Serve::Server
-    end
-  end
-end

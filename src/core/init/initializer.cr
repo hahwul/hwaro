@@ -209,18 +209,3 @@ module Hwaro
     end
   end
 end
-
-# Backward compatibility alias
-module Hwaro
-  module Core
-    class Init
-      def run(options : Options::InitOptions)
-        Init::Initializer.new.run(options)
-      end
-
-      def run(target_path : String, force : Bool = false)
-        Init::Initializer.new.run(target_path, force)
-      end
-    end
-  end
-end
