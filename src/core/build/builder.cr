@@ -10,6 +10,8 @@ require "file_utils"
 require "toml"
 require "./cache"
 require "./parallel"
+require "./seo/feeds"
+require "./seo/sitemap"
 require "../../utils/logger"
 require "../../options/build_options"
 require "../../plugins/processors/markdown"
@@ -100,12 +102,12 @@ module Hwaro
 
           # Generate sitemap if enabled
           if site.config.sitemap
-            generate_sitemap(all_pages, site, output_dir)
+            Seo::Sitemap.generate(all_pages, site, output_dir)
           end
 
           # Generate feeds if enabled
           if site.config.feeds.generate
-            Feeds.generate(all_pages, site.config, output_dir)
+            Seo::Feeds.generate(all_pages, site.config, output_dir)
           end
 
           # Generate 404 page
@@ -437,55 +439,7 @@ module Hwaro
           Logger.action :create, output_path
         end
 
-        private def escape_xml(text : String) : String
-          text.gsub(/[&<>"']/) do |match|
-            case match
-            when "&"  then "&amp;"
-            when "<"  then "&lt;"
-            when ">"  then "&gt;"
-            when "\"" then "&quot;"
-            when "'"  then "&apos;"
-            else           match
-            end
-          end
-        end
 
-        private def generate_sitemap(pages : Array(Schemas::Page), site : Schemas::Site, output_dir : String)
-          sitemap_pages = pages.select { |p| p.in_sitemap }
-
-          if sitemap_pages.empty?
-            Logger.info "  No pages to include in sitemap."
-            return
-          end
-
-          if site.config.base_url.empty?
-            Logger.warn "  [WARN] base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
-          end
-
-          xml_content = String.build do |str|
-            str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
-
-            sitemap_pages.each do |page|
-              base = site.config.base_url.rstrip('/')
-              path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-              full_url = base.empty? ? path : base + path
-
-              escaped_url = escape_xml(full_url)
-
-              str << "  <url>\n"
-              str << "    <loc>#{escaped_url}</loc>\n"
-              str << "  </url>\n"
-            end
-
-            str << "</urlset>\n"
-          end
-
-          sitemap_path = Path[output_dir, "sitemap.xml"].to_s
-          File.write(sitemap_path, xml_content)
-          Logger.action :create, sitemap_path
-          Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
-        end
 
         private def generate_404_page(site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
           return unless templates.has_key?("404")

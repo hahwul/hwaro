@@ -50,7 +50,8 @@ require "./core/build/parallel"
 require "./core/build/builder"
 require "./core/init/initializer"
 require "./core/serve/server"
-require "./core/feeds"
+require "./core/build/seo/feeds"
+require "./core/build/seo/sitemap"
 
 # Load CLI
 require "./cli/runner"
