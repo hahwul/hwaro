@@ -10,10 +10,10 @@ module Hwaro
   module Services
     class Initializer
       def run(options : Config::Options::InitOptions)
-        run(options.path, options.force, options.skip_agents_md)
+        run(options.path, options.force, options.skip_agents_md, options.skip_sample_content)
       end
 
-      def run(target_path : String, force : Bool = false, skip_agents_md : Bool = false)
+      def run(target_path : String, force : Bool = false, skip_agents_md : Bool = false, skip_sample_content : Bool = false)
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
         end
@@ -27,8 +27,10 @@ module Hwaro
         Logger.info "Initializing new Hwaro project in #{target_path}..."
 
         create_directory(File.join(target_path, "content"))
-        create_file(File.join(target_path, "content", "index.md"), sample_content)
-        create_file(File.join(target_path, "content", "about.md"), sample_about_content)
+        unless skip_sample_content
+          create_file(File.join(target_path, "content", "index.md"), sample_content)
+          create_file(File.join(target_path, "content", "about.md"), sample_about_content)
+        end
 
         create_directory(File.join(target_path, "templates"))
         create_file(File.join(target_path, "templates", "header.ecr"), sample_header)
