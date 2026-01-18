@@ -1,6 +1,6 @@
 require "option_parser"
-require "../../options/new_options"
-require "../../core/new/creator"
+require "../../config/options/new_options"
+require "../../services/creator"
 require "../../utils/logger"
 
 module Hwaro
@@ -9,10 +9,10 @@ module Hwaro
       class NewCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::New::Creator.new.run(options)
+          Services::Creator.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Options::NewOptions
+        private def parse_options(args : Array(String)) : Config::Options::NewOptions
           path = nil
           title = nil
 
@@ -25,7 +25,7 @@ module Hwaro
             end
           end
 
-          Options::NewOptions.new(path: path, title: title)
+          Config::Options::NewOptions.new(path: path, title: title)
         end
       end
     end

@@ -3,18 +3,17 @@
 # This is the main entry point for the Hwaro application.
 # The codebase is organized as follows:
 #
-# - options/   : Option structs for each command (BuildOptions, ServeOptions, etc.)
-# - core/      : Core functionality modules
-#   - build/   : Build-related modules (builder, cache, parallel)
-#   - init/    : Project initialization
-#   - serve/   : Development server
-# - plugins/   : Extensible plugin system
+# - config/    : Configuration loading and options
+#   - options/ : Command option structs (BuildOptions, ServeOptions, etc.)
+# - core/      : Build orchestration (builder, cache, parallel, lifecycle)
+# - content/   : Content domain
 #   - processors/ : Content processors (markdown, html, etc.)
-# - cli/       : Command-line interface handling
-#   - commands/: Individual command implementations
-#   - runner.cr: Main CLI runner with command registry
+#   - seo/     : SEO file generators (sitemap, feeds, robots, llms)
+#   - hooks/   : Lifecycle hook implementations
+# - services/  : Non-build features (init, new, serve)
+# - models/    : Data structures (config, page, site, etc.)
+# - cli/       : Command-line interface
 # - utils/     : Utility modules (logger, etc.)
-# - schemas/   : Data structures for config, pages, etc.
 
 require "option_parser"
 require "yaml"
@@ -28,33 +27,44 @@ require "toml"
 require "./utils/logger"
 
 # Load options
-require "./options/init_options"
-require "./options/build_options"
-require "./options/serve_options"
+require "./config/options/init_options"
+require "./config/options/build_options"
+require "./config/options/serve_options"
 
-# Load schemas
-require "./schemas/config"
-require "./schemas/page"
-require "./schemas/section"
-require "./schemas/site"
-require "./schemas/toc"
+# Load models
+require "./models/config"
+require "./models/page"
+require "./models/section"
+require "./models/site"
+require "./models/toc"
 
-# Load plugins
-require "./plugins/processors/base"
-require "./plugins/processors/markdown"
-require "./plugins/processors/html"
+# Load content processors
+require "./content/processors/base"
+require "./content/processors/markdown"
+require "./content/processors/html"
+
+# Load lifecycle system
+require "./core/lifecycle"
 
 # Load core modules
 require "./core/build/cache"
 require "./core/build/parallel"
 require "./core/build/builder"
-require "./core/init/initializer"
-require "./core/serve/server"
-require "./core/build/seo/feeds"
-require "./core/build/seo/sitemap"
-require "./core/build/seo/robots"
-require "./core/build/seo/llms"
-require "./core/build/search"
+
+# Load services
+require "./services/initializer"
+require "./services/creator"
+require "./services/server/server"
+
+# Load content domain
+require "./content/seo/feeds"
+require "./content/seo/sitemap"
+require "./content/seo/robots"
+require "./content/seo/llms"
+require "./content/search"
+
+# Load content hooks
+require "./content/hooks"
 
 # Load CLI
 require "./cli/runner"

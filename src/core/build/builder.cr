@@ -5,34 +5,55 @@
 # - Template loading and rendering
 # - Parallel processing with caching
 # - Output generation
+#
+# The Builder uses the Lifecycle system to allow extensibility
+# through hooks at various phases of the build process.
 
 require "file_utils"
 require "toml"
 require "./cache"
 require "./parallel"
-require "./seo/feeds"
-require "./seo/sitemap"
-require "./seo/robots"
-require "./seo/llms"
-require "./search"
+require "../../content/seo/feeds"
+require "../../content/seo/sitemap"
+require "../../content/seo/robots"
+require "../../content/seo/llms"
+require "../../content/search"
 require "../../utils/logger"
-require "../../options/build_options"
-require "../../plugins/processors/markdown"
-require "../../schemas/config"
-require "../../schemas/page"
-require "../../schemas/section"
-require "../../schemas/toc"
-require "../../schemas/site"
+require "../../config/options/build_options"
+require "../../content/processors/markdown"
+require "../../models/config"
+require "../../models/page"
+require "../../models/section"
+require "../../models/toc"
+require "../../models/site"
+require "../lifecycle"
 
 module Hwaro
   module Core
     module Build
       class Builder
-        @site : Schemas::Site?
+        @site : Models::Site?
         @templates : Hash(String, String)?
         @cache : Cache?
+        @lifecycle : Lifecycle::Manager
+        @context : Lifecycle::BuildContext?
 
-        def run(options : Options::BuildOptions)
+        def initialize
+          @lifecycle = Lifecycle::Manager.new
+        end
+
+        # Access lifecycle for external hook registration
+        def lifecycle : Lifecycle::Manager
+          @lifecycle
+        end
+
+        # Register a Hookable module
+        def register(hookable : Lifecycle::Hookable)
+          @lifecycle.register(hookable)
+          self
+        end
+
+        def run(options : Config::Options::BuildOptions)
           run(
             output_dir: options.output_dir,
             drafts: options.drafts,
@@ -52,78 +73,234 @@ module Hwaro
           Logger.info "Building site..."
           start_time = Time.instant
 
-          # Reset caches
+          # Create build context for lifecycle
+          options = Config::Options::BuildOptions.new(
+            output_dir: output_dir,
+            drafts: drafts,
+            minify: minify,
+            parallel: parallel,
+            cache: cache
+          )
+          ctx = Lifecycle::BuildContext.new(options)
+          ctx.stats.start_time = Time.instant
+          @context = ctx
+
+          # Reset internal caches
           @site = nil
           @templates = nil
 
-          # Initialize build cache
-          @cache = Cache.new(enabled: cache)
-          build_cache = @cache.not_nil!
+          # Execute build phases through lifecycle
+          result = execute_phases(ctx, drafts, minify, parallel, cache)
 
-          if cache
-            stats = build_cache.stats
-            Logger.info "  Cache enabled (#{stats[:valid]} valid entries)"
+          ctx.stats.end_time = Time.instant
+
+          if result == Lifecycle::HookResult::Abort
+            Logger.error "Build failed!"
+            return
           end
 
-          # Setup output directory
-          setup_output_dir(output_dir)
+          elapsed = Time.instant - start_time
+          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} pages in #{elapsed.total_milliseconds.round(2)}ms."
+        end
 
-          # Copy static files
-          copy_static_files(output_dir)
+        # Execute all build phases with lifecycle hooks
+        private def execute_phases(
+          ctx : Lifecycle::BuildContext,
+          drafts : Bool,
+          minify : Bool,
+          parallel : Bool,
+          cache_enabled : Bool
+        ) : Lifecycle::HookResult
+          output_dir = ctx.output_dir
 
-          # Initialize site
-          config = Schemas::Config.load
-          @site = Schemas::Site.new(config)
+          # Phase: Initialize
+          result = @lifecycle.run_phase(Lifecycle::Phase::Initialize, ctx) do
+            @cache = Cache.new(enabled: cache_enabled)
+            ctx.cache = @cache
+
+            if cache_enabled
+              stats = @cache.not_nil!.stats
+              Logger.info "  Cache enabled (#{stats[:valid]} valid entries)"
+            end
+
+            setup_output_dir(output_dir)
+            copy_static_files(output_dir)
+
+            config = Models::Config.load
+            @site = Models::Site.new(config)
+            ctx.site = @site
+            ctx.config = config
+
+            ctx.templates = load_templates
+            @templates = ctx.templates
+          end
+          return result if result != Lifecycle::HookResult::Continue
+
           site = @site.not_nil!
+          templates = @templates.not_nil!
+          build_cache = @cache.not_nil!
 
-          # Load templates (cached)
-          templates = load_templates
+          # Phase: ReadContent
+          result = @lifecycle.run_phase(Lifecycle::Phase::ReadContent, ctx) do
+            collect_content_paths(ctx, drafts)
+            Logger.info "  Found #{ctx.all_pages.size} pages."
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          # Collect and parse all content files
-          collect_content(site, drafts)
-          all_pages = (site.pages + site.sections).as(Array(Schemas::Page))
+          # Phase: ParseContent (hooks handle actual parsing)
+          result = @lifecycle.run_phase(Lifecycle::Phase::ParseContent, ctx) do
+            # Default parsing if no hooks registered
+            unless @lifecycle.has_hooks?(Lifecycle::HookPoint::AfterReadContent)
+              parse_content_default(ctx)
+            end
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          Logger.info "  Found #{all_pages.size} pages."
+          # Phase: Transform
+          result = @lifecycle.run_phase(Lifecycle::Phase::Transform, ctx) do
+            # Hooks handle transformation (Markdown → HTML)
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          # Filter pages that need rebuilding if caching is enabled
-          pages_to_build = if cache
+          all_pages = ctx.all_pages
+
+          # Filter pages for caching
+          pages_to_build = if cache_enabled
                              filter_changed_pages(all_pages, output_dir, build_cache)
                            else
                              all_pages
                            end
 
-          if cache && pages_to_build.size < all_pages.size
-            Logger.info "  Skipping #{all_pages.size - pages_to_build.size} unchanged pages."
+          if cache_enabled && pages_to_build.size < all_pages.size
+            ctx.stats.cache_hits = all_pages.size - pages_to_build.size
+            Logger.info "  Skipping #{ctx.stats.cache_hits} unchanged pages."
           end
 
-          # Process files
-          count = if parallel && pages_to_build.size > 1
-                    process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache)
-                  else
-                    process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache)
-                  end
+          # Phase: Render
+          result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
+            count = if parallel && pages_to_build.size > 1
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache)
+                    else
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache)
+                    end
+            ctx.stats.pages_rendered = count
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          # Generate SEO files (Sitemap, Feeds, Robots, LLMs)
-          # Note: Each generator checks its own 'enabled' configuration
-          Seo::Sitemap.generate(all_pages, site, output_dir)
-          Seo::Feeds.generate(all_pages, site.config, output_dir)
-          Seo::Robots.generate(site.config, output_dir)
-          Seo::Llms.generate(site.config, output_dir)
+          # Phase: Generate (SEO, Search, etc.)
+          result = @lifecycle.run_phase(Lifecycle::Phase::Generate, ctx) do
+            # Default generation if no SEO hooks registered
+            unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeGenerate)
+              Content::Seo::Sitemap.generate(all_pages, site, output_dir)
+              Content::Seo::Feeds.generate(all_pages, site.config, output_dir)
+              Content::Seo::Robots.generate(site.config, output_dir)
+              Content::Seo::Llms.generate(site.config, output_dir)
+              Content::Search.generate(all_pages, site.config, output_dir)
+            end
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          # Generate search index
-          Search.generate(all_pages, site.config, output_dir)
+          # Phase: Write
+          result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
+            generate_404_page(site, templates, output_dir, minify)
+          end
+          return result if result != Lifecycle::HookResult::Continue
 
-          # Generate 404 page
-          generate_404_page(site, templates, output_dir, minify)
-
-          # Save cache
-          build_cache.save if cache
-
-          elapsed = Time.instant - start_time
-          Logger.success "Build complete! Generated #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          # Phase: Finalize
+          @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
+            build_cache.save if cache_enabled
+          end
         end
 
-        private def filter_changed_pages(pages : Array(Schemas::Page), output_dir : String, cache : Cache) : Array(Schemas::Page)
+        # Collect content file paths without parsing
+        private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
+          Dir.glob("content/**/*.md") do |file_path|
+            relative_path = Path[file_path].relative_to("content").to_s
+            is_index = Path[relative_path].basename == "index.md"
+
+            if is_index
+              page = Models::Section.new(relative_path)
+              ctx.sections << page
+            else
+              page = Models::Page.new(relative_path)
+              ctx.pages << page
+            end
+
+            # Set basic path info
+            path_parts = Path[relative_path].parts
+            page.section = path_parts.size > 1 ? path_parts.first : ""
+            page.is_index = is_index
+          end
+        end
+
+        # Default parsing when no hooks are registered
+        private def parse_content_default(ctx : Lifecycle::BuildContext)
+          ctx.all_pages.each do |page|
+            source_path = File.join("content", page.path)
+            next unless File.exists?(source_path)
+
+            raw_content = File.read(source_path)
+            data = Processor::Markdown.parse(raw_content, source_path)
+
+            page.title = data[:title]
+            page.raw_content = data[:content]
+            page.draft = data[:draft]
+            page.template = data[:layout]
+            page.in_sitemap = data[:in_sitemap]
+            page.toc = data[:toc]
+            page.date = data[:date]
+            page.updated = data[:updated]
+            page.render = data[:render]
+            page.slug = data[:slug]
+            page.custom_path = data[:custom_path]
+            page.aliases = data[:aliases]
+            page.tags = data[:tags]
+
+            if page.is_a?(Models::Section)
+              page.transparent = data[:transparent]
+              page.generate_feeds = data[:generate_feeds]
+            end
+
+            # Calculate URL
+            calculate_page_url(page)
+          end
+
+          # Filter drafts
+          unless ctx.options.drafts
+            ctx.pages.reject! { |p| p.draft }
+            ctx.sections.reject! { |s| s.draft }
+          end
+        end
+
+        private def calculate_page_url(page : Models::Page)
+          relative_path = page.path
+          path_parts = Path[relative_path].parts
+
+          if page.custom_path
+            custom = page.custom_path.not_nil!.sub(/^\//, "")
+            page.url = "/#{custom}"
+            page.url += "/" unless page.url.ends_with?("/")
+          elsif page.is_index
+            if path_parts.size == 1
+              page.url = "/"
+            else
+              parent = Path[relative_path].dirname
+              page.url = "/#{parent}/"
+            end
+          else
+            dir = Path[relative_path].dirname
+            stem = Path[relative_path].stem
+            leaf = page.slug || stem
+
+            if dir == "."
+              page.url = "/#{leaf}/"
+            else
+              page.url = "/#{dir}/#{leaf}/"
+            end
+          end
+        end
+
+        private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache) : Array(Models::Page)
           pages.select do |page|
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
@@ -131,7 +308,7 @@ module Hwaro
           end
         end
 
-        private def get_output_path(page : Schemas::Page, output_dir : String) : String
+        private def get_output_path(page : Models::Page, output_dir : String) : String
           url_path = page.url.sub(/^\//, "")
           File.join(output_dir, url_path, "index.html")
         end
@@ -171,88 +348,16 @@ module Hwaro
           @templates = templates
         end
 
-        private def collect_content(site : Schemas::Site, include_drafts : Bool)
-          Dir.glob("content/**/*.md") do |file_path|
-            relative_path = Path[file_path].relative_to("content").to_s
-            raw_content = File.read(file_path)
-
-            parsed = Processor::Markdown.parse(raw_content, file_path)
-            next unless parsed
-
-            data = parsed
-
-            if data[:draft] && !include_drafts
-              next
-            end
-
-            is_index = Path[relative_path].basename == "index.md"
-
-            if is_index
-              page = Schemas::Section.new(relative_path)
-              site.sections << page
-            else
-              page = Schemas::Page.new(relative_path)
-              site.pages << page
-            end
-
-            page.title = data[:title]
-            page.raw_content = data[:content]
-            page.draft = data[:draft]
-            page.template = data[:layout]
-            page.in_sitemap = data[:in_sitemap]
-            page.toc = data[:toc]
-            page.date = data[:date]
-            page.updated = data[:updated]
-            page.render = data[:render]
-            page.slug = data[:slug]
-            page.custom_path = data[:custom_path]
-            page.aliases = data[:aliases]
-            page.tags = data[:tags]
-
-            if page.is_a?(Schemas::Section)
-              page.transparent = data[:transparent]
-              page.generate_feeds = data[:generate_feeds]
-            end
-
-            path_parts = Path[relative_path].parts
-            page.section = path_parts.size > 1 ? path_parts.first : ""
-            page.is_index = is_index
-
-            if page.custom_path
-              custom = page.custom_path.not_nil!.sub(/^\//, "")
-              page.url = "/#{custom}"
-              page.url += "/" unless page.url.ends_with?("/")
-            elsif page.is_index
-              if path_parts.size == 1
-                page.url = "/"
-              else
-                parent = Path[relative_path].dirname
-                page.url = "/#{parent}/"
-              end
-            else
-              dir = Path[relative_path].dirname
-              stem = Path[relative_path].stem
-              leaf = page.slug || stem
-
-              if dir == "."
-                page.url = "/#{leaf}/"
-              else
-                page.url = "/#{dir}/#{leaf}/"
-              end
-            end
-          end
-        end
-
         private def process_files_parallel(
-          pages : Array(Schemas::Page),
-          site : Schemas::Site,
+          pages : Array(Models::Page),
+          site : Models::Site,
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool,
           cache : Cache
         ) : Int32
           config = ParallelConfig.new(enabled: true)
-          processor = Parallel(Schemas::Page, Bool).new(config)
+          processor = Parallel(Models::Page, Bool).new(config)
 
           results = processor.process(pages) do |page, _idx|
             render_page(page, site, templates, output_dir, minify)
@@ -266,8 +371,8 @@ module Hwaro
         end
 
         private def process_files_sequential(
-          pages : Array(Schemas::Page),
-          site : Schemas::Site,
+          pages : Array(Models::Page),
+          site : Models::Site,
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool,
@@ -285,8 +390,8 @@ module Hwaro
         end
 
         private def render_page(
-          page : Schemas::Page,
-          site : Schemas::Site,
+          page : Models::Page,
+          site : Models::Site,
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool
@@ -325,7 +430,7 @@ module Hwaro
           generate_aliases(page, output_dir)
         end
 
-        private def determine_template(page : Schemas::Page, templates : Hash(String, String)) : String
+        private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
           if custom = page.template
             return custom if templates.has_key?(custom)
             Logger.warn "  [WARN] Custom template '#{custom}' not found for #{page.path}."
@@ -338,7 +443,7 @@ module Hwaro
           "page"
         end
 
-        private def generate_section_list(current_page : Schemas::Page, site : Schemas::Site) : String
+        private def generate_section_list(current_page : Models::Page, site : Models::Site) : String
           section_pages = site.pages.select do |p|
             p.section == current_page.section && !p.is_index
           end
@@ -353,7 +458,7 @@ module Hwaro
           end
         end
 
-        private def generate_aliases(page : Schemas::Page, output_dir : String)
+        private def generate_aliases(page : Models::Page, output_dir : String)
           page.aliases.each do |alias_path|
             alias_clean = alias_path.sub(/^\//, "")
             dest_path = File.join(output_dir, alias_clean, "index.html")
@@ -379,7 +484,7 @@ module Hwaro
           end
         end
 
-        private def generate_toc_html(headers : Array(Schemas::TocHeader)) : String
+        private def generate_toc_html(headers : Array(Models::TocHeader)) : String
           return "" if headers.empty?
 
           String.build do |str|
@@ -412,8 +517,8 @@ module Hwaro
         private def apply_template(
           template : String,
           content : String,
-          page : Schemas::Page,
-          config : Schemas::Config,
+          page : Models::Page,
+          config : Models::Config,
           section_list : String,
           toc : String,
           templates : Hash(String, String)
@@ -477,7 +582,7 @@ module Hwaro
           html.gsub(/\n\s*/, "")
         end
 
-        private def write_output(page : Schemas::Page, output_dir : String, content : String)
+        private def write_output(page : Models::Page, output_dir : String, content : String)
           output_path = get_output_path(page, output_dir)
 
           FileUtils.mkdir_p(Path[output_path].dirname)
@@ -485,11 +590,11 @@ module Hwaro
           Logger.action :create, output_path
         end
 
-        private def generate_404_page(site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
+        private def generate_404_page(site : Models::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
           return unless templates.has_key?("404")
 
           template = templates["404"]
-          page = Schemas::Page.new("404.html")
+          page = Models::Page.new("404.html")
           page.title = "404 Not Found"
 
           content = ""

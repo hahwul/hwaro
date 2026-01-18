@@ -8,9 +8,9 @@ describe Hwaro do
     end
   end
 
-  describe Hwaro::Options::BuildOptions do
+  describe Hwaro::Config::Options::BuildOptions do
     it "has default values" do
-      options = Hwaro::Options::BuildOptions.new
+      options = Hwaro::Config::Options::BuildOptions.new
       options.output_dir.should eq("public")
       options.drafts.should eq(false)
       options.minify.should eq(false)
@@ -19,7 +19,7 @@ describe Hwaro do
     end
 
     it "accepts custom values" do
-      options = Hwaro::Options::BuildOptions.new(
+      options = Hwaro::Config::Options::BuildOptions.new(
         output_dir: "dist",
         drafts: true,
         minify: true,
@@ -34,9 +34,9 @@ describe Hwaro do
     end
   end
 
-  describe Hwaro::Options::ServeOptions do
+  describe Hwaro::Config::Options::ServeOptions do
     it "has default values" do
-      options = Hwaro::Options::ServeOptions.new
+      options = Hwaro::Config::Options::ServeOptions.new
       options.host.should eq("0.0.0.0")
       options.port.should eq(3000)
       options.drafts.should eq(false)
@@ -44,24 +44,24 @@ describe Hwaro do
     end
 
     it "converts to build options" do
-      options = Hwaro::Options::ServeOptions.new(drafts: true)
+      options = Hwaro::Config::Options::ServeOptions.new(drafts: true)
       build_options = options.to_build_options
       build_options.drafts.should eq(true)
       build_options.output_dir.should eq("public")
     end
   end
 
-  describe Hwaro::Options::InitOptions do
+  describe Hwaro::Config::Options::InitOptions do
     it "has default values" do
-      options = Hwaro::Options::InitOptions.new
+      options = Hwaro::Config::Options::InitOptions.new
       options.path.should eq(".")
       options.force.should eq(false)
     end
   end
 
-  describe Hwaro::Schemas::Config do
+  describe Hwaro::Models::Config do
     it "has default values" do
-      config = Hwaro::Schemas::Config.new
+      config = Hwaro::Models::Config.new
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
@@ -71,7 +71,7 @@ describe Hwaro do
     end
 
     it "has default search configuration" do
-      config = Hwaro::Schemas::Config.new
+      config = Hwaro::Models::Config.new
       config.search.enabled.should eq(false)
       config.search.format.should eq("fuse_json")
       config.search.fields.should eq(["title", "content"])
@@ -79,22 +79,22 @@ describe Hwaro do
     end
 
     it "has default plugin configuration" do
-      config = Hwaro::Schemas::Config.new
+      config = Hwaro::Models::Config.new
       config.plugins.processors.should eq(["markdown"])
     end
   end
 
-  describe Hwaro::Plugins::Processors::Registry do
+  describe Hwaro::Content::Processors::Registry do
     it "has markdown processor registered by default" do
-      Hwaro::Plugins::Processors::Registry.has?("markdown").should be_true
+      Hwaro::Content::Processors::Registry.has?("markdown").should be_true
     end
 
     it "has html processor registered" do
-      Hwaro::Plugins::Processors::Registry.has?("html").should be_true
+      Hwaro::Content::Processors::Registry.has?("html").should be_true
     end
 
     it "can list all processor names" do
-      names = Hwaro::Plugins::Processors::Registry.names
+      names = Hwaro::Content::Processors::Registry.names
       names.should contain("markdown")
       names.should contain("html")
     end
@@ -131,13 +131,9 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          title.should eq("Test Page")
-          draft.should eq(false)
-          in_sitemap.should eq(false)
-        end
+        result[:title].should eq("Test Page")
+        result[:draft].should eq(false)
+        result[:in_sitemap].should eq(false)
       end
 
       it "defaults in_sitemap to true when not specified in TOML" do
@@ -150,11 +146,7 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          in_sitemap.should eq(true)
-        end
+        result[:in_sitemap].should eq(true)
       end
 
       it "parses YAML frontmatter with in_sitemap" do
@@ -169,13 +161,9 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          title.should eq("Test Page")
-          draft.should eq(false)
-          in_sitemap.should eq(false)
-        end
+        result[:title].should eq("Test Page")
+        result[:draft].should eq(false)
+        result[:in_sitemap].should eq(false)
       end
 
       it "defaults in_sitemap to true when not specified in YAML" do
@@ -188,11 +176,7 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          in_sitemap.should eq(true)
-        end
+        result[:in_sitemap].should eq(true)
       end
 
       it "handles in_sitemap explicitly set to true in TOML" do
@@ -206,11 +190,7 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          in_sitemap.should eq(true)
-        end
+        result[:in_sitemap].should eq(true)
       end
 
       it "handles in_sitemap explicitly set to true in YAML" do
@@ -224,11 +204,7 @@ describe Hwaro do
         MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result.should_not be_nil
-        if result
-          title, markdown, draft, layout, in_sitemap = result
-          in_sitemap.should eq(true)
-        end
+        result[:in_sitemap].should eq(true)
       end
     end
   end
