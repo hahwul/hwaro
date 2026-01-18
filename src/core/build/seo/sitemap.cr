@@ -11,7 +11,7 @@ module Hwaro
             # Check if sitemap is enabled
             return unless site.config.sitemap.enabled
 
-            sitemap_pages = pages.select { |p| p.in_sitemap }
+            sitemap_pages = pages.select { |p| p.in_sitemap && p.render }
 
             if sitemap_pages.empty?
               Logger.info "  No pages to include in sitemap."
@@ -37,7 +37,7 @@ module Hwaro
                 str << "    <loc>#{escaped_url}</loc>\n"
 
                 # Add lastmod if available
-                if date = page.date
+                if date = (page.updated || page.date)
                   str << "    <lastmod>#{date.to_s("%Y-%m-%d")}</lastmod>\n"
                 end
 
