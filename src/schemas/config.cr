@@ -150,7 +150,7 @@ module Hwaro
 
                   if allow = rule_h["allow"]?
                     if allow_arr = allow.as_a?
-                      rule.allow = allow_arr.map(&.as_s)
+                      rule.allow = allow_arr.compact_map(&.as_s?)
                     elsif allow_str = allow.as_s?
                       rule.allow = [allow_str]
                     end
@@ -158,7 +158,7 @@ module Hwaro
 
                   if disallow = rule_h["disallow"]?
                     if disallow_arr = disallow.as_a?
-                      rule.disallow = disallow_arr.map(&.as_s)
+                      rule.disallow = disallow_arr.compact_map(&.as_s?)
                     elsif disallow_str = disallow.as_s?
                       rule.disallow = [disallow_str]
                     end
@@ -195,7 +195,7 @@ module Hwaro
             config.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
             config.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
             if sections = feeds_section["sections"]?.try(&.as_a)
-              config.feeds.sections = sections.map(&.as_s)
+              config.feeds.sections = sections.compact_map(&.as_s?)
             end
           end
 
@@ -205,14 +205,14 @@ module Hwaro
             config.search.format = search_section["format"]?.try(&.as_s) || config.search.format
             config.search.filename = search_section["filename"]?.try(&.as_s) || config.search.filename
             if fields = search_section["fields"]?.try(&.as_a)
-              config.search.fields = fields.map(&.as_s)
+              config.search.fields = fields.compact_map(&.as_s?)
             end
           end
 
           # Load plugins configuration
           if plugins_section = config.raw["plugins"]?.try(&.as_h)
             if processors = plugins_section["processors"]?.try(&.as_a)
-              config.plugins.processors = processors.map(&.as_s)
+              config.plugins.processors = processors.compact_map(&.as_s?)
             end
           end
         end
