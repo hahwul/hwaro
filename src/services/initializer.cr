@@ -10,10 +10,10 @@ module Hwaro
   module Services
     class Initializer
       def run(options : Config::Options::InitOptions)
-        run(options.path, options.force)
+        run(options.path, options.force, options.skip_agents_md)
       end
 
-      def run(target_path : String, force : Bool = false)
+      def run(target_path : String, force : Bool = false, skip_agents_md : Bool = false)
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
         end
@@ -43,10 +43,11 @@ module Hwaro
         create_directory(File.join(target_path, "static"))
         create_file(File.join(target_path, "config.toml"), sample_config)
 
-        Logger.success "Done! Run `hwaro build` to generate the site."
-        unless target_path == "."
-          Logger.info "  cd #{target_path}"
+        unless skip_agents_md
+          create_file(File.join(target_path, "AGENTS.md"), "")
         end
+
+        Logger.success "Done! Run `hwaro build` to generate the site."
       end
 
       private def create_directory(path : String)
