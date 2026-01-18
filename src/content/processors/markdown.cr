@@ -70,6 +70,8 @@ module Hwaro
           tags = [] of String
           transparent = false
           generate_feeds = false
+          paginate = nil.as(Int32?)
+          pagination_enabled = nil.as(Bool?)
 
           # Try TOML Front Matter (+++)
           if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
@@ -95,6 +97,14 @@ module Hwaro
               end
               if toml_fm.has_key?("generate_feeds")
                 generate_feeds = toml_fm["generate_feeds"].as_bool
+              end
+
+              # Section-specific pagination settings
+              if toml_fm.has_key?("paginate")
+                paginate = toml_fm["paginate"].as_i
+              end
+              if toml_fm.has_key?("pagination_enabled")
+                pagination_enabled = toml_fm["pagination_enabled"].as_bool
               end
 
               slug = toml_fm["slug"]?.try(&.as_s)
@@ -142,6 +152,17 @@ module Hwaro
                   generate_feeds = bool_val unless bool_val.nil?
                 end
 
+                # Section-specific pagination settings
+                if (val = yaml_fm["paginate"]?)
+                  int_val = val.as_i?
+                  paginate = int_val unless int_val.nil?
+                end
+
+                if (val = yaml_fm["pagination_enabled"]?)
+                  bool_val = val.as_bool?
+                  pagination_enabled = bool_val unless bool_val.nil?
+                end
+
                 slug = yaml_fm["slug"]?.try(&.as_s?)
                 custom_path = yaml_fm["path"]?.try(&.as_s?)
 
@@ -174,7 +195,9 @@ module Hwaro
             aliases: aliases,
             tags: tags,
             transparent: transparent,
-            generate_feeds: generate_feeds
+            generate_feeds: generate_feeds,
+            paginate: paginate,
+            pagination_enabled: pagination_enabled
           }
         end
 

@@ -63,6 +63,8 @@ module Hwaro
           if page.is_a?(Models::Section)
             page.transparent = data[:transparent]
             page.generate_feeds = data[:generate_feeds]
+            page.paginate = data[:paginate]
+            page.pagination_enabled = data[:pagination_enabled]
           end
         end
 

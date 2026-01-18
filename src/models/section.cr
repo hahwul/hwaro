@@ -4,8 +4,9 @@ module Hwaro
   module Models
     class Section < Page
       # Section-specific Front Matter Properties
-      property paginate : Int32?
-      property sort_by : String? # e.g., "date", "weight", "title"
+      property paginate : Int32?          # Override per_page count for this section
+      property pagination_enabled : Bool? # Override pagination enabled/disabled for this section
+      property sort_by : String?          # e.g., "date", "weight", "title"
       property reverse : Bool?
       property transparent : Bool
       property generate_feeds : Bool
