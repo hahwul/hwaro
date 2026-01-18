@@ -144,7 +144,7 @@ SEO-related features live in `src/content/seo/`:
 - `feeds.cr` - RSS/Atom feed generation
 - `sitemap.cr` - Sitemap XML generation
 - `robots.cr` - Robots.txt generation
-- `llms.cr` - llms.txt file generator for AI/LLM crawler instructions
+- `llms.cr` - LLM instructions file generator for AI/LLM crawler instructions
 
 ### Configuration
 
