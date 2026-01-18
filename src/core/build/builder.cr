@@ -11,6 +11,7 @@
 
 require "file_utils"
 require "toml"
+require "uri"
 require "./cache"
 require "./parallel"
 require "../../content/seo/feeds"
@@ -461,7 +462,7 @@ module Hwaro
           pagination_result = paginator.paginate(section, section_pages)
           renderer = Content::Pagination::Renderer.new(site.config)
 
-          pagination_result.paginated_pages.each_with_index do |paginated_page, idx|
+          pagination_result.paginated_pages.each do |paginated_page|
             section_list_html = renderer.render_section_list(paginated_page)
             pagination_nav_html = renderer.render_pagination_nav(paginated_page)
 
@@ -506,9 +507,16 @@ module Hwaro
         end
 
         # Sanitize path to prevent directory traversal
+        # Uses Crystal's Path normalization and filters out unsafe components
         private def sanitize_path(path : String) : String
-          # Remove any parent directory references and normalize
-          path.gsub(/\.\./, "").gsub(/\/+/, "/").strip("/")
+          # URL-decode the path first to handle encoded traversal attempts
+          decoded = URI.decode(path)
+          # Remove any parent directory references, null bytes, and normalize slashes
+          decoded
+            .gsub(/\.\./, "")           # Remove parent directory references
+            .gsub(/\0/, "")             # Remove null bytes
+            .gsub(/\/+/, "/")           # Normalize multiple slashes
+            .gsub(/^\/+|\/+$/, "")      # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
