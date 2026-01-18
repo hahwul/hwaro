@@ -1,6 +1,7 @@
 require "./commands/init_command"
 require "./commands/build_command"
 require "./commands/serve_command"
+require "./commands/new_command"
 require "../utils/logger"
 
 module Hwaro
@@ -102,6 +103,11 @@ module Hwaro
         # Register serve command
         CommandRegistry.register("serve", "Serve the project and watch for changes") do |args|
           Commands::ServeCommand.new.run(args)
+        end
+
+        # Register new command
+        CommandRegistry.register("new", "Create a new content file") do |args|
+          Commands::NewCommand.new.run(args)
         end
       end
 
