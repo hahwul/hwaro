@@ -53,14 +53,21 @@ module Hwaro
           {(html || ""), [] of Schemas::TocHeader}
         end
 
-        # Returns {title, content, draft, layout, in_sitemap, toc}
-        def parse(raw_content : String, file_path : String = "") : Tuple(String, String, Bool, String?, Bool, Bool)?
+        # Returns parsed metadata and content
+        def parse(raw_content : String, file_path : String = "")
           markdown_content = raw_content
           title = "Untitled"
           is_draft = false
           layout = nil
           in_sitemap = true
           toc = false
+          date = nil
+          updated = nil
+          render = true
+          slug = nil
+          custom_path = nil
+          aliases = [] of String
+          tags = [] of String
 
           # Try TOML Front Matter (+++)
           if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
@@ -73,6 +80,23 @@ module Hwaro
                 in_sitemap = toml_fm["in_sitemap"].as_bool
               end
               toc = toml_fm["toc"]?.try(&.as_bool) || false
+
+              date = parse_time(toml_fm["date"]?.try(&.as_s))
+              updated = parse_time(toml_fm["updated"]?.try(&.as_s))
+
+              if toml_fm.has_key?("render")
+                render = toml_fm["render"].as_bool
+              end
+
+              slug = toml_fm["slug"]?.try(&.as_s)
+              custom_path = toml_fm["path"]?.try(&.as_s)
+
+              if toml_fm.has_key?("aliases")
+                aliases = toml_fm["aliases"].as_a.map(&.as_s)
+              end
+              if toml_fm.has_key?("tags")
+                tags = toml_fm["tags"].as_a.map(&.as_s)
+              end
             rescue ex
               Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
             end
@@ -90,6 +114,25 @@ module Hwaro
                   in_sitemap = bool_val unless bool_val.nil?
                 end
                 toc = yaml_fm["toc"]?.try(&.as_bool?) || false
+
+                date = parse_time(yaml_fm["date"]?.try(&.as_s?))
+                updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
+
+                if (val = yaml_fm["render"]?)
+                  bool_val = val.as_bool?
+                  render = bool_val unless bool_val.nil?
+                end
+
+                slug = yaml_fm["slug"]?.try(&.as_s?)
+                custom_path = yaml_fm["path"]?.try(&.as_s?)
+
+                if (val = yaml_fm["aliases"]?)
+                  aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+                end
+
+                if (val = yaml_fm["tags"]?)
+                  tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+                end
               end
             rescue ex
               Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
@@ -97,7 +140,21 @@ module Hwaro
             markdown_content = match[2]
           end
 
-          {title, markdown_content, is_draft, layout, in_sitemap, toc}
+          {
+            title: title,
+            content: markdown_content,
+            draft: is_draft,
+            layout: layout,
+            in_sitemap: in_sitemap,
+            toc: toc,
+            date: date,
+            updated: updated,
+            render: render,
+            slug: slug,
+            custom_path: custom_path,
+            aliases: aliases,
+            tags: tags
+          }
         end
 
         private def process_html_headers(html : String) : Tuple(String, Array(Schemas::TocHeader))
@@ -153,6 +210,31 @@ module Hwaro
           {final_html, roots}
         end
 
+        private def parse_time(time_str : String?) : Time?
+          return nil unless time_str
+
+          formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d"
+          ]
+
+          formats.each do |fmt|
+            begin
+              return Time.parse(time_str, fmt, Time::Location.local)
+            rescue
+              next
+            end
+          end
+
+          # Try ISO 8601 parsing as last resort
+          begin
+             return Time.parse_rfc3339(time_str)
+          rescue
+             nil
+          end
+        end
+
         private def slugify(text : String) : String
           text.downcase
               .gsub(/[^a-z0-9\s-]/, "") # Remove non-alphanumeric chars except space and hyphen
@@ -181,8 +263,8 @@ module Hwaro
         @@instance.render(content)
       end
 
-      # Returns {title, content, draft, layout, in_sitemap, toc}
-      def parse(raw_content : String, file_path : String = "") : Tuple(String, String, Bool, String?, Bool, Bool)?
+      # Returns parsed metadata and content
+      def parse(raw_content : String, file_path : String = "")
         @@instance.parse(raw_content, file_path)
       end
     end

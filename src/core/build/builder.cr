@@ -132,12 +132,8 @@ module Hwaro
         end
 
         private def get_output_path(page : Schemas::Page, output_dir : String) : String
-          if page.is_index
-            Path[output_dir, page.path].to_s.gsub(/\.md$/, ".html")
-          else
-            clean_path = page.path.gsub(/\.md$/, "")
-            Path[output_dir, clean_path, "index.html"].to_s
-          end
+          url_path = page.url.sub(/^\//, "")
+          File.join(output_dir, url_path, "index.html")
         end
 
         private def setup_output_dir(output_dir : String)
@@ -183,9 +179,9 @@ module Hwaro
             parsed = Processor::Markdown.parse(raw_content, file_path)
             next unless parsed
 
-            title, markdown_content, draft, layout_name, in_sitemap, toc = parsed
+            data = parsed
 
-            if draft && !include_drafts
+            if data[:draft] && !include_drafts
               next
             end
 
@@ -199,18 +195,29 @@ module Hwaro
               site.pages << page
             end
 
-            page.title = title
-            page.raw_content = markdown_content
-            page.draft = draft
-            page.template = layout_name
-            page.in_sitemap = in_sitemap
-            page.toc = toc
+            page.title = data[:title]
+            page.raw_content = data[:content]
+            page.draft = data[:draft]
+            page.template = data[:layout]
+            page.in_sitemap = data[:in_sitemap]
+            page.toc = data[:toc]
+            page.date = data[:date]
+            page.updated = data[:updated]
+            page.render = data[:render]
+            page.slug = data[:slug]
+            page.custom_path = data[:custom_path]
+            page.aliases = data[:aliases]
+            page.tags = data[:tags]
 
             path_parts = Path[relative_path].parts
             page.section = path_parts.size > 1 ? path_parts.first : ""
             page.is_index = is_index
 
-            if page.is_index
+            if page.custom_path
+              custom = page.custom_path.not_nil!.sub(/^\//, "")
+              page.url = "/#{custom}"
+              page.url += "/" unless page.url.ends_with?("/")
+            elsif page.is_index
               if path_parts.size == 1
                 page.url = "/"
               else
@@ -220,10 +227,12 @@ module Hwaro
             else
               dir = Path[relative_path].dirname
               stem = Path[relative_path].stem
+              leaf = page.slug || stem
+
               if dir == "."
-                page.url = "/#{stem}/"
+                page.url = "/#{leaf}/"
               else
-                page.url = "/#{dir}/#{stem}/"
+                page.url = "/#{dir}/#{leaf}/"
               end
             end
           end
@@ -277,6 +286,8 @@ module Hwaro
           output_dir : String,
           minify : Bool
         )
+          return unless page.render
+
           processed_content = process_shortcodes(page.raw_content, templates)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content)
@@ -306,6 +317,7 @@ module Hwaro
           final_html = minify_html(final_html) if minify
 
           write_output(page, output_dir, final_html)
+          generate_aliases(page, output_dir)
         end
 
         private def determine_template(page : Schemas::Page, templates : Hash(String, String)) : String
@@ -333,6 +345,32 @@ module Hwaro
               full_url = "#{site.config.base_url}#{p.url}"
               str << "<li><a href=\"#{full_url}\">#{p.title}</a></li>\n"
             end
+          end
+        end
+
+        private def generate_aliases(page : Schemas::Page, output_dir : String)
+          page.aliases.each do |alias_path|
+            alias_clean = alias_path.sub(/^\//, "")
+            dest_path = File.join(output_dir, alias_clean, "index.html")
+            FileUtils.mkdir_p(File.dirname(dest_path))
+
+            redirect_url = page.url
+
+            content = <<-HTML
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta http-equiv="refresh" content="0; url=#{redirect_url}" />
+              <title>Redirecting to #{redirect_url}</title>
+            </head>
+            <body>
+              <p>Redirecting to <a href="#{redirect_url}">#{redirect_url}</a>.</p>
+            </body>
+            </html>
+            HTML
+
+            File.write(dest_path, content)
+            Logger.action :create, dest_path, :yellow
           end
         end
 

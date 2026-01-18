@@ -5,8 +5,13 @@ module Hwaro
       property title : String
       property description : String?
       property date : Time?
+      property updated : Time?
       property template : String?
       property draft : Bool
+      property render : Bool
+      property slug : String?
+      property custom_path : String?
+      property aliases : Array(String)
       property tags : Array(String)
       property weight : Int32
       property in_sitemap : Bool
@@ -23,7 +28,9 @@ module Hwaro
       def initialize(@path : String)
         @title = "Untitled"
         @draft = false
+        @render = true
         @tags = [] of String
+        @aliases = [] of String
         @weight = 0
         @content = ""
         @raw_content = ""
