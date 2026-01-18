@@ -51,6 +51,9 @@ module Hwaro
 
           return html unless body
 
+          # Collect replacements to perform
+          replacements = [] of {XML::Node, String}
+
           # Find all <pre><code> blocks
           body.xpath_nodes("//pre/code").each do |code_node|
             # Get language from class attribute (e.g., "language-ruby")
@@ -64,26 +67,35 @@ module Hwaro
             if language && !language.empty?
               highlighted_html = highlight_code(code_content, language)
               
-              # Replace code node content with highlighted version
               if highlighted_html
-                # Remove existing content
-                code_node.children.each(&.unlink)
-                
-                # Parse highlighted HTML and add as child nodes
-                highlighted_doc = XML.parse_html(highlighted_html)
-                highlighted_body = highlighted_doc.xpath_node("//body")
-                
-                if highlighted_body
-                  highlighted_body.children.each do |child|
-                    code_node << child.dup
-                  end
-                end
+                replacements << {code_node, highlighted_html}
               end
             end
           end
 
-          # Return the modified HTML
-          body.children.map(&.to_xml).join
+          # Perform replacements
+          replacements.each do |code_node, highlighted_html|
+            # Remove existing content
+            code_node.children.each(&.unlink)
+            
+            # Create a temporary document to parse the highlighted HTML
+            temp_html = "<div>#{highlighted_html}</div>"
+            temp_doc = XML.parse_html(temp_html)
+            temp_body = temp_doc.xpath_node("//body")
+            temp_div = temp_body.try(&.first_element_child)
+            
+            # Add the parsed highlighted content as children
+            if temp_div
+              temp_div.children.each do |child|
+                # Use clone/dup to avoid ownership issues
+                cloned = child.dup
+                code_node << cloned
+              end
+            end
+          end
+
+          # Return the modified HTML - use to_s for HTML output
+          body.children.to_s
         rescue ex
           Logger.warn "  [WARN] Error processing code blocks: #{ex.message}"
           html
