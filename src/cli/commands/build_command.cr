@@ -1,7 +1,7 @@
 require "option_parser"
 require "../../options/build_options"
-require "../../core/build"
-require "../../logger/logger"
+require "../../core/build/builder"
+require "../../utils/logger"
 
 module Hwaro
   module CLI
@@ -9,7 +9,7 @@ module Hwaro
       class BuildCommand
         def run(args : Array(String))
           options = parse_options(args)
-          Core::Build.new.run(options)
+          Core::Build::Builder.new.run(options)
         end
 
         private def parse_options(args : Array(String)) : Options::BuildOptions
@@ -17,6 +17,7 @@ module Hwaro
           drafts = false
           minify = false
           parallel = true
+          cache = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -24,6 +25,7 @@ module Hwaro
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--minify", "Minify HTML output") { minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
+            parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -31,7 +33,8 @@ module Hwaro
             output_dir: output_dir,
             drafts: drafts,
             minify: minify,
-            parallel: parallel
+            parallel: parallel,
+            cache: cache
           )
         end
       end

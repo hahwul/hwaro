@@ -16,12 +16,22 @@ module Hwaro
       end
     end
 
+    # Plugin configuration for extensibility
+    class PluginConfig
+      property processors : Array(String)
+
+      def initialize
+        @processors = ["markdown"]  # Default processor
+      end
+    end
+
     class Config
       property title : String
       property description : String
       property base_url : String
       property sitemap : Bool
       property feeds : FeedConfig
+      property plugins : PluginConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -30,6 +40,7 @@ module Hwaro
         @base_url = ""
         @sitemap = false
         @feeds = FeedConfig.new
+        @plugins = PluginConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -48,6 +59,13 @@ module Hwaro
             config.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.feeds.filename
             config.feeds.type = feeds_section["type"]?.try(&.as_s) || config.feeds.type
             config.feeds.truncate = feeds_section["truncate"]?.try(&.as_i) || config.feeds.truncate
+          end
+
+          # Load plugins configuration
+          if plugins_section = config.raw["plugins"]?.try(&.as_h)
+            if processors = plugins_section["processors"]?.try(&.as_a)
+              config.plugins.processors = processors.map(&.as_s)
+            end
           end
         end
         config

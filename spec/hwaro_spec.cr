@@ -15,6 +15,7 @@ describe Hwaro do
       options.drafts.should eq(false)
       options.minify.should eq(false)
       options.parallel.should eq(true)
+      options.cache.should eq(false)
     end
 
     it "accepts custom values" do
@@ -22,12 +23,14 @@ describe Hwaro do
         output_dir: "dist",
         drafts: true,
         minify: true,
-        parallel: false
+        parallel: false,
+        cache: true
       )
       options.output_dir.should eq("dist")
       options.drafts.should eq(true)
       options.minify.should eq(true)
       options.parallel.should eq(false)
+      options.cache.should eq(true)
     end
   end
 
@@ -56,13 +59,48 @@ describe Hwaro do
     end
   end
 
-  describe Hwaro::Core::SiteConfig do
+  describe Hwaro::Schemas::Config do
     it "has default values" do
-      config = Hwaro::Core::SiteConfig.new
+      config = Hwaro::Schemas::Config.new
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
       config.sitemap.should eq(false)
+    end
+
+    it "has default plugin configuration" do
+      config = Hwaro::Schemas::Config.new
+      config.plugins.processors.should eq(["markdown"])
+    end
+  end
+
+  describe Hwaro::Plugins::Processors::Registry do
+    it "has markdown processor registered by default" do
+      Hwaro::Plugins::Processors::Registry.has?("markdown").should be_true
+    end
+
+    it "has html processor registered" do
+      Hwaro::Plugins::Processors::Registry.has?("html").should be_true
+    end
+
+    it "can list all processor names" do
+      names = Hwaro::Plugins::Processors::Registry.names
+      names.should contain("markdown")
+      names.should contain("html")
+    end
+  end
+
+  describe Hwaro::CLI::CommandRegistry do
+    it "has init command registered" do
+      Hwaro::CLI::CommandRegistry.has?("init").should be_true
+    end
+
+    it "has build command registered" do
+      Hwaro::CLI::CommandRegistry.has?("build").should be_true
+    end
+
+    it "has serve command registered" do
+      Hwaro::CLI::CommandRegistry.has?("serve").should be_true
     end
   end
 
