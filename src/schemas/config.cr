@@ -52,6 +52,20 @@ module Hwaro
       end
     end
 
+    class SearchConfig
+      property enabled : Bool
+      property format : String
+      property fields : Array(String)
+      property filename : String
+
+      def initialize
+        @enabled = false
+        @format = "fuse_json"
+        @fields = ["title", "content"]
+        @filename = "search.json"
+      end
+    end
+
     class FeedConfig
       property enabled : Bool
       property filename : String
@@ -87,6 +101,7 @@ module Hwaro
       property robots : RobotsConfig
       property llms : LlmsConfig
       property feeds : FeedConfig
+      property search : SearchConfig
       property plugins : PluginConfig
       property raw : Hash(String, TOML::Any)
 
@@ -98,6 +113,7 @@ module Hwaro
         @robots = RobotsConfig.new
         @llms = LlmsConfig.new
         @feeds = FeedConfig.new
+        @search = SearchConfig.new
         @plugins = PluginConfig.new
         @raw = Hash(String, TOML::Any).new
       end
@@ -180,6 +196,16 @@ module Hwaro
             config.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
             if sections = feeds_section["sections"]?.try(&.as_a)
               config.feeds.sections = sections.map(&.as_s)
+            end
+          end
+
+          # Load search configuration
+          if search_section = config.raw["search"]?.try(&.as_h)
+            config.search.enabled = search_section["enabled"]?.try(&.as_bool) || config.search.enabled
+            config.search.format = search_section["format"]?.try(&.as_s) || config.search.format
+            config.search.filename = search_section["filename"]?.try(&.as_s) || config.search.filename
+            if fields = search_section["fields"]?.try(&.as_a)
+              config.search.fields = fields.map(&.as_s)
             end
           end
 

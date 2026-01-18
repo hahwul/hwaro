@@ -14,6 +14,7 @@ require "./seo/feeds"
 require "./seo/sitemap"
 require "./seo/robots"
 require "./seo/llms"
+require "./search"
 require "../../utils/logger"
 require "../../options/build_options"
 require "../../plugins/processors/markdown"
@@ -108,6 +109,9 @@ module Hwaro
           Seo::Feeds.generate(all_pages, site.config, output_dir)
           Seo::Robots.generate(site.config, output_dir)
           Seo::Llms.generate(site.config, output_dir)
+
+          # Generate search index
+          Search.generate(all_pages, site.config, output_dir)
 
           # Generate 404 page
           generate_404_page(site, templates, output_dir, minify)

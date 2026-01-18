@@ -67,6 +67,15 @@ describe Hwaro do
       config.base_url.should eq("")
       config.sitemap.enabled.should eq(false)
       config.feeds.enabled.should eq(false)
+      config.search.enabled.should eq(false)
+    end
+
+    it "has default search configuration" do
+      config = Hwaro::Schemas::Config.new
+      config.search.enabled.should eq(false)
+      config.search.format.should eq("fuse_json")
+      config.search.fields.should eq(["title", "content"])
+      config.search.filename.should eq("search.json")
     end
 
     it "has default plugin configuration" do
