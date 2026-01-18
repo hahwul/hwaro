@@ -1,7 +1,7 @@
-require "../../../schemas/page"
-require "../../../schemas/config"
-require "../../../utils/logger"
-require "../../../plugins/processors/markdown"
+require "../../schemas/page"
+require "../../schemas/config"
+require "../../utils/logger"
+require "../../plugins/processors/markdown"
 require "json"
 
 module Hwaro
