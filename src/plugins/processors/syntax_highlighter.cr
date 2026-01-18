@@ -87,9 +87,9 @@ module Hwaro
             # Add the parsed highlighted content as children
             if temp_div
               temp_div.children.each do |child|
-                # Use clone for deep copy including all attributes and children
-                cloned = child.clone
-                code_node << cloned
+                # Use dup to copy the node (Crystal XML doesn't have clone method)
+                copied = child.dup
+                code_node << copied
               end
             end
           end
