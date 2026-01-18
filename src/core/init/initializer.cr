@@ -193,6 +193,12 @@ module Hwaro
           description = "Welcome to my new Hwaro site."
           base_url = "http://localhost:3000"
 
+          [search]
+          enabled = true
+          format = "fuse_json"
+          fields = ["title", "content"]
+          filename = "search.json"
+
           [sitemap]
           enabled = true
           filename = "sitemap.xml"
