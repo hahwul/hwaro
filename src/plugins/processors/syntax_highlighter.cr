@@ -87,14 +87,15 @@ module Hwaro
             # Add the parsed highlighted content as children
             if temp_div
               temp_div.children.each do |child|
-                # Use clone/dup to avoid ownership issues
-                cloned = child.dup
+                # Use clone for deep copy including all attributes and children
+                cloned = child.clone
                 code_node << cloned
               end
             end
           end
 
-          # Return the modified HTML - use to_s for HTML output
+          # Return the modified HTML content (without the body wrapper added by XML.parse_html)
+          # This preserves the original HTML structure that was passed in
           body.children.to_s
         rescue ex
           Logger.warn "  [WARN] Error processing code blocks: #{ex.message}"
@@ -105,8 +106,9 @@ module Hwaro
         private def extract_language(class_attr : String?) : String?
           return nil unless class_attr
 
-          # Handle common formats: "language-ruby", "lang-ruby", "ruby"
-          if match = class_attr.match(/(?:language-|lang-)?([\w+]+)/)
+          # Handle common formats: "language-ruby", "lang-ruby", "ruby", "c++", "objective-c++"
+          # The pattern matches word characters, hyphens, and plus signs
+          if match = class_attr.match(/(?:language-|lang-)?([\w+-]+)/)
             match[1]
           else
             nil
