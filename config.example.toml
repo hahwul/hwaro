@@ -1,0 +1,20 @@
+# Example Hwaro Configuration
+# This file shows how to configure syntax highlighting
+
+title = "My Site"
+description = "A site with syntax highlighting"
+base_url = "https://example.com"
+
+# Markdown Configuration
+[markdown.highlighting]
+# Enable syntax highlighting for code blocks
+enabled = true
+
+# Theme for syntax highlighting
+# Available themes include: github, monokai, catppuccin-macchiato, colorful, and many more
+# See Tartrazine documentation for a complete list
+theme = "github"
+
+# Plugin Configuration
+[plugins]
+processors = ["markdown"]
