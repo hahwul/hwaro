@@ -1,18 +1,16 @@
 # hwaro
 
-TODO: Write a description here
-
-## Installation
-
-TODO: Write installation instructions here
-
-## Usage
-
-TODO: Write usage instructions here
-
 ## Development
 
-TODO: Write development instructions here
+### Build
+
+```bash
+# Install dependencies 
+shards install
+
+# Build
+shards build
+```
 
 ## Contributing
 
@@ -24,4 +22,4 @@ TODO: Write development instructions here
 
 ## Contributors
 
-- [HAHWUL](https://github.com/your-github-user) - creator and maintainer
+- [HAHWUL](https://github.com/hahwul) - creator and maintainer
