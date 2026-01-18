@@ -73,6 +73,12 @@ describe Hwaro do
       config = Hwaro::Schemas::Config.new
       config.plugins.processors.should eq(["markdown"])
     end
+
+    it "has default markdown highlighting configuration" do
+      config = Hwaro::Schemas::Config.new
+      config.markdown.highlighting.enabled.should eq(false)
+      config.markdown.highlighting.theme.should eq("github")
+    end
   end
 
   describe Hwaro::Plugins::Processors::Registry do
@@ -221,6 +227,40 @@ describe Hwaro do
           in_sitemap.should eq(true)
         end
       end
+    end
+  end
+
+  describe Hwaro::Plugins::Processors::SyntaxHighlighter do
+    it "can be initialized with default values" do
+      highlighter = Hwaro::Plugins::Processors::SyntaxHighlighter.new
+      highlighter.enabled.should eq(false)
+      highlighter.theme.should eq("github")
+    end
+
+    it "can be initialized with custom values" do
+      highlighter = Hwaro::Plugins::Processors::SyntaxHighlighter.new(enabled: true, theme: "monokai")
+      highlighter.enabled.should eq(true)
+      highlighter.theme.should eq("monokai")
+    end
+
+    it "returns original content when disabled" do
+      highlighter = Hwaro::Plugins::Processors::SyntaxHighlighter.new(enabled: false)
+      context = Hwaro::Plugins::Processors::ProcessorContext.new
+      html = "<pre><code class=\"language-ruby\">puts 'hello'</code></pre>"
+      
+      result = highlighter.process(html, context)
+      result.success.should be_true
+      result.content.should eq(html)
+    end
+
+    it "extracts language from class attribute" do
+      highlighter = Hwaro::Plugins::Processors::SyntaxHighlighter.new(enabled: true)
+      
+      # Test various formats
+      highlighter.send(:extract_language, "language-ruby").should eq("ruby")
+      highlighter.send(:extract_language, "lang-python").should eq("python")
+      highlighter.send(:extract_language, "javascript").should eq("javascript")
+      highlighter.send(:extract_language, nil).should be_nil
     end
   end
 end
