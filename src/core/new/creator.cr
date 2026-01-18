@@ -10,8 +10,12 @@ module Hwaro
         def run(options : Options::NewOptions)
           base_path = options.path || "content/drafts"
 
-          print "Enter title: "
-          title = gets.try(&.chomp) || ""
+          title = options.title || ""
+
+          if title.empty?
+            print "Enter title: "
+            title = gets.try(&.chomp) || ""
+          end
 
           if title.empty?
             Logger.error "Title cannot be empty."
