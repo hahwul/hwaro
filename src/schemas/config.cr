@@ -70,20 +70,6 @@ module Hwaro
       end
     end
 
-    class SeoConfig
-      property sitemap : SitemapConfig
-      property robots : RobotsConfig
-      property llms : LlmsConfig
-      property feeds : FeedConfig
-
-      def initialize
-        @sitemap = SitemapConfig.new
-        @robots = RobotsConfig.new
-        @llms = LlmsConfig.new
-        @feeds = FeedConfig.new
-      end
-    end
-
     # Plugin configuration for extensibility
     class PluginConfig
       property processors : Array(String)
@@ -97,7 +83,10 @@ module Hwaro
       property title : String
       property description : String
       property base_url : String
-      property seo : SeoConfig
+      property sitemap : SitemapConfig
+      property robots : RobotsConfig
+      property llms : LlmsConfig
+      property feeds : FeedConfig
       property plugins : PluginConfig
       property raw : Hash(String, TOML::Any)
 
@@ -105,7 +94,10 @@ module Hwaro
         @title = "Hwaro Site"
         @description = ""
         @base_url = ""
-        @seo = SeoConfig.new
+        @sitemap = SitemapConfig.new
+        @robots = RobotsConfig.new
+        @llms = LlmsConfig.new
+        @feeds = FeedConfig.new
         @plugins = PluginConfig.new
         @raw = Hash(String, TOML::Any).new
       end
@@ -118,80 +110,76 @@ module Hwaro
           config.description = config.raw["description"]?.try(&.as_s) || config.description
           config.base_url = config.raw["base_url"]?.try(&.as_s) || config.base_url
 
-          # Backward compatibility for sitemap
+          # Load Sitemap configuration
+          # Handle backward compatibility where sitemap was just a boolean
           if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool)
-             config.seo.sitemap.enabled = sitemap_bool
+            config.sitemap.enabled = sitemap_bool
+          elsif sitemap_section = config.raw["sitemap"]?.try(&.as_h)
+            config.sitemap.enabled = sitemap_section["enabled"]?.try(&.as_bool) || config.sitemap.enabled
+            config.sitemap.filename = sitemap_section["filename"]?.try(&.as_s) || config.sitemap.filename
+            config.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s) || config.sitemap.changefreq
+            config.sitemap.priority = sitemap_section["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
           end
 
-           # Backward compatibility for feeds
-          if feeds_section = config.raw["feeds"]?.try(&.as_h)
-            config.seo.feeds.enabled = feeds_section["generate"]?.try(&.as_bool) || config.seo.feeds.enabled
-            config.seo.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.seo.feeds.filename
-            config.seo.feeds.type = feeds_section["type"]?.try(&.as_s) || config.seo.feeds.type
-            config.seo.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.seo.feeds.truncate
-          end
+          # Load Robots configuration
+          if robots_section = config.raw["robots"]?.try(&.as_h)
+            config.robots.enabled = robots_section["enabled"]?.try(&.as_bool) || config.robots.enabled
+            config.robots.filename = robots_section["filename"]?.try(&.as_s) || config.robots.filename
 
-          # Load new SEO configuration
-          if seo_section = config.raw["seo"]?.try(&.as_h)
-            # Sitemap
-            if sitemap_section = seo_section["sitemap"]?.try(&.as_h)
-              config.seo.sitemap.enabled = sitemap_section["enabled"]?.try(&.as_bool) || config.seo.sitemap.enabled
-              config.seo.sitemap.filename = sitemap_section["filename"]?.try(&.as_s) || config.seo.sitemap.filename
-              config.seo.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s) || config.seo.sitemap.changefreq
-              config.seo.sitemap.priority = sitemap_section["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.seo.sitemap.priority
-            end
+            if rules = robots_section["rules"]?.try(&.as_a)
+              config.robots.rules = rules.compact_map do |rule_any|
+                if rule_h = rule_any.as_h?
+                  user_agent = rule_h["user_agent"]?.try(&.as_s) || "*"
+                  rule = RobotsRule.new(user_agent)
 
-            # Robots
-            if robots_section = seo_section["robots"]?.try(&.as_h)
-              config.seo.robots.enabled = robots_section["enabled"]?.try(&.as_bool) || config.seo.robots.enabled
-              config.seo.robots.filename = robots_section["filename"]?.try(&.as_s) || config.seo.robots.filename
-
-              if rules = robots_section["rules"]?.try(&.as_a)
-                config.seo.robots.rules = rules.compact_map do |rule_any|
-                  if rule_h = rule_any.as_h?
-                    user_agent = rule_h["user_agent"]?.try(&.as_s) || "*"
-                    rule = RobotsRule.new(user_agent)
-
-                    if allow = rule_h["allow"]?
-                      if allow_arr = allow.as_a?
-                        rule.allow = allow_arr.map(&.as_s)
-                      elsif allow_str = allow.as_s?
-                        rule.allow = [allow_str]
-                      end
+                  if allow = rule_h["allow"]?
+                    if allow_arr = allow.as_a?
+                      rule.allow = allow_arr.map(&.as_s)
+                    elsif allow_str = allow.as_s?
+                      rule.allow = [allow_str]
                     end
-
-                    if disallow = rule_h["disallow"]?
-                      if disallow_arr = disallow.as_a?
-                        rule.disallow = disallow_arr.map(&.as_s)
-                      elsif disallow_str = disallow.as_s?
-                        rule.disallow = [disallow_str]
-                      end
-                    end
-                    rule
-                  else
-                    nil
                   end
+
+                  if disallow = rule_h["disallow"]?
+                    if disallow_arr = disallow.as_a?
+                      rule.disallow = disallow_arr.map(&.as_s)
+                    elsif disallow_str = disallow.as_s?
+                      rule.disallow = [disallow_str]
+                    end
+                  end
+                  rule
+                else
+                  nil
                 end
               end
             end
+          end
 
-            # LLMs
-            if llms_section = seo_section["llms"]?.try(&.as_h)
-              config.seo.llms.enabled = llms_section["enabled"]?.try(&.as_bool) || config.seo.llms.enabled
-              config.seo.llms.filename = llms_section["filename"]?.try(&.as_s) || config.seo.llms.filename
-              config.seo.llms.instructions = llms_section["instructions"]?.try(&.as_s) || config.seo.llms.instructions
+          # Load LLMs configuration
+          if llms_section = config.raw["llms"]?.try(&.as_h)
+            config.llms.enabled = llms_section["enabled"]?.try(&.as_bool) || config.llms.enabled
+            config.llms.filename = llms_section["filename"]?.try(&.as_s) || config.llms.filename
+            config.llms.instructions = llms_section["instructions"]?.try(&.as_s) || config.llms.instructions
+          end
+
+          # Load Feeds configuration
+          if feeds_section = config.raw["feeds"]?.try(&.as_h)
+            # Backward compatibility for 'generate' property
+            enabled = feeds_section["enabled"]?.try(&.as_bool)
+            generate = feeds_section["generate"]?.try(&.as_bool)
+
+            if !enabled.nil?
+              config.feeds.enabled = enabled
+            elsif !generate.nil?
+              config.feeds.enabled = generate
             end
 
-            # Feeds
-            if feeds_section = seo_section["feeds"]?.try(&.as_h)
-              config.seo.feeds.enabled = feeds_section["enabled"]?.try(&.as_bool) || config.seo.feeds.enabled
-              config.seo.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.seo.feeds.filename
-              config.seo.feeds.type = feeds_section["type"]?.try(&.as_s) || config.seo.feeds.type
-              config.seo.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.seo.feeds.truncate
-              config.seo.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.seo.feeds.limit
-              if sections = feeds_section["sections"]?.try(&.as_a)
-                config.seo.feeds.sections = sections.map(&.as_s)
-              end
+            config.feeds.filename = feeds_section["filename"]?.try(&.as_s) || config.feeds.filename
+            config.feeds.type = feeds_section["type"]?.try(&.as_s) || config.feeds.type
+            config.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
+            config.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
+            if sections = feeds_section["sections"]?.try(&.as_a)
+              config.feeds.sections = sections.map(&.as_s)
             end
           end
 

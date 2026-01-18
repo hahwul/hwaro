@@ -7,11 +7,11 @@ module Hwaro
       module Seo
         class Robots
           def self.generate(config : Schemas::Config, output_dir : String)
-            return unless config.seo.robots.enabled
+            return unless config.robots.enabled
 
             content = String.build do |str|
               # Add rules
-              config.seo.robots.rules.each do |rule|
+              config.robots.rules.each do |rule|
                 str << "User-agent: #{rule.user_agent}\n"
 
                 rule.allow.each do |path|
@@ -26,16 +26,16 @@ module Hwaro
               end
 
               # Default rule if no rules provided
-              if config.seo.robots.rules.empty?
+              if config.robots.rules.empty?
                 str << "User-agent: *\n"
                 str << "Allow: /\n"
                 str << "\n"
               end
 
               # Add Sitemap directive if sitemap is enabled and base_url is set
-              if config.seo.sitemap.enabled && !config.base_url.empty?
+              if config.sitemap.enabled && !config.base_url.empty?
                 base_url = config.base_url.rstrip('/')
-                sitemap_filename = config.seo.sitemap.filename
+                sitemap_filename = config.sitemap.filename
                 # Ensure filename doesn't start with / if base_url doesn't end with /
                 # But we stripped / from base_url, so we need / separator unless filename has it (which it shouldn't typically)
                 # Usually sitemap is at root.
@@ -44,7 +44,7 @@ module Hwaro
               end
             end
 
-            filename = config.seo.robots.filename
+            filename = config.robots.filename
             file_path = File.join(output_dir, filename)
             File.write(file_path, content)
             Logger.action :create, file_path

@@ -438,8 +438,6 @@ module Hwaro
           Logger.action :create, output_path
         end
 
-
-
         private def generate_404_page(site : Schemas::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
           return unless templates.has_key?("404")
 

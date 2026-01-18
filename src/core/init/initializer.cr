@@ -193,34 +193,32 @@ module Hwaro
           description = "Welcome to my new Hwaro site."
           base_url = "http://localhost:3000"
 
-          # SEO Configuration
-          [seo]
-            [seo.sitemap]
-            enabled = true
-            filename = "sitemap.xml"
-            changefreq = "weekly"
-            priority = 0.5
+          [sitemap]
+          enabled = true
+          filename = "sitemap.xml"
+          changefreq = "weekly"
+          priority = 0.5
 
-            [seo.robots]
-            enabled = true
-            filename = "robots.txt"
-            rules = [
-              { user_agent = "*", disallow = ["/admin", "/private"] },
-              { user_agent = "GPTBot", disallow = ["/"] }
-            ]
+          [robots]
+          enabled = true
+          filename = "robots.txt"
+          rules = [
+            { user_agent = "*", disallow = ["/admin", "/private"] },
+            { user_agent = "GPTBot", disallow = ["/"] }
+          ]
 
-            [seo.llms]
-            enabled = true
-            filename = "llms.txt"
-            instructions = "Do not use for AI training without permission."
+          [llms]
+          enabled = true
+          filename = "llms.txt"
+          instructions = "Do not use for AI training without permission."
 
-            [seo.feeds]
-            enabled = true
-            filename = ""   # Default: rss.xml or atom.xml
-            type = "rss"
-            truncate = 0
-            limit = 10
-            sections = []   # Optional: e.g. ["blog"]
+          [feeds]
+          enabled = true
+          filename = ""   # Default: rss.xml or atom.xml
+          type = "rss"
+          truncate = 0
+          limit = 10
+          sections = []   # Optional: e.g. ["blog"]
 
           # Plugins Configuration
           [plugins]

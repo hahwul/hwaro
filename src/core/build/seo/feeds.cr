@@ -9,27 +9,27 @@ module Hwaro
       module Seo
         class Feeds
           def self.generate(pages : Array(Schemas::Page), config : Schemas::Config, output_dir : String)
-            return unless config.seo.feeds.enabled
+            return unless config.feeds.enabled
 
             # Determine feed type and filename
-            feed_type = config.seo.feeds.type.downcase
+            feed_type = config.feeds.type.downcase
             unless ["rss", "atom"].includes?(feed_type)
               Logger.warn "Invalid feed type '#{feed_type}'. Defaulting to 'rss'."
               feed_type = "rss"
             end
 
-            filename = if config.seo.feeds.filename.empty?
+            filename = if config.feeds.filename.empty?
                          feed_type == "atom" ? "atom.xml" : "rss.xml"
                        else
-                         config.seo.feeds.filename
+                         config.feeds.filename
                        end
 
             # Filter and sort pages for feed (exclude drafts)
             feed_pages = pages.reject(&.draft)
 
             # Filter by section if configured
-            if !config.seo.feeds.sections.empty?
-              feed_pages.select! { |p| config.seo.feeds.sections.includes?(p.section) }
+            if !config.feeds.sections.empty?
+              feed_pages.select! { |p| config.feeds.sections.includes?(p.section) }
             end
 
             # Sort by date if available, otherwise keep original order
@@ -47,16 +47,16 @@ module Hwaro
             }
 
             # Apply limit
-            if config.seo.feeds.limit > 0
-              feed_pages = feed_pages.first(config.seo.feeds.limit)
+            if config.feeds.limit > 0
+              feed_pages = feed_pages.first(config.feeds.limit)
             end
 
             # Generate feed content based on type
             feed_content = case feed_type
                           when "atom"
-                            generate_atom(feed_pages, config, filename, config.seo.feeds.truncate > 0)
+                            generate_atom(feed_pages, config, filename, config.feeds.truncate > 0)
                           else
-                            generate_rss(feed_pages, config, filename, config.seo.feeds.truncate > 0)
+                            generate_rss(feed_pages, config, filename, config.feeds.truncate > 0)
                           end
 
             # Write feed file
@@ -93,7 +93,7 @@ module Hwaro
                 str << "      <guid>#{escape_xml(full_url)}</guid>\n"
 
                 # Add description/content
-                content = get_content_for_feed(page, config.seo.feeds.truncate)
+                content = get_content_for_feed(page, config.feeds.truncate)
                 str << "      <description>#{escape_xml(content)}</description>\n"
 
                 # Add date if available
@@ -147,7 +147,7 @@ module Hwaro
                 str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
 
                 # Add content with appropriate type
-                content = get_content_for_feed(page, config.seo.feeds.truncate)
+                content = get_content_for_feed(page, config.feeds.truncate)
                 content_type = is_text ? "text" : "html"
                 str << "    <content type=\"#{content_type}\">#{escape_xml(content)}</content>\n"
 

@@ -65,8 +65,8 @@ describe Hwaro do
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
-      config.seo.sitemap.enabled.should eq(false)
-      config.seo.feeds.enabled.should eq(false)
+      config.sitemap.enabled.should eq(false)
+      config.feeds.enabled.should eq(false)
     end
 
     it "has default plugin configuration" do

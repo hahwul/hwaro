@@ -8,8 +8,8 @@ module Hwaro
       module Seo
         class Sitemap
           def self.generate(pages : Array(Schemas::Page), site : Schemas::Site, output_dir : String)
-            # Check if sitemap is enabled in new config structure
-            return unless site.config.seo.sitemap.enabled
+            # Check if sitemap is enabled
+            return unless site.config.sitemap.enabled
 
             sitemap_pages = pages.select { |p| p.in_sitemap }
 
@@ -42,10 +42,10 @@ module Hwaro
                 end
 
                 # Add changefreq
-                str << "    <changefreq>#{site.config.seo.sitemap.changefreq}</changefreq>\n"
+                str << "    <changefreq>#{site.config.sitemap.changefreq}</changefreq>\n"
 
                 # Add priority
-                str << "    <priority>#{site.config.seo.sitemap.priority}</priority>\n"
+                str << "    <priority>#{site.config.sitemap.priority}</priority>\n"
 
                 str << "  </url>\n"
               end
@@ -53,7 +53,7 @@ module Hwaro
               str << "</urlset>\n"
             end
 
-            filename = site.config.seo.sitemap.filename
+            filename = site.config.sitemap.filename
             sitemap_path = Path[output_dir, filename].to_s
             File.write(sitemap_path, xml_content)
             Logger.action :create, sitemap_path
