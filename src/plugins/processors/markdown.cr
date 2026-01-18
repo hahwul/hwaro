@@ -68,6 +68,8 @@ module Hwaro
           custom_path = nil
           aliases = [] of String
           tags = [] of String
+          transparent = false
+          generate_feeds = false
 
           # Try TOML Front Matter (+++)
           if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
@@ -86,6 +88,13 @@ module Hwaro
 
               if toml_fm.has_key?("render")
                 render = toml_fm["render"].as_bool
+              end
+
+              if toml_fm.has_key?("transparent")
+                transparent = toml_fm["transparent"].as_bool
+              end
+              if toml_fm.has_key?("generate_feeds")
+                generate_feeds = toml_fm["generate_feeds"].as_bool
               end
 
               slug = toml_fm["slug"]?.try(&.as_s)
@@ -123,6 +132,16 @@ module Hwaro
                   render = bool_val unless bool_val.nil?
                 end
 
+                if (val = yaml_fm["transparent"]?)
+                  bool_val = val.as_bool?
+                  transparent = bool_val unless bool_val.nil?
+                end
+
+                if (val = yaml_fm["generate_feeds"]?)
+                  bool_val = val.as_bool?
+                  generate_feeds = bool_val unless bool_val.nil?
+                end
+
                 slug = yaml_fm["slug"]?.try(&.as_s?)
                 custom_path = yaml_fm["path"]?.try(&.as_s?)
 
@@ -153,7 +172,9 @@ module Hwaro
             slug: slug,
             custom_path: custom_path,
             aliases: aliases,
-            tags: tags
+            tags: tags,
+            transparent: transparent,
+            generate_feeds: generate_feeds
           }
         end
 

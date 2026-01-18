@@ -209,6 +209,11 @@ module Hwaro
             page.aliases = data[:aliases]
             page.tags = data[:tags]
 
+            if page.is_a?(Schemas::Section)
+              page.transparent = data[:transparent]
+              page.generate_feeds = data[:generate_feeds]
+            end
+
             path_parts = Path[relative_path].parts
             page.section = path_parts.size > 1 ? path_parts.first : ""
             page.is_index = is_index
