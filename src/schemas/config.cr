@@ -52,6 +52,24 @@ module Hwaro
       end
     end
 
+    class MarkdownHighlightingConfig
+      property enabled : Bool
+      property theme : String
+
+      def initialize
+        @enabled = false
+        @theme = "github"
+      end
+    end
+
+    class MarkdownConfig
+      property highlighting : MarkdownHighlightingConfig
+
+      def initialize
+        @highlighting = MarkdownHighlightingConfig.new
+      end
+    end
+
     class FeedConfig
       property enabled : Bool
       property filename : String
@@ -88,6 +106,7 @@ module Hwaro
       property llms : LlmsConfig
       property feeds : FeedConfig
       property plugins : PluginConfig
+      property markdown : MarkdownConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -99,6 +118,7 @@ module Hwaro
         @llms = LlmsConfig.new
         @feeds = FeedConfig.new
         @plugins = PluginConfig.new
+        @markdown = MarkdownConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -187,6 +207,14 @@ module Hwaro
           if plugins_section = config.raw["plugins"]?.try(&.as_h)
             if processors = plugins_section["processors"]?.try(&.as_a)
               config.plugins.processors = processors.map(&.as_s)
+            end
+          end
+
+          # Load markdown configuration
+          if markdown_section = config.raw["markdown"]?.try(&.as_h)
+            if highlighting_section = markdown_section["highlighting"]?.try(&.as_h)
+              config.markdown.highlighting.enabled = highlighting_section["enabled"]?.try(&.as_bool) || config.markdown.highlighting.enabled
+              config.markdown.highlighting.theme = highlighting_section["theme"]?.try(&.as_s) || config.markdown.highlighting.theme
             end
           end
         end

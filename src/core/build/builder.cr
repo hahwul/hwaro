@@ -17,6 +17,7 @@ require "./seo/llms"
 require "../../utils/logger"
 require "../../options/build_options"
 require "../../plugins/processors/markdown"
+require "../../plugins/processors/syntax_highlighter"
 require "../../schemas/config"
 require "../../schemas/page"
 require "../../schemas/section"
@@ -30,6 +31,7 @@ module Hwaro
         @site : Schemas::Site?
         @templates : Hash(String, String)?
         @cache : Cache?
+        @syntax_highlighter : Plugins::Processors::SyntaxHighlighter?
 
         def run(options : Options::BuildOptions)
           run(
@@ -74,6 +76,16 @@ module Hwaro
           config = Schemas::Config.load
           @site = Schemas::Site.new(config)
           site = @site.not_nil!
+
+          # Initialize syntax highlighter based on configuration
+          if config.markdown.highlighting.enabled
+            @syntax_highlighter = Plugins::Processors::SyntaxHighlighter.new(
+              enabled: true,
+              theme: config.markdown.highlighting.theme
+            )
+          else
+            @syntax_highlighter = nil
+          end
 
           # Load templates (cached)
           templates = load_templates
@@ -275,7 +287,7 @@ module Hwaro
         )
           processed_content = process_shortcodes(page.raw_content, templates)
 
-          html_content, toc_headers = Processor::Markdown.render(processed_content)
+          html_content, toc_headers = Processor::Markdown.render(processed_content, @syntax_highlighter)
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)

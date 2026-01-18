@@ -10,6 +10,7 @@ require "yaml"
 require "toml"
 require "xml"
 require "./base"
+require "./syntax_highlighter"
 require "../../schemas/toc"
 require "../../utils/logger"
 
@@ -39,8 +40,15 @@ module Hwaro
 
         # Renders Markdown to HTML and generates a Table of Contents
         # Returns {html_content, toc_headers}
-        def render(content : String) : Tuple(String, Array(Schemas::TocHeader))
+        # Optionally applies syntax highlighting if syntax_highlighter is provided
+        def render(content : String, syntax_highlighter : SyntaxHighlighter? = nil) : Tuple(String, Array(Schemas::TocHeader))
           html = Markd.to_html(content)
+
+          # Apply syntax highlighting before processing headers if enabled
+          if syntax_highlighter
+            result = syntax_highlighter.process(html, ProcessorContext.new)
+            html = result.content if result.success
+          end
 
           # Optimization: If no headers, don't parse XML
           unless html.includes?("<h")
@@ -177,8 +185,8 @@ module Hwaro
       @@instance = Plugins::Processors::Markdown.new
 
       # Renders Markdown to HTML and generates a Table of Contents
-      def render(content : String) : Tuple(String, Array(Schemas::TocHeader))
-        @@instance.render(content)
+      def render(content : String, syntax_highlighter : Plugins::Processors::SyntaxHighlighter? = nil) : Tuple(String, Array(Schemas::TocHeader))
+        @@instance.render(content, syntax_highlighter)
       end
 
       # Returns {title, content, draft, layout, in_sitemap, toc}
