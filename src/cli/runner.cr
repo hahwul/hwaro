@@ -116,8 +116,13 @@ module Hwaro
         Logger.info ""
         Logger.info "Commands:"
 
+        # Define priority order
+        priority = ["init", "build", "serve", "new"]
+
         # Print registered commands
-        CommandRegistry.all.each do |cmd|
+        CommandRegistry.all.sort_by { |cmd|
+          priority.index(cmd[:name]) || priority.size
+        }.each do |cmd|
           Logger.info "  #{cmd[:name].ljust(8)} #{cmd[:description]}"
         end
 
