@@ -93,6 +93,17 @@ module Hwaro
       end
     end
 
+    # Pagination configuration
+    class PaginationConfig
+      property enabled : Bool
+      property per_page : Int32
+
+      def initialize
+        @enabled = false
+        @per_page = 10
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -103,6 +114,7 @@ module Hwaro
       property feeds : FeedConfig
       property search : SearchConfig
       property plugins : PluginConfig
+      property pagination : PaginationConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -115,6 +127,7 @@ module Hwaro
         @feeds = FeedConfig.new
         @search = SearchConfig.new
         @plugins = PluginConfig.new
+        @pagination = PaginationConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -214,6 +227,12 @@ module Hwaro
             if processors = plugins_section["processors"]?.try(&.as_a?)
               config.plugins.processors = processors.compact_map(&.as_s?)
             end
+          end
+
+          # Load pagination configuration
+          if pagination_section = config.raw["pagination"]?.try(&.as_h?)
+            config.pagination.enabled = pagination_section["enabled"]?.try(&.as_bool?) || config.pagination.enabled
+            config.pagination.per_page = pagination_section["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
           end
         end
         config

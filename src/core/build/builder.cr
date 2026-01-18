@@ -11,6 +11,7 @@
 
 require "file_utils"
 require "toml"
+require "uri"
 require "./cache"
 require "./parallel"
 require "../../content/seo/feeds"
@@ -18,6 +19,8 @@ require "../../content/seo/sitemap"
 require "../../content/seo/robots"
 require "../../content/seo/llms"
 require "../../content/search"
+require "../../content/pagination/paginator"
+require "../../content/pagination/renderer"
 require "../../utils/logger"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
@@ -162,6 +165,10 @@ module Hwaro
           end
           return result if result != Lifecycle::HookResult::Continue
 
+          # Populate site with pages and sections from context
+          site.pages = ctx.pages
+          site.sections = ctx.sections
+
           all_pages = ctx.all_pages
 
           # Filter pages for caching
@@ -259,6 +266,8 @@ module Hwaro
             if page.is_a?(Models::Section)
               page.transparent = data[:transparent]
               page.generate_feeds = data[:generate_feeds]
+              page.paginate = data[:paginate]
+              page.pagination_enabled = data[:pagination_enabled]
             end
 
             # Calculate URL
@@ -411,23 +420,103 @@ module Hwaro
           template_name = determine_template(page, templates)
           template_content = templates[template_name]? || templates["page"]?
 
-          section_list_html = ""
-          if template_name == "section" || page.template == "section"
-            section_list_html = generate_section_list(page, site)
+          # Handle section pages with pagination
+          if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
+            render_section_with_pagination(page, site, templates, template_content, output_dir, minify, html_content, toc_html)
+          else
+            section_list_html = ""
+
+            final_html = if template_content
+                           full_template = resolve_includes(template_content, templates)
+                           apply_template(full_template, html_content, page, site.config, section_list_html, toc_html, templates)
+                         else
+                           Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
+                           html_content
+                         end
+
+            final_html = minify_html(final_html) if minify
+
+            write_output(page, output_dir, final_html)
           end
 
-          final_html = if template_content
-                         full_template = resolve_includes(template_content, templates)
-                         apply_template(full_template, html_content, page, site.config, section_list_html, toc_html, templates)
-                       else
-                         Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
-                         html_content
-                       end
-
-          final_html = minify_html(final_html) if minify
-
-          write_output(page, output_dir, final_html)
           generate_aliases(page, output_dir)
+        end
+
+        private def render_section_with_pagination(
+          section : Models::Section,
+          site : Models::Site,
+          templates : Hash(String, String),
+          template_content : String?,
+          output_dir : String,
+          minify : Bool,
+          html_content : String,
+          toc_html : String
+        )
+          # Get pages in this section
+          section_pages = site.pages.select do |p|
+            p.section == section.section && !p.is_index
+          end
+
+          # Create paginator and render
+          paginator = Content::Pagination::Paginator.new(site.config)
+          pagination_result = paginator.paginate(section, section_pages)
+          renderer = Content::Pagination::Renderer.new(site.config)
+
+          pagination_result.paginated_pages.each do |paginated_page|
+            section_list_html = renderer.render_section_list(paginated_page)
+            pagination_nav_html = renderer.render_pagination_nav(paginated_page)
+
+            # Combined section list with pagination nav
+            combined_section_html = section_list_html + pagination_nav_html
+
+            final_html = if template_content
+                           full_template = resolve_includes(template_content, templates)
+                           apply_template(full_template, html_content, section, site.config, combined_section_html, toc_html, templates)
+                         else
+                           Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
+                           html_content
+                         end
+
+            final_html = minify_html(final_html) if minify
+
+            # Write output - first page uses section URL, subsequent pages use /page/N/
+            if paginated_page.page_number == 1
+              write_output(section, output_dir, final_html)
+            else
+              write_paginated_output(section, paginated_page.page_number, output_dir, final_html)
+            end
+          end
+        end
+
+        private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String)
+          # Sanitize URL to prevent path traversal
+          url_path = sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
+          output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
+
+          # Ensure output path is within output directory
+          canonical_output = File.expand_path(output_path)
+          canonical_output_dir = File.expand_path(output_dir)
+          unless canonical_output.starts_with?(canonical_output_dir)
+            Logger.warn "  [WARN] Skipping output outside output directory: #{output_path}"
+            return
+          end
+
+          FileUtils.mkdir_p(Path[output_path].dirname)
+          File.write(output_path, content)
+          Logger.action :create, output_path
+        end
+
+        # Sanitize path to prevent directory traversal
+        # Uses Crystal's Path normalization and filters out unsafe components
+        private def sanitize_path(path : String) : String
+          # URL-decode the path first to handle encoded traversal attempts
+          decoded = URI.decode(path)
+          # Remove any parent directory references, null bytes, and normalize slashes
+          decoded
+            .gsub(/\.\./, "")           # Remove parent directory references
+            .gsub(/\0/, "")             # Remove null bytes
+            .gsub(/\/+/, "/")           # Normalize multiple slashes
+            .gsub(/^\/+|\/+$/, "")      # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String

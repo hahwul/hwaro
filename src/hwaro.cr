@@ -63,6 +63,10 @@ require "./content/seo/robots"
 require "./content/seo/llms"
 require "./content/search"
 
+# Load pagination
+require "./content/pagination/paginator"
+require "./content/pagination/renderer"
+
 # Load content hooks
 require "./content/hooks"
 
