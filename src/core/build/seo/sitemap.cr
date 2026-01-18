@@ -8,6 +8,9 @@ module Hwaro
       module Seo
         class Sitemap
           def self.generate(pages : Array(Schemas::Page), site : Schemas::Site, output_dir : String)
+            # Check if sitemap is enabled in new config structure
+            return unless site.config.seo.sitemap.enabled
+
             sitemap_pages = pages.select { |p| p.in_sitemap }
 
             if sitemap_pages.empty?
@@ -32,13 +35,26 @@ module Hwaro
 
                 str << "  <url>\n"
                 str << "    <loc>#{escaped_url}</loc>\n"
+
+                # Add lastmod if available
+                if date = page.date
+                  str << "    <lastmod>#{date.to_s("%Y-%m-%d")}</lastmod>\n"
+                end
+
+                # Add changefreq
+                str << "    <changefreq>#{site.config.seo.sitemap.changefreq}</changefreq>\n"
+
+                # Add priority
+                str << "    <priority>#{site.config.seo.sitemap.priority}</priority>\n"
+
                 str << "  </url>\n"
               end
 
               str << "</urlset>\n"
             end
 
-            sitemap_path = Path[output_dir, "sitemap.xml"].to_s
+            filename = site.config.seo.sitemap.filename
+            sitemap_path = Path[output_dir, filename].to_s
             File.write(sitemap_path, xml_content)
             Logger.action :create, sitemap_path
             Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."

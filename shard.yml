@@ -10,7 +10,7 @@ license: MIT
 
 targets:
   hwaro:
-    main: src/hwaro.cr
+    main: src/main.cr
 
 dependencies:
   markd:

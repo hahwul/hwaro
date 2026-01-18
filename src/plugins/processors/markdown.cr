@@ -69,7 +69,9 @@ module Hwaro
               title = toml_fm["title"]?.try(&.as_s) || title
               is_draft = toml_fm["draft"]?.try(&.as_bool) || false
               layout = toml_fm["layout"]?.try(&.as_s)
-              in_sitemap = toml_fm["in_sitemap"]?.try(&.as_bool) || true
+              if toml_fm.has_key?("in_sitemap")
+                in_sitemap = toml_fm["in_sitemap"].as_bool
+              end
               toc = toml_fm["toc"]?.try(&.as_bool) || false
             rescue ex
               Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
@@ -83,7 +85,10 @@ module Hwaro
                 title = yaml_fm["title"]?.try(&.as_s?) || title
                 is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
                 layout = yaml_fm["layout"]?.try(&.as_s?)
-                in_sitemap = yaml_fm["in_sitemap"]?.try(&.as_bool?) || true
+                if (val = yaml_fm["in_sitemap"]?)
+                  bool_val = val.as_bool?
+                  in_sitemap = bool_val unless bool_val.nil?
+                end
                 toc = yaml_fm["toc"]?.try(&.as_bool?) || false
               end
             rescue ex

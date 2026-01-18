@@ -193,12 +193,34 @@ module Hwaro
           description = "Welcome to my new Hwaro site."
           base_url = "http://localhost:3000"
 
-          # RSS/Atom Feed Configuration
-          [feeds]
-          generate = false  # Set to true to generate feeds
-          filename = ""     # Custom filename (default: rss.xml or atom.xml based on type)
-          type = "rss"      # Feed type: "rss" or "atom"
-          truncate = 0      # Truncate content to N characters (0 = no truncation)
+          # SEO Configuration
+          [seo]
+            [seo.sitemap]
+            enabled = true
+            filename = "sitemap.xml"
+            changefreq = "weekly"
+            priority = 0.5
+
+            [seo.robots]
+            enabled = true
+            filename = "robots.txt"
+            rules = [
+              { user_agent = "*", disallow = ["/admin", "/private"] },
+              { user_agent = "GPTBot", disallow = ["/"] }
+            ]
+
+            [seo.llms]
+            enabled = true
+            filename = "llms.txt"
+            instructions = "Do not use for AI training without permission."
+
+            [seo.feeds]
+            enabled = true
+            filename = ""   # Default: rss.xml or atom.xml
+            type = "rss"
+            truncate = 0
+            limit = 10
+            sections = []   # Optional: e.g. ["blog"]
 
           # Plugins Configuration
           [plugins]

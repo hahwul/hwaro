@@ -12,6 +12,8 @@ require "./cache"
 require "./parallel"
 require "./seo/feeds"
 require "./seo/sitemap"
+require "./seo/robots"
+require "./seo/llms"
 require "../../utils/logger"
 require "../../options/build_options"
 require "../../plugins/processors/markdown"
@@ -100,15 +102,12 @@ module Hwaro
                     process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache)
                   end
 
-          # Generate sitemap if enabled
-          if site.config.sitemap
-            Seo::Sitemap.generate(all_pages, site, output_dir)
-          end
-
-          # Generate feeds if enabled
-          if site.config.feeds.generate
-            Seo::Feeds.generate(all_pages, site.config, output_dir)
-          end
+          # Generate SEO files (Sitemap, Feeds, Robots, LLMs)
+          # Note: Each generator checks its own 'enabled' configuration
+          Seo::Sitemap.generate(all_pages, site, output_dir)
+          Seo::Feeds.generate(all_pages, site.config, output_dir)
+          Seo::Robots.generate(site.config, output_dir)
+          Seo::Llms.generate(site.config, output_dir)
 
           # Generate 404 page
           generate_404_page(site, templates, output_dir, minify)

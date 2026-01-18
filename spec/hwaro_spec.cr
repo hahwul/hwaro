@@ -65,7 +65,8 @@ describe Hwaro do
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
-      config.sitemap.should eq(false)
+      config.seo.sitemap.enabled.should eq(false)
+      config.seo.feeds.enabled.should eq(false)
     end
 
     it "has default plugin configuration" do
@@ -91,6 +92,9 @@ describe Hwaro do
   end
 
   describe Hwaro::CLI::CommandRegistry do
+    # Initialize runner to register commands
+    Hwaro::CLI::Runner.new
+
     it "has init command registered" do
       Hwaro::CLI::CommandRegistry.has?("init").should be_true
     end

@@ -52,6 +52,8 @@ require "./core/init/initializer"
 require "./core/serve/server"
 require "./core/build/seo/feeds"
 require "./core/build/seo/sitemap"
+require "./core/build/seo/robots"
+require "./core/build/seo/llms"
 
 # Load CLI
 require "./cli/runner"
@@ -59,5 +61,3 @@ require "./cli/runner"
 module Hwaro
   VERSION = "0.1.0"
 end
-
-Hwaro::CLI::Runner.new.run
