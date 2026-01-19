@@ -59,6 +59,10 @@ module Hwaro
           page.custom_path = data[:custom_path]
           page.aliases = data[:aliases]
           page.tags = data[:tags]
+          page.taxonomies = data[:taxonomies]
+          page.front_matter_keys = data[:front_matter_keys]
+          page.taxonomy_name = nil
+          page.taxonomy_term = nil
 
           if page.is_a?(Models::Section)
             page.transparent = data[:transparent]

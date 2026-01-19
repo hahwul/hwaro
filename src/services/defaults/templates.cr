@@ -62,9 +62,10 @@ module Hwaro
             <h1><%= page_title %></h1>
             <%= content %>
 
-            <ul class="section-list">
-              <%= section_list %>
-            </ul>
+          <ul class="section-list">
+            <%= section_list %>
+          </ul>
+
           </main>
           <%= render "footer" %>
           HTML
@@ -87,6 +88,30 @@ module Hwaro
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
             <strong><%= type.upcase %>:</strong> <%= message %>
           </div>
+          HTML
+        end
+
+        def self.taxonomy : String
+          <<-HTML
+          <%= render "header" %>
+          <main>
+            <h1><%= page_title %></h1>
+            <p>Browse all terms in this taxonomy:</p>
+            <%= content %>
+          </main>
+          <%= render "footer" %>
+          HTML
+        end
+
+        def self.taxonomy_term : String
+          <<-HTML
+          <%= render "header" %>
+          <main>
+            <h1><%= page_title %></h1>
+            <p>Posts tagged with this term:</p>
+            <%= content %>
+          </main>
+          <%= render "footer" %>
           HTML
         end
       end

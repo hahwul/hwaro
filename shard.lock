@@ -1,13 +1,5 @@
 version: 2.0
 shards:
-  ameba:
-    git: https://github.com/crystal-ameba/ameba.git
-    version: 1.7.0-dev+git.commit.a74c675501891beba1ef0eb4ad926b41af1b53f2
-
-  cyclonedx-cr:
-    git: https://github.com/hahwul/cyclonedx-cr.git
-    version: 1.0.2+git.commit.03ed8dd299aeeb8f94db0fbd97e09605843e9b3a
-
   markd:
     git: https://github.com/icyleaf/markd.git
     version: 0.5.0
