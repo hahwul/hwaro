@@ -52,6 +52,7 @@ require "./core/build/parallel"
 require "./core/build/builder"
 
 # Load services
+require "./services/scaffolds/registry"
 require "./services/initializer"
 require "./services/creator"
 require "./services/server/server"
