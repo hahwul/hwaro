@@ -8,7 +8,6 @@
 # Usage:
 #   html = SyntaxHighlighter.highlight(html_content, theme: "monokai")
 
-require "xml"
 require "tartrazine"
 
 module Hwaro
@@ -80,17 +79,7 @@ module Hwaro
           theme : String = DEFAULT_THEME,
           line_numbers : Bool = false,
         ) : String
-          begin
-            Tartrazine.to_html(
-              code,
-              language: language,
-              theme: theme,
-              standalone: false,
-              line_numbers: line_numbers
-            )
-          rescue ex
-            # If highlighting fails (unknown language, etc.), return escaped code
-            Hwaro::Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
+          apply_highlighting(code, language, theme, line_numbers) do
             "<pre><code>#{escape_html(code)}</code></pre>"
           end
         end
@@ -108,21 +97,32 @@ module Hwaro
             # Decode HTML entities in the code
             decoded_code = decode_html_entities(code)
 
-            begin
-              highlighted = Tartrazine.to_html(
-                decoded_code,
-                language: language,
-                theme: theme,
-                standalone: false,
-                line_numbers: line_numbers
-              )
-              highlighted
-            rescue ex
-              Hwaro::Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
+            apply_highlighting(decoded_code, language, theme, line_numbers) do
               # Return original match if highlighting fails
               match
             end
           end
+        end
+
+        # Apply syntax highlighting to code using Tartrazine
+        # Yields to block on failure for custom fallback behavior
+        private def apply_highlighting(
+          code : String,
+          language : String,
+          theme : String,
+          line_numbers : Bool,
+          &fallback : -> String,
+        ) : String
+          Tartrazine.to_html(
+            code,
+            language: language,
+            theme: theme,
+            standalone: false,
+            line_numbers: line_numbers
+          )
+        rescue ex
+          Hwaro::Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
+          yield
         end
 
         # Escape HTML special characters
