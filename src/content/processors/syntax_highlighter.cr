@@ -14,20 +14,6 @@ require "tartrazine"
 module Hwaro
   module Content
     module Processors
-      # Configuration for syntax highlighting
-      class SyntaxHighlighterConfig
-        property enabled : Bool
-        property theme : String
-        property line_numbers : Bool
-
-        def initialize(
-          @enabled : Bool = true,
-          @theme : String = "monokai",
-          @line_numbers : Bool = false,
-        )
-        end
-      end
-
       # Syntax highlighter for code blocks in HTML content
       module SyntaxHighlighter
         extend self
@@ -87,7 +73,7 @@ module Hwaro
             )
           rescue ex
             # If highlighting fails (unknown language, etc.), return escaped code
-            Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
+            Hwaro::Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
             "<pre><code>#{escape_html(code)}</code></pre>"
           end
         end
@@ -121,7 +107,7 @@ module Hwaro
               )
               highlighted
             rescue ex
-              Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
+              Hwaro::Logger.debug "Syntax highlighting failed for language '#{language}': #{ex.message}"
               # Return original match if highlighting fails
               match
             end
