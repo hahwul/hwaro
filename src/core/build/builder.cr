@@ -21,6 +21,7 @@ require "../../content/seo/llms"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
+require "../../content/processors/syntax_highlighter"
 require "../../utils/logger"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
@@ -460,6 +461,15 @@ module Hwaro
           processed_content = process_shortcodes(page.raw_content, templates)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content)
+
+          # Apply syntax highlighting to code blocks
+          if site.config.highlight.enabled
+            html_content = Content::Processors::SyntaxHighlighter.highlight(
+              html_content,
+              theme: site.config.highlight.theme,
+              line_numbers: site.config.highlight.line_numbers
+            )
+          end
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)

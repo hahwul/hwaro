@@ -84,6 +84,13 @@ describe Hwaro do
       config.plugins.processors.should eq(["markdown"])
     end
 
+    it "has default highlight configuration" do
+      config = Hwaro::Models::Config.new
+      config.highlight.enabled.should eq(true)
+      config.highlight.theme.should eq("monokai")
+      config.highlight.line_numbers.should eq(false)
+    end
+
     it "has default pagination configuration" do
       config = Hwaro::Models::Config.new
       config.pagination.enabled.should eq(false)

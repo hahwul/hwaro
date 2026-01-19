@@ -42,6 +42,7 @@ require "./models/toc"
 require "./content/processors/base"
 require "./content/processors/markdown"
 require "./content/processors/html"
+require "./content/processors/syntax_highlighter"
 
 # Load lifecycle system
 require "./core/lifecycle"

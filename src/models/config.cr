@@ -93,6 +93,19 @@ module Hwaro
       end
     end
 
+    # Syntax highlighting configuration
+    class HighlightConfig
+      property enabled : Bool
+      property theme : String
+      property line_numbers : Bool
+
+      def initialize
+        @enabled = true
+        @theme = "monokai"
+        @line_numbers = false
+      end
+    end
+
     # Pagination configuration
     class PaginationConfig
       property enabled : Bool
@@ -145,6 +158,7 @@ module Hwaro
       property feeds : FeedConfig
       property search : SearchConfig
       property plugins : PluginConfig
+      property highlight : HighlightConfig
       property pagination : PaginationConfig
       property taxonomies : Array(TaxonomyConfig)
       property default_language : String
@@ -161,6 +175,7 @@ module Hwaro
         @feeds = FeedConfig.new
         @search = SearchConfig.new
         @plugins = PluginConfig.new
+        @highlight = HighlightConfig.new
         @pagination = PaginationConfig.new
         @taxonomies = [] of TaxonomyConfig
         @default_language = "en"
@@ -285,6 +300,17 @@ module Hwaro
           if pagination_section = config.raw["pagination"]?.try(&.as_h?)
             config.pagination.enabled = pagination_section["enabled"]?.try(&.as_bool?) || config.pagination.enabled
             config.pagination.per_page = pagination_section["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
+          end
+
+          # Load highlight (syntax highlighting) configuration
+          if highlight_section = config.raw["highlight"]?.try(&.as_h?)
+            if highlight_section.has_key?("enabled")
+              config.highlight.enabled = highlight_section["enabled"]?.try(&.as_bool?) || config.highlight.enabled
+            end
+            config.highlight.theme = highlight_section["theme"]?.try(&.as_s?) || config.highlight.theme
+            if highlight_section.has_key?("line_numbers")
+              config.highlight.line_numbers = highlight_section["line_numbers"]?.try(&.as_bool?) || config.highlight.line_numbers
+            end
           end
 
           # Load taxonomies configuration
