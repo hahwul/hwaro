@@ -21,6 +21,23 @@ module Hwaro
         # Default theme to use if none specified
         DEFAULT_THEME = "monokai"
 
+        # Regex pattern for matching code blocks with language specification
+        #
+        # Pattern breakdown:
+        #   <pre><code\s+         - Match opening <pre><code with whitespace
+        #   class="               - Start of class attribute
+        #   (?:[^"]*\s)?          - Optional: any text followed by space (for additional classes before language-)
+        #   language-             - The language- prefix
+        #   (?<lang>[^\s"]+)      - Named capture: the language identifier (no spaces or quotes)
+        #   (?:\s[^"]*)?          - Optional: space followed by additional class names
+        #   "                     - End of class attribute value
+        #   [^>]*>                - Any other attributes until closing >
+        #   (?<code>.*?)          - Named capture: the code content (non-greedy)
+        #   <\/code><\/pre>       - Closing tags
+        #
+        # The /m flag enables multiline mode so .*? matches across newlines
+        CODE_BLOCK_PATTERN = /<pre><code\s+class="(?:[^"]*\s)?language-(?<lang>[^\s"]+)(?:\s[^"]*)?"[^>]*>(?<code>.*?)<\/code><\/pre>/m
+
         # Highlight code blocks in HTML content
         #
         # This method finds all <pre><code class="language-xxx"> elements
@@ -84,15 +101,7 @@ module Hwaro
           theme : String,
           line_numbers : Bool,
         ) : String
-          # Match <pre><code class="language-xxx">...</code></pre> patterns
-          # The regex uses named captures for clarity and handles:
-          # - Optional whitespace variations
-          # - Additional class attributes (e.g., class="language-ruby highlight")
-          # - The language name from class="language-xxx"
-          # - The code content between <code> and </code>
-          pattern = /<pre><code\s+class="(?:[^"]*\s)?language-(?<lang>[^\s"]+)(?:\s[^"]*)?"[^>]*>(?<code>.*?)<\/code><\/pre>/m
-
-          html.gsub(pattern) do |match, match_data|
+          html.gsub(CODE_BLOCK_PATTERN) do |match, match_data|
             language = match_data["lang"]
             code = match_data["code"]
 
