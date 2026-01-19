@@ -38,6 +38,7 @@ module Hwaro
         @site : Models::Site?
         @templates : Hash(String, String)?
         @cache : Cache?
+        @config : Models::Config?
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
 
@@ -131,6 +132,7 @@ module Hwaro
 
             config = Models::Config.load
             @site = Models::Site.new(config)
+            @config = config
             ctx.site = @site
             ctx.config = config
 
@@ -290,16 +292,23 @@ module Hwaro
           relative_path = page.path
           path_parts = Path[relative_path].parts
 
+          # For multilingual sites, include language prefix for non-default languages
+          lang_prefix = if page.language && @config && page.language != @config.not_nil!.default_language
+                          "/#{page.language}"
+                        else
+                          ""
+                        end
+
           if page.custom_path
             custom = page.custom_path.not_nil!.sub(/^\//, "")
-            page.url = "/#{custom}"
+            page.url = "#{lang_prefix}/#{custom}"
             page.url += "/" unless page.url.ends_with?("/")
           elsif page.is_index
             if path_parts.size == 1
-              page.url = "/"
+              page.url = lang_prefix.empty? ? "/" : "#{lang_prefix}/"
             else
               parent = Path[relative_path].dirname
-              page.url = "/#{parent}/"
+              page.url = "#{lang_prefix}/#{parent}/"
             end
           else
             dir = Path[relative_path].dirname
@@ -307,9 +316,9 @@ module Hwaro
             leaf = page.slug || stem
 
             if dir == "."
-              page.url = "/#{leaf}/"
+              page.url = "#{lang_prefix}/#{leaf}/"
             else
-              page.url = "/#{dir}/#{leaf}/"
+              page.url = "#{lang_prefix}/#{dir}/#{leaf}/"
             end
           end
         end

@@ -29,6 +29,7 @@ module Hwaro
       property section : String # First directory component (e.g. "projects")
       property url : String     # Calculated relative URL (e.g. "/projects/a/")
       property is_index : Bool  # Is this an index file?
+      property language : String? # Language code (e.g. "en", "ko", nil for default)
 
       def initialize(@path : String)
         @title = "Untitled"
@@ -49,6 +50,7 @@ module Hwaro
         @is_index = false
         @in_sitemap = true
         @toc = false
+        @language = nil
       end
     end
   end

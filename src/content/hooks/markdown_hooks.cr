@@ -80,25 +80,35 @@ module Hwaro
         end
 
         private def calculate_urls(ctx : Core::Lifecycle::BuildContext)
+          config = ctx.config
+          return unless config
+
           ctx.all_pages.each do |page|
-            calculate_page_url(page)
+            calculate_page_url(page, config)
           end
         end
 
-        private def calculate_page_url(page : Models::Page)
+        private def calculate_page_url(page : Models::Page, config : Models::Config)
           relative_path = page.path
           path_parts = Path[relative_path].parts
 
+          # For multilingual sites, include language prefix for non-default languages
+          lang_prefix = if page.language && page.language != config.default_language
+                          "/#{page.language}"
+                        else
+                          ""
+                        end
+
           if page.custom_path
             custom = page.custom_path.not_nil!.sub(/^\//, "")
-            page.url = "/#{custom}"
+            page.url = "#{lang_prefix}/#{custom}"
             page.url += "/" unless page.url.ends_with?("/")
           elsif page.is_index
             if path_parts.size == 1
-              page.url = "/"
+              page.url = lang_prefix.empty? ? "/" : "#{lang_prefix}/"
             else
               parent = Path[relative_path].dirname
-              page.url = "/#{parent}/"
+              page.url = "#{lang_prefix}/#{parent}/"
             end
           else
             dir = Path[relative_path].dirname
@@ -106,9 +116,9 @@ module Hwaro
             leaf = page.slug || stem
 
             if dir == "."
-              page.url = "/#{leaf}/"
+              page.url = "#{lang_prefix}/#{leaf}/"
             else
-              page.url = "/#{dir}/#{leaf}/"
+              page.url = "#{lang_prefix}/#{dir}/#{leaf}/"
             end
           end
         end

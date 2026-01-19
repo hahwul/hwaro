@@ -117,6 +117,24 @@ module Hwaro
       end
     end
 
+    # Language configuration for multilingual sites
+    class LanguageConfig
+      property code : String
+      property language_name : String
+      property weight : Int32
+      property generate_feed : Bool
+      property build_search_index : Bool
+      property taxonomies : Array(String)
+
+      def initialize(@code : String)
+        @language_name = code
+        @weight = 1
+        @generate_feed = true
+        @build_search_index = true
+        @taxonomies = ["tags", "categories"]
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -129,6 +147,8 @@ module Hwaro
       property plugins : PluginConfig
       property pagination : PaginationConfig
       property taxonomies : Array(TaxonomyConfig)
+      property default_language : String
+      property languages : Hash(String, LanguageConfig)
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -143,7 +163,24 @@ module Hwaro
         @plugins = PluginConfig.new
         @pagination = PaginationConfig.new
         @taxonomies = [] of TaxonomyConfig
+        @default_language = "en"
+        @languages = {} of String => LanguageConfig
         @raw = Hash(String, TOML::Any).new
+      end
+
+      # Check if site is multilingual
+      def multilingual? : Bool
+        @languages.size > 1
+      end
+
+      # Get language config by code, returns nil if not found
+      def language(code : String) : LanguageConfig?
+        @languages[code]?
+      end
+
+      # Get sorted languages by weight
+      def sorted_languages : Array(LanguageConfig)
+        @languages.values.sort_by(&.weight)
       end
 
       def self.load(config_path : String = "config.toml") : Config
@@ -264,6 +301,28 @@ module Hwaro
               taxonomy.sitemap = taxonomy_hash["sitemap"]?.try(&.as_bool?) || taxonomy.sitemap
               taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
               taxonomy
+            end
+          end
+
+          # Load default language
+          config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
+
+          # Load languages configuration
+          if languages_section = config.raw["languages"]?.try(&.as_h?)
+            languages_section.each do |lang_code, lang_data|
+              next unless lang_hash = lang_data.as_h?
+
+              lang_config = LanguageConfig.new(lang_code)
+              lang_config.language_name = lang_hash["language_name"]?.try(&.as_s?) || lang_code
+              lang_config.weight = lang_hash["weight"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || lang_config.weight
+              lang_config.generate_feed = lang_hash["generate_feed"]?.try(&.as_bool?) || lang_config.generate_feed
+              lang_config.build_search_index = lang_hash["build_search_index"]?.try(&.as_bool?) || lang_config.build_search_index
+
+              if taxonomies = lang_hash["taxonomies"]?.try(&.as_a?)
+                lang_config.taxonomies = taxonomies.compact_map(&.as_s?)
+              end
+
+              config.languages[lang_code] = lang_config
             end
           end
         end

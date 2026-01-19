@@ -18,6 +18,7 @@ module Hwaro
           skip_agents_md = false
           skip_sample_content = false
           skip_taxonomies = false
+          multilingual_languages = [] of String
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
@@ -25,13 +26,16 @@ module Hwaro
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
+            parser.on("--include-multilingual LANGS", "Enable multilingual support (e.g., en,ko)") do |langs|
+              multilingual_languages = langs.split(",").map(&.strip).reject(&.empty?)
+            end
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?
             end
           end
 
-          Config::Options::InitOptions.new(path: path, force: force, skip_agents_md: skip_agents_md, skip_sample_content: skip_sample_content, skip_taxonomies: skip_taxonomies)
+          Config::Options::InitOptions.new(path: path, force: force, skip_agents_md: skip_agents_md, skip_sample_content: skip_sample_content, skip_taxonomies: skip_taxonomies, multilingual_languages: multilingual_languages)
         end
       end
     end
