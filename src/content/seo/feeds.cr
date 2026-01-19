@@ -44,7 +44,7 @@ module Hwaro
           end
         end
 
-        private def self.process_feed(
+        def self.process_feed(
           pages : Array(Models::Page),
           config : Models::Config,
           output_dir : String,
@@ -99,7 +99,7 @@ module Hwaro
           Logger.action :create, feed_path
         end
 
-        private def self.generate_rss(
+        def self.generate_rss(
           pages : Array(Models::Page),
           config : Models::Config,
           filename : String,
@@ -149,7 +149,7 @@ module Hwaro
           end
         end
 
-        private def self.generate_atom(
+        def self.generate_atom(
           pages : Array(Models::Page),
           config : Models::Config,
           filename : String,

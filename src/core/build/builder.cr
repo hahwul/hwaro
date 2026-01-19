@@ -223,7 +223,8 @@ module Hwaro
         private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
           Dir.glob("content/**/*.md") do |file_path|
             relative_path = Path[file_path].relative_to("content").to_s
-            is_index = Path[relative_path].basename == "index.md"
+            basename = Path[relative_path].basename
+            is_index = basename == "index.md" || basename == "_index.md"
 
             if is_index
               page = Models::Section.new(relative_path)
@@ -262,6 +263,10 @@ module Hwaro
             page.custom_path = data[:custom_path]
             page.aliases = data[:aliases]
             page.tags = data[:tags]
+            page.taxonomies = data[:taxonomies]
+            page.front_matter_keys = data[:front_matter_keys]
+            page.taxonomy_name = nil
+            page.taxonomy_term = nil
 
             if page.is_a?(Models::Section)
               page.transparent = data[:transparent]
@@ -427,8 +432,7 @@ module Hwaro
             section_list_html = ""
 
             final_html = if template_content
-                           full_template = resolve_includes(template_content, templates)
-                           apply_template(full_template, html_content, page, site.config, section_list_html, toc_html, templates)
+                           apply_template(template_content, html_content, page, site.config, section_list_html, toc_html, templates)
                          else
                            Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                            html_content
@@ -470,8 +474,7 @@ module Hwaro
             combined_section_html = section_list_html + pagination_nav_html
 
             final_html = if template_content
-                           full_template = resolve_includes(template_content, templates)
-                           apply_template(full_template, html_content, section, site.config, combined_section_html, toc_html, templates)
+                           apply_template(template_content, html_content, section, site.config, combined_section_html, toc_html, templates)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -589,7 +592,7 @@ module Hwaro
           end
         end
 
-        private def resolve_includes(content : String, templates : Hash(String, String), depth : Int32 = 0) : String
+        def resolve_includes(content : String, templates : Hash(String, String), depth : Int32 = 0) : String
           return content if depth > 10
 
           content.gsub(/<%=\s*render\s+"([^"]+)"\s*%>/) do |match|
@@ -603,7 +606,7 @@ module Hwaro
           end
         end
 
-        private def apply_template(
+        def apply_template(
           template : String,
           content : String,
           page : Models::Page,
@@ -612,11 +615,16 @@ module Hwaro
           toc : String,
           templates : Hash(String, String),
         ) : String
-          result = template
+          # First resolve includes (render partials)
+          resolved = resolve_includes(template, templates)
+
+          result = resolved
             .gsub(/<%=\s*page_title\s*%>/, page.title)
             .gsub(/<%=\s*page_section\s*%>/, page.section)
             .gsub(/<%=\s*section_list\s*%>/, section_list)
             .gsub(/<%=\s*toc\s*%>/, toc)
+            .gsub(/<%=\s*taxonomy_name\s*%>/, page.taxonomy_name || "")
+            .gsub(/<%=\s*taxonomy_term\s*%>/, page.taxonomy_term || "")
             .gsub(/<%=\s*site_title\s*%>/, config.title)
             .gsub(/<%=\s*site_description\s*%>/, config.description || "")
             .gsub(/<%=\s*base_url\s*%>/, config.base_url)
@@ -690,8 +698,7 @@ module Hwaro
           section_list = ""
           toc = ""
 
-          full_template = resolve_includes(template, templates)
-          final_html = apply_template(full_template, content, page, site.config, section_list, toc, templates)
+          final_html = apply_template(template, content, page, site.config, section_list, toc, templates)
 
           final_html = minify_html(final_html) if minify
 

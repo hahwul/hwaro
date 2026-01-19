@@ -65,6 +65,11 @@ module Hwaro
 
       def initialize
         @builder = Core::Build::Builder.new
+
+        # Register content hooks with lifecycle (same as build command)
+        Content::Hooks.all.each do |hookable|
+          @builder.register(hookable)
+        end
       end
 
       def run(options : Config::Options::ServeOptions)

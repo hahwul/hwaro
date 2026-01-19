@@ -104,6 +104,19 @@ module Hwaro
       end
     end
 
+    class TaxonomyConfig
+      property name : String
+      property feed : Bool
+      property sitemap : Bool
+      property paginate_by : Int32?
+
+      def initialize(@name : String)
+        @feed = false
+        @sitemap = true
+        @paginate_by = nil
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -115,6 +128,7 @@ module Hwaro
       property search : SearchConfig
       property plugins : PluginConfig
       property pagination : PaginationConfig
+      property taxonomies : Array(TaxonomyConfig)
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -128,6 +142,7 @@ module Hwaro
         @search = SearchConfig.new
         @plugins = PluginConfig.new
         @pagination = PaginationConfig.new
+        @taxonomies = [] of TaxonomyConfig
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -233,6 +248,23 @@ module Hwaro
           if pagination_section = config.raw["pagination"]?.try(&.as_h?)
             config.pagination.enabled = pagination_section["enabled"]?.try(&.as_bool?) || config.pagination.enabled
             config.pagination.per_page = pagination_section["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
+          end
+
+          # Load taxonomies configuration
+          if taxonomies_section = config.raw["taxonomies"]?.try(&.as_a?)
+            config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
+              taxonomy_hash = taxonomy_any.as_h?
+              next unless taxonomy_hash
+
+              name = taxonomy_hash["name"]?.try(&.as_s?)
+              next unless name
+
+              taxonomy = TaxonomyConfig.new(name)
+              taxonomy.feed = taxonomy_hash["feed"]?.try(&.as_bool?) || taxonomy.feed
+              taxonomy.sitemap = taxonomy_hash["sitemap"]?.try(&.as_bool?) || taxonomy.sitemap
+              taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+              taxonomy
+            end
           end
         end
         config

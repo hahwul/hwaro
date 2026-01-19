@@ -13,9 +13,14 @@ module Hwaro
       property custom_path : String?
       property aliases : Array(String)
       property tags : Array(String)
+      property taxonomies : Hash(String, Array(String))
+      property front_matter_keys : Array(String)
       property weight : Int32
+      property taxonomy_name : String?
+      property taxonomy_term : String?
       property in_sitemap : Bool
       property toc : Bool
+      property generated : Bool
 
       # Runtime / Computed Properties
       property content : String
@@ -31,7 +36,12 @@ module Hwaro
         @render = true
         @tags = [] of String
         @aliases = [] of String
+        @taxonomies = {} of String => Array(String)
+        @front_matter_keys = [] of String
         @weight = 0
+        @taxonomy_name = nil
+        @taxonomy_term = nil
+        @generated = false
         @content = ""
         @raw_content = ""
         @section = ""

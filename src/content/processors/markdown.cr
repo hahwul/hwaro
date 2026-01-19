@@ -68,6 +68,8 @@ module Hwaro
           custom_path = nil
           aliases = [] of String
           tags = [] of String
+          taxonomies = {} of String => Array(String)
+          front_matter_keys = [] of String
           transparent = false
           generate_feeds = false
           paginate = nil.as(Int32?)
@@ -113,9 +115,12 @@ module Hwaro
               if toml_fm.has_key?("aliases")
                 aliases = toml_fm["aliases"].as_a.map(&.as_s)
               end
+              front_matter_keys = toml_fm.keys
+              taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
               if toml_fm.has_key?("tags")
                 tags = toml_fm["tags"].as_a.map(&.as_s)
               end
+              taxonomies["tags"] = tags if tags.any?
             rescue ex
               Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
             end
@@ -170,9 +175,12 @@ module Hwaro
                   aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
                 end
 
+                front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
+                taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
                 if (val = yaml_fm["tags"]?)
                   tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
                 end
+                taxonomies["tags"] = tags if tags.any?
               end
             rescue ex
               Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
@@ -194,6 +202,8 @@ module Hwaro
             custom_path:        custom_path,
             aliases:            aliases,
             tags:               tags,
+            taxonomies:         taxonomies,
+            front_matter_keys:  front_matter_keys,
             transparent:        transparent,
             generate_feeds:     generate_feeds,
             paginate:           paginate,
@@ -277,6 +287,39 @@ module Hwaro
           rescue
             nil
           end
+        end
+
+        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any, keys : Array(String)) : Hash(String, Array(String))
+          taxonomies = {} of String => Array(String)
+
+          if front_matter.is_a?(TOML::Table)
+            front_matter.each do |key, value|
+              next if key == "tags"
+              # TOML values are wrapped in TOML::Any, need to check as_a?
+              if arr = value.as_a?
+                values = arr.compact_map { |v| v.as_s? }
+                taxonomies[key] = values
+              end
+            end
+          else
+            if fm_hash = front_matter.as_h?
+              fm_hash.each do |key_any, value|
+                key = key_any.as_s?
+                next unless key
+                next if key == "tags"
+                values = value.as_a?.try { |arr| arr.compact_map(&.as_s?) } || [] of String
+                taxonomies[key] = values
+              end
+            end
+          end
+
+          keys.each do |key|
+            next if key == "tags"
+            next if taxonomies.has_key?(key)
+            taxonomies[key] = [] of String
+          end
+
+          taxonomies
         end
 
         private def slugify(text : String) : String

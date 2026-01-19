@@ -62,6 +62,7 @@ require "./content/seo/sitemap"
 require "./content/seo/robots"
 require "./content/seo/llms"
 require "./content/search"
+require "./content/taxonomies"
 
 # Load pagination
 require "./content/pagination/paginator"

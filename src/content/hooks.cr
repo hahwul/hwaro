@@ -4,6 +4,7 @@
 
 require "./hooks/markdown_hooks"
 require "./hooks/seo_hooks"
+require "./hooks/taxonomy_hooks"
 
 module Hwaro
   module Content
@@ -13,6 +14,7 @@ module Hwaro
         [
           MarkdownHooks.new,
           SeoHooks.new,
+          TaxonomyHooks.new,
         ] of Core::Lifecycle::Hookable
       end
     end

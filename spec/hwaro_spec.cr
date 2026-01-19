@@ -68,6 +68,7 @@ describe Hwaro do
       config.sitemap.enabled.should eq(false)
       config.feeds.enabled.should eq(false)
       config.search.enabled.should eq(false)
+      config.taxonomies.should eq([] of Hwaro::Models::TaxonomyConfig)
     end
 
     it "has default search configuration" do
@@ -301,6 +302,36 @@ describe Hwaro do
 
   describe Hwaro::Processor::Markdown do
     describe "parse" do
+      it "captures front matter keys for taxonomy detection" do
+        content = <<-MARKDOWN
+        +++
+        title = "Post"
+        tags = ["a"]
+        categories = []
+        +++
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result[:front_matter_keys].should contain("tags")
+        result[:front_matter_keys].should contain("categories")
+      end
+
+      it "keeps empty taxonomy arrays for configured keys" do
+        content = <<-MARKDOWN
+        ---
+        title: Post
+        categories: []
+        ---
+
+        # Content
+        MARKDOWN
+
+        result = Hwaro::Processor::Markdown.parse(content)
+        result[:taxonomies].has_key?("categories").should be_true
+        result[:taxonomies]["categories"].should eq([] of String)
+      end
       it "parses TOML frontmatter with in_sitemap" do
         content = <<-MARKDOWN
         +++
