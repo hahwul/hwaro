@@ -197,7 +197,7 @@ module Hwaro
           when "th" then "ไทย"
           when "ar" then "العربية"
           when "hi" then "हिन्दी"
-          else code.upcase
+          else           code.upcase
           end
         end
       end

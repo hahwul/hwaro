@@ -3,9 +3,9 @@ module Hwaro
     module Options
       # Available scaffold types for project initialization
       enum ScaffoldType
-        Simple  # Basic pages (current default)
-        Blog    # Blog-focused with posts, archives, tags
-        Docs    # Documentation-focused with sidebar, TOC
+        Simple # Basic pages (current default)
+        Blog   # Blog-focused with posts, archives, tags
+        Docs   # Documentation-focused with sidebar, TOC
 
         def self.from_string(value : String) : ScaffoldType
           case value.downcase
@@ -25,7 +25,7 @@ module Hwaro
           when Simple then "simple"
           when Blog   then "blog"
           when Docs   then "docs"
-          else "simple"
+          else             "simple"
           end
         end
       end
