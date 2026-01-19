@@ -223,10 +223,23 @@ module Hwaro
 
         # Collect content file paths without parsing
         private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
+          config = ctx.config
+
           Dir.glob("content/**/*.md") do |file_path|
             relative_path = Path[file_path].relative_to("content").to_s
             basename = Path[relative_path].basename
-            is_index = basename == "index.md" || basename == "_index.md"
+
+            # Extract language from filename (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
+            language = extract_language_from_filename(basename, config)
+
+            # Remove language suffix from basename for is_index check
+            clean_basename = if language
+                               basename.sub(/\.#{language}\.md$/, ".md")
+                             else
+                               basename
+                             end
+
+            is_index = clean_basename == "index.md" || clean_basename == "_index.md"
 
             if is_index
               page = Models::Section.new(relative_path)
@@ -240,7 +253,22 @@ module Hwaro
             path_parts = Path[relative_path].parts
             page.section = path_parts.size > 1 ? path_parts.first : ""
             page.is_index = is_index
+            page.language = language
           end
+        end
+
+        # Extract language code from filename if it matches configured languages
+        private def extract_language_from_filename(basename : String, config : Models::Config?) : String?
+          return nil unless config
+          return nil unless config.multilingual?
+
+          # Match pattern: filename.lang.md (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
+          if match = basename.match(/^(.+)\.([a-z]{2,3})\.md$/)
+            lang_code = match[2]
+            return lang_code if config.languages.has_key?(lang_code)
+          end
+
+          nil
         end
 
         # Default parsing when no hooks are registered
@@ -313,7 +341,15 @@ module Hwaro
           else
             dir = Path[relative_path].dirname
             stem = Path[relative_path].stem
-            leaf = page.slug || stem
+
+            # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
+            clean_stem = if page.language
+                           stem.sub(/\.#{page.language}$/, "")
+                         else
+                           stem
+                         end
+
+            leaf = page.slug || clean_stem
 
             if dir == "."
               page.url = "#{lang_prefix}/#{leaf}/"
@@ -465,9 +501,14 @@ module Hwaro
           html_content : String,
           toc_html : String,
         )
-          # Get pages in this section
+          # Get pages in this section, filtered by language
+          # nil language means default language, so we need to compare carefully
+          section_lang = section.language
           section_pages = site.pages.select do |p|
-            p.section == section.section && !p.is_index
+            next false if p.section != section.section
+            next false if p.is_index
+            # Match language: both nil (default), or same language code
+            p.language == section_lang
           end
 
           # Create paginator and render
@@ -545,8 +586,12 @@ module Hwaro
         end
 
         private def generate_section_list(current_page : Models::Page, site : Models::Site) : String
+          current_lang = current_page.language
           section_pages = site.pages.select do |p|
-            p.section == current_page.section && !p.is_index
+            next false if p.section != current_page.section
+            next false if p.is_index
+            # Match language: both nil (default), or same language code
+            p.language == current_lang
           end
 
           section_pages.sort_by! { |p| p.title }

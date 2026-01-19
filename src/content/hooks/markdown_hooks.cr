@@ -113,7 +113,15 @@ module Hwaro
           else
             dir = Path[relative_path].dirname
             stem = Path[relative_path].stem
-            leaf = page.slug || stem
+
+            # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
+            clean_stem = if page.language
+                           stem.sub(/\.#{page.language}$/, "")
+                         else
+                           stem
+                         end
+
+            leaf = page.slug || clean_stem
 
             if dir == "."
               page.url = "#{lang_prefix}/#{leaf}/"
