@@ -85,14 +85,16 @@ module Hwaro
           line_numbers : Bool,
         ) : String
           # Match <pre><code class="language-xxx">...</code></pre> patterns
-          # The regex captures:
-          # 1. The language name from class="language-xxx"
-          # 2. The code content between <code> and </code>
-          pattern = /<pre><code\s+class="language-([^"]+)">(.*?)<\/code><\/pre>/m
+          # The regex uses named captures for clarity and handles:
+          # - Optional whitespace variations
+          # - Additional class attributes (e.g., class="language-ruby highlight")
+          # - The language name from class="language-xxx"
+          # - The code content between <code> and </code>
+          pattern = /<pre><code\s+class="(?:[^"]*\s)?language-(?<lang>[^\s"]+)(?:\s[^"]*)?"[^>]*>(?<code>.*?)<\/code><\/pre>/m
 
-          html.gsub(pattern) do |match|
-            language = $1
-            code = $2
+          html.gsub(pattern) do |match, match_data|
+            language = match_data["lang"]
+            code = match_data["code"]
 
             # Decode HTML entities in the code
             decoded_code = decode_html_entities(code)
