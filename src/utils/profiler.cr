@@ -11,12 +11,8 @@ module Hwaro
     struct PhaseTime
       property phase : String
       property duration_ms : Float64
-      property started_at : Time::Instant?
-      property ended_at : Time::Instant?
 
       def initialize(@phase : String, @duration_ms : Float64 = 0.0)
-        @started_at = nil
-        @ended_at = nil
       end
     end
 
@@ -53,10 +49,13 @@ module Hwaro
     # End timing for the current phase
     def end_phase
       return unless @enabled
-      return unless @phase_start && @current_phase
 
-      duration = (Time.instant - @phase_start.not_nil!).total_milliseconds
-      @phases << PhaseTime.new(@current_phase.not_nil!, duration)
+      phase_start = @phase_start
+      current_phase = @current_phase
+      return unless phase_start && current_phase
+
+      duration = (Time.instant - phase_start).total_milliseconds
+      @phases << PhaseTime.new(current_phase, duration)
       @current_phase = nil
       @phase_start = nil
     end
