@@ -79,8 +79,8 @@ module Hwaro
               <nav>
                 <a href="<%= base_url %>/">Home</a>
                 <a href="<%= base_url %>/posts/">Posts</a>
-                <a href="<%= base_url %>/archives.html">Archives</a>
-                <a href="<%= base_url %>/about.html">About</a>
+                <a href="<%= base_url %>/archives/">Archives</a>
+                <a href="<%= base_url %>/about/">About</a>
               </nav>
           NAV
         end
