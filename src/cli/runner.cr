@@ -2,6 +2,7 @@ require "./commands/init_command"
 require "./commands/build_command"
 require "./commands/serve_command"
 require "./commands/new_command"
+require "./commands/tool_command"
 require "../utils/logger"
 
 module Hwaro
@@ -108,6 +109,11 @@ module Hwaro
         # Register new command
         CommandRegistry.register("new", "Create a new content file") do |args|
           Commands::NewCommand.new.run(args)
+        end
+
+        # Register tool command
+        CommandRegistry.register("tool", "Utility tools (convert, etc.)") do |args|
+          Commands::ToolCommand.new.run(args)
         end
       end
 
