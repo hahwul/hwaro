@@ -64,7 +64,8 @@ module Hwaro
             minify: options.minify,
             parallel: options.parallel,
             cache: options.cache,
-            highlight: options.highlight
+            highlight: options.highlight,
+            verbose: options.verbose
           )
         end
 
@@ -75,6 +76,7 @@ module Hwaro
           parallel : Bool = true,
           cache : Bool = false,
           highlight : Bool = true,
+          verbose : Bool = false,
         )
           Logger.info "Building site..."
           start_time = Time.instant
@@ -86,7 +88,8 @@ module Hwaro
             minify: minify,
             parallel: parallel,
             cache: cache,
-            highlight: highlight
+            highlight: highlight,
+            verbose: verbose
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -97,7 +100,7 @@ module Hwaro
           @templates = nil
 
           # Execute build phases through lifecycle
-          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight)
+          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight, verbose)
 
           ctx.stats.end_time = Time.instant
 
@@ -118,6 +121,7 @@ module Hwaro
           parallel : Bool,
           cache_enabled : Bool,
           highlight : Bool,
+          verbose : Bool,
         ) : Lifecycle::HookResult
           output_dir = ctx.output_dir
 
@@ -132,7 +136,7 @@ module Hwaro
             end
 
             setup_output_dir(output_dir)
-            copy_static_files(output_dir)
+            copy_static_files(output_dir, verbose)
 
             config = Models::Config.load
             @site = Models::Site.new(config)
@@ -196,9 +200,9 @@ module Hwaro
           # Phase: Render
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             count = if parallel && pages_to_build.size > 1
-                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight)
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose)
                     else
-                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight)
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose)
                     end
             ctx.stats.pages_rendered = count
           end
@@ -219,7 +223,7 @@ module Hwaro
 
           # Phase: Write
           result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
-            generate_404_page(site, templates, output_dir, minify)
+            generate_404_page(site, templates, output_dir, minify, verbose)
           end
           return result if result != Lifecycle::HookResult::Continue
 
@@ -387,10 +391,10 @@ module Hwaro
           FileUtils.mkdir_p(output_dir)
         end
 
-        private def copy_static_files(output_dir : String)
+        private def copy_static_files(output_dir : String, verbose : Bool)
           if Dir.exists?("static")
             FileUtils.cp_r("static/.", "#{output_dir}/")
-            Logger.action :copy, "static files", :blue
+            Logger.action :copy, "static files", :blue if verbose
           end
         end
 
@@ -423,12 +427,13 @@ module Hwaro
           minify : Bool,
           cache : Cache,
           highlight : Bool,
+          verbose : Bool,
         ) : Int32
           config = ParallelConfig.new(enabled: true)
           processor = Parallel(Models::Page, Bool).new(config)
 
           results = processor.process(pages) do |page, _idx|
-            render_page(page, site, templates, output_dir, minify, highlight)
+            render_page(page, site, templates, output_dir, minify, highlight, verbose)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -446,10 +451,11 @@ module Hwaro
           minify : Bool,
           cache : Cache,
           highlight : Bool,
+          verbose : Bool,
         ) : Int32
           count = 0
           pages.each do |page|
-            render_page(page, site, templates, output_dir, minify, highlight)
+            render_page(page, site, templates, output_dir, minify, highlight, verbose)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -465,6 +471,7 @@ module Hwaro
           output_dir : String,
           minify : Bool,
           highlight : Bool = true,
+          verbose : Bool = false,
         )
           return unless page.render
 
@@ -496,10 +503,10 @@ module Hwaro
 
             final_html = minify_html(final_html) if minify
 
-            write_output(page, output_dir, final_html)
+            write_output(page, output_dir, final_html, verbose)
           end
 
-          generate_aliases(page, output_dir)
+          generate_aliases(page, output_dir, verbose)
         end
 
         private def render_section_with_pagination(
@@ -511,6 +518,7 @@ module Hwaro
           minify : Bool,
           html_content : String,
           toc_html : String,
+          verbose : Bool = false,
         )
           # Get pages in this section, filtered by language
           # nil language means default language, so we need to compare carefully
@@ -545,14 +553,14 @@ module Hwaro
 
             # Write output - first page uses section URL, subsequent pages use /page/N/
             if paginated_page.page_number == 1
-              write_output(section, output_dir, final_html)
+              write_output(section, output_dir, final_html, verbose)
             else
-              write_paginated_output(section, paginated_page.page_number, output_dir, final_html)
+              write_paginated_output(section, paginated_page.page_number, output_dir, final_html, verbose)
             end
           end
         end
 
-        private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String)
+        private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool)
           # Sanitize URL to prevent path traversal
           url_path = sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
           output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
@@ -567,7 +575,7 @@ module Hwaro
 
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, content)
-          Logger.action :create, output_path
+          Logger.action :create, output_path if verbose
         end
 
         # Sanitize path to prevent directory traversal
@@ -615,7 +623,7 @@ module Hwaro
           end
         end
 
-        private def generate_aliases(page : Models::Page, output_dir : String)
+        private def generate_aliases(page : Models::Page, output_dir : String, verbose : Bool)
           page.aliases.each do |alias_path|
             alias_clean = alias_path.sub(/^\//, "")
             dest_path = File.join(output_dir, alias_clean, "index.html")
@@ -637,7 +645,7 @@ module Hwaro
             HTML
 
             File.write(dest_path, content)
-            Logger.action :create, dest_path, :yellow
+            Logger.action :create, dest_path, :yellow if verbose
           end
         end
 
@@ -747,15 +755,15 @@ module Hwaro
           html.gsub(/\n\s*/, "")
         end
 
-        private def write_output(page : Models::Page, output_dir : String, content : String)
+        private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
           output_path = get_output_path(page, output_dir)
 
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, content)
-          Logger.action :create, output_path
+          Logger.action :create, output_path if verbose
         end
 
-        private def generate_404_page(site : Models::Site, templates : Hash(String, String), output_dir : String, minify : Bool)
+        private def generate_404_page(site : Models::Site, templates : Hash(String, String), output_dir : String, minify : Bool, verbose : Bool)
           return unless templates.has_key?("404")
 
           template = templates["404"]
@@ -773,7 +781,7 @@ module Hwaro
           output_path = File.join(output_dir, "404.html")
           FileUtils.mkdir_p(File.dirname(output_path))
           File.write(output_path, final_html)
-          Logger.action :create, output_path
+          Logger.action :create, output_path if verbose
         end
       end
     end

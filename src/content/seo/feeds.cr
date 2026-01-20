@@ -9,7 +9,7 @@ module Hwaro
   module Content
     module Seo
       class Feeds
-        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String)
+        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
           # 1. Generate Main Site Feed
           if config.feeds.enabled
             site_pages = pages.reject { |p| p.draft || !p.render || p.is_index }
@@ -19,7 +19,7 @@ module Hwaro
               site_pages.select! { |p| config.feeds.sections.includes?(p.section) }
             end
 
-            process_feed(site_pages, config, output_dir, config.feeds.filename, config.title)
+            process_feed(site_pages, config, output_dir, config.feeds.filename, config.title, "", verbose)
           end
 
           # 2. Generate Section Feeds
@@ -39,7 +39,7 @@ module Hwaro
 
               feed_title = "#{config.title} - #{page.title}"
 
-              process_feed(section_pages, config, section_output_dir, "", feed_title, page.url)
+              process_feed(section_pages, config, section_output_dir, "", feed_title, page.url, verbose)
             end
           end
         end
@@ -51,6 +51,7 @@ module Hwaro
           custom_filename : String,
           feed_title : String,
           base_path : String = "",
+          verbose : Bool = false,
         )
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
@@ -96,7 +97,7 @@ module Hwaro
           # Write feed file
           feed_path = File.join(output_dir, filename)
           File.write(feed_path, feed_content)
-          Logger.action :create, feed_path
+          Logger.action :create, feed_path if verbose
         end
 
         def self.generate_rss(

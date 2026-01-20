@@ -17,6 +17,7 @@ module Hwaro
           port = 3000
           drafts = false
           open_browser = false
+          verbose = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -24,6 +25,7 @@ module Hwaro
             parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--open", "Open browser after starting server") { open_browser = true }
+            parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -31,7 +33,8 @@ module Hwaro
             host: host,
             port: port,
             drafts: drafts,
-            open_browser: open_browser
+            open_browser: open_browser,
+            verbose: verbose
           )
         end
       end

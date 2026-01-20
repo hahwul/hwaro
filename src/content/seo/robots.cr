@@ -5,7 +5,7 @@ module Hwaro
   module Content
     module Seo
       class Robots
-        def self.generate(config : Models::Config, output_dir : String)
+        def self.generate(config : Models::Config, output_dir : String, verbose : Bool = false)
           return unless config.robots.enabled
 
           content = String.build do |str|
@@ -43,7 +43,7 @@ module Hwaro
           filename = config.robots.filename
           file_path = File.join(output_dir, filename)
           File.write(file_path, content)
-          Logger.action :create, file_path
+          Logger.action :create, file_path if verbose
           Logger.info "  Generated robots.txt"
         end
       end

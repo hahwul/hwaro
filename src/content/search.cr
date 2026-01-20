@@ -7,7 +7,7 @@ require "json"
 module Hwaro
   module Content
     class Search
-      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String)
+      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
         return unless config.search.enabled
 
         # Filter out draft pages
@@ -36,7 +36,7 @@ module Hwaro
         filename = config.search.filename
         search_path = File.join(output_dir, filename)
         File.write(search_path, content)
-        Logger.action :create, search_path
+        Logger.action :create, search_path if verbose
         Logger.info "  Generated search index with #{search_pages.size} pages."
       end
 

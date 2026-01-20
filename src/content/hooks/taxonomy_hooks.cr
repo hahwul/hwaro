@@ -22,7 +22,7 @@ module Hwaro
           site = ctx.site
           return unless site
 
-          Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates)
+          Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose)
         end
       end
     end

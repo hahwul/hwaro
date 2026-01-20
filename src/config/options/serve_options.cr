@@ -6,12 +6,14 @@ module Hwaro
         property port : Int32
         property drafts : Bool
         property open_browser : Bool
+        property verbose : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
           @port : Int32 = 3000,
           @drafts : Bool = false,
           @open_browser : Bool = false,
+          @verbose : Bool = false,
         )
         end
 
@@ -21,7 +23,8 @@ module Hwaro
             output_dir: "public",
             drafts: @drafts,
             minify: false,
-            parallel: true
+            parallel: true,
+            verbose: @verbose
           )
         end
       end

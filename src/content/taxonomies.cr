@@ -15,7 +15,7 @@ require "../content/pagination/renderer"
 module Hwaro
   module Content
     class Taxonomies
-      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String))
+      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false)
         config = site.config
         return if config.taxonomies.empty?
 
@@ -30,10 +30,10 @@ module Hwaro
           base_path = "/#{taxonomy.name}/"
           index_page = build_taxonomy_index_page(taxonomy, base_path)
 
-          render_taxonomy_index(index_page, terms.keys.sort, templates, site, output_dir)
+          render_taxonomy_index(index_page, terms.keys.sort, templates, site, output_dir, verbose)
 
           terms.each do |term, pages|
-            render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir)
+            render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir, verbose)
           end
         end
       end
@@ -97,12 +97,13 @@ module Hwaro
         templates : Hash(String, String),
         site : Models::Site,
         output_dir : String,
+        verbose : Bool = false,
       )
         template_content = templates["taxonomy"]? || templates["page"]?
         html_content = build_term_list(terms, page.url, site.config.base_url)
 
         final_html = apply_template(template_content, html_content, page, site, templates)
-        write_output(page, output_dir, final_html)
+        write_output(page, output_dir, final_html, verbose)
       end
 
       private def self.render_taxonomy_term(
@@ -112,6 +113,7 @@ module Hwaro
         templates : Hash(String, String),
         site : Models::Site,
         output_dir : String,
+        verbose : Bool = false,
       )
         slug = slugify(term)
         base_url = "/#{taxonomy.name}/#{slug}/"
@@ -141,15 +143,15 @@ module Hwaro
           final_html = apply_template(template_content, html_content, index_page, site, templates)
 
           if paginated_page.page_number == 1
-            write_output(index_page, output_dir, final_html)
+            write_output(index_page, output_dir, final_html, verbose)
           else
-            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html)
+            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose)
           end
         end
 
         return unless taxonomy.feed
 
-        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url)
+        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url, verbose)
       end
 
       private def self.paginate_taxonomy(
@@ -256,6 +258,7 @@ module Hwaro
         site : Models::Site,
         output_dir : String,
         base_url : String,
+        verbose : Bool = false,
       )
         return if site.config.base_url.empty?
 
@@ -289,7 +292,8 @@ module Hwaro
           feed_output_dir,
           "",
           feed_title,
-          base_url
+          base_url,
+          verbose
         )
       end
 
@@ -341,18 +345,18 @@ module Hwaro
           .strip("-")
       end
 
-      private def self.write_output(page : Models::Section, output_dir : String, content : String)
+      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
         output_path = File.join(output_dir, page.url.sub(/^\//, ""), "index.html")
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
-        Logger.action :create, output_path
+        Logger.action :create, output_path if verbose
       end
 
-      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String)
+      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false)
         output_path = File.join(output_dir, page.url.sub(/^\//, ""), "page", page_number.to_s, "index.html")
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
-        Logger.action :create, output_path
+        Logger.action :create, output_path if verbose
       end
     end
   end

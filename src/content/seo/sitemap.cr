@@ -6,7 +6,7 @@ module Hwaro
   module Content
     module Seo
       class Sitemap
-        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String)
+        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false)
           # Check if sitemap is enabled
           return unless site.config.sitemap.enabled
 
@@ -55,7 +55,7 @@ module Hwaro
           filename = site.config.sitemap.filename
           sitemap_path = Path[output_dir, filename].to_s
           File.write(sitemap_path, xml_content)
-          Logger.action :create, sitemap_path
+          Logger.action :create, sitemap_path if verbose
           Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
         end
 

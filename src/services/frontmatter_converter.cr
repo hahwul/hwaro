@@ -29,7 +29,7 @@ module Hwaro
         @message : String = "",
         @converted_count : Int32 = 0,
         @skipped_count : Int32 = 0,
-        @error_count : Int32 = 0
+        @error_count : Int32 = 0,
       )
       end
     end

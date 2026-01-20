@@ -36,23 +36,23 @@ module Hwaro
           all_pages = ctx.all_pages
 
           # Generate sitemap
-          Content::Seo::Sitemap.generate(all_pages, site, ctx.output_dir)
+          Content::Seo::Sitemap.generate(all_pages, site, ctx.output_dir, ctx.options.verbose)
 
           # Generate feeds (RSS/Atom)
-          Content::Seo::Feeds.generate(all_pages, site.config, ctx.output_dir)
+          Content::Seo::Feeds.generate(all_pages, site.config, ctx.output_dir, ctx.options.verbose)
 
           # Generate robots.txt
-          Content::Seo::Robots.generate(site.config, ctx.output_dir)
+          Content::Seo::Robots.generate(site.config, ctx.output_dir, ctx.options.verbose)
 
           # Generate llms.txt
-          Content::Seo::Llms.generate(site.config, ctx.output_dir)
+          Content::Seo::Llms.generate(site.config, ctx.output_dir, ctx.options.verbose)
         end
 
         private def generate_search_index(ctx : Core::Lifecycle::BuildContext)
           site = ctx.site
           return unless site
 
-          Content::Search.generate(ctx.all_pages, site.config, ctx.output_dir)
+          Content::Search.generate(ctx.all_pages, site.config, ctx.output_dir, ctx.options.verbose)
         end
       end
     end

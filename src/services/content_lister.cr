@@ -27,7 +27,7 @@ module Hwaro
         @path : String,
         @title : String = "Untitled",
         @draft : Bool = false,
-        @date : Time? = nil
+        @date : Time? = nil,
       )
       end
     end
@@ -185,7 +185,7 @@ module Hwaro
           rescue
             # Ignore parsing errors
           end
-        # Try YAML Front Matter (---)
+          # Try YAML Front Matter (---)
         elsif match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?/m)
           begin
             yaml_fm = YAML.parse(match[1])
