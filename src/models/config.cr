@@ -104,6 +104,45 @@ module Hwaro
       end
     end
 
+    # Syntax highlighting configuration
+    class HighlightConfig
+      property enabled : Bool
+      property theme : String
+      property use_cdn : Bool
+
+      def initialize
+        @enabled = true
+        @theme = "github"
+        @use_cdn = true
+      end
+
+      # Generate the CSS link tag for highlighting
+      def css_tag : String
+        return "" unless @enabled
+        if @use_cdn
+          %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{@theme}.min.css">)
+        else
+          %(<link rel="stylesheet" href="/assets/css/highlight/#{@theme}.min.css">)
+        end
+      end
+
+      # Generate the JS script tag for highlighting
+      def js_tag : String
+        return "" unless @enabled
+        if @use_cdn
+          %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+        else
+          %(<script src="/assets/js/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+        end
+      end
+
+      # Generate both CSS and JS tags
+      def tags : String
+        return "" unless @enabled
+        "#{css_tag}\n#{js_tag}"
+      end
+    end
+
     class TaxonomyConfig
       property name : String
       property feed : Bool
@@ -146,6 +185,7 @@ module Hwaro
       property search : SearchConfig
       property plugins : PluginConfig
       property pagination : PaginationConfig
+      property highlight : HighlightConfig
       property taxonomies : Array(TaxonomyConfig)
       property default_language : String
       property languages : Hash(String, LanguageConfig)
@@ -162,6 +202,7 @@ module Hwaro
         @search = SearchConfig.new
         @plugins = PluginConfig.new
         @pagination = PaginationConfig.new
+        @highlight = HighlightConfig.new
         @taxonomies = [] of TaxonomyConfig
         @default_language = "en"
         @languages = {} of String => LanguageConfig
@@ -285,6 +326,19 @@ module Hwaro
           if pagination_section = config.raw["pagination"]?.try(&.as_h?)
             config.pagination.enabled = pagination_section["enabled"]?.try(&.as_bool?) || config.pagination.enabled
             config.pagination.per_page = pagination_section["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
+          end
+
+          # Load highlight (syntax highlighting) configuration
+          if highlight_section = config.raw["highlight"]?.try(&.as_h?)
+            if highlight_section.has_key?("enabled")
+              enabled_val = highlight_section["enabled"]?.try(&.as_bool?)
+              config.highlight.enabled = enabled_val unless enabled_val.nil?
+            end
+            config.highlight.theme = highlight_section["theme"]?.try(&.as_s?) || config.highlight.theme
+            if highlight_section.has_key?("use_cdn")
+              use_cdn_val = highlight_section["use_cdn"]?.try(&.as_bool?)
+              config.highlight.use_cdn = use_cdn_val unless use_cdn_val.nil?
+            end
           end
 
           # Load taxonomies configuration

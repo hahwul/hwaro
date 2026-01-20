@@ -52,6 +52,7 @@ module Hwaro
             <meta name="description" content="<%= site_description %>">
             <title><%= page_title %> - <%= site_title %></title>
             #{styles}
+            <%= highlight_css %>
           </head>
           <body data-section="<%= page_section %>">
             <header>
@@ -68,6 +69,7 @@ module Hwaro
             <footer>
               <p>Powered by Hwaro</p>
             </footer>
+            <%= highlight_js %>
           </body>
           </html>
           HTML
@@ -245,6 +247,17 @@ module Hwaro
           # Plugins Configuration
           [plugins]
           processors = ["markdown"]  # List of enabled processors
+          TOML
+        end
+
+        protected def highlight_config : String
+          <<-TOML
+
+          # Syntax Highlighting Configuration
+          [highlight]
+          enabled = true     # Enable syntax highlighting for code blocks
+          theme = "github"   # Highlight.js theme (github, monokai, atom-one-dark, etc.)
+          use_cdn = true     # Use CDN for highlight.js (set to false to use local assets)
           TOML
         end
 

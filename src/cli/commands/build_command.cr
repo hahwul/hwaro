@@ -26,6 +26,7 @@ module Hwaro
           minify = false
           parallel = true
           cache = false
+          highlight = true
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -34,6 +35,7 @@ module Hwaro
             parser.on("--minify", "Minify HTML output") { minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
+            parser.on("--skip-highlighting", "Disable syntax highlighting") { highlight = false }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -42,7 +44,8 @@ module Hwaro
             drafts: drafts,
             minify: minify,
             parallel: parallel,
-            cache: cache
+            cache: cache,
+            highlight: highlight
           )
         end
       end

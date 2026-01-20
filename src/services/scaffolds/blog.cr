@@ -67,6 +67,7 @@ module Hwaro
             str << llms_config
             str << feeds_config(["posts"])
             str << plugins_config
+            str << highlight_config
             str << taxonomies_config unless skip_taxonomies
           end
           config

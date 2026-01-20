@@ -7,6 +7,7 @@ module Hwaro
         property minify : Bool
         property parallel : Bool
         property cache : Bool
+        property highlight : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -14,6 +15,7 @@ module Hwaro
           @minify : Bool = false,
           @parallel : Bool = true,
           @cache : Bool = false,
+          @highlight : Bool = true,
         )
         end
       end

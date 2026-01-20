@@ -30,4 +30,11 @@ describe Hwaro::Models::Config do
     config.pagination.enabled.should eq(false)
     config.pagination.per_page.should eq(10)
   end
+
+  it "has default highlight configuration" do
+    config = Hwaro::Models::Config.new
+    config.highlight.enabled.should eq(true)
+    config.highlight.theme.should eq("github")
+    config.highlight.use_cdn.should eq(true)
+  end
 end

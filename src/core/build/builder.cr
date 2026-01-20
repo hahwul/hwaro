@@ -63,7 +63,8 @@ module Hwaro
             drafts: options.drafts,
             minify: options.minify,
             parallel: options.parallel,
-            cache: options.cache
+            cache: options.cache,
+            highlight: options.highlight
           )
         end
 
@@ -73,6 +74,7 @@ module Hwaro
           minify : Bool = false,
           parallel : Bool = true,
           cache : Bool = false,
+          highlight : Bool = true,
         )
           Logger.info "Building site..."
           start_time = Time.instant
@@ -83,7 +85,8 @@ module Hwaro
             drafts: drafts,
             minify: minify,
             parallel: parallel,
-            cache: cache
+            cache: cache,
+            highlight: highlight
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -94,7 +97,7 @@ module Hwaro
           @templates = nil
 
           # Execute build phases through lifecycle
-          result = execute_phases(ctx, drafts, minify, parallel, cache)
+          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight)
 
           ctx.stats.end_time = Time.instant
 
@@ -114,6 +117,7 @@ module Hwaro
           minify : Bool,
           parallel : Bool,
           cache_enabled : Bool,
+          highlight : Bool,
         ) : Lifecycle::HookResult
           output_dir = ctx.output_dir
 
@@ -185,12 +189,16 @@ module Hwaro
             Logger.info "  Skipping #{ctx.stats.cache_hits} unchanged pages."
           end
 
+          # Determine if syntax highlighting should be used
+          # Config setting takes precedence, but can be overridden by CLI flag
+          use_highlight = highlight && (site.config.highlight.enabled)
+
           # Phase: Render
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             count = if parallel && pages_to_build.size > 1
-                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache)
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight)
                     else
-                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache)
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight)
                     end
             ctx.stats.pages_rendered = count
           end
@@ -414,12 +422,13 @@ module Hwaro
           output_dir : String,
           minify : Bool,
           cache : Cache,
+          highlight : Bool,
         ) : Int32
           config = ParallelConfig.new(enabled: true)
           processor = Parallel(Models::Page, Bool).new(config)
 
           results = processor.process(pages) do |page, _idx|
-            render_page(page, site, templates, output_dir, minify)
+            render_page(page, site, templates, output_dir, minify, highlight)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -436,10 +445,11 @@ module Hwaro
           output_dir : String,
           minify : Bool,
           cache : Cache,
+          highlight : Bool,
         ) : Int32
           count = 0
           pages.each do |page|
-            render_page(page, site, templates, output_dir, minify)
+            render_page(page, site, templates, output_dir, minify, highlight)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -454,12 +464,13 @@ module Hwaro
           templates : Hash(String, String),
           output_dir : String,
           minify : Bool,
+          highlight : Bool = true,
         )
           return unless page.render
 
           processed_content = process_shortcodes(page.raw_content, templates)
 
-          html_content, toc_headers = Processor::Markdown.render(processed_content)
+          html_content, toc_headers = Processor::Markdown.render(processed_content, highlight)
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)
@@ -683,6 +694,9 @@ module Hwaro
             .gsub(/<%=\s*site_description\s*%>/, config.description || "")
             .gsub(/<%=\s*base_url\s*%>/, config.base_url)
             .gsub(/<%=\s*content\s*%>/, content)
+            .gsub(/<%=\s*highlight_css\s*%>/, config.highlight.css_tag)
+            .gsub(/<%=\s*highlight_js\s*%>/, config.highlight.js_tag)
+            .gsub(/<%=\s*highlight_tags\s*%>/, config.highlight.tags)
 
           process_shortcodes(result, templates)
         end

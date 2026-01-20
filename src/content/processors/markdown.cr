@@ -4,12 +4,14 @@
 # - TOML and YAML front matter parsing
 # - Markdown to HTML conversion using Markd
 # - Table of Contents generation with header IDs
+# - Syntax highlighting support via HighlightingRenderer
 
 require "markd"
 require "yaml"
 require "toml"
 require "xml"
 require "./base"
+require "./syntax_highlighter"
 require "../../models/toc"
 require "../../utils/logger"
 
@@ -39,8 +41,10 @@ module Hwaro
 
         # Renders Markdown to HTML and generates a Table of Contents
         # Returns {html_content, toc_headers}
-        def render(content : String) : Tuple(String, Array(Models::TocHeader))
-          html = Markd.to_html(content)
+        # @param highlight - whether to enable syntax highlighting for code blocks
+        def render(content : String, highlight : Bool = true) : Tuple(String, Array(Models::TocHeader))
+          # Use SyntaxHighlighter for rendering with highlighting support
+          html = SyntaxHighlighter.render(content, highlight)
 
           # Optimization: If no headers, don't parse XML
           unless html.includes?("<h")
@@ -346,8 +350,9 @@ module Hwaro
       @@instance = Content::Processors::Markdown.new
 
       # Renders Markdown to HTML and generates a Table of Contents
-      def render(content : String) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content)
+      # @param highlight - whether to enable syntax highlighting for code blocks
+      def render(content : String, highlight : Bool = true) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight)
       end
 
       # Returns parsed metadata and content
