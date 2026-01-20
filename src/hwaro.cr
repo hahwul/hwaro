@@ -57,6 +57,7 @@ require "./services/scaffolds/registry"
 require "./services/initializer"
 require "./services/creator"
 require "./services/server/server"
+require "./services/frontmatter_converter"
 
 # Load content domain
 require "./content/seo/feeds"
