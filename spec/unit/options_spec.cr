@@ -8,6 +8,7 @@ describe Hwaro::Config::Options::BuildOptions do
     options.minify.should eq(false)
     options.parallel.should eq(true)
     options.cache.should eq(false)
+    options.profile.should eq(false)
   end
 
   it "accepts custom values" do
@@ -16,13 +17,15 @@ describe Hwaro::Config::Options::BuildOptions do
       drafts: true,
       minify: true,
       parallel: false,
-      cache: true
+      cache: true,
+      profile: true
     )
     options.output_dir.should eq("dist")
     options.drafts.should eq(true)
     options.minify.should eq(true)
     options.parallel.should eq(false)
     options.cache.should eq(true)
+    options.profile.should eq(true)
   end
 end
 

@@ -28,6 +28,7 @@ module Hwaro
           cache = false
           highlight = true
           verbose = false
+          profile = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -38,6 +39,7 @@ module Hwaro
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--skip-highlighting", "Disable syntax highlighting") { highlight = false }
             parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
+            parser.on("--profile", "Show build timing profile for each phase") { profile = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -48,7 +50,8 @@ module Hwaro
             parallel: parallel,
             cache: cache,
             highlight: highlight,
-            verbose: verbose
+            verbose: verbose,
+            profile: profile
           )
         end
       end

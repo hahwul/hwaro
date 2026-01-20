@@ -22,6 +22,7 @@ require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/logger"
+require "../../utils/profiler"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
 require "../../models/config"
@@ -41,6 +42,7 @@ module Hwaro
         @config : Models::Config?
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
+        @profiler : Profiler?
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -65,7 +67,8 @@ module Hwaro
             parallel: options.parallel,
             cache: options.cache,
             highlight: options.highlight,
-            verbose: options.verbose
+            verbose: options.verbose,
+            profile: options.profile
           )
         end
 
@@ -77,9 +80,15 @@ module Hwaro
           cache : Bool = false,
           highlight : Bool = true,
           verbose : Bool = false,
+          profile : Bool = false,
         )
           Logger.info "Building site..."
           start_time = Time.instant
+
+          # Initialize profiler
+          @profiler = Profiler.new(enabled: profile)
+          profiler = @profiler.not_nil!
+          profiler.start
 
           # Create build context for lifecycle
           options = Config::Options::BuildOptions.new(
@@ -89,7 +98,8 @@ module Hwaro
             parallel: parallel,
             cache: cache,
             highlight: highlight,
-            verbose: verbose
+            verbose: verbose,
+            profile: profile
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -100,7 +110,7 @@ module Hwaro
           @templates = nil
 
           # Execute build phases through lifecycle
-          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight, verbose)
+          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight, verbose, profiler)
 
           ctx.stats.end_time = Time.instant
 
@@ -111,6 +121,9 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} pages in #{elapsed.total_milliseconds.round(2)}ms."
+
+          # Print profiling report if enabled
+          profiler.report
         end
 
         # Execute all build phases with lifecycle hooks
@@ -122,10 +135,12 @@ module Hwaro
           cache_enabled : Bool,
           highlight : Bool,
           verbose : Bool,
+          profiler : Profiler,
         ) : Lifecycle::HookResult
           output_dir = ctx.output_dir
 
           # Phase: Initialize
+          profiler.start_phase("Initialize")
           result = @lifecycle.run_phase(Lifecycle::Phase::Initialize, ctx) do
             @cache = Cache.new(enabled: cache_enabled)
             ctx.cache = @cache
@@ -147,6 +162,7 @@ module Hwaro
             ctx.templates = load_templates
             @templates = ctx.templates
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           site = @site.not_nil!
@@ -154,25 +170,31 @@ module Hwaro
           build_cache = @cache.not_nil!
 
           # Phase: ReadContent
+          profiler.start_phase("ReadContent")
           result = @lifecycle.run_phase(Lifecycle::Phase::ReadContent, ctx) do
             collect_content_paths(ctx, drafts)
             Logger.info "  Found #{ctx.all_pages.size} pages."
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: ParseContent (hooks handle actual parsing)
+          profiler.start_phase("ParseContent")
           result = @lifecycle.run_phase(Lifecycle::Phase::ParseContent, ctx) do
             # Default parsing if no hooks registered
             unless @lifecycle.has_hooks?(Lifecycle::HookPoint::AfterReadContent)
               parse_content_default(ctx)
             end
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: Transform
+          profiler.start_phase("Transform")
           result = @lifecycle.run_phase(Lifecycle::Phase::Transform, ctx) do
             # Hooks handle transformation (Markdown → HTML)
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Populate site with pages and sections from context
@@ -198,6 +220,7 @@ module Hwaro
           use_highlight = highlight && (site.config.highlight.enabled)
 
           # Phase: Render
+          profiler.start_phase("Render")
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             count = if parallel && pages_to_build.size > 1
                       process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose)
@@ -206,9 +229,11 @@ module Hwaro
                     end
             ctx.stats.pages_rendered = count
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: Generate (SEO, Search, etc.)
+          profiler.start_phase("Generate")
           result = @lifecycle.run_phase(Lifecycle::Phase::Generate, ctx) do
             # Default generation if no SEO hooks registered
             unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeGenerate)
@@ -219,18 +244,24 @@ module Hwaro
               Content::Search.generate(all_pages, site.config, output_dir)
             end
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: Write
+          profiler.start_phase("Write")
           result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
             generate_404_page(site, templates, output_dir, minify, verbose)
           end
+          profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: Finalize
-          @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
+          profiler.start_phase("Finalize")
+          result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
             build_cache.save if cache_enabled
           end
+          profiler.end_phase
+          result
         end
 
         # Collect content file paths without parsing
