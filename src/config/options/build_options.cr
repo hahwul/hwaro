@@ -9,6 +9,7 @@ module Hwaro
         property cache : Bool
         property highlight : Bool
         property verbose : Bool
+        property profile : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -18,6 +19,7 @@ module Hwaro
           @cache : Bool = false,
           @highlight : Bool = true,
           @verbose : Bool = false,
+          @profile : Bool = false,
         )
         end
       end

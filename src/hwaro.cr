@@ -25,6 +25,7 @@ require "toml"
 
 # Load utilities
 require "./utils/logger"
+require "./utils/profiler"
 
 # Load options
 require "./config/options/init_options"
