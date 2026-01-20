@@ -29,7 +29,17 @@ src/
 
 ### Key Architectural Patterns
 
-1. **Lifecycle Hook System**: The project uses a sophisticated lifecycle system that allows extensibility through hooks at various build phases. See `src/core/lifecycle/` for implementation.
+1. **Lifecycle Hook System**: The project uses a sophisticated lifecycle system that allows extensibility through hooks at various build phases. The build process is divided into 8 phases:
+   - **Initialize**: Setup cache, output directory, load config
+   - **ReadContent**: Collect content files from filesystem
+   - **ParseContent**: Parse front matter and extract metadata
+   - **Transform**: Content transformation (e.g., Markdown → HTML)
+   - **Render**: Apply templates to transformed content
+   - **Generate**: Generate SEO files, search index, taxonomies, etc.
+   - **Write**: Write rendered pages to filesystem
+   - **Finalize**: Cleanup, save cache, final operations
+   
+   Each phase has before/after hook points for extensibility. Modules can implement the `Hookable` interface or use the `HookDSL` for registering hooks with priorities. See `src/core/lifecycle/` for implementation.
 
 2. **Processor Registry Pattern**: Content processors follow a registry pattern allowing dynamic registration and discovery. See `src/content/processors/base.cr`.
 
@@ -147,12 +157,35 @@ SEO-related features live in `src/content/seo/`:
 - `robots.cr` - Robots.txt generation
 - `llms.cr` - LLM instructions file generator for AI/LLM crawler instructions
 
+#### 5. Search Feature
+
+Search functionality is implemented in `src/content/search.cr`:
+- Supports Fuse.js compatible JSON format
+- Configurable search fields (title, content, tags, url, section, description)
+- Automatic search index generation during build
+
+#### 6. Taxonomies
+
+Taxonomy system for categorizing content (tags, categories, etc.) in `src/content/taxonomies.cr`:
+- Automatic taxonomy index and term page generation
+- Support for custom taxonomies defined in config
+- Feed generation for taxonomy terms
+- Pagination support for large taxonomy listings
+
+#### 7. Pagination
+
+Content pagination logic in `src/content/pagination/`:
+- `paginator.cr` - Core pagination logic
+- `renderer.cr` - HTML rendering for pagination controls
+- Supports section pagination and taxonomy pagination
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
 - Site metadata (title, description, base_url)
 - SEO features (sitemap, robots, llms, feeds)
 - Search configuration
+- Taxonomy configuration
 - Plugin configuration
 
 ### Extensibility Considerations
@@ -176,6 +209,11 @@ The project is designed with extensibility in mind:
 
 3. **Parallel Processing**: The builder supports parallel content processing with caching for performance optimization
 
+4. **Caching System**: Implemented in `src/core/build/cache.cr` for build optimization:
+   - File-based caching to skip unchanged content
+   - Cache invalidation based on file modification times
+   - Configurable cache enabling/disabling
+
 ## Testing
 
 - Tests are located in `spec/` directory
@@ -194,7 +232,8 @@ The project is designed with extensibility in mind:
 ### Logging
 
 - Use the `Logger` utility from `src/utils/logger.cr`
-- Levels: `Logger.info`, `Logger.error`, `Logger.success`, `Logger.debug`
+- Levels: `Logger.info`, `Logger.error`, `Logger.success`, `Logger.debug`, `Logger.action`
+- `Logger.action` for file operations (conditionally shown based on verbose flag)
 - Keep user-facing messages clear and actionable
 
 ### Type Safety
@@ -212,10 +251,30 @@ Current external dependencies:
 
 Keep dependencies minimal and evaluate alternatives before adding new ones.
 
+### CLI Options
+
+Common CLI options across commands:
+- `-v, --verbose` - Show detailed output including generated files (default: concise summary)
+- `-h, --help` - Show help information
+
+Build-specific options:
+- `-o DIR, --output-dir DIR` - Output directory (default: public)
+- `-d, --drafts` - Include draft content
+- `--minify` - Minify HTML output
+- `--no-parallel` - Disable parallel file processing
+- `--cache` - Enable build caching
+- `--skip-highlighting` - Disable syntax highlighting
+
+Serve-specific options:
+- `-b HOST, --bind HOST` - Bind address (default: 0.0.0.0)
+- `-p PORT, --port PORT` - Port to listen on (default: 3000)
+- `--open` - Open browser after starting server
+
 ## Performance Considerations
 
 - The builder uses caching to avoid reprocessing unchanged content
 - Parallel processing is implemented for content generation
+- File watching in serve mode for automatic rebuilds
 - Be mindful of I/O operations and consider batching when possible
 
 ## Contributing
@@ -243,3 +302,7 @@ Areas with room for expansion:
 - Deployment integrations
 - Multi-language support (i18n)
 - Advanced search backends (beyond Fuse.js)
+- Custom taxonomy types
+- Content internationalization (i18n)
+- Image processing and optimization
+- API endpoints for dynamic content
