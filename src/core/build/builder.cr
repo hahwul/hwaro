@@ -257,10 +257,11 @@ module Hwaro
 
           # Phase: Finalize
           profiler.start_phase("Finalize")
-          @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
+          result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
             build_cache.save if cache_enabled
           end
           profiler.end_phase
+          result
         end
 
         # Collect content file paths without parsing
