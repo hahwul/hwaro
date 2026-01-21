@@ -24,7 +24,7 @@ src/
 │   └── lifecycle/    # Lifecycle management system
 ├── models/           # Data structures (config, page, site, section, toc)
 ├── services/         # Non-build features (init, new, serve)
-└── utils/            # Utility modules (logger, etc.)
+└── utils/            # Utility modules (logger, command_runner, etc.)
 ```
 
 ### Key Architectural Patterns
@@ -179,6 +179,44 @@ Content pagination logic in `src/content/pagination/`:
 - `renderer.cr` - HTML rendering for pagination controls
 - Supports section pagination and taxonomy pagination
 
+#### 8. User-defined Build Hooks
+
+User-defined build hooks allow running custom shell commands before and after the build process. This is useful for tasks like:
+- Installing dependencies before build
+- Running custom scripts (preprocessing, data fetching)
+- Post-processing assets (minification, optimization)
+- Deployment automation
+
+Configuration in `config.toml`:
+```toml
+[build]
+hooks.pre = ["npm install", "python scripts/preprocess.py"]   # Commands to run before build
+hooks.post = ["npm run minify", "rsync -av public/ server:/var/www/"]  # Commands to run after build
+```
+
+Implementation details:
+- `src/utils/command_runner.cr` - Shell command execution utility
+- `src/models/config.cr` - `BuildConfig` and `BuildHooksConfig` classes
+- Commands are executed sequentially in the order defined
+- Pre-hooks failure aborts the build process
+- Post-hooks failure shows a warning but doesn't fail the build
+- Hooks are executed for both `hwaro build` and `hwaro serve` commands
+- During serve mode, hooks are re-executed on each rebuild (config changes are picked up)
+
+Example use cases:
+```toml
+# Install npm dependencies and compile TypeScript before build
+[build]
+hooks.pre = ["npm ci", "npx tsc"]
+
+# Optimize images and deploy after build
+[build]
+hooks.post = [
+  "npx imagemin public/images/* --out-dir=public/images",
+  "./scripts/deploy.sh"
+]
+```
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
@@ -187,6 +225,7 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Search configuration
 - Taxonomy configuration
 - Plugin configuration
+- Build hooks (pre/post build commands)
 
 ### Extensibility Considerations
 
@@ -206,6 +245,11 @@ The project is designed with extensibility in mind:
    - Custom SEO generators
    - Search engine backends
    - Asset pipeline processors
+
+5. **User-defined Build Hooks**: Run custom shell commands before/after builds:
+   - Pre-build hooks for setup tasks (dependency installation, preprocessing)
+   - Post-build hooks for deployment and optimization
+   - Implemented in `src/utils/command_runner.cr`
 
 3. **Parallel Processing**: The builder supports parallel content processing with caching for performance optimization
 

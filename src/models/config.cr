@@ -156,6 +156,26 @@ module Hwaro
       end
     end
 
+    # Build hooks configuration for pre/post build commands
+    class BuildHooksConfig
+      property pre : Array(String)
+      property post : Array(String)
+
+      def initialize
+        @pre = [] of String
+        @post = [] of String
+      end
+    end
+
+    # Build configuration section
+    class BuildConfig
+      property hooks : BuildHooksConfig
+
+      def initialize
+        @hooks = BuildHooksConfig.new
+      end
+    end
+
     # Language configuration for multilingual sites
     class LanguageConfig
       property code : String
@@ -189,6 +209,7 @@ module Hwaro
       property taxonomies : Array(TaxonomyConfig)
       property default_language : String
       property languages : Hash(String, LanguageConfig)
+      property build : BuildConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -206,6 +227,7 @@ module Hwaro
         @taxonomies = [] of TaxonomyConfig
         @default_language = "en"
         @languages = {} of String => LanguageConfig
+        @build = BuildConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -377,6 +399,18 @@ module Hwaro
               end
 
               config.languages[lang_code] = lang_config
+            end
+          end
+
+          # Load build configuration (hooks)
+          if build_section = config.raw["build"]?.try(&.as_h?)
+            if hooks_section = build_section["hooks"]?.try(&.as_h?)
+              if pre_hooks = hooks_section["pre"]?.try(&.as_a?)
+                config.build.hooks.pre = pre_hooks.compact_map(&.as_s?)
+              end
+              if post_hooks = hooks_section["post"]?.try(&.as_a?)
+                config.build.hooks.post = post_hooks.compact_map(&.as_s?)
+              end
             end
           end
         end

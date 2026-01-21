@@ -45,6 +45,11 @@ module Hwaro
           [plugins]
           processors = ["markdown"]  # List of enabled processors
 
+          # Build Hooks - Run custom commands before/after build
+          # [build]
+          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
+          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+
           # Taxonomies (root level configuration)
           [[taxonomies]]
           name = "tags"
@@ -102,6 +107,11 @@ module Hwaro
           # Plugins Configuration
           [plugins]
           processors = ["markdown"]  # List of enabled processors
+
+          # Build Hooks - Run custom commands before/after build
+          # [build]
+          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
+          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
           CONTENT
         end
 
@@ -173,7 +183,11 @@ module Hwaro
             str << "sections = []   # Optional: e.g. [\"blog\"]\n\n"
             str << "# Plugins Configuration\n"
             str << "[plugins]\n"
-            str << "processors = [\"markdown\"]  # List of enabled processors\n"
+            str << "processors = [\"markdown\"]  # List of enabled processors\n\n"
+            str << "# Build Hooks - Run custom commands before/after build\n"
+            str << "# [build]\n"
+            str << "# hooks.pre = [\"npm install\", \"python scripts/preprocess.py\"]\n"
+            str << "# hooks.post = [\"npm run minify\", \"./scripts/deploy.sh\"]\n"
             str << taxonomies_config
           end
         end

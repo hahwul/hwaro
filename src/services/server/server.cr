@@ -12,6 +12,7 @@ require "../../content/hooks"
 require "../../utils/logger"
 require "../../config/options/serve_options"
 require "../../config/options/build_options"
+require "../../utils/command_runner"
 
 module Hwaro
   module Services
@@ -62,9 +63,13 @@ module Hwaro
 
     class Server
       @builder : Core::Build::Builder
+      @pre_hooks : Array(String)
+      @post_hooks : Array(String)
 
       def initialize
         @builder = Core::Build::Builder.new
+        @pre_hooks = [] of String
+        @post_hooks = [] of String
 
         # Register content hooks with lifecycle (same as build command)
         Content::Hooks.all.each do |hookable|
@@ -83,8 +88,13 @@ module Hwaro
       end
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, build_options : Config::Options::BuildOptions)
+        # Load config for build hooks
+        config = Models::Config.load
+        @pre_hooks = config.build.hooks.pre
+        @post_hooks = config.build.hooks.post
+
         Logger.info "Performing initial build..."
-        @builder.run(build_options)
+        run_build_with_hooks(build_options)
 
         spawn do
           watch_for_changes(build_options)
@@ -134,11 +144,37 @@ module Hwaro
           if current_mtimes != last_mtimes
             Logger.info "\n[Watch] Change detected. Rebuilding..."
             begin
-              @builder.run(build_options)
+              # Reload config to pick up any hook changes
+              config = Models::Config.load
+              @pre_hooks = config.build.hooks.pre
+              @post_hooks = config.build.hooks.post
+
+              run_build_with_hooks(build_options)
             rescue ex
               Logger.error "[Watch] Build failed: #{ex.message}"
             end
             last_mtimes = current_mtimes
+          end
+        end
+      end
+
+      # Run build with pre/post hooks
+      private def run_build_with_hooks(build_options : Config::Options::BuildOptions)
+        # Run pre-build hooks
+        unless @pre_hooks.empty?
+          unless Utils::CommandRunner.run_pre_hooks(@pre_hooks)
+            Logger.error "Build aborted due to pre-build hook failure."
+            return
+          end
+        end
+
+        # Run the actual build
+        @builder.run(build_options)
+
+        # Run post-build hooks
+        unless @post_hooks.empty?
+          unless Utils::CommandRunner.run_post_hooks(@post_hooks)
+            Logger.warn "Post-build hooks failed, but build was successful."
           end
         end
       end
