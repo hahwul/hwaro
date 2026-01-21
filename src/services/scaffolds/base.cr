@@ -278,6 +278,16 @@ module Hwaro
           name = "authors"
           TOML
         end
+
+        protected def build_hooks_config : String
+          <<-TOML
+
+          # Build Hooks - Run custom commands before/after build
+          # [build]
+          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
+          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+          TOML
+        end
       end
     end
   end

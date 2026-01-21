@@ -82,6 +82,19 @@ module Hwaro
           verbose : Bool = false,
           profile : Bool = false,
         )
+          # Load config early to get build hooks
+          config = Models::Config.load
+          pre_hooks = config.build.hooks.pre
+          post_hooks = config.build.hooks.post
+
+          # Run pre-build hooks
+          unless pre_hooks.empty?
+            unless Utils::CommandRunner.run_pre_hooks(pre_hooks)
+              Logger.error "Build aborted due to pre-build hook failure."
+              return
+            end
+          end
+
           Logger.info "Building site..."
           start_time = Time.instant
 
@@ -124,6 +137,13 @@ module Hwaro
 
           # Print profiling report if enabled
           profiler.report
+
+          # Run post-build hooks
+          unless post_hooks.empty?
+            unless Utils::CommandRunner.run_post_hooks(post_hooks)
+              Logger.warn "Post-build hooks failed, but build was successful."
+            end
+          end
         end
 
         # Execute all build phases with lifecycle hooks

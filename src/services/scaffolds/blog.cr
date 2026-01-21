@@ -68,6 +68,7 @@ module Hwaro
             str << feeds_config(["posts"])
             str << plugins_config
             str << highlight_config
+            str << build_hooks_config
             str << taxonomies_config unless skip_taxonomies
           end
           config
