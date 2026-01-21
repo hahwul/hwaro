@@ -93,6 +93,62 @@ module Hwaro
       end
     end
 
+    # Auto-includes configuration for automatic CSS/JS loading
+    class AutoIncludesConfig
+      property enabled : Bool
+      property dirs : Array(String)
+
+      def initialize
+        @enabled = false
+        @dirs = [] of String
+      end
+
+      # Generate CSS link tags for files in configured directories
+      def css_tags(base_url : String = "") : String
+        return "" unless @enabled
+        return "" if @dirs.empty?
+
+        tags = [] of String
+        @dirs.each do |dir|
+          static_dir = File.join("static", dir)
+          next unless Dir.exists?(static_dir)
+
+          Dir.glob(File.join(static_dir, "**", "*.css")).sort.each do |file|
+            # Convert static/assets/css/style.css to /assets/css/style.css
+            relative_path = file.sub(/^static\/?/, "/")
+            tags << %(<link rel="stylesheet" href="#{base_url}#{relative_path}">)
+          end
+        end
+        tags.join("\n")
+      end
+
+      # Generate JS script tags for files in configured directories
+      def js_tags(base_url : String = "") : String
+        return "" unless @enabled
+        return "" if @dirs.empty?
+
+        tags = [] of String
+        @dirs.each do |dir|
+          static_dir = File.join("static", dir)
+          next unless Dir.exists?(static_dir)
+
+          Dir.glob(File.join(static_dir, "**", "*.js")).sort.each do |file|
+            # Convert static/assets/js/main.js to /assets/js/main.js
+            relative_path = file.sub(/^static\/?/, "/")
+            tags << %(<script src="#{base_url}#{relative_path}"></script>)
+          end
+        end
+        tags.join("\n")
+      end
+
+      # Generate both CSS and JS tags
+      def all_tags(base_url : String = "") : String
+        css = css_tags(base_url)
+        js = js_tags(base_url)
+        [css, js].reject(&.empty?).join("\n")
+      end
+    end
+
     # Pagination configuration
     class PaginationConfig
       property enabled : Bool
@@ -206,6 +262,7 @@ module Hwaro
       property plugins : PluginConfig
       property pagination : PaginationConfig
       property highlight : HighlightConfig
+      property auto_includes : AutoIncludesConfig
       property taxonomies : Array(TaxonomyConfig)
       property default_language : String
       property languages : Hash(String, LanguageConfig)
@@ -224,6 +281,7 @@ module Hwaro
         @plugins = PluginConfig.new
         @pagination = PaginationConfig.new
         @highlight = HighlightConfig.new
+        @auto_includes = AutoIncludesConfig.new
         @taxonomies = [] of TaxonomyConfig
         @default_language = "en"
         @languages = {} of String => LanguageConfig
@@ -360,6 +418,14 @@ module Hwaro
             if highlight_section.has_key?("use_cdn")
               use_cdn_val = highlight_section["use_cdn"]?.try(&.as_bool?)
               config.highlight.use_cdn = use_cdn_val unless use_cdn_val.nil?
+            end
+          end
+
+          # Load auto_includes configuration
+          if auto_includes_section = config.raw["auto_includes"]?.try(&.as_h?)
+            config.auto_includes.enabled = auto_includes_section["enabled"]?.try(&.as_bool?) || config.auto_includes.enabled
+            if dirs = auto_includes_section["dirs"]?.try(&.as_a?)
+              config.auto_includes.dirs = dirs.compact_map(&.as_s?)
             end
           end
 

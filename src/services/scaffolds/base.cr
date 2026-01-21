@@ -53,6 +53,7 @@ module Hwaro
             <title><%= page_title %> - <%= site_title %></title>
             #{styles}
             <%= highlight_css %>
+            <%= auto_includes_css %>
           </head>
           <body data-section="<%= page_section %>">
             <header>
@@ -70,6 +71,7 @@ module Hwaro
               <p>Powered by Hwaro</p>
             </footer>
             <%= highlight_js %>
+            <%= auto_includes_js %>
           </body>
           </html>
           HTML
@@ -286,6 +288,17 @@ module Hwaro
           # [build]
           # hooks.pre = ["npm install", "python scripts/preprocess.py"]
           # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+          TOML
+        end
+
+        protected def auto_includes_config : String
+          <<-TOML
+
+          # Auto Includes - Automatically load CSS/JS from static directories
+          # Files are included alphabetically. Use numeric prefixes for ordering (e.g., 01-reset.css)
+          # [auto_includes]
+          # enabled = true
+          # dirs = ["assets/css", "assets/js"]  # Directories under static/ to scan
           TOML
         end
       end

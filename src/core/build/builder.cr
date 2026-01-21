@@ -756,6 +756,9 @@ module Hwaro
             .gsub(/<%=\s*highlight_css\s*%>/, config.highlight.css_tag)
             .gsub(/<%=\s*highlight_js\s*%>/, config.highlight.js_tag)
             .gsub(/<%=\s*highlight_tags\s*%>/, config.highlight.tags)
+            .gsub(/<%=\s*auto_includes_css\s*%>/, config.auto_includes.css_tags(config.base_url))
+            .gsub(/<%=\s*auto_includes_js\s*%>/, config.auto_includes.js_tags(config.base_url))
+            .gsub(/<%=\s*auto_includes\s*%>/, config.auto_includes.all_tags(config.base_url))
 
           process_shortcodes(result, templates)
         end
