@@ -25,11 +25,11 @@ module Hwaro
         stderr = IO::Memory.new
 
         process_args = {
-          command:        command,
-          shell:          true,
-          output:         stdout,
-          error:          stderr,
-          chdir:          working_dir,
+          command: command,
+          shell:   true,
+          output:  stdout,
+          error:   stderr,
+          chdir:   working_dir,
         }
 
         status = Process.run(**process_args)

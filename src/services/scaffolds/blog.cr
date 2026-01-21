@@ -60,17 +60,24 @@ module Hwaro
 
         def config_content(skip_taxonomies : Bool = false) : String
           config = String.build do |str|
+            # Site basics
             str << base_config("My Blog", "Welcome to my personal blog powered by Hwaro.")
+
+            # Content & Processing
+            str << plugins_config
+            str << highlight_config
             str << search_config
+            str << taxonomies_config unless skip_taxonomies
+
+            # SEO & Feeds
             str << sitemap_config
             str << robots_config
             str << llms_config
             str << feeds_config(["posts"])
-            str << plugins_config
-            str << highlight_config
+
+            # Optional features (commented out by default)
             str << auto_includes_config
             str << build_hooks_config
-            str << taxonomies_config unless skip_taxonomies
           end
           config
         end

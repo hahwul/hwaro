@@ -178,36 +178,88 @@ module Hwaro
         # Common config sections
         protected def base_config(title : String = "My Hwaro Site", description : String = "Welcome to my new Hwaro site.") : String
           <<-TOML
+          # =============================================================================
+          # Site Configuration
+          # =============================================================================
+
           title = "#{title}"
           description = "#{description}"
           base_url = "http://localhost:3000"
+
+          TOML
+        end
+
+        protected def plugins_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Plugins
+          # =============================================================================
+          # Configure content processors and extensions
+
+          [plugins]
+          processors = ["markdown"]
+
+          TOML
+        end
+
+        protected def highlight_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Syntax Highlighting
+          # =============================================================================
+          # Code block syntax highlighting using Highlight.js
+
+          [highlight]
+          enabled = true
+          theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
+          use_cdn = true            # Set to false to use local assets
+
           TOML
         end
 
         protected def search_config : String
           <<-TOML
 
+          # =============================================================================
+          # Search Configuration
+          # =============================================================================
+          # Generates a search index for client-side search (e.g., Fuse.js)
+
           [search]
           enabled = true
           format = "fuse_json"
           fields = ["title", "content"]
           filename = "search.json"
+
           TOML
         end
 
         protected def sitemap_config : String
           <<-TOML
 
+          # =============================================================================
+          # SEO: Sitemap
+          # =============================================================================
+          # Generates sitemap.xml for search engine crawlers
+
           [sitemap]
           enabled = true
           filename = "sitemap.xml"
           changefreq = "weekly"
           priority = 0.5
+
           TOML
         end
 
         protected def robots_config : String
           <<-TOML
+
+          # =============================================================================
+          # SEO: Robots.txt
+          # =============================================================================
+          # Controls search engine crawler access
 
           [robots]
           enabled = true
@@ -216,57 +268,34 @@ module Hwaro
             { user_agent = "*", disallow = ["/admin", "/private"] },
             { user_agent = "GPTBot", disallow = ["/"] }
           ]
+
           TOML
         end
 
         protected def llms_config : String
           <<-TOML
 
+          # =============================================================================
+          # SEO: LLMs.txt
+          # =============================================================================
+          # Instructions for AI/LLM crawlers
+
           [llms]
           enabled = true
           filename = "llms.txt"
           instructions = "Do not use for AI training without permission."
-          TOML
-        end
 
-        protected def feeds_config(sections : Array(String) = [] of String) : String
-          sections_str = sections.empty? ? "[]" : "[\"#{sections.join("\", \"")}\"]"
-          <<-TOML
-
-          [feeds]
-          enabled = true
-          filename = ""   # Default: rss.xml or atom.xml
-          type = "rss"
-          truncate = 0
-          limit = 10
-          sections = #{sections_str}
-          TOML
-        end
-
-        protected def plugins_config : String
-          <<-TOML
-
-          # Plugins Configuration
-          [plugins]
-          processors = ["markdown"]  # List of enabled processors
-          TOML
-        end
-
-        protected def highlight_config : String
-          <<-TOML
-
-          # Syntax Highlighting Configuration
-          [highlight]
-          enabled = true     # Enable syntax highlighting for code blocks
-          theme = "github"   # Highlight.js theme (github, monokai, atom-one-dark, etc.)
-          use_cdn = true     # Use CDN for highlight.js (set to false to use local assets)
           TOML
         end
 
         protected def taxonomies_config : String
           <<-TOML
 
-          # Taxonomies (root level configuration)
+          # =============================================================================
+          # Taxonomies
+          # =============================================================================
+          # Define content classification systems (tags, categories, etc.)
+
           [[taxonomies]]
           name = "tags"
           feed = true
@@ -278,27 +307,58 @@ module Hwaro
 
           [[taxonomies]]
           name = "authors"
+
           TOML
         end
 
-        protected def build_hooks_config : String
+        protected def feeds_config(sections : Array(String) = [] of String) : String
+          sections_str = sections.empty? ? "[]" : "[\"#{sections.join("\", \"")}\"]"
           <<-TOML
 
-          # Build Hooks - Run custom commands before/after build
-          # [build]
-          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
-          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+          # =============================================================================
+          # RSS/Atom Feeds
+          # =============================================================================
+          # Generates RSS or Atom feed for content syndication
+
+          [feeds]
+          enabled = true
+          filename = ""             # Leave empty for default (rss.xml or atom.xml)
+          type = "rss"              # "rss" or "atom"
+          truncate = 0              # Truncate content to N characters (0 = full content)
+          limit = 10                # Maximum number of items in feed
+          sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
+
           TOML
         end
 
         protected def auto_includes_config : String
           <<-TOML
 
-          # Auto Includes - Automatically load CSS/JS from static directories
-          # Files are included alphabetically. Use numeric prefixes for ordering (e.g., 01-reset.css)
+          # =============================================================================
+          # Auto Includes (Optional)
+          # =============================================================================
+          # Automatically load CSS/JS files from static directories
+          # Files are included alphabetically - use numeric prefixes for ordering
+          # Example: 01-reset.css, 02-typography.css, 03-layout.css
+
           # [auto_includes]
           # enabled = true
-          # dirs = ["assets/css", "assets/js"]  # Directories under static/ to scan
+          # dirs = ["assets/css", "assets/js"]
+
+          TOML
+        end
+
+        protected def build_hooks_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Build Hooks (Optional)
+          # =============================================================================
+          # Run custom shell commands before/after build process
+
+          # [build]
+          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
+          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
           TOML
         end
       end

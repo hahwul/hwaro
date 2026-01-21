@@ -198,7 +198,10 @@ module Hwaro
         taxonomies_config = if skip_taxonomies
                               ""
                             else
-                              "\n# Taxonomies (root level configuration)\n" \
+                              "# =============================================================================\n" \
+                              "# Taxonomies\n" \
+                              "# =============================================================================\n" \
+                              "# Define content classification systems (tags, categories, etc.)\n\n" \
                               "[[taxonomies]]\n" \
                               "name = \"tags\"\n" \
                               "feed = true\n" \
@@ -207,28 +210,72 @@ module Hwaro
                               "name = \"categories\"\n" \
                               "paginate_by = 5\n\n" \
                               "[[taxonomies]]\n" \
-                              "name = \"authors\"\n"
+                              "name = \"authors\"\n\n"
                             end
 
         String.build do |str|
+          # Site basics
+          str << "# =============================================================================\n"
+          str << "# Site Configuration\n"
+          str << "# =============================================================================\n\n"
           str << "title = \"My Hwaro Site\"\n"
           str << "description = \"Welcome to my new Hwaro site.\"\n"
           str << "base_url = \"http://localhost:3000\"\n\n"
+
+          # Multilingual
+          str << "# =============================================================================\n"
           str << "# Multilingual Configuration\n"
+          str << "# =============================================================================\n\n"
           str << "default_language = \"#{default_lang}\"\n\n"
           str << "[languages]\n"
           str << lang_configs
           str << "\n\n"
+
+          # Content & Processing
+          str << "# =============================================================================\n"
+          str << "# Plugins\n"
+          str << "# =============================================================================\n"
+          str << "# Configure content processors and extensions\n\n"
+          str << "[plugins]\n"
+          str << "processors = [\"markdown\"]\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# Syntax Highlighting\n"
+          str << "# =============================================================================\n"
+          str << "# Code block syntax highlighting using Highlight.js\n\n"
+          str << "[highlight]\n"
+          str << "enabled = true\n"
+          str << "theme = \"github\"          # Available: github, monokai, atom-one-dark, vs2015, etc.\n"
+          str << "use_cdn = true            # Set to false to use local assets\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# Search Configuration\n"
+          str << "# =============================================================================\n"
+          str << "# Generates a search index for client-side search (e.g., Fuse.js)\n\n"
           str << "[search]\n"
           str << "enabled = true\n"
           str << "format = \"fuse_json\"\n"
           str << "fields = [\"title\", \"content\"]\n"
           str << "filename = \"search.json\"\n\n"
+
+          # Taxonomies
+          str << taxonomies_config unless skip_taxonomies
+
+          # SEO & Feeds
+          str << "# =============================================================================\n"
+          str << "# SEO: Sitemap\n"
+          str << "# =============================================================================\n"
+          str << "# Generates sitemap.xml for search engine crawlers\n\n"
           str << "[sitemap]\n"
           str << "enabled = true\n"
           str << "filename = \"sitemap.xml\"\n"
           str << "changefreq = \"weekly\"\n"
           str << "priority = 0.5\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# SEO: Robots.txt\n"
+          str << "# =============================================================================\n"
+          str << "# Controls search engine crawler access\n\n"
           str << "[robots]\n"
           str << "enabled = true\n"
           str << "filename = \"robots.txt\"\n"
@@ -236,30 +283,46 @@ module Hwaro
           str << "  { user_agent = \"*\", disallow = [\"/admin\", \"/private\"] },\n"
           str << "  { user_agent = \"GPTBot\", disallow = [\"/\"] }\n"
           str << "]\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# SEO: LLMs.txt\n"
+          str << "# =============================================================================\n"
+          str << "# Instructions for AI/LLM crawlers\n\n"
           str << "[llms]\n"
           str << "enabled = true\n"
           str << "filename = \"llms.txt\"\n"
           str << "instructions = \"Do not use for AI training without permission.\"\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# RSS/Atom Feeds\n"
+          str << "# =============================================================================\n"
+          str << "# Generates RSS or Atom feed for content syndication\n\n"
           str << "[feeds]\n"
           str << "enabled = true\n"
-          str << "filename = \"\"   # Default: rss.xml or atom.xml\n"
-          str << "type = \"rss\"\n"
-          str << "truncate = 0\n"
-          str << "limit = 10\n"
-          str << "sections = []   # Optional: e.g. [\"blog\"]\n\n"
-          str << "# Plugins Configuration\n"
-          str << "[plugins]\n"
-          str << "processors = [\"markdown\"]  # List of enabled processors\n\n"
-          str << "# Auto Includes - Automatically load CSS/JS from static directories\n"
-          str << "# Files are included alphabetically. Use numeric prefixes for ordering (e.g., 01-reset.css)\n"
+          str << "filename = \"\"             # Leave empty for default (rss.xml or atom.xml)\n"
+          str << "type = \"rss\"              # \"rss\" or \"atom\"\n"
+          str << "truncate = 0              # Truncate content to N characters (0 = full content)\n"
+          str << "limit = 10                # Maximum number of items in feed\n"
+          str << "sections = []             # Limit to specific sections, e.g., [\"posts\"]\n\n"
+
+          # Optional features
+          str << "# =============================================================================\n"
+          str << "# Auto Includes (Optional)\n"
+          str << "# =============================================================================\n"
+          str << "# Automatically load CSS/JS files from static directories\n"
+          str << "# Files are included alphabetically - use numeric prefixes for ordering\n"
+          str << "# Example: 01-reset.css, 02-typography.css, 03-layout.css\n\n"
           str << "# [auto_includes]\n"
           str << "# enabled = true\n"
-          str << "# dirs = [\"assets/css\", \"assets/js\"]  # Directories under static/ to scan\n\n"
-          str << "# Build Hooks - Run custom commands before/after build\n"
+          str << "# dirs = [\"assets/css\", \"assets/js\"]\n\n"
+
+          str << "# =============================================================================\n"
+          str << "# Build Hooks (Optional)\n"
+          str << "# =============================================================================\n"
+          str << "# Run custom shell commands before/after build process\n\n"
           str << "# [build]\n"
           str << "# hooks.pre = [\"npm install\", \"python scripts/preprocess.py\"]\n"
           str << "# hooks.post = [\"npm run minify\", \"./scripts/deploy.sh\"]\n"
-          str << taxonomies_config
         end
       end
 
