@@ -217,6 +217,54 @@ hooks.post = [
 ]
 ```
 
+#### 9. Auto Includes
+
+Auto includes automatically load CSS and JS files from specified static directories into all pages. This eliminates the need to manually add each asset file to templates.
+
+Configuration in `config.toml`:
+```toml
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]  # Directories under static/ to scan
+```
+
+Implementation details:
+- `src/models/config.cr` - `AutoIncludesConfig` class with `css_tags()`, `js_tags()`, `all_tags()` methods
+- Files are scanned from `static/{dir}/**/*.css` and `static/{dir}/**/*.js`
+- Files are included alphabetically - use numeric prefixes for ordering (e.g., `01-reset.css`, `02-main.css`)
+- CSS files generate `<link rel="stylesheet">` tags
+- JS files generate `<script src="">` tags
+
+Template variables:
+- `<%= auto_includes_css %>` - CSS link tags only (place in `<head>`)
+- `<%= auto_includes_js %>` - JS script tags only (place before `</body>`)
+- `<%= auto_includes %>` - Both CSS and JS tags combined
+
+Example directory structure:
+```
+static/
+├── assets/
+│   ├── css/
+│   │   ├── 01-reset.css
+│   │   ├── 02-typography.css
+│   │   └── 03-layout.css
+│   └── js/
+│       ├── 01-utils.js
+│       └── 02-app.js
+```
+
+Generated output:
+```html
+<!-- In <head> -->
+<link rel="stylesheet" href="/assets/css/01-reset.css">
+<link rel="stylesheet" href="/assets/css/02-typography.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+
+<!-- Before </body> -->
+<script src="/assets/js/01-utils.js"></script>
+<script src="/assets/js/02-app.js"></script>
+```
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
@@ -226,6 +274,7 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Taxonomy configuration
 - Plugin configuration
 - Build hooks (pre/post build commands)
+- Auto includes (automatic CSS/JS loading)
 
 ### Extensibility Considerations
 
