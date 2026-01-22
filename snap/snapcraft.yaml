@@ -1,0 +1,46 @@
+name: hwaro
+base: core20
+version: 0.1.0
+summary: Hwaro (화로) is a lightweight and fast static site generator written in Crystal.
+description: Hwaro (화로) is a lightweight and fast static site generator written in Crystal. It provides a flexible, extensible architecture for building static websites with support for markdown content, templates, SEO features, and lifecycle hooks.
+
+grade: stable # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+license: MIT
+
+apps:
+  hwaro:
+    command: hwaro
+    plugs:
+      - home
+      - removable-media
+      - network
+      - network-bind
+
+parts:
+  hwaro:
+    source: ./
+    plugin: nil #crystal
+    #crystal-channel: latest/stable
+    override-build: |
+      curl -fsSL https://crystal-lang.org/install.sh | sudo bash
+      snapcraftctl pull
+      shards install --production
+      shards build --release --no-debug --production
+      cp ./bin/hwaro $SNAPCRAFT_PART_INSTALL/
+      snapcraftctl build
+    build-packages:
+      - git
+      - curl
+      - pkg-config
+      - libssl-dev
+      - libxml2-dev
+      - libz-dev
+      - libyaml-dev
+      - libpcre2-dev
+      - libevent-dev
+      - libgmp-dev
+    stage-packages:
+      - libxml2
+      - zlib1g
+      - libyaml-0-2
