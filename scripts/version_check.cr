@@ -32,16 +32,28 @@ def get_docker_version : String?
   end
 end
 
+# Extract version from snapcraft.yaml
+def get_snapcraft_version : String?
+  begin
+    snapcraft = YAML.parse(File.read("snap/snapcraft.yaml"))
+    snapcraft["version"].as_s
+  rescue
+    nil
+  end
+end
+
 # Main logic
 shard_v = get_shard_version
 hwaro_v = get_hwaro_version
 docker_v = get_docker_version
+snapcraft_v = get_snapcraft_version
 
 puts "Shard version: #{shard_v || "Not found"}"
 puts "Hwaro version: #{hwaro_v || "Not found"}"
 puts "Docker version: #{docker_v || "Not found"}"
+puts "Snapcraft version: #{snapcraft_v || "Not found"}"
 
-versions = [shard_v, hwaro_v, docker_v].compact
+versions = [shard_v, hwaro_v, docker_v, snapcraft_v].compact
 
 if versions.empty?
   puts "No versions found!"
