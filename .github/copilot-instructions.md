@@ -265,6 +265,57 @@ Generated output:
 <script src="/assets/js/02-app.js"></script>
 ```
 
+#### 10. OpenGraph & Twitter Cards
+
+Automatic generation of OpenGraph and Twitter Card meta tags for social sharing.
+
+Configuration in `config.toml`:
+```toml
+[og]
+default_image = "/images/og-default.png"   # Default image when page has no image
+type = "article"                           # OpenGraph type (website, article, etc.)
+twitter_card = "summary_large_image"       # Twitter card type
+twitter_site = "@yourusername"             # Twitter @username for the site
+twitter_creator = "@authorusername"        # Twitter @username for content creator
+fb_app_id = "your_fb_app_id"               # Facebook App ID (optional)
+```
+
+Page-level front matter (overrides defaults):
+```toml
++++
+title = "My Article"
+description = "Article description for social sharing"
+image = "/images/article-cover.png"
++++
+```
+
+Implementation details:
+- `src/models/config.cr` - `OpenGraphConfig` class with `og_tags()`, `twitter_tags()`, `all_tags()` methods
+- `src/models/page.cr` - `description` and `image` properties
+- `src/content/processors/markdown.cr` - Parses `description` and `image` from front matter
+- `src/content/hooks/markdown_hooks.cr` - Assigns parsed values to page
+
+Template variables:
+- `<%= og_tags %>` - OpenGraph meta tags only
+- `<%= twitter_tags %>` - Twitter Card meta tags only
+- `<%= og_all_tags %>` - Both OG and Twitter tags combined
+- `<%= page_description %>` - Page description (falls back to site description)
+- `<%= page_image %>` - Page image (falls back to og.default_image)
+
+Generated output example:
+```html
+<meta property="og:title" content="My Article">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://example.com/my-article/">
+<meta property="og:description" content="Article description for social sharing">
+<meta property="og:image" content="https://example.com/images/article-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="My Article">
+<meta name="twitter:description" content="Article description for social sharing">
+<meta name="twitter:image" content="https://example.com/images/article-cover.png">
+<meta name="twitter:site" content="@yourusername">
+```
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
@@ -275,6 +326,7 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Plugin configuration
 - Build hooks (pre/post build commands)
 - Auto includes (automatic CSS/JS loading)
+- OpenGraph & Twitter Cards (social sharing meta tags)
 
 ### Extensibility Considerations
 

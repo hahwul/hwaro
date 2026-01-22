@@ -61,6 +61,8 @@ module Hwaro
         def parse(raw_content : String, file_path : String = "")
           markdown_content = raw_content
           title = "Untitled"
+          description = nil.as(String?)
+          image = nil.as(String?)
           is_draft = false
           layout = nil
           in_sitemap = true
@@ -84,6 +86,8 @@ module Hwaro
             begin
               toml_fm = TOML.parse(match[1])
               title = toml_fm["title"]?.try(&.as_s) || title
+              description = toml_fm["description"]?.try(&.as_s)
+              image = toml_fm["image"]?.try(&.as_s)
               is_draft = toml_fm["draft"]?.try(&.as_bool) || false
               layout = toml_fm["layout"]?.try(&.as_s)
               if toml_fm.has_key?("in_sitemap")
@@ -135,6 +139,8 @@ module Hwaro
               yaml_fm = YAML.parse(match[1])
               if yaml_fm.as_h?
                 title = yaml_fm["title"]?.try(&.as_s?) || title
+                description = yaml_fm["description"]?.try(&.as_s?)
+                image = yaml_fm["image"]?.try(&.as_s?)
                 is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
                 layout = yaml_fm["layout"]?.try(&.as_s?)
                 if (val = yaml_fm["in_sitemap"]?)
@@ -194,6 +200,8 @@ module Hwaro
 
           {
             title:              title,
+            description:        description,
+            image:              image,
             content:            markdown_content,
             draft:              is_draft,
             layout:             layout,

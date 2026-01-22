@@ -47,6 +47,8 @@ module Hwaro
           data = Processor::Markdown.parse(raw_content, source_path)
 
           page.title = data[:title]
+          page.description = data[:description]
+          page.image = data[:image]
           page.raw_content = data[:content]
           page.draft = data[:draft]
           page.template = data[:layout]

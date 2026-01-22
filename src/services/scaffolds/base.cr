@@ -49,8 +49,9 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="<%= site_description %>">
+            <meta name="description" content="<%= page_description %>">
             <title><%= page_title %> - <%= site_title %></title>
+            <%= og_all_tags %>
             #{styles}
             <%= highlight_css %>
             <%= auto_includes_css %>
@@ -215,6 +216,26 @@ module Hwaro
           enabled = true
           theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
           use_cdn = true            # Set to false to use local assets
+
+          TOML
+        end
+
+        protected def og_config : String
+          <<-TOML
+
+          # =============================================================================
+          # OpenGraph & Twitter Cards
+          # =============================================================================
+          # Default meta tags for social sharing
+          # Page-level settings (front matter) override these defaults
+
+          [og]
+          default_image = "/images/og-default.png"   # Default image for social sharing
+          type = "article"                           # OpenGraph type (website, article, etc.)
+          twitter_card = "summary_large_image"       # Twitter card type (summary, summary_large_image)
+          # twitter_site = "@yourusername"           # Twitter @username for the site
+          # twitter_creator = "@authorusername"      # Twitter @username for content creator
+          # fb_app_id = "your_fb_app_id"             # Facebook App ID (optional)
 
           TOML
         end

@@ -160,6 +160,110 @@ module Hwaro
       end
     end
 
+    # OpenGraph and Twitter Card configuration
+    class OpenGraphConfig
+      property default_image : String?
+      property twitter_card : String
+      property twitter_site : String?
+      property twitter_creator : String?
+      property fb_app_id : String?
+      property og_type : String
+
+      def initialize
+        @default_image = nil
+        @twitter_card = "summary_large_image"
+        @twitter_site = nil
+        @twitter_creator = nil
+        @fb_app_id = nil
+        @og_type = "article"
+      end
+
+      # Generate OG meta tags
+      def og_tags(
+        title : String,
+        description : String?,
+        url : String,
+        image : String?,
+        base_url : String
+      ) : String
+        tags = [] of String
+
+        tags << %(<meta property="og:title" content="#{escape_html(title)}">)
+        tags << %(<meta property="og:type" content="#{@og_type}">)
+        tags << %(<meta property="og:url" content="#{base_url}#{url}">)
+
+        if desc = description
+          tags << %(<meta property="og:description" content="#{escape_html(desc)}">)
+        end
+
+        # Use page image or fall back to default
+        if img = (image || @default_image)
+          # Make image URL absolute
+          img_url = img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
+          tags << %(<meta property="og:image" content="#{img_url}">)
+        end
+
+        if fb_id = @fb_app_id
+          tags << %(<meta property="fb:app_id" content="#{fb_id}">)
+        end
+
+        tags.join("\n")
+      end
+
+      # Generate Twitter Card meta tags
+      def twitter_tags(
+        title : String,
+        description : String?,
+        image : String?,
+        base_url : String
+      ) : String
+        tags = [] of String
+
+        tags << %(<meta name="twitter:card" content="#{@twitter_card}">)
+        tags << %(<meta name="twitter:title" content="#{escape_html(title)}">)
+
+        if desc = description
+          tags << %(<meta name="twitter:description" content="#{escape_html(desc)}">)
+        end
+
+        # Use page image or fall back to default
+        if img = (image || @default_image)
+          img_url = img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
+          tags << %(<meta name="twitter:image" content="#{img_url}">)
+        end
+
+        if site = @twitter_site
+          tags << %(<meta name="twitter:site" content="#{site}">)
+        end
+
+        if creator = @twitter_creator
+          tags << %(<meta name="twitter:creator" content="#{creator}">)
+        end
+
+        tags.join("\n")
+      end
+
+      # Generate both OG and Twitter tags
+      def all_tags(
+        title : String,
+        description : String?,
+        url : String,
+        image : String?,
+        base_url : String
+      ) : String
+        og = og_tags(title, description, url, image, base_url)
+        twitter = twitter_tags(title, description, image, base_url)
+        [og, twitter].reject(&.empty?).join("\n")
+      end
+
+      private def escape_html(text : String) : String
+        text.gsub("&", "&amp;")
+            .gsub("<", "&lt;")
+            .gsub(">", "&gt;")
+            .gsub("\"", "&quot;")
+      end
+    end
+
     # Syntax highlighting configuration
     class HighlightConfig
       property enabled : Bool
@@ -263,6 +367,7 @@ module Hwaro
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
+      property og : OpenGraphConfig
       property taxonomies : Array(TaxonomyConfig)
       property default_language : String
       property languages : Hash(String, LanguageConfig)
@@ -282,6 +387,7 @@ module Hwaro
         @pagination = PaginationConfig.new
         @highlight = HighlightConfig.new
         @auto_includes = AutoIncludesConfig.new
+        @og = OpenGraphConfig.new
         @taxonomies = [] of TaxonomyConfig
         @default_language = "en"
         @languages = {} of String => LanguageConfig
@@ -427,6 +533,16 @@ module Hwaro
             if dirs = auto_includes_section["dirs"]?.try(&.as_a?)
               config.auto_includes.dirs = dirs.compact_map(&.as_s?)
             end
+          end
+
+          # Load OpenGraph configuration
+          if og_section = config.raw["og"]?.try(&.as_h?)
+            config.og.default_image = og_section["default_image"]?.try(&.as_s?)
+            config.og.twitter_card = og_section["twitter_card"]?.try(&.as_s?) || config.og.twitter_card
+            config.og.twitter_site = og_section["twitter_site"]?.try(&.as_s?)
+            config.og.twitter_creator = og_section["twitter_creator"]?.try(&.as_s?)
+            config.og.fb_app_id = og_section["fb_app_id"]?.try(&.as_s?)
+            config.og.og_type = og_section["type"]?.try(&.as_s?) || config.og.og_type
           end
 
           # Load taxonomies configuration

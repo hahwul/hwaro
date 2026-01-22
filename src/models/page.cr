@@ -21,6 +21,7 @@ module Hwaro
       property in_sitemap : Bool
       property toc : Bool
       property generated : Bool
+      property image : String?
 
       # Runtime / Computed Properties
       property content : String
@@ -43,6 +44,7 @@ module Hwaro
         @taxonomy_name = nil
         @taxonomy_term = nil
         @generated = false
+        @image = nil
         @content = ""
         @raw_content = ""
         @section = ""

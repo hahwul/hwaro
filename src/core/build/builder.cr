@@ -344,6 +344,8 @@ module Hwaro
             data = Processor::Markdown.parse(raw_content, source_path)
 
             page.title = data[:title]
+            page.description = data[:description]
+            page.image = data[:image]
             page.raw_content = data[:content]
             page.draft = data[:draft]
             page.template = data[:layout]
@@ -742,8 +744,23 @@ module Hwaro
           # First resolve includes (render partials)
           resolved = resolve_includes(template, templates)
 
+          # Get page description (fall back to site description)
+          page_description = page.description || config.description || ""
+          # Get page image (fall back to og default_image)
+          page_image = page.image || config.og.default_image
+          # Format page date
+          page_date = page.date.try(&.to_s("%Y-%m-%d")) || ""
+
+          # Generate OG/Twitter tags (pass page.image, let og methods handle fallback)
+          og_tags = config.og.og_tags(page.title, page.description, page.url, page.image, config.base_url)
+          twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
+          og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
+
           result = resolved
             .gsub(/<%=\s*page_title\s*%>/, page.title)
+            .gsub(/<%=\s*page_description\s*%>/, page_description)
+            .gsub(/<%=\s*page_image\s*%>/, page_image || "")
+            .gsub(/<%=\s*page_date\s*%>/, page_date)
             .gsub(/<%=\s*page_section\s*%>/, page.section)
             .gsub(/<%=\s*section_list\s*%>/, section_list)
             .gsub(/<%=\s*toc\s*%>/, toc)
@@ -759,6 +776,9 @@ module Hwaro
             .gsub(/<%=\s*auto_includes_css\s*%>/, config.auto_includes.css_tags(config.base_url))
             .gsub(/<%=\s*auto_includes_js\s*%>/, config.auto_includes.js_tags(config.base_url))
             .gsub(/<%=\s*auto_includes\s*%>/, config.auto_includes.all_tags(config.base_url))
+            .gsub(/<%=\s*og_tags\s*%>/, og_tags)
+            .gsub(/<%=\s*twitter_tags\s*%>/, twitter_tags)
+            .gsub(/<%=\s*og_all_tags\s*%>/, og_all_tags)
 
           process_shortcodes(result, templates)
         end
