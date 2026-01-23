@@ -11,11 +11,9 @@ This is the complete reference for all variables available in Hwaro's ECR templa
 
 Variables containing site-wide information from `config.toml`.
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `site_title` | String | Site title from configuration |
-| `site_description` | String | Site description from configuration |
-| `base_url` | String | Base URL from configuration (no trailing slash) |
+- `site_title` (String): Site title from configuration
+- `site_description` (String): Site description from configuration
+- `base_url` (String): Base URL from configuration (no trailing slash)
 
 ### Example Usage
 
@@ -29,14 +27,12 @@ Variables containing site-wide information from `config.toml`.
 
 Variables containing information about the current page.
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `page_title` | String | Current page title from front matter |
-| `page_description` | String | Page description (falls back to `site_description`) |
-| `page_url` | String | Current page URL path (e.g., `/getting-started/`) |
-| `page_section` | String | Section the page belongs to (e.g., `getting-started`) |
-| `page_image` | String | Page image URL from front matter |
-| `content` | String | Rendered page content (HTML) |
+- `page_title` (String): Current page title from front matter
+- `page_description` (String): Page description (falls back to `site_description`)
+- `page_url` (String): Current page URL path (e.g., `/getting-started/`)
+- `page_section` (String): Section the page belongs to (e.g., `getting-started`)
+- `page_image` (String): Page image URL from front matter
+- `content` (String): Rendered page content (HTML)
 
 ### Example Usage
 
@@ -56,31 +52,25 @@ Variables containing information about the current page.
 
 ### Page URL Examples
 
-| Content File | `page_url` Value |
-|--------------|------------------|
-| `content/index.md` | `/` |
-| `content/about.md` | `/about/` |
-| `content/blog/_index.md` | `/blog/` |
-| `content/blog/my-post.md` | `/blog/my-post/` |
-| `content/docs/guide/intro.md` | `/docs/guide/intro/` |
+- `content/index.md` → `page_url` = `/`
+- `content/about.md` → `page_url` = `/about/`
+- `content/blog/_index.md` → `page_url` = `/blog/`
+- `content/blog/my-post.md` → `page_url` = `/blog/my-post/`
+- `content/docs/guide/intro.md` → `page_url` = `/docs/guide/intro/`
 
 ### Page Section Examples
 
-| Content File | `page_section` Value |
-|--------------|----------------------|
-| `content/index.md` | `""` (empty) |
-| `content/about.md` | `""` (empty) |
-| `content/blog/_index.md` | `blog` |
-| `content/blog/my-post.md` | `blog` |
-| `content/docs/guide/intro.md` | `docs` |
+- `content/index.md` → `page_section` = `""` (empty)
+- `content/about.md` → `page_section` = `""` (empty)
+- `content/blog/_index.md` → `page_section` = `blog`
+- `content/blog/my-post.md` → `page_section` = `blog`
+- `content/docs/guide/intro.md` → `page_section` = `docs`
 
 ## Section Variables
 
 Variables available in section templates (`section.ecr`).
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `section_list` | String | HTML list of pages in the section |
+- `section_list` (String): HTML list of pages in the section
 
 ### Example Usage
 
@@ -105,11 +95,9 @@ The `section_list` variable generates HTML list items:
 
 Variables for SEO and social sharing meta tags.
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `og_tags` | String | OpenGraph meta tags |
-| `twitter_tags` | String | Twitter Card meta tags |
-| `og_all_tags` | String | Combined OpenGraph and Twitter tags |
+- `og_tags` (String): OpenGraph meta tags
+- `twitter_tags` (String): Twitter Card meta tags
+- `og_all_tags` (String): Combined OpenGraph and Twitter tags
 
 ### Example Usage
 
@@ -145,13 +133,11 @@ When using `<%= og_all_tags %>`:
 
 Variables for including CSS, JavaScript, and other assets.
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `highlight_css` | String | Syntax highlighting CSS (if enabled) |
-| `highlight_js` | String | Syntax highlighting JavaScript (if enabled) |
-| `auto_includes_css` | String | Auto-included CSS `<link>` tags |
-| `auto_includes_js` | String | Auto-included JS `<script>` tags |
-| `auto_includes` | String | All auto-included CSS and JS tags |
+- `highlight_css` (String): Syntax highlighting CSS (if enabled)
+- `highlight_js` (String): Syntax highlighting JavaScript (if enabled)
+- `auto_includes_css` (String): Auto-included CSS `<link>` tags
+- `auto_includes_js` (String): Auto-included JS `<script>` tags
+- `auto_includes` (String): All auto-included CSS and JS tags
 
 ### Example Usage
 
@@ -383,26 +369,20 @@ Use Crystal control structures for conditional content.
 
 ## Variable Availability by Template
 
-| Variable | page.ecr | section.ecr | index.ecr | taxonomy.ecr | taxonomy_term.ecr |
-|----------|----------|-------------|-----------|--------------|-------------------|
-| `site_title` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `site_description` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `base_url` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `page_title` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `page_description` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `page_url` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `page_section` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `page_image` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `content` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `section_list` | — | ✓ | — | — | — |
-| `og_tags` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `twitter_tags` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `og_all_tags` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `highlight_css` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `highlight_js` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `auto_includes_css` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `auto_includes_js` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `auto_includes` | ✓ | ✓ | ✓ | ✓ | ✓ |
+All variables are available in all template types unless noted otherwise:
+
+**Available in all templates:**
+
+- `site_title`, `site_description`, `base_url`
+- `page_title`, `page_description`, `page_url`, `page_section`, `page_image`
+- `content`
+- `og_tags`, `twitter_tags`, `og_all_tags`
+- `highlight_css`, `highlight_js`
+- `auto_includes_css`, `auto_includes_js`, `auto_includes`
+
+**Section-specific:**
+
+- `section_list` — Only available in `section.ecr`
 
 ## See Also
 

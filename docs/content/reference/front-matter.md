@@ -9,7 +9,7 @@ Front matter is metadata at the beginning of content files that defines page pro
 
 ## Basic Structure
 
-```markdown
+```toml
 +++
 title = "Page Title"
 date = "2024-01-15"
@@ -29,9 +29,8 @@ The page title. Used in templates, browser tabs, and meta tags.
 title = "Getting Started with Hwaro"
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| string | Yes | — |
+- **Type:** string
+- **Required:** Yes
 
 **Usage in templates:**
 
@@ -51,9 +50,8 @@ date = "2024-01-15"
 date = "2024-01-15T10:30:00Z"
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| string | No | — |
+- **Type:** string
+- **Required:** No
 
 ### description
 
@@ -63,9 +61,9 @@ Page description for SEO and social sharing. Falls back to site description if n
 description = "Learn how to install and configure Hwaro"
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| string | No | Site description |
+- **Type:** string
+- **Required:** No
+- **Default:** Site description
 
 **Usage in templates:**
 
@@ -81,9 +79,9 @@ Mark content as draft. Drafts are excluded from production builds unless `--draf
 draft = true
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| bool | No | `false` |
+- **Type:** bool
+- **Required:** No
+- **Default:** `false`
 
 **Building with drafts:**
 
@@ -100,9 +98,9 @@ Override the default template for this page.
 layout = "landing"
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| string | No | Auto-detected |
+- **Type:** string
+- **Required:** No
+- **Default:** Auto-detected
 
 This looks for `templates/landing.ecr` instead of the default `page.ecr` or `section.ecr`.
 
@@ -114,9 +112,9 @@ Numeric value for custom sorting. Lower numbers appear first.
 weight = 10
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| int | No | `0` |
+- **Type:** int
+- **Required:** No
+- **Default:** `0`
 
 Useful for controlling page order in section listings.
 
@@ -128,9 +126,9 @@ Featured image for social sharing (OpenGraph/Twitter Cards).
 image = "/images/featured-post.png"
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| string | No | `og.default_image` from config |
+- **Type:** string
+- **Required:** No
+- **Default:** `og.default_image` from config
 
 **Usage in templates:**
 
@@ -148,9 +146,9 @@ Array of tags for content classification.
 tags = ["tutorial", "beginner", "crystal"]
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| array | No | `[]` |
+- **Type:** array
+- **Required:** No
+- **Default:** `[]`
 
 Requires `tags` taxonomy in config:
 
@@ -167,9 +165,9 @@ Array of categories for content grouping.
 categories = ["Documentation", "Guides"]
 ```
 
-| Type | Required | Default |
-|------|----------|---------|
-| array | No | `[]` |
+- **Type:** array
+- **Required:** No
+- **Default:** `[]`
 
 Requires `categories` taxonomy in config:
 
@@ -271,20 +269,23 @@ tags = ["preview", "upcoming"]
 +++
 ```
 
-## Field Reference Table
+## Field Reference Summary
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `title` | string | required | Page title |
-| `date` | string | — | Publication date (ISO 8601) |
-| `description` | string | Site description | Page description for SEO |
-| `draft` | bool | `false` | Exclude from production builds |
-| `layout` | string | auto | Template override |
-| `weight` | int | `0` | Sort order (lower = first) |
-| `image` | string | Config default | Featured image for social sharing |
-| `tags` | array | `[]` | Tag taxonomy terms |
-| `categories` | array | `[]` | Category taxonomy terms |
-| `[taxonomy]` | array | `[]` | Any custom taxonomy |
+**Required:**
+
+- `title` (string): Page title
+
+**Optional:**
+
+- `date` (string): Publication date (ISO 8601)
+- `description` (string, default: site description): Page description for SEO
+- `draft` (bool, default: `false`): Exclude from production builds
+- `layout` (string, default: auto): Template override
+- `weight` (int, default: `0`): Sort order (lower = first)
+- `image` (string, default: config default): Featured image for social sharing
+- `tags` (array, default: `[]`): Tag taxonomy terms
+- `categories` (array, default: `[]`): Category taxonomy terms
+- `[taxonomy]` (array, default: `[]`): Any custom taxonomy
 
 ## Best Practices
 

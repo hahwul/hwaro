@@ -11,11 +11,9 @@ Complete reference for all Hwaro command-line commands and options.
 
 These options are available for all commands:
 
-| Option | Description |
-|--------|-------------|
-| `-v, --verbose` | Show detailed output including generated files |
-| `-h, --help` | Show help information |
-| `--version` | Show version number |
+- `-v, --verbose` — Show detailed output including generated files
+- `-h, --help` — Show help information
+- `--version` — Show version number
 
 ## hwaro init
 
@@ -29,25 +27,19 @@ hwaro init [path] [options]
 
 ### Arguments
 
-| Argument | Description |
-|----------|-------------|
-| `path` | Directory to create the project in (default: current directory) |
+- `path` — Directory to create the project in (default: current directory)
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--scaffold TYPE` | Project scaffold type (default: `simple`) |
-| `--force` | Overwrite existing files without prompting |
-| `--skip-sample-content` | Don't create sample content files |
+- `--scaffold TYPE` — Project scaffold type (default: `simple`)
+- `--force` — Overwrite existing files without prompting
+- `--skip-sample-content` — Don't create sample content files
 
 ### Scaffold Types
 
-| Type | Description |
-|------|-------------|
-| `simple` | Minimal site with basic structure |
-| `blog` | Blog-focused with posts section and RSS feed |
-| `docs` | Documentation site with sidebar navigation |
+- `simple` — Minimal site with basic structure
+- `blog` — Blog-focused with posts section and RSS feed
+- `docs` — Documentation site with sidebar navigation
 
 ### Examples
 
@@ -101,15 +93,13 @@ hwaro build [options]
 
 ### Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--output-dir DIR` | `-o DIR` | Output directory (default: `public`) |
-| `--drafts` | `-d` | Include draft content |
-| `--minify` | | Minify HTML, JSON, and XML output |
-| `--no-parallel` | | Disable parallel file processing |
-| `--cache` | | Enable build caching for faster rebuilds |
-| `--skip-highlighting` | | Disable syntax highlighting |
-| `--verbose` | `-v` | Show detailed output |
+- `--output-dir DIR` / `-o DIR` — Output directory (default: `public`)
+- `--drafts` / `-d` — Include draft content
+- `--minify` — Minify HTML, JSON, and XML output
+- `--no-parallel` — Disable parallel file processing
+- `--cache` — Enable build caching for faster rebuilds
+- `--skip-highlighting` — Disable syntax highlighting
+- `--verbose` / `-v` — Show detailed output
 
 ### Examples
 
@@ -188,13 +178,11 @@ hwaro serve [options]
 
 ### Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--port PORT` | `-p PORT` | Server port (default: `3000`) |
-| `--bind HOST` | `-b HOST` | Bind address (default: `0.0.0.0`) |
-| `--open` | | Open browser after starting server |
-| `--drafts` | `-d` | Include draft content |
-| `--verbose` | `-v` | Show detailed output |
+- `--port PORT` / `-p PORT` — Server port (default: `3000`)
+- `--bind HOST` / `-b HOST` — Bind address (default: `0.0.0.0`)
+- `--open` — Open browser after starting server
+- `--drafts` / `-d` — Include draft content
+- `--verbose` / `-v` — Show detailed output
 
 ### Examples
 
@@ -252,9 +240,7 @@ hwaro new [path]
 
 ### Arguments
 
-| Argument | Description |
-|----------|-------------|
-| `path` | Path for the new content file (relative to project root) |
+- `path` — Path for the new content file (relative to project root)
 
 ### Examples
 
@@ -293,10 +279,8 @@ Write your content here...
 
 Hwaro respects these environment variables:
 
-| Variable | Description |
-|----------|-------------|
-| `HWARO_CONFIG` | Path to configuration file |
-| `NO_COLOR` | Disable colored output |
+- `HWARO_CONFIG` — Path to configuration file
+- `NO_COLOR` — Disable colored output
 
 ### Examples
 
@@ -310,12 +294,10 @@ NO_COLOR=1 hwaro build
 
 ## Exit Codes
 
-| Code | Description |
-|------|-------------|
-| `0` | Success |
-| `1` | General error |
-| `2` | Configuration error |
-| `3` | Build error |
+- `0` — Success
+- `1` — General error
+- `2` — Configuration error
+- `3` — Build error
 
 ---
 

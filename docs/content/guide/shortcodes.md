@@ -66,10 +66,8 @@ Display styled alert boxes for notices, warnings, and tips:
 
 **Parameters:**
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `type` | Yes | Alert type: `info`, `warning`, `tip`, `note`, `danger` |
-| `message` | Yes | The alert message text |
+- `type` (required): Alert type: `info`, `warning`, `tip`, `note`, `danger`
+- `message` (required): The alert message text
 
 ### Code Block
 
@@ -85,10 +83,8 @@ function greet(name) {
 
 **Parameters:**
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `lang` | No | Programming language for highlighting |
-| `title` | No | Title displayed above the code block |
+- `lang` (optional): Programming language for highlighting
+- `title` (optional): Title displayed above the code block
 
 ### Figure
 
@@ -100,12 +96,10 @@ Display images with captions:
 
 **Parameters:**
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `src` | Yes | Image source path |
-| `alt` | Yes | Alt text for accessibility |
-| `caption` | No | Caption displayed below the image |
-| `class` | No | Additional CSS class |
+- `src` (required): Image source path
+- `alt` (required): Alt text for accessibility
+- `caption` (optional): Caption displayed below the image
+- `class` (optional): Additional CSS class
 
 ### YouTube
 
@@ -117,10 +111,8 @@ Embed YouTube videos:
 
 **Parameters:**
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `id` | Yes | YouTube video ID |
-| `title` | No | Video title for accessibility |
+- `id` (required): YouTube video ID
+- `title` (optional): Video title for accessibility
 
 ### Details
 
@@ -135,10 +127,8 @@ Click the title to reveal it.
 
 **Parameters:**
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `title` | Yes | The clickable summary text |
-| `open` | No | Set to "true" to expand by default |
+- `title` (required): The clickable summary text
+- `open` (optional): Set to "true" to expand by default
 
 ## Creating Custom Shortcodes
 
@@ -182,10 +172,8 @@ Ruby-like syntax with C-like performance.
 
 ### Available Variables in Shortcodes
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `params` | Hash | All parameters passed to the shortcode |
-| `content` | String | Content between opening and closing tags |
+- `params` (Hash): All parameters passed to the shortcode
+- `content` (String): Content between opening and closing tags
 
 ### Accessing Parameters
 

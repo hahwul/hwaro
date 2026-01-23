@@ -159,46 +159,36 @@ The partial name is relative to the `templates/` directory, without the `.ecr` e
 
 ### Site Variables
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `site_title` | String | Site title from config |
-| `base_url` | String | Base URL from config |
-| `site_description` | String | Site description from config |
+- `site_title` (String): Site title from config
+- `base_url` (String): Base URL from config
+- `site_description` (String): Site description from config
 
 ### Page Variables
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `page_title` | String | Current page title |
-| `page_description` | String | Page description (falls back to site description) |
-| `page_url` | String | Current page URL path |
-| `page_section` | String | Section the page belongs to |
-| `page_image` | String | Page image (for social sharing) |
-| `content` | String | Rendered page content |
+- `page_title` (String): Current page title
+- `page_description` (String): Page description (falls back to site description)
+- `page_url` (String): Current page URL path
+- `page_section` (String): Section the page belongs to
+- `page_image` (String): Page image (for social sharing)
+- `content` (String): Rendered page content
 
 ### Section Variables
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `section_list` | String | HTML list of pages in the section |
+- `section_list` (String): HTML list of pages in the section
 
 ### SEO Variables
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `og_tags` | String | OpenGraph meta tags |
-| `twitter_tags` | String | Twitter Card meta tags |
-| `og_all_tags` | String | Both OG and Twitter tags combined |
+- `og_tags` (String): OpenGraph meta tags
+- `twitter_tags` (String): Twitter Card meta tags
+- `og_all_tags` (String): Both OG and Twitter tags combined
 
 ### Asset Variables
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `highlight_css` | String | Syntax highlighting CSS (if enabled) |
-| `highlight_js` | String | Syntax highlighting JS (if enabled) |
-| `auto_includes_css` | String | Auto-included CSS files |
-| `auto_includes_js` | String | Auto-included JS files |
-| `auto_includes` | String | All auto-included files |
+- `highlight_css` (String): Syntax highlighting CSS (if enabled)
+- `highlight_js` (String): Syntax highlighting JS (if enabled)
+- `auto_includes_css` (String): Auto-included CSS files
+- `auto_includes_js` (String): Auto-included JS files
+- `auto_includes` (String): All auto-included files
 
 ## Custom Layouts
 

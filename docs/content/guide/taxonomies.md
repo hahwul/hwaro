@@ -36,12 +36,10 @@ feed = false
 
 ### Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | required | Taxonomy name (used in URLs and front matter) |
-| `feed` | bool | `false` | Generate RSS feed for this taxonomy |
-| `paginate_by` | int | `0` | Items per page (0 = no pagination) |
-| `sitemap` | bool | `true` | Include in sitemap |
+- `name` (string, required): Taxonomy name (used in URLs and front matter)
+- `feed` (bool, default: `false`): Generate RSS feed for this taxonomy
+- `paginate_by` (int, default: `0`): Items per page (0 = no pagination)
+- `sitemap` (bool, default: `true`): Include in sitemap
 
 ## Using Taxonomies in Content
 

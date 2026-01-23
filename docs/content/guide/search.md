@@ -25,23 +25,19 @@ filename = "search.json"
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable search index generation |
-| `format` | string | `"fuse_json"` | Index format (currently only `fuse_json`) |
-| `fields` | array | `["title"]` | Fields to include in the index |
-| `filename` | string | `"search.json"` | Output filename |
+- `enabled` (bool, default: `false`): Enable search index generation
+- `format` (string, default: `"fuse_json"`): Index format (currently only `fuse_json`)
+- `fields` (array, default: `["title"]`): Fields to include in the index
+- `filename` (string, default: `"search.json"`): Output filename
 
 ### Available Fields
 
-| Field | Description |
-|-------|-------------|
-| `title` | Page title |
-| `content` | Full page content (stripped of HTML) |
-| `description` | Page description from front matter |
-| `tags` | Page tags |
-| `url` | Page URL |
-| `section` | Section the page belongs to |
+- `title`: Page title
+- `content`: Full page content (stripped of HTML)
+- `description`: Page description from front matter
+- `tags`: Page tags
+- `url`: Page URL
+- `section`: Section the page belongs to
 
 ## Search Index Format
 

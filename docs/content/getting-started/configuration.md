@@ -17,11 +17,11 @@ description = "A brief description of your site"
 base_url = "https://example.com"
 ```
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `title` | string | Your site's title, used in templates and meta tags |
-| `description` | string | Site description for SEO and meta tags |
-| `base_url` | string | Production URL of your site (no trailing slash) |
+**Options:**
+
+- `title` (string): Your site's title, used in templates and meta tags
+- `description` (string): Site description for SEO and meta tags
+- `base_url` (string): Production URL of your site (no trailing slash)
 
 ## Plugins
 
@@ -32,9 +32,9 @@ Configure which content processors to use:
 processors = ["markdown"]
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `processors` | array | `["markdown"]` | List of content processors to enable |
+**Options:**
+
+- `processors` (array, default: `["markdown"]`): List of content processors to enable
 
 ## Syntax Highlighting
 
@@ -47,11 +47,11 @@ theme = "github-dark"
 use_cdn = true
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable syntax highlighting |
-| `theme` | string | `"github"` | Highlight.js theme name |
-| `use_cdn` | bool | `true` | Use CDN for Highlight.js assets |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable syntax highlighting
+- `theme` (string, default: `"github"`): Highlight.js theme name
+- `use_cdn` (bool, default: `true`): Use CDN for Highlight.js assets
 
 Available themes include: `github`, `github-dark`, `monokai`, `atom-one-dark`, `vs2015`, `nord`, and many more.
 
@@ -64,9 +64,9 @@ Configure markdown parsing behavior:
 safe = false
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `safe` | bool | `false` | If true, raw HTML in markdown is stripped |
+**Options:**
+
+- `safe` (bool, default: `false`): If true, raw HTML in markdown is stripped
 
 When `safe` is enabled, any raw HTML in your markdown files will be replaced with `<!-- raw HTML omitted -->` comments.
 
@@ -82,12 +82,12 @@ fields = ["title", "content", "tags", "description"]
 filename = "search.json"
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable search index generation |
-| `format` | string | `"fuse_json"` | Index format (currently only `fuse_json`) |
-| `fields` | array | `["title"]` | Fields to include in the index |
-| `filename` | string | `"search.json"` | Output filename |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable search index generation
+- `format` (string, default: `"fuse_json"`): Index format (currently only `fuse_json`)
+- `fields` (array, default: `["title"]`): Fields to include in the index
+- `filename` (string, default: `"search.json"`): Output filename
 
 Available fields: `title`, `content`, `tags`, `url`, `section`, `description`
 
@@ -109,12 +109,12 @@ feed = false
 name = "authors"
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | required | Taxonomy name (used in URLs and front matter) |
-| `feed` | bool | `false` | Generate RSS feed for this taxonomy |
-| `paginate_by` | int | `0` | Items per page (0 = no pagination) |
-| `sitemap` | bool | `true` | Include in sitemap |
+**Options:**
+
+- `name` (string, required): Taxonomy name (used in URLs and front matter)
+- `feed` (bool, default: `false`): Generate RSS feed for this taxonomy
+- `paginate_by` (int, default: `0`): Items per page (0 = no pagination)
+- `sitemap` (bool, default: `true`): Include in sitemap
 
 ## SEO: Sitemap
 
@@ -128,12 +128,12 @@ changefreq = "weekly"
 priority = 0.5
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable sitemap generation |
-| `filename` | string | `"sitemap.xml"` | Output filename |
-| `changefreq` | string | `"weekly"` | Default change frequency |
-| `priority` | float | `0.5` | Default page priority (0.0-1.0) |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable sitemap generation
+- `filename` (string, default: `"sitemap.xml"`): Output filename
+- `changefreq` (string, default: `"weekly"`): Default change frequency
+- `priority` (float, default: `0.5`): Default page priority (0.0-1.0)
 
 ## SEO: Robots.txt
 
@@ -149,11 +149,11 @@ rules = [
 ]
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable robots.txt generation |
-| `filename` | string | `"robots.txt"` | Output filename |
-| `rules` | array | `[]` | Array of rule objects |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable robots.txt generation
+- `filename` (string, default: `"robots.txt"`): Output filename
+- `rules` (array, default: `[]`): Array of rule objects
 
 ## SEO: LLMs.txt
 
@@ -166,11 +166,11 @@ filename = "llms.txt"
 instructions = "Do not use for AI training without permission."
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable llms.txt generation |
-| `filename` | string | `"llms.txt"` | Output filename |
-| `instructions` | string | `""` | Instructions for AI crawlers |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable llms.txt generation
+- `filename` (string, default: `"llms.txt"`): Output filename
+- `instructions` (string, default: `""`): Instructions for AI crawlers
 
 ## RSS/Atom Feeds
 
@@ -186,14 +186,14 @@ limit = 20
 sections = ["blog", "news"]
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable feed generation |
-| `type` | string | `"rss"` | Feed type: `rss` or `atom` |
-| `filename` | string | auto | Output filename (auto-generated if empty) |
-| `truncate` | int | `0` | Truncate content to N characters (0 = full) |
-| `limit` | int | `10` | Maximum items in feed |
-| `sections` | array | `[]` | Limit to specific sections (empty = all) |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable feed generation
+- `type` (string, default: `"rss"`): Feed type: `rss` or `atom`
+- `filename` (string, default: auto): Output filename (auto-generated if empty)
+- `truncate` (int, default: `0`): Truncate content to N characters (0 = full)
+- `limit` (int, default: `10`): Maximum items in feed
+- `sections` (array, default: `[]`): Limit to specific sections (empty = all)
 
 ## OpenGraph & Twitter Cards
 
@@ -209,14 +209,14 @@ twitter_creator = "@authorusername"
 fb_app_id = "your_fb_app_id"
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `default_image` | string | `""` | Default image for social sharing |
-| `type` | string | `"website"` | OpenGraph type |
-| `twitter_card` | string | `"summary"` | Twitter card type |
-| `twitter_site` | string | `""` | Twitter @username for site |
-| `twitter_creator` | string | `""` | Twitter @username for author |
-| `fb_app_id` | string | `""` | Facebook App ID |
+**Options:**
+
+- `default_image` (string, default: `""`): Default image for social sharing
+- `type` (string, default: `"website"`): OpenGraph type
+- `twitter_card` (string, default: `"summary"`): Twitter card type
+- `twitter_site` (string, default: `""`): Twitter @username for site
+- `twitter_creator` (string, default: `""`): Twitter @username for author
+- `fb_app_id` (string, default: `""`): Facebook App ID
 
 ## Auto Includes
 
@@ -228,10 +228,10 @@ enabled = true
 dirs = ["assets/css", "assets/js"]
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable auto includes |
-| `dirs` | array | `[]` | Directories under `static/` to scan |
+**Options:**
+
+- `enabled` (bool, default: `false`): Enable auto includes
+- `dirs` (array, default: `[]`): Directories under `static/` to scan
 
 Files are included alphabetically. Use numeric prefixes to control order:
 
@@ -256,10 +256,10 @@ hooks.pre = ["npm install", "npx tsc"]
 hooks.post = ["npm run minify", "./scripts/deploy.sh"]
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `hooks.pre` | array | `[]` | Commands to run before build |
-| `hooks.post` | array | `[]` | Commands to run after build |
+**Options:**
+
+- `hooks.pre` (array, default: `[]`): Commands to run before build
+- `hooks.post` (array, default: `[]`): Commands to run after build
 
 - Pre-hooks run sequentially; failure aborts the build
 - Post-hooks run sequentially; failure shows a warning but doesn't fail the build

@@ -34,12 +34,10 @@ priority = 0.5
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable sitemap generation |
-| `filename` | string | `"sitemap.xml"` | Output filename |
-| `changefreq` | string | `"weekly"` | How often pages change |
-| `priority` | float | `0.5` | Default page priority (0.0–1.0) |
+- `enabled` (bool, default: `false`): Enable sitemap generation
+- `filename` (string, default: `"sitemap.xml"`): Output filename
+- `changefreq` (string, default: `"weekly"`): How often pages change
+- `priority` (float, default: `0.5`): Default page priority (0.0–1.0)
 
 ### Change Frequency Values
 
@@ -91,19 +89,15 @@ rules = [
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable robots.txt generation |
-| `filename` | string | `"robots.txt"` | Output filename |
-| `rules` | array | `[]` | Array of rule objects |
+- `enabled` (bool, default: `false`): Enable robots.txt generation
+- `filename` (string, default: `"robots.txt"`): Output filename
+- `rules` (array, default: `[]`): Array of rule objects
 
 ### Rule Object Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `user_agent` | string | Bot identifier (`*` for all bots) |
-| `disallow` | array | Paths to block |
-| `allow` | array | Paths to allow (optional) |
+- `user_agent` (string): Bot identifier (`*` for all bots)
+- `disallow` (array): Paths to block
+- `allow` (array): Paths to allow (optional)
 
 ### Generated Output
 
@@ -124,14 +118,12 @@ Sitemap: https://example.com/sitemap.xml
 
 ### Common Bot User Agents
 
-| Bot | User Agent | Description |
-|-----|------------|-------------|
-| All bots | `*` | Applies to all crawlers |
-| Google | `Googlebot` | Google's web crawler |
-| Bing | `Bingbot` | Microsoft Bing crawler |
-| OpenAI | `GPTBot` | OpenAI's crawler |
-| Anthropic | `anthropic-ai` | Anthropic's crawler |
-| Common Crawl | `CCBot` | Open web crawler |
+- `*` — All bots (applies to all crawlers)
+- `Googlebot` — Google's web crawler
+- `Bingbot` — Microsoft Bing crawler
+- `GPTBot` — OpenAI's crawler
+- `anthropic-ai` — Anthropic's crawler
+- `CCBot` — Common Crawl (open web crawler)
 
 ## RSS/Atom Feeds
 
@@ -151,14 +143,12 @@ sections = ["blog", "news"]
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable feed generation |
-| `type` | string | `"rss"` | Feed format: `rss` or `atom` |
-| `filename` | string | auto | Output filename |
-| `truncate` | int | `0` | Truncate content to N characters (0 = full content) |
-| `limit` | int | `10` | Maximum items in feed |
-| `sections` | array | `[]` | Limit to specific sections (empty = all) |
+- `enabled` (bool, default: `false`): Enable feed generation
+- `type` (string, default: `"rss"`): Feed format: `rss` or `atom`
+- `filename` (string, default: auto): Output filename
+- `truncate` (int, default: `0`): Truncate content to N characters (0 = full content)
+- `limit` (int, default: `10`): Maximum items in feed
+- `sections` (array, default: `[]`): Limit to specific sections (empty = all)
 
 ### RSS vs Atom
 
@@ -199,14 +189,12 @@ fb_app_id = "your_fb_app_id"
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `default_image` | string | `""` | Default image when page has no image |
-| `type` | string | `"website"` | OpenGraph type |
-| `twitter_card` | string | `"summary"` | Twitter card type |
-| `twitter_site` | string | `""` | Twitter @username for site |
-| `twitter_creator` | string | `""` | Twitter @username for author |
-| `fb_app_id` | string | `""` | Facebook App ID (optional) |
+- `default_image` (string, default: `""`): Default image when page has no image
+- `type` (string, default: `"website"`): OpenGraph type
+- `twitter_card` (string, default: `"summary"`): Twitter card type
+- `twitter_site` (string, default: `""`): Twitter @username for site
+- `twitter_creator` (string, default: `""`): Twitter @username for author
+- `fb_app_id` (string, default: `""`): Facebook App ID (optional)
 
 ### OpenGraph Types
 
@@ -265,12 +253,10 @@ Use these in your templates:
 
 For best results across platforms:
 
-| Platform | Recommended Size | Aspect Ratio |
-|----------|------------------|--------------|
-| Facebook | 1200 × 630 px | 1.91:1 |
-| Twitter | 1200 × 600 px | 2:1 |
-| LinkedIn | 1200 × 627 px | 1.91:1 |
-| General | 1200 × 630 px | 1.91:1 |
+- **Facebook**: 1200 × 630 px (aspect ratio 1.91:1)
+- **Twitter**: 1200 × 600 px (aspect ratio 2:1)
+- **LinkedIn**: 1200 × 627 px (aspect ratio 1.91:1)
+- **General recommendation**: 1200 × 630 px (aspect ratio 1.91:1)
 
 Use PNG or JPG format, under 5MB file size.
 
@@ -289,11 +275,9 @@ instructions = "This is documentation for the Hwaro project. Please respect the 
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable llms.txt generation |
-| `filename` | string | `"llms.txt"` | Output filename |
-| `instructions` | string | `""` | Instructions for AI crawlers |
+- `enabled` (bool, default: `false`): Enable llms.txt generation
+- `filename` (string, default: `"llms.txt"`): Output filename
+- `instructions` (string, default: `""`): Instructions for AI crawlers
 
 ### Example Instructions
 

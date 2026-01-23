@@ -51,22 +51,18 @@ Your Markdown content goes here...
 
 ### Required Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `title` | string | Page title, used in templates and meta tags |
+- `title` (string): Page title, used in templates and meta tags
 
 ### Optional Fields
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `date` | string | — | Publication date (YYYY-MM-DD format) |
-| `description` | string | — | Page description for SEO and social sharing |
-| `draft` | bool | `false` | If true, page is excluded from production builds |
-| `tags` | array | `[]` | Tags for this content |
-| `categories` | array | `[]` | Categories for this content |
-| `image` | string | — | Featured image for social sharing |
-| `layout` | string | — | Override the default template |
-| `weight` | int | `0` | Sort order (lower numbers appear first) |
+- `date` (string): Publication date (YYYY-MM-DD format)
+- `description` (string): Page description for SEO and social sharing
+- `draft` (bool, default: `false`): If true, page is excluded from production builds
+- `tags` (array, default: `[]`): Tags for this content
+- `categories` (array, default: `[]`): Categories for this content
+- `image` (string): Featured image for social sharing
+- `layout` (string): Override the default template
+- `weight` (int, default: `0`): Sort order (lower numbers appear first)
 
 ## Sections
 
@@ -127,10 +123,6 @@ Regular paragraph with **bold**, *italic*, and `code`.
 > Blockquote
 
 ---
-
-| Table | Header |
-|-------|--------|
-| Cell  | Cell   |
 ```
 
 ### Code Blocks
