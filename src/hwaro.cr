@@ -47,6 +47,7 @@ require "./content/processors/html"
 require "./content/processors/json"
 require "./content/processors/xml"
 require "./content/processors/syntax_highlighter"
+require "./content/processors/template"
 
 # Load lifecycle system
 require "./core/lifecycle"

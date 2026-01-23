@@ -771,6 +771,10 @@ module Hwaro
           # First resolve includes (render partials)
           resolved = resolve_includes(template, templates)
 
+          # Process conditional statements (if/unless/elsif/else)
+          template_context = Content::Processors::TemplateContext.new(page, config)
+          resolved = Content::Processors::Template.process(resolved, template_context)
+
           # Get page description (fall back to site description)
           page_description = page.description || config.description || ""
           # Get page image (fall back to og default_image)

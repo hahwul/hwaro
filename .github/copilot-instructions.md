@@ -316,6 +316,88 @@ Generated output example:
 <meta name="twitter:site" content="@yourusername">
 ```
 
+#### 11. Template Conditional Statements
+
+Hwaro templates support ECR-style control flow syntax for conditional rendering.
+
+Supported syntax:
+- `<% if condition %>...<% end %>` - Basic conditional
+- `<% if condition %>...<% else %>...<% end %>` - If/else
+- `<% if condition %>...<% elsif condition %>...<% else %>...<% end %>` - If/elsif/else
+- `<% unless condition %>...<% end %>` - Negated conditional
+- `<% unless condition %>...<% else %>...<% end %>` - Unless/else
+
+Supported conditions:
+- Equality: `page_url == "/about/"`, `page_section == "blog"`
+- Inequality: `page_section != "docs"`
+- String methods: `page_url.starts_with?("/blog/")`, `page_title.ends_with?("!")`
+- String methods: `page_url.includes?("products")`, `page_description.empty?`, `page_description.present?`
+- Boolean properties: `page.draft`, `page.toc`, `page.is_index`, `page.render`, `page.generated`, `page.in_sitemap`
+- Negation: `!page.draft`
+- Logical AND: `page_section == "blog" && !page.draft`
+- Logical OR: `page_section == "blog" || page_section == "news"`
+
+Available variables for conditions:
+- `page_url` - Page URL (e.g., "/about/")
+- `page_section` - Page section (e.g., "blog")
+- `page_title` - Page title
+- `page_description` - Page description
+- `page_date` - Page date
+- `page_image` - Page image
+- `taxonomy_name` - Taxonomy name (for taxonomy pages)
+- `taxonomy_term` - Taxonomy term (for taxonomy pages)
+- `site_title` - Site title
+- `site_description` - Site description
+- `base_url` - Site base URL
+
+Example usage in templates:
+```html
+<nav>
+  <a href="/"<% if page_url == "/" %> class="active"<% end %>>Home</a>
+  <a href="/blog/"<% if page_url.starts_with?("/blog/") %> class="active"<% end %>>Blog</a>
+  <a href="/about/"<% if page_url == "/about/" %> class="active"<% end %>>About</a>
+</nav>
+
+<% if page_section == "blog" %>
+  <article class="blog-post">
+    <% if page.toc %>
+    <div class="toc"><%= toc %></div>
+    <% end %>
+    <%= content %>
+  </article>
+<% elsif page_section == "docs" %>
+  <div class="documentation">
+    <%= content %>
+  </div>
+<% else %>
+  <main>
+    <%= content %>
+  </main>
+<% end %>
+
+<% unless page_description.empty? %>
+<meta name="description" content="<%= page_description %>">
+<% end %>
+
+<% if !page.draft %>
+<p>Published</p>
+<% end %>
+
+<% if page_section == "blog" && !page.draft %>
+<p>Published blog post</p>
+<% end %>
+
+<% if page_section == "blog" || page_section == "news" %>
+<p>Content section</p>
+<% end %>
+```
+
+Implementation details:
+- `src/content/processors/template.cr` - `Template` class and `TemplateContext` class
+- `src/core/build/builder.cr` - Integrated into `apply_template()` method
+- Supports nested conditionals (inner conditionals are processed first)
+- Processing is done before variable substitution
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
