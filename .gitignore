@@ -12,4 +12,6 @@ testapp
 
 # Hwaro docs
 docs/public
-hahwul.com
+
+# macOS
+.DS_Store
