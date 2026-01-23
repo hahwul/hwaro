@@ -11,6 +11,17 @@ require "../../config/options/build_options"
 module Hwaro
   module Core
     module Lifecycle
+      # Represents a raw file (JSON, XML, etc.) that needs processing
+      struct RawFile
+        property source_path : String
+        property relative_path : String
+        property extension : String
+
+        def initialize(@source_path : String, @relative_path : String)
+          @extension = File.extname(@source_path).downcase
+        end
+      end
+
       # Build context that flows through all phases
       class BuildContext
         # Build options
@@ -23,6 +34,9 @@ module Hwaro
         # Content
         property pages : Array(Models::Page)
         property sections : Array(Models::Section)
+
+        # Raw files (JSON, XML, etc.)
+        property raw_files : Array(RawFile)
 
         # Templates
         property templates : Hash(String, String)
@@ -42,6 +56,7 @@ module Hwaro
         def initialize(@options : Config::Options::BuildOptions)
           @pages = [] of Models::Page
           @sections = [] of Models::Section
+          @raw_files = [] of RawFile
           @templates = {} of String => String
           @output_dir = options.output_dir
           @metadata = {} of String => String | Bool | Int32 | Float64
@@ -79,6 +94,7 @@ module Hwaro
         property pages_skipped : Int32
         property files_written : Int32
         property cache_hits : Int32
+        property raw_files_processed : Int32
         property start_time : Time::Instant?
         property end_time : Time::Instant?
 
@@ -88,6 +104,7 @@ module Hwaro
           @pages_skipped = 0
           @files_written = 0
           @cache_hits = 0
+          @raw_files_processed = 0
         end
 
         def elapsed : Float64

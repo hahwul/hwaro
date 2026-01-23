@@ -405,7 +405,7 @@ Common CLI options across commands:
 Build-specific options:
 - `-o DIR, --output-dir DIR` - Output directory (default: public)
 - `-d, --drafts` - Include draft content
-- `--minify` - Minify HTML output
+- `--minify` - Minify HTML output (and minified json, xml)
 - `--no-parallel` - Disable parallel file processing
 - `--cache` - Enable build caching
 - `--skip-highlighting` - Disable syntax highlighting

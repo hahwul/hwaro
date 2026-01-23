@@ -133,7 +133,8 @@ module Hwaro
           end
 
           elapsed = Time.instant - start_time
-          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          raw_msg = ctx.stats.raw_files_processed > 0 ? " + #{ctx.stats.raw_files_processed} raw files" : ""
+          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} pages#{raw_msg} in #{elapsed.total_milliseconds.round(2)}ms."
 
           # Print profiling report if enabled
           profiler.report
@@ -271,6 +272,10 @@ module Hwaro
           profiler.start_phase("Write")
           result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
             generate_404_page(site, templates, output_dir, minify, verbose)
+
+            # Process raw files (JSON, XML)
+            raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose)
+            ctx.stats.raw_files_processed = raw_count
           end
           profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
@@ -288,6 +293,7 @@ module Hwaro
         private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
           config = ctx.config
 
+          # Collect markdown files
           Dir.glob("content/**/*.md") do |file_path|
             relative_path = Path[file_path].relative_to("content").to_s
             basename = Path[relative_path].basename
@@ -317,6 +323,24 @@ module Hwaro
             page.section = path_parts.size > 1 ? path_parts.first : ""
             page.is_index = is_index
             page.language = language
+          end
+
+          # Collect raw files (JSON, XML) for processing
+          collect_raw_files(ctx)
+        end
+
+        # Collect JSON and XML files from content directory
+        private def collect_raw_files(ctx : Lifecycle::BuildContext)
+          # JSON files
+          Dir.glob("content/**/*.json") do |file_path|
+            relative_path = Path[file_path].relative_to("content").to_s
+            ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
+          end
+
+          # XML files
+          Dir.glob("content/**/*.xml") do |file_path|
+            relative_path = Path[file_path].relative_to("content").to_s
+            ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
           end
         end
 
@@ -856,6 +880,42 @@ module Hwaro
           FileUtils.mkdir_p(File.dirname(output_path))
           File.write(output_path, final_html)
           Logger.action :create, output_path if verbose
+        end
+
+        # Process raw files (JSON, XML) with minification
+        private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool) : Int32
+          count = 0
+
+          raw_files.each do |raw_file|
+            content = File.read(raw_file.source_path)
+            output_path = File.join(output_dir, raw_file.relative_path)
+
+            # Get appropriate processor
+            processor = Content::Processors::Registry.for_file(raw_file.source_path).first?
+
+            processed_content = if processor && minify
+                                  context = Content::Processors::ProcessorContext.new(
+                                    file_path: raw_file.source_path,
+                                    output_path: output_path
+                                  )
+                                  result = processor.process(content, context)
+                                  if result.success
+                                    result.content
+                                  else
+                                    Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
+                                    content
+                                  end
+                                else
+                                  content
+                                end
+
+            FileUtils.mkdir_p(File.dirname(output_path))
+            File.write(output_path, processed_content)
+            Logger.action :create, output_path if verbose
+            count += 1
+          end
+
+          count
         end
       end
     end
