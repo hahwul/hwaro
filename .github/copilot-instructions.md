@@ -365,6 +365,12 @@ SEO/Meta variables:
 - `{{ highlight_css }}`, `{{ highlight_js }}`, `{{ highlight_tags }}`
 - `{{ auto_includes_css }}`, `{{ auto_includes_js }}`, `{{ auto_includes }}`
 
+Time-related variables:
+- `{{ current_year }}` - Current year (e.g., 2025)
+- `{{ current_date }}` - Current date in YYYY-MM-DD format
+- `{{ current_datetime }}` - Current datetime in YYYY-MM-DD HH:MM:SS format
+- `{{ now() }}` - Function that returns current datetime (supports format parameter)
+
 **Example usage in templates:**
 ```jinja
 <nav>

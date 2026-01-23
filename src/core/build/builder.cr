@@ -968,6 +968,12 @@ module Hwaro
           vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
           vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
 
+          # Time-related variables
+          now = Time.local
+          vars["current_year"] = Crinja::Value.new(now.year)
+          vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
+          vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
+
           vars
         end
 

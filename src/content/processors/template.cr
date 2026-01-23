@@ -111,6 +111,12 @@ module Hwaro
           }
           vars["config"] = Crinja::Value.new(config_obj)
 
+          # Time-related variables
+          now = Time.local
+          vars["current_year"] = Crinja::Value.new(now.year)
+          vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
+          vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
+
           vars
         end
 

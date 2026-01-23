@@ -538,4 +538,50 @@ describe Hwaro::Content::Processors::Template do
       result.should eq("https://example.com/about/")
     end
   end
+
+  describe "Time-related Variables" do
+    it "provides current_year variable" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ current_year }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq(Time.local.year.to_s)
+    end
+
+    it "provides current_date variable" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ current_date }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should match(/\d{4}-\d{2}-\d{2}/)
+    end
+
+    it "provides current_datetime variable" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ current_datetime }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+    end
+
+    it "can use current_year in footer copyright" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "© {{ current_year }} My Site"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("© #{Time.local.year} My Site")
+    end
+  end
 end
