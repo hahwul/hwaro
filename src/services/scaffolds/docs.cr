@@ -85,118 +85,157 @@ module Hwaro
           config
         end
 
-        # Override navigation for docs
-        protected def navigation : String
-          <<-NAV
-              <nav>
-                <a href="<%= base_url %>/">Home</a>
-                <a href="<%= base_url %>/getting-started/">Getting Started</a>
-                <a href="<%= base_url %>/guide/">Guide</a>
-                <a href="<%= base_url %>/reference/">Reference</a>
-              </nav>
-          NAV
+        # Override header for docs - minimal header integrated with layout
+        protected def header_template : String
+          <<-HTML
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="description" content="<%= page_description %>">
+            <title><%= page_title %> - <%= site_title %></title>
+            <%= og_all_tags %>
+            #{styles}
+            <%= highlight_css %>
+            <%= auto_includes_css %>
+          </head>
+          <body data-section="<%= page_section %>">
+          HTML
         end
 
-        # Override styles for docs
+        # Override styles for docs - modern unified layout
         protected def styles : String
           <<-CSS
             <style>
               :root {
-                --primary-color: #0070f3;
-                --secondary-color: #7928ca;
-                --text-color: #333;
-                --text-muted: #666;
-                --border-color: #eaeaea;
-                --bg-code: #f6f8fa;
-                --bg-sidebar: #fafbfc;
+                --primary: #0070f3;
+                --text: #24292f;
+                --text-muted: #57606a;
+                --border: #d0d7de;
+                --bg: #ffffff;
+                --bg-subtle: #f6f8fa;
+                --header-h: 56px;
+                --sidebar-w: 260px;
               }
-              * { box-sizing: border-box; }
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.7; margin: 0; padding: 0; color: var(--text-color); }
-              .docs-layout { display: flex; min-height: 100vh; }
-              .docs-sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); padding: 1.5rem; position: fixed; height: 100vh; overflow-y: auto; }
-              .docs-main { flex: 1; margin-left: 260px; padding: 2rem 3rem; max-width: 900px; }
-              header { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
-              h1, h2, h3, h4 { line-height: 1.3; margin-top: 1.5em; }
-              h1 { font-size: 2rem; margin-top: 0; }
-              h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
-              h3 { font-size: 1.25rem; }
-              nav a { margin-right: 1.5rem; text-decoration: none; color: var(--primary-color); font-weight: 500; }
-              nav a:hover { text-decoration: underline; }
-              footer { margin-top: 3rem; border-top: 1px solid var(--border-color); padding-top: 1rem; color: var(--text-muted); font-size: 0.9rem; }
-              code { background: var(--bg-code); padding: 0.2rem 0.4rem; border-radius: 3px; font-size: 0.9em; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
-              pre { background: var(--bg-code); padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border-color); }
-              pre code { background: none; padding: 0; }
-              a { color: var(--primary-color); }
-              a:hover { text-decoration: underline; }
-              /* Sidebar styles */
+              *, *::before, *::after { box-sizing: border-box; }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; margin: 0; color: var(--text); background: var(--bg); }
+
+              /* Header - fixed top */
+              .docs-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 1.5rem; z-index: 100; }
+              .docs-header .logo { font-weight: 600; font-size: 1.1rem; color: var(--text); text-decoration: none; margin-right: 2rem; }
+              .docs-header nav { display: flex; gap: 1.5rem; }
+              .docs-header nav a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
+              .docs-header nav a:hover { color: var(--primary); }
+
+              /* Layout container */
+              .docs-container { display: flex; padding-top: var(--header-h); min-height: 100vh; }
+
+              /* Sidebar - fixed */
+              .docs-sidebar { position: fixed; top: var(--header-h); left: 0; width: var(--sidebar-w); height: calc(100vh - var(--header-h)); background: var(--bg-subtle); border-right: 1px solid var(--border); padding: 1.5rem 1rem; overflow-y: auto; }
               .sidebar-section { margin-bottom: 1.5rem; }
-              .sidebar-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; letter-spacing: 0.05em; }
+              .sidebar-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; letter-spacing: 0.05em; padding-left: 0.5rem; }
               .sidebar-links { list-style: none; padding: 0; margin: 0; }
-              .sidebar-links li { margin-bottom: 0.25rem; }
-              .sidebar-links a { display: block; padding: 0.3rem 0.5rem; color: var(--text-color); text-decoration: none; border-radius: 4px; font-size: 0.9rem; }
-              .sidebar-links a:hover { background: var(--border-color); color: var(--primary-color); }
-              .sidebar-links a.active { background: var(--primary-color); color: white; }
-              /* Table of contents */
-              .toc { background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
-              .toc-title { font-weight: 600; margin-bottom: 0.5rem; }
-              .toc ul { margin: 0; padding-left: 1.5rem; }
-              .toc li { margin-bottom: 0.25rem; }
+              .sidebar-links li { margin-bottom: 2px; }
+              .sidebar-links a { display: block; padding: 0.35rem 0.5rem; color: var(--text-muted); text-decoration: none; border-radius: 4px; font-size: 0.875rem; }
+              .sidebar-links a:hover { background: var(--border); color: var(--text); }
+              .sidebar-links a.active { background: var(--primary); color: white; }
+
+              /* Main content */
+              .docs-main { flex: 1; margin-left: var(--sidebar-w); padding: 2rem 3rem; max-width: 800px; }
+              .docs-main h1 { font-size: 1.75rem; margin: 0 0 1.5rem 0; font-weight: 600; }
+              .docs-main h2 { font-size: 1.35rem; margin: 2rem 0 1rem 0; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+              .docs-main h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem 0; }
+
+              /* Typography */
+              code { background: var(--bg-subtle); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85em; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+              pre { background: var(--bg-subtle); padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
+              pre code { background: none; padding: 0; }
+              a { color: var(--primary); text-decoration: none; }
+              a:hover { text-decoration: underline; }
+
               /* Info boxes */
-              .info-box { padding: 1rem; border-radius: 6px; margin: 1rem 0; border-left: 4px solid; }
-              .info-box.note { background: #e7f5ff; border-color: #1c7ed6; }
-              .info-box.warning { background: #fff3bf; border-color: #f59f00; }
-              .info-box.tip { background: #d3f9d8; border-color: #37b24d; }
+              .info-box { padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0; border-left: 3px solid; font-size: 0.9rem; }
+              .info-box.note { background: #ddf4ff; border-color: #54aeff; }
+              .info-box.warning { background: #fff8c5; border-color: #d4a72c; }
+              .info-box.tip { background: #dafbe1; border-color: #4ac26b; }
+
               /* Section list */
               ul.section-list { list-style: none; padding: 0; }
-              ul.section-list li { margin-bottom: 0.75rem; padding: 0.75rem; background: var(--bg-sidebar); border-radius: 6px; border: 1px solid var(--border-color); }
+              ul.section-list li { margin-bottom: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-subtle); border-radius: 6px; border: 1px solid var(--border); }
               ul.section-list li a { font-weight: 500; }
+
+              /* Footer */
+              .docs-footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; }
+
               /* Responsive */
               @media (max-width: 768px) {
                 .docs-sidebar { display: none; }
-                .docs-main { margin-left: 0; padding: 1rem; }
+                .docs-main { margin-left: 0; padding: 1.5rem 1rem; }
               }
             </style>
           CSS
         end
 
         # Docs-specific page template
+        # Override footer for docs
+        protected def footer_template : String
+          <<-HTML
+              <div class="docs-footer">
+                <p>Powered by Hwaro</p>
+              </div>
+            </main>
+          </div>
+          <%= highlight_js %>
+          <%= auto_includes_js %>
+          </body>
+          </html>
+          HTML
+        end
+
         private def docs_page_template : String
           <<-HTML
           <%= render "header" %>
-          <div class="docs-layout">
+          <header class="docs-header">
+            <a href="<%= base_url %>/" class="logo"><%= site_title %></a>
+            <nav>
+              <a href="<%= base_url %>/getting-started/">Getting Started</a>
+              <a href="<%= base_url %>/guide/">Guide</a>
+              <a href="<%= base_url %>/reference/">Reference</a>
+            </nav>
+          </header>
+          <div class="docs-container">
             <aside class="docs-sidebar">
               <div class="sidebar-section">
                 <div class="sidebar-title">Getting Started</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/getting-started/">Overview</a></li>
-                  <li><a href="<%= base_url %>/getting-started/installation.html">Installation</a></li>
-                  <li><a href="<%= base_url %>/getting-started/quick-start.html">Quick Start</a></li>
-                  <li><a href="<%= base_url %>/getting-started/configuration.html">Configuration</a></li>
+                  <li><a href="<%= base_url %>/getting-started/installation/">Installation</a></li>
+                  <li><a href="<%= base_url %>/getting-started/quick-start/">Quick Start</a></li>
+                  <li><a href="<%= base_url %>/getting-started/configuration/">Configuration</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Guide</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/guide/">Overview</a></li>
-                  <li><a href="<%= base_url %>/guide/content-management.html">Content Management</a></li>
-                  <li><a href="<%= base_url %>/guide/templates.html">Templates</a></li>
-                  <li><a href="<%= base_url %>/guide/shortcodes.html">Shortcodes</a></li>
+                  <li><a href="<%= base_url %>/guide/content-management/">Content Management</a></li>
+                  <li><a href="<%= base_url %>/guide/templates/">Templates</a></li>
+                  <li><a href="<%= base_url %>/guide/shortcodes/">Shortcodes</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Reference</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/reference/">Overview</a></li>
-                  <li><a href="<%= base_url %>/reference/cli.html">CLI Commands</a></li>
-                  <li><a href="<%= base_url %>/reference/config.html">Configuration</a></li>
+                  <li><a href="<%= base_url %>/reference/cli/">CLI Commands</a></li>
+                  <li><a href="<%= base_url %>/reference/config/">Configuration</a></li>
                 </ul>
               </div>
             </aside>
             <main class="docs-main">
               <h1><%= page_title %></h1>
               <%= content %>
-            </main>
-          </div>
           <%= render "footer" %>
           HTML
         end
@@ -205,32 +244,40 @@ module Hwaro
         private def docs_section_template : String
           <<-HTML
           <%= render "header" %>
-          <div class="docs-layout">
+          <header class="docs-header">
+            <a href="<%= base_url %>/" class="logo"><%= site_title %></a>
+            <nav>
+              <a href="<%= base_url %>/getting-started/">Getting Started</a>
+              <a href="<%= base_url %>/guide/">Guide</a>
+              <a href="<%= base_url %>/reference/">Reference</a>
+            </nav>
+          </header>
+          <div class="docs-container">
             <aside class="docs-sidebar">
               <div class="sidebar-section">
                 <div class="sidebar-title">Getting Started</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/getting-started/">Overview</a></li>
-                  <li><a href="<%= base_url %>/getting-started/installation.html">Installation</a></li>
-                  <li><a href="<%= base_url %>/getting-started/quick-start.html">Quick Start</a></li>
-                  <li><a href="<%= base_url %>/getting-started/configuration.html">Configuration</a></li>
+                  <li><a href="<%= base_url %>/getting-started/installation/">Installation</a></li>
+                  <li><a href="<%= base_url %>/getting-started/quick-start/">Quick Start</a></li>
+                  <li><a href="<%= base_url %>/getting-started/configuration/">Configuration</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Guide</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/guide/">Overview</a></li>
-                  <li><a href="<%= base_url %>/guide/content-management.html">Content Management</a></li>
-                  <li><a href="<%= base_url %>/guide/templates.html">Templates</a></li>
-                  <li><a href="<%= base_url %>/guide/shortcodes.html">Shortcodes</a></li>
+                  <li><a href="<%= base_url %>/guide/content-management/">Content Management</a></li>
+                  <li><a href="<%= base_url %>/guide/templates/">Templates</a></li>
+                  <li><a href="<%= base_url %>/guide/shortcodes/">Shortcodes</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Reference</div>
                 <ul class="sidebar-links">
                   <li><a href="<%= base_url %>/reference/">Overview</a></li>
-                  <li><a href="<%= base_url %>/reference/cli.html">CLI Commands</a></li>
-                  <li><a href="<%= base_url %>/reference/config.html">Configuration</a></li>
+                  <li><a href="<%= base_url %>/reference/cli/">CLI Commands</a></li>
+                  <li><a href="<%= base_url %>/reference/config/">Configuration</a></li>
                 </ul>
               </div>
             </aside>
@@ -242,8 +289,6 @@ module Hwaro
               <ul class="section-list">
                 <%= section_list %>
               </ul>
-            </main>
-          </div>
           <%= render "footer" %>
           HTML
         end
