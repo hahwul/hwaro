@@ -1,0 +1,109 @@
+# =============================================================================
+# Site Configuration
+# =============================================================================
+
+title = "Hwaro"
+description = "Fast and lightweight static site generator built with Crystal"
+base_url = "http://localhost:3000"
+
+# =============================================================================
+# Plugins
+# =============================================================================
+# Configure content processors and extensions
+
+[plugins]
+processors = ["markdown"]
+
+# =============================================================================
+# Syntax Highlighting
+# =============================================================================
+# Code block syntax highlighting using Highlight.js
+
+[highlight]
+enabled = true
+theme = "github-dark"
+use_cdn = true
+
+# =============================================================================
+# OpenGraph & Twitter Cards
+# =============================================================================
+# Default meta tags for social sharing
+# Page-level settings (front matter) override these defaults
+
+[og]
+default_image = "/images/og-default.png"
+type = "article"
+twitter_card = "summary_large_image"
+# twitter_site = "@haborobot"
+# twitter_creator = "@hahwul"
+
+# =============================================================================
+# Search Configuration
+# =============================================================================
+# Generates a search index for client-side search (e.g., Fuse.js)
+
+[search]
+enabled = true
+format = "fuse_json"
+fields = ["title", "content", "description"]
+filename = "search.json"
+
+# =============================================================================
+# Taxonomies
+# =============================================================================
+# Define content classification systems (tags, categories, etc.)
+
+[[taxonomies]]
+name = "tags"
+feed = false
+sitemap = true
+
+# =============================================================================
+# SEO: Sitemap
+# =============================================================================
+# Generates sitemap.xml for search engine crawlers
+
+[sitemap]
+enabled = true
+filename = "sitemap.xml"
+changefreq = "weekly"
+priority = 0.5
+
+# =============================================================================
+# SEO: Robots.txt
+# =============================================================================
+# Controls search engine crawler access
+
+[robots]
+enabled = true
+filename = "robots.txt"
+rules = [
+  { user_agent = "*", allow = ["/"] },
+  { user_agent = "GPTBot", disallow = ["/"] }
+]
+
+# =============================================================================
+# SEO: LLMs.txt
+# =============================================================================
+# Instructions for AI/LLM crawlers
+
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license."
+
+# =============================================================================
+# RSS/Atom Feeds
+# =============================================================================
+# Generates RSS or Atom feed for content syndication
+
+[feeds]
+enabled = false
+
+# =============================================================================
+# Markdown Configuration
+# =============================================================================
+# Configure markdown parser behavior
+
+[markdown]
+safe = false
