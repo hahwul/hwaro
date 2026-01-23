@@ -10,6 +10,7 @@
 #   - Code blocks will be rendered with language-* classes
 
 require "markd"
+require "./table_parser"
 
 module Hwaro
   module Content
@@ -68,8 +69,11 @@ module Hwaro
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
         def render(content : String, highlight : Bool = true, safe : Bool = false) : String
+          # Pre-process tables before passing to markd (markd doesn't support GFM tables)
+          processed_content = TableParser.process(content)
+
           options = Markd::Options.new(safe: safe)
-          document = Markd::Parser.parse(content, options)
+          document = Markd::Parser.parse(processed_content, options)
           renderer = HighlightingRenderer.new(options, highlight)
           renderer.render(document)
         end

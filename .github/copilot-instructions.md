@@ -495,6 +495,55 @@ Implementation:
 - `src/content/processors/syntax_highlighter.cr` - Passes options to `Markd::Options`
 - `src/core/build/builder.cr` - `render_page()` uses config's markdown.safe option
 
+#### GFM Table Support
+
+Hwaro includes built-in support for GitHub Flavored Markdown (GFM) tables, since the underlying markd library doesn't support tables natively.
+
+**Table syntax:**
+```markdown
+| Header 1 | Header 2 | Header 3 |
+|----------|:--------:|---------:|
+| Left     | Center   | Right    |
+| Cell     | Cell     | Cell     |
+```
+
+**Alignment options:**
+- `---` or `:---` = left align (default)
+- `:---:` = center align
+- `---:` = right align
+
+**Features:**
+- Pipe-delimited columns
+- Optional leading/trailing pipes
+- Column alignment via colons in separator row
+- Escaped pipes (`\|`) within cells
+- HTML character escaping in cell content
+- Empty cells and rows with fewer columns than headers
+
+**Generated HTML example:**
+```html
+<table>
+<thead>
+<tr>
+<th>Header 1</th>
+<th style="text-align: center;">Header 2</th>
+<th style="text-align: right;">Header 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Left</td>
+<td style="text-align: center;">Center</td>
+<td style="text-align: right;">Right</td>
+</tr>
+</tbody>
+</table>
+```
+
+Implementation:
+- `src/content/processors/table_parser.cr` - Table parsing and HTML conversion module
+- `src/content/processors/syntax_highlighter.cr` - Integrates table processing before markd rendering
+
 ### Extensibility Considerations
 
 The project is designed with extensibility in mind:

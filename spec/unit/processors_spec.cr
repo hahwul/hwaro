@@ -1,5 +1,164 @@
 require "../spec_helper"
 
+describe Hwaro::Content::Processors::TableParser do
+  describe "has_table?" do
+    it "returns true when content contains pipe character" do
+      content = "| Header 1 | Header 2 |"
+      Hwaro::Content::Processors::TableParser.has_table?(content).should be_true
+    end
+
+    it "returns false when content has no pipe character" do
+      content = "Just some regular text"
+      Hwaro::Content::Processors::TableParser.has_table?(content).should be_false
+    end
+  end
+
+  describe "process" do
+    it "converts a basic table to HTML" do
+      content = <<-MARKDOWN
+      | Header 1 | Header 2 |
+      |----------|----------|
+      | Cell 1   | Cell 2   |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<table>")
+      result.should contain("<thead>")
+      result.should contain("<tbody>")
+      result.should contain("<th>Header 1</th>")
+      result.should contain("<th>Header 2</th>")
+      result.should contain("<td>Cell 1</td>")
+      result.should contain("<td>Cell 2</td>")
+      result.should contain("</table>")
+    end
+
+    it "handles left alignment" do
+      content = <<-MARKDOWN
+      | Left |
+      |:-----|
+      | Text |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<th>Left</th>")
+      result.should_not contain("text-align")
+    end
+
+    it "handles center alignment" do
+      content = <<-MARKDOWN
+      | Center |
+      |:------:|
+      | Text   |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("text-align: center;")
+    end
+
+    it "handles right alignment" do
+      content = <<-MARKDOWN
+      | Right |
+      |------:|
+      | Text  |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("text-align: right;")
+    end
+
+    it "handles mixed alignments" do
+      content = <<-MARKDOWN
+      | Left | Center | Right |
+      |:-----|:------:|------:|
+      | A    | B      | C     |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<th>Left</th>")
+      result.should contain("text-align: center;")
+      result.should contain("text-align: right;")
+    end
+
+    it "handles multiple rows" do
+      content = <<-MARKDOWN
+      | Name  | Age |
+      |-------|-----|
+      | Alice | 30  |
+      | Bob   | 25  |
+      | Carol | 35  |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td>Alice</td>")
+      result.should contain("<td>Bob</td>")
+      result.should contain("<td>Carol</td>")
+    end
+
+    it "handles table without leading/trailing pipes" do
+      content = <<-MARKDOWN
+      Header 1 | Header 2
+      ---------|----------
+      Cell 1   | Cell 2
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<table>")
+      result.should contain("<th>Header 1</th>")
+      result.should contain("<td>Cell 1</td>")
+    end
+
+    it "preserves non-table content" do
+      content = <<-MARKDOWN
+      # Title
+
+      Some paragraph text.
+
+      | Header |
+      |--------|
+      | Cell   |
+
+      More text after table.
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("# Title")
+      result.should contain("Some paragraph text.")
+      result.should contain("<table>")
+      result.should contain("More text after table.")
+    end
+
+    it "handles empty table body" do
+      content = <<-MARKDOWN
+      | Header 1 | Header 2 |
+      |----------|----------|
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<table>")
+      result.should contain("<thead>")
+      result.should_not contain("<tbody>")
+    end
+
+    it "escapes HTML characters in cells" do
+      content = <<-MARKDOWN
+      | Code |
+      |------|
+      | <div> |
+      MARKDOWN
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("&lt;div&gt;")
+      result.should_not contain("<div>")
+    end
+
+    it "returns content unchanged when no tables present" do
+      content = "Just some text without tables"
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should eq(content)
+    end
+  end
+end
+
 describe Hwaro::Content::Processors::SyntaxHighlighter do
   describe "render" do
     it "renders code blocks with language class and hljs class when highlight is enabled" do
@@ -66,6 +225,42 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
     it "returns false for content without code blocks" do
       content = "Just some regular text"
       Hwaro::Content::Processors::SyntaxHighlighter.has_code_blocks?(content).should be_false
+    end
+  end
+
+  describe "table rendering integration" do
+    it "renders markdown tables as HTML tables" do
+      content = <<-MARKDOWN
+      # Title
+
+      | Name | Age |
+      |------|-----|
+      | Alice | 30 |
+
+      Some text after.
+      MARKDOWN
+
+      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content)
+      html.should contain("<table>")
+      html.should contain("<th>Name</th>")
+      html.should contain("<th>Age</th>")
+      html.should contain("<td>Alice</td>")
+      html.should contain("<td>30</td>")
+      html.should contain("</table>")
+      html.should contain("<h1")
+      html.should contain("Title")
+    end
+
+    it "renders tables with alignment styles" do
+      content = <<-MARKDOWN
+      | Left | Center | Right |
+      |:-----|:------:|------:|
+      | A    | B      | C     |
+      MARKDOWN
+
+      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content)
+      html.should contain("text-align: center;")
+      html.should contain("text-align: right;")
     end
   end
 

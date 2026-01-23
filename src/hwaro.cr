@@ -48,6 +48,7 @@ require "./content/processors/markdown"
 require "./content/processors/html"
 require "./content/processors/json"
 require "./content/processors/xml"
+require "./content/processors/table_parser"
 require "./content/processors/syntax_highlighter"
 require "./content/processors/template"
 
