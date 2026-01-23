@@ -1,0 +1,54 @@
+name: "Hwaro Deploy to Pages"
+description: "Build and deploy a Hwaro static site to GitHub Pages"
+author: "HAHWUL"
+
+branding:
+  icon: "zap"
+  color: "orange"
+
+inputs:
+  pages_branch:
+    description: "The git branch to deploy to"
+    required: false
+    default: "gh-pages"
+  build_dir:
+    description: "Directory where the Hwaro site source is located"
+    required: false
+    default: "."
+  output_dir:
+    description: "Output directory for the built site"
+    required: false
+    default: "public"
+  build_flags:
+    description: "Additional flags to pass to hwaro build command"
+    required: false
+    default: ""
+  build_only:
+    description: "Set to true to only build without deploying"
+    required: false
+    default: "false"
+  repository:
+    description: "Target repository to deploy to (default: current repository)"
+    required: false
+    default: ""
+  github_hostname:
+    description: "GitHub hostname (for GitHub Enterprise)"
+    required: false
+    default: "github.com"
+  token:
+    description: "GitHub token for deployment (defaults to GITHUB_TOKEN)"
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: "docker"
+  image: "gha/Dockerfile"
+  env:
+    PAGES_BRANCH: ${{ inputs.pages_branch }}
+    BUILD_DIR: ${{ inputs.build_dir }}
+    OUT_DIR: ${{ inputs.output_dir }}
+    BUILD_FLAGS: ${{ inputs.build_flags }}
+    BUILD_ONLY: ${{ inputs.build_only }}
+    REPOSITORY: ${{ inputs.repository }}
+    GITHUB_HOSTNAME: ${{ inputs.github_hostname }}
+    INPUT_TOKEN: ${{ inputs.token }}
