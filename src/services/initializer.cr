@@ -6,6 +6,7 @@
 require "../config/options/init_options"
 require "../utils/logger"
 require "../services/scaffolds/registry"
+require "./defaults/agents_md"
 
 module Hwaro
   module Services
@@ -74,7 +75,7 @@ module Hwaro
 
         # Create AGENTS.md unless skipped
         unless skip_agents_md
-          create_file(File.join(target_path, "AGENTS.md"), "")
+          create_file(File.join(target_path, "AGENTS.md"), Defaults::AgentsMd.content)
         end
 
         Logger.success "Done! Run `hwaro build` to generate the site."
