@@ -783,11 +783,32 @@ module Hwaro
           twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
           og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
 
-          result = resolved
+          # Process ternary conditionals for page_url comparisons
+          # e.g., <%= page_url == "/reference/" ? " class=\"active\"" : "" %>
+          # Handle both escaped quotes (\") and regular quotes
+          result = resolved.gsub(/<%=\s*page_url\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
+            compare_url = $1
+            true_value = $2.gsub("\\\"", "\"")
+            false_value = $3.gsub("\\\"", "\"")
+            page.url == compare_url ? true_value : false_value
+          end
+
+          # Process ternary conditionals for page_section comparisons
+          # e.g., <%= page_section == "guide" ? " class=\"active\"" : "" %>
+          # Handle both escaped quotes (\") and regular quotes
+          result = result.gsub(/<%=\s*page_section\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
+            compare_section = $1
+            true_value = $2.gsub("\\\"", "\"")
+            false_value = $3.gsub("\\\"", "\"")
+            page.section == compare_section ? true_value : false_value
+          end
+
+          result = result
             .gsub(/<%=\s*page_title\s*%>/, page.title)
             .gsub(/<%=\s*page_description\s*%>/, page_description)
             .gsub(/<%=\s*page_image\s*%>/, page_image || "")
             .gsub(/<%=\s*page_date\s*%>/, page_date)
+            .gsub(/<%=\s*page_url\s*%>/, page.url)
             .gsub(/<%=\s*page_section\s*%>/, page.section)
             .gsub(/<%=\s*section_list\s*%>/, section_list)
             .gsub(/<%=\s*toc\s*%>/, toc)
