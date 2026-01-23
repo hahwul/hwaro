@@ -2,6 +2,14 @@
 #
 # Scaffolds provide pre-configured content and templates for different
 # project types (simple, blog, docs, etc.)
+#
+# Templates use Jinja2 syntax (powered by Crinja):
+# - {{ variable }} - print variable
+# - {% if condition %}...{% endif %} - conditionals
+# - {% for item in items %}...{% endfor %} - loops
+# - {% include "partial.html" %} - includes
+# - {% extends "base.html" %} - inheritance
+# - {{ value | filter }} - filters
 
 require "../../config/options/init_options"
 
@@ -25,23 +33,23 @@ module Hwaro
         # Returns shortcode files as a hash of path => content
         def shortcode_files : Hash(String, String)
           {
-            "shortcodes/alert.ecr" => alert_shortcode,
+            "shortcodes/alert.html" => alert_shortcode,
           }
         end
 
         # Returns the config.toml content
         abstract def config_content(skip_taxonomies : Bool = false) : String
 
-        # Common shortcode: alert
+        # Common shortcode: alert (Jinja2 syntax)
         protected def alert_shortcode : String
           <<-HTML
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-            <strong><%= type.upcase %>:</strong> <%= message %>
+            <strong>{{ type | upper }}:</strong> {{ message }}
           </div>
           HTML
         end
 
-        # Common template: header
+        # Common template: header (Jinja2 syntax)
         protected def header_template : String
           <<-HTML
           <!DOCTYPE html>
@@ -49,99 +57,99 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="<%= page_description %>">
-            <title><%= page_title %> - <%= site_title %></title>
-            <%= og_all_tags %>
+            <meta name="description" content="{{ page_description }}">
+            <title>{{ page_title }} - {{ site_title }}</title>
+            {{ og_all_tags }}
             #{styles}
-            <%= highlight_css %>
-            <%= auto_includes_css %>
+            {{ highlight_css }}
+            {{ auto_includes_css }}
           </head>
-          <body data-section="<%= page_section %>">
+          <body data-section="{{ page_section }}">
             <div class="site-wrapper">
               <header class="site-header">
-                <a href="<%= base_url %>/" class="site-logo"><%= site_title %></a>
+                <a href="{{ base_url }}/" class="site-logo">{{ site_title }}</a>
                 #{navigation}
               </header>
 
           HTML
         end
 
-        # Common template: footer
+        # Common template: footer (Jinja2 syntax)
         protected def footer_template : String
           <<-HTML
               <footer class="site-footer">
                 <p>Powered by Hwaro</p>
               </footer>
             </div>
-            <%= highlight_js %>
-            <%= auto_includes_js %>
+            {{ highlight_js }}
+            {{ auto_includes_js }}
           </body>
           </html>
           HTML
         end
 
-        # Common template: page
+        # Common template: page (Jinja2 syntax)
         protected def page_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
-              <%= content %>
+              {{ content }}
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 
-        # Common template: section
+        # Common template: section (Jinja2 syntax)
         protected def section_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
-              <h1><%= page_title %></h1>
-              <%= content %>
+              <h1>{{ page_title }}</h1>
+              {{ content }}
               <ul class="section-list">
-                <%= section_list %>
+                {{ section_list }}
               </ul>
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 
-        # Common template: 404
+        # Common template: 404 (Jinja2 syntax)
         protected def not_found_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
               <h1>404 Not Found</h1>
               <p>The page you are looking for does not exist.</p>
-              <p><a href="<%= base_url %>/">Return to Home</a></p>
+              <p><a href="{{ base_url }}/">Return to Home</a></p>
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 
-        # Common template: taxonomy
+        # Common template: taxonomy (Jinja2 syntax)
         protected def taxonomy_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
-              <h1><%= page_title %></h1>
+              <h1>{{ page_title }}</h1>
               <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
-              <%= content %>
+              {{ content }}
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 
-        # Common template: taxonomy_term
+        # Common template: taxonomy_term (Jinja2 syntax)
         protected def taxonomy_term_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
-              <h1><%= page_title %></h1>
+              <h1>{{ page_title }}</h1>
               <p class="taxonomy-desc">Posts tagged with this term:</p>
-              <%= content %>
+              {{ content }}
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 
@@ -198,12 +206,12 @@ module Hwaro
           CSS
         end
 
-        # Override in subclasses to customize navigation
+        # Override in subclasses to customize navigation (Jinja2 syntax)
         protected def navigation : String
           <<-NAV
                 <nav>
-                  <a href="<%= base_url %>/">Home</a>
-                  <a href="<%= base_url %>/about/">About</a>
+                  <a href="{{ base_url }}/">Home</a>
+                  <a href="{{ base_url }}/about/">About</a>
                 </nav>
           NAV
         end

@@ -42,17 +42,17 @@ module Hwaro
 
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.ecr"  => header_template,
-            "footer.ecr"  => footer_template,
-            "page.ecr"    => page_template,
-            "section.ecr" => section_template,
-            "post.ecr"    => post_template,
-            "404.ecr"     => not_found_template,
+            "header.html"  => header_template,
+            "footer.html"  => footer_template,
+            "page.html"    => page_template,
+            "section.html" => section_template,
+            "post.html"    => post_template,
+            "404.html"     => not_found_template,
           }
 
           unless skip_taxonomies
-            files["taxonomy.ecr"] = taxonomy_template
-            files["taxonomy_term.ecr"] = taxonomy_term_template
+            files["taxonomy.html"] = taxonomy_template
+            files["taxonomy_term.html"] = taxonomy_term_template
           end
 
           files
@@ -84,14 +84,14 @@ module Hwaro
           config
         end
 
-        # Override navigation for blog
+        # Override navigation for blog (Jinja2 syntax)
         protected def navigation : String
           <<-NAV
                 <nav>
-                  <a href="<%= base_url %>/">Home</a>
-                  <a href="<%= base_url %>/posts/">Posts</a>
-                  <a href="<%= base_url %>/archives/">Archives</a>
-                  <a href="<%= base_url %>/about/">About</a>
+                  <a href="{{ base_url }}/">Home</a>
+                  <a href="{{ base_url }}/posts/">Posts</a>
+                  <a href="{{ base_url }}/archives/">Archives</a>
+                  <a href="{{ base_url }}/about/">About</a>
                 </nav>
           NAV
         end
@@ -170,24 +170,24 @@ module Hwaro
           CSS
         end
 
-        # Blog-specific post template
+        # Blog-specific post template (Jinja2 syntax)
         private def post_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
             <main class="site-main">
               <article class="post">
                 <header class="post-header">
-                  <h1><%= page_title %></h1>
+                  <h1>{{ page_title }}</h1>
                   <div class="post-meta">
-                    <time><%= page_date %></time>
+                    <time>{{ page_date }}</time>
                   </div>
                 </header>
                 <div class="post-content">
-                  <%= content %>
+                  {{ content }}
                 </div>
               </article>
             </main>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 

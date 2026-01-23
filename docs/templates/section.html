@@ -1,10 +1,15 @@
-<%= render "header" %>
-<%= render "nav" %>
+{% include "header.html" %}
+{% include "nav.html" %}
 <div class="docs-container">
-  <%= render "sidebar" %>
+  {% include "sidebar.html" %}
   <main class="docs-main">
-    <h1><%= page_title %></h1>
-    <%= content %>
+    <h1>{{ page_title }}</h1>
+    {{ content }}
+
+    <h2 id="in-this-section">In This Section</h2>
+    <ul class="section-list">
+      {{ section_list }}
+    </ul>
     <footer class="docs-footer">
       <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
       <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
@@ -12,7 +17,7 @@
   </main>
   <aside class="docs-toc">
     <div class="toc-title">On this page</div>
-    <%= toc %>
+    {{ toc }}
   </aside>
 </div>
-<%= render "footer" %>
+{% include "footer.html" %}

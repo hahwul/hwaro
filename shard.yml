@@ -17,6 +17,8 @@ dependencies:
     github: icyleaf/markd
   toml:
     github: crystal-community/toml.cr
+  crinja:
+    github: straight-shoota/crinja
 # Development Dependencies
 #development_dependencies:
 #  ameba:

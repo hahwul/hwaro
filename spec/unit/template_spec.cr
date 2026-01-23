@@ -10,9 +10,9 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_url == "/about/" %>
+      {% if page_url == "/about/" %}
       <p>About page</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
@@ -27,16 +27,16 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_url == "/about/" %>
+      {% if page_url == "/about/" %}
       <p>About page</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should_not contain("<p>About page</p>")
     end
 
-    it "processes unless condition (true - should not show)" do
+    it "processes if/else condition (if branch)" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/about/"
       config = Hwaro::Models::Config.new
@@ -44,45 +44,11 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% unless page_url == "/about/" %>
-      <p>Not about page</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Not about page</p>")
-    end
-
-    it "processes unless condition (false - should show)" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.url = "/contact/"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% unless page_url == "/about/" %>
-      <p>Not about page</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Not about page</p>")
-    end
-
-    it "processes if/else condition" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.url = "/about/"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_url == "/about/" %>
+      {% if page_url == "/about/" %}
       <p>About page</p>
-      <% else %>
+      {% else %}
       <p>Other page</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
@@ -98,11 +64,11 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_url == "/about/" %>
+      {% if page_url == "/about/" %}
       <p>About page</p>
-      <% else %>
+      {% else %}
       <p>Other page</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
@@ -118,149 +84,147 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_section != "docs" %>
+      {% if page_section != "docs" %}
       <p>Not docs</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Not docs</p>")
     end
 
-    it "processes starts_with? condition" do
+    it "processes variable interpolation" do
       page = Hwaro::Models::Page.new("test.md")
-      page.url = "/blog/my-post/"
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.section = "blog"
       config = Hwaro::Models::Config.new
+      config.title = "My Site"
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_url.starts_with?("/blog/") %>
-      <p>Blog post</p>
-      <% end %>
+      <h1>{{ page_title }}</h1>
+      <p>Section: {{ page_section }}</p>
+      <p>Site: {{ site_title }}</p>
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Blog post</p>")
+      result.should contain("<h1>Test Page</h1>")
+      result.should contain("<p>Section: blog</p>")
+      result.should contain("<p>Site: My Site</p>")
     end
 
-    it "processes ends_with? condition" do
+    it "processes page object properties" do
       page = Hwaro::Models::Page.new("test.md")
-      page.title = "Welcome!"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_title.ends_with?("!") %>
-      <p>Exciting!</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Exciting!</p>")
-    end
-
-    it "processes includes? condition" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.url = "/products/software/"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_url.includes?("products") %>
-      <p>Product page</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Product page</p>")
-    end
-
-    it "processes empty? condition" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.description = nil
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_description.empty? %>
-      <p>No description</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>No description</p>")
-    end
-
-    it "processes present? condition" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.description = "A great page"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_description.present? %>
-      <p>Has description</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Has description</p>")
-    end
-
-    it "processes negation with !" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.draft = false
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if !page.draft %>
-      <p>Published</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Published</p>")
-    end
-
-    it "processes boolean property page.draft" do
-      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
       page.draft = true
       config = Hwaro::Models::Config.new
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page.draft %>
+      {% if page.draft %}
       <p>Draft</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Draft</p>")
     end
 
-    it "processes boolean property page.toc" do
+    it "processes page object not draft" do
       page = Hwaro::Models::Page.new("test.md")
-      page.toc = true
+      page.title = "Test"
+      page.draft = false
       config = Hwaro::Models::Config.new
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page.toc %>
-      <p>Show TOC</p>
-      <% end %>
+      {% if not page.draft %}
+      <p>Published</p>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Show TOC</p>")
+      result.should contain("<p>Published</p>")
+    end
+
+    it "processes filters" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "hello world"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <h1>{{ page_title | upper }}</h1>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<h1>HELLO WORLD</h1>")
+    end
+
+    it "processes default filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.description = nil
+      config = Hwaro::Models::Config.new
+      # config.description defaults to nil in the constructor
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("empty_var", nil)
+
+      template = <<-TPL
+      <p>{{ empty_var | default("No description") }}</p>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<p>No description</p>")
+    end
+
+    it "processes elif branches" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.section = "docs"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      {% if page_section == "blog" %}
+      <p>Blog</p>
+      {% elif page_section == "docs" %}
+      <p>Documentation</p>
+      {% else %}
+      <p>Other</p>
+      {% endif %}
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should_not contain("<p>Blog</p>")
+      result.should contain("<p>Documentation</p>")
+      result.should_not contain("<p>Other</p>")
+    end
+
+    it "processes for loop" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("items", ["apple", "banana", "cherry"])
+
+      template = <<-TPL
+      <ul>
+      {% for item in items %}
+      <li>{{ item }}</li>
+      {% endfor %}
+      </ul>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<li>apple</li>")
+      result.should contain("<li>banana</li>")
+      result.should contain("<li>cherry</li>")
     end
 
     it "processes nested conditionals" do
@@ -272,315 +236,36 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_section == "blog" %>
-      <div class="blog">
-        <% if !page.draft %>
+      {% if page_section == "blog" %}
+        {% if not page.draft %}
         <p>Published blog post</p>
-        <% end %>
-      </div>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<div class=\"blog\">")
-      result.should contain("<p>Published blog post</p>")
-    end
-
-    it "handles multiple independent conditionals" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "blog"
-      page.toc = true
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" %>
-      <p>Blog section</p>
-      <% end %>
-      <% if page.toc %>
-      <p>Has TOC</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Blog section</p>")
-      result.should contain("<p>Has TOC</p>")
-    end
-
-    it "processes if/elsif condition (first branch)" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "blog"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" %>
-      <p>Blog section</p>
-      <% elsif page_section == "docs" %>
-      <p>Docs section</p>
-      <% else %>
-      <p>Other section</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Blog section</p>")
-      result.should_not contain("<p>Docs section</p>")
-      result.should_not contain("<p>Other section</p>")
-    end
-
-    it "processes if/elsif condition (elsif branch)" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "docs"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" %>
-      <p>Blog section</p>
-      <% elsif page_section == "docs" %>
-      <p>Docs section</p>
-      <% else %>
-      <p>Other section</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Blog section</p>")
-      result.should contain("<p>Docs section</p>")
-      result.should_not contain("<p>Other section</p>")
-    end
-
-    it "processes if/elsif condition (else branch)" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "about"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" %>
-      <p>Blog section</p>
-      <% elsif page_section == "docs" %>
-      <p>Docs section</p>
-      <% else %>
-      <p>Other section</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Blog section</p>")
-      result.should_not contain("<p>Docs section</p>")
-      result.should contain("<p>Other section</p>")
-    end
-
-    it "processes multiple elsif branches" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "tutorials"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" %>
-      <p>Blog</p>
-      <% elsif page_section == "docs" %>
-      <p>Docs</p>
-      <% elsif page_section == "tutorials" %>
-      <p>Tutorials</p>
-      <% elsif page_section == "api" %>
-      <p>API</p>
-      <% else %>
-      <p>Other</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Blog</p>")
-      result.should_not contain("<p>Docs</p>")
-      result.should contain("<p>Tutorials</p>")
-      result.should_not contain("<p>API</p>")
-      result.should_not contain("<p>Other</p>")
-    end
-
-    it "preserves content outside conditionals" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.url = "/about/"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <header>Header</header>
-      <% if page_url == "/about/" %>
-      <p>About</p>
-      <% end %>
-      <footer>Footer</footer>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<header>Header</header>")
-      result.should contain("<p>About</p>")
-      result.should contain("<footer>Footer</footer>")
-    end
-  end
-end
-
-describe Hwaro::Content::Processors::TemplateContext do
-  describe "#get_string" do
-    it "returns page_url" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.url = "/test/"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.get_string("page_url").should eq("/test/")
-    end
-
-    it "returns page_section" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "blog"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.get_string("page_section").should eq("blog")
-    end
-
-    it "returns site_title" do
-      page = Hwaro::Models::Page.new("test.md")
-      config = Hwaro::Models::Config.new
-      config.title = "My Site"
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.get_string("site_title").should eq("My Site")
-    end
-
-    it "returns nil for unknown variable" do
-      page = Hwaro::Models::Page.new("test.md")
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.get_string("unknown").should be_nil
-    end
-  end
-
-  describe "#truthy?" do
-    it "returns true for page.draft when draft is true" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.draft = true
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.truthy?("page.draft").should be_true
-    end
-
-    it "returns false for page.draft when draft is false" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.draft = false
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.truthy?("page.draft").should be_false
-    end
-
-    it "returns true for non-empty string variable" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.title = "Hello"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.truthy?("page_title").should be_true
-    end
-
-    it "returns false for unknown variable" do
-      page = Hwaro::Models::Page.new("test.md")
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-      context.truthy?("unknown_var").should be_false
-    end
-  end
-end
-
-describe "Logical operators" do
-  describe "&& (AND)" do
-    it "evaluates true && true as true" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "blog"
-      page.draft = false
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" && !page.draft %>
-      <p>Published blog post</p>
-      <% end %>
+        {% endif %}
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Published blog post</p>")
     end
 
-    it "evaluates true && false as false" do
+    it "processes logical and condition" do
       page = Hwaro::Models::Page.new("test.md")
       page.section = "blog"
-      page.draft = true
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" && !page.draft %>
-      <p>Published blog post</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Published blog post</p>")
-    end
-
-    it "evaluates false && true as false" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "docs"
       page.draft = false
       config = Hwaro::Models::Config.new
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_section == "blog" && !page.draft %>
+      {% if page_section == "blog" and not page.draft %}
       <p>Published blog post</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Published blog post</p>")
-    end
-  end
-
-  describe "|| (OR)" do
-    it "evaluates true || false as true" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.section = "blog"
-      config = Hwaro::Models::Config.new
-
-      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-      template = <<-TPL
-      <% if page_section == "blog" || page_section == "news" %>
-      <p>Content section</p>
-      <% end %>
-      TPL
-
-      result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should contain("<p>Content section</p>")
+      result.should contain("<p>Published blog post</p>")
     end
 
-    it "evaluates false || true as true" do
+    it "processes logical or condition" do
       page = Hwaro::Models::Page.new("test.md")
       page.section = "news"
       config = Hwaro::Models::Config.new
@@ -588,30 +273,269 @@ describe "Logical operators" do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_section == "blog" || page_section == "news" %>
+      {% if page_section == "blog" or page_section == "news" %}
       <p>Content section</p>
-      <% end %>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Content section</p>")
     end
 
-    it "evaluates false || false as false" do
+    it "processes string startswith filter" do
       page = Hwaro::Models::Page.new("test.md")
-      page.section = "about"
+      page.url = "/blog/my-post/"
       config = Hwaro::Models::Config.new
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <% if page_section == "blog" || page_section == "news" %>
-      <p>Content section</p>
-      <% end %>
+      {% if page_url is startswith("/blog/") %}
+      <p>Blog post</p>
+      {% endif %}
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
-      result.should_not contain("<p>Content section</p>")
+      result.should contain("<p>Blog post</p>")
+    end
+
+    it "processes empty check with equality" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.description = nil
+      config = Hwaro::Models::Config.new
+      # config.description defaults to nil in the constructor
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("empty_var", "")
+
+      template = <<-TPL
+      {% if empty_var == "" %}
+      <p>No description</p>
+      {% endif %}
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<p>No description</p>")
+    end
+
+    it "processes page.toc boolean property" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.toc = true
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      {% if page.toc %}
+      <div class="toc">Table of Contents</div>
+      {% endif %}
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<div class=\"toc\">Table of Contents</div>")
+    end
+
+    it "processes base_url variable" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <a href="{{ base_url }}/about/">About</a>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<a href=\"https://example.com/about/\">About</a>")
+    end
+
+    it "processes site object" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.title = "My Site"
+      config.description = "A great site"
+      config.base_url = "https://example.com"
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <h1>{{ site.title }}</h1>
+      <p>{{ site.description }}</p>
+      <a href="{{ site.base_url }}">Home</a>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<h1>My Site</h1>")
+      result.should contain("<p>A great site</p>")
+      result.should contain("<a href=\"https://example.com\">Home</a>")
+    end
+
+    it "adds custom variables to context" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("custom_var", "custom value")
+      context.add("is_special", true)
+      context.add("count", 42)
+
+      template = <<-TPL
+      <p>{{ custom_var }}</p>
+      {% if is_special %}<p>Special!</p>{% endif %}
+      <p>Count: {{ count }}</p>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<p>custom value</p>")
+      result.should contain("<p>Special!</p>")
+      result.should contain("<p>Count: 42</p>")
+    end
+  end
+
+  describe "TemplateEngine" do
+    it "creates engine with custom filters" do
+      engine = Hwaro::Content::Processors::TemplateEngine.new
+      engine.env.should_not be_nil
+    end
+
+    it "renders template with variables" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Hello World"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      engine = Hwaro::Content::Processors::TemplateEngine.new
+      result = engine.render("<h1>{{ page_title }}</h1>", context)
+
+      result.should eq("<h1>Hello World</h1>")
+    end
+  end
+
+  describe "Custom Filters" do
+    it "processes slugify filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "Hello World! This is a Test")
+
+      template = "{{ text | slugify }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("hello-world-this-is-a-test")
+    end
+
+    it "processes strip_html filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("html", "<p>Hello <strong>World</strong></p>")
+
+      template = "{{ html | strip_html }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("Hello World")
+    end
+
+    it "processes truncate_words filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "one two three four five six seven eight nine ten")
+
+      template = "{{ text | truncate_words(length=5) }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("one two three four five...")
+    end
+
+    it "processes xml_escape filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "<tag attr=\"value\">content</tag>")
+
+      template = "{{ text | xml_escape }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("&lt;tag attr=&quot;value&quot;&gt;content&lt;/tag&gt;")
+    end
+  end
+
+  describe "Custom Tests" do
+    it "processes startswith test" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/blog/post/"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{% if page_url is startswith(\"/blog/\") %}yes{% else %}no{% endif %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("yes")
+    end
+
+    it "processes endswith test" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Hello World!"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{% if page_title is endswith(\"!\") %}yes{% else %}no{% endif %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("yes")
+    end
+
+    it "processes containing test" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/products/software/"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{% if page_url is containing(\"products\") %}yes{% else %}no{% endif %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("yes")
+    end
+
+    it "processes defined test" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.description = "A description"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{% if page_title is defined %}yes{% else %}no{% endif %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("yes")
+    end
+  end
+
+  describe "Custom Functions" do
+    it "processes now function" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ now() }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      # Should contain a date-like string
+      result.should match(/\d{4}-\d{2}-\d{2}/)
+    end
+
+    it "processes url_for function" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ url_for(path=\"/about/\") }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("https://example.com/about/")
     end
   end
 end

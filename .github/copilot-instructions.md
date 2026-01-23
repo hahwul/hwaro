@@ -236,9 +236,9 @@ Implementation details:
 - JS files generate `<script src="">` tags
 
 Template variables:
-- `<%= auto_includes_css %>` - CSS link tags only (place in `<head>`)
-- `<%= auto_includes_js %>` - JS script tags only (place before `</body>`)
-- `<%= auto_includes %>` - Both CSS and JS tags combined
+- `{{ auto_includes_css }}` - CSS link tags only (place in `<head>`)
+- `{{ auto_includes_js }}` - JS script tags only (place before `</body>`)
+- `{{ auto_includes }}` - Both CSS and JS tags combined
 
 Example directory structure:
 ```
@@ -296,11 +296,11 @@ Implementation details:
 - `src/content/hooks/markdown_hooks.cr` - Assigns parsed values to page
 
 Template variables:
-- `<%= og_tags %>` - OpenGraph meta tags only
-- `<%= twitter_tags %>` - Twitter Card meta tags only
-- `<%= og_all_tags %>` - Both OG and Twitter tags combined
-- `<%= page_description %>` - Page description (falls back to site description)
-- `<%= page_image %>` - Page image (falls back to og.default_image)
+- `{{ og_tags }}` - OpenGraph meta tags only
+- `{{ twitter_tags }}` - Twitter Card meta tags only
+- `{{ og_all_tags }}` - Both OG and Twitter tags combined
+- `{{ page_description }}` - Page description (falls back to site description)
+- `{{ page_image }}` - Page image (falls back to og.default_image)
 
 Generated output example:
 ```html
@@ -316,87 +316,148 @@ Generated output example:
 <meta name="twitter:site" content="@yourusername">
 ```
 
-#### 11. Template Conditional Statements
+#### 11. Jinja2 Template Engine (Crinja)
 
-Hwaro templates support ECR-style control flow syntax for conditional rendering.
+Hwaro uses the Crinja library for Jinja2-compatible templating. Templates support the full Jinja2 syntax.
 
-Supported syntax:
-- `<% if condition %>...<% end %>` - Basic conditional
-- `<% if condition %>...<% else %>...<% end %>` - If/else
-- `<% if condition %>...<% elsif condition %>...<% else %>...<% end %>` - If/elsif/else
-- `<% unless condition %>...<% end %>` - Negated conditional
-- `<% unless condition %>...<% else %>...<% end %>` - Unless/else
+**Template File Extensions:**
+- `.html` (recommended)
+- `.j2`, `.jinja2`, `.jinja`
+- `.ecr` (legacy, for backward compatibility)
 
-Supported conditions:
-- Equality: `page_url == "/about/"`, `page_section == "blog"`
-- Inequality: `page_section != "docs"`
-- String methods: `page_url.starts_with?("/blog/")`, `page_title.ends_with?("!")`
-- String methods: `page_url.includes?("products")`, `page_description.empty?`, `page_description.present?`
-- Boolean properties: `page.draft`, `page.toc`, `page.is_index`, `page.render`, `page.generated`, `page.in_sitemap`
-- Negation: `!page.draft`
-- Logical AND: `page_section == "blog" && !page.draft`
-- Logical OR: `page_section == "blog" || page_section == "news"`
+**Basic Syntax:**
+- `{{ variable }}` - Print a variable
+- `{% if condition %}...{% endif %}` - Conditionals
+- `{% for item in items %}...{% endfor %}` - Loops
+- `{% include "partial.html" %}` - Include another template
+- `{% extends "base.html" %}` - Template inheritance
+- `{{ value | filter }}` - Apply a filter
+- `{# comment #}` - Comments (not rendered)
 
-Available variables for conditions:
-- `page_url` - Page URL (e.g., "/about/")
-- `page_section` - Page section (e.g., "blog")
-- `page_title` - Page title
-- `page_description` - Page description
-- `page_date` - Page date
-- `page_image` - Page image
-- `taxonomy_name` - Taxonomy name (for taxonomy pages)
-- `taxonomy_term` - Taxonomy term (for taxonomy pages)
-- `site_title` - Site title
-- `site_description` - Site description
-- `base_url` - Site base URL
+**Available Variables:**
 
-Example usage in templates:
-```html
+Page variables:
+- `{{ page_url }}` - Page URL (e.g., "/about/")
+- `{{ page_section }}` - Page section (e.g., "blog")
+- `{{ page_title }}` - Page title
+- `{{ page_description }}` - Page description
+- `{{ page_date }}` - Page date
+- `{{ page_image }}` - Page image
+
+Page object (with boolean properties):
+- `{{ page.title }}`, `{{ page.url }}`, `{{ page.section }}`
+- `{{ page.draft }}` - Is draft (boolean)
+- `{{ page.toc }}` - Show TOC (boolean)
+- `{{ page.is_index }}`, `{{ page.render }}`, `{{ page.generated }}`, `{{ page.in_sitemap }}`
+
+Site variables:
+- `{{ site_title }}`, `{{ site_description }}`, `{{ base_url }}`
+- `{{ site.title }}`, `{{ site.description }}`, `{{ site.base_url }}`
+
+Content variables:
+- `{{ content }}` - Rendered page content
+- `{{ section_list }}` - HTML list of pages in section
+- `{{ toc }}` - Table of contents HTML
+- `{{ taxonomy_name }}`, `{{ taxonomy_term }}`
+
+SEO/Meta variables:
+- `{{ og_tags }}`, `{{ twitter_tags }}`, `{{ og_all_tags }}`
+- `{{ highlight_css }}`, `{{ highlight_js }}`, `{{ highlight_tags }}`
+- `{{ auto_includes_css }}`, `{{ auto_includes_js }}`, `{{ auto_includes }}`
+
+**Example usage in templates:**
+```jinja
 <nav>
-  <a href="/"<% if page_url == "/" %> class="active"<% end %>>Home</a>
-  <a href="/blog/"<% if page_url.starts_with?("/blog/") %> class="active"<% end %>>Blog</a>
-  <a href="/about/"<% if page_url == "/about/" %> class="active"<% end %>>About</a>
+  <a href="{{ base_url }}/"{% if page_url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="{{ base_url }}/blog/"{% if page_section == "blog" %} class="active"{% endif %}>Blog</a>
+  <a href="{{ base_url }}/about/"{% if page_url == "/about/" %} class="active"{% endif %}>About</a>
 </nav>
 
-<% if page_section == "blog" %>
+{% if page_section == "blog" %}
   <article class="blog-post">
-    <% if page.toc %>
-    <div class="toc"><%= toc %></div>
-    <% end %>
-    <%= content %>
+    {% if page.toc %}
+    <div class="toc">{{ toc }}</div>
+    {% endif %}
+    {{ content }}
   </article>
-<% elsif page_section == "docs" %>
+{% elif page_section == "docs" %}
   <div class="documentation">
-    <%= content %>
+    {{ content }}
   </div>
-<% else %>
+{% else %}
   <main>
-    <%= content %>
+    {{ content }}
   </main>
-<% end %>
+{% endif %}
 
-<% unless page_description.empty? %>
-<meta name="description" content="<%= page_description %>">
-<% end %>
+{% if page_description %}
+<meta name="description" content="{{ page_description }}">
+{% endif %}
 
-<% if !page.draft %>
+{% if not page.draft %}
 <p>Published</p>
-<% end %>
+{% endif %}
 
-<% if page_section == "blog" && !page.draft %>
+{% if page_section == "blog" and not page.draft %}
 <p>Published blog post</p>
-<% end %>
+{% endif %}
 
-<% if page_section == "blog" || page_section == "news" %>
+{% if page_section == "blog" or page_section == "news" %}
 <p>Content section</p>
-<% end %>
+{% endif %}
 ```
 
-Implementation details:
-- `src/content/processors/template.cr` - `Template` class and `TemplateContext` class
-- `src/core/build/builder.cr` - Integrated into `apply_template()` method
-- Supports nested conditionals (inner conditionals are processed first)
-- Processing is done before variable substitution
+**Template Inheritance Example:**
+
+Base template (`templates/base.html`):
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+  {{ highlight_css }}
+</head>
+<body>
+  {% block content %}{% endblock %}
+  {{ highlight_js }}
+</body>
+</html>
+```
+
+Child template (`templates/page.html`):
+```jinja
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+
+{% block content %}
+<main>{{ content }}</main>
+{% endblock %}
+```
+
+**Custom Filters:**
+- `{{ text | slugify }}` - Convert to URL slug
+- `{{ text | truncate_words(50) }}` - Truncate by word count
+- `{{ url | absolute_url }}` - Make URL absolute with base_url
+- `{{ url | relative_url }}` - Prefix with base_url
+- `{{ html | strip_html }}` - Remove HTML tags
+- `{{ text | markdownify }}` - Render markdown
+- `{{ text | xml_escape }}` - XML escape
+- `{{ data | jsonify }}` - JSON encode
+- `{{ date | date("%Y-%m-%d") }}` - Format date
+
+**Custom Tests:**
+- `{% if page_url is startswith("/blog/") %}` - String starts with
+- `{% if page_title is endswith("!") %}` - String ends with
+- `{% if page_url is containing("products") %}` - String contains
+- `{% if page_description is empty %}` - Value is empty
+- `{% if page_title is present %}` - Value is not empty
+
+**Implementation details:**
+- `src/content/processors/template.cr` - `TemplateEngine` class wrapping Crinja
+- `src/core/build/builder.cr` - Template rendering in `apply_template()` method
+- Legacy ECR syntax is still supported for backward compatibility
+- Templates are loaded from `templates/` directory with FileSystemLoader
 
 ### Configuration
 
@@ -493,6 +554,7 @@ The project is designed with extensibility in mind:
 Current external dependencies:
 - `markd` - Markdown parsing
 - `toml` - TOML configuration parsing
+- `crinja` - Jinja2 template engine
 
 Keep dependencies minimal and evaluate alternatives before adding new ones.
 

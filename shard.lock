@@ -1,5 +1,9 @@
 version: 2.0
 shards:
+  crinja:
+    git: https://github.com/straight-shoota/crinja.git
+    version: 0.9.0
+
   markd:
     git: https://github.com/icyleaf/markd.git
     version: 0.5.0

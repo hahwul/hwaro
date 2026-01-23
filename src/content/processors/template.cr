@@ -1,30 +1,18 @@
-# Template processor for conditional statements in Hwaro templates
+# Template processor for Hwaro using Crinja (Jinja2) template engine
 #
-# This processor handles ECR-style control flow syntax:
-# - <% if condition %>...<% end %>
-# - <% if condition %>...<% else %>...<% end %>
-# - <% if condition %>...<% elsif condition %>...<% else %>...<% end %>
-# - <% unless condition %>...<% end %>
-# - <% unless condition %>...<% else %>...<% end %>
+# This processor handles Jinja2-style templates with support for:
+# - Variable interpolation: {{ variable }}
+# - Control structures: {% if %}, {% for %}, {% endif %}, {% endfor %}
+# - Filters: {{ value | filter }}
+# - Template inheritance: {% extends %}, {% block %}
+# - Includes: {% include %}
+# - Macros: {% macro %}
 #
-# Supported conditions:
-# - Equality: page_url == "/about/"
-# - Inequality: page_section != "blog"
-# - String methods: page_url.starts_with?("/blog/"), page_title.ends_with?("!")
-# - String methods: page_url.includes?("blog"), page_url.empty?
-# - Boolean checks: page.draft, page.toc (truthy/falsy)
-# - Negation: !page.draft
-# - Logical AND: page_section == "blog" && !page.draft
-# - Logical OR: page_section == "blog" || page_section == "news"
-#
-# Example usage in templates:
-#   <% if page_section == "blog" %>
-#     <p>This is a blog post</p>
-#   <% elsif page_section == "docs" %>
-#     <p>This is documentation</p>
-#   <% else %>
-#     <p>Other content</p>
-#   <% end %>
+# For full Jinja2 syntax documentation, see:
+# https://jinja.palletsprojects.com/en/3.1.x/templates/
+# https://github.com/straight-shoota/crinja
+
+require "crinja"
 
 module Hwaro
   module Content
@@ -33,310 +21,454 @@ module Hwaro
       class TemplateContext
         getter page : Models::Page
         getter config : Models::Config
-        getter variables : Hash(String, String)
+        getter variables : Hash(String, Crinja::Value)
 
         def initialize(@page : Models::Page, @config : Models::Config)
           @variables = build_variables
         end
 
-        private def build_variables : Hash(String, String)
-          {
-            "page_title"       => @page.title,
-            "page_description" => @page.description || @config.description || "",
-            "page_url"         => @page.url,
-            "page_section"     => @page.section,
-            "page_date"        => @page.date.try(&.to_s("%Y-%m-%d")) || "",
-            "page_image"       => @page.image || @config.og.default_image || "",
-            "taxonomy_name"    => @page.taxonomy_name || "",
-            "taxonomy_term"    => @page.taxonomy_term || "",
-            "site_title"       => @config.title,
-            "site_description" => @config.description || "",
-            "base_url"         => @config.base_url,
+        # Add extra variables to the context
+        def add(name : String, value : Crinja::Value)
+          @variables[name] = value
+        end
+
+        def add(name : String, value : String)
+          @variables[name] = Crinja::Value.new(value)
+        end
+
+        def add(name : String, value : Bool)
+          @variables[name] = Crinja::Value.new(value)
+        end
+
+        def add(name : String, value : Int32 | Int64)
+          @variables[name] = Crinja::Value.new(value)
+        end
+
+        def add(name : String, value : Nil)
+          @variables[name] = Crinja::Value.new(nil)
+        end
+
+        def add(name : String, value : Array(String))
+          @variables[name] = Crinja::Value.new(value.map { |v| Crinja::Value.new(v) })
+        end
+
+        def add(name : String, value : Hash(String, String))
+          hash = {} of Crinja::Value => Crinja::Value
+          value.each do |k, v|
+            hash[Crinja::Value.new(k)] = Crinja::Value.new(v)
+          end
+          @variables[name] = Crinja::Value.new(hash)
+        end
+
+        private def build_variables : Hash(String, Crinja::Value)
+          vars = {} of String => Crinja::Value
+
+          # Page variables
+          vars["page_title"] = Crinja::Value.new(@page.title)
+          vars["page_description"] = Crinja::Value.new(@page.description || @config.description || "")
+          vars["page_url"] = Crinja::Value.new(@page.url)
+          vars["page_section"] = Crinja::Value.new(@page.section)
+          vars["page_date"] = Crinja::Value.new(@page.date.try(&.to_s("%Y-%m-%d")) || "")
+          vars["page_image"] = Crinja::Value.new(@page.image || @config.og.default_image || "")
+          vars["taxonomy_name"] = Crinja::Value.new(@page.taxonomy_name || "")
+          vars["taxonomy_term"] = Crinja::Value.new(@page.taxonomy_term || "")
+
+          # Page object with boolean properties
+          page_obj = {
+            "title"       => Crinja::Value.new(@page.title),
+            "description" => Crinja::Value.new(@page.description || ""),
+            "url"         => Crinja::Value.new(@page.url),
+            "section"     => Crinja::Value.new(@page.section),
+            "date"        => Crinja::Value.new(@page.date.try(&.to_s("%Y-%m-%d")) || ""),
+            "image"       => Crinja::Value.new(@page.image || ""),
+            "draft"       => Crinja::Value.new(@page.draft),
+            "toc"         => Crinja::Value.new(@page.toc),
+            "render"      => Crinja::Value.new(@page.render),
+            "is_index"    => Crinja::Value.new(@page.is_index),
+            "generated"   => Crinja::Value.new(@page.generated),
+            "in_sitemap"  => Crinja::Value.new(@page.in_sitemap),
           }
+          vars["page"] = Crinja::Value.new(page_obj)
+
+          # Site variables
+          vars["site_title"] = Crinja::Value.new(@config.title)
+          vars["site_description"] = Crinja::Value.new(@config.description || "")
+          vars["base_url"] = Crinja::Value.new(@config.base_url)
+
+          # Site object
+          site_obj = {
+            "title"       => Crinja::Value.new(@config.title),
+            "description" => Crinja::Value.new(@config.description || ""),
+            "base_url"    => Crinja::Value.new(@config.base_url),
+          }
+          vars["site"] = Crinja::Value.new(site_obj)
+
+          # Config object (for advanced use)
+          config_obj = {
+            "title"       => Crinja::Value.new(@config.title),
+            "description" => Crinja::Value.new(@config.description || ""),
+            "base_url"    => Crinja::Value.new(@config.base_url),
+          }
+          vars["config"] = Crinja::Value.new(config_obj)
+
+          vars
         end
 
-        # Get a string variable value
-        def get_string(name : String) : String?
-          @variables[name]?
-        end
-
-        # Get a boolean variable value
-        def get_bool(name : String) : Bool
-          case name
-          when "page.draft", "page_draft"
-            @page.draft
-          when "page.toc", "page_toc"
-            @page.toc
-          when "page.render", "page_render"
-            @page.render
-          when "page.is_index", "page_is_index"
-            @page.is_index
-          when "page.generated", "page_generated"
-            @page.generated
-          when "page.in_sitemap", "page_in_sitemap"
-            @page.in_sitemap
-          else
-            false
-          end
-        end
-
-        # Check if a variable exists and has a non-empty value
-        def truthy?(name : String) : Bool
-          # Check boolean properties first
-          if name.starts_with?("page.")
-            prop = name.sub("page.", "")
-            case prop
-            when "draft"      then return @page.draft
-            when "toc"        then return @page.toc
-            when "render"     then return @page.render
-            when "is_index"   then return @page.is_index
-            when "generated"  then return @page.generated
-            when "in_sitemap" then return @page.in_sitemap
-            end
-          end
-
-          # Check string variables
-          if value = @variables[name]?
-            return !value.empty?
-          end
-
-          false
+        # Convert to Crinja variables hash
+        def to_crinja_vars : Hash(String, Crinja::Value)
+          @variables
         end
       end
 
-      # Template processor for conditional logic
-      class Template
-        # Process template with conditional statements
+      # Template Engine wrapper for Crinja
+      class TemplateEngine
+        getter env : Crinja
+
+        def initialize
+          @env = Crinja.new
+          # Disable autoescape completely - Hwaro templates are trusted
+          # and many variables contain pre-rendered HTML (og_tags, highlight_css, etc.)
+          @env.config.autoescape.enabled_extensions = [] of String
+          @env.config.autoescape.default = false
+          register_custom_filters
+          register_custom_tests
+          register_custom_functions
+        end
+
+        # Set the template loader
+        def loader=(loader : Crinja::Loader)
+          @env.loader = loader
+        end
+
+        # Render a template string with the given context
+        def render(template_string : String, context : TemplateContext) : String
+          template = @env.from_string(template_string)
+          template.render(context.to_crinja_vars)
+        end
+
+        # Render a template string with raw hash
+        def render(template_string : String, variables : Hash(String, Crinja::Value)) : String
+          template = @env.from_string(template_string)
+          template.render(variables)
+        end
+
+        # Load and render a template by name
+        def render_template(template_name : String, context : TemplateContext) : String
+          template = @env.get_template(template_name)
+          template.render(context.to_crinja_vars)
+        end
+
+        # Load and render a template by name with raw hash
+        def render_template(template_name : String, variables : Hash(String, Crinja::Value)) : String
+          template = @env.get_template(template_name)
+          template.render(variables)
+        end
+
+        # Register custom filters specific to Hwaro
+        private def register_custom_filters
+          # Date formatting filter
+          @env.filters["date"] = Crinja.filter({ format: "%Y-%m-%d" }) do
+            value = target.raw
+            format = arguments["format"].as_s
+
+            case value
+            when Time
+              value.to_s(format)
+            when String
+              # Try to parse the string as a date
+              begin
+                Time.parse(value, "%Y-%m-%d", Time::Location::UTC).to_s(format)
+              rescue
+                value
+              end
+            else
+              value.to_s
+            end
+          end
+
+          # Truncate words filter
+          @env.filters["truncate_words"] = Crinja.filter({ length: 50, end: "..." }) do
+            text = target.to_s
+            length = arguments["length"].as_number.to_i
+            ending = arguments["end"].as_s
+
+            words = text.split(/\s+/)
+            if words.size > length
+              words[0...length].join(" ") + ending
+            else
+              text
+            end
+          end
+
+          # Slugify filter
+          @env.filters["slugify"] = Crinja.filter do
+            text = target.to_s
+            text.downcase
+              .gsub(/[^\w\s-]/, "")
+              .gsub(/[\s_-]+/, "-")
+              .strip("-")
+          end
+
+          # Absolute URL filter
+          @env.filters["absolute_url"] = Crinja.filter do
+            url = target.to_s
+            base_url = env.resolve("base_url").to_s
+
+            if url.starts_with?("http://") || url.starts_with?("https://")
+              url
+            elsif url.starts_with?("/")
+              base_url.rstrip("/") + url
+            else
+              base_url.rstrip("/") + "/" + url
+            end
+          end
+
+          # Relative URL filter (for base_url prefix)
+          @env.filters["relative_url"] = Crinja.filter do
+            url = target.to_s
+            base_url = env.resolve("base_url").to_s
+
+            if url.starts_with?("/")
+              base_url.rstrip("/") + url
+            else
+              url
+            end
+          end
+
+          # Strip HTML tags filter
+          @env.filters["strip_html"] = Crinja.filter do
+            target.to_s.gsub(/<[^>]*>/, "")
+          end
+
+          # Markdownify filter (simple - for inline markdown)
+          @env.filters["markdownify"] = Crinja.filter do
+            Markd.to_html(target.to_s)
+          end
+
+          # XML escape filter
+          @env.filters["xml_escape"] = Crinja.filter do
+            target.to_s
+              .gsub("&", "&amp;")
+              .gsub("<", "&lt;")
+              .gsub(">", "&gt;")
+              .gsub("\"", "&quot;")
+              .gsub("'", "&apos;")
+          end
+
+          # JSON encode filter
+          @env.filters["jsonify"] = Crinja.filter do
+            target.to_s.to_json
+          end
+
+          # Array where filter (filter array by property value)
+          @env.filters["where"] = Crinja.filter({ attribute: nil, value: nil }) do
+            result = begin
+              arr = target.as_a
+              attr = arguments["attribute"].to_s
+              val = arguments["value"]
+
+              filtered = arr.select do |item|
+                begin
+                  item_hash = item.as_h
+                  item_val = item_hash[Crinja::Value.new(attr)]?
+                  item_val == val
+                rescue
+                  false
+                end
+              end
+              Crinja::Value.new(filtered)
+            rescue
+              Crinja::Value.new([] of Crinja::Value)
+            end
+            result
+          end
+
+          # Array sort_by filter
+          @env.filters["sort_by"] = Crinja.filter({ attribute: nil, reverse: false }) do
+            result = begin
+              arr = target.as_a
+              attr = arguments["attribute"].to_s
+              reverse = arguments["reverse"].truthy?
+
+              sorted = arr.sort_by do |item|
+                begin
+                  item_hash = item.as_h
+                  item_hash[Crinja::Value.new(attr)]?.try(&.to_s) || ""
+                rescue
+                  ""
+                end
+              end
+
+              sorted = sorted.reverse if reverse
+              Crinja::Value.new(sorted)
+            rescue
+              Crinja::Value.new([] of Crinja::Value)
+            end
+            result
+          end
+
+          # Group by filter
+          @env.filters["group_by"] = Crinja.filter({ attribute: nil }) do
+            result = begin
+              arr = target.as_a
+              attr = arguments["attribute"].to_s
+              groups = {} of String => Array(Crinja::Value)
+
+              arr.each do |item|
+                begin
+                  item_hash = item.as_h
+                  key = item_hash[Crinja::Value.new(attr)]?.try(&.to_s) || ""
+                  groups[key] ||= [] of Crinja::Value
+                  groups[key] << item
+                rescue
+                  # Skip non-hash items
+                end
+              end
+
+              group_result = groups.map do |key, items|
+                {
+                  "grouper" => Crinja::Value.new(key),
+                  "list"    => Crinja::Value.new(items),
+                }
+              end
+
+              Crinja::Value.new(group_result.map { |h| Crinja::Value.new(h) })
+            rescue
+              Crinja::Value.new([] of Crinja::Value)
+            end
+            result
+          end
+        end
+
+        # Register custom tests
+        private def register_custom_tests
+          # Test if a string starts with a prefix
+          # Usage: {% if page_url is startswith("/blog/") %}
+          @env.tests["startswith"] = Crinja.test do
+            prefix = arguments.varargs.first?.try(&.to_s) || ""
+            target.to_s.starts_with?(prefix)
+          end
+
+          # Test if a string ends with a suffix
+          # Usage: {% if page_title is endswith("!") %}
+          @env.tests["endswith"] = Crinja.test do
+            suffix = arguments.varargs.first?.try(&.to_s) || ""
+            target.to_s.ends_with?(suffix)
+          end
+
+          # Test if a string contains a substring
+          # Usage: {% if page_url is containing("products") %}
+          @env.tests["containing"] = Crinja.test do
+            substring = arguments.varargs.first?.try(&.to_s) || ""
+            target.to_s.includes?(substring)
+          end
+
+          # Test if value is empty (string, array, hash)
+          @env.tests["empty"] = Crinja.test do
+            value = target.raw
+            case value
+            when String
+              value.empty?
+            when Array
+              value.empty?
+            when Hash
+              value.empty?
+            when Nil
+              true
+            else
+              false
+            end
+          end
+
+          # Test if value is present (not empty and not nil)
+          @env.tests["present"] = Crinja.test do
+            value = target.raw
+            case value
+            when String
+              !value.empty?
+            when Array
+              !value.empty?
+            when Hash
+              !value.empty?
+            when Nil
+              false
+            else
+              true
+            end
+          end
+        end
+
+        # Register custom functions
+        private def register_custom_functions
+          # now() function - returns current time
+          @env.functions["now"] = Crinja.function({ format: nil }) do
+            format = arguments["format"]
+            time = Time.local
+
+            if format.none?
+              Crinja::Value.new(time.to_s("%Y-%m-%d %H:%M:%S"))
+            else
+              Crinja::Value.new(time.to_s(format.to_s))
+            end
+          end
+
+          # url_for() function - generate URL for a path
+          @env.functions["url_for"] = Crinja.function({ path: "" }) do
+            path = arguments["path"].to_s
+            base_url = env.resolve("base_url").to_s
+
+            if path.starts_with?("/")
+              Crinja::Value.new(base_url.rstrip("/") + path)
+            else
+              Crinja::Value.new(base_url.rstrip("/") + "/" + path)
+            end
+          end
+        end
+      end
+
+      # Template processor using Crinja
+      # This module provides a singleton-like interface for template processing
+      module Template
+        @@engine : TemplateEngine?
+
+        # Get or create the template engine
+        def self.engine : TemplateEngine
+          @@engine ||= TemplateEngine.new
+        end
+
+        # Reset the engine (useful for testing or reconfiguration)
+        def self.reset_engine
+          @@engine = nil
+        end
+
+        # Set custom loader for the engine
+        def self.set_loader(loader : Crinja::Loader)
+          engine.loader = loader
+        end
+
+        # Set loader from templates directory path
+        def self.set_loader(templates_path : String)
+          engine.loader = Crinja::Loader::FileSystemLoader.new(templates_path)
+        end
+
+        # Process a template string with context
         def self.process(content : String, context : TemplateContext) : String
-          result = content
-
-          # Process nested conditionals from innermost to outermost
-          # Keep processing until no more conditionals are found
-          loop do
-            new_result = process_conditionals(result, context)
-            break if new_result == result
-            result = new_result
-          end
-
-          result
+          engine.render(content, context)
         end
 
-        # Process if/unless conditionals
-        private def self.process_conditionals(content : String, context : TemplateContext) : String
-          result = content
-
-          # Match if/unless blocks (non-greedy, innermost first)
-          # Pattern explanation:
-          # <%\s*(if|unless)\s+(.+?)\s*%> - opening tag with condition
-          # (.*?) - content (non-greedy)
-          # <%\s*end\s*%> - closing end tag
-          pattern = /<%\s*(if|unless)\s+(.+?)\s*%>(.*?)<%\s*end\s*%>/m
-
-          result = result.gsub(pattern) do |match|
-            keyword = $1
-            condition = $2
-            body = $3
-
-            process_conditional_block(keyword, condition, body, context)
-          end
-
-          result
+        # Process a template string with raw variables hash
+        def self.process(content : String, variables : Hash(String, Crinja::Value)) : String
+          engine.render(content, variables)
         end
 
-        # Process a single conditional block (if or unless)
-        private def self.process_conditional_block(
-          keyword : String,
-          condition : String,
-          body : String,
-          context : TemplateContext
-        ) : String
-          # Parse elsif and else branches
-          branches = parse_branches(body)
-
-          # Evaluate conditions in order
-          if keyword == "if"
-            if evaluate_condition(condition, context)
-              return branches[:if_body]
-            end
-          else # unless
-            unless evaluate_condition(condition, context)
-              return branches[:if_body]
-            end
-          end
-
-          # Check elsif branches
-          branches[:elsif_branches].each do |elsif_branch|
-            if evaluate_condition(elsif_branch[:condition], context)
-              return elsif_branch[:body]
-            end
-          end
-
-          # Return else body if present
-          branches[:else_body] || ""
+        # Render a named template from the loader
+        def self.render_template(template_name : String, context : TemplateContext) : String
+          engine.render_template(template_name, context)
         end
 
-        # Parse if body into branches (if, elsif*, else?)
-        private def self.parse_branches(body : String) : NamedTuple(
-          if_body: String,
-          elsif_branches: Array(NamedTuple(condition: String, body: String)),
-          else_body: String?
-        )
-          elsif_branches = [] of NamedTuple(condition: String, body: String)
-          else_body : String? = nil
-
-          remaining = body
-
-          # First, check for else (must be done before elsif since elsif contains "else")
-          # Pattern: <% else %> followed by content
-          else_pattern = /<%\s*else\s*%>/m
-
-          if else_match = remaining.match(else_pattern)
-            else_pos = else_match.begin || remaining.size
-            before_else = remaining[0...else_pos]
-            after_else = remaining[(else_pos + else_match[0].size)..]
-            else_body = after_else
-            remaining = before_else
-          end
-
-          # Now check for elsif branches in the remaining content
-          # We need to find all elsif tags and split accordingly
-          elsif_pattern = /<%\s*elsif\s+(.+?)\s*%>/m
-
-          # Find all elsif positions
-          elsif_positions = [] of Tuple(Int32, Int32, String) # start, end, condition
-          remaining.scan(elsif_pattern) do |match|
-            if match_begin = match.begin
-              elsif_positions << {match_begin, match_begin + match[0].size, match[1]}
-            end
-          end
-
-          if elsif_positions.empty?
-            # No elsif, the remaining content is the if body
-            return {
-              if_body:         remaining,
-              elsif_branches:  elsif_branches,
-              else_body:       else_body,
-            }
-          end
-
-          # Extract if body (before first elsif)
-          if_body = remaining[0...elsif_positions[0][0]]
-
-          # Extract elsif branches
-          elsif_positions.each_with_index do |pos, i|
-            condition = pos[2]
-            start_pos = pos[1] # after the elsif tag
-
-            # Find the end position (either next elsif or end of remaining)
-            end_pos = if i + 1 < elsif_positions.size
-                        elsif_positions[i + 1][0]
-                      else
-                        remaining.size
-                      end
-
-            branch_body = remaining[start_pos...end_pos]
-            elsif_branches << {condition: condition, body: branch_body}
-          end
-
-          {
-            if_body:         if_body,
-            elsif_branches:  elsif_branches,
-            else_body:       else_body,
-          }
-        end
-
-        # Evaluate a condition expression
-        private def self.evaluate_condition(condition : String, context : TemplateContext) : Bool
-          condition = condition.strip
-
-          # Handle logical AND (&&) - split and evaluate both parts
-          # Use a simple split approach (doesn't handle nested parentheses)
-          if condition.includes?("&&")
-            parts = condition.split(/\s*&&\s*/, 2)
-            if parts.size == 2
-              return evaluate_condition(parts[0], context) && evaluate_condition(parts[1], context)
-            end
-          end
-
-          # Handle logical OR (||) - split and evaluate both parts
-          if condition.includes?("||")
-            parts = condition.split(/\s*\|\|\s*/, 2)
-            if parts.size == 2
-              return evaluate_condition(parts[0], context) || evaluate_condition(parts[1], context)
-            end
-          end
-
-          # Handle negation
-          if condition.starts_with?("!")
-            return !evaluate_condition(condition[1..].strip, context)
-          end
-
-          # Handle equality: variable == "value"
-          if match = condition.match(/^(\w+)\s*==\s*"([^"]*)"$/)
-            var_name = match[1]
-            expected = match[2]
-            actual = context.get_string(var_name)
-            return actual == expected
-          end
-
-          # Handle inequality: variable != "value"
-          if match = condition.match(/^(\w+)\s*!=\s*"([^"]*)"$/)
-            var_name = match[1]
-            expected = match[2]
-            actual = context.get_string(var_name)
-            return actual != expected
-          end
-
-          # Handle starts_with?: variable.starts_with?("value")
-          if match = condition.match(/^(\w+)\.starts_with\?\("([^"]*)"\)$/)
-            var_name = match[1]
-            prefix = match[2]
-            actual = context.get_string(var_name) || ""
-            return actual.starts_with?(prefix)
-          end
-
-          # Handle ends_with?: variable.ends_with?("value")
-          if match = condition.match(/^(\w+)\.ends_with\?\("([^"]*)"\)$/)
-            var_name = match[1]
-            suffix = match[2]
-            actual = context.get_string(var_name) || ""
-            return actual.ends_with?(suffix)
-          end
-
-          # Handle includes?: variable.includes?("value")
-          if match = condition.match(/^(\w+)\.includes\?\("([^"]*)"\)$/)
-            var_name = match[1]
-            substring = match[2]
-            actual = context.get_string(var_name) || ""
-            return actual.includes?(substring)
-          end
-
-          # Handle empty?: variable.empty?
-          if match = condition.match(/^(\w+)\.empty\?$/)
-            var_name = match[1]
-            actual = context.get_string(var_name)
-            return actual.nil? || actual.empty?
-          end
-
-          # Handle present?: variable.present? (non-empty)
-          if match = condition.match(/^(\w+)\.present\?$/)
-            var_name = match[1]
-            actual = context.get_string(var_name)
-            return !actual.nil? && !actual.empty?
-          end
-
-          # Handle boolean property: page.draft, page.toc, etc.
-          if match = condition.match(/^(page\.\w+)$/)
-            return context.truthy?(match[1])
-          end
-
-          # Handle simple variable truthy check
-          if condition =~ /^\w+$/
-            return context.truthy?(condition)
-          end
-
-          # Default to false for unrecognized conditions
-          false
+        # Create a context for the given page and config
+        def self.create_context(page : Models::Page, config : Models::Config) : TemplateContext
+          TemplateContext.new(page, config)
         end
       end
     end

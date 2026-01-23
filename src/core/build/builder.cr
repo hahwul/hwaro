@@ -2,7 +2,7 @@
 #
 # This is the core build logic that orchestrates:
 # - Content collection and parsing
-# - Template loading and rendering
+# - Template loading and rendering (using Crinja/Jinja2 engine)
 # - Parallel processing with caching
 # - Output generation
 #
@@ -12,6 +12,7 @@
 require "file_utils"
 require "toml"
 require "uri"
+require "crinja"
 require "./cache"
 require "./parallel"
 require "../../content/seo/feeds"
@@ -25,6 +26,7 @@ require "../../utils/logger"
 require "../../utils/profiler"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
+require "../../content/processors/template"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
@@ -43,6 +45,7 @@ module Hwaro
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
+        @crinja_env : Crinja?
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -480,10 +483,16 @@ module Hwaro
 
           templates = {} of String => String
           if Dir.exists?("templates")
-            Dir.glob("templates/**/*.ecr") do |path|
-              relative = Path[path].relative_to("templates")
-              name = relative.to_s.gsub(/\.ecr$/, "")
-              templates[name] = File.read(path)
+            # Support multiple template extensions: .html, .j2, .jinja2, .jinja
+            # Also support legacy .ecr files for backward compatibility
+            extensions = ["html", "j2", "jinja2", "jinja", "ecr"]
+            extensions.each do |ext|
+              Dir.glob("templates/**/*.#{ext}") do |path|
+                relative = Path[path].relative_to("templates")
+                name = relative.to_s.gsub(/\.(html|j2|jinja2|jinja|ecr)$/, "")
+                # Don't overwrite if already loaded (priority: html > j2 > jinja2 > jinja > ecr)
+                templates[name] ||= File.read(path)
+              end
             end
           end
 
@@ -493,7 +502,27 @@ module Hwaro
             end
           end
 
+          # Initialize Crinja environment with file system loader
+          @crinja_env = setup_crinja_env
+
           @templates = templates
+        end
+
+        # Setup Crinja environment with custom filters, tests, and functions
+        private def setup_crinja_env : Crinja
+          env = Content::Processors::Template.engine.env
+
+          # Set up file system loader for template inheritance and includes
+          if Dir.exists?("templates")
+            env.loader = Crinja::Loader::FileSystemLoader.new("templates/")
+          end
+
+          env
+        end
+
+        # Get or create Crinja environment
+        private def crinja_env : Crinja
+          @crinja_env ||= setup_crinja_env
         end
 
         private def process_files_parallel(
@@ -768,12 +797,47 @@ module Hwaro
           toc : String,
           templates : Hash(String, String),
         ) : String
+          # Check if template uses legacy ECR syntax
+          if uses_legacy_ecr_syntax?(template)
+            return apply_legacy_template(template, content, page, config, section_list, toc, templates)
+          end
+
+          # Use Crinja for Jinja2-style templates
+          env = crinja_env
+
+          # Build template variables
+          vars = build_template_variables(page, config, content, section_list, toc)
+
+          # Process shortcodes in template first (convert to Jinja2 include syntax)
+          processed_template = process_shortcodes_jinja(template, templates)
+
+          begin
+            crinja_template = env.from_string(processed_template)
+            crinja_template.render(vars)
+          rescue ex : Crinja::TemplateError
+            Logger.warn "  [WARN] Template error for #{page.path}: #{ex.message}"
+            # Fallback to content only
+            content
+          end
+        end
+
+        # Check if template uses legacy ECR syntax (<%= ... %> or <% ... %>)
+        private def uses_legacy_ecr_syntax?(template : String) : Bool
+          template.includes?("<%=") || template.includes?("<%")
+        end
+
+        # Legacy ECR-style template processing for backward compatibility
+        private def apply_legacy_template(
+          template : String,
+          content : String,
+          page : Models::Page,
+          config : Models::Config,
+          section_list : String,
+          toc : String,
+          templates : Hash(String, String),
+        ) : String
           # First resolve includes (render partials)
           resolved = resolve_includes(template, templates)
-
-          # Process conditional statements (if/unless/elsif/else)
-          template_context = Content::Processors::TemplateContext.new(page, config)
-          resolved = Content::Processors::Template.process(resolved, template_context)
 
           # Get page description (fall back to site description)
           page_description = page.description || config.description || ""
@@ -788,8 +852,6 @@ module Hwaro
           og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
 
           # Process ternary conditionals for page_url comparisons
-          # e.g., <%= page_url == "/reference/" ? " class=\"active\"" : "" %>
-          # Handle both escaped quotes (\") and regular quotes
           result = resolved.gsub(/<%=\s*page_url\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
             compare_url = $1
             true_value = $2.gsub("\\\"", "\"")
@@ -798,8 +860,6 @@ module Hwaro
           end
 
           # Process ternary conditionals for page_section comparisons
-          # e.g., <%= page_section == "guide" ? " class=\"active\"" : "" %>
-          # Handle both escaped quotes (\") and regular quotes
           result = result.gsub(/<%=\s*page_section\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
             compare_section = $1
             true_value = $2.gsub("\\\"", "\"")
@@ -835,6 +895,134 @@ module Hwaro
           process_shortcodes(result, templates)
         end
 
+        # Build template variables hash for Crinja
+        private def build_template_variables(
+          page : Models::Page,
+          config : Models::Config,
+          content : String,
+          section_list : String,
+          toc : String,
+        ) : Hash(String, Crinja::Value)
+          vars = {} of String => Crinja::Value
+
+          # Page variables (flat for convenience)
+          vars["page_title"] = Crinja::Value.new(page.title)
+          vars["page_description"] = Crinja::Value.new(page.description || config.description || "")
+          vars["page_url"] = Crinja::Value.new(page.url)
+          vars["page_section"] = Crinja::Value.new(page.section)
+          vars["page_date"] = Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || "")
+          vars["page_image"] = Crinja::Value.new(page.image || config.og.default_image || "")
+          vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
+          vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
+
+          # Page object with all properties
+          page_obj = {
+            "title"       => Crinja::Value.new(page.title),
+            "description" => Crinja::Value.new(page.description || ""),
+            "url"         => Crinja::Value.new(page.url),
+            "section"     => Crinja::Value.new(page.section),
+            "date"        => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
+            "image"       => Crinja::Value.new(page.image || ""),
+            "draft"       => Crinja::Value.new(page.draft),
+            "toc"         => Crinja::Value.new(page.toc),
+            "render"      => Crinja::Value.new(page.render),
+            "is_index"    => Crinja::Value.new(page.is_index),
+            "generated"   => Crinja::Value.new(page.generated),
+            "in_sitemap"  => Crinja::Value.new(page.in_sitemap),
+          }
+          vars["page"] = Crinja::Value.new(page_obj)
+
+          # Site variables (flat for convenience)
+          vars["site_title"] = Crinja::Value.new(config.title)
+          vars["site_description"] = Crinja::Value.new(config.description || "")
+          vars["base_url"] = Crinja::Value.new(config.base_url)
+
+          # Site object
+          site_obj = {
+            "title"       => Crinja::Value.new(config.title),
+            "description" => Crinja::Value.new(config.description || ""),
+            "base_url"    => Crinja::Value.new(config.base_url),
+          }
+          vars["site"] = Crinja::Value.new(site_obj)
+
+          # Content and layout variables
+          vars["content"] = Crinja::Value.new(content)
+          vars["section_list"] = Crinja::Value.new(section_list)
+          vars["toc"] = Crinja::Value.new(toc)
+
+          # Highlight tags
+          vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag)
+          vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag)
+          vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags)
+
+          # Auto includes
+          vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url))
+          vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url))
+          vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url))
+
+          # OG/Twitter tags
+          og_tags = config.og.og_tags(page.title, page.description, page.url, page.image, config.base_url)
+          twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
+          og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
+          vars["og_tags"] = Crinja::Value.new(og_tags)
+          vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
+          vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
+
+          vars
+        end
+
+        # Process shortcodes in Jinja2 templates
+        # Converts shortcode calls to rendered output
+        private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
+          # Pattern: {{ shortcode("name", arg1="value1", arg2="value2") }}
+          # or: {% call shortcode("name", arg1="value1") %}
+          content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
+            name = $1
+            args_str = $2
+
+            template_key = "shortcodes/#{name}"
+            if template = templates[template_key]?
+              args = parse_shortcode_args_jinja(args_str)
+              render_shortcode_jinja(template, args)
+            else
+              Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
+              match
+            end
+          end
+        end
+
+        # Parse shortcode arguments from Jinja2-style syntax
+        private def parse_shortcode_args_jinja(args_str : String?) : Hash(String, String)
+          args = {} of String => String
+          return args unless args_str
+
+          # Match: key="value" or key='value'
+          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/) do |match|
+            key = match[1]
+            value = match[2]? || match[3]? || ""
+            args[key] = value
+          end
+          args
+        end
+
+        # Render a shortcode template with arguments (Jinja2 style)
+        private def render_shortcode_jinja(template : String, args : Hash(String, String)) : String
+          env = crinja_env
+          vars = {} of String => Crinja::Value
+          args.each do |key, value|
+            vars[key] = Crinja::Value.new(value)
+          end
+
+          begin
+            crinja_template = env.from_string(template)
+            crinja_template.render(vars)
+          rescue ex : Crinja::TemplateError
+            Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
+            ""
+          end
+        end
+
+        # Legacy shortcode processing for ECR-style templates
         private def process_shortcodes(content : String, templates : Hash(String, String)) : String
           content.gsub(/<%=\s*shortcode\s+"([^"]+)"(?:\s*,\s*(.*?))?\s*%>/) do |match|
             name = $1
@@ -851,6 +1039,7 @@ module Hwaro
           end
         end
 
+        # Legacy argument parsing for ECR-style shortcodes
         private def parse_args(args_str : String?) : Hash(String, String)
           args = {} of String => String
           return args unless args_str
@@ -863,6 +1052,7 @@ module Hwaro
           args
         end
 
+        # Legacy shortcode rendering for ECR-style templates
         private def render_shortcode(template : String, args : Hash(String, String)) : String
           result = template
           args.each do |key, value|

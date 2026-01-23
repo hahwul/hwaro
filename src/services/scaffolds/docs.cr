@@ -45,16 +45,16 @@ module Hwaro
 
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.ecr"  => header_template,
-            "footer.ecr"  => footer_template,
-            "page.ecr"    => docs_page_template,
-            "section.ecr" => docs_section_template,
-            "404.ecr"     => not_found_template,
+            "header.html"  => header_template,
+            "footer.html"  => footer_template,
+            "page.html"    => docs_page_template,
+            "section.html" => docs_section_template,
+            "404.html"     => not_found_template,
           }
 
           unless skip_taxonomies
-            files["taxonomy.ecr"] = taxonomy_template
-            files["taxonomy_term.ecr"] = taxonomy_term_template
+            files["taxonomy.html"] = taxonomy_template
+            files["taxonomy_term.html"] = taxonomy_term_template
           end
 
           files
@@ -86,7 +86,7 @@ module Hwaro
           config
         end
 
-        # Override header for docs - minimal header integrated with layout
+        # Override header for docs - minimal header integrated with layout (Jinja2 syntax)
         protected def header_template : String
           <<-HTML
           <!DOCTYPE html>
@@ -94,14 +94,14 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="<%= page_description %>">
-            <title><%= page_title %> - <%= site_title %></title>
-            <%= og_all_tags %>
+            <meta name="description" content="{{ page_description }}">
+            <title>{{ page_title }} - {{ site_title }}</title>
+            {{ og_all_tags }}
             #{styles}
-            <%= highlight_css %>
-            <%= auto_includes_css %>
+            {{ highlight_css }}
+            {{ auto_includes_css }}
           </head>
-          <body data-section="<%= page_section %>">
+          <body data-section="{{ page_section }}">
           HTML
         end
 
@@ -179,7 +179,7 @@ module Hwaro
         end
 
         # Docs-specific page template
-        # Override footer for docs
+        # Override footer for docs (Jinja2 syntax)
         protected def footer_template : String
           <<-HTML
               <div class="docs-footer">
@@ -187,22 +187,23 @@ module Hwaro
               </div>
             </main>
           </div>
-          <%= highlight_js %>
-          <%= auto_includes_js %>
+          {{ highlight_js }}
+          {{ auto_includes_js }}
           </body>
           </html>
           HTML
         end
 
+        # Docs-specific page template (Jinja2 syntax)
         private def docs_page_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
           <header class="docs-header">
-            <a href="<%= base_url %>/" class="logo"><%= site_title %></a>
+            <a href="{{ base_url }}/" class="logo">{{ site_title }}</a>
             <nav>
-              <a href="<%= base_url %>/getting-started/">Getting Started</a>
-              <a href="<%= base_url %>/guide/">Guide</a>
-              <a href="<%= base_url %>/reference/">Reference</a>
+              <a href="{{ base_url }}/getting-started/">Getting Started</a>
+              <a href="{{ base_url }}/guide/">Guide</a>
+              <a href="{{ base_url }}/reference/">Reference</a>
             </nav>
           </header>
           <div class="docs-container">
@@ -210,47 +211,47 @@ module Hwaro
               <div class="sidebar-section">
                 <div class="sidebar-title">Getting Started</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/getting-started/">Overview</a></li>
-                  <li><a href="<%= base_url %>/getting-started/installation/">Installation</a></li>
-                  <li><a href="<%= base_url %>/getting-started/quick-start/">Quick Start</a></li>
-                  <li><a href="<%= base_url %>/getting-started/configuration/">Configuration</a></li>
+                  <li><a href="{{ base_url }}/getting-started/">Overview</a></li>
+                  <li><a href="{{ base_url }}/getting-started/installation/">Installation</a></li>
+                  <li><a href="{{ base_url }}/getting-started/quick-start/">Quick Start</a></li>
+                  <li><a href="{{ base_url }}/getting-started/configuration/">Configuration</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Guide</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/guide/">Overview</a></li>
-                  <li><a href="<%= base_url %>/guide/content-management/">Content Management</a></li>
-                  <li><a href="<%= base_url %>/guide/templates/">Templates</a></li>
-                  <li><a href="<%= base_url %>/guide/shortcodes/">Shortcodes</a></li>
+                  <li><a href="{{ base_url }}/guide/">Overview</a></li>
+                  <li><a href="{{ base_url }}/guide/content-management/">Content Management</a></li>
+                  <li><a href="{{ base_url }}/guide/templates/">Templates</a></li>
+                  <li><a href="{{ base_url }}/guide/shortcodes/">Shortcodes</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Reference</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/reference/">Overview</a></li>
-                  <li><a href="<%= base_url %>/reference/cli/">CLI Commands</a></li>
-                  <li><a href="<%= base_url %>/reference/config/">Configuration</a></li>
+                  <li><a href="{{ base_url }}/reference/">Overview</a></li>
+                  <li><a href="{{ base_url }}/reference/cli/">CLI Commands</a></li>
+                  <li><a href="{{ base_url }}/reference/config/">Configuration</a></li>
                 </ul>
               </div>
             </aside>
             <main class="docs-main">
-              <h1><%= page_title %></h1>
-              <%= content %>
-          <%= render "footer" %>
+              <h1>{{ page_title }}</h1>
+              {{ content }}
+          {% include "footer.html" %}
           HTML
         end
 
-        # Docs-specific section template
+        # Docs-specific section template (Jinja2 syntax)
         private def docs_section_template : String
           <<-HTML
-          <%= render "header" %>
+          {% include "header.html" %}
           <header class="docs-header">
-            <a href="<%= base_url %>/" class="logo"><%= site_title %></a>
+            <a href="{{ base_url }}/" class="logo">{{ site_title }}</a>
             <nav>
-              <a href="<%= base_url %>/getting-started/">Getting Started</a>
-              <a href="<%= base_url %>/guide/">Guide</a>
-              <a href="<%= base_url %>/reference/">Reference</a>
+              <a href="{{ base_url }}/getting-started/">Getting Started</a>
+              <a href="{{ base_url }}/guide/">Guide</a>
+              <a href="{{ base_url }}/reference/">Reference</a>
             </nav>
           </header>
           <div class="docs-container">
@@ -258,39 +259,39 @@ module Hwaro
               <div class="sidebar-section">
                 <div class="sidebar-title">Getting Started</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/getting-started/">Overview</a></li>
-                  <li><a href="<%= base_url %>/getting-started/installation/">Installation</a></li>
-                  <li><a href="<%= base_url %>/getting-started/quick-start/">Quick Start</a></li>
-                  <li><a href="<%= base_url %>/getting-started/configuration/">Configuration</a></li>
+                  <li><a href="{{ base_url }}/getting-started/">Overview</a></li>
+                  <li><a href="{{ base_url }}/getting-started/installation/">Installation</a></li>
+                  <li><a href="{{ base_url }}/getting-started/quick-start/">Quick Start</a></li>
+                  <li><a href="{{ base_url }}/getting-started/configuration/">Configuration</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Guide</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/guide/">Overview</a></li>
-                  <li><a href="<%= base_url %>/guide/content-management/">Content Management</a></li>
-                  <li><a href="<%= base_url %>/guide/templates/">Templates</a></li>
-                  <li><a href="<%= base_url %>/guide/shortcodes/">Shortcodes</a></li>
+                  <li><a href="{{ base_url }}/guide/">Overview</a></li>
+                  <li><a href="{{ base_url }}/guide/content-management/">Content Management</a></li>
+                  <li><a href="{{ base_url }}/guide/templates/">Templates</a></li>
+                  <li><a href="{{ base_url }}/guide/shortcodes/">Shortcodes</a></li>
                 </ul>
               </div>
               <div class="sidebar-section">
                 <div class="sidebar-title">Reference</div>
                 <ul class="sidebar-links">
-                  <li><a href="<%= base_url %>/reference/">Overview</a></li>
-                  <li><a href="<%= base_url %>/reference/cli/">CLI Commands</a></li>
-                  <li><a href="<%= base_url %>/reference/config/">Configuration</a></li>
+                  <li><a href="{{ base_url }}/reference/">Overview</a></li>
+                  <li><a href="{{ base_url }}/reference/cli/">CLI Commands</a></li>
+                  <li><a href="{{ base_url }}/reference/config/">Configuration</a></li>
                 </ul>
               </div>
             </aside>
             <main class="docs-main">
-              <h1><%= page_title %></h1>
-              <%= content %>
+              <h1>{{ page_title }}</h1>
+              {{ content }}
 
               <h2>In This Section</h2>
               <ul class="section-list">
-                <%= section_list %>
+                {{ section_list }}
               </ul>
-          <%= render "footer" %>
+          {% include "footer.html" %}
           HTML
         end
 

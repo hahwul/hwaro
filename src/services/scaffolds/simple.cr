@@ -33,16 +33,16 @@ module Hwaro
 
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.ecr"  => header_template,
-            "footer.ecr"  => footer_template,
-            "page.ecr"    => page_template,
-            "section.ecr" => section_template,
-            "404.ecr"     => not_found_template,
+            "header.html"  => header_template,
+            "footer.html"  => footer_template,
+            "page.html"    => page_template,
+            "section.html" => section_template,
+            "404.html"     => not_found_template,
           }
 
           unless skip_taxonomies
-            files["taxonomy.ecr"] = taxonomy_template
-            files["taxonomy_term.ecr"] = taxonomy_term_template
+            files["taxonomy.html"] = taxonomy_template
+            files["taxonomy_term.html"] = taxonomy_term_template
           end
 
           files

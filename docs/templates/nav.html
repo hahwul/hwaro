@@ -1,12 +1,12 @@
 <header class="docs-header">
-  <a href="<%= base_url %>/" class="logo">
+  <a href="{{ base_url }}/" class="logo">
     <img src="/hwaro.png" style="height: 30px;">
     Hwaro
   </a>
   <nav>
-    <a href="<%= base_url %>/getting-started/"<%= page_section == "getting-started" ? " class=\"active\"" : "" %>>Getting Started</a>
-    <a href="<%= base_url %>/guide/"<%= page_section == "guide" ? " class=\"active\"" : "" %>>Guide</a>
-    <a href="<%= base_url %>/reference/"<%= page_section == "reference" ? " class=\"active\"" : "" %>>Reference</a>
+    <a href="{{ base_url }}/getting-started/"{% if page_section == "getting-started" %} class="active"{% endif %}>Getting Started</a>
+    <a href="{{ base_url }}/guide/"{% if page_section == "guide" %} class="active"{% endif %}>Guide</a>
+    <a href="{{ base_url }}/reference/"{% if page_section == "reference" %} class="active"{% endif %}>Reference</a>
   </nav>
   <div class="header-right">
     <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">

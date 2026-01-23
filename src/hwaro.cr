@@ -17,8 +17,8 @@
 
 require "option_parser"
 require "yaml"
-require "ecr"
 require "file_utils"
+require "crinja"
 require "http/server"
 require "markd"
 require "toml"
