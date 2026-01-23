@@ -68,6 +68,7 @@ module Hwaro
 
             # Optional features (commented out by default)
             str << auto_includes_config
+            str << markdown_config
             str << build_hooks_config
           end
           config

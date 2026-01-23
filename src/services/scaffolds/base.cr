@@ -401,6 +401,20 @@ module Hwaro
           TOML
         end
 
+        protected def markdown_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Markdown Configuration (Optional)
+          # =============================================================================
+          # Configure markdown parser behavior
+
+          # [markdown]
+          # safe = false    # If true, raw HTML in markdown will be stripped (replaced by comments)
+
+          TOML
+        end
+
         protected def build_hooks_config : String
           <<-TOML
 

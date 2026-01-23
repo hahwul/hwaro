@@ -42,9 +42,10 @@ module Hwaro
         # Renders Markdown to HTML and generates a Table of Contents
         # Returns {html_content, toc_headers}
         # @param highlight - whether to enable syntax highlighting for code blocks
-        def render(content : String, highlight : Bool = true) : Tuple(String, Array(Models::TocHeader))
+        # @param safe - if true, raw HTML will not be passed through (replaced by comments)
+        def render(content : String, highlight : Bool = true, safe : Bool = false) : Tuple(String, Array(Models::TocHeader))
           # Use SyntaxHighlighter for rendering with highlighting support
-          html = SyntaxHighlighter.render(content, highlight)
+          html = SyntaxHighlighter.render(content, highlight, safe)
 
           # Optimization: If no headers, don't parse XML
           unless html.includes?("<h")
@@ -359,8 +360,9 @@ module Hwaro
 
       # Renders Markdown to HTML and generates a Table of Contents
       # @param highlight - whether to enable syntax highlighting for code blocks
-      def render(content : String, highlight : Bool = true) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight)
+      # @param safe - if true, raw HTML will not be passed through (replaced by comments)
+      def render(content : String, highlight : Bool = true, safe : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight, safe)
       end
 
       # Returns parsed metadata and content

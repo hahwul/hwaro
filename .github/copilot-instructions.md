@@ -327,6 +327,24 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Build hooks (pre/post build commands)
 - Auto includes (automatic CSS/JS loading)
 - OpenGraph & Twitter Cards (social sharing meta tags)
+- Markdown parser options (safe mode)
+
+#### Markdown Configuration
+
+The `[markdown]` section controls markdown parsing behavior:
+
+```toml
+[markdown]
+safe = false    # If true, raw HTML in markdown will be stripped (replaced by comments)
+```
+
+Options mapped from [markd](https://github.com/icyleaf/markd):
+- `safe` (Bool, default: false) - If true, raw HTML will not be passed through to HTML output (replaced by `<!-- raw HTML omitted -->` comments)
+
+Implementation:
+- `src/models/config.cr` - `MarkdownConfig` class
+- `src/content/processors/syntax_highlighter.cr` - Passes options to `Markd::Options`
+- `src/core/build/builder.cr` - `render_page()` uses config's markdown.safe option
 
 ### Extensibility Considerations
 

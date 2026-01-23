@@ -336,6 +336,16 @@ module Hwaro
       end
     end
 
+    # Markdown parser configuration
+    # Maps to Markd::Options for controlling markdown parsing behavior
+    class MarkdownConfig
+      property safe : Bool # If true, raw HTML will not be passed through (replaced by comments)
+
+      def initialize
+        @safe = false
+      end
+    end
+
     # Language configuration for multilingual sites
     class LanguageConfig
       property code : String
@@ -372,6 +382,7 @@ module Hwaro
       property default_language : String
       property languages : Hash(String, LanguageConfig)
       property build : BuildConfig
+      property markdown : MarkdownConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -392,6 +403,7 @@ module Hwaro
         @default_language = "en"
         @languages = {} of String => LanguageConfig
         @build = BuildConfig.new
+        @markdown = MarkdownConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -593,6 +605,14 @@ module Hwaro
               if post_hooks = hooks_section["post"]?.try(&.as_a?)
                 config.build.hooks.post = post_hooks.compact_map(&.as_s?)
               end
+            end
+          end
+
+          # Load markdown configuration
+          if markdown_section = config.raw["markdown"]?.try(&.as_h?)
+            if markdown_section.has_key?("safe")
+              safe_val = markdown_section["safe"]?.try(&.as_bool?)
+              config.markdown.safe = safe_val unless safe_val.nil?
             end
           end
         end

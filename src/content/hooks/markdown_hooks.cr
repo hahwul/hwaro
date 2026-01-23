@@ -134,16 +134,19 @@ module Hwaro
         end
 
         private def transform_all_pages(ctx : Core::Lifecycle::BuildContext)
+          # Get markdown config options
+          safe = ctx.config.try(&.markdown.safe) || false
+
           ctx.all_pages.each do |page|
-            transform_page(page)
+            transform_page(page, safe)
           end
         end
 
-        private def transform_page(page : Models::Page)
+        private def transform_page(page : Models::Page, safe : Bool = false)
           return unless page.render
           return if page.raw_content.empty?
 
-          html_content, toc_headers = Processor::Markdown.render(page.raw_content)
+          html_content, toc_headers = Processor::Markdown.render(page.raw_content, highlight: true, safe: safe)
           page.content = html_content
           # Store TOC in metadata if needed
         end

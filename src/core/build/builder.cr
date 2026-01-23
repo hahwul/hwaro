@@ -509,8 +509,9 @@ module Hwaro
           config = ParallelConfig.new(enabled: true)
           processor = Parallel(Models::Page, Bool).new(config)
 
+          safe = site.config.markdown.safe
           results = processor.process(pages) do |page, _idx|
-            render_page(page, site, templates, output_dir, minify, highlight, verbose)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -531,8 +532,9 @@ module Hwaro
           verbose : Bool,
         ) : Int32
           count = 0
+          safe = site.config.markdown.safe
           pages.each do |page|
-            render_page(page, site, templates, output_dir, minify, highlight, verbose)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -548,13 +550,14 @@ module Hwaro
           output_dir : String,
           minify : Bool,
           highlight : Bool = true,
+          safe : Bool = false,
           verbose : Bool = false,
         )
           return unless page.render
 
           processed_content = process_shortcodes(page.raw_content, templates)
 
-          html_content, toc_headers = Processor::Markdown.render(processed_content, highlight)
+          html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)

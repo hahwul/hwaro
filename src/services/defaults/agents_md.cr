@@ -186,6 +186,18 @@ module Hwaro
           - **RSS Feed**: Set `[feeds] enabled = true`
           - **Sitemap**: Set `[sitemap] enabled = true`
           - **Taxonomies**: Add `[[taxonomies]]` sections
+          - **Safe Markdown**: Set `[markdown] safe = true` to strip raw HTML
+
+          ### Markdown Configuration
+
+          Control how markdown is parsed in `config.toml`:
+
+          ```toml
+          [markdown]
+          safe = true   # Strip raw HTML from markdown (default: false)
+          ```
+
+          When `safe = true`, raw HTML in markdown files is replaced with `<!-- raw HTML omitted -->` comments. This is useful for user-generated content or when you want to ensure only markdown syntax is used.
 
           ## Notes for AI Agents
 

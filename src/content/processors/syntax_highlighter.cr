@@ -64,8 +64,11 @@ module Hwaro
         extend self
 
         # Render markdown to HTML with syntax highlighting enabled
-        def render(content : String, highlight : Bool = true) : String
-          options = Markd::Options.new
+        # @param content - markdown content to render
+        # @param highlight - whether to enable syntax highlighting for code blocks
+        # @param safe - if true, raw HTML will not be passed through (replaced by comments)
+        def render(content : String, highlight : Bool = true, safe : Bool = false) : String
+          options = Markd::Options.new(safe: safe)
           document = Markd::Parser.parse(content, options)
           renderer = HighlightingRenderer.new(options, highlight)
           renderer.render(document)
