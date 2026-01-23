@@ -10,6 +10,8 @@ require "../models/page"
 require "../models/section"
 require "../models/config"
 require "../utils/logger"
+require "../utils/text_utils"
+require "../utils/sort_utils"
 require "../content/pagination/renderer"
 
 module Hwaro
@@ -73,20 +75,7 @@ module Hwaro
 
         site.taxonomies.each_value do |terms|
           terms.each_value do |pages|
-            pages.sort! do |a, b|
-              date_a = a.updated || a.date
-              date_b = b.updated || b.date
-
-              if date_a && date_b
-                date_b.not_nil! <=> date_a.not_nil!
-              elsif date_a
-                -1
-              elsif date_b
-                1
-              else
-                a.title <=> b.title
-              end
-            end
+            pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
           end
         end
       end
@@ -115,7 +104,7 @@ module Hwaro
         output_dir : String,
         verbose : Bool = false,
       )
-        slug = slugify(term)
+        slug = Utils::TextUtils.slugify(term)
         base_url = "/#{taxonomy.name}/#{slug}/"
 
         index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
@@ -267,20 +256,7 @@ module Hwaro
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
 
         feed_pages = pages.dup
-        feed_pages.sort! do |a, b|
-          date_a = a.updated || a.date
-          date_b = b.updated || b.date
-
-          if date_a && date_b
-            date_b.not_nil! <=> date_a.not_nil!
-          elsif date_a
-            -1
-          elsif date_b
-            1
-          else
-            0
-          end
-        end
+        feed_pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
 
         if site.config.feeds.limit > 0
           feed_pages = feed_pages.first(site.config.feeds.limit)
@@ -309,7 +285,7 @@ module Hwaro
         String.build do |str|
           str << "<ul class=\"taxonomy-terms\">\n"
           terms.each do |term|
-            term_slug = slugify(term)
+            term_slug = Utils::TextUtils.slugify(term)
             term_url = join_url(base_url, base_path, term_slug + "/")
             str << "  <li><a href=\"#{HTML.escape(term_url)}\">#{HTML.escape(term)}</a></li>\n"
           end
@@ -336,13 +312,6 @@ module Hwaro
         end
 
         base.rstrip("/") + "/" + suffix.lstrip("/")
-      end
-
-      private def self.slugify(text : String) : String
-        text.downcase
-          .gsub(/[^a-z0-9\s-]/, "")
-          .gsub(/\s+/, "-")
-          .strip("-")
       end
 
       private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)

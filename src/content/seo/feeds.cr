@@ -3,6 +3,8 @@ require "../../models/config"
 require "../../models/page"
 require "../../models/section"
 require "../../utils/logger"
+require "../../utils/text_utils"
+require "../../utils/sort_utils"
 require "../processors/markdown"
 
 module Hwaro
@@ -65,21 +67,8 @@ module Hwaro
                        feed_type == "atom" ? "atom.xml" : "rss.xml"
                      end
 
-          # Sort pages: updated > date > none
-          pages.sort! { |a, b|
-            date_a = a.updated || a.date
-            date_b = b.updated || b.date
-
-            if date_a && date_b
-              date_b.not_nil! <=> date_a.not_nil!
-            elsif date_a
-              -1
-            elsif date_b
-              1
-            else
-              0
-            end
-          }
+          # Sort pages: updated > date > none (newest first)
+          pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
 
           # Apply limit
           if config.feeds.limit > 0
@@ -112,30 +101,30 @@ module Hwaro
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
             str << "  <channel>\n"
-            str << "    <title>#{escape_xml(feed_title)}</title>\n"
-            str << "    <link>#{escape_xml(config.base_url)}</link>\n"
-            str << "    <description>#{escape_xml(config.description)}</description>\n"
+            str << "    <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
+            str << "    <link>#{Utils::TextUtils.escape_xml(config.base_url)}</link>\n"
+            str << "    <description>#{Utils::TextUtils.escape_xml(config.description)}</description>\n"
 
             # Self-referencing link
             base_url = config.base_url.rstrip('/')
             feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
             feed_url = "#{base_url}/#{feed_url_path.sub(/^\//, "")}"
 
-            str << "    <atom:link href=\"#{escape_xml(feed_url)}\" rel=\"self\" type=\"application/rss+xml\" />\n"
+            str << "    <atom:link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" type=\"application/rss+xml\" />\n"
 
             pages.each do |page|
               str << "    <item>\n"
-              str << "      <title>#{escape_xml(page.title)}</title>\n"
+              str << "      <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
 
               # Build full URL
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base_url.empty? ? path : base_url + path
-              str << "      <link>#{escape_xml(full_url)}</link>\n"
-              str << "      <guid>#{escape_xml(full_url)}</guid>\n"
+              str << "      <link>#{Utils::TextUtils.escape_xml(full_url)}</link>\n"
+              str << "      <guid>#{Utils::TextUtils.escape_xml(full_url)}</guid>\n"
 
               # Add description/content
               content = get_content_for_feed(page, config.feeds.truncate)
-              str << "      <description>#{escape_xml(content)}</description>\n"
+              str << "      <description>#{Utils::TextUtils.escape_xml(content)}</description>\n"
 
               # Add date if available (prefer updated, then date)
               if date = (page.updated || page.date)
@@ -163,32 +152,32 @@ module Hwaro
           String.build do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             str << "<feed xmlns=\"http://www.w3.org/2005/Atom\">\n"
-            str << "  <title>#{escape_xml(feed_title)}</title>\n"
-            str << "  <link href=\"#{escape_xml(config.base_url)}\" />\n"
+            str << "  <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
+            str << "  <link href=\"#{Utils::TextUtils.escape_xml(config.base_url)}\" />\n"
 
             # Self-referencing link
             base_url = config.base_url.rstrip('/')
             feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
             feed_url = "#{base_url}/#{feed_url_path.sub(/^\//, "")}"
 
-            str << "  <link href=\"#{escape_xml(feed_url)}\" rel=\"self\" />\n"
+            str << "  <link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" />\n"
 
             str << "  <updated>#{now.to_rfc3339}</updated>\n"
-            str << "  <id>#{escape_xml(config.base_url)}</id>\n"
+            str << "  <id>#{Utils::TextUtils.escape_xml(config.base_url)}</id>\n"
 
             if !config.description.empty?
-              str << "  <subtitle>#{escape_xml(config.description)}</subtitle>\n"
+              str << "  <subtitle>#{Utils::TextUtils.escape_xml(config.description)}</subtitle>\n"
             end
 
             pages.each do |page|
               str << "  <entry>\n"
-              str << "    <title>#{escape_xml(page.title)}</title>\n"
+              str << "    <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
 
               # Build full URL
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base_url.empty? ? path : base_url + path
-              str << "    <link href=\"#{escape_xml(full_url)}\" />\n"
-              str << "    <id>#{escape_xml(full_url)}</id>\n"
+              str << "    <link href=\"#{Utils::TextUtils.escape_xml(full_url)}\" />\n"
+              str << "    <id>#{Utils::TextUtils.escape_xml(full_url)}</id>\n"
 
               # Add date
               entry_date = page.updated || page.date || now
@@ -197,7 +186,7 @@ module Hwaro
               # Add content with appropriate type
               content = get_content_for_feed(page, config.feeds.truncate)
               content_type = is_text ? "text" : "html"
-              str << "    <content type=\"#{content_type}\">#{escape_xml(content)}</content>\n"
+              str << "    <content type=\"#{content_type}\">#{Utils::TextUtils.escape_xml(content)}</content>\n"
 
               str << "  </entry>\n"
             end
@@ -224,18 +213,7 @@ module Hwaro
           end
         end
 
-        private def self.escape_xml(text : String) : String
-          text.gsub(/[&<>"']/) do |match|
-            case match
-            when "&"  then "&amp;"
-            when "<"  then "&lt;"
-            when ">"  then "&gt;"
-            when "\"" then "&quot;"
-            when "'"  then "&apos;"
-            else           match
-            end
-          end
-        end
+
       end
     end
   end

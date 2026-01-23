@@ -20,7 +20,7 @@ describe Hwaro::Profiler do
 
       profiler.start_phase("TestPhase")
       # Simulate some work
-      sleep 0.01
+      sleep 10.milliseconds
       profiler.end_phase
 
       # The profiler should have recorded this phase
@@ -34,7 +34,7 @@ describe Hwaro::Profiler do
       profiler.start
 
       profiler.start_phase("TestPhase")
-      sleep 0.01
+      sleep 10.milliseconds
       profiler.end_phase
 
       # Report should be empty when disabled
@@ -53,7 +53,7 @@ describe Hwaro::Profiler do
       profiler.end_phase
 
       profiler.start_phase("Render")
-      sleep 0.01
+      sleep 10.milliseconds
       profiler.end_phase
 
       output = IO::Memory.new
@@ -83,7 +83,7 @@ describe Hwaro::Profiler do
     it "returns elapsed time after start" do
       profiler = Hwaro::Profiler.new(enabled: true)
       profiler.start
-      sleep 0.01
+      sleep 10.milliseconds
       profiler.total_elapsed.should be > 0.0
     end
   end

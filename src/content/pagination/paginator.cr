@@ -8,6 +8,7 @@
 require "../../models/page"
 require "../../models/section"
 require "../../models/config"
+require "../../utils/sort_utils"
 
 module Hwaro
   module Content
@@ -58,9 +59,6 @@ module Hwaro
 
       class Paginator
         @config : Models::Config
-
-        # Default fallback date used when a page has no date set
-        FALLBACK_DATE = Time.utc(1970, 1, 1)
 
         def initialize(@config : Models::Config)
         end
@@ -162,40 +160,9 @@ module Hwaro
 
         # Sort pages according to section settings
         private def sort_section_pages(pages : Array(Models::Page), section : Models::Section) : Array(Models::Page)
-          sorted = pages.dup
           sort_by = section.sort_by || "date"
           reverse = section.reverse || false
-
-          sorted.sort! do |a, b|
-            result = case sort_by
-                     when "date"
-                       compare_by_date(a, b)
-                     when "title"
-                       compare_by_title(a, b)
-                     when "weight"
-                       compare_by_weight(a, b)
-                     else
-                       compare_by_date(a, b)
-                     end
-            reverse ? -result : result
-          end
-
-          sorted
-        end
-
-        private def compare_by_date(a : Models::Page, b : Models::Page) : Int32
-          a_date = a.date || FALLBACK_DATE
-          b_date = b.date || FALLBACK_DATE
-          # Default: newest first (descending)
-          b_date <=> a_date
-        end
-
-        private def compare_by_title(a : Models::Page, b : Models::Page) : Int32
-          a.title <=> b.title
-        end
-
-        private def compare_by_weight(a : Models::Page, b : Models::Page) : Int32
-          a.weight <=> b.weight
+          Utils::SortUtils.sort_pages(pages, sort_by, reverse)
         end
 
         # Generate URL for a specific page number

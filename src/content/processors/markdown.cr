@@ -14,6 +14,7 @@ require "./base"
 require "./syntax_highlighter"
 require "../../models/toc"
 require "../../utils/logger"
+require "../../utils/text_utils"
 
 module Hwaro
   module Content
@@ -244,7 +245,7 @@ module Hwaro
 
             # Generate ID
             existing_id = node["id"]?
-            id = existing_id || slugify(title)
+            id = existing_id || Utils::TextUtils.slugify(title)
 
             unless existing_id
               node["id"] = id
@@ -335,12 +336,6 @@ module Hwaro
           taxonomies
         end
 
-        private def slugify(text : String) : String
-          text.downcase
-            .gsub(/[^a-z0-9\s-]/, "") # Remove non-alphanumeric chars except space and hyphen
-            .gsub(/\s+/, "-")         # Replace spaces with hyphens
-            .strip("-")               # Trim leading/trailing hyphens
-        end
       end
 
       # Register the markdown processor by default

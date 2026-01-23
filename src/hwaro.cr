@@ -27,6 +27,8 @@ require "toml"
 require "./utils/logger"
 require "./utils/profiler"
 require "./utils/command_runner"
+require "./utils/text_utils"
+require "./utils/sort_utils"
 
 # Load options
 require "./config/options/init_options"
