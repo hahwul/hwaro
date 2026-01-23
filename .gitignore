@@ -1,5 +1,4 @@
 # Crystal
-/docs/
 /lib/
 /bin/
 /.shards/
@@ -10,3 +9,6 @@ testapp
 
 # Hwaro build cache
 .hwaro_cache.json
+
+# Hwaro docs
+docs/public
