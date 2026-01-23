@@ -584,7 +584,8 @@ module Hwaro
         )
           return unless page.render
 
-          processed_content = process_shortcodes(page.raw_content, templates)
+          processed_content = process_shortcodes_jinja(page.raw_content, templates)
+          processed_content = process_shortcodes(processed_content, templates)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
 
@@ -596,6 +597,7 @@ module Hwaro
 
           template_name = determine_template(page, templates)
           template_content = templates[template_name]? || templates["page"]?
+          Logger.debug "Rendering #{page.path} (section=#{page.section.empty? ? "<root>" : page.section}, index=#{page.is_index}) using template '#{template_name}'" if verbose
 
           # Handle section pages with pagination
           if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
@@ -980,9 +982,9 @@ module Hwaro
         # Process shortcodes in Jinja2 templates
         # Converts shortcode calls to rendered output
         private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
-          # Pattern: {{ shortcode("name", arg1="value1", arg2="value2") }}
-          # or: {% call shortcode("name", arg1="value1") %}
-          content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
+          # Pattern: {{ shortcode("name", arg1="value1", arg2="value2") }} (explicit call)
+          # Pattern: {{ name(arg1="value1") }} (implicit call)
+          processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
             args_str = $2
 
@@ -995,6 +997,19 @@ module Hwaro
               match
             end
           end
+
+          processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
+            name = $1
+            args_str = $2
+
+            template_key = "shortcodes/#{name}"
+            if template = templates[template_key]?
+              args = parse_shortcode_args_jinja(args_str)
+              render_shortcode_jinja(template, args)
+            else
+              match
+            end
+          end
         end
 
         # Parse shortcode arguments from Jinja2-style syntax
@@ -1002,10 +1017,10 @@ module Hwaro
           args = {} of String => String
           return args unless args_str
 
-          # Match: key="value" or key='value'
-          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/) do |match|
+          # Match: key="value", key='value', or key=value (unquoted)
+          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/) do |match|
             key = match[1]
-            value = match[2]? || match[3]? || ""
+            value = match[2]? || match[3]? || match[4]? || ""
             args[key] = value
           end
           args

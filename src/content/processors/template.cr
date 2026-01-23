@@ -344,6 +344,35 @@ module Hwaro
             end
             result
           end
+
+          # Split filter - split string by separator
+          @env.filters["split"] = Crinja.filter({ pat: "," }) do
+            text = target.to_s
+            separator = arguments["pat"].to_s
+            parts = text.split(separator).map { |s| Crinja::Value.new(s.strip) }
+            Crinja::Value.new(parts)
+          end
+
+          # Safe filter - mark content as safe (no escaping)
+          # In Crinja, we return a SafeString to prevent auto-escaping
+          @env.filters["safe"] = Crinja.filter do
+            Crinja::Value.new(Crinja::SafeString.new(target.to_s))
+          end
+
+          # Trim filter - remove leading/trailing whitespace
+          @env.filters["trim"] = Crinja.filter do
+            target.to_s.strip
+          end
+
+          # Default filter - provide default value if empty/nil
+          @env.filters["default"] = Crinja.filter({ value: "" }) do
+            val = target.to_s
+            if val.empty?
+              arguments["value"].to_s
+            else
+              val
+            end
+          end
         end
 
         # Register custom tests
