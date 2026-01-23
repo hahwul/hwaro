@@ -1,6 +1,7 @@
 +++
 title = "Search"
 description = "Add client-side search functionality to your Hwaro site"
+toc = true
 +++
 
 

@@ -1,6 +1,7 @@
 +++
 title = "Installation"
 description = "Learn how to install Hwaro on your system"
+toc = true
 +++
 
 

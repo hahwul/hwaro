@@ -1,6 +1,7 @@
 +++
 title = "Reference"
 description = "Technical reference documentation for Hwaro"
+toc = true
 +++
 
 

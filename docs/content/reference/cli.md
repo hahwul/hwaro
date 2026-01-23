@@ -1,6 +1,7 @@
 +++
 title = "CLI Commands"
 description = "Complete reference for all Hwaro command-line commands"
+toc = true
 +++
 
 

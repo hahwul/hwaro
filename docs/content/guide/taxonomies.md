@@ -1,6 +1,7 @@
 +++
 title = "Taxonomies"
 description = "Organize content with tags, categories, and custom taxonomies"
+toc = true
 +++
 
 

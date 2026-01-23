@@ -1,6 +1,7 @@
 +++
 title = "Quick Start"
 description = "Get up and running with Hwaro in minutes"
+toc = true
 +++
 
 

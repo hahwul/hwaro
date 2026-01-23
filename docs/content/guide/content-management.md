@@ -1,6 +1,7 @@
 +++
 title = "Content Management"
 description = "Learn how to organize, write, and manage content in Hwaro"
+toc = true
 +++
 
 

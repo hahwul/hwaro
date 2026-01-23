@@ -1,6 +1,7 @@
 +++
 title = "Front Matter Reference"
 description = "Complete reference for all front matter fields in Hwaro content files"
+toc = true
 +++
 
 

@@ -1,6 +1,7 @@
 +++
 title = "Templates"
 description = "Learn how to customize your site's appearance with ECR templates"
+toc = true
 +++
 
 

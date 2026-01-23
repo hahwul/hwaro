@@ -1,6 +1,7 @@
 +++
 title = "Guide"
 description = "In-depth guides for using Hwaro effectively"
+toc = true
 +++
 
 

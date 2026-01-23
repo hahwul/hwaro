@@ -1,6 +1,7 @@
 +++
 title = "Shortcodes"
 description = "Learn how to use and create reusable shortcodes in Hwaro"
+toc = true
 +++
 
 

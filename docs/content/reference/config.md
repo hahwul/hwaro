@@ -1,6 +1,7 @@
 +++
 title = "Configuration Reference"
 description = "Complete reference for all Hwaro configuration options"
+toc = true
 +++
 
 

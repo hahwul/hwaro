@@ -1,6 +1,7 @@
 +++
 title = "SEO Features"
 description = "Optimize your Hwaro site for search engines with built-in SEO features"
+toc = true
 +++
 
 

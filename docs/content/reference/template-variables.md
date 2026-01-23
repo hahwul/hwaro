@@ -1,6 +1,7 @@
 +++
 title = "Template Variables"
 description = "Complete reference for all variables available in ECR templates"
+toc = true
 +++
 
 

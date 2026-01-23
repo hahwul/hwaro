@@ -1,6 +1,7 @@
 +++
 title = "Configuration"
 description = "Learn how to configure your Hwaro site with config.toml"
+toc = true
 +++
 
 

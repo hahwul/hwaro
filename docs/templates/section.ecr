@@ -53,17 +53,14 @@
     <h1><%= page_title %></h1>
     <%= content %>
 
-    <h2>In This Section</h2>
+    <h2 id="in-this-section">In This Section</h2>
     <ul class="section-list">
       <%= section_list %>
     </ul>
-    <div class="docs-footer">
-      <p>Powered by <a href="https://github.com/hahwul/hwaro">Hwaro</a></p>
-      <p><a href="https://github.com/hahwul/hwaro/issues">Report an issue</a></p>
-    </div>
   </main>
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <%= toc %>
+  </aside>
 </div>
-<%= highlight_js %>
-<%= auto_includes_js %>
-</body>
-</html>
+<%= render "footer" %>
