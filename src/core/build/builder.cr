@@ -483,8 +483,8 @@ module Hwaro
 
           templates = {} of String => String
           if Dir.exists?("templates")
-            # Support multiple template extensions: .html, .j2, .jinja2, .jinja
-            # Also support legacy .ecr files for backward compatibility
+            # Support multiple template extensions: .html (recommended), .j2, .jinja2, .jinja
+            # Note: .ecr files are loaded but processed as Jinja2 templates (legacy filename support only)
             extensions = ["html", "j2", "jinja2", "jinja", "ecr"]
             extensions.each do |ext|
               Dir.glob("templates/**/*.#{ext}") do |path|
@@ -585,7 +585,6 @@ module Hwaro
           return unless page.render
 
           processed_content = process_shortcodes_jinja(page.raw_content, templates)
-          processed_content = process_shortcodes(processed_content, templates)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
 
@@ -776,20 +775,6 @@ module Hwaro
           end
         end
 
-        def resolve_includes(content : String, templates : Hash(String, String), depth : Int32 = 0) : String
-          return content if depth > 10
-
-          content.gsub(/<%=\s*render\s+"([^"]+)"\s*%>/) do |match|
-            name = $1
-            if partial = templates[name]?
-              resolve_includes(partial, templates, depth + 1)
-            else
-              Logger.warn "  [WARN] Partial template '#{name}' not found."
-              ""
-            end
-          end
-        end
-
         def apply_template(
           template : String,
           content : String,
@@ -799,11 +784,6 @@ module Hwaro
           toc : String,
           templates : Hash(String, String),
         ) : String
-          # Check if template uses legacy ECR syntax
-          if uses_legacy_ecr_syntax?(template)
-            return apply_legacy_template(template, content, page, config, section_list, toc, templates)
-          end
-
           # Use Crinja for Jinja2-style templates
           env = crinja_env
 
@@ -821,80 +801,6 @@ module Hwaro
             # Fallback to content only
             content
           end
-        end
-
-        # Check if template uses legacy ECR syntax (<%= ... %> or <% ... %>)
-        private def uses_legacy_ecr_syntax?(template : String) : Bool
-          template.includes?("<%=") || template.includes?("<%")
-        end
-
-        # Legacy ECR-style template processing for backward compatibility
-        private def apply_legacy_template(
-          template : String,
-          content : String,
-          page : Models::Page,
-          config : Models::Config,
-          section_list : String,
-          toc : String,
-          templates : Hash(String, String),
-        ) : String
-          # First resolve includes (render partials)
-          resolved = resolve_includes(template, templates)
-
-          # Get page description (fall back to site description)
-          page_description = page.description || config.description || ""
-          # Get page image (fall back to og default_image)
-          page_image = page.image || config.og.default_image
-          # Format page date
-          page_date = page.date.try(&.to_s("%Y-%m-%d")) || ""
-
-          # Generate OG/Twitter tags (pass page.image, let og methods handle fallback)
-          og_tags = config.og.og_tags(page.title, page.description, page.url, page.image, config.base_url)
-          twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
-          og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
-
-          # Process ternary conditionals for page_url comparisons
-          result = resolved.gsub(/<%=\s*page_url\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
-            compare_url = $1
-            true_value = $2.gsub("\\\"", "\"")
-            false_value = $3.gsub("\\\"", "\"")
-            page.url == compare_url ? true_value : false_value
-          end
-
-          # Process ternary conditionals for page_section comparisons
-          result = result.gsub(/<%=\s*page_section\s*==\s*"([^"]+)"\s*\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*%>/) do |match|
-            compare_section = $1
-            true_value = $2.gsub("\\\"", "\"")
-            false_value = $3.gsub("\\\"", "\"")
-            page.section == compare_section ? true_value : false_value
-          end
-
-          result = result
-            .gsub(/<%=\s*page_title\s*%>/, page.title)
-            .gsub(/<%=\s*page_description\s*%>/, page_description)
-            .gsub(/<%=\s*page_image\s*%>/, page_image || "")
-            .gsub(/<%=\s*page_date\s*%>/, page_date)
-            .gsub(/<%=\s*page_url\s*%>/, page.url)
-            .gsub(/<%=\s*page_section\s*%>/, page.section)
-            .gsub(/<%=\s*section_list\s*%>/, section_list)
-            .gsub(/<%=\s*toc\s*%>/, toc)
-            .gsub(/<%=\s*taxonomy_name\s*%>/, page.taxonomy_name || "")
-            .gsub(/<%=\s*taxonomy_term\s*%>/, page.taxonomy_term || "")
-            .gsub(/<%=\s*site_title\s*%>/, config.title)
-            .gsub(/<%=\s*site_description\s*%>/, config.description || "")
-            .gsub(/<%=\s*base_url\s*%>/, config.base_url)
-            .gsub(/<%=\s*content\s*%>/, content)
-            .gsub(/<%=\s*highlight_css\s*%>/, config.highlight.css_tag)
-            .gsub(/<%=\s*highlight_js\s*%>/, config.highlight.js_tag)
-            .gsub(/<%=\s*highlight_tags\s*%>/, config.highlight.tags)
-            .gsub(/<%=\s*auto_includes_css\s*%>/, config.auto_includes.css_tags(config.base_url))
-            .gsub(/<%=\s*auto_includes_js\s*%>/, config.auto_includes.js_tags(config.base_url))
-            .gsub(/<%=\s*auto_includes\s*%>/, config.auto_includes.all_tags(config.base_url))
-            .gsub(/<%=\s*og_tags\s*%>/, og_tags)
-            .gsub(/<%=\s*twitter_tags\s*%>/, twitter_tags)
-            .gsub(/<%=\s*og_all_tags\s*%>/, og_all_tags)
-
-          process_shortcodes(result, templates)
         end
 
         # Build template variables hash for Crinja
@@ -979,11 +885,11 @@ module Hwaro
           vars
         end
 
-        # Process shortcodes in Jinja2 templates
-        # Converts shortcode calls to rendered output
+        # Process shortcodes in content (Jinja2/Crinja style)
+        # Supports two syntax patterns:
+        # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
+        # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
         private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
-          # Pattern: {{ shortcode("name", arg1="value1", arg2="value2") }} (explicit call)
-          # Pattern: {{ name(arg1="value1") }} (implicit call)
           processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
             args_str = $2
@@ -1012,7 +918,7 @@ module Hwaro
           end
         end
 
-        # Parse shortcode arguments from Jinja2-style syntax
+        # Parse shortcode arguments (key="value" or key='value' or key=value)
         private def parse_shortcode_args_jinja(args_str : String?) : Hash(String, String)
           args = {} of String => String
           return args unless args_str
@@ -1026,7 +932,7 @@ module Hwaro
           args
         end
 
-        # Render a shortcode template with arguments (Jinja2 style)
+        # Render a shortcode template with Crinja
         private def render_shortcode_jinja(template : String, args : Hash(String, String)) : String
           env = crinja_env
           vars = {} of String => Crinja::Value
@@ -1041,51 +947,6 @@ module Hwaro
             Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
             ""
           end
-        end
-
-        # Legacy shortcode processing for ECR-style templates
-        private def process_shortcodes(content : String, templates : Hash(String, String)) : String
-          content.gsub(/<%=\s*shortcode\s+"([^"]+)"(?:\s*,\s*(.*?))?\s*%>/) do |match|
-            name = $1
-            args_str = $2
-
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_args(args_str)
-              render_shortcode(template, args)
-            else
-              Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
-              match
-            end
-          end
-        end
-
-        # Legacy argument parsing for ECR-style shortcodes
-        private def parse_args(args_str : String?) : Hash(String, String)
-          args = {} of String => String
-          return args unless args_str
-
-          args_str.scan(/(\w+):\s*(?:"([^"]*)"|([^,\s]+))/) do |match|
-            key = match[1]
-            value = match[2]? || match[3]
-            args[key] = value
-          end
-          args
-        end
-
-        # Legacy shortcode rendering for ECR-style templates
-        private def render_shortcode(template : String, args : Hash(String, String)) : String
-          result = template
-          args.each do |key, value|
-            result = result.gsub(/<%=\s*#{key}(\.upcase)?\s*%>/) do |m|
-              if $1? == ".upcase"
-                value.upcase
-              else
-                value
-              end
-            end
-          end
-          result
         end
 
         private def minify_html(html : String) : String

@@ -315,7 +315,7 @@ This documentation site is powered by [Hwaro](https://github.com/hahwul/hwaro), 
 ## Features
 
 - 📝 Write content in Markdown
-- 🎨 Customizable templates with ECR
+- 🎨 Customizable Jinja2 templates
 - ⚡ Fast build times with Crystal
 - 🔍 Built-in search support
 - 📱 Responsive documentation layout
@@ -405,7 +405,7 @@ my-docs/
 │   ├── index.md
 │   ├── getting-started/
 │   └── guide/
-├── templates/           # ECR templates
+├── templates/           # Jinja2 templates
 └── static/              # Static assets
 ```
 
@@ -564,7 +564,7 @@ title = "Templates"
 
 # Templates
 
-Hwaro uses ECR (Embedded Crystal) templates for rendering pages.
+Hwaro uses Jinja2-compatible templates (via Crinja) for rendering pages.
 
 ## Template Directory
 
@@ -572,11 +572,12 @@ Templates are stored in `templates/`:
 
 ```
 templates/
-├── header.ecr    # Common header
-├── footer.ecr    # Common footer
-├── page.ecr      # Regular pages
-├── section.ecr   # Section indexes
-└── shortcodes/   # Shortcode templates
+├── base.html       # Base template with common structure
+├── page.html       # Regular pages
+├── section.html    # Section indexes
+├── partials/       # Partial templates
+│   └── nav.html
+└── shortcodes/     # Shortcode templates
 ```
 
 ## Available Variables
@@ -590,12 +591,21 @@ In templates, you have access to:
 | `content` | Rendered page content |
 | `base_url` | Site base URL |
 
+## Template Inheritance
+
+Extend base templates:
+
+```jinja
+{% extends "base.html" %}
+{% block content %}{{ content }}{% endblock %}
+```
+
 ## Including Partials
 
 Include other templates:
 
-```erb
-<%= render "header" %>
+```jinja
+{% include "partials/nav.html" %}
 ```
 
 ## Customization
@@ -618,8 +628,8 @@ Shortcodes are reusable content snippets you can embed in your Markdown.
 
 In your Markdown content:
 
-```markdown
-{{< alert type="info" message="This is an info alert" >}}
+```jinja
+{{ alert(type="info", message="This is an info alert") }}
 ```
 
 ## Built-in Shortcodes
@@ -628,8 +638,8 @@ In your Markdown content:
 
 Display an alert box:
 
-```markdown
-{{< alert type="warning" message="Be careful!" >}}
+```jinja
+{{ alert(type="warning", message="Be careful!") }}
 ```
 
 Types: `info`, `warning`, `tip`, `note`
@@ -638,19 +648,26 @@ Types: `info`, `warning`, `tip`, `note`
 
 1. Create a template in `templates/shortcodes/`:
 
-```erb
-<!-- templates/shortcodes/myshortcode.ecr -->
-<div class="my-shortcode">
-  <%= content %>
-</div>
+```jinja
+{# templates/shortcodes/highlight.html #}
+<mark class="highlight">{{ text }}</mark>
 ```
 
 2. Use it in your content:
 
-```markdown
-{{< myshortcode >}}
-Content here
-{{< /myshortcode >}}
+```jinja
+{{ highlight(text="Important text here") }}
+```
+
+## Advanced Example
+
+```jinja
+{# templates/shortcodes/alert.html #}
+{% if type and message %}
+<div class="alert alert-{{ type }}">
+  {{ message | safe }}
+</div>
+{% endif %}
 ```
 
 ## Best Practices
@@ -658,6 +675,7 @@ Content here
 - Keep shortcodes simple and focused
 - Document your custom shortcodes
 - Use semantic HTML in shortcode templates
+- Use the `safe` filter for HTML content
 CONTENT
         end
 

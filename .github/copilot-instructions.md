@@ -323,7 +323,6 @@ Hwaro uses the Crinja library for Jinja2-compatible templating. Templates suppor
 **Template File Extensions:**
 - `.html` (recommended)
 - `.j2`, `.jinja2`, `.jinja`
-- `.ecr` (legacy, for backward compatibility)
 
 **Basic Syntax:**
 - `{{ variable }}` - Print a variable
@@ -451,6 +450,10 @@ Child template (`templates/page.html`):
 - `{{ text | xml_escape }}` - XML escape
 - `{{ data | jsonify }}` - JSON encode
 - `{{ date | date("%Y-%m-%d") }}` - Format date
+- `{{ text | split(pat=",") }}` - Split string by separator
+- `{{ html | safe }}` - Mark content as safe (no escaping)
+- `{{ text | trim }}` - Remove leading/trailing whitespace
+- `{{ value | default(value="fallback") }}` - Provide default value if empty
 
 **Custom Tests:**
 - `{% if page_url is startswith("/blog/") %}` - String starts with
@@ -459,10 +462,44 @@ Child template (`templates/page.html`):
 - `{% if page_description is empty %}` - Value is empty
 - `{% if page_title is present %}` - Value is not empty
 
+**Shortcodes:**
+
+Shortcodes allow reusable template components in content files. Two syntax patterns are supported:
+
+1. **Direct call** (recommended):
+```jinja
+{{ shortcode_name(arg1="value1", arg2="value2") }}
+```
+
+2. **Explicit call**:
+```jinja
+{{ shortcode("shortcode_name", arg1="value1", arg2="value2") }}
+```
+
+Shortcode templates are stored in `templates/shortcodes/` directory.
+
+Example shortcode template (`templates/shortcodes/alert.html`):
+```jinja
+{% if type and message %}
+<div class="alert alert-{{ type }}">
+  {{ message | safe }}
+</div>
+{% endif %}
+```
+
+Usage in content:
+```markdown
+{{ alert(type="warning", message="<strong>Be careful!</strong> This is important.") }}
+```
+
+Shortcode arguments support:
+- Double quotes: `arg="value"`
+- Single quotes: `arg='value'`
+- Unquoted values: `arg=value`
+
 **Implementation details:**
 - `src/content/processors/template.cr` - `TemplateEngine` class wrapping Crinja
-- `src/core/build/builder.cr` - Template rendering in `apply_template()` method
-- Legacy ECR syntax is still supported for backward compatibility
+- `src/core/build/builder.cr` - Template rendering in `apply_template()` method, shortcode processing in `process_shortcodes_jinja()`
 - Templates are loaded from `templates/` directory with FileSystemLoader
 
 ### Configuration

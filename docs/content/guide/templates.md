@@ -1,11 +1,10 @@
 +++
 title = "Templates"
-description = "Learn how to customize your site's appearance with ECR templates"
+description = "Learn how to customize your site's appearance with Jinja2 templates"
 toc = true
 +++
 
-
-Hwaro uses ECR (Embedded Crystal) templates for rendering pages. Templates give you complete control over your site's HTML structure and design.
+Hwaro uses Crinja (Jinja2-compatible) templates for rendering pages. Templates give you complete control over your site's HTML structure and design.
 
 ## Template Directory
 
@@ -13,155 +12,219 @@ All templates are stored in the `templates/` directory:
 
 ```
 templates/
-├── header.ecr          # Common header partial (HTML head, navigation)
-├── footer.ecr          # Common footer partial
-├── page.ecr            # Regular page template
-├── section.ecr         # Section index template
-├── index.ecr           # Homepage template (optional)
-├── taxonomy.ecr        # Taxonomy listing template
-├── taxonomy_term.ecr   # Individual taxonomy term template
-├── 404.ecr             # 404 error page template
+├── base.html           # Base template with common structure
+├── page.html           # Regular page template
+├── section.html        # Section index template
+├── index.html          # Homepage template (optional)
+├── taxonomy.html       # Taxonomy listing template
+├── taxonomy_term.html  # Individual taxonomy term template
+├── 404.html            # 404 error page template
+├── partials/           # Partial templates
+│   ├── nav.html
+│   └── footer.html
 └── shortcodes/         # Shortcode templates
-    └── alert.ecr
+    └── alert.html
 ```
 
 ## Template Types
 
-### Page Template (`page.ecr`)
+### Base Template (`base.html`)
 
-Used for regular content pages:
+The base template provides the common HTML structure that other templates extend:
 
-```erb
-<%= render "header" %>
-<header class="site-header">
-  <a href="<%= base_url %>/" class="logo"><%= site_title %></a>
-</header>
-<main>
-  <article>
-    <h1><%= page_title %></h1>
-    <%= content %>
-  </article>
-</main>
-<%= render "footer" %>
-```
-
-### Section Template (`section.ecr`)
-
-Used for section index pages (content directories with `_index.md`):
-
-```erb
-<%= render "header" %>
-<main>
-  <h1><%= page_title %></h1>
-  <%= content %>
-  
-  <h2>Pages in this Section</h2>
-  <ul class="section-list">
-    <%= section_list %>
-  </ul>
-</main>
-<%= render "footer" %>
-```
-
-### Index Template (`index.ecr`)
-
-Optional template for the homepage. If not present, `page.ecr` is used:
-
-```erb
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title><%= site_title %></title>
-</head>
-<body>
-  <header>
-    <h1>Welcome to <%= site_title %></h1>
-  </header>
-  <main>
-    <%= content %>
-  </main>
-</body>
-</html>
-```
-
-### Header Partial (`header.ecr`)
-
-Contains the HTML document head and opening body tag:
-
-```erb
+```jinja
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="<%= page_description %>">
-  <title><%= page_title %> - <%= site_title %></title>
-  <%= og_all_tags %>
-  <%= highlight_css %>
-  <%= auto_includes_css %>
-  <style>
-    /* Your CSS here */
-  </style>
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+  <meta name="description" content="{{ page_description }}">
+  {{ og_all_tags }}
+  {{ highlight_css }}
+  {{ auto_includes_css }}
 </head>
 <body>
-```
-
-### Footer Partial (`footer.ecr`)
-
-Contains closing elements and scripts:
-
-```erb
-  <footer>
-    <p>&copy; 2024 <%= site_title %></p>
-  </footer>
-  <%= highlight_js %>
-  <%= auto_includes_js %>
+  {% include "partials/nav.html" %}
+  
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  
+  {% include "partials/footer.html" %}
+  {{ highlight_js }}
+  {{ auto_includes_js }}
 </body>
 </html>
 ```
 
-## ECR Syntax
+### Page Template (`page.html`)
 
-ECR (Embedded Crystal) uses Ruby-like syntax for embedding dynamic content:
+Used for regular content pages:
+
+```jinja
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+
+{% block content %}
+<article>
+  <header>
+    <h1>{{ page_title }}</h1>
+    {% if page_date %}
+    <time>{{ page_date }}</time>
+    {% endif %}
+  </header>
+  
+  <div class="content">
+    {{ content }}
+  </div>
+</article>
+{% endblock %}
+```
+
+### Section Template (`section.html`)
+
+Used for section index pages (content directories with `_index.md` or `index.md`):
+
+```jinja
+{% extends "base.html" %}
+
+{% block title %}{{ section_title }} - {{ site_title }}{% endblock %}
+
+{% block content %}
+<header class="section-header">
+  <h1>{{ section_title }}</h1>
+  {% if section_description %}
+  <p>{{ section_description }}</p>
+  {% endif %}
+</header>
+
+{% if content %}
+<div class="section-content">
+  {{ content }}
+</div>
+{% endif %}
+
+<ul class="post-list">
+  {{ section_list }}
+</ul>
+{% endblock %}
+```
+
+### Index Template (`index.html`)
+
+Optional template for the homepage. If not present, `page.html` is used:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+  <h1>Welcome to {{ site_title }}</h1>
+  <p>{{ site_description }}</p>
+</div>
+
+<div class="intro">
+  {{ content }}
+</div>
+{% endblock %}
+```
+
+## Jinja2 Syntax
+
+Hwaro uses Crinja, a Jinja2-compatible template engine. Here's the essential syntax:
 
 ### Output Expression
 
 Output the result of an expression:
 
-```erb
-<%= page_title %>
-<%= site_title %>
+```jinja
+{{ page_title }}
+{{ site_title }}
+{{ page_description | default(value="No description") }}
 ```
 
 ### Control Structures
 
-Use Crystal control structures (note: usually not needed in simple templates):
+#### Conditionals
 
-```erb
-<% if page_title != "" %>
-  <h1><%= page_title %></h1>
-<% end %>
+```jinja
+{% if page_title %}
+  <h1>{{ page_title }}</h1>
+{% endif %}
+
+{% if page_section == "blog" %}
+  <span class="badge">Blog Post</span>
+{% elif page_section == "docs" %}
+  <span class="badge">Documentation</span>
+{% else %}
+  <span class="badge">Page</span>
+{% endif %}
+```
+
+#### Loops
+
+```jinja
+{% for item in items %}
+  <li>{{ item.title }}</li>
+{% endfor %}
+```
+
+### Comments
+
+```jinja
+{# This is a comment and won't appear in the output #}
+```
+
+### Template Inheritance
+
+#### Extending Templates
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+  <p>This replaces the content block in base.html</p>
+{% endblock %}
+```
+
+#### Defining Blocks
+
+```jinja
+{% block title %}{{ site_title }}{% endblock %}
+{% block content %}Default content{% endblock %}
 ```
 
 ### Including Partials
 
-Include other template files:
-
-```erb
-<%= render "header" %>
-<%= render "footer" %>
+```jinja
+{% include "partials/nav.html" %}
+{% include "partials/footer.html" %}
 ```
 
-The partial name is relative to the `templates/` directory, without the `.ecr` extension.
+### Filters
+
+Apply transformations to values:
+
+```jinja
+{{ text | upper }}
+{{ text | lower }}
+{{ text | truncate_words(50) }}
+{{ url | absolute_url }}
+{{ content | safe }}
+```
 
 ## Available Variables
 
 ### Site Variables
 
 - `site_title` (String): Site title from config
-- `base_url` (String): Base URL from config
 - `site_description` (String): Site description from config
+- `base_url` (String): Base URL from config
+
+Site object access:
+- `site.title`, `site.description`, `site.base_url`
 
 ### Page Variables
 
@@ -169,12 +232,26 @@ The partial name is relative to the `templates/` directory, without the `.ecr` e
 - `page_description` (String): Page description (falls back to site description)
 - `page_url` (String): Current page URL path
 - `page_section` (String): Section the page belongs to
+- `page_date` (String): Page date in YYYY-MM-DD format
 - `page_image` (String): Page image (for social sharing)
 - `content` (String): Rendered page content
 
+Page object (for boolean properties):
+- `page.title`, `page.url`, `page.section`
+- `page.draft` - Is draft (boolean)
+- `page.toc` - Show TOC (boolean)
+- `page.is_index`, `page.render`, `page.generated`, `page.in_sitemap`
+
 ### Section Variables
 
+- `section_title` (String): Section title
+- `section_description` (String): Section description
 - `section_list` (String): HTML list of pages in the section
+
+### Taxonomy Variables
+
+- `taxonomy_name` (String): Name of the taxonomy (e.g., "tags")
+- `taxonomy_term` (String): Current taxonomy term
 
 ### SEO Variables
 
@@ -184,11 +261,66 @@ The partial name is relative to the `templates/` directory, without the `.ecr` e
 
 ### Asset Variables
 
-- `highlight_css` (String): Syntax highlighting CSS (if enabled)
-- `highlight_js` (String): Syntax highlighting JS (if enabled)
+- `highlight_css` (String): Syntax highlighting CSS link tag
+- `highlight_js` (String): Syntax highlighting JS script tag
+- `highlight_tags` (String): Both CSS and JS tags combined
 - `auto_includes_css` (String): Auto-included CSS files
 - `auto_includes_js` (String): Auto-included JS files
 - `auto_includes` (String): All auto-included files
+
+### Time Variables
+
+- `current_year` (Integer): Current year (e.g., 2025)
+- `current_date` (String): Current date in YYYY-MM-DD format
+- `current_datetime` (String): Current datetime in YYYY-MM-DD HH:MM:SS format
+
+### Table of Contents
+
+- `toc` (String): Generated table of contents HTML
+
+## Custom Filters
+
+Hwaro provides additional filters beyond standard Jinja2:
+
+- `{{ text | slugify }}` - Convert to URL slug
+- `{{ text | truncate_words(50) }}` - Truncate by word count
+- `{{ url | absolute_url }}` - Make URL absolute with base_url
+- `{{ url | relative_url }}` - Prefix with base_url
+- `{{ html | strip_html }}` - Remove HTML tags
+- `{{ text | markdownify }}` - Render markdown to HTML
+- `{{ text | xml_escape }}` - XML escape special characters
+- `{{ data | jsonify }}` - JSON encode
+- `{{ date | date("%Y-%m-%d") }}` - Format date
+- `{{ text | split(pat=",") }}` - Split string by separator
+- `{{ html | safe }}` - Mark content as safe (no escaping)
+- `{{ text | trim }}` - Remove leading/trailing whitespace
+- `{{ value | default(value="fallback") }}` - Provide default value if empty
+
+## Custom Tests
+
+Use these in conditionals:
+
+```jinja
+{% if page_url is startswith("/blog/") %}
+  {# URL starts with /blog/ #}
+{% endif %}
+
+{% if page_title is endswith("!") %}
+  {# Title ends with exclamation mark #}
+{% endif %}
+
+{% if page_url is containing("products") %}
+  {# URL contains "products" #}
+{% endif %}
+
+{% if page_description is empty %}
+  {# Description is empty #}
+{% endif %}
+
+{% if page_title is present %}
+  {# Title is not empty #}
+{% endif %}
+```
 
 ## Custom Layouts
 
@@ -203,32 +335,44 @@ layout = "landing"
 Welcome to our landing page!
 ```
 
-Create the corresponding template `templates/landing.ecr`:
+Create the corresponding template `templates/landing.html`:
 
-```erb
+```jinja
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title><%= page_title %></title>
+  <title>{{ page_title }}</title>
   <style>
     /* Landing page specific styles */
   </style>
 </head>
 <body class="landing">
   <main>
-    <%= content %>
+    {{ content }}
   </main>
 </body>
 </html>
+```
+
+## Navigation Menus
+
+Build navigation with active state highlighting:
+
+```jinja
+<nav>
+  <a href="{{ base_url }}/"{% if page_url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="{{ base_url }}/blog/"{% if page_section == "blog" %} class="active"{% endif %}>Blog</a>
+  <a href="{{ base_url }}/about/"{% if page_url == "/about/" %} class="active"{% endif %}>About</a>
+</nav>
 ```
 
 ## Styling Templates
 
 ### Inline Styles
 
-Include CSS directly in your header template:
+Include CSS directly in your base template:
 
-```erb
+```jinja
 <style>
   :root {
     --primary: #e53935;
@@ -247,132 +391,103 @@ Include CSS directly in your header template:
 
 Reference CSS files from the `static/` directory:
 
-```erb
-<link rel="stylesheet" href="/css/main.css">
+```jinja
+<link rel="stylesheet" href="{{ base_url }}/css/main.css">
 ```
 
 ### Auto Includes
 
-Let Hwaro automatically include CSS files:
+Let Hwaro automatically include CSS/JS files:
 
 1. Configure in `config.toml`:
 
 ```toml
 [auto_includes]
 enabled = true
-dirs = ["assets/css"]
+dirs = ["assets/css", "assets/js"]
 ```
 
-2. Place CSS files in `static/assets/css/`:
+2. Place files in `static/assets/`:
 
 ```
 static/
 └── assets/
-    └── css/
-        ├── 01-reset.css
-        ├── 02-typography.css
-        └── 03-layout.css
+    ├── css/
+    │   ├── 01-reset.css
+    │   ├── 02-typography.css
+    │   └── 03-layout.css
+    └── js/
+        └── app.js
 ```
 
-3. Use in your header:
+3. Use in your template:
 
-```erb
-<%= auto_includes_css %>
-```
-
-## Adding JavaScript
-
-### Inline Scripts
-
-```erb
-<script>
-  // Your JavaScript here
-</script>
-```
-
-### External Scripts
-
-```erb
-<script src="/js/app.js"></script>
-```
-
-### Auto Includes for JS
-
-```erb
-<%= auto_includes_js %>
-```
-
-## Navigation Menus
-
-Build navigation based on your site structure:
-
-```erb
-<nav>
-  <a href="<%= base_url %>/">Home</a>
-  <a href="<%= base_url %>/getting-started/">Getting Started</a>
-  <a href="<%= base_url %>/guide/">Guide</a>
-  <a href="<%= base_url %>/reference/">Reference</a>
-</nav>
-```
-
-### Active State
-
-Highlight the current section:
-
-```erb
-<nav>
-  <a href="<%= base_url %>/guide/"<%= page_section == "guide" ? " class=\"active\"" : "" %>>Guide</a>
-</nav>
-```
-
-## Responsive Design
-
-Include responsive meta tags and CSS:
-
-```erb
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-    
-    @media (max-width: 768px) {
-      .sidebar {
-        display: none;
-      }
-    }
-  </style>
-</head>
+```jinja
+{{ auto_includes_css }}  {# In <head> #}
+{{ auto_includes_js }}   {# Before </body> #}
 ```
 
 ## Best Practices
 
-### Keep Templates DRY
+### Use Template Inheritance
 
-Use partials to avoid repetition:
+Create a base template and extend it:
 
-```erb
-<!-- templates/nav.ecr -->
+```jinja
+{# base.html #}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>
+```
+
+```jinja
+{# page.html #}
+{% extends "base.html" %}
+{% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+{% block content %}
+<article>{{ content }}</article>
+{% endblock %}
+```
+
+### Use Partials for Reusable Components
+
+```jinja
+{# partials/nav.html #}
 <nav class="main-nav">
-  <a href="<%= base_url %>/">Home</a>
-  <a href="<%= base_url %>/about/">About</a>
+  <a href="{{ base_url }}/">Home</a>
+  <a href="{{ base_url }}/about/">About</a>
 </nav>
 ```
 
 Then include it:
 
-```erb
-<%= render "nav" %>
+```jinja
+{% include "partials/nav.html" %}
+```
+
+### Handle Missing Values
+
+Use the `default` filter or conditionals:
+
+```jinja
+{{ page_description | default(value=site_description) }}
+
+{% if page_image %}
+<meta property="og:image" content="{{ page_image }}">
+{% endif %}
 ```
 
 ### Semantic HTML
 
 Use semantic elements for better accessibility:
 
-```erb
+```jinja
 <header>...</header>
 <nav>...</nav>
 <main>
@@ -382,11 +497,7 @@ Use semantic elements for better accessibility:
 <footer>...</footer>
 ```
 
-### Escape User Content
-
-Content from markdown is already escaped, but be careful with custom data.
-
-### Mobile-First
+### Mobile-First Design
 
 Design for mobile first, then add complexity for larger screens:
 
@@ -403,5 +514,5 @@ Design for mobile first, then add complexity for larger screens:
 ## Next Steps
 
 - Learn about [Shortcodes](/guide/shortcodes/) for reusable components
-- Explore [Template Variables](/reference/template-variables/) for complete reference
-- See [Content Management](/guide/content-management/) for organizing content
+- Explore [Content Management](/guide/content-management/) for organizing content
+- See [SEO](/guide/seo/) for search engine optimization
