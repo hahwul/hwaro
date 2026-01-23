@@ -107,3 +107,12 @@ enabled = false
 
 [markdown]
 safe = false
+
+# =============================================================================
+# Auto Includes
+# =============================================================================
+# Automatically include CSS and JS files from static directories
+
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]

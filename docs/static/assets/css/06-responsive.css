@@ -1,0 +1,49 @@
+/* =============================================================================
+   Responsive Styles
+   ============================================================================= */
+
+@media (max-width: 1200px) {
+  .docs-toc {
+    display: none;
+  }
+
+  .docs-main {
+    margin-right: 0;
+    max-width: calc(100% - var(--sidebar-w));
+  }
+}
+
+@media (max-width: 1024px) {
+  .docs-main {
+    padding: 2rem 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .docs-sidebar {
+    display: none;
+  }
+
+  .docs-toc {
+    display: none;
+  }
+
+  .docs-main {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 1.5rem 1rem;
+    max-width: 100%;
+  }
+
+  .docs-header nav {
+    display: none;
+  }
+
+  .heading-anchor {
+    position: static;
+    display: inline-flex;
+    transform: none;
+    opacity: 0.5;
+    margin-left: 0.5rem;
+  }
+}

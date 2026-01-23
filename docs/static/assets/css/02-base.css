@@ -1,0 +1,42 @@
+/* Base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.7;
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image:
+    linear-gradient(rgba(255, 68, 68, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 68, 68, 0.02) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Pixel-style selection */
+::selection {
+  background: var(--primary);
+  color: var(--bg);
+}
+
+/* Links */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: all 0.1s ease;
+  border-bottom: 1px dashed transparent;
+}
+
+a:hover {
+  color: var(--primary-hover);
+  border-bottom-color: var(--primary);
+}

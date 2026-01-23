@@ -1,0 +1,360 @@
+/* =============================================================================
+   Header - fixed top with pixel border
+   ============================================================================= */
+
+.docs-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-h);
+  background: rgba(10, 10, 12, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: var(--pixel-border) solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  z-index: 100;
+}
+
+.docs-header::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary-dim), transparent);
+}
+
+.docs-header .logo {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  letter-spacing: -0.02em;
+}
+
+.docs-header .logo:hover {
+  color: var(--primary);
+}
+
+.docs-header .logo:hover .logo-icon {
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.docs-header .logo-icon {
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(135deg, var(--primary) 0%, #cc3333 100%);
+  border: var(--pixel-border) solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+  transition: box-shadow 0.2s ease;
+  image-rendering: pixelated;
+}
+
+.docs-header nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.docs-header nav a {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.docs-header nav a:hover {
+  color: var(--text);
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+
+.docs-header nav a.active {
+  color: var(--primary);
+  background: var(--primary-dim);
+  border-color: var(--primary);
+}
+
+.docs-header nav a.active::before {
+  content: '>';
+  margin-right: 0.35rem;
+  opacity: 0.7;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.github-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 0.5rem;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.github-link:hover {
+  color: var(--text);
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+
+.github-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* =============================================================================
+   Layout container
+   ============================================================================= */
+
+.docs-container {
+  display: flex;
+  padding-top: var(--header-h);
+  min-height: 100vh;
+}
+
+/* =============================================================================
+   Sidebar - fixed with terminal style
+   ============================================================================= */
+
+.docs-sidebar {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--header-h));
+  background: var(--bg-elevated);
+  border-right: var(--pixel-border) solid var(--border);
+  padding: 1.5rem 0.75rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+}
+
+.sidebar-section {
+  margin-bottom: 1.75rem;
+}
+
+.sidebar-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.1em;
+  padding-left: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar-title::before {
+  content: '//';
+  opacity: 0.5;
+}
+
+.sidebar-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-links li {
+  margin-bottom: 1px;
+}
+
+.sidebar-links a {
+  font-family: var(--font-mono);
+  display: block;
+  padding: 0.45rem 0.75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  transition: all 0.1s ease;
+  border-left: 2px solid transparent;
+  position: relative;
+}
+
+.sidebar-links a:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-left-color: var(--border-light);
+}
+
+.sidebar-links a.active {
+  background: var(--primary-dim);
+  color: var(--primary);
+  border-left-color: var(--primary);
+}
+
+.sidebar-links a.active::before {
+  content: '→';
+  position: absolute;
+  right: 0.75rem;
+  opacity: 0.5;
+}
+
+/* =============================================================================
+   TOC Sidebar - fixed right
+   ============================================================================= */
+
+.docs-toc {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  width: var(--toc-w);
+  height: calc(100vh - var(--header-h));
+  padding: 1.5rem 1rem 6rem 1rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+  background: linear-gradient(to left, rgba(10, 10, 12, 0.5), transparent);
+}
+
+.docs-toc::-webkit-scrollbar {
+  width: 6px;
+}
+
+.docs-toc::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-toc::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+}
+
+.toc-title {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.toc-title::before {
+  content: '#';
+  color: var(--primary);
+  opacity: 0.6;
+}
+
+.docs-toc > ul,
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-left: 1px solid var(--border);
+}
+
+.docs-toc ul ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-left: none;
+}
+
+.docs-toc li,
+.toc-list li {
+  margin-bottom: 0;
+}
+
+.docs-toc a,
+.toc-list a {
+  font-family: var(--font-mono);
+  display: block;
+  padding: 0.3rem 0.75rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  transition: all 0.1s ease;
+  border-left: 1px solid transparent;
+  margin-left: -1px;
+}
+
+.docs-toc a:hover,
+.toc-list a:hover {
+  color: var(--text-muted);
+  border-left-color: var(--border-light);
+}
+
+.docs-toc a.active,
+.toc-list a.active {
+  color: var(--text);
+  border-left-color: var(--primary);
+  background: linear-gradient(to right, var(--primary-dim), transparent);
+}
+
+/* Nested TOC levels - indentation */
+.docs-toc ul ul a {
+  padding-left: 1.25rem;
+  font-size: 0.65rem;
+}
+
+.docs-toc ul ul ul a {
+  padding-left: 1.75rem;
+  font-size: 0.65rem;
+}
+
+.toc-list .toc-h3 {
+  padding-left: 1.25rem;
+  font-size: 0.65rem;
+}
+
+.toc-list .toc-h4 {
+  padding-left: 1.75rem;
+  font-size: 0.65rem;
+}
+
+/* =============================================================================
+   Main content area
+   ============================================================================= */
+
+.docs-main {
+  flex: 1;
+  margin-left: var(--sidebar-w);
+  margin-right: var(--toc-w);
+  padding: 2.5rem 3.5rem;
+  max-width: calc(100% - var(--sidebar-w) - var(--toc-w));
+  min-width: 0;
+}
