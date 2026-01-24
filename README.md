@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="Hwaro Logo" src="docs/static/hwaro.png" width="200px;">
+  <img alt="Hwaro Logo" src="docs/static/hwaro-wide.png" width="500px;">
   <p>Hwaro (화로) is a lightweight and fast static site generator written in Crystal.</p>
 </div>
 
