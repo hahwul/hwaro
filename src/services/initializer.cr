@@ -241,6 +241,16 @@ module Hwaro
           str << "processors = [\"markdown\"]\n\n"
 
           str << "# =============================================================================\n"
+          str << "# Content Files\n"
+          str << "# =============================================================================\n"
+          str << "# Publish non-Markdown files from `content/` into the output directory.\n"
+          str << "# Example: content/about/profile.jpg -> /about/profile.jpg\n\n"
+          str << "[content.files]\n"
+          str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
+          str << "# disallow_extensions = [\"psd\"]\n"
+          str << "# disallow_paths = [\"private/**\", \"**/_*\"]\n\n"
+
+          str << "# =============================================================================\n"
           str << "# Syntax Highlighting\n"
           str << "# =============================================================================\n"
           str << "# Code block syntax highlighting using Highlight.js\n\n"

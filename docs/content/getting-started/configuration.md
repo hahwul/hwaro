@@ -120,3 +120,16 @@ safe = false    # true = strip raw HTML
 enabled = true
 instructions = "Content is MIT licensed."
 ```
+
+## Content Files
+
+Publish non-Markdown files from `content/` into the output directory (preserving paths).
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "png", "svg", "pdf"]
+disallow_extensions = ["psd"]
+disallow_paths = ["private/**", "**/_*"]
+```
+
+Example: `content/about/profile.jpg` → `/about/profile.jpg`

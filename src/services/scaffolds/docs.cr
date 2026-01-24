@@ -67,6 +67,7 @@ module Hwaro
 
             # Content & Processing
             str << plugins_config
+            str << content_files_config
             str << highlight_config
             str << og_config
             str << search_config

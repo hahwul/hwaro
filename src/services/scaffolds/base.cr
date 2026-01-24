@@ -244,6 +244,23 @@ module Hwaro
           TOML
         end
 
+        protected def content_files_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Content Files
+          # =============================================================================
+          # Publish non-Markdown files from `content/` into the output directory.
+          # Example: content/about/profile.jpg -> /about/profile.jpg
+
+          [content.files]
+          allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
+          # disallow_extensions = ["psd"]
+          # disallow_paths = ["private/**", "**/_*"]
+
+          TOML
+        end
+
         protected def highlight_config : String
           <<-TOML
 

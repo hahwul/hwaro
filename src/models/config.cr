@@ -93,6 +93,65 @@ module Hwaro
       end
     end
 
+    # Content file publishing configuration
+    #
+    # Allows copying non-Markdown files from `content/` to the output directory
+    # (e.g. `content/about/profile.jpg` -> `/about/profile.jpg`).
+    class ContentFilesConfig
+      property allow_extensions : Array(String)
+      property disallow_extensions : Array(String)
+      property disallow_paths : Array(String)
+
+      def initialize
+        @allow_extensions = [] of String
+        @disallow_extensions = [] of String
+        @disallow_paths = [] of String
+      end
+
+      def enabled? : Bool
+        @allow_extensions.any?
+      end
+
+      def publish?(relative_path : String) : Bool
+        normalized_path = ContentFilesConfig.normalize_path(relative_path)
+        ext = File.extname(normalized_path).downcase
+        return false if ext.empty?
+        return false if ext == ".md"
+        return false unless @allow_extensions.includes?(ext)
+        return false if @disallow_extensions.includes?(ext)
+        @disallow_paths.each do |pattern|
+          return false if File.match?(pattern, normalized_path)
+        end
+        true
+      end
+
+      def self.normalize_extensions(values : Array(String)) : Array(String)
+        values.compact_map do |ext|
+          normalize_extension(ext)
+        end.uniq
+      end
+
+      def self.normalize_paths(values : Array(String)) : Array(String)
+        values.compact_map do |pattern|
+          normalized = normalize_path(pattern)
+          normalized.empty? ? nil : normalized
+        end
+      end
+
+      def self.normalize_path(path : String) : String
+        path = path.strip.gsub('\\', '/')
+        path = path.sub(/\A\//, "")
+        path = path.sub(/\Acontent\//, "")
+        path
+      end
+
+      private def self.normalize_extension(ext : String) : String?
+        ext = ext.strip.downcase
+        return nil if ext.empty?
+        ext.starts_with?(".") ? ext : ".#{ext}"
+      end
+    end
+
     # Auto-includes configuration for automatic CSS/JS loading
     class AutoIncludesConfig
       property enabled : Bool
@@ -374,6 +433,7 @@ module Hwaro
       property feeds : FeedConfig
       property search : SearchConfig
       property plugins : PluginConfig
+      property content_files : ContentFilesConfig
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
@@ -395,6 +455,7 @@ module Hwaro
         @feeds = FeedConfig.new
         @search = SearchConfig.new
         @plugins = PluginConfig.new
+        @content_files = ContentFilesConfig.new
         @pagination = PaginationConfig.new
         @highlight = HighlightConfig.new
         @auto_includes = AutoIncludesConfig.new
@@ -517,6 +578,36 @@ module Hwaro
           if plugins_section = config.raw["plugins"]?.try(&.as_h?)
             if processors = plugins_section["processors"]?.try(&.as_a?)
               config.plugins.processors = processors.compact_map(&.as_s?)
+            end
+          end
+
+          # Load content files publishing configuration
+          if content_section = config.raw["content"]?.try(&.as_h?)
+            if files_section = content_section["files"]?.try(&.as_h?)
+              allow_any = files_section["allow_extensions"]? || files_section["extensions"]?
+              disallow_any = files_section["disallow_extensions"]?
+              disallow_paths_any = files_section["disallow_paths"]?
+
+              if allow_any
+                values = allow_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                         allow_any.as_s?.try { |s| [s] } ||
+                         ([] of String)
+                config.content_files.allow_extensions = ContentFilesConfig.normalize_extensions(values)
+              end
+
+              if disallow_any
+                values = disallow_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                         disallow_any.as_s?.try { |s| [s] } ||
+                         ([] of String)
+                config.content_files.disallow_extensions = ContentFilesConfig.normalize_extensions(values)
+              end
+
+              if disallow_paths_any
+                values = disallow_paths_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                         disallow_paths_any.as_s?.try { |s| [s] } ||
+                         ([] of String)
+                config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(values)
+              end
             end
           end
 

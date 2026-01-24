@@ -138,6 +138,46 @@ describe Hwaro::Models::Config do
     end
   end
 
+  describe "content files configuration" do
+    it "is disabled by default" do
+      config = Hwaro::Models::Config.new
+      config.content_files.enabled?.should be_false
+      config.content_files.allow_extensions.should eq([] of String)
+      config.content_files.disallow_extensions.should eq([] of String)
+      config.content_files.disallow_paths.should eq([] of String)
+    end
+
+    it "loads allow/deny rules from config.toml" do
+      toml = <<-TOML
+      title = "Test"
+
+      [content.files]
+      allow_extensions = ["jpg", ".png", "MD"]
+      disallow_extensions = ["png"]
+      disallow_paths = ["private/**", "**/_*"]
+      TOML
+
+      File.tempfile("hwaro-config") do |file|
+        file.print(toml)
+        file.flush
+
+        config = Hwaro::Models::Config.load(file.path)
+        config.content_files.enabled?.should be_true
+        config.content_files.allow_extensions.should eq([".jpg", ".png", ".md"])
+        config.content_files.disallow_extensions.should eq([".png"])
+        config.content_files.disallow_paths.should eq(["private/**", "**/_*"])
+
+        config.content_files.publish?("about/profile.jpg").should be_true
+        config.content_files.publish?("about/job.png").should be_false
+        config.content_files.publish?("private/file.jpg").should be_false
+        config.content_files.publish?("about/_secret.jpg").should be_false
+
+        # Never publish markdown as a raw file
+        config.content_files.publish?("notes/readme.md").should be_false
+      end
+    end
+  end
+
   describe "pagination configuration" do
     it "has default pagination configuration" do
       config = Hwaro::Models::Config.new

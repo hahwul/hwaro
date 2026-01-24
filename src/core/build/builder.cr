@@ -10,6 +10,7 @@
 # through hooks at various phases of the build process.
 
 require "file_utils"
+require "set"
 require "toml"
 require "uri"
 require "crinja"
@@ -26,6 +27,7 @@ require "../../utils/logger"
 require "../../utils/profiler"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
+require "../../content/processors/content_files"
 require "../../content/processors/template"
 require "../../models/config"
 require "../../models/page"
@@ -334,16 +336,31 @@ module Hwaro
 
         # Collect JSON and XML files from content directory
         private def collect_raw_files(ctx : Lifecycle::BuildContext)
-          # JSON files
-          Dir.glob("content/**/*.json") do |file_path|
+          seen = Set(String).new
+
+          add_raw_file = ->(file_path : String) do
             relative_path = Path[file_path].relative_to("content").to_s
+            return if seen.includes?(relative_path)
             ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
+            seen << relative_path
           end
 
+          # JSON files
+          Dir.glob("content/**/*.json") { |file_path| add_raw_file.call(file_path) }
+
           # XML files
-          Dir.glob("content/**/*.xml") do |file_path|
-            relative_path = Path[file_path].relative_to("content").to_s
-            ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
+          Dir.glob("content/**/*.xml") { |file_path| add_raw_file.call(file_path) }
+
+          # Publish configured non-Markdown content files as-is (images, PDFs, etc.)
+          if config = ctx.config
+            return unless config.content_files.enabled?
+
+            Dir.glob("content/**/*") do |file_path|
+              next if File.directory?(file_path)
+              relative_path = Path[file_path].relative_to("content").to_s
+              next unless Content::Processors::ContentFiles.publish?(relative_path, config)
+              add_raw_file.call(file_path)
+            end
           end
         end
 
@@ -987,30 +1004,31 @@ module Hwaro
           count = 0
 
           raw_files.each do |raw_file|
-            content = File.read(raw_file.source_path)
             output_path = File.join(output_dir, raw_file.relative_path)
 
             # Get appropriate processor
             processor = Content::Processors::Registry.for_file(raw_file.source_path).first?
 
-            processed_content = if processor && minify
-                                  context = Content::Processors::ProcessorContext.new(
-                                    file_path: raw_file.source_path,
-                                    output_path: output_path
-                                  )
-                                  result = processor.process(content, context)
-                                  if result.success
-                                    result.content
-                                  else
-                                    Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
-                                    content
-                                  end
-                                else
-                                  content
-                                end
-
             FileUtils.mkdir_p(File.dirname(output_path))
-            File.write(output_path, processed_content)
+
+            if processor && minify
+              content = File.read(raw_file.source_path)
+              context = Content::Processors::ProcessorContext.new(
+                file_path: raw_file.source_path,
+                output_path: output_path
+              )
+              result = processor.process(content, context)
+              if result.success
+                File.write(output_path, result.content)
+              else
+                Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
+                FileUtils.cp(raw_file.source_path, output_path)
+              end
+            else
+              # Copy as-is (binary-safe) when not minifying or no processor exists.
+              FileUtils.cp(raw_file.source_path, output_path)
+            end
+
             Logger.action :create, output_path if verbose
             count += 1
           end
