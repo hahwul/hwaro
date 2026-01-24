@@ -1,5 +1,6 @@
 +++
 title = "Installation"
+toc = true
 +++
 
 ## Prerequisites

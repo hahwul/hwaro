@@ -108,7 +108,7 @@ priority = 0.5
 enabled = true
 filename = "robots.txt"
 rules = [
-  { user_agent = "*", allow = ["/"] } }
+  { user_agent = "*", allow = ["/"] }
 ]
 
 # =============================================================================

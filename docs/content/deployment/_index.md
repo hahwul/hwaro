@@ -1,5 +1,6 @@
 +++
 title = "Overview"
+toc = true
 +++
 
 Deploy your Hwaro site to any static hosting provider.
