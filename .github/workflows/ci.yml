@@ -7,7 +7,7 @@ on:
       - .github/workflows/ci.yml
       - shard.yml
       - shard.lock
-      - Dockerfile
+      - docker/Dockerfile
       - "**/*.cr"
   push:
     branches: [main]
@@ -59,6 +59,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/Dockerfile
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
