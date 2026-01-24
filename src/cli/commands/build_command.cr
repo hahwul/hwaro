@@ -22,6 +22,7 @@ module Hwaro
 
         private def parse_options(args : Array(String)) : Config::Options::BuildOptions
           output_dir = "public"
+          base_url = nil.as(String?)
           drafts = false
           minify = false
           parallel = true
@@ -33,6 +34,7 @@ module Hwaro
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
             parser.on("-o DIR", "--output-dir DIR", "Output directory (default: public)") { |dir| output_dir = dir }
+            parser.on("--base-url URL", "Override base_url from config.toml") { |url| base_url = url }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--minify", "Minify HTML output (and minified json, xml)") { minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
@@ -45,6 +47,7 @@ module Hwaro
 
           Config::Options::BuildOptions.new(
             output_dir: output_dir,
+            base_url: base_url,
             drafts: drafts,
             minify: minify,
             parallel: parallel,

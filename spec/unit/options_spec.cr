@@ -4,6 +4,7 @@ describe Hwaro::Config::Options::BuildOptions do
   it "has default values" do
     options = Hwaro::Config::Options::BuildOptions.new
     options.output_dir.should eq("public")
+    options.base_url.should be_nil
     options.drafts.should eq(false)
     options.minify.should eq(false)
     options.parallel.should eq(true)
@@ -14,6 +15,7 @@ describe Hwaro::Config::Options::BuildOptions do
   it "accepts custom values" do
     options = Hwaro::Config::Options::BuildOptions.new(
       output_dir: "dist",
+      base_url: "https://example.com",
       drafts: true,
       minify: true,
       parallel: false,
@@ -21,6 +23,7 @@ describe Hwaro::Config::Options::BuildOptions do
       profile: true
     )
     options.output_dir.should eq("dist")
+    options.base_url.should eq("https://example.com")
     options.drafts.should eq(true)
     options.minify.should eq(true)
     options.parallel.should eq(false)
@@ -34,15 +37,17 @@ describe Hwaro::Config::Options::ServeOptions do
     options = Hwaro::Config::Options::ServeOptions.new
     options.host.should eq("0.0.0.0")
     options.port.should eq(3000)
+    options.base_url.should be_nil
     options.drafts.should eq(false)
     options.open_browser.should eq(false)
   end
 
   it "converts to build options" do
-    options = Hwaro::Config::Options::ServeOptions.new(drafts: true)
+    options = Hwaro::Config::Options::ServeOptions.new(drafts: true, base_url: "https://example.com")
     build_options = options.to_build_options
     build_options.drafts.should eq(true)
     build_options.output_dir.should eq("public")
+    build_options.base_url.should eq("https://example.com")
   end
 end
 

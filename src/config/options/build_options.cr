@@ -3,6 +3,7 @@ module Hwaro
     module Options
       struct BuildOptions
         property output_dir : String
+        property base_url : String?
         property drafts : Bool
         property minify : Bool
         property parallel : Bool
@@ -13,6 +14,7 @@ module Hwaro
 
         def initialize(
           @output_dir : String = "public",
+          @base_url : String? = nil,
           @drafts : Bool = false,
           @minify : Bool = false,
           @parallel : Bool = true,

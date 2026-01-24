@@ -48,6 +48,7 @@ hwaro build [options]
 | Option | Description |
 |--------|-------------|
 | `-o, --output-dir DIR` | Output directory (default: `public`) |
+| `--base-url URL` | Override `base_url` from `config.toml` |
 | `-d, --drafts` | Include drafts |
 | `--minify` | Minify HTML/JSON/XML |
 | `--no-parallel` | Disable parallel processing |
@@ -61,6 +62,7 @@ hwaro build
 hwaro build --minify
 hwaro build --drafts --cache
 hwaro build -o dist
+hwaro build --base-url https://example.com
 ```
 
 ## serve
@@ -77,6 +79,7 @@ hwaro serve [options]
 |--------|-------------|
 | `-p, --port PORT` | Port (default: `3000`) |
 | `-b, --bind HOST` | Bind address (default: `0.0.0.0`) |
+| `--base-url URL` | Override `base_url` from `config.toml` |
 | `--open` | Open browser |
 | `-d, --drafts` | Include drafts |
 
@@ -86,6 +89,7 @@ hwaro serve [options]
 hwaro serve
 hwaro serve --port 8080
 hwaro serve --open --drafts
+hwaro serve --base-url https://example.com
 ```
 
 ## new

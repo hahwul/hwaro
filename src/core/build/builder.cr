@@ -67,6 +67,7 @@ module Hwaro
         def run(options : Config::Options::BuildOptions)
           run(
             output_dir: options.output_dir,
+            base_url: options.base_url,
             drafts: options.drafts,
             minify: options.minify,
             parallel: options.parallel,
@@ -79,6 +80,7 @@ module Hwaro
 
         def run(
           output_dir : String = "public",
+          base_url : String? = nil,
           drafts : Bool = false,
           minify : Bool = false,
           parallel : Bool = true,
@@ -111,6 +113,7 @@ module Hwaro
           # Create build context for lifecycle
           options = Config::Options::BuildOptions.new(
             output_dir: output_dir,
+            base_url: base_url,
             drafts: drafts,
             minify: minify,
             parallel: parallel,
@@ -128,7 +131,7 @@ module Hwaro
           @templates = nil
 
           # Execute build phases through lifecycle
-          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight, verbose, profiler)
+          result = execute_phases(ctx, drafts, minify, parallel, cache, highlight, verbose, profiler, base_url)
 
           ctx.stats.end_time = Time.instant
 
@@ -162,6 +165,7 @@ module Hwaro
           highlight : Bool,
           verbose : Bool,
           profiler : Profiler,
+          base_url_override : String?,
         ) : Lifecycle::HookResult
           output_dir = ctx.output_dir
 
@@ -180,6 +184,10 @@ module Hwaro
             copy_static_files(output_dir, verbose)
 
             config = Models::Config.load
+            if url = base_url_override
+              override = url.strip
+              config.base_url = override unless override.empty?
+            end
             @site = Models::Site.new(config)
             @config = config
             ctx.site = @site
