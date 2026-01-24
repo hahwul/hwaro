@@ -21,17 +21,6 @@ def get_hwaro_version : String?
   end
 end
 
-# Extract version from Dockerfile (LABEL org.opencontainers.image.version="...")
-def get_docker_version : String?
-  begin
-    content = File.read("Dockerfile")
-    match = content.match(/LABEL\s+org\.opencontainers\.image\.version\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
-end
-
 # Extract version from snapcraft.yaml
 def get_snapcraft_version : String?
   begin
@@ -56,17 +45,15 @@ end
 # Main logic
 shard_v = get_shard_version
 hwaro_v = get_hwaro_version
-docker_v = get_docker_version
 snapcraft_v = get_snapcraft_version
 spec_v = get_spec_version
 
 puts "Shard version: #{shard_v || "Not found"}"
 puts "Hwaro version: #{hwaro_v || "Not found"}"
-puts "Docker version: #{docker_v || "Not found"}"
 puts "Snapcraft version: #{snapcraft_v || "Not found"}"
 puts "Spec version: #{spec_v || "Not found"}"
 
-versions = [shard_v, hwaro_v, docker_v, snapcraft_v, spec_v].compact
+versions = [shard_v, hwaro_v, snapcraft_v, spec_v].compact
 
 if versions.empty?
   puts "No versions found!"

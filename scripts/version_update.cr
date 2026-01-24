@@ -3,7 +3,6 @@ require "yaml"
 # Version file locations
 SHARD_FILE     = "shard.yml"
 HWARO_FILE     = "src/hwaro.cr"
-DOCKERFILE     = "Dockerfile"
 SNAPCRAFT_FILE = "snap/snapcraft.yaml"
 SPEC_FILE      = "spec/hwaro_spec.cr"
 
@@ -22,17 +21,6 @@ def get_hwaro_version : String?
   begin
     content = File.read(HWARO_FILE)
     match = content.match(/VERSION\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
-end
-
-# Extract version from Dockerfile (LABEL org.opencontainers.image.version="...")
-def get_docker_version : String?
-  begin
-    content = File.read(DOCKERFILE)
-    match = content.match(/LABEL\s+org\.opencontainers\.image\.version\s*=\s*"([^"]+)"/)
     match ? match[1] : nil
   rescue
     nil
@@ -86,22 +74,6 @@ def update_hwaro_version(new_version : String) : Bool
   end
 end
 
-# Update Dockerfile version
-def update_docker_version(new_version : String) : Bool
-  begin
-    content = File.read(DOCKERFILE)
-    updated = content.gsub(
-      /LABEL\s+org\.opencontainers\.image\.version\s*=\s*"[^"]+"/,
-      "LABEL org.opencontainers.image.version=\"#{new_version}\""
-    )
-    File.write(DOCKERFILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{DOCKERFILE}: #{ex.message}"
-    false
-  end
-end
-
 # Update snapcraft.yaml version
 def update_snapcraft_version(new_version : String) : Bool
   begin
@@ -142,20 +114,18 @@ puts
 # Show current versions
 shard_v = get_shard_version
 hwaro_v = get_hwaro_version
-docker_v = get_docker_version
 snapcraft_v = get_snapcraft_version
 spec_v = get_spec_version
 
 puts "Current versions:"
 puts "  #{SHARD_FILE.ljust(25)} #{shard_v || "Not found"}"
 puts "  #{HWARO_FILE.ljust(25)} #{hwaro_v || "Not found"}"
-puts "  #{DOCKERFILE.ljust(25)} #{docker_v || "Not found"}"
 puts "  #{SNAPCRAFT_FILE.ljust(25)} #{snapcraft_v || "Not found"}"
 puts "  #{SPEC_FILE.ljust(25)} #{spec_v || "Not found"}"
 puts
 
 # Check if versions match
-versions = [shard_v, hwaro_v, docker_v, snapcraft_v, spec_v].compact
+versions = [shard_v, hwaro_v, snapcraft_v, spec_v].compact
 unique_versions = versions.uniq
 
 if unique_versions.size > 1
@@ -164,7 +134,7 @@ if unique_versions.size > 1
   puts
 end
 
-current_version = shard_v || hwaro_v || docker_v || snapcraft_v || "unknown"
+current_version = shard_v || hwaro_v || snapcraft_v || "unknown"
 puts "Current version: #{current_version}"
 puts
 
@@ -211,17 +181,6 @@ if hwaro_v
   total_count += 1
   print "  Updating #{HWARO_FILE}... "
   if update_hwaro_version(new_version)
-    puts "✓"
-    success_count += 1
-  else
-    puts "✗"
-  end
-end
-
-if docker_v
-  total_count += 1
-  print "  Updating #{DOCKERFILE}... "
-  if update_docker_version(new_version)
     puts "✓"
     success_count += 1
   else
