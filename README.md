@@ -44,3 +44,5 @@ shards build
 ## Contributors
 
 - [HAHWUL](https://github.com/hahwul) - creator and maintainer
+
+![](docs/static/CONTRIBUTORS.svg)
