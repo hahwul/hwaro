@@ -2,7 +2,7 @@
 {% include "nav.html" %}
 <div class="docs-container">
   {% include "sidebar.html" %}
-  <main class="docs-main">
+  <main class="docs-main{% if not page.toc %} no-toc{% endif %}">
     <h1>{{ page_title }}</h1>
     {{ content }}
 
@@ -15,9 +15,11 @@
       <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
     </footer>
   </main>
+  {% if page.toc %}
   <aside class="docs-toc">
     <div class="toc-title">On this page</div>
     {{ toc }}
   </aside>
+  {% endif %}
 </div>
 {% include "footer.html" %}
