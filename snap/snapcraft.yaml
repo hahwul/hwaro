@@ -1,6 +1,6 @@
 name: hwaro
 base: core20
-version: 0.0.2
+version: 0.0.3
 summary: Hwaro (화로) is a lightweight and fast static site generator written in Crystal.
 description: Hwaro (화로) is a lightweight and fast static site generator written in Crystal. It provides a flexible, extensible architecture for building static websites with support for markdown content, templates, SEO features, and lifecycle hooks.
 

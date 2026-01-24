@@ -12,7 +12,7 @@ RUN apt-get update && \
 ##= RUNNER =##
 FROM debian:13-slim
 LABEL org.opencontainers.image.title="Hwaro"
-LABEL org.opencontainers.image.version="0.0.2"
+LABEL org.opencontainers.image.version="0.0.3"
 LABEL org.opencontainers.image.description="Hwaro (화로) is a lightweight and fast static site generator written in Crystal."
 LABEL org.opencontainers.image.authors="HAHWUL <hahwul@gmail.com>"
 LABEL org.opencontainers.image.source=https://github.com/hahwul/hwaro
