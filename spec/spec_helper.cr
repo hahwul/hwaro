@@ -1,6 +1,9 @@
 require "spec"
 require "../src/hwaro"
 
+# Suppress Logger output during tests
+Hwaro::Logger.io = IO::Memory.new
+
 # Helper for creating temp directories in tests
 class Dir
   def self.mktmpdir(&)
