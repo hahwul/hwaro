@@ -1,0 +1,75 @@
+---
+name: Build and Release .deb Package
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g., 1.0.0)"
+        required: true
+        type: string
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  build-deb:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+      - name: Checkout source code
+        uses: actions/checkout@v6
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Get Version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Build hwaro Binary
+        run: |
+          docker run --rm --platform linux/${{ matrix.arch }} -v $(pwd):/hwaro -w /hwaro --entrypoint="" 84codes/crystal:latest-debian-12 sh -c "
+            apt-get update && apt-get install -y libyaml-dev ca-certificates git curl &&
+            shards install --production &&
+            /usr/bin/crystal build src/main.cr -o hwaro --release --no-debug --static
+          "
+      - name: Create Debian Package Structure
+        run: |
+          mkdir -p hwaro_${{ env.VERSION }}_${{ matrix.arch }}/DEBIAN
+          mkdir -p hwaro_${{ env.VERSION }}_${{ matrix.arch }}/usr/bin
+          mkdir -p hwaro_${{ env.VERSION }}_${{ matrix.arch }}/usr/share/doc/hwaro
+          cp hwaro hwaro_${{ env.VERSION }}_${{ matrix.arch }}/usr/bin/
+          cp README.md hwaro_${{ env.VERSION }}_${{ matrix.arch }}/usr/share/doc/hwaro/
+          cp LICENSE hwaro_${{ env.VERSION }}_${{ matrix.arch }}/usr/share/doc/hwaro/
+      - name: Create DEBIAN/control file
+        run: |
+          cat > hwaro_${{ env.VERSION }}_${{ matrix.arch }}/DEBIAN/control << EOF
+          Package: hwaro
+          Version: ${{ env.VERSION }}
+          Architecture: ${{ matrix.arch }}
+          Maintainer: HAHWUL <hahwul@gmail.com>, KSG <ksg97031@gmail.com>
+          Description: Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface.
+          Depends: libc6 (>= 2.17)
+          EOF
+      - name: Build .deb Package
+        run: |
+          dpkg-deb --build hwaro_${{ env.VERSION }}_${{ matrix.arch }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: hwaro_${{ env.VERSION }}_${{ matrix.arch }}.deb
+          path: ./
+      - name: Upload .deb to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hwaro_${{ env.VERSION }}_${{ matrix.arch }}.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
