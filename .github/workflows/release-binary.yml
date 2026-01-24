@@ -38,7 +38,7 @@ jobs:
           mkdir -p build
           # Use Crystal container to build static binary
           docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" 84codes/crystal:latest-debian-12 sh -c "
-            apt-get update && apt-get install -y libyaml-dev ca-certificates git curl &&
+            apt-get update && apt-get install -y libyaml-dev liblzma-dev ca-certificates git curl &&
             shards install --production &&
             mkdir -p build &&
             /usr/bin/crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static

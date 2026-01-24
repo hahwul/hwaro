@@ -36,7 +36,7 @@ jobs:
       - name: Build hwaro Binary
         run: |
           docker run --rm --platform linux/${{ matrix.arch }} -v $(pwd):/hwaro -w /hwaro --entrypoint="" 84codes/crystal:latest-debian-12 sh -c "
-            apt-get update && apt-get install -y libyaml-dev ca-certificates git curl &&
+            apt-get update && apt-get install -y libyaml-dev liblzma-dev ca-certificates git curl &&
             shards install --production &&
             /usr/bin/crystal build src/main.cr -o hwaro --release --no-debug --static
           "
