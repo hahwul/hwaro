@@ -5,6 +5,7 @@ SHARD_FILE     = "shard.yml"
 HWARO_FILE     = "src/hwaro.cr"
 DOCKERFILE     = "Dockerfile"
 SNAPCRAFT_FILE = "snap/snapcraft.yaml"
+SPEC_FILE      = "spec/hwaro_spec.cr"
 
 # Extract version from shard.yml
 def get_shard_version : String?
@@ -43,6 +44,17 @@ def get_snapcraft_version : String?
   begin
     snapcraft = YAML.parse(File.read(SNAPCRAFT_FILE))
     snapcraft["version"].as_s
+  rescue
+    nil
+  end
+end
+
+# Extract version from spec/hwaro_spec.cr
+def get_spec_version : String?
+  begin
+    content = File.read(SPEC_FILE)
+    match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
+    match ? match[1] : nil
   rescue
     nil
   end
@@ -103,6 +115,19 @@ def update_snapcraft_version(new_version : String) : Bool
   end
 end
 
+# Update spec/hwaro_spec.cr version
+def update_spec_version(new_version : String) : Bool
+  begin
+    content = File.read(SPEC_FILE)
+    updated = content.gsub(/VERSION\.should eq\("[^"]+"\)/, "VERSION.should eq(\"#{new_version}\")")
+    File.write(SPEC_FILE, updated)
+    true
+  rescue ex
+    puts "  Error updating #{SPEC_FILE}: #{ex.message}"
+    false
+  end
+end
+
 # Validate version format (semver-like: X.Y.Z)
 def valid_version?(version : String) : Bool
   !!(version =~ /^\d+\.\d+\.\d+$/)
@@ -119,16 +144,18 @@ shard_v = get_shard_version
 hwaro_v = get_hwaro_version
 docker_v = get_docker_version
 snapcraft_v = get_snapcraft_version
+spec_v = get_spec_version
 
 puts "Current versions:"
 puts "  #{SHARD_FILE.ljust(25)} #{shard_v || "Not found"}"
 puts "  #{HWARO_FILE.ljust(25)} #{hwaro_v || "Not found"}"
 puts "  #{DOCKERFILE.ljust(25)} #{docker_v || "Not found"}"
 puts "  #{SNAPCRAFT_FILE.ljust(25)} #{snapcraft_v || "Not found"}"
+puts "  #{SPEC_FILE.ljust(25)} #{spec_v || "Not found"}"
 puts
 
 # Check if versions match
-versions = [shard_v, hwaro_v, docker_v, snapcraft_v].compact
+versions = [shard_v, hwaro_v, docker_v, snapcraft_v, spec_v].compact
 unique_versions = versions.uniq
 
 if unique_versions.size > 1
@@ -206,6 +233,17 @@ if snapcraft_v
   total_count += 1
   print "  Updating #{SNAPCRAFT_FILE}... "
   if update_snapcraft_version(new_version)
+    puts "✓"
+    success_count += 1
+  else
+    puts "✗"
+  end
+end
+
+if spec_v
+  total_count += 1
+  print "  Updating #{SPEC_FILE}... "
+  if update_spec_version(new_version)
     puts "✓"
     success_count += 1
   else
