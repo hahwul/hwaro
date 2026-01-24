@@ -32,7 +32,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US.UTF-8
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libxml2 zlib1g libyaml-0-2 git && \
+    apt-get install -y --no-install-recommends libxml2 zlib1g libyaml-0-2 git ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /hwaro/bin/hwaro /usr/local/bin/hwaro
