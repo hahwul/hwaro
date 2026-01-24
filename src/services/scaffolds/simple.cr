@@ -54,6 +54,7 @@ module Hwaro
             str << base_config
 
             # Content & Processing
+            str << multilingual_config
             str << plugins_config
             str << content_files_config
             str << highlight_config

@@ -29,6 +29,8 @@ From front matter and content:
 | `page_section` | Section name (e.g., `blog`) |
 | `page_date` | Page date (YYYY-MM-DD) |
 | `page_image` | Featured image |
+| `page_language` | Page language code |
+| `page_translations` | Language variants (array) |
 | `content` | Rendered HTML content |
 
 ### Page Object
@@ -43,6 +45,8 @@ Access boolean properties via `page` object:
 | `page.render` | Should render |
 | `page.generated` | Is generated |
 | `page.in_sitemap` | Include in sitemap |
+| `page.language` | Page language code |
+| `page.translations` | Language variants (array) |
 
 ## Section Variables
 

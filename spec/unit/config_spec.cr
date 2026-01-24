@@ -337,6 +337,15 @@ describe Hwaro::Models::Config do
       config.multilingual?.should be_true
     end
 
+    it "returns true for multilingual? when default language differs and one language configured" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      config.languages["ko"] = ko
+
+      config.multilingual?.should be_true
+    end
+
     it "can configure multiple languages" do
       config = Hwaro::Models::Config.new
 

@@ -13,6 +13,29 @@ description = "Site description"
 base_url = "https://example.com"
 ```
 
+## Multilingual
+
+Enable multilingual routing by defining languages and a default language:
+
+```toml
+default_language = "en"
+
+[languages.en]
+language_name = "English"
+weight = 1
+
+[languages.ko]
+language_name = "한국어"
+weight = 2
+```
+
+Then add language variants using filename suffixes:
+
+- `content/about.md` → `/about/`
+- `content/about.ko.md` → `/ko/about/`
+- `content/about/index.md` → `/about/`
+- `content/about/index.ko.md` → `/ko/about/`
+
 ## Syntax Highlighting
 
 ```toml

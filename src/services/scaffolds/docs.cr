@@ -66,6 +66,7 @@ module Hwaro
             str << base_config("Documentation", "Project documentation powered by Hwaro.")
 
             # Content & Processing
+            str << multilingual_config
             str << plugins_config
             str << content_files_config
             str << highlight_config

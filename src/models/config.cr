@@ -470,7 +470,9 @@ module Hwaro
 
       # Check if site is multilingual
       def multilingual? : Bool
-        @languages.size > 1
+        codes = @languages.keys
+        codes << @default_language unless @default_language.empty?
+        codes.uniq.size > 1
       end
 
       # Get language config by code, returns nil if not found

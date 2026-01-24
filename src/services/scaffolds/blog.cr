@@ -64,6 +64,7 @@ module Hwaro
             str << base_config("My Blog", "Welcome to my personal blog powered by Hwaro.")
 
             # Content & Processing
+            str << multilingual_config
             str << plugins_config
             str << content_files_config
             str << highlight_config

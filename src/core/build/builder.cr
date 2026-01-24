@@ -29,6 +29,7 @@ require "../../config/options/build_options"
 require "../../content/processors/markdown"
 require "../../content/processors/content_files"
 require "../../content/processors/template"
+require "../../content/multilingual"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
@@ -223,6 +224,11 @@ module Hwaro
           profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
+          # Link multilingual translations between pages/sections (for language switchers)
+          if config = ctx.config
+            Content::Multilingual.link_translations!(ctx.all_pages, config)
+          end
+
           # Phase: Transform
           profiler.start_phase("Transform")
           result = @lifecycle.run_phase(Lifecycle::Phase::Transform, ctx) do
@@ -380,7 +386,7 @@ module Hwaro
           # Match pattern: filename.lang.md (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
           if match = basename.match(/^(.+)\.([a-z]{2,3})\.md$/)
             lang_code = match[2]
-            return lang_code if config.languages.has_key?(lang_code)
+            return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
           end
 
           nil
@@ -847,21 +853,38 @@ module Hwaro
           vars["page_image"] = Crinja::Value.new(page.image || config.og.default_image || "")
           vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
           vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
+          page_language = page.language || config.default_language
+          vars["page_language"] = Crinja::Value.new(page_language)
+
+          translations = page.translations.map do |t|
+            Crinja::Value.new(
+              {
+                "code"       => Crinja::Value.new(t.code),
+                "url"        => Crinja::Value.new(t.url),
+                "title"      => Crinja::Value.new(t.title),
+                "is_current" => Crinja::Value.new(t.is_current),
+                "is_default" => Crinja::Value.new(t.is_default),
+              }
+            )
+          end
+          vars["page_translations"] = Crinja::Value.new(translations)
 
           # Page object with all properties
           page_obj = {
-            "title"       => Crinja::Value.new(page.title),
-            "description" => Crinja::Value.new(page.description || ""),
-            "url"         => Crinja::Value.new(page.url),
-            "section"     => Crinja::Value.new(page.section),
-            "date"        => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
-            "image"       => Crinja::Value.new(page.image || ""),
-            "draft"       => Crinja::Value.new(page.draft),
-            "toc"         => Crinja::Value.new(page.toc),
-            "render"      => Crinja::Value.new(page.render),
-            "is_index"    => Crinja::Value.new(page.is_index),
-            "generated"   => Crinja::Value.new(page.generated),
-            "in_sitemap"  => Crinja::Value.new(page.in_sitemap),
+            "title"        => Crinja::Value.new(page.title),
+            "description"  => Crinja::Value.new(page.description || ""),
+            "url"          => Crinja::Value.new(page.url),
+            "section"      => Crinja::Value.new(page.section),
+            "date"         => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
+            "image"        => Crinja::Value.new(page.image || ""),
+            "draft"        => Crinja::Value.new(page.draft),
+            "toc"          => Crinja::Value.new(page.toc),
+            "render"       => Crinja::Value.new(page.render),
+            "is_index"     => Crinja::Value.new(page.is_index),
+            "generated"    => Crinja::Value.new(page.generated),
+            "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
+            "language"     => Crinja::Value.new(page_language),
+            "translations" => Crinja::Value.new(translations),
           }
           vars["page"] = Crinja::Value.new(page_obj)
 

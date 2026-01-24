@@ -52,6 +52,7 @@ require "./content/processors/xml"
 require "./content/processors/table_parser"
 require "./content/processors/syntax_highlighter"
 require "./content/processors/template"
+require "./content/multilingual"
 
 # Load lifecycle system
 require "./core/lifecycle"

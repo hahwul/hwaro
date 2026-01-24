@@ -1,5 +1,22 @@
 module Hwaro
   module Models
+    struct TranslationLink
+      property code : String
+      property url : String
+      property title : String
+      property is_current : Bool
+      property is_default : Bool
+
+      def initialize(
+        @code : String,
+        @url : String,
+        @title : String,
+        @is_current : Bool = false,
+        @is_default : Bool = false,
+      )
+      end
+    end
+
     class Page
       # Front Matter Properties
       property title : String
@@ -31,6 +48,7 @@ module Hwaro
       property url : String       # Calculated relative URL (e.g. "/projects/a/")
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
+      property translations : Array(TranslationLink)
 
       def initialize(@path : String)
         @title = "Untitled"
@@ -53,6 +71,7 @@ module Hwaro
         @in_sitemap = true
         @toc = false
         @language = nil
+        @translations = [] of TranslationLink
       end
     end
   end

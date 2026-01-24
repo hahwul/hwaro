@@ -230,6 +230,31 @@ module Hwaro
           TOML
         end
 
+        protected def multilingual_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Multilingual (Optional)
+          # =============================================================================
+          # Enable multilingual routing by defining languages and a default language.
+          # Then add language variants using filename suffixes:
+          # - content/about.md -> /about/
+          # - content/about.ko.md -> /ko/about/
+          # - content/about/index.ko.md -> /ko/about/
+
+          # default_language = "en"
+          #
+          # [languages.en]
+          # language_name = "English"
+          # weight = 1
+          #
+          # [languages.ko]
+          # language_name = "한국어"
+          # weight = 2
+
+          TOML
+        end
+
         protected def plugins_config : String
           <<-TOML
 
