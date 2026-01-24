@@ -4,7 +4,7 @@
 
 title = "Hwaro"
 description = "Fast and lightweight static site generator built with Crystal"
-base_url = "/"
+base_url = ""
 
 # =============================================================================
 # Plugins
