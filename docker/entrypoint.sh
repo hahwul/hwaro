@@ -2,18 +2,22 @@
 set -e
 set -o pipefail
 
+# Detect if running in GitHub Actions environment
+# If not in GitHub Actions, pass through to hwaro CLI
+if [[ -z "$GITHUB_ACTIONS" ]]; then
+    exec hwaro "$@"
+fi
+
+# ========================================
+# GitHub Actions Mode
+# ========================================
+
 # Default values
-if [[ -z "$PAGES_BRANCH" ]]; then
-    PAGES_BRANCH="gh-pages"
-fi
-
-if [[ -z "$BUILD_DIR" ]]; then
-    BUILD_DIR="."
-fi
-
-if [[ -z "$OUT_DIR" ]]; then
-    OUT_DIR="public"
-fi
+PAGES_BRANCH="${PAGES_BRANCH:-gh-pages}"
+BUILD_DIR="${BUILD_DIR:-.}"
+OUT_DIR="${OUT_DIR:-public}"
+BUILD_ONLY="${BUILD_ONLY:-false}"
+GITHUB_HOSTNAME="${GITHUB_HOSTNAME:-github.com}"
 
 if [[ -n "$REPOSITORY" ]]; then
     TARGET_REPOSITORY=$REPOSITORY
@@ -23,14 +27,6 @@ else
         exit 1
     fi
     TARGET_REPOSITORY=${GITHUB_REPOSITORY}
-fi
-
-if [[ -z "$BUILD_ONLY" ]]; then
-    BUILD_ONLY=false
-fi
-
-if [[ -z "$GITHUB_HOSTNAME" ]]; then
-    GITHUB_HOSTNAME="github.com"
 fi
 
 # Support both INPUT_TOKEN (from action inputs) and GITHUB_TOKEN
@@ -50,9 +46,9 @@ main() {
     echo "Building in $BUILD_DIR directory"
     cd "$BUILD_DIR"
 
-    # Disable safe directory check to avoid 'dubious ownership' error
-    git config --global --add safe.directory '*'
-    git config --global init.defaultBranch 'gh_action'
+    # Disable safe directory check to avoid dubious ownership error
+    git config --global --add safe.directory "*"
+    git config --global init.defaultBranch "gh_action"
 
     # Show hwaro version
     version=$(hwaro --version)
