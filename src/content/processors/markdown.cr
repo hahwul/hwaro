@@ -335,7 +335,6 @@ module Hwaro
 
           taxonomies
         end
-
       end
 
       # Register the markdown processor by default

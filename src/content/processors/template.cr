@@ -173,7 +173,7 @@ module Hwaro
         # Register custom filters specific to Hwaro
         private def register_custom_filters
           # Date formatting filter
-          @env.filters["date"] = Crinja.filter({ format: "%Y-%m-%d" }) do
+          @env.filters["date"] = Crinja.filter({format: "%Y-%m-%d"}) do
             value = target.raw
             format = arguments["format"].as_s
 
@@ -193,7 +193,7 @@ module Hwaro
           end
 
           # Truncate words filter
-          @env.filters["truncate_words"] = Crinja.filter({ length: 50, end: "..." }) do
+          @env.filters["truncate_words"] = Crinja.filter({length: 50, end: "..."}) do
             text = target.to_s
             length = arguments["length"].as_number.to_i
             ending = arguments["end"].as_s
@@ -267,7 +267,7 @@ module Hwaro
           end
 
           # Array where filter (filter array by property value)
-          @env.filters["where"] = Crinja.filter({ attribute: nil, value: nil }) do
+          @env.filters["where"] = Crinja.filter({attribute: nil, value: nil}) do
             result = begin
               arr = target.as_a
               attr = arguments["attribute"].to_s
@@ -290,7 +290,7 @@ module Hwaro
           end
 
           # Array sort_by filter
-          @env.filters["sort_by"] = Crinja.filter({ attribute: nil, reverse: false }) do
+          @env.filters["sort_by"] = Crinja.filter({attribute: nil, reverse: false}) do
             result = begin
               arr = target.as_a
               attr = arguments["attribute"].to_s
@@ -314,7 +314,7 @@ module Hwaro
           end
 
           # Group by filter
-          @env.filters["group_by"] = Crinja.filter({ attribute: nil }) do
+          @env.filters["group_by"] = Crinja.filter({attribute: nil}) do
             result = begin
               arr = target.as_a
               attr = arguments["attribute"].to_s
@@ -346,7 +346,7 @@ module Hwaro
           end
 
           # Split filter - split string by separator
-          @env.filters["split"] = Crinja.filter({ pat: "," }) do
+          @env.filters["split"] = Crinja.filter({pat: ","}) do
             text = target.to_s
             separator = arguments["pat"].to_s
             parts = text.split(separator).map { |s| Crinja::Value.new(s.strip) }
@@ -365,7 +365,7 @@ module Hwaro
           end
 
           # Default filter - provide default value if empty/nil
-          @env.filters["default"] = Crinja.filter({ value: "" }) do
+          @env.filters["default"] = Crinja.filter({value: ""}) do
             val = target.to_s
             if val.empty?
               arguments["value"].to_s
@@ -436,7 +436,7 @@ module Hwaro
         # Register custom functions
         private def register_custom_functions
           # now() function - returns current time
-          @env.functions["now"] = Crinja.function({ format: nil }) do
+          @env.functions["now"] = Crinja.function({format: nil}) do
             format = arguments["format"]
             time = Time.local
 
@@ -448,7 +448,7 @@ module Hwaro
           end
 
           # url_for() function - generate URL for a path
-          @env.functions["url_for"] = Crinja.function({ path: "" }) do
+          @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
             base_url = env.resolve("base_url").to_s
 

@@ -212,8 +212,6 @@ module Hwaro
             html_content # No truncation - return full HTML
           end
         end
-
-
       end
     end
   end

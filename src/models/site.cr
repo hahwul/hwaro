@@ -23,7 +23,7 @@ module Hwaro
       end
 
       def taxonomy_pages(name : String, term : String) : Array(Page)
-        @taxonomies[name]?.try(&.[term]) || [] of Page
+        @taxonomies[name]?.try(&.[term]?) || [] of Page
       end
     end
   end

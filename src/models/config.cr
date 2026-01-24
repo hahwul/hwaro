@@ -184,7 +184,7 @@ module Hwaro
         description : String?,
         url : String,
         image : String?,
-        base_url : String
+        base_url : String,
       ) : String
         tags = [] of String
 
@@ -215,7 +215,7 @@ module Hwaro
         title : String,
         description : String?,
         image : String?,
-        base_url : String
+        base_url : String,
       ) : String
         tags = [] of String
 
@@ -249,7 +249,7 @@ module Hwaro
         description : String?,
         url : String,
         image : String?,
-        base_url : String
+        base_url : String,
       ) : String
         og = og_tags(title, description, url, image, base_url)
         twitter = twitter_tags(title, description, image, base_url)
@@ -258,9 +258,9 @@ module Hwaro
 
       private def escape_html(text : String) : String
         text.gsub("&", "&amp;")
-            .gsub("<", "&lt;")
-            .gsub(">", "&gt;")
-            .gsub("\"", "&quot;")
+          .gsub("<", "&lt;")
+          .gsub(">", "&gt;")
+          .gsub("\"", "&quot;")
       end
     end
 
