@@ -38,7 +38,7 @@ module Hwaro
 
       # Get all registered command names
       def self.names : Array(String)
-        @@commands.keys.sort
+        @@commands.keys.sort!
       end
 
       # Get command description
@@ -119,6 +119,7 @@ module Hwaro
 
       private def print_help
         Logger.info "Usage: hwaro <command> [options]"
+        Logger.info "Hwaro is a fast and lightweight static site generator written in Crystal."
         Logger.info ""
         Logger.info "Commands:"
 
