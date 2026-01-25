@@ -5,8 +5,30 @@ toc = true
 
 ## Prerequisites
 
-- [Crystal](https://crystal-lang.org/install/) 1.0+
+- [Crystal](https://crystal-lang.org/install/) 1.19+
 - Git
+
+## Homebrew
+
+```bash
+brew tap hahwul/hwaro
+brew install hwaro
+```
+
+## Docker
+
+You can use the official Docker image from GitHub Container Registry:
+
+```bash
+# Run hwaro commands
+docker run --rm -v $(pwd):/app ghcr.io/hahwul/hwaro --help
+
+# Build a site
+docker run --rm -v $(pwd):/app ghcr.io/hahwul/hwaro build
+
+# Serve a site
+docker run --rm -p 3000:3000 -v $(pwd):/app ghcr.io/hahwul/hwaro serve
+```
 
 ## Build from Source
 
@@ -19,7 +41,7 @@ shards build --release
 
 The binary is created at `bin/hwaro`.
 
-## Add to PATH
+### Add to PATH
 
 ```bash
 # Option 1: Copy to system path
@@ -36,6 +58,15 @@ hwaro --version
 ```
 
 ## Update
+
+### Via Homebrew
+
+```bash
+brew update
+brew upgrade hwaro
+```
+
+### Via Source
 
 ```bash
 cd hwaro
