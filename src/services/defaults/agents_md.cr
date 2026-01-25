@@ -115,6 +115,7 @@ module Hwaro
 
           #### Section Variables (in section.html)
           - `{{ section_list }}` - HTML list of pages in section
+          - `{{ pagination }}` - Pagination navigation HTML (empty if disabled or single page)
           - `{{ toc }}` - Table of contents HTML
 
           #### Taxonomy Variables
@@ -136,6 +137,27 @@ module Hwaro
           ```jinja
           {% include "header.html" %}
           {% include "footer.html" %}
+          ```
+
+          ### Pagination
+
+          Enable global pagination in `config.toml`:
+
+          ```toml
+          [pagination]
+          enabled = true
+          per_page = 10
+          ```
+
+          Override per section in a section `_index.md` front matter:
+
+          ```toml
+          +++
+          paginate = 10
+          pagination_enabled = true
+          sort_by = "date"   # "date" | "title" | "weight"
+          reverse = false
+          +++
           ```
 
           ### Conditional Rendering

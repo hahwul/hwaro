@@ -72,6 +72,7 @@ module Hwaro
             str << highlight_config
             str << og_config
             str << search_config
+            str << pagination_config
             str << taxonomies_config unless skip_taxonomies
 
             # SEO & Feeds
@@ -167,6 +168,12 @@ module Hwaro
               ul.section-list { list-style: none; padding: 0; }
               ul.section-list li { margin-bottom: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-subtle); border-radius: 6px; border: 1px solid var(--border); }
               ul.section-list li a { font-weight: 500; }
+              nav.pagination { margin: 1.5rem 0; }
+              nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+              nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); text-decoration: none; }
+              nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
+              .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+              .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
 
               /* Footer */
               .docs-footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; }
@@ -293,6 +300,7 @@ module Hwaro
               <ul class="section-list">
                 {{ section_list }}
               </ul>
+              {{ pagination }}
           {% include "footer.html" %}
           HTML
         end

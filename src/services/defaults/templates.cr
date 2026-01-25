@@ -21,6 +21,12 @@ module Hwaro
               code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; font-size: 0.9em; }
               ul.section-list { list-style: none; padding: 0; }
               ul.section-list li { margin-bottom: 0.5rem; }
+              nav.pagination { margin: 1.5rem 0; }
+              nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+              nav.pagination a { color: #0070f3; text-decoration: none; padding: 0.25rem 0.5rem; border: 1px solid #eaeaea; border-radius: 6px; }
+              nav.pagination a:hover { text-decoration: underline; }
+              .pagination-current span { padding: 0.25rem 0.5rem; border: 1px solid #0070f3; border-radius: 6px; background: #eef6ff; }
+              .pagination-disabled span { padding: 0.25rem 0.5rem; border: 1px solid #eaeaea; border-radius: 6px; color: #999; }
             </style>
           </head>
           <body data-section="{{ page_section }}">
@@ -65,6 +71,7 @@ module Hwaro
           <ul class="section-list">
             {{ section_list }}
           </ul>
+          {{ pagination }}
 
           </main>
           {% include "footer.html" %}

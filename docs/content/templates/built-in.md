@@ -107,6 +107,7 @@ For section index pages (`_index.md`):
 <ul class="page-list">
   {{ section_list }}
 </ul>
+{{ pagination }}
 {% endblock %}
 ```
 

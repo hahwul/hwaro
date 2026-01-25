@@ -79,6 +79,20 @@ fields = ["title", "content", "description"]
 filename = "search.json"
 
 # =============================================================================
+# Pagination
+# =============================================================================
+# Enable pagination for section listing pages (e.g., /blog/, /posts/).
+# You can override per section in `_index.md` with:
+# - paginate = 10
+# - pagination_enabled = true
+# - sort_by = "date" | "title" | "weight"
+# - reverse = false
+
+[pagination]
+enabled = false
+per_page = 10
+
+# =============================================================================
 # Taxonomies
 # =============================================================================
 # Define content classification systems (tags, categories, etc.)

@@ -57,6 +57,7 @@ For section templates:
 | `section_title` | Section title |
 | `section_description` | Section description |
 | `section_list` | HTML list of pages in section |
+| `pagination` | Pagination navigation HTML (empty if disabled or single page) |
 
 ## Taxonomy Variables
 

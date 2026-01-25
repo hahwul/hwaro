@@ -82,6 +82,8 @@ module Hwaro
           generate_feeds = false
           paginate = nil.as(Int32?)
           pagination_enabled = nil.as(Bool?)
+          sort_by = nil.as(String?)
+          reverse = nil.as(Bool?)
 
           # Try TOML Front Matter (+++)
           if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
@@ -117,6 +119,12 @@ module Hwaro
               end
               if toml_fm.has_key?("pagination_enabled")
                 pagination_enabled = toml_fm["pagination_enabled"].as_bool
+              end
+              if toml_fm.has_key?("sort_by")
+                sort_by = toml_fm["sort_by"].as_s
+              end
+              if toml_fm.has_key?("reverse")
+                reverse = toml_fm["reverse"].as_bool
               end
 
               slug = toml_fm["slug"]?.try(&.as_s)
@@ -179,6 +187,13 @@ module Hwaro
                   bool_val = val.as_bool?
                   pagination_enabled = bool_val unless bool_val.nil?
                 end
+                if (val = yaml_fm["sort_by"]?)
+                  sort_by = val.as_s?
+                end
+                if (val = yaml_fm["reverse"]?)
+                  bool_val = val.as_bool?
+                  reverse = bool_val unless bool_val.nil?
+                end
 
                 slug = yaml_fm["slug"]?.try(&.as_s?)
                 custom_path = yaml_fm["path"]?.try(&.as_s?)
@@ -222,6 +237,8 @@ module Hwaro
             generate_feeds:     generate_feeds,
             paginate:           paginate,
             pagination_enabled: pagination_enabled,
+            sort_by:            sort_by,
+            reverse:            reverse,
           }
         end
 

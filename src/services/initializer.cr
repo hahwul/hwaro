@@ -282,6 +282,19 @@ module Hwaro
           str << "fields = [\"title\", \"content\"]\n"
           str << "filename = \"search.json\"\n\n"
 
+          str << "# =============================================================================\n"
+          str << "# Pagination\n"
+          str << "# =============================================================================\n"
+          str << "# Enable pagination for section listing pages (e.g., /blog/).\n"
+          str << "# You can override per section in `_index.md` with:\n"
+          str << "# - paginate = 10\n"
+          str << "# - pagination_enabled = true\n"
+          str << "# - sort_by = \"date\" | \"title\" | \"weight\"\n"
+          str << "# - reverse = false\n\n"
+          str << "[pagination]\n"
+          str << "enabled = false\n"
+          str << "per_page = 10\n\n"
+
           # Taxonomies
           str << taxonomies_config unless skip_taxonomies
 
@@ -405,6 +418,8 @@ module Hwaro
         <<-CONTENT
 +++
 title = "#{title}"
+paginate = 10
+pagination_enabled = true
 +++
 
 # #{title}

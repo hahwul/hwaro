@@ -426,6 +426,8 @@ module Hwaro
               page.generate_feeds = data[:generate_feeds]
               page.paginate = data[:paginate]
               page.pagination_enabled = data[:pagination_enabled]
+              page.sort_by = data[:sort_by]
+              page.reverse = data[:reverse]
             end
 
             # Calculate URL
@@ -680,11 +682,16 @@ module Hwaro
             section_list_html = renderer.render_section_list(paginated_page)
             pagination_nav_html = renderer.render_pagination_nav(paginated_page)
 
-            # Combined section list with pagination nav
-            combined_section_html = section_list_html + pagination_nav_html
+            # Use the correct URL for each paginated page during rendering (important for SEO tags, nav, etc.)
+            base = section.url.rstrip("/")
+            current_url = if paginated_page.page_number == 1
+                            "#{base}/"
+                          else
+                            "#{base}/page/#{paginated_page.page_number}/"
+                          end
 
             final_html = if template_content
-                           apply_template(template_content, html_content, section, site.config, combined_section_html, toc_html, templates)
+                           apply_template(template_content, html_content, section, site.config, section_list_html, toc_html, templates, pagination_nav_html, current_url)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -814,12 +821,14 @@ module Hwaro
           section_list : String,
           toc : String,
           templates : Hash(String, String),
+          pagination : String = "",
+          page_url_override : String? = nil,
         ) : String
           # Use Crinja for Jinja2-style templates
           env = crinja_env
 
           # Build template variables
-          vars = build_template_variables(page, config, content, section_list, toc)
+          vars = build_template_variables(page, config, content, section_list, toc, pagination, page_url_override)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
           processed_template = process_shortcodes_jinja(template, templates)
@@ -841,13 +850,17 @@ module Hwaro
           content : String,
           section_list : String,
           toc : String,
+          pagination : String = "",
+          page_url_override : String? = nil,
         ) : Hash(String, Crinja::Value)
           vars = {} of String => Crinja::Value
+
+          effective_url = page_url_override || page.url
 
           # Page variables (flat for convenience)
           vars["page_title"] = Crinja::Value.new(page.title)
           vars["page_description"] = Crinja::Value.new(page.description || config.description || "")
-          vars["page_url"] = Crinja::Value.new(page.url)
+          vars["page_url"] = Crinja::Value.new(effective_url)
           vars["page_section"] = Crinja::Value.new(page.section)
           vars["page_date"] = Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || "")
           vars["page_image"] = Crinja::Value.new(page.image || config.og.default_image || "")
@@ -873,7 +886,7 @@ module Hwaro
           page_obj = {
             "title"        => Crinja::Value.new(page.title),
             "description"  => Crinja::Value.new(page.description || ""),
-            "url"          => Crinja::Value.new(page.url),
+            "url"          => Crinja::Value.new(effective_url),
             "section"      => Crinja::Value.new(page.section),
             "date"         => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
             "image"        => Crinja::Value.new(page.image || ""),
@@ -905,6 +918,7 @@ module Hwaro
           vars["content"] = Crinja::Value.new(content)
           vars["section_list"] = Crinja::Value.new(section_list)
           vars["toc"] = Crinja::Value.new(toc)
+          vars["pagination"] = Crinja::Value.new(pagination)
 
           # Highlight tags
           vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag)
@@ -917,9 +931,9 @@ module Hwaro
           vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url))
 
           # OG/Twitter tags
-          og_tags = config.og.og_tags(page.title, page.description, page.url, page.image, config.base_url)
+          og_tags = config.og.og_tags(page.title, page.description, effective_url, page.image, config.base_url)
           twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
-          og_all_tags = config.og.all_tags(page.title, page.description, page.url, page.image, config.base_url)
+          og_all_tags = config.og.all_tags(page.title, page.description, effective_url, page.image, config.base_url)
           vars["og_tags"] = Crinja::Value.new(og_tags)
           vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
           vars["og_all_tags"] = Crinja::Value.new(og_all_tags)

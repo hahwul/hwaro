@@ -60,6 +60,7 @@ module Hwaro
             str << highlight_config
             str << og_config
             str << search_config
+            str << pagination_config
             str << taxonomies_config unless skip_taxonomies
 
             # SEO & Feeds
