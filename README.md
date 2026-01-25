@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://hwaro.hahwul.com/getting-started/">Documentation</a> •
   <a href="https://hwaro.hahwul.com/getting-started/installation/">Installation</a> •
-  <a href="#usage">Usage</a> •
+  <a href="https://hwaro.hahwul.com/deployment/#github-actions">Github Action</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -35,14 +35,6 @@ shards build
 
 ## Contributing
 
-1. Fork it (<https://github.com/your-github-user/hwaro/fork>)
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create a new Pull Request
-
-## Contributors
-
-- [HAHWUL](https://github.com/hahwul) - creator and maintainer
+Hwaro is an open-source project made with ❤️. If you would like to contribute, please check [CONTRIBUTING.md](CONTRIBUTING.md) and submit a Pull Request.
 
 ![](docs/static/CONTRIBUTORS.svg)
