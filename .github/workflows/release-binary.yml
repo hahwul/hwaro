@@ -39,9 +39,9 @@ jobs:
           # Use Alpine/musl-based Crystal container for proper static binary
           docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" 84codes/crystal:latest-alpine sh -c "
             apk add --no-cache yaml-dev git curl &&
-            shards install --production &&
+            shards install --release --no-debug --production &&
             mkdir -p build &&
-            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release  --static
+            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static
           "
       - if: startsWith(matrix.os, 'macos')
         name: Build binary (macOS)

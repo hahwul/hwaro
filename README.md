@@ -54,7 +54,7 @@ cd hwaro
 shards install
 
 # Build
-shards build --production
+shards build --release --no-debug --production
 ```
 
 ## Contributing

@@ -22,7 +22,7 @@ jobs:
             "crystal"
           install: |
             system "shards install"
-            system "shards build --production"
+            system "shards build --release --no-debug --production"
             bin.install "bin/hwaro"
           test: system "{bin}/hwaro", "version"
           update_readme_table: false
