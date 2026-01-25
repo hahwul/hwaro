@@ -108,7 +108,8 @@ style.textContent = `
     cursor: pointer;
     transition: background 0.2s;
   }
-  .search-result:hover {
+  .search-result:hover,
+  .search-result.selected {
     background: var(--bg-hover);
   }
   .search-result-title {
@@ -153,25 +154,57 @@ document.getElementById("search-overlay").addEventListener("click", hideSearch);
 document.getElementById("search-close").addEventListener("click", hideSearch);
 
 const searchInput = document.getElementById("search-input");
-searchInput.addEventListener("input", performSearch);
+let selectedIndex = -1;
+
+searchInput.addEventListener("input", () => {
+  selectedIndex = -1;
+  performSearch();
+});
+
 searchInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const results = document.querySelectorAll(".search-result");
-    if (results.length > 0) {
+  const results = document.querySelectorAll(".search-result");
+  if (results.length === 0) return;
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    selectedIndex = (selectedIndex + 1) % results.length;
+    updateSelection(results);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    selectedIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
+    updateSelection(results);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (selectedIndex >= 0 && selectedIndex < results.length) {
+      results[selectedIndex].click();
+    } else if (results.length > 0) {
       results[0].click();
     }
   }
 });
+
+function updateSelection(results) {
+  results.forEach((result, index) => {
+    if (index === selectedIndex) {
+      result.classList.add("selected");
+      result.scrollIntoView({ block: "nearest" });
+    } else {
+      result.classList.remove("selected");
+    }
+  });
+}
 
 function showSearch() {
   searchModal.style.display = "block";
   searchInput.focus();
   searchInput.value = "";
   document.getElementById("search-results").innerHTML = "";
+  selectedIndex = -1;
 }
 
 function hideSearch() {
   searchModal.style.display = "none";
+  selectedIndex = -1;
 }
 
 function performSearch() {
