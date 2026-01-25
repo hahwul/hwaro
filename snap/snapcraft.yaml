@@ -26,7 +26,7 @@ parts:
       curl -fsSL https://crystal-lang.org/install.sh | sudo bash
       snapcraftctl pull
       shards install --production
-      shards build --release --no-debug --production
+      shards build --production
       cp ./bin/hwaro $SNAPCRAFT_PART_INSTALL/
       snapcraftctl build
     build-packages:

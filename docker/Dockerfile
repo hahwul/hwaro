@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends zlib1g-dev pkg-config && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     shards install --production && \
-    shards build --release --no-debug --production
+    shards build --production
 
 ##= RUNNER =##
 FROM debian:13-slim
