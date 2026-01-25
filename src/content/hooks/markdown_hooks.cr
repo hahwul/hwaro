@@ -71,6 +71,8 @@ module Hwaro
             page.generate_feeds = data[:generate_feeds]
             page.paginate = data[:paginate]
             page.pagination_enabled = data[:pagination_enabled]
+            page.sort_by = data[:sort_by]
+            page.reverse = data[:reverse]
           end
         end
 

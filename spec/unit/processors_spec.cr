@@ -512,6 +512,8 @@ describe Hwaro::Processor::Markdown do
       title = "Wiki"
       paginate = 5
       pagination_enabled = true
+      sort_by = "title"
+      reverse = true
       +++
 
       # Wiki Section
@@ -520,6 +522,8 @@ describe Hwaro::Processor::Markdown do
       result = Hwaro::Processor::Markdown.parse(content)
       result[:paginate].should eq(5)
       result[:pagination_enabled].should eq(true)
+      result[:sort_by].should eq("title")
+      result[:reverse].should eq(true)
     end
 
     it "parses pagination settings from YAML frontmatter" do
@@ -528,6 +532,8 @@ describe Hwaro::Processor::Markdown do
       title: Wiki
       paginate: 10
       pagination_enabled: false
+      sort_by: date
+      reverse: false
       ---
 
       # Wiki Section
@@ -536,6 +542,8 @@ describe Hwaro::Processor::Markdown do
       result = Hwaro::Processor::Markdown.parse(content)
       result[:paginate].should eq(10)
       result[:pagination_enabled].should eq(false)
+      result[:sort_by].should eq("date")
+      result[:reverse].should eq(false)
     end
 
     it "defaults pagination settings to nil when not specified" do
@@ -550,6 +558,8 @@ describe Hwaro::Processor::Markdown do
       result = Hwaro::Processor::Markdown.parse(content)
       result[:paginate].should be_nil
       result[:pagination_enabled].should be_nil
+      result[:sort_by].should be_nil
+      result[:reverse].should be_nil
     end
   end
 end
