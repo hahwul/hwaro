@@ -124,17 +124,24 @@ style.textContent = `
   }
   #search-close {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    background: none;
-    border: none;
-    font-size: 24px;
+    top: -12px;
+    right: -12px;
+    background: var(--bg);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
     cursor: pointer;
-    color: var(--text-muted);
+    z-index: 1001;
     font-family: var(--font-mono);
   }
   #search-close:hover {
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--bg);
   }
 `;
 document.head.appendChild(style);
