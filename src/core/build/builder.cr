@@ -952,6 +952,39 @@ module Hwaro
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
         # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
         private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
+          # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
+          # so documentation can show literal `{{ ... }}` examples safely.
+          String.build do |io|
+            in_fence = false
+            fence_marker = ""
+            buffer = String::Builder.new
+
+            content.each_line(chomp: false) do |line|
+              if in_fence
+                io << line
+                if line.match(/^\s*#{Regex.escape(fence_marker)}\s*$/)
+                  in_fence = false
+                  fence_marker = ""
+                end
+                next
+              end
+
+              if match = line.match(/^\s*(`{3,}|~{3,})/)
+                io << process_shortcodes_in_text(buffer.to_s, templates)
+                buffer = String::Builder.new
+                in_fence = true
+                fence_marker = match[1]
+                io << line
+              else
+                buffer << line
+              end
+            end
+
+            io << process_shortcodes_in_text(buffer.to_s, templates)
+          end
+        end
+
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String)) : String
           processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
             args_str = $2
