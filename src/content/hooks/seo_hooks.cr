@@ -45,7 +45,7 @@ module Hwaro
           Content::Seo::Robots.generate(site.config, ctx.output_dir, ctx.options.verbose)
 
           # Generate llms.txt
-          Content::Seo::Llms.generate(site.config, ctx.output_dir, ctx.options.verbose)
+          Content::Seo::Llms.generate(site.config, all_pages, ctx.output_dir, ctx.options.verbose)
         end
 
         private def generate_search_index(ctx : Core::Lifecycle::BuildContext)

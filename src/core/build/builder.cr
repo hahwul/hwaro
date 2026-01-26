@@ -280,7 +280,7 @@ module Hwaro
               Content::Seo::Sitemap.generate(all_pages, site, output_dir)
               Content::Seo::Feeds.generate(all_pages, site.config, output_dir)
               Content::Seo::Robots.generate(site.config, output_dir)
-              Content::Seo::Llms.generate(site.config, output_dir)
+              Content::Seo::Llms.generate(site.config, all_pages, output_dir)
               Content::Search.generate(all_pages, site.config, output_dir)
             end
           end

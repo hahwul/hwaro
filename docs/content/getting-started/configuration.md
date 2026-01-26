@@ -142,6 +142,8 @@ safe = false    # true = strip raw HTML
 [llms]
 enabled = true
 instructions = "Content is MIT licensed."
+full_enabled = false
+full_filename = "llms-full.txt"
 ```
 
 ## Content Files

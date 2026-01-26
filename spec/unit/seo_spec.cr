@@ -283,6 +283,44 @@ describe Hwaro::Content::Seo::Llms do
         content.should eq("No newline\n")
       end
     end
+
+    it "does not generate llms-full.txt when full generation disabled" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = false
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.render = true
+      page.raw_content = "Hello world"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir)
+        File.exists?(File.join(output_dir, "llms-full.txt")).should be_false
+      end
+    end
+
+    it "generates llms-full.txt when full generation enabled" do
+      config = Hwaro::Models::Config.new
+      config.title = "Test Site"
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.render = true
+      page.raw_content = "Hello world"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir)
+
+        full_path = File.join(output_dir, "llms-full.txt")
+        File.exists?(full_path).should be_true
+        File.read(full_path).should contain("Hello world")
+      end
+    end
   end
 end
 

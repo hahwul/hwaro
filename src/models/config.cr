@@ -44,11 +44,15 @@ module Hwaro
       property enabled : Bool
       property filename : String
       property instructions : String
+      property full_enabled : Bool
+      property full_filename : String
 
       def initialize
         @enabled = true
         @filename = "llms.txt"
         @instructions = ""
+        @full_enabled = false
+        @full_filename = "llms-full.txt"
       end
     end
 
@@ -543,6 +547,8 @@ module Hwaro
             config.llms.enabled = llms_section["enabled"]?.try(&.as_bool?) || config.llms.enabled
             config.llms.filename = llms_section["filename"]?.try(&.as_s?) || config.llms.filename
             config.llms.instructions = llms_section["instructions"]?.try(&.as_s?) || config.llms.instructions
+            config.llms.full_enabled = llms_section["full_enabled"]?.try(&.as_bool?) || config.llms.full_enabled
+            config.llms.full_filename = llms_section["full_filename"]?.try(&.as_s?) || config.llms.full_filename
           end
 
           # Load Feeds configuration

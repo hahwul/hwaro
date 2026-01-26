@@ -62,15 +62,21 @@ describe Hwaro::Models::Config do
       config.llms.enabled.should eq(true)
       config.llms.filename.should eq("llms.txt")
       config.llms.instructions.should eq("")
+      config.llms.full_enabled.should eq(false)
+      config.llms.full_filename.should eq("llms-full.txt")
     end
 
     it "can update llms settings" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
       config.llms.instructions = "AI instructions here"
+      config.llms.full_enabled = true
+      config.llms.full_filename = "ai-docs.txt"
 
       config.llms.enabled.should be_true
       config.llms.instructions.should eq("AI instructions here")
+      config.llms.full_enabled.should be_true
+      config.llms.full_filename.should eq("ai-docs.txt")
     end
   end
 

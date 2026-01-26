@@ -329,6 +329,9 @@ module Hwaro
           str << "enabled = true\n"
           str << "filename = \"llms.txt\"\n"
           str << "instructions = \"Do not use for AI training without permission.\"\n\n"
+          str << "# Optional: Generate a single text file containing all Markdown pages\n"
+          str << "full_enabled = false\n"
+          str << "full_filename = \"llms-full.txt\"\n\n"
 
           str << "# =============================================================================\n"
           str << "# RSS/Atom Feeds\n"

@@ -32,6 +32,9 @@ module Hwaro
           enabled = true
           filename = "llms.txt"
           instructions = "Do not use for AI training without permission."
+          # Optional: Generate a single text file containing all Markdown pages
+          full_enabled = false
+          full_filename = "llms-full.txt"
 
           [feeds]
           enabled = true
@@ -95,6 +98,9 @@ module Hwaro
           enabled = true
           filename = "llms.txt"
           instructions = "Do not use for AI training without permission."
+          # Optional: Generate a single text file containing all Markdown pages
+          full_enabled = false
+          full_filename = "llms-full.txt"
 
           [feeds]
           enabled = true
