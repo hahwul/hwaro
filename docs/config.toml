@@ -134,6 +134,8 @@ rules = [
 enabled = true
 filename = "llms.txt"
 instructions = "This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
 
 # =============================================================================
 # RSS/Atom Feeds
