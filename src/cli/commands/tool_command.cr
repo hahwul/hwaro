@@ -10,6 +10,7 @@
 require "option_parser"
 require "./tool/convert_command"
 require "./tool/list_command"
+require "./tool/check_command"
 require "../../utils/logger"
 
 module Hwaro
@@ -19,6 +20,7 @@ module Hwaro
         SUBCOMMANDS = {
           "convert" => "Convert frontmatter format (YAML <-> TOML)",
           "list"    => "List content files (all, drafts, published)",
+          "check"   => "Check for dead links in content files",
         }
 
         def run(args : Array(String))
@@ -34,6 +36,8 @@ module Hwaro
             Tool::ConvertCommand.new.run(args)
           when "list"
             Tool::ListCommand.new.run(args)
+          when "check"
+            Tool::CheckCommand.new.run(args)
           when "-h", "--help", "help"
             print_help
           else
