@@ -119,6 +119,88 @@ draft = true
 Write your content here...
 ```
 
+## tool
+
+Run utility tools for content management.
+
+```bash
+hwaro tool <subcommand> [options]
+```
+
+**Available subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `convert` | Convert frontmatter format (YAML ↔ TOML) |
+| `list` | List content files (all, drafts, published) |
+| `check` | Check for dead links in content files |
+
+### tool convert
+
+Convert frontmatter in content files between YAML and TOML formats.
+
+```bash
+hwaro tool convert <toYAML|toTOML> [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-c DIR, --content-dir DIR` | Content directory (default: `content`) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+hwaro tool convert toYAML
+hwaro tool convert toTOML
+hwaro tool convert toYAML --content-dir=posts
+```
+
+### tool list
+
+List content files based on their publication status.
+
+```bash
+hwaro tool list <all|drafts|published> [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-c DIR, --content-dir DIR` | Content directory (default: `content`) |
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+hwaro tool list all
+hwaro tool list drafts
+hwaro tool list published --content-dir=posts
+```
+
+### tool check
+
+Check for dead links in content files.
+
+```bash
+hwaro tool check [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help |
+
+**Examples:**
+
+```bash
+hwaro tool check
+```
+
 ## Build Hooks
 
 Configure in `config.toml`:
