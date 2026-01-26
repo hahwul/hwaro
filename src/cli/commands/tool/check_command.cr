@@ -23,12 +23,12 @@ module Hwaro
               return
             end
 
-            Logger.info "🔍 Starting dead link check in '#{target_dir}'..."
+            Logger.info "Starting dead link check in '#{target_dir}'..."
 
             links = find_links(target_dir)
 
             if links.empty?
-              Logger.info "✅ No external links found."
+              Logger.info "✔ No external links found."
               return
             end
 
@@ -37,9 +37,9 @@ module Hwaro
 
             Logger.info "----------------------------------------"
             if dead_links.empty?
-              Logger.info "✅ All #{links.size} links are healthy."
+              Logger.info "✔ All #{links.size} links are healthy."
             else
-              Logger.warn "🔥 Found #{dead_links.size} dead links (out of #{links.size} total):"
+              Logger.warn "✘ Found #{dead_links.size} dead links (out of #{links.size} total):"
               dead_links.each do |result|
                 Logger.error "[DEAD] #{result.link.file}"
                 Logger.error "  └─ URL: #{result.link.url}"
@@ -65,7 +65,7 @@ module Hwaro
 
           private def check_links_concurrently(links : Array(Link)) : Array(Result)
             results_channel = Channel(Result).new(links.size)
-            
+
             links.each do |link|
               spawn do
                 status = 0
