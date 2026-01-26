@@ -1,0 +1,114 @@
+{% include "header.html" %}
+{% include "nav.html" %}
+<div class="docs-container docs-container--no-sidebar">
+  <main class="docs-main docs-main--full no-toc">
+    <h1>{{ page_title }}</h1>
+    {{ content }}
+
+    <div class="sc-market" id="shortcode-market">
+      <div class="sc-market__toolbar">
+        <label class="sc-market__search">
+          <span class="sc-market__search-label">Search</span>
+          <input type="search" placeholder="alert, button, ui…" autocomplete="off" data-shortcode-search>
+        </label>
+
+        <div class="sc-market__filters" aria-label="Shortcode categories">
+          <button class="sc-chip is-active" type="button" data-shortcode-filter="all">All</button>
+          <button class="sc-chip" type="button" data-shortcode-filter="ui">UI</button>
+          <button class="sc-chip" type="button" data-shortcode-filter="content">Content</button>
+          <button class="sc-chip" type="button" data-shortcode-filter="media">Media</button>
+        </div>
+      </div>
+
+      <div class="sc-market__meta">
+        <span class="sc-market__count" data-shortcode-count></span>
+        <span class="sc-market__hint">Select → Preview/Code → Copy</span>
+      </div>
+
+      <div class="sc-browser">
+        <aside class="sc-browser__list" data-shortcode-list></aside>
+        <section class="sc-browser__detail" data-shortcode-detail>
+          <div class="sc-detail__empty">
+            Select a shortcode on the left.
+          </div>
+        </section>
+      </div>
+
+      <div class="sc-items" hidden>
+        <div class="sc-item" data-name="alert" data-tags="ui,feedback" data-description="Callout box for notes, warnings, and tips.">
+          <template data-preview>
+            {{ alert(type="info", title="Info", message="This is an info alert.") }}
+            {{ alert(type="warning", title="Warning", message="Be careful with this setting.") }}
+          </template>
+          <template data-code>&#123;&#123; alert(type="info", title="Info", message="This is an info alert.") &#125;&#125;</template>
+          <template data-template>&#123;% set tone = type | default(value="info") | lower %&#125;
+&lt;div class=&quot;sc-alert sc-alert--&#123;&#123; tone &#125;&#125;&quot;&gt;
+  &#123;% if title %&#125;&lt;div class=&quot;sc-alert__title&quot;&gt;&#123;&#123; title &#125;&#125;&lt;/div&gt;&#123;% endif %&#125;
+  &#123;% if message %&#125;&lt;div class=&quot;sc-alert__message&quot;&gt;&#123;&#123; message &#125;&#125;&lt;/div&gt;&#123;% endif %&#125;
+&lt;/div&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="badge" data-tags="ui" data-description="Small label for status, version, and metadata.">
+          <template data-preview>
+            {{ badge(text="Stable", tone="success") }}
+            {{ badge(text="Beta", tone="warning") }}
+            {{ badge(text="v1.2.3", tone="neutral") }}
+          </template>
+          <template data-code>&#123;&#123; badge(text="Stable", tone="success") &#125;&#125;</template>
+          <template data-template>&#123;% set tone = tone | default(value="neutral") | lower %&#125;
+&lt;span class=&quot;sc-badge sc-badge--&#123;&#123; tone &#125;&#125;&quot;&gt;&#123;&#123; text &#125;&#125;&lt;/span&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="button" data-tags="ui" data-description="Link styled as a button.">
+          <template data-preview>
+            {{ button(href="/getting-started/", text="Get Started", style="primary") }}
+            {{ button(href="https://github.com/hahwul/hwaro", text="GitHub", style="secondary", target="_blank") }}
+          </template>
+          <template data-code>&#123;&#123; button(href="/getting-started/", text="Get Started", style="primary") &#125;&#125;</template>
+          <template data-template>&#123;% set style = style | default(value="primary") | lower %&#125;
+&lt;a class=&quot;sc-button sc-button--&#123;&#123; style &#125;&#125;&quot; href=&quot;&#123;&#123; href &#125;&#125;&quot;&#123;% if target %&#125; target=&quot;&#123;&#123; target &#125;&#125;&quot;&#123;% endif %&#125;&#123;% if target == &quot;_blank&quot; %&#125; rel=&quot;noopener&quot;&#123;% endif %&#125;&gt;
+  &#123;&#123; text &#125;&#125;
+&lt;/a&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="kbd" data-tags="content,ui" data-description="Inline keyboard key styling.">
+          <template data-preview>
+            Press {{ kbd(keys="Ctrl") }} + {{ kbd(keys="K") }} to open search.
+          </template>
+          <template data-code>Press &#123;&#123; kbd(keys="Ctrl") &#125;&#125; + &#123;&#123; kbd(keys="K") &#125;&#125; to open search.</template>
+          <template data-template>&lt;kbd class=&quot;sc-kbd&quot;&gt;&#123;&#123; keys &#125;&#125;&lt;/kbd&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="quote" data-tags="content" data-description="Stylized quote with optional author.">
+          <template data-preview>
+            {{ quote(text="Simple things should be simple, complex things should be possible.", author="Alan Kay") }}
+          </template>
+          <template data-code>&#123;&#123; quote(text="Simple things should be simple, complex things should be possible.", author="Alan Kay") &#125;&#125;</template>
+          <template data-template>&lt;figure class=&quot;sc-quote&quot;&gt;
+  &lt;blockquote class=&quot;sc-quote__text&quot;&gt;
+    &lt;p&gt;&#123;&#123; text &#125;&#125;&lt;/p&gt;
+  &lt;/blockquote&gt;
+  &#123;% if author %&#125;&lt;figcaption class=&quot;sc-quote__author&quot;&gt;— &#123;&#123; author &#125;&#125;&lt;/figcaption&gt;&#123;% endif %&#125;
+&lt;/figure&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="figure" data-tags="media,content" data-description="Image with caption.">
+          <template data-preview>
+            {{ figure(src="/hwaro-wide.png", alt="Hwaro", caption="Hwaro logo (example)") }}
+          </template>
+          <template data-code>&#123;&#123; figure(src="/hwaro-wide.png", alt="Hwaro", caption="Hwaro logo (example)") &#125;&#125;</template>
+          <template data-template>&lt;figure class=&quot;sc-figure&quot;&gt;
+  &lt;img src=&quot;&#123;&#123; src &#125;&#125;&quot; alt=&quot;&#123;&#123; alt | default(value='') &#125;&#125;&quot;&gt;
+  &#123;% if caption %&#125;&lt;figcaption&gt;&#123;&#123; caption &#125;&#125;&lt;/figcaption&gt;&#123;% endif %&#125;
+&lt;/figure&gt;</template>
+        </div>
+      </div>
+    </div>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+</div>
+{% include "footer.html" %}

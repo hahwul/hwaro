@@ -1,0 +1,3 @@
+{% set tone = tone | default(value="neutral") | lower %}
+<span class="sc-badge sc-badge--{{ tone }}">{{ text }}</span>
+

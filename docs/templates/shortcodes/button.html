@@ -1,0 +1,5 @@
+{% set style = style | default(value="primary") | lower %}
+<a class="sc-button sc-button--{{ style }}" href="{{ href }}"{% if target %} target="{{ target }}"{% endif %}{% if target == "_blank" %} rel="noopener"{% endif %}>
+  {{ text }}
+</a>
+
