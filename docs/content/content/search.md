@@ -2,14 +2,14 @@
 title = "Search"
 +++
 
-Hwaro generates a JSON search index compatible with [Fuse.js](https://fusejs.io/) for client-side search.
+Hwaro generates a JSON search index compatible with [Fuse.js](https://fusejs.io/) or [Elasticlunr.js](http://elasticlunr.com/) for client-side search.
 
 ## Configuration
 
 ```toml
 [search]
 enabled = true
-format = "fuse_json"
+format = "fuse_json" # or elasticlunr_json
 fields = ["title", "content", "tags", "description"]
 filename = "search.json"
 ```
@@ -19,7 +19,7 @@ filename = "search.json"
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | `false` | Enable search index |
-| `format` | `"fuse_json"` | Index format |
+| `format` | `"fuse_json"` | Index format (`fuse_json`, `fuse_javascript`, `elasticlunr_json`, `elasticlunr_javascript`) |
 | `fields` | `["title"]` | Fields to index |
 | `filename` | `"search.json"` | Output filename |
 
@@ -36,7 +36,7 @@ filename = "search.json"
 
 ## Index Format
 
-Generated `search.json`:
+The generated `search.json` is an array of documents:
 
 ```json
 [
@@ -49,7 +49,11 @@ Generated `search.json`:
 ]
 ```
 
-## Basic Implementation
+This format is compatible with both Fuse.js and Elasticlunr.js.
+
+---
+
+## Fuse.js Implementation
 
 ### 1. Include Fuse.js
 
@@ -88,7 +92,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
   if (query.length < 2) return;
   
   const results = fuse.search(query, { limit: 10 });
-  renderResults(results);
+  renderResults(results.map(r => r.item));
 });
 
 function renderResults(results) {
@@ -99,10 +103,10 @@ function renderResults(results) {
     return;
   }
   
-  container.innerHTML = results.map(r => `
-    <a href="${r.item.url}">
-      <strong>${r.item.title}</strong>
-      <span>${r.item.description || ''}</span>
+  container.innerHTML = results.map(item => `
+    <a href="${item.url}">
+      <strong>${item.title}</strong>
+      <span>${item.description || ''}</span>
     </a>
   `).join('');
 }
@@ -110,14 +114,77 @@ function renderResults(results) {
 initSearch();
 ```
 
-## Fuse.js Options
+---
 
-| Option | Description |
-|--------|-------------|
-| `keys` | Fields to search with weights |
-| `threshold` | Match sensitivity (0 = exact, 1 = any) |
-| `includeMatches` | Include match positions |
-| `minMatchCharLength` | Minimum characters to match |
+## Elasticlunr.js Implementation
+
+### 1. Include Elasticlunr.js
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/elasticlunr@0.9.5/dist/elasticlunr.min.js"></script>
+```
+
+### 2. Create Search UI
+
+```html
+<input type="search" id="search-input" placeholder="Search...">
+<div id="search-results"></div>
+```
+
+### 3. Initialize Search
+
+```javascript
+let index;
+
+async function initSearch() {
+  const response = await fetch('/search.json');
+  const data = await response.json();
+  
+  index = elasticlunr(function () {
+    this.setRef('url');
+    this.addField('title');
+    this.addField('description');
+    this.addField('content');
+    
+    data.forEach(doc => this.addDoc(doc));
+  });
+}
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+  const query = e.target.value;
+  if (query.length < 2) return;
+  
+  const results = index.search(query, {
+    fields: {
+      title: { bool: "AND", expand: true },
+      description: { bool: "AND", expand: true },
+      content: { bool: "AND", expand: true }
+    },
+    expand: true
+  });
+  
+  const documents = results.map(r => index.documentStore.getDoc(r.ref));
+  renderResults(documents);
+});
+
+function renderResults(results) {
+  const container = document.getElementById('search-results');
+  
+  if (!results.length) {
+    container.innerHTML = '<p>No results found</p>';
+    return;
+  }
+  
+  container.innerHTML = results.map(item => `
+    <a href="${item.url}">
+      <strong>${item.title}</strong>
+      <span>${item.description || ''}</span>
+    </a>
+  `).join('');
+}
+
+initSearch();
+```
 
 ## Keyboard Shortcut
 
@@ -159,5 +226,5 @@ document.addEventListener('keydown', (e) => {
 ## Performance Tips
 
 - Limit fields indexed for large sites
-- Lazy-load Fuse.js on first search focus
+- Lazy-load the search library on first search focus
 - Use debouncing for search input

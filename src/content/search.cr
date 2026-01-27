@@ -21,12 +21,17 @@ module Hwaro
         # Build search data based on format
         search_data = build_search_data(search_pages, config)
 
-        # Generate output based on format
+        # Both libraries use the same array for now, so Hwaro generates a common format and lets the client build the index.
+        # We've kept the names distinct to respect user intent and stay ready for library-specific optimizations later.
         content = case config.search.format.downcase
                   when "fuse_javascript"
                     generate_javascript(search_data)
                   when "fuse_json"
                     generate_json(search_data)
+                  when "elasticlunr_json"
+                    generate_json(search_data)
+                  when "elasticlunr_javascript"
+                    generate_javascript(search_data)
                   else
                     Logger.warn "  [WARN] Unknown search format '#{config.search.format}'. Defaulting to 'fuse_json'."
                     generate_json(search_data)

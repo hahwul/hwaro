@@ -101,6 +101,50 @@ describe Hwaro::Content::Search do
       end
     end
 
+    it "generates elasticlunr_json format when configured" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "elasticlunr_json"
+      config.search.filename = "search.json"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        search_path = File.join(output_dir, "search.json")
+        File.exists?(search_path).should be_true
+        content = File.read(search_path)
+        content.should contain("Test")
+      end
+    end
+
+    it "generates elasticlunr_javascript format when configured" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "elasticlunr_javascript"
+      config.search.filename = "search.js"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.js"))
+        content.should start_with("var searchData = ")
+      end
+    end
+
     it "includes all configured fields" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true
