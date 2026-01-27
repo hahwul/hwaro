@@ -8,6 +8,8 @@ describe Hwaro::Models::Config do
       config.description.should eq("")
       config.base_url.should eq("")
       config.default_language.should eq("en")
+      config.deployment.source_dir.should eq("public")
+      config.deployment.targets.should eq([] of Hwaro::Models::DeploymentTarget)
     end
   end
 
@@ -369,6 +371,63 @@ describe Hwaro::Models::Config do
       config.languages.size.should eq(2)
       config.languages["en"].language_name.should eq("English")
       config.languages["ko"].language_name.should eq("한국어")
+    end
+  end
+
+  describe "deployment configuration" do
+    it "loads deployment targets from config.toml" do
+      toml = <<-TOML
+      title = "Test"
+
+      [deployment]
+      target = "prod"
+      confirm = true
+      dryRun = true
+      maxDeletes = 10
+      source_dir = "dist"
+
+      [[deployment.targets]]
+      name = "prod"
+      url = "file://./out"
+      include = "**/*.html"
+      exclude = "**/drafts/**"
+
+      [[deployment.targets]]
+      name = "s3"
+      url = "s3://my-bucket"
+      command = "aws s3 sync {source}/ {url} --delete"
+
+      [[deployment.matchers]]
+      pattern = "^.+\\\\.css$"
+      cacheControl = "max-age=31536000"
+      gzip = true
+      TOML
+
+      File.tempfile("hwaro-config") do |file|
+        file.print(toml)
+        file.flush
+
+        config = Hwaro::Models::Config.load(file.path)
+        config.deployment.target.should eq("prod")
+        config.deployment.confirm.should be_true
+        config.deployment.dry_run.should be_true
+        config.deployment.max_deletes.should eq(10)
+        config.deployment.source_dir.should eq("dist")
+
+        config.deployment.targets.size.should eq(2)
+        config.deployment.targets[0].name.should eq("prod")
+        config.deployment.targets[0].url.should eq("file://./out")
+        config.deployment.targets[0].include.should eq("**/*.html")
+        config.deployment.targets[0].exclude.should eq("**/drafts/**")
+
+        config.deployment.targets[1].name.should eq("s3")
+        config.deployment.targets[1].command.should eq("aws s3 sync {source}/ {url} --delete")
+
+        config.deployment.matchers.size.should eq(1)
+        config.deployment.matchers[0].pattern.should eq("^.+\\.css$")
+        config.deployment.matchers[0].cache_control.should eq("max-age=31536000")
+        config.deployment.matchers[0].gzip.should be_true
+      end
     end
   end
 end

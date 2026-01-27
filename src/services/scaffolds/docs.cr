@@ -85,6 +85,7 @@ module Hwaro
             str << auto_includes_config
             str << markdown_config
             str << build_hooks_config
+            str << deployment_config
           end
           config
         end

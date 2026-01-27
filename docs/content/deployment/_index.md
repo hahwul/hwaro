@@ -13,6 +13,30 @@ hwaro build --minify
 
 This creates optimized files in `public/`.
 
+## hwaro deploy
+
+You can configure deployment targets in `config.toml` and deploy with:
+
+```bash
+hwaro deploy <targets>
+```
+
+Example `config.toml`:
+
+```toml
+[deployment]
+target = "prod"
+
+[[deployment.targets]]
+name = "prod"
+url = "file://./out"
+
+[[deployment.targets]]
+name = "s3"
+url = "s3://your-bucket"
+command = "aws s3 sync {source}/ {url} --delete"
+```
+
 ## Deployment Options
 
 ### Static Hosts
