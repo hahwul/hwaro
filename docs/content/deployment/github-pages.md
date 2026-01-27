@@ -3,10 +3,6 @@ title = "Github Pages"
 toc = true
 +++
 
-## CLI
-
-> Coming soon
-
 ## GitHub Actions
 
 ### Using Hwaro Action (Recommended)
