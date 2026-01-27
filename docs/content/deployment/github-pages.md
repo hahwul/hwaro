@@ -5,6 +5,8 @@ toc = true
 
 ## GitHub Actions
 
+{{ button(href="[/getting-started/](https://github.com/marketplace/actions/hwaro-deploy-to-pages)", text="View on Github Marketplace", style="primary") }}
+
 ### Using Hwaro Action (Recommended)
 
 The easiest way to deploy to GitHub Pages is using the official Hwaro action:
