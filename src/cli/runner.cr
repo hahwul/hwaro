@@ -2,6 +2,7 @@ require "./commands/init_command"
 require "./commands/build_command"
 require "./commands/serve_command"
 require "./commands/new_command"
+require "./commands/deploy_command"
 require "./commands/tool_command"
 require "../utils/logger"
 
@@ -111,6 +112,11 @@ module Hwaro
           Commands::NewCommand.new.run(args)
         end
 
+        # Register deploy command
+        CommandRegistry.register("deploy", "Deploy the built site using config.toml") do |args|
+          Commands::DeployCommand.new.run(args)
+        end
+
         # Register tool command
         CommandRegistry.register("tool", "Utility tools (convert, etc.)") do |args|
           Commands::ToolCommand.new.run(args)
@@ -124,7 +130,7 @@ module Hwaro
         Logger.info "Commands:"
 
         # Define priority order
-        priority = ["init", "build", "serve", "new"]
+        priority = ["init", "build", "serve", "new", "deploy"]
 
         # Print registered commands
         CommandRegistry.all.sort_by { |cmd|

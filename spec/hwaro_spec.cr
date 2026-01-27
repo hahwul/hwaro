@@ -298,6 +298,10 @@ describe Hwaro do
     it "has serve command registered" do
       Hwaro::CLI::CommandRegistry.has?("serve").should be_true
     end
+
+    it "has deploy command registered" do
+      Hwaro::CLI::CommandRegistry.has?("deploy").should be_true
+    end
   end
 
   describe Hwaro::Processor::Markdown do

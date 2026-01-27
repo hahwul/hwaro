@@ -508,6 +508,46 @@ module Hwaro
           # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
           TOML
         end
+
+        protected def deployment_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Deployment (Optional)
+          # =============================================================================
+          # Configure deploy targets for `hwaro deploy`
+          #
+          # - Local filesystem sync: url = "file://./out"
+          # - Remote/object stores: set `command` and use external tools (aws/gsutil/rsync/etc)
+          #
+          # Placeholders for `command`:
+          #   {source} => source directory (default: public)
+          #   {url}    => target url
+          #   {target} => target name
+
+          # [deployment]
+          # target = "prod"
+          # source_dir = "public"
+          # confirm = false
+          # dryRun = false
+          # maxDeletes = 256      # safety limit (-1 disables)
+
+          # [[deployment.targets]]
+          # name = "prod"
+          # url = "file://./out"
+
+          # [[deployment.targets]]
+          # name = "s3"
+          # url = "s3://my-bucket"
+          # command = "aws s3 sync {source}/ {url} --delete"
+
+          # [[deployment.matchers]]
+          # pattern = "^.+\\.css$"
+          # cacheControl = "max-age=31536000"
+          # gzip = true
+
+          TOML
+        end
       end
     end
   end

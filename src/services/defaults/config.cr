@@ -53,6 +53,23 @@ module Hwaro
           # hooks.pre = ["npm install", "python scripts/preprocess.py"]
           # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
 
+          # Deployment - Configure targets for `hwaro deploy`
+          # [deployment]
+          # target = "prod"          # default target name (optional)
+          # source_dir = "public"    # default: public
+          # confirm = false          # ask before deploying
+          # dryRun = false           # show plan only
+          # maxDeletes = 256         # safety limit (-1 disables)
+          #
+          # [[deployment.targets]]
+          # name = "prod"
+          # url = "file://./out"
+          #
+          # [[deployment.targets]]
+          # name = "s3"
+          # url = "s3://my-bucket"
+          # command = "aws s3 sync {source}/ {url} --delete"
+
           # Taxonomies (root level configuration)
           [[taxonomies]]
           name = "tags"
@@ -118,6 +135,23 @@ module Hwaro
           # [build]
           # hooks.pre = ["npm install", "python scripts/preprocess.py"]
           # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+
+          # Deployment - Configure targets for `hwaro deploy`
+          # [deployment]
+          # target = "prod"          # default target name (optional)
+          # source_dir = "public"    # default: public
+          # confirm = false          # ask before deploying
+          # dryRun = false           # show plan only
+          # maxDeletes = 256         # safety limit (-1 disables)
+          #
+          # [[deployment.targets]]
+          # name = "prod"
+          # url = "file://./out"
+          #
+          # [[deployment.targets]]
+          # name = "s3"
+          # url = "s3://my-bucket"
+          # command = "aws s3 sync {source}/ {url} --delete"
           CONTENT
         end
 
@@ -194,6 +228,23 @@ module Hwaro
             str << "# [build]\n"
             str << "# hooks.pre = [\"npm install\", \"python scripts/preprocess.py\"]\n"
             str << "# hooks.post = [\"npm run minify\", \"./scripts/deploy.sh\"]\n"
+            str << "\n"
+            str << "# Deployment - Configure targets for `hwaro deploy`\n"
+            str << "# [deployment]\n"
+            str << "# target = \"prod\"          # default target name (optional)\n"
+            str << "# source_dir = \"public\"    # default: public\n"
+            str << "# confirm = false          # ask before deploying\n"
+            str << "# dryRun = false           # show plan only\n"
+            str << "# maxDeletes = 256         # safety limit (-1 disables)\n"
+            str << "#\n"
+            str << "# [[deployment.targets]]\n"
+            str << "# name = \"prod\"\n"
+            str << "# url = \"file://./out\"\n"
+            str << "#\n"
+            str << "# [[deployment.targets]]\n"
+            str << "# name = \"s3\"\n"
+            str << "# url = \"s3://my-bucket\"\n"
+            str << "# command = \"aws s3 sync {source}/ {url} --delete\"\n"
             str << taxonomies_config
           end
         end

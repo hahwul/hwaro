@@ -20,7 +20,7 @@ module Hwaro
       end
 
       # Execute a single command and return the result
-      def self.run(command : String, working_dir : String? = nil) : Result
+      def self.run(command : String, working_dir : String? = nil, env : Hash(String, String)? = nil) : Result
         stdout = IO::Memory.new
         stderr = IO::Memory.new
 
@@ -30,6 +30,7 @@ module Hwaro
           output:  stdout,
           error:   stderr,
           chdir:   working_dir,
+          env:     env,
         }
 
         status = Process.run(**process_args)
@@ -44,13 +45,13 @@ module Hwaro
 
       # Execute multiple commands sequentially
       # Returns true if all commands succeed, false otherwise
-      def self.run_all(commands : Array(String), working_dir : String? = nil, label : String = "hook") : Bool
+      def self.run_all(commands : Array(String), working_dir : String? = nil, label : String = "hook", env : Hash(String, String)? = nil) : Bool
         return true if commands.empty?
 
         commands.each_with_index do |command, index|
           Logger.action(:Running, "#{label} [#{index + 1}/#{commands.size}]: #{command}")
 
-          result = run(command, working_dir)
+          result = run(command, working_dir, env)
 
           unless result.output.empty?
             result.output.each_line do |line|
@@ -73,11 +74,11 @@ module Hwaro
       end
 
       # Execute pre-build hooks
-      def self.run_pre_hooks(commands : Array(String), working_dir : String? = nil) : Bool
+      def self.run_pre_hooks(commands : Array(String), working_dir : String? = nil, env : Hash(String, String)? = nil) : Bool
         return true if commands.empty?
 
         Logger.info "Running pre-build hooks..."
-        success = run_all(commands, working_dir, "pre-build")
+        success = run_all(commands, working_dir, "pre-build", env)
 
         if success
           Logger.success "Pre-build hooks completed successfully."
@@ -89,11 +90,11 @@ module Hwaro
       end
 
       # Execute post-build hooks
-      def self.run_post_hooks(commands : Array(String), working_dir : String? = nil) : Bool
+      def self.run_post_hooks(commands : Array(String), working_dir : String? = nil, env : Hash(String, String)? = nil) : Bool
         return true if commands.empty?
 
         Logger.info "Running post-build hooks..."
-        success = run_all(commands, working_dir, "post-build")
+        success = run_all(commands, working_dir, "post-build", env)
 
         if success
           Logger.success "Post-build hooks completed successfully."

@@ -363,6 +363,28 @@ module Hwaro
           str << "# [build]\n"
           str << "# hooks.pre = [\"npm install\", \"python scripts/preprocess.py\"]\n"
           str << "# hooks.post = [\"npm run minify\", \"./scripts/deploy.sh\"]\n"
+
+          str << "\n"
+          str << "# =============================================================================\n"
+          str << "# Deployment (Optional)\n"
+          str << "# =============================================================================\n"
+          str << "# Configure deploy targets for `hwaro deploy`\n"
+          str << "#\n"
+          str << "# [deployment]\n"
+          str << "# target = \"prod\"\n"
+          str << "# source_dir = \"public\"\n"
+          str << "# confirm = false\n"
+          str << "# dryRun = false\n"
+          str << "# maxDeletes = 256      # safety limit (-1 disables)\n"
+          str << "#\n"
+          str << "# [[deployment.targets]]\n"
+          str << "# name = \"prod\"\n"
+          str << "# url = \"file://./out\"\n"
+          str << "#\n"
+          str << "# [[deployment.targets]]\n"
+          str << "# name = \"s3\"\n"
+          str << "# url = \"s3://my-bucket\"\n"
+          str << "# command = \"aws s3 sync {source}/ {url} --delete\"\n"
         end
       end
 

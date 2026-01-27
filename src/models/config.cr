@@ -1,4 +1,5 @@
 require "toml"
+require "./deployment"
 
 module Hwaro
   module Models
@@ -447,6 +448,7 @@ module Hwaro
       property languages : Hash(String, LanguageConfig)
       property build : BuildConfig
       property markdown : MarkdownConfig
+      property deployment : DeploymentConfig
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -469,6 +471,7 @@ module Hwaro
         @languages = {} of String => LanguageConfig
         @build = BuildConfig.new
         @markdown = MarkdownConfig.new
+        @deployment = DeploymentConfig.new
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -712,6 +715,81 @@ module Hwaro
             if markdown_section.has_key?("safe")
               safe_val = markdown_section["safe"]?.try(&.as_bool?)
               config.markdown.safe = safe_val unless safe_val.nil?
+            end
+          end
+
+          # Load deployment configuration (inspired by Hugo deploy configuration)
+          if deployment_section = config.raw["deployment"]?.try(&.as_h?)
+            config.deployment.target = deployment_section["target"]?.try(&.as_s?)
+            config.deployment.confirm = deployment_section["confirm"]?.try(&.as_bool?) || config.deployment.confirm
+
+            dry_any = deployment_section["dryRun"]? || deployment_section["dry_run"]?
+            if dry_val = dry_any.try(&.as_bool?)
+              config.deployment.dry_run = dry_val
+            end
+
+            force_any = deployment_section["force"]?
+            if force_val = force_any.try(&.as_bool?)
+              config.deployment.force = force_val
+            end
+
+            max_deletes_any = deployment_section["maxDeletes"]? || deployment_section["max_deletes"]?
+            if max_deletes_val = max_deletes_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+              config.deployment.max_deletes = max_deletes_val
+            end
+
+            workers_any = deployment_section["workers"]?
+            if workers_val = workers_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+              config.deployment.workers = workers_val
+            end
+
+            source_any = deployment_section["source_dir"]? || deployment_section["source"]?
+            if source_val = source_any.try(&.as_s?)
+              config.deployment.source_dir = source_val
+            end
+
+            if targets_any = deployment_section["targets"]?.try(&.as_a?)
+              config.deployment.targets = targets_any.compact_map do |target_any|
+                next unless target_h = target_any.as_h?
+
+                name = target_h["name"]?.try(&.as_s?)
+                next unless name
+
+                target = DeploymentTarget.new
+                target.name = name
+                target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || ""
+                target.command = target_h["command"]?.try(&.as_s?)
+                target.include = target_h["include"]?.try(&.as_s?)
+                target.exclude = target_h["exclude"]?.try(&.as_s?)
+
+                strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
+                if strip_val = strip_any.try(&.as_bool?)
+                  target.strip_index_html = strip_val
+                end
+
+                target
+              end
+            end
+
+            if matchers_any = deployment_section["matchers"]?.try(&.as_a?)
+              config.deployment.matchers = matchers_any.compact_map do |matcher_any|
+                next unless matcher_h = matcher_any.as_h?
+
+                pattern = matcher_h["pattern"]?.try(&.as_s?)
+                next unless pattern
+
+                matcher = DeploymentMatcher.new
+                matcher.pattern = pattern
+                matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
+                matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
+                if gzip_val = matcher_h["gzip"]?.try(&.as_bool?)
+                  matcher.gzip = gzip_val
+                end
+                if force_val = matcher_h["force"]?.try(&.as_bool?)
+                  matcher.force = force_val
+                end
+                matcher
+              end
             end
           end
         end
