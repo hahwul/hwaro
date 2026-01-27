@@ -1,5 +1,14 @@
 <aside class="docs-sidebar">
   <div class="sidebar-section">
+    <div class="sidebar-title">Guide</div>
+    <ul class="sidebar-links">
+      <li><a href="{{ base_url }}/guide/"{% if page_url == "/guide/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/guide/quickstart/"{% if page_url == "/guide/quickstart/" %} class="active"{% endif %}>Quickstart</a></li>
+      <li><a href="{{ base_url }}/guide/docs-site/"{% if page_url == "/guide/docs-site/" %} class="active"{% endif %}>Build a Docs Site</a></li>
+      <li><a href="{{ base_url }}/guide/production/"{% if page_url == "/guide/production/" %} class="active"{% endif %}>Production Checklist</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
     <div class="sidebar-title">Getting Started</div>
     <ul class="sidebar-links">
       <li><a href="{{ base_url }}/getting-started/"{% if page_url == "/getting-started/" %} class="active"{% endif %}>Overview</a></li>

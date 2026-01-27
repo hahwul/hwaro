@@ -12,6 +12,11 @@ Hwaro (화로) is a fast, lightweight static site generator built with Crystal.
 - **SEO built-in** — Sitemaps, RSS feeds, meta tags
 - **Extensible** — Lifecycle hooks and custom processors
 
+## Where to Start
+
+- Want an end-to-end walkthrough? Start here: [Guide](/guide/)
+- Prefer reference docs? Continue with the pages below.
+
 ## Quick Start
 
 ```bash
@@ -38,6 +43,7 @@ Visit `http://localhost:3000` to see your site.
 
 ## Next Steps
 
+- [Guide](/guide/) — From zero → deployed (recommended)
 - [Installation](/getting-started/installation/) — Install Hwaro
 - [CLI Usage](/getting-started/cli/) — Learn the commands
 - [Directory Structure](/getting-started/directory-structure/) — Understand the layout

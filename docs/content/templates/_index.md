@@ -4,6 +4,8 @@ title = "Overview"
 
 Templates define how your content is rendered into HTML. Hwaro uses Crinja, a Jinja2-compatible template engine.
 
+If you’re looking for a “build and ship” walkthrough first, start here: [Guide](/guide/).
+
 ## Template Directory
 
 ```

@@ -5,6 +5,8 @@ toc = true
 
 Deploy your Hwaro site to any static hosting provider.
 
+If you haven’t built a site yet, start with: [Quickstart](/guide/quickstart/).
+
 ## Build for Production
 
 ```bash

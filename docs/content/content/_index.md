@@ -4,6 +4,8 @@ title = "Overview"
 
 The `content/` directory contains all your site's content written in Markdown with TOML front matter.
 
+New to Hwaro? Start with the end-to-end walkthrough: [Guide](/guide/).
+
 ## Content Types
 
 ### Pages
