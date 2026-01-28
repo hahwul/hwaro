@@ -116,7 +116,7 @@ module Hwaro
           - `{{ section_list }}` / `{{ section.list }}` - HTML list of pages in section
           - `{{ section.pages }}` - Array of page objects for iteration
           - `{{ pagination }}` - Pagination navigation HTML (empty if disabled or single page)
-          - `{{ toc }}` - Table of contents HTML
+          - `{{ toc }}` / `{{ toc_obj.html }}` - Table of contents HTML
 
           #### Taxonomy Variables
           - `{{ taxonomy_name }}` - Name of taxonomy (e.g., "tags")
