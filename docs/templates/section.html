@@ -1,14 +1,25 @@
-<!doctype html>
-<html>
-    <head>
-        <title>{{ section_title }} - {{ site_title }}</title>
-    </head>
-    <body>
-        <h1>{{ section_title }}</h1>
-        <p>{{ section_description }}</p>
-        <div>{{ content }}</div>
-        <ul>
-            {{ section_list }}
-        </ul>
-    </body>
-</html>
+{% include "header.html" %}
+{% include "nav.html" %}
+<div class="docs-container">
+  {% include "sidebar.html" %}
+  <main class="docs-main">
+    <h1>{{ section_title }}</h1>
+    {% if section_description %}
+    <p>{{ section_description }}</p>
+    {% endif %}
+    {{ content }}
+    {% if section.pages.size > 0 %}
+    <h2>Pages</h2>
+    <ul class="page-list">
+      {% for page in section.pages %}
+      <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+</div>
+{% include "footer.html" %}

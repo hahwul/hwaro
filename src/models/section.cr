@@ -11,6 +11,9 @@ module Hwaro
       property transparent : Bool
       property generate_feeds : Bool
 
+      # Pages in this section
+      property pages : Array(Page) = [] of Page
+
       def initialize(path : String)
         super(path)
         @transparent = false
