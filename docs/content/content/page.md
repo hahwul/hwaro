@@ -182,14 +182,14 @@ To strip raw HTML, set `markdown.safe = true` in config.
 
 ## Template Variables
 
-Page front matter is available in templates:
+Page front matter is available in templates via both flat variables and object access:
 
-| Variable | Description |
-|----------|-------------|
-| `page_title` | Page title |
-| `page_description` | Page description |
-| `page_url` | Page URL path |
-| `page_section` | Section name |
-| `page_date` | Page date |
-| `page_image` | Featured image |
-| `content` | Rendered HTML content |
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `page_title` | `page.title` | Page title |
+| `page_description` | `page.description` | Page description |
+| `page_url` | `page.url` | Page URL path |
+| `page_section` | `page.section` | Section name |
+| `page_date` | `page.date` | Page date |
+| `page_image` | `page.image` | Featured image |
+| `content` | — | Rendered HTML content |

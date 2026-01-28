@@ -9,33 +9,31 @@ Variables available in Jinja2 templates.
 
 From `config.toml`:
 
-| Variable | Description |
-|----------|-------------|
-| `site_title` | Site title |
-| `site_description` | Site description |
-| `base_url` | Base URL (no trailing slash) |
-
-Object access: `site.title`, `site.description`, `site.base_url`
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `site_title` | `site.title` | Site title |
+| `site_description` | `site.description` | Site description |
+| `base_url` | `site.base_url` | Base URL (no trailing slash) |
 
 ## Page Variables
 
 From front matter and content:
 
-| Variable | Description |
-|----------|-------------|
-| `page_title` | Page title |
-| `page_description` | Page description (fallback: site description) |
-| `page_url` | Page URL path (e.g., `/about/`) |
-| `page_section` | Section name (e.g., `blog`) |
-| `page_date` | Page date (YYYY-MM-DD) |
-| `page_image` | Featured image |
-| `page_language` | Page language code |
-| `page_translations` | Language variants (array) |
-| `content` | Rendered HTML content |
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `page_title` | `page.title` | Page title |
+| `page_description` | `page.description` | Page description (fallback: site description) |
+| `page_url` | `page.url` | Page URL path (e.g., `/about/`) |
+| `page_section` | `page.section` | Section name (e.g., `blog`) |
+| `page_date` | `page.date` | Page date (YYYY-MM-DD) |
+| `page_image` | `page.image` | Featured image |
+| `page_language` | `page.language` | Page language code |
+| `page_translations` | `page.translations` | Language variants (array) |
+| `content` | — | Rendered HTML content |
 
-### Page Object
+### Page Object Properties
 
-Access boolean properties via `page` object:
+The `page` object also provides access to boolean and computed properties:
 
 | Property | Description |
 |----------|-------------|
@@ -45,19 +43,48 @@ Access boolean properties via `page` object:
 | `page.render` | Should render |
 | `page.generated` | Is generated |
 | `page.in_sitemap` | Include in sitemap |
-| `page.language` | Page language code |
-| `page.translations` | Language variants (array) |
 
 ## Section Variables
 
 For section templates:
 
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `section_title` | `section.title` | Section title |
+| `section_description` | `section.description` | Section description |
+| `section_list` | `section.list` | HTML list of pages in section |
+| — | `section.pages` | Array of page objects for iteration |
+| `pagination` | — | Pagination navigation HTML |
+
+### Using section.pages
+
+For more control over section listing, iterate over `section.pages`:
+
+```jinja
+<ul>
+{% for p in section.pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    {% if p.description %}
+    <p>{{ p.description }}</p>
+    {% endif %}
+  </li>
+{% endfor %}
+</ul>
+```
+
+Each page in `section.pages` has these properties:
+- `title`, `description`, `url`, `date`, `image`
+- `draft`, `toc`, `render`, `is_index`, `generated`, `in_sitemap`, `language`
+
+## Table of Contents
+
 | Variable | Description |
 |----------|-------------|
-| `section_title` | Section title |
-| `section_description` | Section description |
-| `section_list` | HTML list of pages in section |
-| `pagination` | Pagination navigation HTML (empty if disabled or single page) |
+| `toc` | Generated TOC HTML |
+| `toc_obj.html` | Same as `toc` (structured access) |
+
+Only populated when `toc = true` in front matter.
 
 ## Taxonomy Variables
 
@@ -93,27 +120,23 @@ For section templates:
 | `current_date` | Current date (YYYY-MM-DD) |
 | `current_datetime` | Current datetime |
 
-## Table of Contents
-
-| Variable | Description |
-|----------|-------------|
-| `toc` | Generated TOC HTML |
-
-Only populated when `toc = true` in front matter.
-
 ## Usage Examples
 
-### Page Title
+### Page Title (Flat vs Object)
 
 ```jinja
+{# Using flat variables #}
 <title>{{ page_title }} - {{ site_title }}</title>
+
+{# Using object access #}
+<title>{{ page.title }} - {{ site.title }}</title>
 ```
 
 ### Meta Tags
 
 ```jinja
 <head>
-  <meta name="description" content="{{ page_description }}">
+  <meta name="description" content="{{ page.description }}">
   {{ og_all_tags }}
   {{ highlight_css }}
   {{ auto_includes_css }}
@@ -123,8 +146,8 @@ Only populated when `toc = true` in front matter.
 ### Conditional Content
 
 ```jinja
-{% if page_description %}
-<p class="lead">{{ page_description }}</p>
+{% if page.description %}
+<p class="lead">{{ page.description }}</p>
 {% endif %}
 
 {% if page.toc %}
@@ -136,21 +159,35 @@ Only populated when `toc = true` in front matter.
 
 ```jinja
 <nav>
-  <a href="/"{% if page_url == "/" %} class="active"{% endif %}>Home</a>
-  <a href="/blog/"{% if page_section == "blog" %} class="active"{% endif %}>Blog</a>
+  <a href="/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
 </nav>
+```
+
+### Section Listing
+
+```jinja
+{# Using section.list (pre-rendered HTML) #}
+<ul>{{ section.list }}</ul>
+
+{# Using section.pages (full control) #}
+<ul>
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
 ```
 
 ### Section-Based Styling
 
 ```jinja
-<body data-section="{{ page_section }}">
+<body data-section="{{ page.section }}">
 ```
 
 ### Canonical URL
 
 ```jinja
-<link rel="canonical" href="{{ base_url }}{{ page_url }}">
+<link rel="canonical" href="{{ base_url }}{{ page.url }}">
 ```
 
 ### RSS Link
@@ -163,6 +200,6 @@ Only populated when `toc = true` in front matter.
 
 ```jinja
 <footer>
-  <p>&copy; {{ current_year }} {{ site_title }}</p>
+  <p>&copy; {{ current_year }} {{ site.title }}</p>
 </footer>
 ```

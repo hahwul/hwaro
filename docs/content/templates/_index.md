@@ -35,17 +35,26 @@ templates/
 
 ### Variables
 
+Variables can be accessed using flat names or object access:
+
 ```jinja
+{# Flat variables #}
 {{ page_title }}
 {{ site_title }}
+
+{# Object access (recommended) #}
+{{ page.title }}
+{{ site.title }}
+
+{# Content is always flat #}
 {{ content }}
 ```
 
 ### Conditionals
 
 ```jinja
-{% if page_description %}
-<meta name="description" content="{{ page_description }}">
+{% if page.description %}
+<meta name="description" content="{{ page.description }}">
 {% endif %}
 ```
 
@@ -57,7 +66,7 @@ Base template:
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+  <title>{% block title %}{{ site.title }}{% endblock %}</title>
 </head>
 <body>
   {% block content %}{% endblock %}
@@ -70,7 +79,7 @@ Child template:
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
 
 {% block content %}
 <article>{{ content }}</article>

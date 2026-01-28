@@ -371,6 +371,62 @@ describe Hwaro::Content::Processors::Template do
       result.should contain("<a href=\"https://example.com\">Home</a>")
     end
 
+    it "processes page object with all properties" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "My Page"
+      page.description = "Page description"
+      page.url = "/my-page/"
+      page.section = "blog"
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <h1>{{ page.title }}</h1>
+      <p>{{ page.description }}</p>
+      <a href="{{ page.url }}">Link</a>
+      <span>{{ page.section }}</span>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<h1>My Page</h1>")
+      result.should contain("<p>Page description</p>")
+      result.should contain("<a href=\"/my-page/\">Link</a>")
+      result.should contain("<span>blog</span>")
+    end
+
+    it "provides section object with empty defaults" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <h1>{{ section.title }}</h1>
+      <p>{{ section.description }}</p>
+      <div>{{ section.list }}</div>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<h1></h1>")
+      result.should contain("<p></p>")
+      result.should contain("<div></div>")
+    end
+
+    it "provides toc_obj object with empty defaults" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      <div>{{ toc_obj.html }}</div>
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("<div></div>")
+    end
+
     it "adds custom variables to context" do
       page = Hwaro::Models::Page.new("test.md")
       config = Hwaro::Models::Config.new

@@ -2,50 +2,50 @@
   <div class="sidebar-section">
     <div class="sidebar-title">Guide</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/guide/"{% if page_url == "/guide/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/guide/quickstart/"{% if page_url == "/guide/quickstart/" %} class="active"{% endif %}>Quickstart</a></li>
-      <li><a href="{{ base_url }}/guide/docs-site/"{% if page_url == "/guide/docs-site/" %} class="active"{% endif %}>Build a Docs Site</a></li>
-      <li><a href="{{ base_url }}/guide/production/"{% if page_url == "/guide/production/" %} class="active"{% endif %}>Production Checklist</a></li>
+      <li><a href="{{ base_url }}/guide/"{% if page.url == "/guide/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/guide/quickstart/"{% if page.url == "/guide/quickstart/" %} class="active"{% endif %}>Quickstart</a></li>
+      <li><a href="{{ base_url }}/guide/docs-site/"{% if page.url == "/guide/docs-site/" %} class="active"{% endif %}>Build a Docs Site</a></li>
+      <li><a href="{{ base_url }}/guide/production/"{% if page.url == "/guide/production/" %} class="active"{% endif %}>Production Checklist</a></li>
     </ul>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Getting Started</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/getting-started/"{% if page_url == "/getting-started/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/getting-started/installation/"{% if page_url == "/getting-started/installation/" %} class="active"{% endif %}>Installation</a></li>
-      <li><a href="{{ base_url }}/getting-started/cli/"{% if page_url == "/getting-started/cli/" %} class="active"{% endif %}>CLI Usage</a></li>
-      <li><a href="{{ base_url }}/getting-started/directory-structure/"{% if page_url == "/getting-started/directory-structure/" %} class="active"{% endif %}>Directory Structure</a></li>
-      <li><a href="{{ base_url }}/getting-started/configuration/"{% if page_url == "/getting-started/configuration/" %} class="active"{% endif %}>Configuration</a></li>
+      <li><a href="{{ base_url }}/getting-started/"{% if page.url == "/getting-started/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/getting-started/installation/"{% if page.url == "/getting-started/installation/" %} class="active"{% endif %}>Installation</a></li>
+      <li><a href="{{ base_url }}/getting-started/cli/"{% if page.url == "/getting-started/cli/" %} class="active"{% endif %}>CLI Usage</a></li>
+      <li><a href="{{ base_url }}/getting-started/directory-structure/"{% if page.url == "/getting-started/directory-structure/" %} class="active"{% endif %}>Directory Structure</a></li>
+      <li><a href="{{ base_url }}/getting-started/configuration/"{% if page.url == "/getting-started/configuration/" %} class="active"{% endif %}>Configuration</a></li>
     </ul>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Content</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/content/"{% if page_url == "/content/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/content/section/"{% if page_url == "/content/section/" %} class="active"{% endif %}>Section</a></li>
-      <li><a href="{{ base_url }}/content/page/"{% if page_url == "/content/page/" %} class="active"{% endif %}>Page</a></li>
-      <li><a href="{{ base_url }}/content/shortcodes/"{% if page_url == "/content/shortcodes/" %} class="active"{% endif %}>Shortcodes</a></li>
-      <li><a href="{{ base_url }}/content/table-of-contents/"{% if page_url == "/content/table-of-contents/" %} class="active"{% endif %}>Table of Contents</a></li>
-      <li><a href="{{ base_url }}/content/syntax-highlighting/"{% if page_url == "/content/syntax-highlighting/" %} class="active"{% endif %}>Syntax Highlighting</a></li>
-      <li><a href="{{ base_url }}/content/taxonomies/"{% if page_url == "/content/taxonomies/" %} class="active"{% endif %}>Taxonomies</a></li>
-      <li><a href="{{ base_url }}/content/search/"{% if page_url == "/content/search/" %} class="active"{% endif %}>Search</a></li>
+      <li><a href="{{ base_url }}/content/"{% if page.url == "/content/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/content/section/"{% if page.url == "/content/section/" %} class="active"{% endif %}>Section</a></li>
+      <li><a href="{{ base_url }}/content/page/"{% if page.url == "/content/page/" %} class="active"{% endif %}>Page</a></li>
+      <li><a href="{{ base_url }}/content/shortcodes/"{% if page.url == "/content/shortcodes/" %} class="active"{% endif %}>Shortcodes</a></li>
+      <li><a href="{{ base_url }}/content/table-of-contents/"{% if page.url == "/content/table-of-contents/" %} class="active"{% endif %}>Table of Contents</a></li>
+      <li><a href="{{ base_url }}/content/syntax-highlighting/"{% if page.url == "/content/syntax-highlighting/" %} class="active"{% endif %}>Syntax Highlighting</a></li>
+      <li><a href="{{ base_url }}/content/taxonomies/"{% if page.url == "/content/taxonomies/" %} class="active"{% endif %}>Taxonomies</a></li>
+      <li><a href="{{ base_url }}/content/search/"{% if page.url == "/content/search/" %} class="active"{% endif %}>Search</a></li>
     </ul>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Templates</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/templates/"{% if page_url == "/templates/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/templates/variables/"{% if page_url == "/templates/variables/" %} class="active"{% endif %}>Variables</a></li>
-      <li><a href="{{ base_url }}/templates/filters/"{% if page_url == "/templates/filters/" %} class="active"{% endif %}>Filters & Tests</a></li>
-      <li><a href="{{ base_url }}/templates/built-in/"{% if page_url == "/templates/built-in/" %} class="active"{% endif %}>Built-in Templates</a></li>
-      <li><a href="{{ base_url }}/templates/pagination/"{% if page_url == "/templates/pagination/" %} class="active"{% endif %}>Pagination</a></li>
+      <li><a href="{{ base_url }}/templates/"{% if page.url == "/templates/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/templates/variables/"{% if page.url == "/templates/variables/" %} class="active"{% endif %}>Variables</a></li>
+      <li><a href="{{ base_url }}/templates/filters/"{% if page.url == "/templates/filters/" %} class="active"{% endif %}>Filters & Tests</a></li>
+      <li><a href="{{ base_url }}/templates/built-in/"{% if page.url == "/templates/built-in/" %} class="active"{% endif %}>Built-in Templates</a></li>
+      <li><a href="{{ base_url }}/templates/pagination/"{% if page.url == "/templates/pagination/" %} class="active"{% endif %}>Pagination</a></li>
     </ul>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Deployment</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/deployment/"{% if page_url == "/deployment/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/deployment/github-pages/"{% if page_url == "/deployment/github-pages/" %} class="active"{% endif %}>Github Pages</a></li>
+      <li><a href="{{ base_url }}/deployment/"{% if page.url == "/deployment/" %} class="active"{% endif %}>Overview</a></li>
+      <li><a href="{{ base_url }}/deployment/github-pages/"{% if page.url == "/deployment/github-pages/" %} class="active"{% endif %}>Github Pages</a></li>
     </ul>
   </div>
 </aside>

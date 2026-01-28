@@ -38,14 +38,14 @@ Filters transform values, tests evaluate conditions.
 | `markdownify` | Render Markdown | `{{ text \| markdownify }}` |
 | `xml_escape` | XML escape | `{{ text \| xml_escape }}` |
 | `jsonify` | JSON encode | `{{ data \| jsonify }}` |
-| `date` | Format date | `{{ page_date \| date("%Y-%m-%d") }}` |
+| `date` | Format date | `{{ page.date \| date("%Y-%m-%d") }}` |
 
 ## Filter Examples
 
 ### Default Value
 
 ```jinja
-{{ page_description | default(value=site_description) }}
+{{ page.description | default(value=site.description) }}
 ```
 
 ### Safe HTML
@@ -60,15 +60,15 @@ Always use `safe` for rendered content:
 ### String Manipulation
 
 ```jinja
-{{ page_title | upper }}
-{{ page_title | slugify }}
+{{ page.title | upper }}
+{{ page.title | slugify }}
 {{ long_text | truncate_words(50) }}
 ```
 
 ### URL Handling
 
 ```jinja
-<a href="{{ page_url | absolute_url }}">Link</a>
+<a href="{{ page.url | absolute_url }}">Link</a>
 <img src="{{ "/images/logo.png" | relative_url }}">
 ```
 
@@ -84,7 +84,7 @@ Always use `safe` for rendered content:
 ### Date Formatting
 
 ```jinja
-<time>{{ page_date | date("%B %d, %Y") }}</time>
+<time>{{ page.date | date("%B %d, %Y") }}</time>
 ```
 
 Format codes:
@@ -102,27 +102,27 @@ Tests evaluate conditions in `{% if %}` statements.
 
 | Test | Description | Example |
 |------|-------------|---------|
-| `startswith` | String starts with | `{% if page_url is startswith("/blog/") %}` |
-| `endswith` | String ends with | `{% if page_url is endswith("/") %}` |
-| `containing` | String contains | `{% if page_url is containing("docs") %}` |
-| `empty` | Value is empty | `{% if page_description is empty %}` |
-| `present` | Value is not empty | `{% if page_title is present %}` |
+| `startswith` | String starts with | `{% if page.url is startswith("/blog/") %}` |
+| `endswith` | String ends with | `{% if page.url is endswith("/") %}` |
+| `containing` | String contains | `{% if page.url is containing("docs") %}` |
+| `empty` | Value is empty | `{% if page.description is empty %}` |
+| `present` | Value is not empty | `{% if page.title is present %}` |
 
 ### Test Examples
 
 ```jinja
-{% if page_url is startswith("/blog/") %}
+{% if page.url is startswith("/blog/") %}
   <span class="badge">Blog</span>
 {% endif %}
 
-{% if page_description is empty %}
-  <meta name="description" content="{{ site_description }}">
+{% if page.description is empty %}
+  <meta name="description" content="{{ site.description }}">
 {% else %}
-  <meta name="description" content="{{ page_description }}">
+  <meta name="description" content="{{ page.description }}">
 {% endif %}
 
-{% if page_title is present %}
-  <h1>{{ page_title }}</h1>
+{% if page.title is present %}
+  <h1>{{ page.title }}</h1>
 {% endif %}
 ```
 
@@ -143,7 +143,7 @@ Tests evaluate conditions in `{% if %}` statements.
 Filters can be chained:
 
 ```jinja
-{{ page_title | lower | slugify }}
+{{ page.title | lower | slugify }}
 {{ content | strip_html | truncate_words(100) }}
 {{ description | default(value="No description") | upper }}
 ```
@@ -153,17 +153,17 @@ Filters can be chained:
 ### Conditional Meta Tags
 
 ```jinja
-{% if page_image is present %}
-<meta property="og:image" content="{{ page_image | absolute_url }}">
+{% if page.image is present %}
+<meta property="og:image" content="{{ page.image | absolute_url }}">
 {% endif %}
 ```
 
 ### Section-Based Content
 
 ```jinja
-{% if page_section is startswith("blog") %}
+{% if page.section is startswith("blog") %}
   <article class="blog-post">{{ content | safe }}</article>
-{% elif page_section is startswith("docs") %}
+{% elif page.section is startswith("docs") %}
   <div class="documentation">{{ content | safe }}</div>
 {% else %}
   <main>{{ content | safe }}</main>
@@ -173,5 +173,5 @@ Filters can be chained:
 ### Safe Defaults
 
 ```jinja
-<title>{{ page_title | default(value="Untitled") }} - {{ site_title }}</title>
+<title>{{ page.title | default(value="Untitled") }} - {{ site.title }}</title>
 ```

@@ -98,14 +98,14 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page_description }}">
-            <title>{{ page_title }} - {{ site_title }}</title>
+            <meta name="description" content="{{ page.description }}">
+            <title>{{ page.title }} - {{ site.title }}</title>
             {{ og_all_tags }}
             #{styles}
             {{ highlight_css }}
             {{ auto_includes_css }}
           </head>
-          <body data-section="{{ page_section }}">
+          <body data-section="{{ page.section }}">
           HTML
         end
 
@@ -246,7 +246,7 @@ module Hwaro
               </div>
             </aside>
             <main class="docs-main">
-              <h1>{{ page_title }}</h1>
+              <h1>{{ page.title }}</h1>
               {{ content }}
           {% include "footer.html" %}
           HTML
@@ -257,7 +257,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <header class="docs-header">
-            <a href="{{ base_url }}/" class="logo">{{ site_title }}</a>
+            <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
             <nav>
               <a href="{{ base_url }}/getting-started/">Getting Started</a>
               <a href="{{ base_url }}/guide/">Guide</a>
@@ -294,12 +294,12 @@ module Hwaro
               </div>
             </aside>
             <main class="docs-main">
-              <h1>{{ page_title }}</h1>
+              <h1>{{ page.title }}</h1>
               {{ content }}
 
               <h2>In This Section</h2>
               <ul class="section-list">
-                {{ section_list }}
+                {{ section.list }}
               </ul>
               {{ pagination }}
           {% include "footer.html" %}

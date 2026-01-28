@@ -27,8 +27,8 @@ Common layout inherited by other templates:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}{{ site_title }}{% endblock %}</title>
-  <meta name="description" content="{{ page_description }}">
+  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  <meta name="description" content="{{ page.description }}">
   {{ og_all_tags }}
   {{ highlight_css }}
   {{ auto_includes_css }}
@@ -59,14 +59,14 @@ For regular content pages:
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
 
 {% block content %}
 <article>
   <header>
-    <h1>{{ page_title }}</h1>
-    {% if page_date %}
-    <time>{{ page_date }}</time>
+    <h1>{{ page.title }}</h1>
+    {% if page.date %}
+    <time>{{ page.date }}</time>
     {% endif %}
   </header>
   
@@ -88,13 +88,13 @@ For section index pages (`_index.md`):
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ section_title }} - {{ site_title }}{% endblock %}
+{% block title %}{{ section.title }} - {{ site.title }}{% endblock %}
 
 {% block content %}
 <header>
-  <h1>{{ section_title }}</h1>
-  {% if section_description %}
-  <p>{{ section_description }}</p>
+  <h1>{{ section.title }}</h1>
+  {% if section.description %}
+  <p>{{ section.description }}</p>
   {% endif %}
 </header>
 
@@ -104,9 +104,20 @@ For section index pages (`_index.md`):
 </div>
 {% endif %}
 
+{# Using section.list for simple HTML output #}
 <ul class="page-list">
-  {{ section_list }}
+  {{ section.list }}
 </ul>
+
+{# Or use section.pages for full control #}
+{#
+<ul class="page-list">
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+#}
+
 {{ pagination }}
 {% endblock %}
 ```
@@ -120,8 +131,8 @@ Optional homepage template. Falls back to `page.html` if not present:
 
 {% block content %}
 <div class="hero">
-  <h1>{{ site_title }}</h1>
-  <p>{{ site_description }}</p>
+  <h1>{{ site.title }}</h1>
+  <p>{{ site.description }}</p>
 </div>
 
 <div class="intro">
@@ -137,7 +148,7 @@ Lists all terms in a taxonomy:
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ taxonomy_name | capitalize }} - {{ site_title }}{% endblock %}
+{% block title %}{{ taxonomy_name | capitalize }} - {{ site.title }}{% endblock %}
 
 {% block content %}
 <h1>{{ taxonomy_name | capitalize }}</h1>
@@ -155,7 +166,7 @@ Lists content with a specific term:
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ taxonomy_term }} - {{ site_title }}{% endblock %}
+{% block title %}{{ taxonomy_term }} - {{ site.title }}{% endblock %}
 
 {% block content %}
 <h1>{{ taxonomy_term }}</h1>
@@ -173,7 +184,7 @@ Error page for missing content:
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}Page Not Found - {{ site_title }}{% endblock %}
+{% block title %}Page Not Found - {{ site.title }}{% endblock %}
 
 {% block content %}
 <div class="error-page">
@@ -192,10 +203,10 @@ Reusable template fragments in `templates/partials/`:
 
 ```jinja
 <nav class="main-nav">
-  <a href="{{ base_url }}/" class="logo">{{ site_title }}</a>
-  <a href="{{ base_url }}/"{% if page_url == "/" %} class="active"{% endif %}>Home</a>
-  <a href="{{ base_url }}/blog/"{% if page_section == "blog" %} class="active"{% endif %}>Blog</a>
-  <a href="{{ base_url }}/about/"{% if page_url == "/about/" %} class="active"{% endif %}>About</a>
+  <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
+  <a href="{{ base_url }}/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="{{ base_url }}/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
+  <a href="{{ base_url }}/about/"{% if page.url == "/about/" %} class="active"{% endif %}>About</a>
 </nav>
 ```
 
@@ -203,7 +214,7 @@ Reusable template fragments in `templates/partials/`:
 
 ```jinja
 <footer>
-  <p>&copy; {{ current_year }} {{ site_title }}</p>
+  <p>&copy; {{ current_year }} {{ site.title }}</p>
 </footer>
 ```
 
@@ -224,7 +235,7 @@ Create `templates/landing.html`:
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{{ page_title }}</title>
+  <title>{{ page.title }}</title>
 </head>
 <body class="landing">
   {{ content }}

@@ -31,11 +31,30 @@ reverse = false
 
 ## Template Usage
 
-`section_list` contains the `<li>...</li>` items for the current page, and `pagination` contains the `<nav>` element.
+`section.list` (or `section_list`) contains the `<li>...</li>` items for the current page, and `pagination` contains the `<nav>` element.
+
+### Using section.list
 
 ```jinja
 <ul class="section-list">
-  {{ section_list }}
+  {{ section.list }}
+</ul>
+
+{{ pagination }}
+```
+
+### Using section.pages
+
+For more control, iterate over `section.pages`:
+
+```jinja
+<ul class="section-list">
+{% for p in section.pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    {% if p.date %}<time>{{ p.date }}</time>{% endif %}
+  </li>
+{% endfor %}
 </ul>
 
 {{ pagination }}

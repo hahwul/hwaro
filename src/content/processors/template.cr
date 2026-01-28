@@ -111,6 +111,25 @@ module Hwaro
           }
           vars["config"] = Crinja::Value.new(config_obj)
 
+          # Section variables (basic, will be enriched by builder with actual section data)
+          vars["section_title"] = Crinja::Value.new("")
+          vars["section_description"] = Crinja::Value.new("")
+          vars["section_list"] = Crinja::Value.new("")
+          section_obj = {
+            "title"       => Crinja::Value.new(""),
+            "description" => Crinja::Value.new(""),
+            "pages"       => Crinja::Value.new([] of Crinja::Value),
+            "list"        => Crinja::Value.new(""),
+          }
+          vars["section"] = Crinja::Value.new(section_obj)
+
+          # TOC variables (basic, will be enriched by builder with actual TOC data)
+          vars["toc"] = Crinja::Value.new("")
+          toc_obj = {
+            "html" => Crinja::Value.new(""),
+          }
+          vars["toc_obj"] = Crinja::Value.new(toc_obj)
+
           # Time-related variables
           now = Time.local
           vars["current_year"] = Crinja::Value.new(now.year)
