@@ -1,25 +1,14 @@
-{% include "header.html" %}
-{% include "nav.html" %}
-<div class="docs-container">
-  {% include "sidebar.html" %}
-  <main class="docs-main{% if not page.toc %} no-toc{% endif %}">
-    <h1>{{ page_title }}</h1>
-    {{ content }}
-
-    <h2 id="in-this-section">In This Section</h2>
-    <ul class="section-list">
-      {{ section_list }}
-    </ul>
-    <footer class="docs-footer">
-      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
-      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
-    </footer>
-  </main>
-  {% if page.toc %}
-  <aside class="docs-toc">
-    <div class="toc-title">On this page</div>
-    {{ toc }}
-  </aside>
-  {% endif %}
-</div>
-{% include "footer.html" %}
+<!doctype html>
+<html>
+    <head>
+        <title>{{ section_title }} - {{ site_title }}</title>
+    </head>
+    <body>
+        <h1>{{ section_title }}</h1>
+        <p>{{ section_description }}</p>
+        <div>{{ content }}</div>
+        <ul>
+            {{ section_list }}
+        </ul>
+    </body>
+</html>

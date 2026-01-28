@@ -638,7 +638,7 @@ module Hwaro
             section_list_html = ""
 
             final_html = if template_content
-                           apply_template(template_content, html_content, page, site.config, section_list_html, toc_html, templates)
+                           apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates)
                          else
                            Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                            html_content
@@ -691,7 +691,7 @@ module Hwaro
                           end
 
             final_html = if template_content
-                           apply_template(template_content, html_content, section, site.config, section_list_html, toc_html, templates, pagination_nav_html, current_url)
+                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -817,7 +817,7 @@ module Hwaro
           template : String,
           content : String,
           page : Models::Page,
-          config : Models::Config,
+          site : Models::Site,
           section_list : String,
           toc : String,
           templates : Hash(String, String),
@@ -828,7 +828,7 @@ module Hwaro
           env = crinja_env
 
           # Build template variables
-          vars = build_template_variables(page, config, content, section_list, toc, pagination, page_url_override)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
           processed_template = process_shortcodes_jinja(template, templates)
@@ -846,13 +846,14 @@ module Hwaro
         # Build template variables hash for Crinja
         private def build_template_variables(
           page : Models::Page,
-          config : Models::Config,
+          site : Models::Site,
           content : String,
           section_list : String,
           toc : String,
           pagination : String = "",
           page_url_override : String? = nil,
         ) : Hash(String, Crinja::Value)
+          config = site.config
           vars = {} of String => Crinja::Value
 
           effective_url = page_url_override || page.url
@@ -913,6 +914,19 @@ module Hwaro
             "base_url"    => Crinja::Value.new(config.base_url),
           }
           vars["site"] = Crinja::Value.new(site_obj)
+
+          # Section variables
+          section_title = ""
+          section_description = ""
+          if !page.section.empty?
+            section_page = (site.pages + site.sections).find { |p| p.section == page.section && p.is_index }
+            if section_page
+              section_title = section_page.title
+              section_description = section_page.description || ""
+            end
+          end
+          vars["section_title"] = Crinja::Value.new(section_title)
+          vars["section_description"] = Crinja::Value.new(section_description)
 
           # Content and layout variables
           vars["content"] = Crinja::Value.new(content)
@@ -1067,7 +1081,7 @@ module Hwaro
           section_list = ""
           toc = ""
 
-          final_html = apply_template(template, content, page, site.config, section_list, toc, templates)
+          final_html = apply_template(template, content, page, site, section_list, toc, templates)
 
           final_html = minify_html(final_html) if minify
 

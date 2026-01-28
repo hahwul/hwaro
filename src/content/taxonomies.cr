@@ -237,7 +237,7 @@ module Hwaro
         return html_content unless template_content
 
         builder = Core::Build::Builder.new
-        builder.apply_template(template_content, html_content, page, site.config, "", "", templates)
+        builder.apply_template(template_content, html_content, page, site, "", "", templates)
       end
 
       private def self.generate_taxonomy_feed(
