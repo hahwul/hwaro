@@ -595,12 +595,12 @@ templates/
 
 In templates, you have access to:
 
-| Variable | Description |
-|----------|-------------|
-| `page_title` | Current page title |
-| `site_title` | Site title from config |
-| `content` | Rendered page content |
-| `base_url` | Site base URL |
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `page_title` | `page.title` | Current page title |
+| `site_title` | `site.title` | Site title from config |
+| `content` | — | Rendered page content |
+| `base_url` | `site.base_url` | Site base URL |
 
 ## Template Inheritance
 
