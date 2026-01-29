@@ -54,6 +54,7 @@ For section templates:
 | `section_description` | `section.description` | Section description |
 | `section_list` | `section.list` | HTML list of pages in section |
 | — | `section.pages` | Array of page objects for iteration |
+| — | `section.pages_count` | Count of pages |
 | `pagination` | — | Pagination navigation HTML |
 
 ### Using section.pages

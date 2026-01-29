@@ -633,7 +633,7 @@ module Hwaro
 
           # Handle section pages with pagination
           if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
-            render_section_with_pagination(page, site, templates, template_content, output_dir, minify, html_content, toc_html)
+            render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html)
           else
             section_list_html = ""
 
@@ -736,7 +736,7 @@ module Hwaro
             .gsub(/\.\./, "")      # Remove parent directory references
             .gsub(/\0/, "")        # Remove null bytes
             .gsub(/\/+/, "/")      # Normalize multiple slashes
-            .gsub(/^\/+|\/+$/, "") # Strip leading/trailing slashes
+            .gsub(/^\/+|^\/+$/, "") # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
@@ -963,6 +963,7 @@ module Hwaro
             "title"       => Crinja::Value.new(section_title),
             "description" => Crinja::Value.new(section_description),
             "pages"       => Crinja::Value.new(section_pages_array),
+            "pages_count" => Crinja::Value.new(section_pages_array.size),
             "list"        => Crinja::Value.new(section_list),
           }
           vars["section"] = Crinja::Value.new(section_obj)
