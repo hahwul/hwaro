@@ -617,9 +617,13 @@ module Hwaro
         )
           return unless page.render
 
-          processed_content = process_shortcodes_jinja(page.raw_content, templates)
+          shortcode_results = {} of String => String
+          processed_content = process_shortcodes_jinja(page.raw_content, templates, shortcode_results)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
+
+          # Replace shortcode placeholders with their rendered HTML content
+          html_content = replace_shortcode_placeholders(html_content, shortcode_results)
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)
@@ -1014,7 +1018,7 @@ module Hwaro
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
         # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
-        private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
+        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), shortcode_results : Hash(String, String)? = nil) : String
           # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
           # so documentation can show literal `{{ ... }}` examples safely.
           String.build do |io|
@@ -1033,7 +1037,7 @@ module Hwaro
               end
 
               if match = line.match(/^\s*(`{3,}|~{3,})/)
-                io << process_shortcodes_in_text(buffer.to_s, templates)
+                io << process_shortcodes_in_text(buffer.to_s, templates, shortcode_results)
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
@@ -1043,11 +1047,11 @@ module Hwaro
               end
             end
 
-            io << process_shortcodes_in_text(buffer.to_s, templates)
+            io << process_shortcodes_in_text(buffer.to_s, templates, shortcode_results)
           end
         end
 
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String)) : String
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), shortcode_results : Hash(String, String)? = nil) : String
           processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
             args_str = $2
@@ -1055,7 +1059,14 @@ module Hwaro
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
               args = parse_shortcode_args_jinja(args_str)
-              render_shortcode_jinja(template, args)
+              html = render_shortcode_jinja(template, args)
+              if results = shortcode_results
+                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+                results[placeholder] = html
+                placeholder
+              else
+                html
+              end
             else
               Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
               match
@@ -1069,7 +1080,14 @@ module Hwaro
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
               args = parse_shortcode_args_jinja(args_str)
-              render_shortcode_jinja(template, args)
+              html = render_shortcode_jinja(template, args)
+              if results = shortcode_results
+                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+                results[placeholder] = html
+                placeholder
+              else
+                html
+              end
             else
               match
             end
@@ -1104,6 +1122,14 @@ module Hwaro
           rescue ex : Crinja::TemplateError
             Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
             ""
+          end
+        end
+
+        # Replace shortcode placeholders with their rendered HTML content
+        private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
+          return html if shortcode_results.empty?
+          html.gsub(/HWARO-SHORTCODE-PLACEHOLDER-\d+/) do |match|
+            shortcode_results[match]? || match
           end
         end
 
