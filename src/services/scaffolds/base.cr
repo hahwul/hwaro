@@ -57,17 +57,17 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page_description }}">
-            <title>{{ page_title }} - {{ site_title }}</title>
+            <meta name="description" content="{{ page.description }}">
+            <title>{{ page.title }} - {{ site.title }}</title>
             {{ og_all_tags }}
             #{styles}
             {{ highlight_css }}
             {{ auto_includes_css }}
           </head>
-          <body data-section="{{ page_section }}">
+          <body data-section="{{ page.section }}">
             <div class="site-wrapper">
               <header class="site-header">
-                <a href="{{ base_url }}/" class="site-logo">{{ site_title }}</a>
+                <a href="{{ base_url }}/" class="site-logo">{{ site.title }}</a>
                 #{navigation}
               </header>
 
@@ -104,10 +104,10 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page_title }}</h1>
+              <h1>{{ page.title }}</h1>
               {{ content }}
               <ul class="section-list">
-                {{ section_list }}
+                {{ section.list }}
               </ul>
               {{ pagination }}
             </main>
@@ -133,7 +133,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page_title }}</h1>
+              <h1>{{ page.title }}</h1>
               <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
               {{ content }}
             </main>
@@ -146,7 +146,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page_title }}</h1>
+              <h1>{{ page.title }}</h1>
               <p class="taxonomy-desc">Posts tagged with this term:</p>
               {{ content }}
             </main>

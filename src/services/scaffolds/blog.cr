@@ -187,9 +187,9 @@ module Hwaro
             <main class="site-main">
               <article class="post">
                 <header class="post-header">
-                  <h1>{{ page_title }}</h1>
+                  <h1>{{ page.title }}</h1>
                   <div class="post-meta">
-                    <time>{{ page_date }}</time>
+                    <time>{{ page.date }}</time>
                   </div>
                 </header>
                 <div class="post-content">

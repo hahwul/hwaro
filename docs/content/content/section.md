@@ -49,53 +49,61 @@ content/
 
 Sections use `section.html` template by default.
 
-Available variables:
+### Available Variables
 
-| Variable | Description |
-|----------|-------------|
-| `section_title` | Section title |
-| `section_description` | Section description |
-| `section_list` | HTML list of pages in section |
-| `content` | Section index content |
-| `section` | Section object containing title, description, and pages array |
+| Flat Variable | Object Access | Description |
+|---------------|---------------|-------------|
+| `section_title` | `section.title` | Section title |
+| `section_description` | `section.description` | Section description |
+| `section_list` | `section.list` | HTML list of pages in section |
+| — | `section.pages` | Array of page objects for iteration |
+| `content` | — | Section index content |
 
-Example template:
-
-```jinja
-{% extends "base.html" %}
-
-{% block content %}
-<h1>{{ section_title }}</h1>
-{{ content }}
-
-<h2>Pages</h2>
-<ul>{{ section_list }}</ul>
-{% endblock %}
-```
-
-## Using section.pages
-
-You can also access the section's pages directly using `section.pages`, which provides an array of page objects. Each page object includes properties like `title`, `url`, `description`, etc.
-
-Example template using `section.pages`:
+### Simple Example (using section.list)
 
 ```jinja
 {% extends "base.html" %}
 
 {% block content %}
 <h1>{{ section.title }}</h1>
-{{ section.description }}
+{{ content }}
+
+<h2>Pages</h2>
+<ul>{{ section.list }}</ul>
+{% endblock %}
+```
+
+### Advanced Example (using section.pages)
+
+For more control over section page listing, iterate over `section.pages`:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ section.title }}</h1>
+{% if section.description %}
+<p class="lead">{{ section.description }}</p>
+{% endif %}
 
 {{ content }}
 
 <h2>Pages</h2>
 <ul>
-{% for page in section.pages %}
-  <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+{% for p in section.pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    {% if p.date %}<time>{{ p.date }}</time>{% endif %}
+    {% if p.description %}<p>{{ p.description }}</p>{% endif %}
+  </li>
 {% endfor %}
 </ul>
 {% endblock %}
 ```
+
+Each page in `section.pages` has these properties:
+- `title`, `description`, `url`, `date`, `image`
+- `draft`, `toc`, `render`, `is_index`, `generated`, `in_sitemap`, `language`
 
 ## Section vs Page
 

@@ -96,27 +96,27 @@ module Hwaro
           - `{{ site.title }}`, `{{ site.description }}`, `{{ site.base_url }}` - Site object
 
           #### Page Variables
-          - `{{ page_title }}` - Current page title
+          Variables can be accessed both as flat variables and via the page object:
+          - `{{ page_title }}` / `{{ page.title }}` - Current page title
+          - `{{ page_description }}` / `{{ page.description }}` - Page description (falls back to site description)
+          - `{{ page_url }}` / `{{ page.url }}` - Page URL
+          - `{{ page_section }}` / `{{ page.section }}` - Current section name
+          - `{{ page_date }}` / `{{ page.date }}` - Page date
+          - `{{ page_image }}` / `{{ page.image }}` - Page image URL
           - `{{ content }}` - Rendered page content
-          - `{{ page_section }}` - Current section name
-          - `{{ page_description }}` - Page description (falls back to site description)
-          - `{{ page_image }}` - Page image URL
-          - `{{ page_date }}` - Page date
-          - `{{ page_url }}` - Page URL
 
-          #### Page Object
-          - `{{ page.title }}` - Page title
-          - `{{ page.description }}` - Page description
-          - `{{ page.url }}` - Page URL
-          - `{{ page.section }}` - Page section
-          - `{{ page.date }}` - Page date
+          #### Page Object Properties
           - `{{ page.draft }}` - Is draft (boolean)
           - `{{ page.toc }}` - Show table of contents (boolean)
 
           #### Section Variables (in section.html)
-          - `{{ section_list }}` - HTML list of pages in section
+          Variables can be accessed both as flat variables and via the section object:
+          - `{{ section_title }}` / `{{ section.title }}` - Section title
+          - `{{ section_description }}` / `{{ section.description }}` - Section description
+          - `{{ section_list }}` / `{{ section.list }}` - HTML list of pages in section
+          - `{{ section.pages }}` - Array of page objects for iteration
           - `{{ pagination }}` - Pagination navigation HTML (empty if disabled or single page)
-          - `{{ toc }}` - Table of contents HTML
+          - `{{ toc }}` / `{{ toc_obj.html }}` - Table of contents HTML
 
           #### Taxonomy Variables
           - `{{ taxonomy_name }}` - Name of taxonomy (e.g., "tags")
@@ -167,14 +167,14 @@ module Hwaro
             <span class="draft-badge">Draft</span>
           {% endif %}
 
-          {% if page_section == "blog" %}
+          {% if page.section == "blog" %}
             <article class="blog-post">{{ content }}</article>
           {% else %}
             <main>{{ content }}</main>
           {% endif %}
 
-          {% if page_description %}
-            <meta name="description" content="{{ page_description }}">
+          {% if page.description %}
+            <meta name="description" content="{{ page.description }}">
           {% endif %}
           ```
 
@@ -230,7 +230,7 @@ module Hwaro
           ```jinja
           {% extends "base.html" %}
 
-          {% block title %}{{ page_title }} - {{ site_title }}{% endblock %}
+          {% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
 
           {% block content %}
             <main>{{ content }}</main>
@@ -312,8 +312,8 @@ module Hwaro
 
           ```jinja
           <nav>
-            <a href="{{ base_url }}/"{% if page_url == "/" %} class="active"{% endif %}>Home</a>
-            <a href="{{ base_url }}/blog/"{% if page_section == "blog" %} class="active"{% endif %}>Blog</a>
+            <a href="{{ base_url }}/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
+            <a href="{{ base_url }}/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
           </nav>
           ```
 

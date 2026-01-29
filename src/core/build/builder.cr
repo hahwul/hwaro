@@ -956,18 +956,30 @@ module Hwaro
           vars["section_title"] = Crinja::Value.new(section_title)
           vars["section_description"] = Crinja::Value.new(section_description)
 
-          # Section object
+          # Section object with structured access
+          # - section.title, section.description, section.pages (for iteration)
+          # - section.list (HTML string, same as section_list for convenience)
           section_obj = {
             "title"       => Crinja::Value.new(section_title),
             "description" => Crinja::Value.new(section_description),
             "pages"       => Crinja::Value.new(section_pages_array),
+            "list"        => Crinja::Value.new(section_list),
           }
           vars["section"] = Crinja::Value.new(section_obj)
 
           # Content and layout variables
           vars["content"] = Crinja::Value.new(content)
           vars["section_list"] = Crinja::Value.new(section_list)
+
+          # TOC variables - both flat and structured access
+          # - toc (HTML string for backward compatibility)
+          # - toc.html (structured access to the same HTML)
           vars["toc"] = Crinja::Value.new(toc)
+          toc_obj = {
+            "html" => Crinja::Value.new(toc),
+          }
+          vars["toc_obj"] = Crinja::Value.new(toc_obj)
+
           vars["pagination"] = Crinja::Value.new(pagination)
 
           # Highlight tags

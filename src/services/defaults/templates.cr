@@ -9,8 +9,8 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ site_description }}">
-            <title>{{ page_title }} - {{ site_title }}</title>
+            <meta name="description" content="{{ site.description }}">
+            <title>{{ page.title }} - {{ site.title }}</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2rem; color: #333; }
               header { margin-bottom: 2rem; border-bottom: 1px solid #eaeaea; padding-bottom: 1rem; }
@@ -29,9 +29,9 @@ module Hwaro
               .pagination-disabled span { padding: 0.25rem 0.5rem; border: 1px solid #eaeaea; border-radius: 6px; color: #999; }
             </style>
           </head>
-          <body data-section="{{ page_section }}">
+          <body data-section="{{ page.section }}">
             <header>
-              <h3>{{ site_title }}</h3>
+              <h3>{{ site.title }}</h3>
               <nav>
                 <a href="{{ base_url }}/">Home</a>
                 <a href="{{ base_url }}/about/">About</a>
@@ -65,11 +65,11 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page_title }}</h1>
+            <h1>{{ page.title }}</h1>
             {{ content }}
 
           <ul class="section-list">
-            {{ section_list }}
+            {{ section.list }}
           </ul>
           {{ pagination }}
 
@@ -102,7 +102,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page_title }}</h1>
+            <h1>{{ page.title }}</h1>
             <p>Browse all terms in this taxonomy:</p>
             {{ content }}
           </main>
@@ -114,7 +114,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page_title }}</h1>
+            <h1>{{ page.title }}</h1>
             <p>Posts tagged with this term:</p>
             {{ content }}
           </main>
