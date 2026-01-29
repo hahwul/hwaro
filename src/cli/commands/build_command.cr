@@ -12,6 +12,11 @@ module Hwaro
           options = parse_options(args)
           builder = Core::Build::Builder.new
 
+          # Set logger level based on verbose option
+          if options.verbose
+            Logger.level = Logger::Level::Debug
+          end
+
           # Register content hooks with lifecycle
           Content::Hooks.all.each do |hookable|
             builder.register(hookable)
