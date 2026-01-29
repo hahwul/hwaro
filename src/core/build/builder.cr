@@ -1100,11 +1100,34 @@ module Hwaro
 
           begin
             crinja_template = env.from_string(template)
-            crinja_template.render(vars)
+            rendered_html = crinja_template.render(vars)
+            # Dedent the rendered HTML to prevent it from being interpreted as a code block by Markdown
+            dedent(rendered_html)
           rescue ex : Crinja::TemplateError
             Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
             ""
           end
+        end
+
+        # Helper method to dedent a string
+        private def dedent(text : String) : String
+          lines = text.split("\n")
+          return text if lines.empty?
+
+          # Find the minimum indentation of non-empty lines
+          min_indent = -1
+          lines.each do |line|
+            next if line.strip.empty?
+            indent = line.match(/^\s*/).not_nil![0].size
+            min_indent = indent if min_indent == -1 || indent < min_indent
+          end
+
+          return text if min_indent <= 0
+
+          # Remove min_indent spaces from the beginning of each line
+          lines.map do |line|
+            line.size >= min_indent ? line[min_indent..-1] : line
+          end.join("\n")
         end
 
         private def minify_html(html : String) : String
