@@ -25,6 +25,10 @@ module Hwaro
       def taxonomy_pages(name : String, term : String) : Array(Page)
         @taxonomies[name]?.try(&.[term]?) || [] of Page
       end
+
+      def all_content : Array(Page)
+        (pages + sections.map { |s| s.as(Page) }).sort_by! { |p| p.path }
+      end
     end
   end
 end

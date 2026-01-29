@@ -670,7 +670,7 @@ module Hwaro
           # Get pages in this section, filtered by language
           # nil language means default language, so we need to compare carefully
           section_lang = section.language
-          section_pages = site.pages.select do |p|
+          section_pages = site.all_content.select do |p|
             next false if p.section != section.section
             next false if p.is_index
             # Match language: both nil (default), or same language code
