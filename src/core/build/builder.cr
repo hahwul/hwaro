@@ -617,9 +617,14 @@ module Hwaro
         )
           return unless page.render
 
-          processed_content = process_shortcodes_jinja(page.raw_content, templates)
+          processed_content, placeholders = process_shortcodes_jinja(page.raw_content, templates)
 
           html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
+
+          # Replace placeholders with actual shortcode HTML after Markdown rendering
+          placeholders.each do |placeholder, html|
+            html_content = html_content.gsub(placeholder, html)
+          end
 
           toc_html = if page.toc && !toc_headers.empty?
                        generate_toc_html(toc_headers)
@@ -831,11 +836,18 @@ module Hwaro
           vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
-          processed_template = process_shortcodes_jinja(template, templates)
+          processed_template_content, template_placeholders = process_shortcodes_jinja(template, templates)
 
           begin
-            crinja_template = env.from_string(processed_template)
-            crinja_template.render(vars)
+            crinja_template = env.from_string(processed_template_content)
+            rendered_template = crinja_template.render(vars)
+
+            # Replace placeholders in the rendered template
+            template_placeholders.each do |placeholder, html|
+              rendered_template = rendered_template.gsub(placeholder, html)
+            end
+
+            rendered_template
           rescue ex : Crinja::TemplateError
             Logger.warn "  [WARN] Template error for #{page.path}: #{ex.message}"
             # Fallback to content only
@@ -1014,10 +1026,9 @@ module Hwaro
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
         # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
-        private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : String
-          # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
-          # so documentation can show literal `{{ ... }}` examples safely.
-          String.build do |io|
+        private def process_shortcodes_jinja(content : String, templates : Hash(String, String)) : Tuple(String, Hash(String, String))
+          placeholders = {} of String => String
+          processed_content = String.build do |io|
             in_fence = false
             fence_marker = ""
             buffer = String::Builder.new
@@ -1033,7 +1044,7 @@ module Hwaro
               end
 
               if match = line.match(/^\s*(`{3,}|~{3,})/)
-                io << process_shortcodes_in_text(buffer.to_s, templates)
+                io << process_shortcodes_in_text(buffer.to_s, templates, placeholders)
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
@@ -1043,19 +1054,22 @@ module Hwaro
               end
             end
 
-            io << process_shortcodes_in_text(buffer.to_s, templates)
+            io << process_shortcodes_in_text(buffer.to_s, templates, placeholders)
           end
+          {processed_content, placeholders}
         end
 
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String)) : String
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), placeholders : Hash(String, String)) : String
           processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
             args_str = $2
 
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              render_shortcode_jinja(template, args)
+              rendered_html = render_shortcode_jinja(template, args_str)
+              placeholder = "<!-- SHORTCODE_PLACEHOLDER_#{placeholders.size} -->"
+              placeholders[placeholder] = rendered_html
+              placeholder
             else
               Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
               match
@@ -1068,8 +1082,10 @@ module Hwaro
 
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              render_shortcode_jinja(template, args)
+              rendered_html = render_shortcode_jinja(template, args_str)
+              placeholder = "<!-- SHORTCODE_PLACEHOLDER_#{placeholders.size} -->"
+              placeholders[placeholder] = rendered_html
+              placeholder
             else
               match
             end
@@ -1091,9 +1107,10 @@ module Hwaro
         end
 
         # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String)) : String
+        private def render_shortcode_jinja(template : String, args_str : String?) : String
           env = crinja_env
           vars = {} of String => Crinja::Value
+          args = parse_shortcode_args_jinja(args_str)
           args.each do |key, value|
             vars[key] = Crinja::Value.new(value)
           end
