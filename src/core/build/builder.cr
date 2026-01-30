@@ -327,9 +327,10 @@ module Hwaro
                                basename
                              end
 
-            is_index = clean_basename == "index.md" || clean_basename == "_index.md"
+            is_section_index = clean_basename == "_index.md"
+            is_index = clean_basename == "index.md" || is_section_index
 
-            if is_index
+            if is_section_index
               page = Models::Section.new(relative_path)
               ctx.sections << page
             else
@@ -749,8 +750,12 @@ module Hwaro
             Logger.warn "  [WARN] Custom template '#{custom}' not found for #{page.path}."
           end
 
-          if page.is_index && !page.section.empty? && templates.has_key?("section")
-            return "section"
+          if page.is_a?(Models::Section)
+            return "section" if templates.has_key?("section")
+          end
+
+          if page.is_index && page.section.empty? && templates.has_key?("index")
+            return "index"
           end
 
           "page"
