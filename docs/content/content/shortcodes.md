@@ -7,9 +7,21 @@ Shortcodes are reusable content components that can be embedded in Markdown.
 
 ## Syntax
 
+### Inline Shortcodes
+
 ```jinja
 {{ shortcode_name(param1="value1", param2="value2") }}
 ```
+
+### Block Shortcodes
+
+```jinja
+{% shortcode_name(param1="value1") %}
+Block content here
+{% end %}
+```
+
+Block shortcodes pass the content between the tags as a `body` variable to the template.
 
 ## Parameter Formats
 
@@ -77,6 +89,27 @@ Usage:
 {{ button(href="/buy/", text="Buy Now", style="secondary") }}
 ```
 
+### Block Shortcode
+
+`templates/shortcodes/mermaid.html`:
+
+```jinja
+<pre class="mermaid">
+{{ body }}
+</pre>
+```
+
+Usage:
+
+```jinja
+{% mermaid() %}
+sequenceDiagram
+    participant A
+    participant B
+    A->>B: Hello
+{% end %}
+```
+
 ## Common Shortcodes
 
 ### Alert
@@ -134,6 +167,18 @@ Usage:
 
 ```jinja
 {{ images(src="/img/a.jpg, /img/b.jpg, /img/c.jpg", alt="Gallery") }}
+```
+
+### Mermaid Diagrams
+
+```jinja
+{% mermaid() %}
+graph TD
+    A[Start] --> B{Is it working?}
+    B -->|Yes| C[Great!]
+    B -->|No| D[Debug]
+    D --> B
+{% end %}
 ```
 
 ## Available Filters

@@ -1106,46 +1106,69 @@ module Hwaro
         end
 
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), shortcode_results : Hash(String, String)? = nil) : String
-          processed = content.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
-            name = $1
-            args_str = $2
+          processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
+              name = $1
+              args_str = $2
+              body = $3.strip
 
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args)
-              if results = shortcode_results
-                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-                results[placeholder] = html
-                placeholder
+              template_key = "shortcodes/#{name}"
+              if template = templates[template_key]?
+                args = parse_shortcode_args_jinja(args_str)
+                args["body"] = body
+                html = render_shortcode_jinja(template, args)
+                if results = shortcode_results
+                  placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+                  results[placeholder] = html
+                  placeholder
+                else
+                  html
+                end
               else
-                html
+                Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
+                match
               end
-            else
-              Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
-              match
             end
-          end
 
-          processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
-            name = $1
-            args_str = $2
+            processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
+              name = $1
+              args_str = $2
 
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args)
-              if results = shortcode_results
-                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-                results[placeholder] = html
-                placeholder
+              template_key = "shortcodes/#{name}"
+              if template = templates[template_key]?
+                args = parse_shortcode_args_jinja(args_str)
+                html = render_shortcode_jinja(template, args)
+                if results = shortcode_results
+                  placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+                  results[placeholder] = html
+                  placeholder
+                else
+                  html
+                end
               else
-                html
+                Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
+                match
               end
-            else
-              match
             end
-          end
+
+            processed = processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
+              name = $1
+              args_str = $2
+
+              template_key = "shortcodes/#{name}"
+              if template = templates[template_key]?
+                args = parse_shortcode_args_jinja(args_str)
+                html = render_shortcode_jinja(template, args)
+                if results = shortcode_results
+                  placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+                  results[placeholder] = html
+                  placeholder
+                else
+                  html
+                end
+              else
+                match
+              end
+            end
         end
 
         # Parse shortcode arguments (key="value" or key='value' or key=value)
