@@ -928,38 +928,49 @@ module Hwaro
           section_title = ""
           section_description = ""
           section_pages_array = [] of Crinja::Value
-          if !page.section.empty?
+          current_section = ""
+
+          if page.is_a?(Models::Section)
+            # For section pages, use the page itself as the section data
+            section_title = page.title
+            section_description = page.description || ""
+            current_section = page.section
+          elsif !page.section.empty?
+            # For regular pages, find the parent section
             section_page = (site.pages + site.sections).find { |p| p.section == page.section && p.is_index }
             if section_page
               section_title = section_page.title
               section_description = section_page.description || ""
+              current_section = page.section
+            end
+          end
 
-              # Calculate section pages
-              current_lang = page.language
-              section_pages = site.pages.select do |p|
-                next false if p.section != page.section
-                next false if p.is_index
-                # Match language: both nil (default), or same language code
-                p.language == current_lang
-              end
-              section_pages.sort_by! { |p| p.title }
+          if !current_section.empty?
+            # Calculate section pages
+            current_lang = page.language
+            section_pages = site.pages.select do |p|
+              next false if p.section != current_section
+              next false if p.is_index
+              # Match language: both nil (default), or same language code
+              p.language == current_lang
+            end
+            section_pages.sort_by! { |p| p.title }
 
-              section_pages_array = section_pages.map do |p|
-                Crinja::Value.new({
-                  "title"       => Crinja::Value.new(p.title),
-                  "description" => Crinja::Value.new(p.description || ""),
-                  "url"         => Crinja::Value.new(p.url),
-                  "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-                  "image"       => Crinja::Value.new(p.image || ""),
-                  "draft"       => Crinja::Value.new(p.draft),
-                  "toc"         => Crinja::Value.new(p.toc),
-                  "render"      => Crinja::Value.new(p.render),
-                  "is_index"    => Crinja::Value.new(p.is_index),
-                  "generated"   => Crinja::Value.new(p.generated),
-                  "in_sitemap"  => Crinja::Value.new(p.in_sitemap),
-                  "language"    => Crinja::Value.new(p.language || config.default_language),
-                })
-              end
+            section_pages_array = section_pages.map do |p|
+              Crinja::Value.new({
+                "title"       => Crinja::Value.new(p.title),
+                "description" => Crinja::Value.new(p.description || ""),
+                "url"         => Crinja::Value.new(p.url),
+                "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                "image"       => Crinja::Value.new(p.image || ""),
+                "draft"       => Crinja::Value.new(p.draft),
+                "toc"         => Crinja::Value.new(p.toc),
+                "render"      => Crinja::Value.new(p.render),
+                "is_index"    => Crinja::Value.new(p.is_index),
+                "generated"   => Crinja::Value.new(p.generated),
+                "in_sitemap"  => Crinja::Value.new(p.in_sitemap),
+                "language"    => Crinja::Value.new(p.language || config.default_language),
+              })
             end
           end
           vars["section_title"] = Crinja::Value.new(section_title)
