@@ -638,7 +638,7 @@ module Hwaro
 
           # Handle section pages with pagination
           if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
-            render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html)
+            render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, verbose)
           else
             section_list_html = ""
 
@@ -673,10 +673,21 @@ module Hwaro
           section_lang = section.language
           section_pages = site.all_content.select do |p|
             next false if p.section != section.section
-            next false if p.is_index
+            next false if p == section  # Exclude the section's own index page
             # Match language: both nil (default), or same language code
             p.language == section_lang
           end
+
+          # Include subsection index pages
+          subsection_prefix = section.path.sub("_index.md", "").sub("content/", "")
+          subsections = site.sections.select do |s|
+            next false if s.section != section.section
+            next false if s.path == section.path
+            s.path.starts_with?("content/#{subsection_prefix}") && s.language == section_lang
+          end
+          section_pages.concat(subsections)
+
+          section_pages.sort_by! { |p| p.title }
 
           # Create paginator and render
           paginator = Content::Pagination::Paginator.new(site.config)
@@ -765,9 +776,20 @@ module Hwaro
           current_lang = current_page.language
           section_pages = site.pages.select do |p|
             next false if p.section != current_page.section
-            next false if p.is_index
+            next false if p == current_page  # Exclude the current page
             # Match language: both nil (default), or same language code
             p.language == current_lang
+          end
+
+          # Include subsection index pages
+          if current_page.is_index
+            subsection_prefix = current_page.path.sub("_index.md", "").sub("content/", "")
+            subsections = site.sections.select do |s|
+              next false if s.section != current_page.section
+              next false if s.path == current_page.path
+              s.path.starts_with?("content/#{subsection_prefix}") && s.language == current_lang
+            end
+            section_pages.concat(subsections)
           end
 
           section_pages.sort_by! { |p| p.title }
@@ -948,12 +970,24 @@ module Hwaro
           if !current_section.empty?
             # Calculate section pages
             current_lang = page.language
-            section_pages = site.pages.select do |p|
+            section_pages = site.all_content.select do |p|
               next false if p.section != current_section
-              next false if p.is_index
+              next false if p == page  # Exclude the current page
               # Match language: both nil (default), or same language code
               p.language == current_lang
             end
+
+            # Include subsection index pages if this is a section page
+            if page.is_index
+              subsection_prefix = page.path.sub("_index.md", "").sub("content/", "")
+              subsections = site.sections.select do |s|
+                next false if s.section != current_section
+                next false if s.path == page.path
+                s.path.starts_with?("content/#{subsection_prefix}") && s.language == current_lang
+              end
+              section_pages.concat(subsections)
+            end
+
             section_pages.sort_by! { |p| p.title }
 
             section_pages_array = section_pages.map do |p|
