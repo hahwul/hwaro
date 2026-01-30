@@ -340,7 +340,17 @@ module Hwaro
 
             # Set basic path info
             path_parts = Path[relative_path].parts
-            page.section = path_parts.size > 1 ? path_parts.first : ""
+            # For nested sections, section is the full path to the directory
+            if is_section_index
+              # For _index.md, section is the directory path
+              page.section = path_parts.size > 1 ? path_parts[0..-2].join("/") : ""
+            elsif is_index
+              # For index.md, section is the parent directory
+              page.section = path_parts.size > 2 ? path_parts[0..-3].join("/") : ""
+            else
+              # For regular pages, section is the directory path
+              page.section = path_parts.size > 1 ? path_parts[0..-2].join("/") : ""
+            end
             page.is_index = is_index
             page.language = language
           end
@@ -970,22 +980,16 @@ module Hwaro
           if !current_section.empty?
             # Calculate section pages
             current_lang = page.language
-            section_pages = site.all_content.select do |p|
-              next false if p.section != current_section
-              next false if p == page  # Exclude the current page
-              # Match language: both nil (default), or same language code
-              p.language == current_lang
-            end
+            current_section_parts = current_section.split("/")
+            section_depth = current_section_parts.size
 
-            # Include subsection index pages if this is a section page
-            if page.is_index
-              subsection_prefix = page.path.sub("_index.md", "").sub("content/", "")
-              subsections = site.sections.select do |s|
-                next false if s.section != current_section
-                next false if s.path == page.path
-                s.path.starts_with?("content/#{subsection_prefix}") && s.language == current_lang
-              end
-              section_pages.concat(subsections)
+            section_pages = site.all_content.select do |p|
+              next false if p == page  # Exclude the current page
+              next false if p.language != current_lang
+              next false if p.section != current_section
+              p_parts = p.path.split("/")
+              # Include direct children or subdirectory index.md files
+              p_parts.size == section_depth + 1 || (p_parts.size > section_depth + 1 && p.is_index && p.path.ends_with?("/index.md"))
             end
 
             section_pages.sort_by! { |p| p.title }
