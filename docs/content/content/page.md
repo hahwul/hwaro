@@ -35,6 +35,7 @@ Your content in **Markdown**.
 | `weight` | int | `0` | Sort order (lower = first) |
 | `image` | string | og default | Featured image for social sharing |
 | `toc` | bool | `false` | Show table of contents |
+| `aliases` | array | `[]` | URL redirects to this page |
 | `tags` | array | `[]` | Tag taxonomy terms |
 | `categories` | array | `[]` | Category taxonomy terms |
 
@@ -105,6 +106,19 @@ weight = 2
 ```
 
 Lower weight values appear first.
+
+### URL Aliases
+
+Create URL redirects to this page with `aliases`:
+
+```markdown
++++
+title = "My Renamed Page"
+aliases = ["/old-url/", "/another-old-url/"]
++++
+
+This page is now at a new URL, but old URLs redirect here.
+```
 
 ## Markdown Content
 
