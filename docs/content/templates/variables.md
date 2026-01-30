@@ -204,3 +204,42 @@ Only populated when `toc = true` in front matter.
   <p>&copy; {{ current_year }} {{ site.title }}</p>
 </footer>
 ```
+
+### Multilingual Links
+
+For multilingual sites, use `page.translations` to create language switchers:
+
+```jinja
+{# Language switcher #}
+{% if page.translations %}
+<nav class="language-switcher">
+  {% for translation in page.translations %}
+    {% if translation.is_current %}
+      <span class="current">{{ translation.code|upper }}</span>
+    {% else %}
+      <a href="{{ translation.url }}" title="{{ translation.title }}">{{ translation.code|upper }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+
+{# Alternative: List all translations #}
+{% if page.translations %}
+<ul class="translations">
+  {% for translation in page.translations %}
+  <li{% if translation.is_current %} class="current"{% endif %}>
+    <a href="{{ translation.url }}">{{ translation.code }}: {{ translation.title }}</a>
+    {% if translation.is_default %}(default){% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+```
+
+Each translation object has:
+- `code`: Language code (e.g., "en", "ko")
+- `url`: Full URL to the translated page
+- `title`: Page title in that language
+- `is_current`: True if this is the current page's language
+- `is_default`: True if this is the default language
+```
