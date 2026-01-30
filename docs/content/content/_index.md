@@ -52,13 +52,3 @@ description = "Page description"
 
 Your content in **Markdown**.
 ```
-
-## In This Section
-
-- [Section](/content/section/) — Organize content with sections
-- [Page](/content/page/) — Page front matter and content
-- [Shortcodes](/content/shortcodes/) — Reusable content components
-- [Table of Contents](/content/table-of-contents/) — Auto-generated TOC
-- [Syntax Highlighting](/content/syntax-highlighting/) — Code block highlighting
-- [Taxonomies](/content/taxonomies/) — Tags, categories, and more
-- [Search](/content/search/) — Client-side search

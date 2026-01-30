@@ -92,10 +92,3 @@ Child template:
 {% include "partials/nav.html" %}
 {% include "partials/footer.html" %}
 ```
-
-## In This Section
-
-- [Variables](/templates/variables/) — Available template variables
-- [Filters & Tests](/templates/filters/) — Data transformation and conditionals
-- [Pagination](/templates/pagination/) — Paginating section listings
-- [Built-in Templates](/templates/built-in/) — Default template structure

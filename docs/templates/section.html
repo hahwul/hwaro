@@ -9,7 +9,7 @@
     {% endif %}
     {{ content }}
     {% if section.pages_count > 0 %}
-    <h2>Pages</h2>
+    <h2>In This Section</h2>
     <ul class="page-list">
       {% for p in section.pages %}
       <li><a href="{{ p.url }}">{{ p.title }}</a></li>
