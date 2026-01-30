@@ -683,7 +683,7 @@ module Hwaro
           section_lang = section.language
           section_pages = site.all_content.select do |p|
             next false if p.section != section.section
-            next false if p == section  # Exclude the section's own index page
+            next false if p == section # Exclude the section's own index page
             # Match language: both nil (default), or same language code
             p.language == section_lang
           end
@@ -759,9 +759,9 @@ module Hwaro
           decoded = URI.decode(path)
           # Remove any parent directory references, null bytes, and normalize slashes
           decoded
-            .gsub(/\.\./, "")      # Remove parent directory references
-            .gsub(/\0/, "")        # Remove null bytes
-            .gsub(/\/+/, "/")      # Normalize multiple slashes
+            .gsub(/\.\./, "")       # Remove parent directory references
+            .gsub(/\0/, "")         # Remove null bytes
+            .gsub(/\/+/, "/")       # Normalize multiple slashes
             .gsub(/^\/+|^\/+$/, "") # Strip leading/trailing slashes
         end
 
@@ -786,7 +786,7 @@ module Hwaro
           current_lang = current_page.language
           section_pages = site.pages.select do |p|
             next false if p.section != current_page.section
-            next false if p == current_page  # Exclude the current page
+            next false if p == current_page # Exclude the current page
             # Match language: both nil (default), or same language code
             p.language == current_lang
           end
@@ -984,7 +984,7 @@ module Hwaro
             section_depth = current_section_parts.size
 
             section_pages = site.all_content.select do |p|
-              next false if p == page  # Exclude the current page
+              next false if p == page # Exclude the current page
               next false if p.language != current_lang
               next false if p.section != current_section
               p_parts = p.path.split("/")

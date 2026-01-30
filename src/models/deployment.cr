@@ -65,4 +65,3 @@ module Hwaro
     end
   end
 end
-
