@@ -63,7 +63,7 @@ See: [Search](/content/search/).
 
 For a docs site, you usually only need:
 
-- `base.html` (layout)
+- `base.html` (base template)
 - `page.html` (single page)
 - `section.html` (section index)
 

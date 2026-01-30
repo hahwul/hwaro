@@ -10,7 +10,7 @@ If you’re looking for a “build and ship” walkthrough first, start here: [G
 
 ```
 templates/
-├── base.html           # Base layout
+├── base.html           # Base template
 ├── page.html           # Regular pages
 ├── section.html        # Section index pages
 ├── index.html          # Homepage (optional)

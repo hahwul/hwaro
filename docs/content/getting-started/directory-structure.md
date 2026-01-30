@@ -14,7 +14,7 @@ my-site/
 │       ├── _index.md    # /blog/
 │       └── post.md      # /blog/post/
 ├── templates/           # Jinja2 templates
-│   ├── base.html        # Base layout
+│   ├── base.html        # Base template
 │   ├── page.html        # Page template
 │   ├── section.html     # Section template
 │   └── shortcodes/      # Shortcode templates

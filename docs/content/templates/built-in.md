@@ -218,14 +218,14 @@ Reusable template fragments in `templates/partials/`:
 </footer>
 ```
 
-## Custom Layouts
+## Custom Templates
 
-Override default template with `layout` front matter:
+Override default template with `template` front matter:
 
 ```markdown
 +++
 title = "Landing Page"
-layout = "landing"
+template = "landing"
 +++
 ```
 
@@ -245,13 +245,13 @@ Create `templates/landing.html`:
 
 ## Template Resolution
 
-1. Check `layout` in front matter
+1. Check `template` in front matter
 2. Check for content-type specific template
 3. Fall back to default template
 
 | Content | Resolution |
 |---------|------------|
-| `layout = "custom"` | `custom.html` |
+| `template = "custom"` | `custom.html` |
 | Homepage | `index.html` → `page.html` |
 | Section index | `section.html` |
 | Regular page | `page.html` |

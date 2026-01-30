@@ -31,7 +31,7 @@ Your content in **Markdown**.
 | `date` | string | — | Publication date (YYYY-MM-DD) |
 | `description` | string | site description | Page description for SEO |
 | `draft` | bool | `false` | Exclude from production builds |
-| `layout` | string | auto | Override default template |
+| `template` | string | auto | Override default template |
 | `weight` | int | `0` | Sort order (lower = first) |
 | `image` | string | og default | Featured image for social sharing |
 | `toc` | bool | `false` | Show table of contents |
@@ -73,12 +73,12 @@ hwaro build --drafts
 hwaro serve --drafts
 ```
 
-### Custom Layout
+### Custom Template
 
 ```markdown
 +++
 title = "Landing Page"
-layout = "landing"
+template = "landing"
 +++
 
 Hero content here.

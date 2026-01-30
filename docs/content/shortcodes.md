@@ -1,7 +1,7 @@
 +++
 title = "Shortcodes"
 description = "Browse, preview, and copy shortcodes."
-layout = "shortcodes"
+template = "shortcodes"
 toc = false
 +++
 

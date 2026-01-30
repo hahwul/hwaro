@@ -66,7 +66,7 @@ module Hwaro
           description = nil.as(String?)
           image = nil.as(String?)
           is_draft = false
-          layout = nil
+          template = nil
           in_sitemap = true
           toc = false
           date = nil
@@ -93,7 +93,7 @@ module Hwaro
               description = toml_fm["description"]?.try(&.as_s)
               image = toml_fm["image"]?.try(&.as_s)
               is_draft = toml_fm["draft"]?.try(&.as_bool) || false
-              layout = toml_fm["layout"]?.try(&.as_s)
+              template = toml_fm["template"]?.try(&.as_s)
               if toml_fm.has_key?("in_sitemap")
                 in_sitemap = toml_fm["in_sitemap"].as_bool
               end
@@ -152,7 +152,7 @@ module Hwaro
                 description = yaml_fm["description"]?.try(&.as_s?)
                 image = yaml_fm["image"]?.try(&.as_s?)
                 is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
-                layout = yaml_fm["layout"]?.try(&.as_s?)
+                template = yaml_fm["template"]?.try(&.as_s?)
                 if (val = yaml_fm["in_sitemap"]?)
                   bool_val = val.as_bool?
                   in_sitemap = bool_val unless bool_val.nil?
@@ -221,7 +221,7 @@ module Hwaro
             image:              image,
             content:            markdown_content,
             draft:              is_draft,
-            layout:             layout,
+            template:           template,
             in_sitemap:         in_sitemap,
             toc:                toc,
             date:               date,

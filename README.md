@@ -23,7 +23,7 @@
 
 Hwaro is a lightweight static site generator written in [Crystal](https://crystal-lang.org/), focused on speed and simplicity. It provides a straightforward workflow for building high-performance websites using Markdown and Jinja2 templates.
 
-The tool processes Markdown content with TOML front matter and utilizes the Crinja engine (a Jinja2 implementation for Crystal) to offer flexible layout management, including template inheritance and includes. To optimize build times, Hwaro incorporates parallel processing and a caching mechanism.
+The tool processes Markdown content with TOML front matter and utilizes the Crinja engine (a Jinja2 implementation for Crystal) to offer flexible template management, including template inheritance and includes. To optimize build times, Hwaro incorporates parallel processing and a caching mechanism.
 
 Core Features:
 * Content & Templating: Supports Markdown-based content creation with Jinja2-compatible templating for full design control.

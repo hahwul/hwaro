@@ -51,7 +51,7 @@ module Hwaro
           page.image = data[:image]
           page.raw_content = data[:content]
           page.draft = data[:draft]
-          page.template = data[:layout]
+          page.template = data[:template]
           page.in_sitemap = data[:in_sitemap]
           page.toc = data[:toc]
           page.date = data[:date]
