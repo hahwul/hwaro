@@ -33,7 +33,19 @@ module Hwaro
         # Returns shortcode files as a hash of path => content
         def shortcode_files : Hash(String, String)
           {
-            "shortcodes/alert.html" => alert_shortcode,
+            "shortcodes/alert.html"   => alert_shortcode,
+            "shortcodes/badge.html"   => badge_shortcode,
+            "shortcodes/button.html"  => button_shortcode,
+            "shortcodes/figure.html"  => figure_shortcode,
+            "shortcodes/kbd.html"     => kbd_shortcode,
+            "shortcodes/quote.html"   => quote_shortcode,
+            "shortcodes/mermaid.html" => mermaid_shortcode,
+            "shortcodes/youtube.html" => youtube_shortcode,
+            "shortcodes/vimeo.html"   => vimeo_shortcode,
+            "shortcodes/gist.html"    => gist_shortcode,
+            "shortcodes/tweet.html"   => tweet_shortcode,
+            "shortcodes/details.html" => details_shortcode,
+            "shortcodes/codepen.html" => codepen_shortcode,
           }
         end
 
@@ -45,6 +57,108 @@ module Hwaro
           <<-HTML
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
             <strong>{{ type | upper }}:</strong> {{ message }}
+          </div>
+          HTML
+        end
+
+        protected def youtube_shortcode : String
+          <<-HTML
+          <div class="sc-video sc-video--youtube">
+            <iframe src="https://www.youtube.com/embed/{{ id }}" allowfullscreen title="YouTube Video"></iframe>
+          </div>
+          HTML
+        end
+
+        protected def vimeo_shortcode : String
+          <<-HTML
+          <div class="sc-video sc-video--vimeo">
+            <iframe src="https://player.vimeo.com/video/{{ id }}" allowfullscreen title="Vimeo Video"></iframe>
+          </div>
+          HTML
+        end
+
+        protected def gist_shortcode : String
+          <<-HTML
+          <script src="https://gist.github.com/{{ user }}/{{ id }}.js{% if file %}?file={{ file }}{% endif %}"></script>
+          HTML
+        end
+
+        protected def tweet_shortcode : String
+          <<-HTML
+          <blockquote class="twitter-tweet">
+            <a href="https://twitter.com/x/status/{{ id }}"></a>
+          </blockquote>
+          <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+          HTML
+        end
+
+        protected def details_shortcode : String
+          <<-HTML
+          <details class="sc-details">
+            <summary class="sc-details__summary">{{ summary | default(value="Details") }}</summary>
+            <div class="sc-details__content">
+              {{ body }}
+            </div>
+          </details>
+          HTML
+        end
+
+        protected def badge_shortcode : String
+          <<-HTML
+          {% set tone = tone | default(value="neutral") | lower %}
+          <span class="sc-badge sc-badge--{{ tone }}">{{ text }}</span>
+          HTML
+        end
+
+        protected def button_shortcode : String
+          <<-HTML
+          {% set style = style | default(value="primary") | lower %}
+          <a class="sc-button sc-button--{{ style }}" href="{{ href }}"{% if target %} target="{{ target }}"{% endif %}{% if target == "_blank" %} rel="noopener"{% endif %}>
+            {{ text }}
+          </a>
+          HTML
+        end
+
+        protected def figure_shortcode : String
+          <<-HTML
+          <figure class="sc-figure">
+            <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+            {% if caption %}<figcaption>{{ caption }}</figcaption>{% endif %}
+          </figure>
+          HTML
+        end
+
+        protected def kbd_shortcode : String
+          <<-HTML
+          <kbd class="sc-kbd">{{ keys }}</kbd>
+          HTML
+        end
+
+        protected def quote_shortcode : String
+          <<-HTML
+          <figure class="sc-quote">
+            <blockquote class="sc-quote__text">
+              <p>{{ text }}</p>
+            </blockquote>
+            {% if author %}<figcaption class="sc-quote__author">— {{ author }}</figcaption>{% endif %}
+          </figure>
+          HTML
+        end
+
+        protected def mermaid_shortcode : String
+          <<-HTML
+          <pre class="mermaid">
+           {{ body }}
+          </pre>
+          HTML
+        end
+
+        protected def codepen_shortcode : String
+          <<-HTML
+          <div class="sc-codepen">
+            <iframe height="{{ height | default(value="300") }}" style="width: 100%;" scrolling="no" title="CodePen Embed" src="https://codepen.io/{{ user }}/embed/{{ id }}?height={{ height | default(value="300") }}&theme-id={{ theme | default(value="default") }}&default-tab={{ tabs | default(value="html,result") }}" frameborder="no" loading="lazy" allowtransparency="true" allowfullscreen="true">
+              See the Pen <a href="https://codepen.io/{{ user }}/pen/{{ id }}"></a> by {{ user }} (<a href="https://codepen.io/{{ user }}">@{{ user }}</a>) on <a href="https://codepen.io">CodePen</a>.
+            </iframe>
           </div>
           HTML
         end
@@ -203,6 +317,24 @@ module Hwaro
               nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
               .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
               .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
+
+              /* Shortcodes */
+              .sc-video { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0; border-radius: 8px; background: #000; }
+              .sc-video iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+              .sc-details { border: 1px solid var(--border); border-radius: 6px; margin: 1rem 0; padding: 0.5rem 1rem; }
+              .sc-details__summary { font-weight: 600; cursor: pointer; padding: 0.5rem 0; }
+              .sc-details__content { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+              .sc-badge { display: inline-block; padding: 0.125rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; line-height: 1; }
+              .sc-badge--neutral { background: var(--bg-subtle); color: var(--text-muted); border: 1px solid var(--border); }
+              .sc-badge--success { background: #dafbe1; color: #1a7f37; border: 1px solid #4ac26b; }
+              .sc-badge--warning { background: #fff8c5; color: #9a6700; border: 1px solid #d4a72c; }
+              .sc-button { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; text-decoration: none; transition: background 0.2s; }
+              .sc-button--primary { background: var(--primary); color: white; }
+              .sc-button--secondary { background: var(--bg-subtle); color: var(--text); border: 1px solid var(--border); }
+              .sc-kbd { display: inline-block; padding: 0.15rem 0.35rem; font-size: 0.75rem; font-family: inherit; line-height: 1.2; color: var(--text); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; box-shadow: inset 0 -1px 0 var(--border); }
+              .sc-quote { margin: 1.5rem 0; padding-left: 1.5rem; border-left: 4px solid var(--border); }
+              .sc-quote__text { margin: 0; font-style: italic; color: var(--text-muted); }
+              .sc-quote__author { margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted); }
 
               /* Responsive */
               @media (max-width: 600px) {
