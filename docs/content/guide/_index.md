@@ -34,3 +34,4 @@ hwaro init my-docs --scaffold docs
 
 - Build a documentation site: [Build a Docs Site](/guide/docs-site/)
 - Go production: [Production Checklist](/guide/production/)
+- Solve common issues: [Troubleshooting](/guide/troubleshooting/)
