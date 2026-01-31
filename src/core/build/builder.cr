@@ -678,24 +678,10 @@ module Hwaro
           toc_html : String,
           verbose : Bool = false,
         )
-          # Get pages in this section, filtered by language
-          # nil language means default language, so we need to compare carefully
-          section_lang = section.language
-          section_pages = site.all_content.select do |p|
-            next false if p.section != section.section
-            next false if p == section # Exclude the section's own index page
-            # Match language: both nil (default), or same language code
-            p.language == section_lang
-          end
-
-          # Include subsection index pages
-          subsection_prefix = section.path.sub("_index.md", "").sub("content/", "")
-          subsections = site.sections.select do |s|
-            next false if s.section != section.section
-            next false if s.path == section.path
-            s.path.starts_with?("content/#{subsection_prefix}") && s.language == section_lang
-          end
-          section_pages.concat(subsections)
+          # Get pages in this section using the site utility method
+          section_name = Path[section.path].dirname
+          section_name = "" if section_name == "."
+          section_pages = site.pages_for_section(section_name, section.language)
 
           section_pages.sort_by! { |p| p.title }
 
@@ -783,24 +769,12 @@ module Hwaro
         end
 
         private def generate_section_list(current_page : Models::Page, site : Models::Site) : String
-          current_lang = current_page.language
-          section_pages = site.pages.select do |p|
-            next false if p.section != current_page.section
-            next false if p == current_page # Exclude the current page
-            # Match language: both nil (default), or same language code
-            p.language == current_lang
-          end
+          # Use the site utility method to get pages for the current section
+          section_name = current_page.section
+          section_pages = site.pages_for_section(section_name, current_page.language)
 
-          # Include subsection index pages
-          if current_page.is_index
-            subsection_prefix = current_page.path.sub("_index.md", "").sub("content/", "")
-            subsections = site.sections.select do |s|
-              next false if s.section != current_page.section
-              next false if s.path == current_page.path
-              s.path.starts_with?("content/#{subsection_prefix}") && s.language == current_lang
-            end
-            section_pages.concat(subsections)
-          end
+          # Exclude the current page if it was included
+          section_pages.reject! { |p| p == current_page }
 
           section_pages.sort_by! { |p| p.title }
 
@@ -978,19 +952,11 @@ module Hwaro
           end
 
           if !current_section.empty?
-            # Calculate section pages
-            current_lang = page.language
-            current_section_parts = current_section.split("/")
-            section_depth = current_section_parts.size
+            # Use the site utility method to get pages for the current section
+            section_pages = site.pages_for_section(current_section, page.language)
 
-            section_pages = site.all_content.select do |p|
-              next false if p == page # Exclude the current page
-              next false if p.language != current_lang
-              next false if p.section != current_section
-              p_parts = p.path.split("/")
-              # Include direct children or subdirectory index.md files
-              p_parts.size == section_depth + 1 || (p_parts.size > section_depth + 1 && p.is_index && p.path.ends_with?("/index.md"))
-            end
+            # Exclude the current page if it was included
+            section_pages.reject! { |p| p == page }
 
             section_pages.sort_by! { |p| p.title }
 
