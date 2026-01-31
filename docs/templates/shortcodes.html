@@ -135,9 +135,9 @@ graph TD
 
         <div class="sc-item" data-name="vimeo" data-tags="media" data-description="Embed Vimeo videos.">
           <template data-preview>
-            {{ vimeo(id="123456789") }}
+            {{ vimeo(id="276071416") }}
           </template>
-          <template data-code>&#123;&#123; vimeo(id="123456789") &#125;&#125;</template>
+          <template data-code>&#123;&#123; vimeo(id="276071416") &#125;&#125;</template>
           <template data-template>&lt;div class=&quot;sc-video sc-video--vimeo&quot;&gt;
   &lt;iframe src=&quot;https://player.vimeo.com/video/&#123;&#123; id &#125;&#125;&quot; allowfullscreen title=&quot;Vimeo Video&quot;&gt;&lt;/iframe&gt;
 &lt;/div&gt;</template>
@@ -145,17 +145,17 @@ graph TD
 
         <div class="sc-item" data-name="gist" data-tags="content" data-description="Embed GitHub Gists.">
           <template data-preview>
-            {{ gist(user="hahwul", id="6063132") }}
+            {{ gist(user="hahwul", id="f7f99c86acc9ad474916049d22f18956") }}
           </template>
-          <template data-code>&#123;&#123; gist(user="hahwul", id="6063132") &#125;&#125;</template>
+          <template data-code>&#123;&#123; gist(user="hahwul", id="f7f99c86acc9ad474916049d22f18956") &#125;&#125;</template>
           <template data-template>&lt;script src=&quot;https://gist.github.com/&#123;&#123; user &#125;&#125;/&#123;&#123; id &#125;&#125;.js&#123;% if file %&#125;?file=&#123;&#123; file &#125;&#125;&#123;% endif %&#125;&quot;&gt;&lt;/script&gt;</template>
         </div>
 
         <div class="sc-item" data-name="tweet" data-tags="content" data-description="Embed Tweets.">
           <template data-preview>
-            {{ tweet(id="1234567890123456789") }}
+            {{ tweet(id="2012519054456783150") }}
           </template>
-          <template data-code>&#123;&#123; tweet(id="1234567890123456789") &#125;&#125;</template>
+          <template data-code>&#123;&#123; tweet(id="2012519054456783150") &#125;&#125;</template>
           <template data-template>&lt;blockquote class=&quot;twitter-tweet&quot;&gt;
   &lt;a href=&quot;https://twitter.com/x/status/&#123;&#123; id &#125;&#125;&quot;&gt;&lt;/a&gt;
 &lt;/blockquote&gt;
@@ -181,9 +181,9 @@ graph TD
 
         <div class="sc-item" data-name="codepen" data-tags="media,content" data-description="Embed CodePen pens.">
           <template data-preview>
-            {{ codepen(user="hahwul", id="xxxxxx") }}
+            {{ codepen(user="hahwul", id="KKjGBbX") }}
           </template>
-          <template data-code>&#123;&#123; codepen(user="hahwul", id="xxxxxx") &#125;&#125;</template>
+          <template data-code>&#123;&#123; codepen(user="hahwul", id="KKjGBbX") &#125;&#125;</template>
           <template data-template>&lt;div class=&quot;sc-codepen&quot;&gt;
   &lt;iframe height=&quot;&#123;&#123; height | default(value=&quot;300&quot;) &#125;&#125;&quot; style=&quot;width: 100%;&quot; scrolling=&quot;no&quot; title=&quot;CodePen Embed&quot; src=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;/embed/&#123;&#123; id &#125;&#125;?height=&#123;&#123; height | default(value=&quot;300&quot;) &#125;&#125;&amp;theme-id=&#123;&#123; theme | default(value=&quot;default&quot;) &#125;&#125;&amp;default-tab=&#123;&#123; tabs | default(value=&quot;html,result&quot;) &#125;&#125;&quot; frameborder=&quot;no&quot; loading=&quot;lazy&quot; allowtransparency=&quot;true&quot; allowfullscreen=&quot;true&quot;&gt;
     See the Pen &lt;a href=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;/pen/&#123;&#123; id &#125;&#125;&quot;&gt;&lt;/a&gt; by &#123;&#123; user &#125;&#125; (&lt;a href=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;&quot;&gt;@&#123;&#123; user &#125;&#125;&lt;/a&gt;) on &lt;a href=&quot;https://codepen.io&quot;&gt;CodePen&lt;/a&gt;.
