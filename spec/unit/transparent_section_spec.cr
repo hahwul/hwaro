@@ -6,20 +6,20 @@ describe Hwaro::Models::Site do
       config = Hwaro::Models::Config.new
       site = Hwaro::Models::Site.new(config)
 
-      # Section /
       root_section = Hwaro::Models::Section.new("_index.md")
+      root_section.section = ""
       root_section.is_index = true
 
-      # Section /blog/ (transparent)
       blog_section = Hwaro::Models::Section.new("blog/_index.md")
+      blog_section.section = "blog"
       blog_section.is_index = true
       blog_section.transparent = true
 
-      # Page /blog/post1.md
       post1 = Hwaro::Models::Page.new("blog/post1.md")
+      post1.section = "blog"
 
-      # Page /about.md
       about = Hwaro::Models::Page.new("about.md")
+      about.section = ""
 
       site.sections << root_section << blog_section
       site.pages << post1 << about
@@ -36,20 +36,23 @@ describe Hwaro::Models::Site do
        site = Hwaro::Models::Site.new(config)
 
        blog = Hwaro::Models::Section.new("blog/_index.md")
+       blog.section = "blog"
        blog.is_index = true
 
        news = Hwaro::Models::Section.new("blog/news/_index.md")
+       news.section = "blog/news"
        news.is_index = true
        news.transparent = false
 
        item = Hwaro::Models::Page.new("blog/news/item.md")
+       item.section = "blog/news"
 
        site.sections << blog << news
        site.pages << item
 
        pages = site.pages_for_section("blog", nil)
        pages.should contain(news)
-       pages.should_not contain(item) # item is in 'blog/news', so not directly in 'blog'
+       pages.should_not contain(item) # item is inside 'news' section which is NOT transparent
     end
 
     it "recursively handles nested transparent sections" do
@@ -57,14 +60,17 @@ describe Hwaro::Models::Site do
        site = Hwaro::Models::Site.new(config)
 
        blog = Hwaro::Models::Section.new("blog/_index.md")
+       blog.section = "blog"
        blog.is_index = true
        blog.transparent = true
 
        news = Hwaro::Models::Section.new("blog/news/_index.md")
+       news.section = "blog/news"
        news.is_index = true
        news.transparent = true
 
        item = Hwaro::Models::Page.new("blog/news/item.md")
+       item.section = "blog/news"
 
        site.sections << blog << news
        site.pages << item
