@@ -102,6 +102,94 @@
   &#123;% if caption %&#125;&lt;figcaption&gt;&#123;&#123; caption &#125;&#125;&lt;/figcaption&gt;&#123;% endif %&#125;
 &lt;/figure&gt;</template>
         </div>
+
+        <div class="sc-item" data-name="mermaid" data-tags="media,content" data-description="Render diagrams using Mermaid.js.">
+          <template data-preview>
+            <div class="mermaid">
+graph TD
+    A[Start] --> B{Is it?}
+    B -- Yes --> C[OK]
+    B -- No --> D[KO]
+            </div>
+          </template>
+          <template data-code>&#123;% mermaid() %&#125;
+graph TD
+    A[Start] --> B{Is it?}
+    B -- Yes --> C[OK]
+    B -- No --> D[KO]
+&#123;% end %&#125;</template>
+          <template data-template>&lt;pre class=&quot;mermaid&quot;&gt;
+ &#123;&#123; body &#125;&#125;
+&lt;/pre&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="youtube" data-tags="media" data-description="Embed YouTube videos.">
+          <template data-preview>
+            {{ youtube(id="aqz-KE-bpKQ") }}
+          </template>
+          <template data-code>&#123;&#123; youtube(id="aqz-KE-bpKQ") &#125;&#125;</template>
+          <template data-template>&lt;div class=&quot;sc-video sc-video--youtube&quot;&gt;
+  &lt;iframe src=&quot;https://www.youtube.com/embed/&#123;&#123; id &#125;&#125;&quot; allowfullscreen title=&quot;YouTube Video&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="vimeo" data-tags="media" data-description="Embed Vimeo videos.">
+          <template data-preview>
+            {{ vimeo(id="276071416") }}
+          </template>
+          <template data-code>&#123;&#123; vimeo(id="276071416") &#125;&#125;</template>
+          <template data-template>&lt;div class=&quot;sc-video sc-video--vimeo&quot;&gt;
+  &lt;iframe src=&quot;https://player.vimeo.com/video/&#123;&#123; id &#125;&#125;&quot; allowfullscreen title=&quot;Vimeo Video&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="gist" data-tags="content" data-description="Embed GitHub Gists.">
+          <template data-preview>
+            {{ gist(user="hahwul", id="f7f99c86acc9ad474916049d22f18956") }}
+          </template>
+          <template data-code>&#123;&#123; gist(user="hahwul", id="f7f99c86acc9ad474916049d22f18956") &#125;&#125;</template>
+          <template data-template>&lt;script src=&quot;https://gist.github.com/&#123;&#123; user &#125;&#125;/&#123;&#123; id &#125;&#125;.js&#123;% if file %&#125;?file=&#123;&#123; file &#125;&#125;&#123;% endif %&#125;&quot;&gt;&lt;/script&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="tweet" data-tags="content" data-description="Embed Tweets.">
+          <template data-preview>
+            {{ tweet(id="2012519054456783150") }}
+          </template>
+          <template data-code>&#123;&#123; tweet(id="2012519054456783150") &#125;&#125;</template>
+          <template data-template>&lt;blockquote class=&quot;twitter-tweet&quot;&gt;
+  &lt;a href=&quot;https://twitter.com/x/status/&#123;&#123; id &#125;&#125;&quot;&gt;&lt;/a&gt;
+&lt;/blockquote&gt;
+&lt;script async src=&quot;https://platform.twitter.com/widgets.js&quot; charset=&quot;utf-8&quot;&gt;&lt;/script&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="details" data-tags="ui,content" data-description="HTML disclosure element.">
+          <template data-preview>
+            {% details(summary="Click to see more") %}
+              This is the hidden content.
+            {% end %}
+          </template>
+          <template data-code>&#123;% details(summary="Click to see more") %&#125;
+  This is the hidden content.
+&#123;% end %&#125;</template>
+          <template data-template>&lt;details class=&quot;sc-details&quot;&gt;
+  &lt;summary class=&quot;sc-details__summary&quot;&gt;&#123;&#123; summary | default(value=&quot;Details&quot;) &#125;&#125;&lt;/summary&gt;
+  &lt;div class=&quot;sc-details__content&quot;&gt;
+    &#123;&#123; body &#125;&#125;
+  &lt;/div&gt;
+&lt;/details&gt;</template>
+        </div>
+
+        <div class="sc-item" data-name="codepen" data-tags="media,content" data-description="Embed CodePen pens.">
+          <template data-preview>
+            {{ codepen(user="hahwul", id="KKjGBbX") }}
+          </template>
+          <template data-code>&#123;&#123; codepen(user="hahwul", id="KKjGBbX") &#125;&#125;</template>
+          <template data-template>&lt;div class=&quot;sc-codepen&quot;&gt;
+  &lt;iframe height=&quot;&#123;&#123; height | default(value=&quot;300&quot;) &#125;&#125;&quot; style=&quot;width: 100%;&quot; scrolling=&quot;no&quot; title=&quot;CodePen Embed&quot; src=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;/embed/&#123;&#123; id &#125;&#125;?height=&#123;&#123; height | default(value=&quot;300&quot;) &#125;&#125;&amp;theme-id=&#123;&#123; theme | default(value=&quot;default&quot;) &#125;&#125;&amp;default-tab=&#123;&#123; tabs | default(value=&quot;html,result&quot;) &#125;&#125;&quot; frameborder=&quot;no&quot; loading=&quot;lazy&quot; allowtransparency=&quot;true&quot; allowfullscreen=&quot;true&quot;&gt;
+    See the Pen &lt;a href=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;/pen/&#123;&#123; id &#125;&#125;&quot;&gt;&lt;/a&gt; by &#123;&#123; user &#125;&#125; (&lt;a href=&quot;https://codepen.io/&#123;&#123; user &#125;&#125;&quot;&gt;@&#123;&#123; user &#125;&#125;&lt;/a&gt;) on &lt;a href=&quot;https://codepen.io&quot;&gt;CodePen&lt;/a&gt;.
+  &lt;/iframe&gt;
+&lt;/div&gt;</template>
+        </div>
       </div>
     </div>
 
