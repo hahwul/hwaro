@@ -39,11 +39,11 @@ module Hwaro
       def pages_for_section(section_name : String, language : String?, content_list : Array(Page)) : Array(Page)
         effective_pages = [] of Page
 
-        # 1. Get direct pages (excluding the section index itself)
+        # 1. Get direct pages (excluding index pages of this section)
         content_list.each do |p|
           next unless p.language == language
           if p.section == section_name
-            if p.is_a?(Section) && p.section == section_name
+            if p.is_index
               next
             end
             effective_pages << p

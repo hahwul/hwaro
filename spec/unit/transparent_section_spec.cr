@@ -37,6 +37,35 @@ describe Hwaro::Models::Site do
       pages.should_not contain(blog_section)
     end
 
+    it "excludes index.md of a transparent sub-section from the parent section" do
+      config = Hwaro::Models::Config.new
+      site = Hwaro::Models::Site.new(config)
+
+      blog_section = Hwaro::Models::Section.new("blog/_index.md")
+      blog_section.section = "blog"
+      blog_section.is_index = true
+      blog_section.transparent = true
+
+      post1 = Hwaro::Models::Page.new("blog/post1.md")
+      post1.section = "blog"
+
+      # A regular index.md that acts as the index for the 'blog' directory
+      # This should be excluded from the parent's list if the section is transparent
+      blog_index = Hwaro::Models::Page.new("blog/index.md")
+      blog_index.title = "Blog Index"
+      blog_index.section = "blog"
+      blog_index.is_index = true
+
+      site.sections << blog_section
+      site.pages << post1
+      site.pages << blog_index
+
+      pages = site.pages_for_section("", nil)
+      pages.should contain(post1)
+      pages.should_not contain(blog_index)
+      pages.should_not contain(blog_section)
+    end
+
     it "correctly handles nested transparent sections" do
        config = Hwaro::Models::Config.new
        site = Hwaro::Models::Site.new(config)
