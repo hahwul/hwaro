@@ -178,6 +178,7 @@ Content pagination logic in `src/content/pagination/`:
 - `paginator.cr` - Core pagination logic
 - `renderer.cr` - HTML rendering for pagination controls
 - Supports section pagination and taxonomy pagination
+- Custom pagination path via `paginate_path` front matter field
 
 #### 8. User-defined Build Hooks
 

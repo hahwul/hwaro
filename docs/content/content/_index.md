@@ -52,3 +52,13 @@ description = "Page description"
 
 Your content in **Markdown**.
 ```
+
+## Documentation
+
+- [Page](/content/page/) - Page front matter and options
+- [Section](/content/section/) - Section configuration and templates
+- [Taxonomies](/content/taxonomies/) - Tags, categories, and custom taxonomies
+- [Table of Contents](/content/table-of-contents/) - TOC generation
+- [Syntax Highlighting](/content/syntax-highlighting/) - Code block highlighting
+- [Shortcodes](/content/shortcodes/) - Reusable content components
+- [Search](/content/search/) - Search index generation

@@ -40,6 +40,21 @@ module Hwaro
       property generated : Bool
       property image : String?
 
+      # New: Authors field (array of author names)
+      property authors : Array(String)
+
+      # New: Extra field for arbitrary custom metadata from front matter
+      property extra : Hash(String, String | Bool | Int64 | Float64 | Array(String))
+
+      # New: Summary - content before <!-- more --> marker or auto-generated
+      property summary : String?
+
+      # New: In search index - whether to include in search index
+      property in_search_index : Bool
+
+      # New: Insert anchor links - whether to add anchor links to headings
+      property insert_anchor_links : Bool
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
@@ -49,6 +64,20 @@ module Hwaro
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
       property translations : Array(TranslationLink)
+
+      # New: Word count and reading time (computed)
+      property word_count : Int32
+      property reading_time : Int32  # in minutes
+
+      # New: Permalink (absolute URL with base_url)
+      property permalink : String?
+
+      # New: Lower/Higher page references (previous/next in section)
+      property lower : Page?   # Previous page (by date or weight)
+      property higher : Page?  # Next page (by date or weight)
+
+      # New: Ancestors - parent sections chain
+      property ancestors : Array(Page)
 
       def initialize(@path : String)
         @title = "Untitled"
@@ -72,6 +101,74 @@ module Hwaro
         @toc = false
         @language = nil
         @translations = [] of TranslationLink
+
+        # New field defaults
+        @authors = [] of String
+        @extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+        @summary = nil
+        @in_search_index = true
+        @insert_anchor_links = false
+        @word_count = 0
+        @reading_time = 0
+        @permalink = nil
+        @lower = nil
+        @higher = nil
+        @ancestors = [] of Page
+      end
+
+      # Calculate word count from raw content (excluding front matter)
+      def calculate_word_count : Int32
+        # Remove front matter
+        content_only = @raw_content.gsub(/\A(\+\+\+|---)\s*\n.*?\n\1\s*\n/m, "")
+        # Remove HTML tags
+        content_only = content_only.gsub(/<[^>]+>/, " ")
+        # Remove markdown syntax elements
+        content_only = content_only.gsub(/[#*_`\[\]()~>|]/, " ")
+        # Split by whitespace and count non-empty words
+        words = content_only.split(/\s+/).reject(&.empty?)
+        @word_count = words.size
+        @word_count
+      end
+
+      # Calculate reading time in minutes (assuming ~200 words per minute)
+      def calculate_reading_time(words_per_minute : Int32 = 200) : Int32
+        calculate_word_count if @word_count == 0
+        @reading_time = (@word_count.to_f / words_per_minute).ceil.to_i
+        @reading_time = 1 if @reading_time < 1 && @word_count > 0
+        @reading_time
+      end
+
+      # Extract summary from content using <!-- more --> marker
+      # Returns content before the marker, or nil if no marker found
+      def extract_summary : String?
+        # Check for <!-- more --> marker in raw content
+        if match = @raw_content.match(/\A(\+\+\+|---)\s*\n.*?\n\1\s*\n(.*?)<!--\s*more\s*-->/mi)
+          summary_md = match[2].strip
+          @summary = summary_md unless summary_md.empty?
+        elsif match = @raw_content.match(/\A(.*?)<!--\s*more\s*-->/mi)
+          # No front matter case
+          summary_md = match[1].strip
+          @summary = summary_md unless summary_md.empty?
+        end
+        @summary
+      end
+
+      # Generate permalink (absolute URL)
+      def generate_permalink(base_url : String) : String
+        base = base_url.rstrip("/")
+        path = @url.starts_with?("/") ? @url : "/#{@url}"
+        @permalink = "#{base}#{path}"
+        @permalink.not_nil!
+      end
+
+      # Check if page has summary (either from <!-- more --> or description)
+      def has_summary? : Bool
+        !@summary.nil? || !@description.nil?
+      end
+
+      # Get effective summary (summary or description fallback)
+      def effective_summary : String?
+        @summary || @description
       end
     end
   end

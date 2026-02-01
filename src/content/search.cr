@@ -10,8 +10,8 @@ module Hwaro
       def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
         return unless config.search.enabled
 
-        # Filter out draft pages
-        search_pages = pages.reject(&.draft)
+        # Filter out draft pages and pages with in_search_index = false
+        search_pages = pages.reject { |p| p.draft || !p.in_search_index }
 
         if search_pages.empty?
           Logger.info "  No pages to include in search index."

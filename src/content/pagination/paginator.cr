@@ -101,6 +101,9 @@ module Hwaro
 
           paginated_pages = [] of PaginatedPage
 
+          # Get custom paginate_path from section (defaults to "page")
+          paginate_path = section.paginate_path
+
           (1..total_pages).each do |page_num|
             start_idx = (page_num - 1) * per_page
             end_idx = [start_idx + per_page, total_items].min
@@ -109,12 +112,12 @@ module Hwaro
             has_prev = page_num > 1
             has_next = page_num < total_pages
 
-            # Generate URLs
-            current_url = page_url(base_url, page_num)
-            prev_url = has_prev ? page_url(base_url, page_num - 1) : nil
-            next_url = has_next ? page_url(base_url, page_num + 1) : nil
-            first_url = page_url(base_url, 1)
-            last_url = page_url(base_url, total_pages)
+            # Generate URLs using section's paginate_path
+            current_url = page_url(base_url, page_num, paginate_path)
+            prev_url = has_prev ? page_url(base_url, page_num - 1, paginate_path) : nil
+            next_url = has_next ? page_url(base_url, page_num + 1, paginate_path) : nil
+            first_url = page_url(base_url, 1, paginate_path)
+            last_url = page_url(base_url, total_pages, paginate_path)
 
             paginated_pages << PaginatedPage.new(
               pages: page_items,
@@ -166,11 +169,11 @@ module Hwaro
         end
 
         # Generate URL for a specific page number
-        private def page_url(base_url : String, page_number : Int32) : String
+        private def page_url(base_url : String, page_number : Int32, paginate_path : String = "page") : String
           if page_number == 1
             "#{base_url}/"
           else
-            "#{base_url}/page/#{page_number}/"
+            "#{base_url}/#{paginate_path}/#{page_number}/"
           end
         end
       end

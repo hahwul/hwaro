@@ -477,6 +477,235 @@ module Hwaro
               Crinja::Value.new(base_url.rstrip("/") + "/" + path)
             end
           end
+
+          # get_page() function - get page data by path
+          # Usage: {% set about = get_page(path="about.md") %}
+          #        {{ about.title }}
+          @env.functions["get_page"] = Crinja.function({path: ""}) do
+            path_arg = arguments["path"].to_s
+            pages_val = env.resolve("__all_pages__")
+
+            result = Crinja::Value.new(nil)
+
+            raw_pages = pages_val.raw
+            if raw_pages.is_a?(Array)
+              raw_pages.each do |page_val|
+                if page_val.is_a?(Hash)
+                  page_path = page_val["path"]?.try(&.to_s) || ""
+                  page_url = page_val["url"]?.try(&.to_s) || ""
+
+                  if page_path == path_arg || page_url == path_arg || page_url == "/#{path_arg.chomp(".md")}/"
+                    result = Crinja::Value.new(page_val)
+                    break
+                  end
+                end
+              end
+            end
+
+            result
+          end
+
+          # get_section() function - get section data by path
+          # Usage: {% set blog = get_section(path="blog/_index.md") %}
+          #        {% for page in blog.pages %}
+          @env.functions["get_section"] = Crinja.function({path: ""}) do
+            path_arg = arguments["path"].to_s
+            sections_val = env.resolve("__all_sections__")
+
+            result = Crinja::Value.new(nil)
+
+            raw_sections = sections_val.raw
+            if raw_sections.is_a?(Array)
+              raw_sections.each do |section_val|
+                if section_val.is_a?(Hash)
+                  section_path = section_val["path"]?.try(&.to_s) || ""
+                  section_name = section_val["name"]?.try(&.to_s) || ""
+                  section_url = section_val["url"]?.try(&.to_s) || ""
+
+                  # Match by path, name, or URL
+                  if section_path == path_arg || section_name == path_arg || section_url == "/#{path_arg}/"
+                    result = Crinja::Value.new(section_val)
+                    break
+                  end
+                end
+              end
+            end
+
+            result
+          end
+
+          # get_taxonomy() function - get taxonomy terms and their pages
+          # Usage: {% set tags = get_taxonomy(kind="tags") %}
+          #        {% for term in tags.items %}
+          @env.functions["get_taxonomy"] = Crinja.function({kind: ""}) do
+            kind = arguments["kind"].to_s
+            taxonomies_val = env.resolve("__taxonomies__")
+
+            result = Crinja::Value.new(nil)
+
+            raw_taxonomies = taxonomies_val.raw
+            if raw_taxonomies.is_a?(Hash)
+              if taxonomy_val = raw_taxonomies[kind]?
+                result = Crinja::Value.new(taxonomy_val)
+              end
+            end
+
+            result
+          end
+
+          # get_taxonomy_url() function - get URL for a taxonomy term
+          # Usage: {{ get_taxonomy_url(kind="tags", term="crystal") }}
+          @env.functions["get_taxonomy_url"] = Crinja.function({kind: "", term: ""}) do
+            kind = arguments["kind"].to_s
+            term = arguments["term"].to_s
+            base_url = env.resolve("base_url").to_s
+
+            # Generate slug from term
+            slug = term.downcase
+              .gsub(/[^\w\s-]/, "")
+              .gsub(/[\s_-]+/, "-")
+              .strip("-")
+
+            url = "/#{kind}/#{slug}/"
+            Crinja::Value.new(base_url.rstrip("/") + url)
+          end
+
+          # resize_image() function - placeholder for image resizing
+          # Usage: {{ resize_image(path="/images/photo.jpg", width=800, height=600) }}
+          # Note: This is a placeholder - actual image processing would need additional libraries
+          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0, op: "fill"}) do
+            path = arguments["path"].to_s
+            width = arguments["width"].as_number.to_i
+            height = arguments["height"].as_number.to_i
+            op = arguments["op"].to_s
+
+            # For now, just return the original path
+            # TODO: Implement actual image resizing with an image processing library
+            Crinja::Value.new({
+              "url"    => Crinja::Value.new(path),
+              "width"  => Crinja::Value.new(width),
+              "height" => Crinja::Value.new(height),
+            })
+          end
+
+          # load_data() function - load data from JSON/TOML/YAML files
+          # Usage: {% set data = load_data(path="data/menu.json") %}
+          @env.functions["load_data"] = Crinja.function({path: ""}) do
+            path = arguments["path"].to_s
+
+            result = Crinja::Value.new(nil)
+
+            begin
+              if File.exists?(path)
+                content = File.read(path)
+
+                if path.ends_with?(".json")
+                  # Parse JSON
+                  json_data = JSON.parse(content)
+                  result = json_to_crinja(json_data)
+                elsif path.ends_with?(".toml")
+                  # Parse TOML
+                  toml_data = TOML.parse(content)
+                  result = toml_to_crinja(toml_data)
+                elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
+                  # Parse YAML
+                  yaml_data = YAML.parse(content)
+                  result = yaml_to_crinja(yaml_data)
+                elsif path.ends_with?(".csv")
+                  # Parse CSV as array of arrays
+                  lines = content.split("\n").reject(&.empty?)
+                  csv_data = lines.map do |line|
+                    Crinja::Value.new(line.split(",").map { |cell| Crinja::Value.new(cell.strip) })
+                  end
+                  result = Crinja::Value.new(csv_data)
+                end
+              end
+            rescue ex
+              # Return nil on error
+              result = Crinja::Value.new(nil)
+            end
+
+            result
+          end
+        end
+
+        # Helper to convert JSON to Crinja value
+        private def json_to_crinja(json : JSON::Any) : Crinja::Value
+          case json.raw
+          when Hash
+            hash = {} of String => Crinja::Value
+            json.as_h.each { |k, v| hash[k] = json_to_crinja(v) }
+            Crinja::Value.new(hash)
+          when Array
+            arr = json.as_a.map { |v| json_to_crinja(v) }
+            Crinja::Value.new(arr)
+          when String
+            Crinja::Value.new(json.as_s)
+          when Int64
+            Crinja::Value.new(json.as_i64)
+          when Float64
+            Crinja::Value.new(json.as_f)
+          when Bool
+            Crinja::Value.new(json.as_bool)
+          when Nil
+            Crinja::Value.new(nil)
+          else
+            Crinja::Value.new(json.to_s)
+          end
+        end
+
+        # Helper to convert TOML to Crinja value
+        private def toml_to_crinja(toml : TOML::Table) : Crinja::Value
+          hash = {} of String => Crinja::Value
+          toml.each do |k, v|
+            hash[k] = toml_any_to_crinja(v)
+          end
+          Crinja::Value.new(hash)
+        end
+
+        private def toml_any_to_crinja(value : TOML::Any) : Crinja::Value
+          if str = value.as_s?
+            Crinja::Value.new(str)
+          elsif int = value.as_i?
+            Crinja::Value.new(int.to_i64)
+          elsif float = value.as_f?
+            Crinja::Value.new(float)
+          elsif bool = value.as_bool?
+            Crinja::Value.new(bool)
+          elsif arr = value.as_a?
+            Crinja::Value.new(arr.map { |v| toml_any_to_crinja(v) })
+          elsif hash = value.as_h?
+            h = {} of String => Crinja::Value
+            hash.each { |k, v| h[k] = toml_any_to_crinja(v) }
+            Crinja::Value.new(h)
+          else
+            Crinja::Value.new(value.to_s)
+          end
+        end
+
+        # Helper to convert YAML to Crinja value
+        private def yaml_to_crinja(yaml : YAML::Any) : Crinja::Value
+          case yaml.raw
+          when Hash
+            hash = {} of String => Crinja::Value
+            yaml.as_h.each { |k, v| hash[k.to_s] = yaml_to_crinja(v) }
+            Crinja::Value.new(hash)
+          when Array
+            arr = yaml.as_a.map { |v| yaml_to_crinja(v) }
+            Crinja::Value.new(arr)
+          when String
+            Crinja::Value.new(yaml.as_s)
+          when Int64
+            Crinja::Value.new(yaml.as_i64)
+          when Float64
+            Crinja::Value.new(yaml.as_f)
+          when Bool
+            Crinja::Value.new(yaml.as_bool)
+          when Nil
+            Crinja::Value.new(nil)
+          else
+            Crinja::Value.new(yaml.to_s)
+          end
         end
       end
 

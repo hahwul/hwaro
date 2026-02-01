@@ -85,6 +85,16 @@ module Hwaro
           sort_by = nil.as(String?)
           reverse = nil.as(Bool?)
 
+          # New fields
+          authors = [] of String
+          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          in_search_index = true
+          insert_anchor_links = false
+          page_template = nil.as(String?)
+          paginate_path = "page"
+          redirect_to = nil.as(String?)
+          weight = 0
+
           # Try TOML Front Matter (+++)
           if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
             begin
@@ -133,6 +143,41 @@ module Hwaro
               if toml_fm.has_key?("aliases")
                 aliases = toml_fm["aliases"].as_a.map(&.as_s)
               end
+
+              # New fields parsing for TOML
+              if toml_fm.has_key?("authors")
+                authors = toml_fm["authors"].as_a.map(&.as_s)
+              end
+              if toml_fm.has_key?("in_search_index")
+                in_search_index = toml_fm["in_search_index"].as_bool
+              end
+              if toml_fm.has_key?("insert_anchor_links")
+                insert_anchor_links = toml_fm["insert_anchor_links"].as_bool
+              end
+              if toml_fm.has_key?("page_template")
+                page_template = toml_fm["page_template"].as_s
+              end
+              if toml_fm.has_key?("paginate_path")
+                paginate_path = toml_fm["paginate_path"].as_s
+              end
+              if toml_fm.has_key?("redirect_to")
+                redirect_to = toml_fm["redirect_to"].as_s
+              end
+              if toml_fm.has_key?("weight")
+                weight = toml_fm["weight"].as_i
+              end
+
+              # Extract extra fields (all keys not in known list)
+              known_keys = ["title", "description", "image", "draft", "template", "in_sitemap",
+                            "toc", "date", "updated", "render", "slug", "path", "aliases", "tags",
+                            "transparent", "generate_feeds", "paginate", "pagination_enabled",
+                            "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
+                            "page_template", "paginate_path", "redirect_to", "weight", "categories"]
+              toml_fm.each do |key, value|
+                next if known_keys.includes?(key)
+                extra[key] = extract_extra_value(value)
+              end
+
               front_matter_keys = toml_fm.keys
               taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
               if toml_fm.has_key?("tags")
@@ -202,6 +247,47 @@ module Hwaro
                   aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
                 end
 
+                # New fields parsing for YAML
+                if (val = yaml_fm["authors"]?)
+                  authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+                end
+                if (val = yaml_fm["in_search_index"]?)
+                  bool_val = val.as_bool?
+                  in_search_index = bool_val unless bool_val.nil?
+                end
+                if (val = yaml_fm["insert_anchor_links"]?)
+                  bool_val = val.as_bool?
+                  insert_anchor_links = bool_val unless bool_val.nil?
+                end
+                if (val = yaml_fm["page_template"]?)
+                  page_template = val.as_s?
+                end
+                if (val = yaml_fm["paginate_path"]?)
+                  paginate_path = val.as_s? || "page"
+                end
+                if (val = yaml_fm["redirect_to"]?)
+                  redirect_to = val.as_s?
+                end
+                if (val = yaml_fm["weight"]?)
+                  int_val = val.as_i?
+                  weight = int_val unless int_val.nil?
+                end
+
+                # Extract extra fields for YAML
+                known_keys = ["title", "description", "image", "draft", "template", "in_sitemap",
+                              "toc", "date", "updated", "render", "slug", "path", "aliases", "tags",
+                              "transparent", "generate_feeds", "paginate", "pagination_enabled",
+                              "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
+                              "page_template", "paginate_path", "redirect_to", "weight", "categories"]
+                if fm_hash = yaml_fm.as_h?
+                  fm_hash.each do |key_any, value|
+                    key = key_any.as_s?
+                    next unless key
+                    next if known_keys.includes?(key)
+                    extra[key] = extract_extra_value_yaml(value)
+                  end
+                end
+
                 front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
                 taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
                 if (val = yaml_fm["tags"]?)
@@ -239,7 +325,88 @@ module Hwaro
             pagination_enabled: pagination_enabled,
             sort_by:            sort_by,
             reverse:            reverse,
+            # New fields
+            authors:             authors,
+            extra:               extra,
+            in_search_index:     in_search_index,
+            insert_anchor_links: insert_anchor_links,
+            page_template:       page_template,
+            paginate_path:       paginate_path,
+            redirect_to:         redirect_to,
+            weight:              weight,
           }
+        end
+
+        # Extract extra value from TOML::Any
+        private def extract_extra_value(value : TOML::Any) : String | Bool | Int64 | Float64 | Array(String)
+          if str = value.as_s?
+            str
+          elsif bool = value.as_bool?
+            bool
+          elsif int = value.as_i?
+            int.to_i64
+          elsif float = value.as_f?
+            float
+          elsif arr = value.as_a?
+            arr.compact_map(&.as_s?)
+          else
+            value.to_s
+          end
+        end
+
+        # Extract extra value from YAML::Any
+        private def extract_extra_value_yaml(value : YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
+          if str = value.as_s?
+            str
+          elsif bool = value.as_bool?
+            bool
+          elsif int = value.as_i?
+            int.to_i64
+          elsif float = value.as_f?
+            float
+          elsif arr = value.as_a?
+            arr.compact_map(&.as_s?)
+          else
+            value.to_s
+          end
+        end
+
+        # Render with anchor links inserted into headings
+        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading") : Tuple(String, Array(Models::TocHeader))
+          html, toc = render(content, highlight, safe)
+          html_with_anchors = insert_anchor_links_to_html(html, anchor_style)
+          {html_with_anchors, toc}
+        end
+
+        # Insert anchor links into headings
+        # Note: This modifies the HTML string directly since XML node manipulation is limited
+        private def insert_anchor_links_to_html(html : String, style : String = "heading") : String
+          return html unless html.includes?("<h")
+
+          result = html
+
+          # Match h1-h6 tags with id attributes and insert anchor links
+          result = result.gsub(/<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m) do |match|
+            tag = $1
+            attrs = $2
+            id = $3
+            content = $4
+
+            anchor = %(<a class="anchor" href="##{id}" aria-hidden="true">🔗</a>)
+
+            new_content = case style
+                          when "before"
+                            "#{anchor} #{content}"
+                          when "after"
+                            "#{content} #{anchor}"
+                          else
+                            content
+                          end
+
+            "<#{tag}#{attrs}>#{new_content}</#{tag}>"
+          end
+
+          result
         end
 
         private def process_html_headers(html : String) : Tuple(String, Array(Models::TocHeader))

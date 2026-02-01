@@ -237,6 +237,11 @@ module Hwaro
             Content::Multilingual.link_translations!(ctx.all_pages, config)
           end
 
+          # Link lower/higher page navigation and build ancestors
+          link_page_navigation(ctx)
+          build_subsections(ctx)
+          collect_section_assets(ctx)
+
           # Phase: Transform
           profiler.start_phase("Transform")
           result = @lifecycle.run_phase(Lifecycle::Phase::Transform, ctx) do
@@ -440,6 +445,20 @@ module Hwaro
             page.taxonomy_name = nil
             page.taxonomy_term = nil
 
+            # New fields assignment
+            page.authors = data[:authors]
+            page.extra = data[:extra]
+            page.in_search_index = data[:in_search_index]
+            page.insert_anchor_links = data[:insert_anchor_links]
+            page.weight = data[:weight]
+
+            # Calculate word count and reading time
+            page.calculate_word_count
+            page.calculate_reading_time
+
+            # Extract summary from <!-- more --> marker
+            page.extract_summary
+
             if page.is_a?(Models::Section)
               page.transparent = data[:transparent]
               page.generate_feeds = data[:generate_feeds]
@@ -447,6 +466,9 @@ module Hwaro
               page.pagination_enabled = data[:pagination_enabled]
               page.sort_by = data[:sort_by]
               page.reverse = data[:reverse]
+              page.page_template = data[:page_template]
+              page.paginate_path = data[:paginate_path]
+              page.redirect_to = data[:redirect_to]
             end
 
             # Calculate URL
@@ -457,6 +479,83 @@ module Hwaro
           unless ctx.options.drafts
             ctx.pages.reject! { |p| p.draft }
             ctx.sections.reject! { |s| s.draft }
+          end
+        end
+
+        # Link lower/higher page navigation for previous/next page links
+        private def link_page_navigation(ctx : Lifecycle::BuildContext)
+          # Group pages by section
+          pages_by_section = {} of String => Array(Models::Page)
+
+          ctx.pages.each do |page|
+            next if page.is_index
+            section = page.section
+            pages_by_section[section] ||= [] of Models::Page
+            pages_by_section[section] << page
+          end
+
+          # For each section, sort pages and link lower/higher
+          pages_by_section.each do |section_name, pages|
+            # Find section to get sort_by setting
+            section = ctx.sections.find { |s| s.section == section_name }
+            sort_by = section.try(&.sort_by) || "date"
+            reverse = section.try(&.reverse) || false
+
+            # Sort pages
+            sorted = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+
+            # Link lower (previous) and higher (next)
+            sorted.each_with_index do |page, idx|
+              page.lower = idx > 0 ? sorted[idx - 1] : nil
+              page.higher = idx < sorted.size - 1 ? sorted[idx + 1] : nil
+            end
+          end
+        end
+
+        # Build subsections hierarchy
+        private def build_subsections(ctx : Lifecycle::BuildContext)
+          sections_by_path = {} of String => Models::Section
+          ctx.sections.each { |s| sections_by_path[s.section] = s }
+
+          ctx.sections.each do |section|
+            path_parts = section.section.split("/")
+            next if path_parts.size <= 1
+
+            # Find parent section
+            parent_path = path_parts[0..-2].join("/")
+            if parent = sections_by_path[parent_path]?
+              parent.add_subsection(section)
+
+              # Build ancestors chain
+              current_path = ""
+              path_parts[0..-2].each do |part|
+                current_path = current_path.empty? ? part : "#{current_path}/#{part}"
+                if ancestor = sections_by_path[current_path]?
+                  section.ancestors << ancestor
+                end
+              end
+            end
+          end
+
+          # Also build ancestors for regular pages
+          ctx.pages.each do |page|
+            next if page.section.empty?
+
+            path_parts = page.section.split("/")
+            current_path = ""
+            path_parts.each do |part|
+              current_path = current_path.empty? ? part : "#{current_path}/#{part}"
+              if ancestor = sections_by_path[current_path]?
+                page.ancestors << ancestor
+              end
+            end
+          end
+        end
+
+        # Collect assets for each section
+        private def collect_section_assets(ctx : Lifecycle::BuildContext)
+          ctx.sections.each do |section|
+            section.collect_assets("content")
           end
         end
 
@@ -636,10 +735,21 @@ module Hwaro
         )
           return unless page.render
 
+          # Handle redirect_to for sections
+          if page.is_a?(Models::Section) && page.has_redirect?
+            generate_redirect_page(page, output_dir, verbose)
+            return
+          end
+
           shortcode_results = {} of String => String
           processed_content = process_shortcodes_jinja(page.raw_content, templates, shortcode_results)
 
-          html_content, toc_headers = Processor::Markdown.render(processed_content, highlight, safe)
+          # Use anchor links if enabled
+          html_content, toc_headers = if page.insert_anchor_links
+                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after")
+                                      else
+                                        Processor::Markdown.render(processed_content, highlight, safe)
+                                      end
 
           # Replace shortcode placeholders with their rendered HTML content
           html_content = replace_shortcode_placeholders(html_content, shortcode_results)
@@ -673,6 +783,37 @@ module Hwaro
           end
 
           generate_aliases(page, output_dir, verbose)
+        end
+
+        # Generate redirect page for sections with redirect_to
+        private def generate_redirect_page(
+          section : Models::Section,
+          output_dir : String,
+          verbose : Bool = false,
+        )
+          redirect_url = section.redirect_to
+          return unless redirect_url
+
+          redirect_html = <<-HTML
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=#{redirect_url}">
+            <link rel="canonical" href="#{redirect_url}">
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="#{redirect_url}">#{redirect_url}</a>...</p>
+            <script>window.location.href = "#{redirect_url}";</script>
+          </body>
+          </html>
+          HTML
+
+          output_path = File.join(output_dir, section.url.sub(/^\//, ""), "index.html")
+          FileUtils.mkdir_p(Path[output_path].dirname)
+          File.write(output_path, redirect_html)
+          Logger.action :create, output_path if verbose
         end
 
         private def render_section_with_pagination(
@@ -908,24 +1049,101 @@ module Hwaro
           end
           vars["page_translations"] = Crinja::Value.new(translations)
 
+          # Generate permalink
+          page.generate_permalink(config.base_url)
+
+          # Convert authors to Crinja array
+          authors_array = page.authors.map { |a| Crinja::Value.new(a) }
+
+          # Convert extra to Crinja hash
+          extra_hash = {} of String => Crinja::Value
+          page.extra.each do |k, v|
+            extra_hash[k] = case v
+                            when String
+                              Crinja::Value.new(v)
+                            when Bool
+                              Crinja::Value.new(v)
+                            when Int64
+                              Crinja::Value.new(v)
+                            when Float64
+                              Crinja::Value.new(v)
+                            when Array(String)
+                              Crinja::Value.new(v.map { |s| Crinja::Value.new(s) })
+                            else
+                              Crinja::Value.new(v.to_s)
+                            end
+          end
+
+          # Build lower/higher page objects
+          lower_obj = if lower = page.lower
+                        {
+                          "title"       => Crinja::Value.new(lower.title),
+                          "url"         => Crinja::Value.new(lower.url),
+                          "description" => Crinja::Value.new(lower.description || ""),
+                          "date"        => Crinja::Value.new(lower.date.try(&.to_s("%Y-%m-%d")) || ""),
+                        }
+                      else
+                        nil
+                      end
+
+          higher_obj = if higher = page.higher
+                         {
+                           "title"       => Crinja::Value.new(higher.title),
+                           "url"         => Crinja::Value.new(higher.url),
+                           "description" => Crinja::Value.new(higher.description || ""),
+                           "date"        => Crinja::Value.new(higher.date.try(&.to_s("%Y-%m-%d")) || ""),
+                         }
+                       else
+                         nil
+                       end
+
+          # Build ancestors array
+          ancestors_array = page.ancestors.map do |ancestor|
+            Crinja::Value.new({
+              "title" => Crinja::Value.new(ancestor.title),
+              "url"   => Crinja::Value.new(ancestor.url),
+            })
+          end
+
           # Page object with all properties
           page_obj = {
-            "title"        => Crinja::Value.new(page.title),
-            "description"  => Crinja::Value.new(page.description || ""),
-            "url"          => Crinja::Value.new(effective_url),
-            "section"      => Crinja::Value.new(page.section),
-            "date"         => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
-            "image"        => Crinja::Value.new(page.image || ""),
-            "draft"        => Crinja::Value.new(page.draft),
-            "toc"          => Crinja::Value.new(page.toc),
-            "render"       => Crinja::Value.new(page.render),
-            "is_index"     => Crinja::Value.new(page.is_index),
-            "generated"    => Crinja::Value.new(page.generated),
-            "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
-            "language"     => Crinja::Value.new(page_language),
-            "translations" => Crinja::Value.new(translations),
+            "title"           => Crinja::Value.new(page.title),
+            "description"     => Crinja::Value.new(page.description || ""),
+            "url"             => Crinja::Value.new(effective_url),
+            "section"         => Crinja::Value.new(page.section),
+            "date"            => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
+            "updated"         => Crinja::Value.new(page.updated.try(&.to_s("%Y-%m-%d")) || ""),
+            "image"           => Crinja::Value.new(page.image || ""),
+            "draft"           => Crinja::Value.new(page.draft),
+            "toc"             => Crinja::Value.new(page.toc),
+            "render"          => Crinja::Value.new(page.render),
+            "is_index"        => Crinja::Value.new(page.is_index),
+            "generated"       => Crinja::Value.new(page.generated),
+            "in_sitemap"      => Crinja::Value.new(page.in_sitemap),
+            "language"        => Crinja::Value.new(page_language),
+            "translations"    => Crinja::Value.new(translations),
+            # New properties
+            "authors"         => Crinja::Value.new(authors_array),
+            "extra"           => Crinja::Value.new(extra_hash),
+            "summary"         => Crinja::Value.new(page.effective_summary || ""),
+            "word_count"      => Crinja::Value.new(page.word_count),
+            "reading_time"    => Crinja::Value.new(page.reading_time),
+            "permalink"       => Crinja::Value.new(page.permalink || ""),
+            "weight"          => Crinja::Value.new(page.weight),
+            "in_search_index" => Crinja::Value.new(page.in_search_index),
+            "lower"           => lower_obj ? Crinja::Value.new(lower_obj) : Crinja::Value.new(nil),
+            "higher"          => higher_obj ? Crinja::Value.new(higher_obj) : Crinja::Value.new(nil),
+            "ancestors"       => Crinja::Value.new(ancestors_array),
           }
           vars["page"] = Crinja::Value.new(page_obj)
+
+          # Flat variables for new properties
+          vars["page_summary"] = Crinja::Value.new(page.effective_summary || "")
+          vars["page_word_count"] = Crinja::Value.new(page.word_count)
+          vars["page_reading_time"] = Crinja::Value.new(page.reading_time)
+          vars["page_permalink"] = Crinja::Value.new(page.permalink || "")
+          vars["page_authors"] = Crinja::Value.new(authors_array)
+          vars["page_weight"] = Crinja::Value.new(page.weight)
 
           # Site variables (flat for convenience)
           vars["site_title"] = Crinja::Value.new(config.title)
@@ -946,11 +1164,36 @@ module Hwaro
           section_pages_array = [] of Crinja::Value
           current_section = ""
 
+          # Section-specific variables
+          subsections_array = [] of Crinja::Value
+          assets_array = [] of Crinja::Value
+          page_template_var = ""
+          paginate_path_var = "page"
+          redirect_to_var = ""
+
           if page.is_a?(Models::Section)
             # For section pages, use the page itself as the section data
             section_title = page.title
             section_description = page.description || ""
             current_section = page.section
+
+            # Section-specific properties
+            page_template_var = page.page_template || ""
+            paginate_path_var = page.paginate_path
+            redirect_to_var = page.redirect_to || ""
+
+            # Build subsections array
+            subsections_array = page.subsections.map do |sub|
+              Crinja::Value.new({
+                "title"       => Crinja::Value.new(sub.title),
+                "description" => Crinja::Value.new(sub.description || ""),
+                "url"         => Crinja::Value.new(sub.url),
+                "pages_count" => Crinja::Value.new(sub.pages.size),
+              })
+            end
+
+            # Build assets array
+            assets_array = page.assets.map { |a| Crinja::Value.new(a) }
           elsif !page.section.empty?
             # For regular pages, find the parent section
             section_page = (site.pages + site.sections).find { |p| p.section == page.section && p.is_index }
@@ -998,11 +1241,17 @@ module Hwaro
           # - section.title, section.description, section.pages (for iteration)
           # - section.list (HTML string, same as section_list for convenience)
           section_obj = {
-            "title"       => Crinja::Value.new(section_title),
-            "description" => Crinja::Value.new(section_description),
-            "pages"       => Crinja::Value.new(section_pages_array),
-            "pages_count" => Crinja::Value.new(section_pages_array.size),
-            "list"        => Crinja::Value.new(section_list),
+            "title"         => Crinja::Value.new(section_title),
+            "description"   => Crinja::Value.new(section_description),
+            "pages"         => Crinja::Value.new(section_pages_array),
+            "pages_count"   => Crinja::Value.new(section_pages_array.size),
+            "list"          => Crinja::Value.new(section_list),
+            # New section properties
+            "subsections"   => Crinja::Value.new(subsections_array),
+            "assets"        => Crinja::Value.new(assets_array),
+            "page_template" => Crinja::Value.new(page_template_var),
+            "paginate_path" => Crinja::Value.new(paginate_path_var),
+            "redirect_to"   => Crinja::Value.new(redirect_to_var),
           }
           vars["section"] = Crinja::Value.new(section_obj)
 
@@ -1044,6 +1293,70 @@ module Hwaro
           vars["current_year"] = Crinja::Value.new(now.year)
           vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
           vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
+
+          # Hidden variables for get_page/get_section/get_taxonomy functions
+          # These are prefixed with __ to indicate they're internal
+          all_pages_array = site.pages.map do |p|
+            Crinja::Value.new({
+              "path"        => Crinja::Value.new(p.path),
+              "title"       => Crinja::Value.new(p.title),
+              "description" => Crinja::Value.new(p.description || ""),
+              "url"         => Crinja::Value.new(p.url),
+              "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+              "section"     => Crinja::Value.new(p.section),
+              "draft"       => Crinja::Value.new(p.draft),
+              "weight"      => Crinja::Value.new(p.weight),
+              "summary"     => Crinja::Value.new(p.effective_summary || ""),
+              "word_count"  => Crinja::Value.new(p.word_count),
+              "reading_time" => Crinja::Value.new(p.reading_time),
+            })
+          end
+          vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
+
+          all_sections_array = site.sections.map do |s|
+            section_pages = s.pages.map do |sp|
+              Crinja::Value.new({
+                "title" => Crinja::Value.new(sp.title),
+                "url"   => Crinja::Value.new(sp.url),
+                "date"  => Crinja::Value.new(sp.date.try(&.to_s("%Y-%m-%d")) || ""),
+              })
+            end
+            Crinja::Value.new({
+              "path"        => Crinja::Value.new(s.path),
+              "name"        => Crinja::Value.new(s.section),
+              "title"       => Crinja::Value.new(s.title),
+              "description" => Crinja::Value.new(s.description || ""),
+              "url"         => Crinja::Value.new(s.url),
+              "pages"       => Crinja::Value.new(section_pages),
+              "pages_count" => Crinja::Value.new(s.pages.size),
+            })
+          end
+          vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
+
+          # Build taxonomies hash for get_taxonomy function
+          taxonomies_hash = {} of String => Crinja::Value
+          site.taxonomies.each do |name, terms|
+            terms_array = terms.map do |term, term_pages|
+              term_pages_array = term_pages.map do |tp|
+                Crinja::Value.new({
+                  "title" => Crinja::Value.new(tp.title),
+                  "url"   => Crinja::Value.new(tp.url),
+                  "date"  => Crinja::Value.new(tp.date.try(&.to_s("%Y-%m-%d")) || ""),
+                })
+              end
+              Crinja::Value.new({
+                "name"  => Crinja::Value.new(term),
+                "slug"  => Crinja::Value.new(Utils::TextUtils.slugify(term)),
+                "pages" => Crinja::Value.new(term_pages_array),
+                "count" => Crinja::Value.new(term_pages.size),
+              })
+            end
+            taxonomies_hash[name] = Crinja::Value.new({
+              "name"  => Crinja::Value.new(name),
+              "items" => Crinja::Value.new(terms_array),
+            })
+          end
+          vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
 
           vars
         end
