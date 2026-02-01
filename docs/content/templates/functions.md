@@ -1,110 +1,106 @@
 +++
-title = "Template Functions"
-description = "Built-in template functions for data retrieval and manipulation"
-toc = true
-weight = 5
+title = "Functions"
+weight = 3
 +++
 
-Hwaro provides built-in template functions for retrieving data, generating URLs, and loading external files.
+Built-in functions for retrieving data and generating URLs in templates.
 
-## Data Retrieval Functions
+## Data Retrieval
 
 ### get_page()
 
-Retrieve any page's data by path:
+Retrieve any page by path:
 
 ```jinja
 {% set about = get_page(path="about.md") %}
 {% if about %}
-<div class="featured">
-  <h3>{{ about.title }}</h3>
-  <p>{{ about.description }}</p>
-  <a href="{{ about.url }}">Read more</a>
-</div>
+<a href="{{ about.url }}">{{ about.title }}</a>
 {% endif %}
 ```
 
 **Parameters:**
-- `path` (string): Path to the page, relative to `content/`
 
-**Returns:** Page object or nil
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `String` | Path relative to `content/` |
 
-**Page object properties:**
-- `path` - File path
-- `title` - Page title
-- `description` - Page description
-- `url` - Page URL
-- `date` - Publication date
-- `section` - Section name
-- `draft` - Is draft
-- `weight` - Sort weight
-- `summary` - Content summary
-- `word_count` - Word count
-- `reading_time` - Reading time (minutes)
+**Returns:** `Page?` (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| `title` | `String` |
+| `description` | `String?` |
+| `url` | `String` |
+| `date` | `String?` |
+| `section` | `String` |
+| `draft` | `Bool` |
+| `weight` | `Int` |
+| `summary` | `String?` |
+| `word_count` | `Int` |
+| `reading_time` | `Int` |
 
 **Examples:**
 
 ```jinja
-{# Get a specific page #}
+{# Page in root #}
 {% set contact = get_page(path="contact.md") %}
 
-{# Get a page in a section #}
+{# Page in section #}
 {% set intro = get_page(path="docs/introduction.md") %}
-
-{# Get by URL path #}
-{% set post = get_page(path="/blog/my-post/") %}
 ```
+
+---
 
 ### get_section()
 
-Retrieve a section's data and pages:
+Retrieve a section and its pages:
 
 ```jinja
 {% set blog = get_section(path="blog") %}
 {% if blog %}
-<h2>Latest from {{ blog.title }}</h2>
+<h2>{{ blog.title }}</h2>
 <ul>
-{% for page in blog.pages %}
-  <li>
-    <a href="{{ page.url }}">{{ page.title }}</a>
-    <time>{{ page.date }}</time>
-  </li>
+{% for p in blog.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
 {% endfor %}
 </ul>
 {% endif %}
 ```
 
 **Parameters:**
-- `path` (string): Section name or path
 
-**Returns:** Section object or nil
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `String` | Section name or path |
 
-**Section object properties:**
-- `path` - File path
-- `name` - Section name
-- `title` - Section title
-- `description` - Section description
-- `url` - Section URL
-- `pages` - Array of page objects
-- `pages_count` - Number of pages
+**Returns:** `Section?` (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| `title` | `String` |
+| `description` | `String?` |
+| `url` | `String` |
+| `pages` | `Array<Page>` |
+| `pages_count` | `Int` |
 
 **Examples:**
 
 ```jinja
-{# Get section by name #}
+{# Top-level section #}
 {% set docs = get_section(path="docs") %}
 
-{# Get nested section #}
+{# Nested section #}
 {% set guides = get_section(path="docs/guides") %}
 
-{# Display section info #}
-{% if docs %}
-<aside class="sidebar">
-  <h3>{{ docs.title }}</h3>
-  <p>{{ docs.pages_count }} articles</p>
-</aside>
-{% endif %}
+{# Display count #}
+<p>{{ docs.pages_count }} articles</p>
 ```
+
+---
 
 ### get_taxonomy()
 
@@ -113,7 +109,6 @@ Access taxonomy terms and their pages:
 ```jinja
 {% set tags = get_taxonomy(kind="tags") %}
 {% if tags %}
-<h3>Tags</h3>
 <ul class="tag-cloud">
 {% for term in tags.items %}
   <li>
@@ -127,47 +122,30 @@ Access taxonomy terms and their pages:
 ```
 
 **Parameters:**
-- `kind` (string): Taxonomy name (e.g., "tags", "categories", "authors")
 
-**Returns:** Taxonomy object or nil
+| Name | Type | Description |
+|------|------|-------------|
+| `kind` | `String` | Taxonomy name (e.g., "tags", "categories") |
 
-**Taxonomy object properties:**
-- `name` - Taxonomy name
-- `items` - Array of term objects
+**Returns:** `Taxonomy?` (nil if not found)
 
-**Term object properties:**
-- `name` - Term name
-- `slug` - URL-safe slug
-- `pages` - Array of pages with this term
-- `count` - Number of pages
+**Returned Properties:**
 
-**Examples:**
+| Property | Type |
+|----------|------|
+| `name` | `String` |
+| `items` | `Array<Term>` |
 
-```jinja
-{# Get categories #}
-{% set categories = get_taxonomy(kind="categories") %}
+**Term Properties:**
 
-{# Display popular tags (by count) #}
-{% set tags = get_taxonomy(kind="tags") %}
-{% if tags %}
-{% for term in tags.items | sort_by(attribute="count", reverse=true) %}
-  <span class="tag">{{ term.name }}</span>
-{% endfor %}
-{% endif %}
+| Property | Type |
+|----------|------|
+| `name` | `String` |
+| `slug` | `String` |
+| `pages` | `Array<Page>` |
+| `count` | `Int` |
 
-{# Show pages for a specific term #}
-{% set tags = get_taxonomy(kind="tags") %}
-{% for term in tags.items %}
-  {% if term.name == "crystal" %}
-  <h4>Crystal articles:</h4>
-  <ul>
-  {% for page in term.pages %}
-    <li><a href="{{ page.url }}">{{ page.title }}</a></li>
-  {% endfor %}
-  </ul>
-  {% endif %}
-{% endfor %}
-```
+---
 
 ### get_taxonomy_url()
 
@@ -177,17 +155,20 @@ Generate URL for a taxonomy term:
 <a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}">
   Crystal articles
 </a>
-
-{# Generates: https://example.com/tags/crystal/ #}
 ```
 
 **Parameters:**
-- `kind` (string): Taxonomy name
-- `term` (string): Term name
 
-**Returns:** Absolute URL string
+| Name | Type | Description |
+|------|------|-------------|
+| `kind` | `String` | Taxonomy name |
+| `term` | `String` | Term name |
 
-## Data Loading Functions
+**Returns:** `String` (absolute URL)
+
+---
+
+## Data Loading
 
 ### load_data()
 
@@ -195,31 +176,31 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 ```jinja
 {% set menu = load_data(path="data/menu.json") %}
-{% if menu %}
-<nav>
 {% for item in menu %}
-  <a href="{{ item.url }}">{{ item.title }}</a>
+<a href="{{ item.url }}">{{ item.title }}</a>
 {% endfor %}
-</nav>
-{% endif %}
 ```
 
 **Parameters:**
-- `path` (string): Path to data file
+
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `String` | Path to data file |
 
 **Returns:** Parsed data or nil
 
-**Supported formats:**
-- `.json` - JSON files
-- `.toml` - TOML files
-- `.yaml` / `.yml` - YAML files
-- `.csv` - CSV files (as array of arrays)
+**Supported Formats:**
+
+| Extension | Format |
+|-----------|--------|
+| `.json` | JSON |
+| `.toml` | TOML |
+| `.yaml`, `.yml` | YAML |
+| `.csv` | CSV (array of arrays) |
 
 **Examples:**
 
-#### JSON Data
-
-`data/team.json`:
+JSON (`data/team.json`):
 ```json
 [
   {"name": "Alice", "role": "Developer"},
@@ -229,84 +210,28 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 ```jinja
 {% set team = load_data(path="data/team.json") %}
-<ul class="team">
+<ul>
 {% for member in team %}
   <li>{{ member.name }} - {{ member.role }}</li>
 {% endfor %}
 </ul>
 ```
 
-#### TOML Data
-
-`data/social.toml`:
+TOML (`data/social.toml`):
 ```toml
 [[links]]
 name = "Twitter"
 url = "https://twitter.com/example"
-
-[[links]]
-name = "GitHub"
-url = "https://github.com/example"
 ```
 
 ```jinja
 {% set social = load_data(path="data/social.toml") %}
-<div class="social-links">
 {% for link in social.links %}
-  <a href="{{ link.url }}">{{ link.name }}</a>
+<a href="{{ link.url }}">{{ link.name }}</a>
 {% endfor %}
-</div>
 ```
 
-#### YAML Data
-
-`data/config.yaml`:
-```yaml
-features:
-  - name: Fast
-    icon: rocket
-  - name: Secure
-    icon: lock
-```
-
-```jinja
-{% set config = load_data(path="data/config.yaml") %}
-<ul class="features">
-{% for feature in config.features %}
-  <li>
-    <i class="icon-{{ feature.icon }}"></i>
-    {{ feature.name }}
-  </li>
-{% endfor %}
-</ul>
-```
-
-#### CSV Data
-
-`data/prices.csv`:
-```csv
-Product,Price,Stock
-Widget,29.99,100
-Gadget,49.99,50
-```
-
-```jinja
-{% set prices = load_data(path="data/prices.csv") %}
-<table>
-  <tr>
-  {% for header in prices[0] %}
-    <th>{{ header }}</th>
-  {% endfor %}
-  </tr>
-  {% for row in prices[1:] %}
-  <tr>
-    {% for cell in row %}
-    <td>{{ cell }}</td>
-    {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
-```
+---
 
 ## URL Functions
 
@@ -320,16 +245,21 @@ Generate URL with base_url:
 ```
 
 **Parameters:**
-- `path` (string): Path to convert
 
-**Returns:** Absolute URL string
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `String` | Path to convert |
+
+**Returns:** `String` (absolute URL)
+
+---
 
 ### now()
 
 Get current datetime:
 
 ```jinja
-{# Default format: YYYY-MM-DD HH:MM:SS #}
+{# Default format #}
 <p>Generated: {{ now() }}</p>
 
 {# Custom format #}
@@ -338,67 +268,55 @@ Get current datetime:
 ```
 
 **Parameters:**
-- `format` (string, optional): Date format string
 
-**Returns:** Formatted datetime string
+| Name | Type | Description |
+|------|------|-------------|
+| `format` | `String?` | Date format string (optional) |
 
-## Image Functions
+**Returns:** `String`
 
-### resize_image()
+**Format Codes:**
 
-Placeholder for image resizing (returns original path):
+| Code | Description | Example |
+|------|-------------|---------|
+| `%Y` | Year | 2025 |
+| `%m` | Month (01-12) | 01 |
+| `%d` | Day (01-31) | 15 |
+| `%B` | Month name | January |
+| `%b` | Month abbr | Jan |
+| `%H` | Hour (00-23) | 14 |
+| `%M` | Minute | 30 |
+| `%S` | Second | 45 |
 
-```jinja
-{% set img = resize_image(path="/images/photo.jpg", width=800, height=600) %}
-<img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}">
-```
-
-**Parameters:**
-- `path` (string): Image path
-- `width` (int): Target width
-- `height` (int): Target height
-- `op` (string, optional): Operation type (fill, fit, etc.)
-
-**Returns:** Object with `url`, `width`, `height`
-
-**Note:** Full image processing is not yet implemented. Currently returns the original image path.
+---
 
 ## Best Practices
 
-### Null Checking
-
-Always check if the function returns data:
+### Always Check for nil
 
 ```jinja
 {% set page = get_page(path="featured.md") %}
 {% if page %}
-  {# Safe to use page properties #}
-  {{ page.title }}
+{{ page.title }}
 {% else %}
-  {# Handle missing page #}
-  <p>Featured content coming soon</p>
+<p>Coming soon</p>
 {% endif %}
 ```
 
-### Caching Data
-
-Assign to variables to avoid repeated lookups:
+### Cache Function Results
 
 ```jinja
 {# Good: Single lookup #}
 {% set blog = get_section(path="blog") %}
 <h2>{{ blog.title }}</h2>
 <p>{{ blog.pages_count }} posts</p>
-{% for page in blog.pages %}...{% endfor %}
 
 {# Avoid: Multiple lookups #}
 <h2>{{ get_section(path="blog").title }}</h2>
 <p>{{ get_section(path="blog").pages_count }} posts</p>
 ```
 
-### Data File Organization
-
-Keep data files organized:
+### Organize Data Files
 
 ```
 data/
@@ -406,16 +324,12 @@ data/
 │   ├── main.json
 │   └── footer.json
 ├── team.yaml
-├── products.toml
-└── pricing.csv
+└── products.toml
 ```
 
-```jinja
-{% set main_nav = load_data(path="data/navigation/main.json") %}
-{% set footer_nav = load_data(path="data/navigation/footer.json") %}
-```
+---
 
 ## See Also
 
-- [Template Variables](/templates/variables/)
-- [Filters](/templates/filters/)
+- [Data Model](/templates/data-model/) — Site, Section, Page types
+- [Filters](/templates/filters/) — Value transformation

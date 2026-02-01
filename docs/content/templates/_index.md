@@ -1,16 +1,15 @@
 +++
-title = "Overview"
+title = "Templates"
+description = "Design your site with Jinja2 templates"
 +++
 
-Templates define how your content is rendered into HTML. Hwaro uses Crinja, a Jinja2-compatible template engine.
-
-If you’re looking for a “build and ship” walkthrough first, start here: [Guide](/guide/).
+Templates define how content becomes HTML. Hwaro uses Crinja, a Jinja2-compatible engine.
 
 ## Template Directory
 
 ```
 templates/
-├── base.html           # Base template
+├── base.html           # Base layout
 ├── page.html           # Regular pages
 ├── section.html        # Section index pages
 ├── index.html          # Homepage (optional)
@@ -31,72 +30,23 @@ templates/
 | Taxonomy index | `taxonomy.html` |
 | Taxonomy term | `taxonomy_term.html` |
 
-## Basic Syntax
-
-### Variables
-
-Variables can be accessed using flat names or object access:
-
-```jinja
-{# Flat variables #}
-{{ page_title }}
-{{ site_title }}
-
-{# Object access (recommended) #}
-{{ page.title }}
-{{ site.title }}
-
-{# Content is always flat #}
-{{ content }}
-```
-
-### Conditionals
-
-```jinja
-{% if page.description %}
-<meta name="description" content="{{ page.description }}">
-{% endif %}
-```
-
-### Template Inheritance
-
-Base template:
-
-```jinja
-<!DOCTYPE html>
-<html>
-<head>
-  <title>{% block title %}{{ site.title }}{% endblock %}</title>
-</head>
-<body>
-  {% block content %}{% endblock %}
-</body>
-</html>
-```
-
-Child template:
+## Quick Example
 
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
-
 {% block content %}
-<article>{{ content }}</article>
+<article>
+  <h1>{{ page.title }}</h1>
+  <time>{{ page.date }}</time>
+  {{ content | safe }}
+</article>
 {% endblock %}
-```
-
-### Includes
-
-```jinja
-{% include "partials/nav.html" %}
-{% include "partials/footer.html" %}
 ```
 
 ## Documentation
 
-- [Variables](/templates/variables/) - Template variables reference
-- [Functions](/templates/functions/) - Built-in template functions
-- [Filters](/templates/filters/) - Text and data filters
-- [Pagination](/templates/pagination/) - Paginated listings
-- [Built-in Templates](/templates/built-in/) - Default template reference
+1. [Data Model](/templates/data-model/) — **Site, Section, Page hierarchy and types**
+2. [Syntax](/templates/syntax/) — Template syntax basics
+3. [Functions](/templates/functions/) — Built-in template functions
+4. [Filters](/templates/filters/) — Text and data transformation
