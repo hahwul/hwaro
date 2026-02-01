@@ -17,6 +17,7 @@ module Hwaro
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
           FlagInfo.new(short: "-t", long: "--title", description: "Content title", takes_value: true, value_hint: "TITLE"),
+          FlagInfo.new(short: "-a", long: "--archetype", description: "Archetype to use", takes_value: true, value_hint: "NAME"),
           HELP_FLAG,
         ]
 
@@ -38,17 +39,19 @@ module Hwaro
         private def parse_options(args : Array(String)) : Config::Options::NewOptions
           path = nil
           title = nil
+          archetype = nil
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro new [path]"
             parser.on("-t TITLE", "--title=TITLE", "Content title") { |t| title = t }
+            parser.on("-a NAME", "--archetype=NAME", "Archetype to use") { |a| archetype = a }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?
             end
           end
 
-          Config::Options::NewOptions.new(path: path, title: title)
+          Config::Options::NewOptions.new(path: path, title: title, archetype: archetype)
         end
       end
     end
