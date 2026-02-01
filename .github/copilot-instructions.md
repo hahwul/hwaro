@@ -670,6 +670,23 @@ Serve-specific options:
 - `-p PORT, --port PORT` - Port to listen on (default: 3000)
 - `--open` - Open browser after starting server
 
+Completion command:
+- `hwaro completion bash` - Generate bash completion script
+- `hwaro completion zsh` - Generate zsh completion script
+- `hwaro completion fish` - Generate fish completion script
+
+Installation examples:
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(hwaro completion bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(hwaro completion zsh)"
+
+# Fish (add to ~/.config/fish/config.fish)
+hwaro completion fish | source
+```
+
 ## Performance Considerations
 
 - The builder uses caching to avoid reprocessing unchanged content

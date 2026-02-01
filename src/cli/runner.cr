@@ -4,6 +4,7 @@ require "./commands/serve_command"
 require "./commands/new_command"
 require "./commands/deploy_command"
 require "./commands/tool_command"
+require "./commands/completion_command"
 require "../utils/logger"
 
 module Hwaro
@@ -120,6 +121,11 @@ module Hwaro
         # Register tool command
         CommandRegistry.register("tool", "Utility tools (convert, etc.)") do |args|
           Commands::ToolCommand.new.run(args)
+        end
+
+        # Register completion command
+        CommandRegistry.register("completion", "Generate shell completion scripts") do |args|
+          Commands::CompletionCommand.new.run(args)
         end
       end
 
