@@ -146,6 +146,24 @@ code = "ko"
 name = "한국어"
 ```
 
+## Deployment
+
+Configure deployment targets for the `hwaro deploy` command.
+
+```toml
+[deployment]
+target = "prod" # Default target
+
+[[deployment.targets]]
+name = "prod"
+url = "file://./out"
+
+[[deployment.targets]]
+name = "s3"
+url = "s3://your-bucket"
+command = "aws s3 sync {source}/ {url} --delete"
+```
+
 ## Full Example
 
 ```toml
