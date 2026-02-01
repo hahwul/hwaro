@@ -30,3 +30,4 @@ Content in **Markdown**.
 2. [Sections](/writing/sections/) — Group related content
 3. [Taxonomies](/writing/taxonomies/) — Tags, categories, and custom terms
 4. [Shortcodes](/writing/shortcodes/) — Reusable content components
+5. [Archetypes](/writing/archetypes/) — Content templates for `hwaro new`

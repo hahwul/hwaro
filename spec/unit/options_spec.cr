@@ -58,3 +58,30 @@ describe Hwaro::Config::Options::InitOptions do
     options.force.should eq(false)
   end
 end
+
+describe Hwaro::Config::Options::NewOptions do
+  it "has default values" do
+    options = Hwaro::Config::Options::NewOptions.new
+    options.path.should be_nil
+    options.title.should be_nil
+    options.archetype.should be_nil
+  end
+
+  it "accepts all parameters" do
+    options = Hwaro::Config::Options::NewOptions.new(
+      path: "posts/my-post.md",
+      title: "My Post",
+      archetype: "posts"
+    )
+    options.path.should eq("posts/my-post.md")
+    options.title.should eq("My Post")
+    options.archetype.should eq("posts")
+  end
+
+  it "accepts partial parameters" do
+    options = Hwaro::Config::Options::NewOptions.new(title: "Test Title")
+    options.path.should be_nil
+    options.title.should eq("Test Title")
+    options.archetype.should be_nil
+  end
+end

@@ -218,7 +218,65 @@ Content pagination logic in `src/content/pagination/`:
 - Supports section pagination and taxonomy pagination
 - Custom pagination path via `paginate_path` front matter field
 
-#### 8. User-defined Build Hooks
+#### 8. Archetypes
+
+Archetypes are content templates used by `hwaro new` to create new content files with predefined front matter and content structure.
+
+Directory structure:
+```
+archetypes/
+├── default.md          # Default template for all content
+├── posts.md            # Template for content/posts/
+├── docs.md             # Template for content/docs/
+└── tools/
+    └── develop.md      # Template for content/tools/develop/
+```
+
+Implementation details:
+- `src/services/creator.cr` - Creator service with archetype matching logic
+- `src/config/options/new_options.cr` - NewOptions with `archetype` property
+- `src/cli/commands/new_command.cr` - `-a, --archetype` flag
+
+Available placeholders in archetype files:
+- `{{ title }}` or `{{title}}` - Content title
+- `{{ date }}` or `{{date}}` - Current date/time
+- `{{ draft }}` or `{{draft}}` - Draft status (true/false)
+
+Archetype matching priority:
+1. Explicit `-a` flag: `hwaro new -t "Title" -a posts` uses `archetypes/posts.md`
+2. Path-based matching: `hwaro new posts/hello.md` checks `archetypes/posts.md`
+3. Nested path fallback: `hwaro new tools/develop/x.md` tries `archetypes/tools/develop.md`, then `archetypes/tools.md`
+4. Default archetype: `archetypes/default.md`
+5. Built-in template if no archetype found
+
+Example archetype (`archetypes/posts.md`):
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: ""
+tags: []
+---
+
+# {{ title }}
+
+Write your content here.
+```
+
+Usage examples:
+```bash
+# Path-based archetype matching
+hwaro new posts/my-article.md
+
+# Explicit archetype with title
+hwaro new -t "My Article" -a posts
+
+# Creates in drafts/ with posts archetype
+hwaro new -t "Draft Post" -a posts
+```
+
+#### 9. User-defined Build Hooks
 
 User-defined build hooks allow running custom shell commands before and after the build process. This is useful for tasks like:
 - Installing dependencies before build
@@ -256,7 +314,7 @@ hooks.post = [
 ]
 ```
 
-#### 9. Auto Includes
+#### 10. Auto Includes
 
 Auto includes automatically load CSS and JS files from specified static directories into all pages. This eliminates the need to manually add each asset file to templates.
 
@@ -304,7 +362,7 @@ Generated output:
 <script src="/assets/js/02-app.js"></script>
 ```
 
-#### 10. OpenGraph & Twitter Cards
+#### 11. OpenGraph & Twitter Cards
 
 Automatic generation of OpenGraph and Twitter Card meta tags for social sharing.
 
@@ -355,7 +413,7 @@ Generated output example:
 <meta name="twitter:site" content="@yourusername">
 ```
 
-#### 11. Jinja2 Template Engine (Crinja)
+#### 12. Jinja2 Template Engine (Crinja)
 
 Hwaro uses the Crinja library for Jinja2-compatible templating. Templates support the full Jinja2 syntax.
 

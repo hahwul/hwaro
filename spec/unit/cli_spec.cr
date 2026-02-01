@@ -144,11 +144,20 @@ describe Hwaro::CLI::Commands::NewCommand do
 
     flag_names = meta.flags.map(&.long)
     flag_names.should contain("--title")
+    flag_names.should contain("--archetype")
   end
 
   it "FLAGS constant is used for metadata" do
     Hwaro::CLI::Commands::NewCommand::FLAGS.size.should be > 0
     Hwaro::CLI::Commands::NewCommand.metadata.flags.should eq(Hwaro::CLI::Commands::NewCommand::FLAGS)
+  end
+
+  it "has archetype flag with correct properties" do
+    archetype_flag = Hwaro::CLI::Commands::NewCommand::FLAGS.find { |f| f.long == "--archetype" }
+    archetype_flag.should_not be_nil
+    archetype_flag.not_nil!.short.should eq("-a")
+    archetype_flag.not_nil!.takes_value.should be_true
+    archetype_flag.not_nil!.value_hint.should eq("NAME")
   end
 end
 

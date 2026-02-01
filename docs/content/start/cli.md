@@ -31,9 +31,47 @@ Create a new content file:
 ```bash
 hwaro new content/about.md
 hwaro new content/blog/my-post.md
+hwaro new -t "My Post Title"
+hwaro new posts/my-post.md -a posts
 ```
 
-Creates a Markdown file with front matter template.
+Creates a Markdown file with front matter template. Supports **archetypes** for customizable templates.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -t, --title TITLE | Content title |
+| -a, --archetype NAME | Archetype to use |
+
+**Archetypes:**
+
+Archetypes are template files in `archetypes/` directory that define default front matter for new content:
+
+- `archetypes/default.md` - Default template for all content
+- `archetypes/posts.md` - Used for `hwaro new posts/...`
+- `archetypes/tools/develop.md` - Used for `hwaro new tools/develop/...`
+
+Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`
+
+Example archetype (`archetypes/posts.md`):
+```
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+tags: []
+---
+
+# {{ title }}
+```
+
+Archetype matching priority:
+1. Explicit `-a` flag (e.g., `-a posts` uses `archetypes/posts.md`)
+2. Path-based matching (e.g., `posts/hello.md` checks `archetypes/posts.md`)
+3. Nested paths try parent archetypes (e.g., `tools/dev/x.md` tries `tools/dev.md`, then `tools.md`)
+4. Falls back to `archetypes/default.md`
+5. Uses built-in template if no archetype found
 
 ### build
 
