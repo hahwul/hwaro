@@ -241,6 +241,7 @@ module Hwaro
           link_page_navigation(ctx)
           build_subsections(ctx)
           collect_section_assets(ctx)
+          populate_taxonomies(ctx)
 
           # Phase: Transform
           profiler.start_phase("Transform")
@@ -556,6 +557,31 @@ module Hwaro
         private def collect_section_assets(ctx : Lifecycle::BuildContext)
           ctx.sections.each do |section|
             section.collect_assets("content")
+          end
+        end
+
+        # Populate site.taxonomies from all pages
+        private def populate_taxonomies(ctx : Lifecycle::BuildContext)
+          site = ctx.site.not_nil!
+          site.taxonomies.clear
+
+          ctx.all_pages.each do |page|
+            page.taxonomies.each do |name, terms|
+              site.taxonomies[name] ||= {} of String => Array(Models::Page)
+              terms.each do |term|
+                site.taxonomies[name][term] ||= [] of Models::Page
+                site.taxonomies[name][term] << page
+              end
+            end
+          end
+
+          # Sort pages in taxonomies (default by date)
+          site.taxonomies.each_value do |terms|
+            terms.each_value do |pages|
+              sorted = Utils::SortUtils.sort_pages(pages, "date", false)
+              pages.clear
+              pages.concat(sorted)
+            end
           end
         end
 
