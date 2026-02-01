@@ -703,7 +703,7 @@ module Hwaro
                           end
 
             final_html = if template_content
-                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url)
+                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page.pages)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -838,12 +838,13 @@ module Hwaro
           templates : Hash(String, String),
           pagination : String = "",
           page_url_override : String? = nil,
+          paginated_pages : Array(Models::Page)? = nil,
         ) : String
           # Use Crinja for Jinja2-style templates
           env = crinja_env
 
           # Build template variables
-          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginated_pages)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
           processed_template = process_shortcodes_jinja(template, templates)
@@ -867,6 +868,7 @@ module Hwaro
           toc : String,
           pagination : String = "",
           page_url_override : String? = nil,
+          paginated_pages : Array(Models::Page)? = nil,
         ) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
@@ -952,13 +954,17 @@ module Hwaro
           end
 
           if !current_section.empty?
-            # Use the site utility method to get pages for the current section
-            section_pages = site.pages_for_section(current_section, page.language)
-
-            # Exclude the current page if it was included
-            section_pages.reject! { |p| p == page }
-
-            section_pages.sort_by! { |p| p.title }
+            # Use paginated pages if provided (for section pages with pagination)
+            # Otherwise, fall back to full section pages list
+            section_pages = if paginated_pages
+                              paginated_pages
+                            else
+                              pages = site.pages_for_section(current_section, page.language)
+                              # Exclude the current page if it was included
+                              pages.reject! { |p| p == page }
+                              pages.sort_by! { |p| p.title }
+                              pages
+                            end
 
             section_pages_array = section_pages.map do |p|
               Crinja::Value.new({
