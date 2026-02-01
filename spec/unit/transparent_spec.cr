@@ -146,5 +146,38 @@ describe Hwaro::Models::Site do
       pages_ko.size.should eq(1)
       pages_ko.should contain(post_ko)
     end
+
+    describe "with optimized lookup" do
+      it "returns same results as unoptimized path" do
+        config = Hwaro::Models::Config.new
+        site = Hwaro::Models::Site.new(config)
+
+        blog = Hwaro::Models::Section.new("blog/_index.md")
+        blog.section = "blog"
+
+        archive = Hwaro::Models::Section.new("blog/archive/_index.md")
+        archive.section = "blog/archive"
+        archive.transparent = true
+
+        post2 = Hwaro::Models::Page.new("blog/archive/post2.md")
+        post2.section = "blog/archive"
+        post2.title = "Post 2"
+
+        site.sections << blog
+        site.sections << archive
+        site.pages << post2
+
+        # Verify unoptimized
+        pages1 = site.pages_for_section("blog", nil)
+
+        # Verify optimized
+        site.build_lookup_index
+        pages2 = site.pages_for_section("blog", nil)
+
+        pages1.should eq(pages2)
+        pages2.size.should eq(1)
+        pages2.should contain(post2)
+      end
+    end
   end
 end

@@ -10,10 +10,20 @@ module Hwaro
       property sections : Array(Section)
       property taxonomies : Hash(String, Hash(String, Array(Page)))
 
+      # Lookup indices for performance
+      property pages_by_section : Hash(String, Array(Page))
+      property sections_by_parent : Hash(String, Array(Section))
+      property pages_for_section_cache : Hash(Tuple(String, String?), Array(Page))
+      @lookup_index_built : Bool = false
+
       def initialize(@config : Config)
         @pages = [] of Page
         @sections = [] of Section
         @taxonomies = {} of String => Hash(String, Array(Page))
+
+        @pages_by_section = {} of String => Array(Page)
+        @sections_by_parent = {} of String => Array(Section)
+        @pages_for_section_cache = {} of Tuple(String, String?) => Array(Page)
       end
 
       def taxonomy_terms(name : String) : Array(String)
@@ -30,10 +40,83 @@ module Hwaro
         (pages + sections.map { |s| s.as(Page) }).sort_by! { |p| p.path }
       end
 
+      def build_lookup_index
+        @pages_by_section.clear
+        @sections_by_parent.clear
+        @pages_for_section_cache.clear
+
+        @pages.each do |p|
+          list = @pages_by_section[p.section]?
+          unless list
+            list = [] of Page
+            @pages_by_section[p.section] = list
+          end
+          list << p
+        end
+
+        @sections.each do |s|
+          # s.section is the section this object represents (e.g. "blog").
+          # We want to index it by its PARENT section (e.g. "").
+          current_section = s.section
+          next if current_section.empty? # Root section has no parent
+
+          parent_section = Path[current_section].parent.to_s
+          parent_section = "" if parent_section == "."
+
+          list = @sections_by_parent[parent_section]?
+          unless list
+            list = [] of Section
+            @sections_by_parent[parent_section] = list
+          end
+          list << s
+        end
+
+        @lookup_index_built = true
+      end
+
       def pages_for_section(section_name : String, language : String?, items : Array(Page)? = nil) : Array(Page)
-        result = [] of Page
         # Normalize section name: remove leading/trailing slashes and handle root
         normalized_name = section_name.strip.gsub(/^\/|\/$/, "")
+
+        if @lookup_index_built && items.nil?
+          cache_key = {normalized_name, language}
+          if cached = @pages_for_section_cache[cache_key]?
+            return cached
+          end
+
+          result = [] of Page
+
+          # 1. Add direct pages
+          if pages = @pages_by_section[normalized_name]?
+            pages.each do |p|
+              result << p if p.language == language
+            end
+          end
+
+          # 2. Add subsections (handling transparency)
+          if subsections = @sections_by_parent[normalized_name]?
+            subsections.each do |s|
+              next unless s.language == language
+
+              if s.transparent
+                # Recursive bubble up: get pages from this sub-section
+                # The subsection name matches the directory of the section file
+                subsection_name = Path[s.path].dirname.to_s
+                subsection_name = "" if subsection_name == "."
+
+                result.concat(pages_for_section(subsection_name, language))
+              else
+                # Non-transparent sections are included as Section (Page) objects
+                result << s
+              end
+            end
+          end
+
+          @pages_for_section_cache[cache_key] = result
+          return result
+        end
+
+        result = [] of Page
 
         # Initial call: filter by language and collect all content to improve performance
         content_items = items || all_content.select { |p| p.language == language }

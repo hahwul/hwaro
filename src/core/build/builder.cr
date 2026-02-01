@@ -255,6 +255,9 @@ module Hwaro
           site.pages = ctx.pages
           site.sections = ctx.sections
 
+          # Build optimized lookup indices
+          site.build_lookup_index
+
           all_pages = ctx.all_pages
 
           # Filter pages for caching
