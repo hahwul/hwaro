@@ -36,6 +36,7 @@ require "../../models/section"
 require "../../models/toc"
 require "../../models/site"
 require "../lifecycle"
+require "../../utils/debug_printer"
 
 module Hwaro
   module Core
@@ -75,7 +76,8 @@ module Hwaro
             cache: options.cache,
             highlight: options.highlight,
             verbose: options.verbose,
-            profile: options.profile
+            profile: options.profile,
+            debug: options.debug
           )
         end
 
@@ -89,6 +91,7 @@ module Hwaro
           highlight : Bool = true,
           verbose : Bool = false,
           profile : Bool = false,
+          debug : Bool = false,
         )
           # Load config early to get build hooks
           config = Models::Config.load
@@ -121,7 +124,8 @@ module Hwaro
             cache: cache,
             highlight: highlight,
             verbose: verbose,
-            profile: profile
+            profile: profile,
+            debug: debug
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -153,6 +157,10 @@ module Hwaro
             unless Utils::CommandRunner.run_post_hooks(post_hooks)
               Logger.warn "Post-build hooks failed, but build was successful."
             end
+          end
+
+          if options.debug
+            Utils::DebugPrinter.print(@site.not_nil!)
           end
         end
 

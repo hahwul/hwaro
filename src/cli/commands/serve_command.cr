@@ -19,6 +19,7 @@ module Hwaro
           drafts = false
           open_browser = false
           verbose = false
+          debug = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -28,6 +29,7 @@ module Hwaro
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--open", "Open browser after starting server") { open_browser = true }
             parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
+            parser.on("--debug", "Print debug information after build") { debug = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -37,7 +39,8 @@ module Hwaro
             base_url: base_url,
             drafts: drafts,
             open_browser: open_browser,
-            verbose: verbose
+            verbose: verbose,
+            debug: debug
           )
         end
       end
