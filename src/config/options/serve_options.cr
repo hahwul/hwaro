@@ -8,6 +8,7 @@ module Hwaro
         property drafts : Bool
         property open_browser : Bool
         property verbose : Bool
+        property debug : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
@@ -16,6 +17,7 @@ module Hwaro
           @drafts : Bool = false,
           @open_browser : Bool = false,
           @verbose : Bool = false,
+          @debug : Bool = false,
         )
         end
 
@@ -27,7 +29,8 @@ module Hwaro
             drafts: @drafts,
             minify: false,
             parallel: true,
-            verbose: @verbose
+            verbose: @verbose,
+            debug: @debug
           )
         end
       end
