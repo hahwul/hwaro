@@ -37,18 +37,18 @@ module Hwaro
 
         # Build tree from sections (to capture sections that might have no pages but exist)
         site.sections.each do |section|
-           # Section path is e.g. "blog/_index.md" -> dirname "blog"
-           dir = Path[section.path].dirname
-           dir = "" if dir == "."
+          # Section path is e.g. "blog/_index.md" -> dirname "blog"
+          dir = Path[section.path].dirname
+          dir = "" if dir == "."
 
-           parts = dir.split("/").reject(&.empty?)
+          parts = dir.split("/").reject(&.empty?)
 
-           current = root
-           parts.each do |part|
-             current = current.children[part] ||= Node.new(part)
-           end
+          current = root
+          parts.each do |part|
+            current = current.children[part] ||= Node.new(part)
+          end
 
-           current.section = section
+          current.section = section
         end
 
         puts "\nSite Structure (Debug):".colorize(:cyan).mode(:bold)
