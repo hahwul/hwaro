@@ -1,0 +1,332 @@
+/* =============================================================================
+   Content Typography
+   ============================================================================= */
+
+.docs-main > h1:first-child {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.docs-main > h1:first-child::before {
+  content: '$ ';
+  color: var(--primary);
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.docs-main h1 {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  margin: 2.5rem 0 1rem 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.docs-main h2 {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  margin: 2.5rem 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.docs-main h2::before {
+  content: '## ';
+  color: var(--primary);
+  opacity: 0.4;
+  font-size: 0.9em;
+}
+
+.docs-main h3 {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  margin: 2rem 0 0.75rem 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.docs-main h3::before {
+  content: '### ';
+  color: var(--text-dim);
+  opacity: 0.4;
+  font-size: 0.85em;
+}
+
+.docs-main h4 {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  margin: 1.5rem 0 0.5rem 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.docs-main p {
+  margin: 0 0 1rem 0;
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+
+.docs-main ul,
+.docs-main ol {
+  margin: 0 0 1rem 0;
+  padding-left: 1.5rem;
+  color: var(--text-muted);
+}
+
+.docs-main li {
+  margin-bottom: 0.4rem;
+}
+
+.docs-main li::marker {
+  color: var(--primary);
+  opacity: 0.6;
+}
+
+.docs-main strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* =============================================================================
+   Heading Anchor Links
+   ============================================================================= */
+
+.docs-main h1[id],
+.docs-main h2[id],
+.docs-main h3[id],
+.docs-main h4[id],
+.docs-main h5[id],
+.docs-main h6[id] {
+  position: relative;
+  scroll-margin-top: calc(var(--header-h) + 1rem);
+}
+
+.heading-anchor {
+  opacity: 0;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.15rem 0.3rem;
+  margin-left: 0.5rem;
+  transition: all 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  border: 1px solid transparent;
+}
+
+.heading-anchor svg {
+  width: 14px;
+  height: 14px;
+}
+
+.heading-anchor:hover {
+  color: var(--primary);
+  border-color: var(--border);
+  background: var(--bg-subtle);
+}
+
+.docs-main h1:hover .heading-anchor,
+.docs-main h2:hover .heading-anchor,
+.docs-main h3:hover .heading-anchor,
+.docs-main h4:hover .heading-anchor,
+.docs-main h5:hover .heading-anchor,
+.docs-main h6:hover .heading-anchor {
+  opacity: 1;
+}
+
+.heading-anchor.copied {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* =============================================================================
+   Code Blocks with Terminal Style
+   ============================================================================= */
+
+.code-wrapper {
+  position: relative;
+  margin: 1rem 0 1.5rem 0;
+}
+
+.code-wrapper pre {
+  margin: 0;
+}
+
+.code-copy-btn {
+  font-family: var(--font-mono);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  opacity: 0;
+  transition: all 0.1s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-copy-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.code-wrapper:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-light);
+}
+
+.code-copy-btn.copied {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Inline code with pixel style */
+code {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  padding: 0.2rem 0.45rem;
+  font-size: 0.85em;
+  color: var(--primary-hover);
+  border: 1px solid var(--border);
+}
+
+pre {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  padding: 1.25rem;
+  overflow-x: auto;
+  border: var(--pixel-border) solid var(--border);
+  margin: 1rem 0 1.5rem 0;
+  position: relative;
+}
+
+pre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), transparent);
+  opacity: 0.5;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+  border: none;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+/* =============================================================================
+   Tables with Grid Style
+   ============================================================================= */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.5rem 0;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+
+th {
+  background: var(--bg-subtle);
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+td {
+  color: var(--text-muted);
+}
+
+td code {
+  font-size: 0.75rem;
+}
+
+tr:hover td {
+  background: var(--bg-subtle);
+}
+
+/* =============================================================================
+   Blockquote with Terminal Style
+   ============================================================================= */
+
+blockquote {
+  font-family: var(--font-mono);
+  margin: 1rem 0 1.5rem 0;
+  padding: 0.75rem 1.25rem;
+  border-left: 2px solid var(--primary);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  font-size: 0.9rem;
+  font-style: normal;
+}
+
+blockquote::before {
+  content: '>';
+  color: var(--primary);
+  margin-right: 0.5rem;
+  opacity: 0.5;
+}
+
+blockquote p {
+  margin: 0;
+  display: inline;
+}
+
+/* =============================================================================
+   HR with Pixel Style
+   ============================================================================= */
+
+hr {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 2rem 0;
+  position: relative;
+}
+
+hr::after {
+  content: '---';
+  font-family: var(--font-mono);
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  padding: 0 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  opacity: 0.5;
+}

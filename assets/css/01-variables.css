@@ -1,0 +1,43 @@
+/* =============================================================================
+   CSS Variables - Hwaro Documentation Theme
+   ============================================================================= */
+
+:root {
+  /* Primary Colors */
+  --primary: #ff4444;
+  --primary-hover: #ff6666;
+  --primary-dark: #cc3333;
+  --primary-dim: rgba(255, 68, 68, 0.12);
+  --primary-glow: rgba(255, 68, 68, 0.4);
+
+  /* Accent Colors */
+  --accent: #00ff88;
+  --accent-dim: rgba(0, 255, 136, 0.1);
+
+  /* Text Colors */
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+
+  /* Background Colors */
+  --bg: #0a0a0c;
+  --bg-elevated: #0e0e10;
+  --bg-subtle: #141418;
+  --bg-hover: #1a1a1f;
+  --bg-card: #111114;
+  --code-bg: #0d1117;
+
+  /* Border Colors */
+  --border: #2a2a2e;
+  --border-light: #3f3f46;
+
+  /* Layout Dimensions */
+  --header-h: 56px;
+  --sidebar-w: 260px;
+  --toc-w: 220px;
+  --pixel-border: 2px;
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Monaco', Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
