@@ -1,6 +1,7 @@
 +++
 title = "Sections"
 weight = 2
+toc = true
 +++
 
 Sections are directories that group related content. They require an `_index.md` file.
@@ -33,19 +34,19 @@ Welcome to my blog.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `title` | string | — | Section title (required) |
-| `description` | string | — | Section description |
-| `template` | string | `"section"` | Template to use |
-| `page_template` | string | — | Default template for pages |
-| `sort_by` | string | `"date"` | Sort by: `date`, `weight`, `title` |
-| `reverse` | bool | `false` | Reverse sort order |
-| `paginate` | int | — | Pages per page |
-| `paginate_path` | string | `"page"` | Pagination URL pattern |
-| `transparent` | bool | `false` | Pass pages to parent |
-| `generate_feeds` | bool | `false` | Generate RSS feed |
-| `redirect_to` | string | — | Redirect URL |
-| `draft` | bool | `false` | Exclude from production |
-| `weight` | int | `0` | Section sort order |
+| title | string | — | Section title (required) |
+| description | string | — | Section description |
+| template | string | "section" | Template to use |
+| page_template | string | — | Default template for pages |
+| sort_by | string | "date" | Sort by: date, weight, title |
+| reverse | bool | false | Reverse sort order |
+| paginate | int | — | Pages per page |
+| paginate_path | string | "page" | Pagination URL pattern |
+| transparent | bool | false | Pass pages to parent |
+| generate_feeds | bool | false | Generate RSS feed |
+| redirect_to | string | — | Redirect URL |
+| draft | bool | false | Exclude from production |
+| weight | int | 0 | Section sort order |
 
 ## Examples
 
@@ -126,7 +127,7 @@ Pages appear in the parent's `section.pages` list.
 
 | File | Type | URL |
 |------|------|-----|
-| `_index.md` | Section index | `/blog/` |
-| `index.md` | Regular page | `/blog/` |
+| _index.md | Section index | `/blog/` |
+| index.md | Regular page | `/blog/` |
 
 Use `_index.md` when you need to list child pages.

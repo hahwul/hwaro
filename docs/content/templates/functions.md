@@ -1,6 +1,7 @@
 +++
 title = "Functions"
 weight = 3
+toc = true
 +++
 
 Built-in functions for retrieving data and generating URLs in templates.
@@ -22,24 +23,24 @@ Retrieve any page by path:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `path` | `String` | Path relative to `content/` |
+| path | String | Path relative to content/ |
 
-**Returns:** `Page?` (nil if not found)
+**Returns:** Page? (nil if not found)
 
 **Returned Properties:**
 
 | Property | Type |
 |----------|------|
-| `title` | `String` |
-| `description` | `String?` |
-| `url` | `String` |
-| `date` | `String?` |
-| `section` | `String` |
-| `draft` | `Bool` |
-| `weight` | `Int` |
-| `summary` | `String?` |
-| `word_count` | `Int` |
-| `reading_time` | `Int` |
+| title | String |
+| description | String? |
+| url | String |
+| date | String? |
+| section | String |
+| draft | Bool |
+| weight | Int |
+| summary | String? |
+| word_count | Int |
+| reading_time | Int |
 
 **Examples:**
 
@@ -73,19 +74,19 @@ Retrieve a section and its pages:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `path` | `String` | Section name or path |
+| path | String | Section name or path |
 
-**Returns:** `Section?` (nil if not found)
+**Returns:** Section? (nil if not found)
 
 **Returned Properties:**
 
 | Property | Type |
 |----------|------|
-| `title` | `String` |
-| `description` | `String?` |
-| `url` | `String` |
-| `pages` | `Array<Page>` |
-| `pages_count` | `Int` |
+| title | String |
+| description | String? |
+| url | String |
+| pages | Array<Page> |
+| pages_count | Int |
 
 **Examples:**
 
@@ -125,25 +126,25 @@ Access taxonomy terms and their pages:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `kind` | `String` | Taxonomy name (e.g., "tags", "categories") |
+| kind | String | Taxonomy name (e.g., "tags", "categories") |
 
-**Returns:** `Taxonomy?` (nil if not found)
+**Returns:** Taxonomy? (nil if not found)
 
 **Returned Properties:**
 
 | Property | Type |
 |----------|------|
-| `name` | `String` |
-| `items` | `Array<Term>` |
+| name | String |
+| items | Array<Term> |
 
 **Term Properties:**
 
 | Property | Type |
 |----------|------|
-| `name` | `String` |
-| `slug` | `String` |
-| `pages` | `Array<Page>` |
-| `count` | `Int` |
+| name | String |
+| slug | String |
+| pages | Array<Page> |
+| count | Int |
 
 ---
 
@@ -161,10 +162,10 @@ Generate URL for a taxonomy term:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `kind` | `String` | Taxonomy name |
-| `term` | `String` | Term name |
+| kind | String | Taxonomy name |
+| term | String | Term name |
 
-**Returns:** `String` (absolute URL)
+**Returns:** String (absolute URL)
 
 ---
 
@@ -185,7 +186,7 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 | Name | Type | Description |
 |------|------|-------------|
-| `path` | `String` | Path to data file |
+| path | String | Path to data file |
 
 **Returns:** Parsed data or nil
 
@@ -193,10 +194,10 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 | Extension | Format |
 |-----------|--------|
-| `.json` | JSON |
-| `.toml` | TOML |
-| `.yaml`, `.yml` | YAML |
-| `.csv` | CSV (array of arrays) |
+| .json | JSON |
+| .toml | TOML |
+| .yaml, .yml | YAML |
+| .csv | CSV (array of arrays) |
 
 **Examples:**
 
@@ -248,9 +249,9 @@ Generate URL with base_url:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `path` | `String` | Path to convert |
+| path | String | Path to convert |
 
-**Returns:** `String` (absolute URL)
+**Returns:** String (absolute URL)
 
 ---
 
@@ -271,22 +272,22 @@ Get current datetime:
 
 | Name | Type | Description |
 |------|------|-------------|
-| `format` | `String?` | Date format string (optional) |
+| format | String? | Date format string (optional) |
 
-**Returns:** `String`
+**Returns:** String
 
 **Format Codes:**
 
 | Code | Description | Example |
 |------|-------------|---------|
-| `%Y` | Year | 2025 |
-| `%m` | Month (01-12) | 01 |
-| `%d` | Day (01-31) | 15 |
-| `%B` | Month name | January |
-| `%b` | Month abbr | Jan |
-| `%H` | Hour (00-23) | 14 |
-| `%M` | Minute | 30 |
-| `%S` | Second | 45 |
+| %Y | Year | 2025 |
+| %m | Month (01-12) | 01 |
+| %d | Day (01-31) | 15 |
+| %B | Month name | January |
+| %b | Month abbr | Jan |
+| %H | Hour (00-23) | 14 |
+| %M | Minute | 30 |
+| %S | Second | 45 |
 
 ---
 

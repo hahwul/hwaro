@@ -1,6 +1,7 @@
 +++
 title = "Taxonomies"
 weight = 4
+toc = true
 +++
 
 Taxonomies organize content into groups like tags, categories, or authors.
@@ -100,24 +101,24 @@ For a taxonomy named `tags` with term `crystal`:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `taxonomy_name` | string | Taxonomy name ("tags") |
-| `taxonomy_terms` | array | List of term objects |
+| taxonomy_name | String | Taxonomy name ("tags") |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
 
 ### In taxonomy_term.html
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `taxonomy_name` | string | Taxonomy name |
-| `taxonomy_term` | string | Current term name |
-| `taxonomy_pages` | array | Pages with this term |
+| taxonomy_name | String | Taxonomy name |
+| taxonomy_term | String | Current term name |
+| taxonomy_pages | Array<Page> | Pages for term |
 
 ### Term Object
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `name` | string | Term name |
-| `slug` | string | URL-safe name |
-| `count` | int | Number of pages |
+| name | String | Term name |
+| slug | String | URL-safe name |
+| count | Int | Number of pages |
 
 ## get_taxonomy() Function
 

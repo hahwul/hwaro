@@ -1,6 +1,7 @@
 +++
 title = "Shortcodes"
 weight = 4
+toc = true
 +++
 
 Shortcodes are reusable template snippets you can use in Markdown content.

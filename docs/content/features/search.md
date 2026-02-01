@@ -17,8 +17,8 @@ include_content = true
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `enabled` | bool | `false` | Generate search index |
-| `include_content` | bool | `true` | Include page content in index |
+| enabled | bool | false | Generate search index |
+| include_content | bool | true | Include page content in index |
 
 ## Generated Files
 
@@ -41,12 +41,12 @@ When enabled, Hwaro generates `/search_index.json`:
 
 | Field | Description |
 |-------|-------------|
-| `title` | Page title |
-| `url` | Page URL |
-| `content` | Page content (if `include_content = true`) |
-| `description` | Page description |
-| `section` | Section name |
-| `tags` | Page tags |
+| title | Page title |
+| url | Page URL |
+| content | Page content (if `include_content = true`) |
+| description | Page description |
+| section | Section name |
+| tags | Page tags |
 
 ## Client-Side Implementation
 

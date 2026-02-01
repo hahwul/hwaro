@@ -9,9 +9,9 @@ Content lives in the `content/` directory. Write Markdown with TOML front matter
 
 | Type | File | URL |
 |------|------|-----|
-| Page | `about.md` | `/about/` |
-| Section | `blog/_index.md` | `/blog/` |
-| Section Page | `blog/post.md` | `/blog/post/` |
+| Page | about.md | /about/ |
+| Section | blog/_index.md | /blog/ |
+| Section Page | blog/post.md | /blog/post/ |
 
 ## Basic Content File
 

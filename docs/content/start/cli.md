@@ -1,6 +1,7 @@
 +++
 title = "CLI"
 weight = 3
+toc = true
 +++
 
 Hwaro provides commands for creating, building, and serving your site.
@@ -21,7 +22,7 @@ hwaro init my-site --scaffold docs
 
 | Flag | Description |
 |------|-------------|
-| `--scaffold NAME` | Use a scaffold template: `simple`, `blog`, `docs` |
+| --scaffold NAME | Use a scaffold template: simple, blog, docs |
 
 ### new
 
@@ -48,13 +49,13 @@ hwaro build --minify
 
 | Flag | Description |
 |------|-------------|
-| `-o, --output-dir DIR` | Output directory (default: `public`) |
-| `-d, --drafts` | Include draft content |
-| `--minify` | Minify HTML, JSON, XML output |
-| `--no-parallel` | Disable parallel processing |
-| `--cache` | Enable build caching |
-| `--skip-highlighting` | Disable syntax highlighting |
-| `-v, --verbose` | Show detailed output |
+| -o, --output-dir DIR | Output directory (default: public) |
+| -d, --drafts | Include draft content |
+| --minify | Minify HTML, JSON, XML output |
+| --no-parallel | Disable parallel processing |
+| --cache | Enable build caching |
+| --skip-highlighting | Disable syntax highlighting |
+| -v, --verbose | Show detailed output |
 
 ### serve
 
@@ -70,11 +71,11 @@ hwaro serve --open
 
 | Flag | Description |
 |------|-------------|
-| `-b, --bind HOST` | Bind address (default: `0.0.0.0`) |
-| `-p, --port PORT` | Port number (default: `3000`) |
-| `--open` | Open browser after starting |
-| `-d, --drafts` | Include draft content |
-| `-v, --verbose` | Show detailed output |
+| -b, --bind HOST | Bind address (default: 0.0.0.0) |
+| -p, --port PORT | Port number (default: 3000) |
+| --open | Open browser after starting |
+| -d, --drafts | Include draft content |
+| -v, --verbose | Show detailed output |
 
 The server watches for file changes and rebuilds automatically.
 
@@ -98,5 +99,5 @@ hwaro serve -p 8000 --open
 
 | Flag | Description |
 |------|-------------|
-| `-h, --help` | Show help |
-| `-v, --verbose` | Verbose output |
+| -h, --help | Show help |
+| -v, --verbose | Verbose output |

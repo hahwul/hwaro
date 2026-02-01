@@ -1,6 +1,7 @@
 +++
 title = "First Site"
 weight = 2
+toc = true
 +++
 
 Create your first Hwaro site in 5 minutes.

@@ -37,17 +37,17 @@ The root container. Configured in `config.toml`.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `site.title` | `String` | Site title |
-| `site.description` | `String` | Site description |
-| `site.base_url` | `String` | Base URL (no trailing slash) |
+| site.title | String | Site title |
+| site.description | String | Site description |
+| site.base_url | String | Base URL (no trailing slash) |
 
 ### Flat Aliases
 
 | Variable | Equivalent |
 |----------|------------|
-| `site_title` | `site.title` |
-| `site_description` | `site.description` |
-| `base_url` | `site.base_url` |
+| site_title | site.title |
+| site_description | site.description |
+| base_url | site.base_url |
 
 ### Example
 
@@ -66,34 +66,34 @@ A directory with `_index.md` that groups related content.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `section.title` | `String` | Section title |
-| `section.description` | `String?` | Section description |
-| `section.url` | `String` | Section URL path |
-| `section.pages` | `Array<Page>` | Pages in this section |
-| `section.pages_count` | `Int` | Number of pages |
-| `section.subsections` | `Array<Section>` | Child sections |
-| `section.assets` | `Array<String>` | Static files in section |
-| `section.page_template` | `String?` | Default template for pages |
-| `section.paginate_path` | `String` | Pagination URL pattern |
-| `section.redirect_to` | `String?` | Redirect URL |
+| section.title | String | Section title |
+| section.description | String? | Section description |
+| section.url | String | Section URL path |
+| section.pages | Array<Page> | Pages in this section |
+| section.pages_count | Int | Number of pages |
+| section.subsections | Array<Section> | Child sections |
+| section.assets | Array<String> | Static files in section |
+| section.page_template | String? | Default template for pages |
+| section.paginate_path | String | Pagination URL pattern |
+| section.redirect_to | String? | Redirect URL |
 
 ### Flat Aliases
 
 | Variable | Equivalent |
 |----------|------------|
-| `section_title` | `section.title` |
-| `section_description` | `section.description` |
-| `section_list` | Pre-rendered HTML list of pages |
+| section_title | section.title |
+| section_description | section.description |
+| section_list | Pre-rendered HTML list of pages |
 
 ### From Front Matter
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `sort_by` | `String?` | `"date"` | Sort by: date, weight, title |
-| `reverse` | `Bool?` | `false` | Reverse sort order |
-| `paginate` | `Int?` | — | Pages per page |
-| `transparent` | `Bool` | `false` | Pass pages to parent |
-| `generate_feeds` | `Bool` | `false` | Generate RSS feed |
+| sort_by | String? | "date" | Sort by: date, weight, title |
+| reverse | Bool? | false | Reverse sort order |
+| paginate | Int? | — | Pages per page |
+| transparent | Bool | false | Pass pages to parent |
+| generate_feeds | Bool | false | Generate RSS feed |
 
 ### Iterating Pages
 
@@ -138,79 +138,79 @@ An individual content file (`.md`).
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `page.title` | `String` | Page title |
-| `page.description` | `String?` | Page description |
-| `page.url` | `String` | Relative URL path |
-| `page.permalink` | `String?` | Absolute URL with base_url |
-| `page.section` | `String` | Parent section name |
-| `page.date` | `String?` | Publication date (YYYY-MM-DD) |
-| `page.updated` | `String?` | Last updated date |
-| `page.content` | `String` | Rendered HTML content |
-| `page.raw_content` | `String` | Original markdown |
+| page.title | String | Page title |
+| page.description | String? | Page description |
+| page.url | String | Relative URL path |
+| page.permalink | String? | Absolute URL with base_url |
+| page.section | String | Parent section name |
+| page.date | String? | Publication date (YYYY-MM-DD) |
+| page.updated | String? | Last updated date |
+| page.content | String | Rendered HTML content |
+| page.raw_content | String | Original markdown |
 
 ### Metadata Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `page.draft` | `Bool` | Is draft |
-| `page.weight` | `Int` | Sort weight |
-| `page.image` | `String?` | Featured image path |
-| `page.authors` | `Array<String>` | Author names |
-| `page.tags` | `Array<String>` | Tags |
-| `page.language` | `String?` | Language code |
+| page.draft | Bool | Is draft |
+| page.weight | Int | Sort weight |
+| page.image | String? | Featured image path |
+| page.authors | Array<String> | Author names |
+| page.tags | Array<String> | Tags |
+| page.language | String? | Language code |
 
 ### Computed Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `page.word_count` | `Int` | Word count |
-| `page.reading_time` | `Int` | Reading time (minutes) |
-| `page.summary` | `String?` | Content before `<!-- more -->` |
+| page.word_count | Int | Word count |
+| page.reading_time | Int | Reading time (minutes) |
+| page.summary | String? | Content before <!-- more --> |
 
 ### Boolean Flags
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `page.toc` | `Bool` | `false` | Show table of contents |
-| `page.render` | `Bool` | `true` | Should render |
-| `page.is_index` | `Bool` | — | Is index file |
-| `page.generated` | `Bool` | `false` | Auto-generated page |
-| `page.in_sitemap` | `Bool` | `true` | Include in sitemap |
-| `page.in_search_index` | `Bool` | `true` | Include in search |
-| `page.insert_anchor_links` | `Bool` | `false` | Add heading anchors |
+| page.toc | Bool | false | Show table of contents |
+| page.render | Bool | true | Should render |
+| page.is_index | Bool | — | Is index file |
+| page.generated | Bool | false | Auto-generated page |
+| page.in_sitemap | Bool | true | Include in sitemap |
+| page.in_search_index | Bool | true | Include in search |
+| page.insert_anchor_links | Bool | false | Add heading anchors |
 
 ### Navigation Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `page.lower` | `Page?` | Previous page in section |
-| `page.higher` | `Page?` | Next page in section |
-| `page.ancestors` | `Array<Page>` | Parent section chain |
-| `page.translations` | `Array<TranslationLink>` | Language variants |
+| page.lower | Page? | Previous page in section |
+| page.higher | Page? | Next page in section |
+| page.ancestors | Array<Page> | Parent section chain |
+| page.translations | Array<TranslationLink> | Language variants |
 
 ### Custom Metadata
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `page.extra` | `Object` | Custom front matter fields |
+| page.extra | Object | Custom front matter fields |
 
 ### Flat Aliases
 
 | Variable | Equivalent |
 |----------|------------|
-| `page_title` | `page.title` |
-| `page_description` | `page.description` |
-| `page_url` | `page.url` |
-| `page_section` | `page.section` |
-| `page_date` | `page.date` |
-| `page_image` | `page.image` |
-| `page_summary` | `page.summary` |
-| `page_word_count` | `page.word_count` |
-| `page_reading_time` | `page.reading_time` |
-| `page_permalink` | `page.permalink` |
-| `page_authors` | `page.authors` |
-| `page_weight` | `page.weight` |
-| `content` | Rendered HTML content |
+| page_title | page.title |
+| page_description | page.description |
+| page_url | page.url |
+| page_section | page.section |
+| page_date | page.date |
+| page_image | page.image |
+| page_summary | page.summary |
+| page_word_count | page.word_count |
+| page_reading_time | page.reading_time |
+| page_permalink | page.permalink |
+| page_authors | page.authors |
+| page_weight | page.weight |
+| content | Rendered HTML content |
 
 ---
 
@@ -218,14 +218,12 @@ An individual content file (`.md`).
 
 ### page.lower / page.higher
 
-Navigate between pages in the same section:
-
 | Property | Type | Description |
 |----------|------|-------------|
-| `.title` | `String` | Page title |
-| `.url` | `String` | Page URL |
-| `.description` | `String?` | Page description |
-| `.date` | `String?` | Page date |
+| .title | String | Page title |
+| .url | String | Page URL |
+| .description | String? | Page description |
+| .date | String? | Page date |
 
 ```jinja
 <nav class="post-nav">
@@ -257,11 +255,11 @@ Parent sections for breadcrumbs:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `.code` | `String` | Language code (e.g., "en") |
-| `.url` | `String` | Translated page URL |
-| `.title` | `String` | Title in that language |
-| `.is_current` | `Bool` | Current page's language |
-| `.is_default` | `Bool` | Default language |
+| .code | String | Language code (e.g., "en") |
+| .url | String | Translated page URL |
+| .title | String | Title in that language |
+| .is_current | Bool | Current page's language |
+| .is_default | Bool | Default language |
 
 ```jinja
 {% if page.translations %}
@@ -310,13 +308,13 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-## Time Variables
+### Time Variables
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `current_year` | `Int` | Current year (e.g., 2025) |
-| `current_date` | `String` | Current date (YYYY-MM-DD) |
-| `current_datetime` | `String` | Current datetime |
+| current_year | Int | Current year (e.g., 2025) |
+| current_date | String | Current date (YYYY-MM-DD) |
+| current_datetime | String | Current datetime |
 
 ```jinja
 <footer>&copy; {{ current_year }} {{ site.title }}</footer>
@@ -324,13 +322,13 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-## SEO Variables
+### SEO Variables
 
 | Variable | Description |
 |----------|-------------|
-| `og_tags` | OpenGraph meta tags |
-| `twitter_tags` | Twitter Card meta tags |
-| `og_all_tags` | Both OG and Twitter tags |
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
 
 ```jinja
 <head>
@@ -340,16 +338,16 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-## Asset Variables
+### Asset Variables
 
 | Variable | Description |
 |----------|-------------|
-| `highlight_css` | Syntax highlighting CSS |
-| `highlight_js` | Syntax highlighting JS |
-| `highlight_tags` | Both CSS and JS |
-| `auto_includes_css` | Auto-included CSS |
-| `auto_includes_js` | Auto-included JS |
-| `auto_includes` | All auto-includes |
+| highlight_css | Syntax highlighting CSS |
+| highlight_js | Syntax highlighting JS |
+| highlight_tags | Both CSS and JS |
+| auto_includes_css | Auto-included CSS |
+| auto_includes_js | Auto-included JS |
+| auto_includes | All auto-includes |
 
 ```jinja
 <head>
@@ -365,11 +363,11 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-## Table of Contents
+### Table of Contents
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `toc` | `String` | Generated TOC HTML |
+| toc | String | Generated TOC HTML |
 
 Only available when `toc = true` in front matter:
 
@@ -383,16 +381,16 @@ Only available when `toc = true` in front matter:
 
 ---
 
-## Taxonomy Variables
+### Taxonomy Variables
 
 Available in taxonomy templates:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `taxonomy_name` | `String` | Taxonomy name (e.g., "tags") |
-| `taxonomy_term` | `String` | Current term name |
-| `taxonomy_terms` | `Array` | All terms (in taxonomy.html) |
-| `taxonomy_pages` | `Array<Page>` | Pages for term |
+| taxonomy_name | String | Taxonomy name (e.g., "tags") |
+| taxonomy_term | String | Current term name |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
+| taxonomy_pages | Array<Page> | Pages for term |
 
 ---
 
@@ -402,12 +400,12 @@ Available in taxonomy templates:
 
 | Type | Description |
 |------|-------------|
-| `String` | Text value |
-| `String?` | Optional text (may be nil) |
-| `Int` | Integer number |
-| `Bool` | true/false |
-| `Array<T>` | List of type T |
-| `Object` | Key-value map |
+| String | Text value |
+| String? | Optional text (may be nil) |
+| Int | Integer number |
+| Bool | true/false |
+| Array<T> | List of type T |
+| Object | Key-value map |
 
 ### Template Checking
 

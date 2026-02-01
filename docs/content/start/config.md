@@ -1,6 +1,7 @@
 +++
 title = "Configuration"
 weight = 4
+toc = true
 +++
 
 All site configuration lives in `config.toml` at the project root.
@@ -15,9 +16,9 @@ base_url = "https://example.com"
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `title` | string | Site title |
-| `description` | string | Site description |
-| `base_url` | string | Production URL (no trailing slash) |
+| title | string | Site title |
+| description | string | Site description |
+| base_url | string | Production URL (no trailing slash) |
 
 ## Build Options
 
@@ -31,10 +32,10 @@ cache = false
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `output_dir` | string | `"public"` | Output directory |
-| `drafts` | bool | `false` | Include draft content |
-| `parallel` | bool | `true` | Parallel processing |
-| `cache` | bool | `false` | Enable build caching |
+| output_dir | string | "public" | Output directory |
+| drafts | bool | false | Include draft content |
+| parallel | bool | true | Parallel processing |
+| cache | bool | false | Enable build caching |
 
 ### Build Hooks
 
@@ -55,7 +56,7 @@ safe = false
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `safe` | bool | `false` | Strip raw HTML from markdown |
+| safe | bool | false | Strip raw HTML from markdown |
 
 ## SEO
 

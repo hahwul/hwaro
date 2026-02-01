@@ -1,6 +1,7 @@
 +++
 title = "Syntax"
 weight = 2
+toc = true
 +++
 
 Hwaro uses Crinja, a Jinja2-compatible template engine. This page covers the essential syntax.
@@ -72,11 +73,11 @@ Loop variables:
 
 | Variable | Description |
 |----------|-------------|
-| `loop.index` | Current iteration (1-based) |
-| `loop.index0` | Current iteration (0-based) |
-| `loop.first` | True on first iteration |
-| `loop.last` | True on last iteration |
-| `loop.length` | Total items |
+| loop.index | Current iteration (1-based) |
+| loop.index0 | Current iteration (0-based) |
+| loop.first | True on first iteration |
+| loop.last | True on last iteration |
+| loop.length | Total items |
 
 ## Template Inheritance
 

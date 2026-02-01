@@ -21,8 +21,8 @@ paginate_path = "page"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `paginate` | int | — | Items per page |
-| `paginate_path` | string | `"page"` | URL pattern for pages |
+| paginate | int | — | Items per page |
+| paginate_path | string | "page" | URL pattern for pages |
 
 ### Generated URLs
 
@@ -30,17 +30,17 @@ For a section at `/blog/`:
 
 | Page | URL |
 |------|-----|
-| 1 | `/blog/` |
-| 2 | `/blog/page/2/` |
-| 3 | `/blog/page/3/` |
+| 1 | /blog/ |
+| 2 | /blog/page/2/ |
+| 3 | /blog/page/3/ |
 
 With `paginate_path = "p"`:
 
 | Page | URL |
 |------|-----|
-| 1 | `/blog/` |
-| 2 | `/blog/p/2/` |
-| 3 | `/blog/p/3/` |
+| 1 | /blog/ |
+| 2 | /blog/p/2/ |
+| 3 | /blog/p/3/ |
 
 ## Template Variables
 
@@ -58,14 +58,14 @@ Pagination object for custom rendering:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `paginator.current_page` | `Int` | Current page number |
-| `paginator.total_pages` | `Int` | Total number of pages |
-| `paginator.per_page` | `Int` | Items per page |
-| `paginator.total_items` | `Int` | Total items |
-| `paginator.first_page` | `String` | URL to first page |
-| `paginator.last_page` | `String` | URL to last page |
-| `paginator.previous_page` | `String?` | URL to previous page |
-| `paginator.next_page` | `String?` | URL to next page |
+| paginator.current_page | Int | Current page number |
+| paginator.total_pages | Int | Total number of pages |
+| paginator.per_page | Int | Items per page |
+| paginator.total_items | Int | Total items |
+| paginator.first_page | String | URL to first page |
+| paginator.last_page | String | URL to last page |
+| paginator.previous_page | String? | URL to previous page |
+| paginator.next_page | String? | URL to next page |
 
 ## Template Examples
 

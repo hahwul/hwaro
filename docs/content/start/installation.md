@@ -1,6 +1,7 @@
 +++
 title = "Installation"
 weight = 1
+toc = true
 +++
 
 Hwaro is written in Crystal. You can install it from source or use a pre-built binary.

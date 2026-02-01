@@ -23,12 +23,12 @@ templates/
 
 | Content | Template |
 |---------|----------|
-| `content/index.md` | `index.html` or `page.html` |
-| `content/about.md` | `page.html` |
-| `content/blog/_index.md` | `section.html` |
-| `content/blog/post.md` | `page.html` |
-| Taxonomy index | `taxonomy.html` |
-| Taxonomy term | `taxonomy_term.html` |
+| content/index.md | index.html or page.html |
+| content/about.md | page.html |
+| content/blog/_index.md | section.html |
+| content/blog/post.md | page.html |
+| Taxonomy index | taxonomy.html |
+| Taxonomy term | taxonomy_term.html |
 
 ## Quick Example
 

@@ -1,6 +1,7 @@
 +++
 title = "Pages"
 weight = 2
+toc = true
 +++
 
 Pages are Markdown files that become HTML pages on your site.
@@ -24,35 +25,35 @@ The `+++` block is TOML front matter. Content below becomes HTML.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `title` | string | Page title |
+| title | string | Page title |
 
 ### Common Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `date` | string | — | Publication date (`YYYY-MM-DD`) |
-| `description` | string | — | SEO description |
-| `draft` | bool | `false` | Exclude from production builds |
-| `template` | string | `"page"` | Template to use |
-| `weight` | int | `0` | Sort order (lower = first) |
-| `image` | string | — | Featured image for social sharing |
-| `tags` | array | `[]` | Tag taxonomy terms |
-| `categories` | array | `[]` | Category taxonomy terms |
+| date | string | — | Publication date (YYYY-MM-DD) |
+| description | string | — | SEO description |
+| draft | bool | false | Exclude from production builds |
+| template | string | "page" | Template to use |
+| weight | int | 0 | Sort order (lower = first) |
+| image | string | — | Featured image for social sharing |
+| tags | array | [] | Tag taxonomy terms |
+| categories | array | [] | Category taxonomy terms |
 
 ### All Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `updated` | string | Last updated date |
-| `slug` | string | Custom URL slug |
-| `path` | string | Custom URL path |
-| `aliases` | array | Redirect URLs to this page |
-| `authors` | array | Author names |
-| `toc` | bool | Show table of contents |
-| `in_search_index` | bool | Include in search |
-| `in_sitemap` | bool | Include in sitemap |
-| `insert_anchor_links` | bool | Add anchors to headings |
-| `extra` | table | Custom metadata |
+| updated | string | Last updated date |
+| slug | string | Custom URL slug |
+| path | string | Custom URL path |
+| aliases | array | Redirect URLs to this page |
+| authors | array | Author names |
+| toc | bool | Show table of contents |
+| in_search_index | bool | Include in search |
+| in_sitemap | bool | Include in sitemap |
+| insert_anchor_links | bool | Add heading anchors |
+| extra | table | Custom metadata |
 
 ## Examples
 
@@ -202,9 +203,9 @@ console.log("Hello");
 
 | File | URL |
 |------|-----|
-| `content/index.md` | `/` |
-| `content/about.md` | `/about/` |
-| `content/blog/post.md` | `/blog/post/` |
+| content/index.md | `/` |
+| content/about.md | `/about/` |
+| content/blog/post.md | `/blog/post/` |
 
 ## See Also
 

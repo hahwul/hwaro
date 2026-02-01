@@ -23,21 +23,21 @@ Common languages:
 
 | Language | Identifiers |
 |----------|-------------|
-| JavaScript | `javascript`, `js` |
-| TypeScript | `typescript`, `ts` |
-| Python | `python`, `py` |
-| Ruby | `ruby`, `rb` |
-| Go | `go`, `golang` |
-| Rust | `rust`, `rs` |
-| Crystal | `crystal`, `cr` |
-| HTML | `html` |
-| CSS | `css` |
-| JSON | `json` |
-| YAML | `yaml`, `yml` |
-| TOML | `toml` |
-| Markdown | `markdown`, `md` |
-| Shell | `bash`, `sh`, `shell` |
-| SQL | `sql` |
+| JavaScript | javascript, js |
+| TypeScript | typescript, ts |
+| Python | python, py |
+| Ruby | ruby, rb |
+| Go | go, golang |
+| Rust | rust, rs |
+| Crystal | crystal, cr |
+| HTML | html |
+| CSS | css |
+| JSON | json |
+| YAML | yaml, yml |
+| TOML | toml |
+| Markdown | markdown, md |
+| Shell | bash, sh, shell |
+| SQL | sql |
 
 ## Configuration
 
@@ -52,9 +52,9 @@ line_numbers = false
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `enabled` | bool | `true` | Enable syntax highlighting |
-| `theme` | string | `"monokai"` | Color theme |
-| `line_numbers` | bool | `false` | Show line numbers |
+| enabled | bool | true | Enable syntax highlighting |
+| theme | string | "monokai" | Color theme |
+| line_numbers | bool | false | Show line numbers |
 
 ## Themes
 

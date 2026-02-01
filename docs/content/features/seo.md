@@ -120,9 +120,9 @@ fb_app_id = "your_fb_app_id"
 
 | Key | Description |
 |-----|-------------|
-| `default_image` | Fallback image when page has none |
-| `type` | OpenGraph type (website, article) |
-| `fb_app_id` | Facebook App ID (optional) |
+| default_image | Fallback image when page has none |
+| type | OpenGraph type (website, article) |
+| fb_app_id | Facebook App ID (optional) |
 
 ### Page-Level Override
 
@@ -169,9 +169,9 @@ twitter_creator = "@authorusername"
 
 | Key | Description |
 |-----|-------------|
-| `twitter_card` | Card type: `summary`, `summary_large_image` |
-| `twitter_site` | Site's Twitter handle |
-| `twitter_creator` | Author's Twitter handle |
+| twitter_card | Card type: summary, summary_large_image |
+| twitter_site | Site's Twitter handle |
+| twitter_creator | Author's Twitter handle |
 
 ### Template Usage
 
@@ -205,11 +205,11 @@ Or include both OG and Twitter:
 
 | Variable | Description |
 |----------|-------------|
-| `og_tags` | OpenGraph meta tags |
-| `twitter_tags` | Twitter Card meta tags |
-| `og_all_tags` | Both OG and Twitter tags |
-| `page_description` | Page description (fallback: site) |
-| `page_image` | Page image (fallback: og.default_image) |
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
+| page_description | Page description (fallback: site) |
+| page_image | Page image (fallback: og.default_image) |
 
 ---
 
