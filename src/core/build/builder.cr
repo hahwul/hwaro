@@ -276,10 +276,11 @@ module Hwaro
           # Phase: Render
           profiler.start_phase("Render")
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
+            global_vars = build_global_vars(site)
             count = if parallel && pages_to_build.size > 1
-                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose)
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars)
                     else
-                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose)
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars)
                     end
             ctx.stats.pages_rendered = count
           end
@@ -711,13 +712,14 @@ module Hwaro
           cache : Cache,
           highlight : Bool,
           verbose : Bool,
+          global_vars : Hash(String, Crinja::Value),
         ) : Int32
           config = ParallelConfig.new(enabled: true)
           processor = Parallel(Models::Page, Bool).new(config)
 
           safe = site.config.markdown.safe
           results = processor.process(pages) do |page, _idx|
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -736,11 +738,12 @@ module Hwaro
           cache : Cache,
           highlight : Bool,
           verbose : Bool,
+          global_vars : Hash(String, Crinja::Value),
         ) : Int32
           count = 0
           safe = site.config.markdown.safe
           pages.each do |page|
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -758,6 +761,7 @@ module Hwaro
           highlight : Bool = true,
           safe : Bool = false,
           verbose : Bool = false,
+          global_vars : Hash(String, Crinja::Value)? = nil,
         )
           return unless page.render
 
@@ -792,12 +796,12 @@ module Hwaro
 
           # Handle section pages with pagination
           if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
-            render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, verbose)
+            render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, verbose, global_vars)
           else
             section_list_html = ""
 
             final_html = if template_content
-                           apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates)
+                           apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates, global_vars: global_vars)
                          else
                            Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
                            html_content
@@ -852,6 +856,7 @@ module Hwaro
           html_content : String,
           toc_html : String,
           verbose : Bool = false,
+          global_vars : Hash(String, Crinja::Value)? = nil,
         )
           # Get pages in this section using the site utility method
           section_name = Path[section.path].dirname
@@ -878,7 +883,7 @@ module Hwaro
                           end
 
             final_html = if template_content
-                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page.pages)
+                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page.pages, global_vars)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -1014,12 +1019,13 @@ module Hwaro
           pagination : String = "",
           page_url_override : String? = nil,
           paginated_pages : Array(Models::Page)? = nil,
+          global_vars : Hash(String, Crinja::Value)? = nil,
         ) : String
           # Use Crinja for Jinja2-style templates
           env = crinja_env
 
           # Build template variables
-          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginated_pages)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginated_pages, global_vars)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
           processed_template = process_shortcodes_jinja(template, templates)
@@ -1034,6 +1040,89 @@ module Hwaro
           end
         end
 
+        # Build global template variables once
+        private def build_global_vars(site : Models::Site) : Hash(String, Crinja::Value)
+          config = site.config
+          vars = {} of String => Crinja::Value
+
+          # Hidden variables for get_page/get_section/get_taxonomy functions
+          # These are prefixed with __ to indicate they're internal
+          all_pages_array = site.pages.map do |p|
+            Crinja::Value.new({
+              "path"         => Crinja::Value.new(p.path),
+              "title"        => Crinja::Value.new(p.title),
+              "description"  => Crinja::Value.new(p.description || ""),
+              "url"          => Crinja::Value.new(p.url),
+              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+              "section"      => Crinja::Value.new(p.section),
+              "draft"        => Crinja::Value.new(p.draft),
+              "weight"       => Crinja::Value.new(p.weight),
+              "summary"      => Crinja::Value.new(p.effective_summary || ""),
+              "word_count"   => Crinja::Value.new(p.word_count),
+              "reading_time" => Crinja::Value.new(p.reading_time),
+            })
+          end
+          vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
+
+          all_sections_array = site.sections.map do |s|
+            section_pages = s.pages.map do |sp|
+              Crinja::Value.new({
+                "title" => Crinja::Value.new(sp.title),
+                "url"   => Crinja::Value.new(sp.url),
+                "date"  => Crinja::Value.new(sp.date.try(&.to_s("%Y-%m-%d")) || ""),
+              })
+            end
+            Crinja::Value.new({
+              "path"        => Crinja::Value.new(s.path),
+              "name"        => Crinja::Value.new(s.section),
+              "title"       => Crinja::Value.new(s.title),
+              "description" => Crinja::Value.new(s.description || ""),
+              "url"         => Crinja::Value.new(s.url),
+              "pages"       => Crinja::Value.new(section_pages),
+              "pages_count" => Crinja::Value.new(s.pages.size),
+            })
+          end
+          vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
+
+          # Build taxonomies hash for get_taxonomy function
+          taxonomies_hash = {} of String => Crinja::Value
+          site.taxonomies.each do |name, terms|
+            terms_array = terms.map do |term, term_pages|
+              term_pages_array = term_pages.map do |tp|
+                Crinja::Value.new({
+                  "title" => Crinja::Value.new(tp.title),
+                  "url"   => Crinja::Value.new(tp.url),
+                  "date"  => Crinja::Value.new(tp.date.try(&.to_s("%Y-%m-%d")) || ""),
+                })
+              end
+              Crinja::Value.new({
+                "name"  => Crinja::Value.new(term),
+                "slug"  => Crinja::Value.new(Utils::TextUtils.slugify(term)),
+                "pages" => Crinja::Value.new(term_pages_array),
+                "count" => Crinja::Value.new(term_pages.size),
+              })
+            end
+            taxonomies_hash[name] = Crinja::Value.new({
+              "name"  => Crinja::Value.new(name),
+              "items" => Crinja::Value.new(terms_array),
+            })
+          end
+          vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
+
+          # Site object with full data
+          site_obj = {
+            "title"       => Crinja::Value.new(config.title),
+            "description" => Crinja::Value.new(config.description || ""),
+            "base_url"    => Crinja::Value.new(config.base_url),
+            "pages"       => Crinja::Value.new(all_pages_array),
+            "sections"    => Crinja::Value.new(all_sections_array),
+            "taxonomies"  => Crinja::Value.new(taxonomies_hash),
+          }
+          vars["site"] = Crinja::Value.new(site_obj)
+
+          vars
+        end
+
         # Build template variables hash for Crinja
         private def build_template_variables(
           page : Models::Page,
@@ -1044,6 +1133,7 @@ module Hwaro
           pagination : String = "",
           page_url_override : String? = nil,
           paginated_pages : Array(Models::Page)? = nil,
+          global_vars : Hash(String, Crinja::Value)? = nil,
         ) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
@@ -1312,80 +1402,11 @@ module Hwaro
           vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
           vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
 
-          # Hidden variables for get_page/get_section/get_taxonomy functions
-          # These are prefixed with __ to indicate they're internal
-          all_pages_array = site.pages.map do |p|
-            Crinja::Value.new({
-              "path"         => Crinja::Value.new(p.path),
-              "title"        => Crinja::Value.new(p.title),
-              "description"  => Crinja::Value.new(p.description || ""),
-              "url"          => Crinja::Value.new(p.url),
-              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-              "section"      => Crinja::Value.new(p.section),
-              "draft"        => Crinja::Value.new(p.draft),
-              "weight"       => Crinja::Value.new(p.weight),
-              "summary"      => Crinja::Value.new(p.effective_summary || ""),
-              "word_count"   => Crinja::Value.new(p.word_count),
-              "reading_time" => Crinja::Value.new(p.reading_time),
-            })
+          if global_vars
+            vars.merge!(global_vars)
+          else
+            vars.merge!(build_global_vars(site))
           end
-          vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
-
-          all_sections_array = site.sections.map do |s|
-            section_pages = s.pages.map do |sp|
-              Crinja::Value.new({
-                "title" => Crinja::Value.new(sp.title),
-                "url"   => Crinja::Value.new(sp.url),
-                "date"  => Crinja::Value.new(sp.date.try(&.to_s("%Y-%m-%d")) || ""),
-              })
-            end
-            Crinja::Value.new({
-              "path"        => Crinja::Value.new(s.path),
-              "name"        => Crinja::Value.new(s.section),
-              "title"       => Crinja::Value.new(s.title),
-              "description" => Crinja::Value.new(s.description || ""),
-              "url"         => Crinja::Value.new(s.url),
-              "pages"       => Crinja::Value.new(section_pages),
-              "pages_count" => Crinja::Value.new(s.pages.size),
-            })
-          end
-          vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
-
-          # Build taxonomies hash for get_taxonomy function
-          taxonomies_hash = {} of String => Crinja::Value
-          site.taxonomies.each do |name, terms|
-            terms_array = terms.map do |term, term_pages|
-              term_pages_array = term_pages.map do |tp|
-                Crinja::Value.new({
-                  "title" => Crinja::Value.new(tp.title),
-                  "url"   => Crinja::Value.new(tp.url),
-                  "date"  => Crinja::Value.new(tp.date.try(&.to_s("%Y-%m-%d")) || ""),
-                })
-              end
-              Crinja::Value.new({
-                "name"  => Crinja::Value.new(term),
-                "slug"  => Crinja::Value.new(Utils::TextUtils.slugify(term)),
-                "pages" => Crinja::Value.new(term_pages_array),
-                "count" => Crinja::Value.new(term_pages.size),
-              })
-            end
-            taxonomies_hash[name] = Crinja::Value.new({
-              "name"  => Crinja::Value.new(name),
-              "items" => Crinja::Value.new(terms_array),
-            })
-          end
-          vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
-
-          # Site object with full data
-          site_obj = {
-            "title"       => Crinja::Value.new(config.title),
-            "description" => Crinja::Value.new(config.description || ""),
-            "base_url"    => Crinja::Value.new(config.base_url),
-            "pages"       => Crinja::Value.new(all_pages_array),
-            "sections"    => Crinja::Value.new(all_sections_array),
-            "taxonomies"  => Crinja::Value.new(taxonomies_hash),
-          }
-          vars["site"] = Crinja::Value.new(site_obj)
 
           vars
         end
