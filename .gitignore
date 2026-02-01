@@ -13,5 +13,8 @@ testapp
 # Hwaro docs
 docs/public
 
+# Hwaro benchmark
+benchmark
+
 # macOS
 .DS_Store

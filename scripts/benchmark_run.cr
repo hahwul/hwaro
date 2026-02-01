@@ -3,18 +3,22 @@ require "option_parser"
 
 # Generate dummy content
 def generate_content(count : Int32, force : Bool)
-  if Dir.exists?("content")
+  benchmark_dir = "benchmark"
+  content_dir = File.join(benchmark_dir, "content")
+  templates_dir = File.join(benchmark_dir, "templates")
+
+  if Dir.exists?(content_dir)
     if force
-      FileUtils.rm_rf("content")
+      FileUtils.rm_rf(content_dir)
     else
-      puts "Error: 'content' directory already exists. Use --force to overwrite."
+      puts "Error: '#{content_dir}' directory already exists. Use --force to overwrite."
       exit 1
     end
   end
-  FileUtils.mkdir_p("content/benchmark")
+  FileUtils.mkdir_p(File.join(content_dir, "benchmark"))
 
   count.times do |i|
-    File.write("content/benchmark/page_#{i}.md", <<-MD
+    File.write(File.join(content_dir, "benchmark", "page_#{i}.md"), <<-MD
       +++
       title = "Benchmark Page #{i}"
       date = "2024-01-01"
@@ -28,16 +32,16 @@ def generate_content(count : Int32, force : Bool)
   end
 
   # Create a template that iterates over all pages to stress-test the variable construction
-  if Dir.exists?("templates")
+  if Dir.exists?(templates_dir)
     if force
-      FileUtils.rm_rf("templates")
+      FileUtils.rm_rf(templates_dir)
     else
-      puts "Error: 'templates' directory already exists. Use --force to overwrite."
+      puts "Error: '#{templates_dir}' directory already exists. Use --force to overwrite."
       exit 1
     end
   end
-  FileUtils.mkdir_p("templates")
-  File.write("templates/default.html", <<-HTML
+  FileUtils.mkdir_p(templates_dir)
+  File.write(File.join(templates_dir, "default.html"), <<-HTML
     <!DOCTYPE html>
     <html>
     <head><title>{{ page.title }}</title></head>
@@ -55,6 +59,19 @@ def generate_content(count : Int32, force : Bool)
     </html>
     HTML
   )
+
+  # Copy config.toml to benchmark directory
+  if File.exists?("config.toml")
+    FileUtils.cp("config.toml", File.join(benchmark_dir, "config.toml"))
+  else
+    # Create a minimal config.toml if not exists
+    File.write(File.join(benchmark_dir, "config.toml"), <<-TOML
+      title = "Benchmark Site"
+      description = "Benchmark site for testing"
+      base_url = "http://localhost:3000"
+      TOML
+    )
+  end
 end
 
 # Run build
@@ -66,16 +83,18 @@ def run_build
     exit 1
   end
 
-  puts "Running hwaro build..."
-  start_time = Time.instant
-  status = Process.run("./bin/hwaro", ["build"], output: Process::Redirect::Inherit, error: Process::Redirect::Inherit)
-  end_time = Time.instant
+  Dir.cd("benchmark") do
+    puts "Running hwaro build..."
+    start_time = Time.instant
+    status = Process.run("../bin/hwaro", ["build"], output: Process::Redirect::Inherit, error: Process::Redirect::Inherit)
+    end_time = Time.instant
 
-  if status.success?
-    puts "Build time: #{(end_time - start_time).total_seconds}s"
-  else
-    puts "Hwaro build failed"
-    exit 1
+    if status.success?
+      puts "Build time: #{(end_time - start_time).total_seconds}s"
+    else
+      puts "Hwaro build failed"
+      exit 1
+    end
   end
 end
 
@@ -86,5 +105,11 @@ OptionParser.parse do |parser|
   parser.on("-f", "--force", "Overwrite content and templates directories") { force = true }
 end
 
+# Create benchmark directory
+FileUtils.mkdir_p("benchmark")
+
 generate_content(count, force)
 run_build
+
+# Clean up benchmark directory
+FileUtils.rm_rf("benchmark")
