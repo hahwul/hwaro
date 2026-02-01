@@ -117,6 +117,26 @@ hwaro serve --open
 
 The server watches for file changes and rebuilds automatically.
 
+### deploy
+
+Deploy the generated site to configured targets.
+
+```bash
+hwaro deploy [target ...]
+hwaro deploy --dry-run
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -s, --source DIR | Source directory to deploy (default: deployment.source_dir or public) |
+| --dry-run | Show planned changes without writing |
+| --confirm | Ask for confirmation before deploying |
+| --force | Force upload/copy (ignore file comparisons) |
+| --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
+| --list-targets | List configured deployment targets and exit |
+
 ## Examples
 
 ```bash
