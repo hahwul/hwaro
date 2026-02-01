@@ -1,4 +1,5 @@
 require "option_parser"
+require "../metadata"
 require "../../config/options/new_options"
 require "../../services/creator"
 require "../../utils/logger"
@@ -7,6 +8,28 @@ module Hwaro
   module CLI
     module Commands
       class NewCommand
+        # Single source of truth for command metadata
+        NAME               = "new"
+        DESCRIPTION        = "Create a new content file"
+        POSITIONAL_ARGS    = ["path"]
+        POSITIONAL_CHOICES = [] of String
+
+        # Flags defined here are used both for OptionParser and completion generation
+        FLAGS = [
+          FlagInfo.new(short: "-t", long: "--title", description: "Content title", takes_value: true, value_hint: "TITLE"),
+          HELP_FLAG,
+        ]
+
+        def self.metadata : CommandInfo
+          CommandInfo.new(
+            name: NAME,
+            description: DESCRIPTION,
+            flags: FLAGS,
+            positional_args: POSITIONAL_ARGS,
+            positional_choices: POSITIONAL_CHOICES
+          )
+        end
+
         def run(args : Array(String))
           options = parse_options(args)
           Services::Creator.new.run(options)

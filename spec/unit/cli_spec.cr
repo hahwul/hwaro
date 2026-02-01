@@ -1,126 +1,9 @@
 require "../spec_helper"
 require "../../src/cli/metadata"
-require "../../src/cli/commands/completion_command"
+require "../../src/cli/runner"
 
-describe Hwaro::CLI::Metadata do
-  describe ".commands" do
-    it "returns all registered commands" do
-      commands = Hwaro::CLI::Metadata.commands
-      commands.should_not be_empty
-      command_names = commands.map(&.name)
-      command_names.should contain("init")
-      command_names.should contain("build")
-      command_names.should contain("serve")
-      command_names.should contain("new")
-      command_names.should contain("deploy")
-      command_names.should contain("tool")
-      command_names.should contain("completion")
-    end
-  end
-
-  describe ".get" do
-    it "returns command by name" do
-      cmd = Hwaro::CLI::Metadata.get("build")
-      cmd.should_not be_nil
-      cmd.not_nil!.name.should eq("build")
-      cmd.not_nil!.description.should eq("Build the project")
-    end
-
-    it "returns nil for unknown command" do
-      cmd = Hwaro::CLI::Metadata.get("unknown")
-      cmd.should be_nil
-    end
-  end
-
-  describe ".command_names" do
-    it "includes all command names plus version and help" do
-      names = Hwaro::CLI::Metadata.command_names
-      names.should contain("init")
-      names.should contain("build")
-      names.should contain("serve")
-      names.should contain("version")
-      names.should contain("help")
-    end
-  end
-
-  describe "init_command" do
-    it "has correct metadata" do
-      cmd = Hwaro::CLI::Metadata.init_command
-      cmd.name.should eq("init")
-      cmd.positional_args.should contain("path")
-      cmd.flags.size.should be > 0
-
-      # Check for specific flags
-      flag_names = cmd.flags.map(&.long)
-      flag_names.should contain("--force")
-      flag_names.should contain("--scaffold")
-      flag_names.should contain("--skip-agents-md")
-    end
-  end
-
-  describe "build_command" do
-    it "has correct metadata" do
-      cmd = Hwaro::CLI::Metadata.build_command
-      cmd.name.should eq("build")
-
-      flag_names = cmd.flags.map(&.long)
-      flag_names.should contain("--output-dir")
-      flag_names.should contain("--drafts")
-      flag_names.should contain("--minify")
-      flag_names.should contain("--verbose")
-      flag_names.should contain("--cache")
-    end
-  end
-
-  describe "serve_command" do
-    it "has correct metadata" do
-      cmd = Hwaro::CLI::Metadata.serve_command
-      cmd.name.should eq("serve")
-
-      flag_names = cmd.flags.map(&.long)
-      flag_names.should contain("--bind")
-      flag_names.should contain("--port")
-      flag_names.should contain("--open")
-    end
-  end
-
-  describe "tool_command" do
-    it "has subcommands" do
-      cmd = Hwaro::CLI::Metadata.tool_command
-      cmd.name.should eq("tool")
-      cmd.subcommands.should_not be_empty
-
-      subcommand_names = cmd.subcommands.map(&.name)
-      subcommand_names.should contain("convert")
-      subcommand_names.should contain("list")
-      subcommand_names.should contain("check")
-    end
-
-    it "convert subcommand has positional choices" do
-      sub = Hwaro::CLI::Metadata.tool_convert_subcommand
-      sub.positional_choices.should contain("toYAML")
-      sub.positional_choices.should contain("toTOML")
-    end
-
-    it "list subcommand has positional choices" do
-      sub = Hwaro::CLI::Metadata.tool_list_subcommand
-      sub.positional_choices.should contain("all")
-      sub.positional_choices.should contain("drafts")
-      sub.positional_choices.should contain("published")
-    end
-  end
-
-  describe "completion_command" do
-    it "has shell choices" do
-      cmd = Hwaro::CLI::Metadata.completion_command
-      cmd.name.should eq("completion")
-      cmd.positional_args.should contain("shell")
-      cmd.positional_choices.should contain("bash")
-      cmd.positional_choices.should contain("zsh")
-      cmd.positional_choices.should contain("fish")
-    end
-  end
-end
+# Initialize Runner to register commands before tests
+Hwaro::CLI::Runner.new
 
 describe Hwaro::CLI::FlagInfo do
   it "stores flag information" do
@@ -195,22 +78,188 @@ describe Hwaro::CLI::CommandInfo do
   end
 end
 
+describe Hwaro::CLI::HELP_FLAG do
+  it "is a standard help flag" do
+    Hwaro::CLI::HELP_FLAG.short.should eq("-h")
+    Hwaro::CLI::HELP_FLAG.long.should eq("--help")
+    Hwaro::CLI::HELP_FLAG.description.should eq("Show this help")
+  end
+end
+
+describe Hwaro::CLI::Commands::InitCommand do
+  it "has correct metadata" do
+    meta = Hwaro::CLI::Commands::InitCommand.metadata
+    meta.name.should eq("init")
+    meta.description.should eq("Initialize a new project")
+    meta.positional_args.should contain("path")
+
+    flag_names = meta.flags.map(&.long)
+    flag_names.should contain("--force")
+    flag_names.should contain("--scaffold")
+    flag_names.should contain("--skip-agents-md")
+  end
+
+  it "FLAGS constant is used for metadata" do
+    Hwaro::CLI::Commands::InitCommand::FLAGS.size.should be > 0
+    Hwaro::CLI::Commands::InitCommand.metadata.flags.should eq(Hwaro::CLI::Commands::InitCommand::FLAGS)
+  end
+end
+
+describe Hwaro::CLI::Commands::BuildCommand do
+  it "has correct metadata" do
+    meta = Hwaro::CLI::Commands::BuildCommand.metadata
+    meta.name.should eq("build")
+
+    flag_names = meta.flags.map(&.long)
+    flag_names.should contain("--output-dir")
+    flag_names.should contain("--drafts")
+    flag_names.should contain("--minify")
+    flag_names.should contain("--verbose")
+    flag_names.should contain("--cache")
+  end
+
+  it "FLAGS constant is used for metadata" do
+    Hwaro::CLI::Commands::BuildCommand::FLAGS.size.should be > 0
+    Hwaro::CLI::Commands::BuildCommand.metadata.flags.should eq(Hwaro::CLI::Commands::BuildCommand::FLAGS)
+  end
+end
+
+describe Hwaro::CLI::Commands::ServeCommand do
+  it "has correct metadata" do
+    meta = Hwaro::CLI::Commands::ServeCommand.metadata
+    meta.name.should eq("serve")
+
+    flag_names = meta.flags.map(&.long)
+    flag_names.should contain("--bind")
+    flag_names.should contain("--port")
+    flag_names.should contain("--open")
+  end
+end
+
+describe Hwaro::CLI::Commands::NewCommand do
+  it "has correct metadata" do
+    meta = Hwaro::CLI::Commands::NewCommand.metadata
+    meta.name.should eq("new")
+    meta.positional_args.should contain("path")
+
+    flag_names = meta.flags.map(&.long)
+    flag_names.should contain("--title")
+  end
+
+  it "FLAGS constant is used for metadata" do
+    Hwaro::CLI::Commands::NewCommand::FLAGS.size.should be > 0
+    Hwaro::CLI::Commands::NewCommand.metadata.flags.should eq(Hwaro::CLI::Commands::NewCommand::FLAGS)
+  end
+end
+
+describe Hwaro::CLI::Commands::DeployCommand do
+  it "has correct metadata" do
+    meta = Hwaro::CLI::Commands::DeployCommand.metadata
+    meta.name.should eq("deploy")
+
+    flag_names = meta.flags.map(&.long)
+    flag_names.should contain("--source")
+    flag_names.should contain("--dry-run")
+    flag_names.should contain("--force")
+  end
+end
+
+describe Hwaro::CLI::Commands::ToolCommand do
+  it "has subcommands" do
+    meta = Hwaro::CLI::Commands::ToolCommand.metadata
+    meta.name.should eq("tool")
+    meta.subcommands.should_not be_empty
+
+    subcommand_names = meta.subcommands.map(&.name)
+    subcommand_names.should contain("convert")
+    subcommand_names.should contain("list")
+    subcommand_names.should contain("check")
+  end
+
+  it "subcommands are loaded from subcommand classes" do
+    subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+    subs.size.should eq(3)
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::ConvertCommand do
+  it "has correct metadata with positional choices" do
+    meta = Hwaro::CLI::Commands::Tool::ConvertCommand.metadata
+    meta.positional_choices.should contain("toYAML")
+    meta.positional_choices.should contain("toTOML")
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::ListCommand do
+  it "has correct metadata with positional choices" do
+    meta = Hwaro::CLI::Commands::Tool::ListCommand.metadata
+    meta.positional_choices.should contain("all")
+    meta.positional_choices.should contain("drafts")
+    meta.positional_choices.should contain("published")
+  end
+end
+
 describe Hwaro::CLI::Commands::CompletionCommand do
-  describe "shell completion generation" do
-    it "supports bash shell" do
-      Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("bash")
-    end
+  it "has shell choices" do
+    meta = Hwaro::CLI::Commands::CompletionCommand.metadata
+    meta.name.should eq("completion")
+    meta.positional_args.should contain("shell")
+    meta.positional_choices.should contain("bash")
+    meta.positional_choices.should contain("zsh")
+    meta.positional_choices.should contain("fish")
+  end
 
-    it "supports zsh shell" do
-      Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("zsh")
-    end
+  it "supports bash shell" do
+    Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("bash")
+  end
 
-    it "supports fish shell" do
-      Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("fish")
-    end
+  it "supports zsh shell" do
+    Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("zsh")
+  end
 
-    it "has exactly three supported shells" do
-      Hwaro::CLI::Commands::CompletionCommand::SHELLS.size.should eq(3)
-    end
+  it "supports fish shell" do
+    Hwaro::CLI::Commands::CompletionCommand::SHELLS.should contain("fish")
+  end
+
+  it "has exactly three supported shells" do
+    Hwaro::CLI::Commands::CompletionCommand::SHELLS.size.should eq(3)
+  end
+end
+
+describe Hwaro::CLI::CommandRegistry do
+  # Note: Tests run after Runner.new is called during spec loading,
+  # so commands are already registered
+
+  it "has registered commands" do
+    Hwaro::CLI::CommandRegistry.names.should_not be_empty
+  end
+
+  it "can get command by name" do
+    handler = Hwaro::CLI::CommandRegistry.get("build")
+    handler.should_not be_nil
+  end
+
+  it "can check if command exists" do
+    Hwaro::CLI::CommandRegistry.has?("build").should be_true
+    Hwaro::CLI::CommandRegistry.has?("nonexistent").should be_false
+  end
+
+  it "returns nil for unknown command" do
+    Hwaro::CLI::CommandRegistry.get("nonexistent").should be_nil
+  end
+
+  it "can get command metadata" do
+    meta = Hwaro::CLI::CommandRegistry.get_metadata("build")
+    meta.should_not be_nil
+    meta.not_nil!.name.should eq("build")
+  end
+
+  it "all_metadata returns all command metadata" do
+    all = Hwaro::CLI::CommandRegistry.all_metadata
+    all.should_not be_empty
+    names = all.map(&.name)
+    names.should contain("init")
+    names.should contain("build")
+    names.should contain("completion")
   end
 end

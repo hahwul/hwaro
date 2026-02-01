@@ -1,4 +1,5 @@
 require "option_parser"
+require "../metadata"
 require "../../config/options/build_options"
 require "../../core/build/builder"
 require "../../content/hooks"
@@ -8,6 +9,37 @@ module Hwaro
   module CLI
     module Commands
       class BuildCommand
+        # Single source of truth for command metadata
+        NAME               = "build"
+        DESCRIPTION        = "Build the project"
+        POSITIONAL_ARGS    = [] of String
+        POSITIONAL_CHOICES = [] of String
+
+        # Flags defined here are used both for OptionParser and completion generation
+        FLAGS = [
+          FlagInfo.new(short: "-o", long: "--output-dir", description: "Output directory (default: public)", takes_value: true, value_hint: "DIR"),
+          FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL"),
+          FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content"),
+          FlagInfo.new(short: nil, long: "--minify", description: "Minify HTML output (and minified json, xml)"),
+          FlagInfo.new(short: nil, long: "--no-parallel", description: "Disable parallel file processing"),
+          FlagInfo.new(short: nil, long: "--cache", description: "Enable build caching (skip unchanged files)"),
+          FlagInfo.new(short: nil, long: "--skip-highlighting", description: "Disable syntax highlighting"),
+          FlagInfo.new(short: "-v", long: "--verbose", description: "Show detailed output including generated files"),
+          FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile for each phase"),
+          FlagInfo.new(short: nil, long: "--debug", description: "Print debug information after build"),
+          HELP_FLAG,
+        ]
+
+        def self.metadata : CommandInfo
+          CommandInfo.new(
+            name: NAME,
+            description: DESCRIPTION,
+            flags: FLAGS,
+            positional_args: POSITIONAL_ARGS,
+            positional_choices: POSITIONAL_CHOICES
+          )
+        end
+
         def run(args : Array(String))
           options = parse_options(args)
           builder = Core::Build::Builder.new

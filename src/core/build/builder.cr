@@ -1133,21 +1133,21 @@ module Hwaro
 
           # Page object with all properties
           page_obj = {
-            "title"           => Crinja::Value.new(page.title),
-            "description"     => Crinja::Value.new(page.description || ""),
-            "url"             => Crinja::Value.new(effective_url),
-            "section"         => Crinja::Value.new(page.section),
-            "date"            => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
-            "updated"         => Crinja::Value.new(page.updated.try(&.to_s("%Y-%m-%d")) || ""),
-            "image"           => Crinja::Value.new(page.image || ""),
-            "draft"           => Crinja::Value.new(page.draft),
-            "toc"             => Crinja::Value.new(page.toc),
-            "render"          => Crinja::Value.new(page.render),
-            "is_index"        => Crinja::Value.new(page.is_index),
-            "generated"       => Crinja::Value.new(page.generated),
-            "in_sitemap"      => Crinja::Value.new(page.in_sitemap),
-            "language"        => Crinja::Value.new(page_language),
-            "translations"    => Crinja::Value.new(translations),
+            "title"        => Crinja::Value.new(page.title),
+            "description"  => Crinja::Value.new(page.description || ""),
+            "url"          => Crinja::Value.new(effective_url),
+            "section"      => Crinja::Value.new(page.section),
+            "date"         => Crinja::Value.new(page.date.try(&.to_s("%Y-%m-%d")) || ""),
+            "updated"      => Crinja::Value.new(page.updated.try(&.to_s("%Y-%m-%d")) || ""),
+            "image"        => Crinja::Value.new(page.image || ""),
+            "draft"        => Crinja::Value.new(page.draft),
+            "toc"          => Crinja::Value.new(page.toc),
+            "render"       => Crinja::Value.new(page.render),
+            "is_index"     => Crinja::Value.new(page.is_index),
+            "generated"    => Crinja::Value.new(page.generated),
+            "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
+            "language"     => Crinja::Value.new(page_language),
+            "translations" => Crinja::Value.new(translations),
             # New properties
             "authors"         => Crinja::Value.new(authors_array),
             "extra"           => Crinja::Value.new(extra_hash),
@@ -1259,11 +1259,11 @@ module Hwaro
           # - section.title, section.description, section.pages (for iteration)
           # - section.list (HTML string, same as section_list for convenience)
           section_obj = {
-            "title"         => Crinja::Value.new(section_title),
-            "description"   => Crinja::Value.new(section_description),
-            "pages"         => Crinja::Value.new(section_pages_array),
-            "pages_count"   => Crinja::Value.new(section_pages_array.size),
-            "list"          => Crinja::Value.new(section_list),
+            "title"       => Crinja::Value.new(section_title),
+            "description" => Crinja::Value.new(section_description),
+            "pages"       => Crinja::Value.new(section_pages_array),
+            "pages_count" => Crinja::Value.new(section_pages_array.size),
+            "list"        => Crinja::Value.new(section_list),
             # New section properties
             "subsections"   => Crinja::Value.new(subsections_array),
             "assets"        => Crinja::Value.new(assets_array),
@@ -1316,16 +1316,16 @@ module Hwaro
           # These are prefixed with __ to indicate they're internal
           all_pages_array = site.pages.map do |p|
             Crinja::Value.new({
-              "path"        => Crinja::Value.new(p.path),
-              "title"       => Crinja::Value.new(p.title),
-              "description" => Crinja::Value.new(p.description || ""),
-              "url"         => Crinja::Value.new(p.url),
-              "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-              "section"     => Crinja::Value.new(p.section),
-              "draft"       => Crinja::Value.new(p.draft),
-              "weight"      => Crinja::Value.new(p.weight),
-              "summary"     => Crinja::Value.new(p.effective_summary || ""),
-              "word_count"  => Crinja::Value.new(p.word_count),
+              "path"         => Crinja::Value.new(p.path),
+              "title"        => Crinja::Value.new(p.title),
+              "description"  => Crinja::Value.new(p.description || ""),
+              "url"          => Crinja::Value.new(p.url),
+              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+              "section"      => Crinja::Value.new(p.section),
+              "draft"        => Crinja::Value.new(p.draft),
+              "weight"       => Crinja::Value.new(p.weight),
+              "summary"      => Crinja::Value.new(p.effective_summary || ""),
+              "word_count"   => Crinja::Value.new(p.word_count),
               "reading_time" => Crinja::Value.new(p.reading_time),
             })
           end

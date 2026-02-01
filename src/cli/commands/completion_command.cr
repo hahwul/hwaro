@@ -16,6 +16,32 @@ module Hwaro
       class CompletionCommand
         SHELLS = ["bash", "zsh", "fish"]
 
+        # Single source of truth for command metadata
+        NAME               = "completion"
+        DESCRIPTION        = "Generate shell completion scripts"
+        POSITIONAL_ARGS    = ["shell"]
+        POSITIONAL_CHOICES = ["bash", "zsh", "fish"]
+
+        # Flags defined here are used both for OptionParser and completion generation
+        FLAGS = [
+          HELP_FLAG,
+        ]
+
+        def self.metadata : CommandInfo
+          CommandInfo.new(
+            name: NAME,
+            description: DESCRIPTION,
+            flags: FLAGS,
+            positional_args: POSITIONAL_ARGS,
+            positional_choices: POSITIONAL_CHOICES
+          )
+        end
+
+        # Get all command metadata dynamically from CommandRegistry
+        def self.all_commands : Array(CommandInfo)
+          CommandRegistry.all_metadata
+        end
+
         def run(args : Array(String))
           shell : String? = nil
 
@@ -71,7 +97,7 @@ module Hwaro
         end
 
         private def generate_bash : String
-          commands = Metadata.commands
+          commands = CompletionCommand.all_commands
           command_names = commands.map(&.name).join(" ") + " version help"
 
           script = <<-BASH
@@ -178,7 +204,7 @@ module Hwaro
         end
 
         private def generate_zsh : String
-          commands = Metadata.commands
+          commands = CompletionCommand.all_commands
 
           script = <<-ZSH
           #compdef hwaro
@@ -320,7 +346,7 @@ module Hwaro
         end
 
         private def generate_fish : String
-          commands = Metadata.commands
+          commands = CompletionCommand.all_commands
 
           script = <<-FISH
           # hwaro fish completion script
@@ -356,7 +382,7 @@ module Hwaro
           result = "# #{cmd.name} command\n"
 
           # Handle subcommands
-          unless cmd.subcommands.empty?
+          if !cmd.subcommands.empty?
             cmd.subcommands.each do |sub|
               result += "complete -c hwaro -n \"__fish_seen_subcommand_from #{cmd.name}; and not __fish_seen_subcommand_from #{cmd.subcommands.map(&.name).join(" ")}\" -a \"#{sub.name}\" -d \"#{escape_fish(sub.description)}\"\n"
             end
@@ -371,7 +397,7 @@ module Hwaro
             end
 
             # Add positional choices
-            unless cmd.positional_choices.empty?
+            if !cmd.positional_choices.empty?
               cmd.positional_choices.each do |choice|
                 result += "complete -c hwaro -n \"__fish_seen_subcommand_from #{cmd.name}\" -a \"#{choice}\"\n"
               end
@@ -390,7 +416,7 @@ module Hwaro
             result += generate_fish_flag_with_condition(condition, flag)
           end
 
-          unless sub.positional_choices.empty?
+          if !sub.positional_choices.empty?
             sub.positional_choices.each do |choice|
               result += "complete -c hwaro -n \"#{condition}\" -a \"#{choice}\"\n"
             end
@@ -414,7 +440,7 @@ module Hwaro
           parts << "-d" << "\"#{escape_fish(flag.description)}\""
 
           if flag.takes_value
-            parts << "-r"  # requires argument
+            parts << "-r" # requires argument
           end
 
           parts.join(" ") + "\n"
