@@ -1150,14 +1150,6 @@ module Hwaro
           vars["site_description"] = Crinja::Value.new(config.description || "")
           vars["base_url"] = Crinja::Value.new(config.base_url)
 
-          # Site object
-          site_obj = {
-            "title"       => Crinja::Value.new(config.title),
-            "description" => Crinja::Value.new(config.description || ""),
-            "base_url"    => Crinja::Value.new(config.base_url),
-          }
-          vars["site"] = Crinja::Value.new(site_obj)
-
           # Section variables
           section_title = ""
           section_description = ""
@@ -1357,6 +1349,17 @@ module Hwaro
             })
           end
           vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
+
+          # Site object with full data
+          site_obj = {
+            "title"       => Crinja::Value.new(config.title),
+            "description" => Crinja::Value.new(config.description || ""),
+            "base_url"    => Crinja::Value.new(config.base_url),
+            "pages"       => Crinja::Value.new(all_pages_array),
+            "sections"    => Crinja::Value.new(all_sections_array),
+            "taxonomies"  => Crinja::Value.new(taxonomies_hash),
+          }
+          vars["site"] = Crinja::Value.new(site_obj)
 
           vars
         end
