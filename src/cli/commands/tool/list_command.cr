@@ -7,6 +7,7 @@
 #   hwaro tool list published - List only published content files
 
 require "option_parser"
+require "../../metadata"
 require "../../../services/content_lister"
 require "../../../utils/logger"
 
@@ -15,6 +16,28 @@ module Hwaro
     module Commands
       module Tool
         class ListCommand
+          # Single source of truth for command metadata
+          NAME               = "list"
+          DESCRIPTION        = "List content files (all, drafts, published)"
+          POSITIONAL_ARGS    = ["filter"]
+          POSITIONAL_CHOICES = ["all", "drafts", "published"]
+
+          # Flags defined here are used both for OptionParser and completion generation
+          FLAGS = [
+            FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR"),
+            HELP_FLAG,
+          ]
+
+          def self.metadata : CommandInfo
+            CommandInfo.new(
+              name: NAME,
+              description: DESCRIPTION,
+              flags: FLAGS,
+              positional_args: POSITIONAL_ARGS,
+              positional_choices: POSITIONAL_CHOICES
+            )
+          end
+
           def run(args : Array(String))
             content_dir = "content"
             filter : String? = nil

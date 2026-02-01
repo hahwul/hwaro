@@ -136,9 +136,47 @@ Hwaro::Content::Processors::Registry.register(MyProcessor.new)
 To add a new CLI command:
 
 1. Create a new file in `src/cli/commands/`
-2. Define a command class with a `run` method
-3. Register it in `CommandRegistry` in `src/cli/runner.cr`
-4. Add the require statement
+2. Define command metadata constants and `FLAGS` array (single source of truth)
+3. Implement `self.metadata` class method returning `CommandInfo`
+4. Implement `run(args)` method with OptionParser
+5. Register in `CommandRegistry` using metadata in `src/cli/runner.cr`
+6. Add the require statement
+
+Example command structure:
+```crystal
+require "../metadata"
+
+class MyCommand
+  # Single source of truth for command metadata
+  NAME        = "mycommand"
+  DESCRIPTION = "My command description"
+  POSITIONAL_ARGS    = ["arg1"]  # Optional positional arguments
+  POSITIONAL_CHOICES = [] of String  # Valid choices for positional args
+
+  # Flags defined here are used for BOTH OptionParser AND completion generation
+  FLAGS = [
+    FlagInfo.new(short: "-f", long: "--flag", description: "A boolean flag"),
+    FlagInfo.new(short: "-o", long: "--option", description: "Option with value", takes_value: true, value_hint: "VALUE"),
+    HELP_FLAG,
+  ]
+
+  def self.metadata : CommandInfo
+    CommandInfo.new(
+      name: NAME,
+      description: DESCRIPTION,
+      flags: FLAGS,
+      positional_args: POSITIONAL_ARGS,
+      positional_choices: POSITIONAL_CHOICES
+    )
+  end
+
+  def run(args : Array(String))
+    # Use OptionParser as usual
+  end
+end
+```
+
+When you modify `FLAGS` in any command file, the shell completion scripts automatically reflect the changes.
 
 #### 3. Lifecycle Hooks
 
@@ -669,6 +707,23 @@ Serve-specific options:
 - `-b HOST, --bind HOST` - Bind address (default: 0.0.0.0)
 - `-p PORT, --port PORT` - Port to listen on (default: 3000)
 - `--open` - Open browser after starting server
+
+Completion command:
+- `hwaro completion bash` - Generate bash completion script
+- `hwaro completion zsh` - Generate zsh completion script
+- `hwaro completion fish` - Generate fish completion script
+
+Installation examples:
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(hwaro completion bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(hwaro completion zsh)"
+
+# Fish (add to ~/.config/fish/config.fish)
+hwaro completion fish | source
+```
 
 ## Performance Considerations
 

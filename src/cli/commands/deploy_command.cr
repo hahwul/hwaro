@@ -1,4 +1,5 @@
 require "option_parser"
+require "../metadata"
 require "../../config/options/deploy_options"
 require "../../models/config"
 require "../../services/deployer"
@@ -8,6 +9,33 @@ module Hwaro
   module CLI
     module Commands
       class DeployCommand
+        # Single source of truth for command metadata
+        NAME               = "deploy"
+        DESCRIPTION        = "Deploy the built site using config.toml"
+        POSITIONAL_ARGS    = ["target"]
+        POSITIONAL_CHOICES = [] of String
+
+        # Flags defined here are used both for OptionParser and completion generation
+        FLAGS = [
+          FlagInfo.new(short: "-s", long: "--source", description: "Source directory to deploy (default: deployment.source_dir or public)", takes_value: true, value_hint: "DIR"),
+          FlagInfo.new(short: nil, long: "--dry-run", description: "Show planned changes without writing"),
+          FlagInfo.new(short: nil, long: "--confirm", description: "Ask for confirmation before deploying"),
+          FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
+          FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
+          FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
+          HELP_FLAG,
+        ]
+
+        def self.metadata : CommandInfo
+          CommandInfo.new(
+            name: NAME,
+            description: DESCRIPTION,
+            flags: FLAGS,
+            positional_args: POSITIONAL_ARGS,
+            positional_choices: POSITIONAL_CHOICES
+          )
+        end
+
         def run(args : Array(String))
           options, list_targets = parse_options(args)
           if list_targets

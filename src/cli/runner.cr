@@ -1,35 +1,35 @@
+require "./metadata"
 require "./commands/init_command"
 require "./commands/build_command"
 require "./commands/serve_command"
 require "./commands/new_command"
 require "./commands/deploy_command"
 require "./commands/tool_command"
+require "./commands/completion_command"
 require "../utils/logger"
 
 module Hwaro
   module CLI
-    # Command interface for all CLI commands
-    abstract class Command
-      abstract def name : String
-      abstract def description : String
-      abstract def run(args : Array(String))
-    end
-
     # Command registry for dynamic command management
     # Allows plugins to register new commands at runtime
     class CommandRegistry
       @@commands = {} of String => Proc(Array(String), Nil)
-      @@descriptions = {} of String => String
+      @@metadata = {} of String => CommandInfo
 
-      # Register a command with its handler
-      def self.register(name : String, description : String, &handler : Array(String) -> Nil)
-        @@commands[name] = handler
-        @@descriptions[name] = description
+      # Register a command with its handler and metadata
+      def self.register(metadata : CommandInfo, &handler : Array(String) -> Nil)
+        @@commands[metadata.name] = handler
+        @@metadata[metadata.name] = metadata
       end
 
       # Get a command handler by name
       def self.get(name : String) : Proc(Array(String), Nil)?
         @@commands[name]?
+      end
+
+      # Get command metadata by name
+      def self.get_metadata(name : String) : CommandInfo?
+        @@metadata[name]?
       end
 
       # Check if a command exists
@@ -44,12 +44,17 @@ module Hwaro
 
       # Get command description
       def self.description(name : String) : String
-        @@descriptions[name]? || ""
+        @@metadata[name]?.try(&.description) || ""
       end
 
       # List all commands with descriptions
       def self.all : Array({name: String, description: String})
         names.map { |n| {name: n, description: description(n)} }
+      end
+
+      # Get all command metadata
+      def self.all_metadata : Array(CommandInfo)
+        @@metadata.values
       end
     end
 
@@ -92,34 +97,39 @@ module Hwaro
       end
 
       private def register_default_commands
-        # Register init command
-        CommandRegistry.register("init", "Initialize a new project") do |args|
+        # Register init command using metadata from command class
+        CommandRegistry.register(Commands::InitCommand.metadata) do |args|
           Commands::InitCommand.new.run(args)
         end
 
         # Register build command
-        CommandRegistry.register("build", "Build the project") do |args|
+        CommandRegistry.register(Commands::BuildCommand.metadata) do |args|
           Commands::BuildCommand.new.run(args)
         end
 
         # Register serve command
-        CommandRegistry.register("serve", "Serve the project and watch for changes") do |args|
+        CommandRegistry.register(Commands::ServeCommand.metadata) do |args|
           Commands::ServeCommand.new.run(args)
         end
 
         # Register new command
-        CommandRegistry.register("new", "Create a new content file") do |args|
+        CommandRegistry.register(Commands::NewCommand.metadata) do |args|
           Commands::NewCommand.new.run(args)
         end
 
         # Register deploy command
-        CommandRegistry.register("deploy", "Deploy the built site using config.toml") do |args|
+        CommandRegistry.register(Commands::DeployCommand.metadata) do |args|
           Commands::DeployCommand.new.run(args)
         end
 
         # Register tool command
-        CommandRegistry.register("tool", "Utility tools (convert, etc.)") do |args|
+        CommandRegistry.register(Commands::ToolCommand.metadata) do |args|
           Commands::ToolCommand.new.run(args)
+        end
+
+        # Register completion command
+        CommandRegistry.register(Commands::CompletionCommand.metadata) do |args|
+          Commands::CompletionCommand.new.run(args)
         end
       end
 

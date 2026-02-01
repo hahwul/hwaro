@@ -67,14 +67,14 @@ module Hwaro
 
       # New: Word count and reading time (computed)
       property word_count : Int32
-      property reading_time : Int32  # in minutes
+      property reading_time : Int32 # in minutes
 
       # New: Permalink (absolute URL with base_url)
       property permalink : String?
 
       # New: Lower/Higher page references (previous/next in section)
-      property lower : Page?   # Previous page (by date or weight)
-      property higher : Page?  # Next page (by date or weight)
+      property lower : Page?  # Previous page (by date or weight)
+      property higher : Page? # Next page (by date or weight)
 
       # New: Ancestors - parent sections chain
       property ancestors : Array(Page)

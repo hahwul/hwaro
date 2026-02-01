@@ -1,4 +1,5 @@
 require "option_parser"
+require "../metadata"
 require "../../config/options/init_options"
 require "../../services/initializer"
 require "../../utils/logger"
@@ -7,6 +8,33 @@ module Hwaro
   module CLI
     module Commands
       class InitCommand
+        # Single source of truth for command metadata
+        NAME               = "init"
+        DESCRIPTION        = "Initialize a new project"
+        POSITIONAL_ARGS    = ["path"]
+        POSITIONAL_CHOICES = [] of String
+
+        # Flags defined here are used both for OptionParser and completion generation
+        FLAGS = [
+          FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
+          FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type: simple, blog, docs", takes_value: true, value_hint: "TYPE"),
+          FlagInfo.new(short: nil, long: "--skip-agents-md", description: "Skip creating AGENTS.md file"),
+          FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
+          FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
+          FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
+          HELP_FLAG,
+        ]
+
+        def self.metadata : CommandInfo
+          CommandInfo.new(
+            name: NAME,
+            description: DESCRIPTION,
+            flags: FLAGS,
+            positional_args: POSITIONAL_ARGS,
+            positional_choices: POSITIONAL_CHOICES
+          )
+        end
+
         def run(args : Array(String))
           options = parse_options(args)
           Services::Initializer.new.run(options)

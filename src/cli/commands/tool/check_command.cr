@@ -2,6 +2,7 @@ require "http/client"
 require "uri"
 require "file"
 require "option_parser"
+require "../../metadata"
 require "../../../utils/logger"
 
 module Hwaro
@@ -9,6 +10,27 @@ module Hwaro
     module Commands
       module Tool
         class CheckCommand
+          # Single source of truth for command metadata
+          NAME               = "check"
+          DESCRIPTION        = "Check for dead links in content files"
+          POSITIONAL_ARGS    = [] of String
+          POSITIONAL_CHOICES = [] of String
+
+          # Flags defined here are used both for OptionParser and completion generation
+          FLAGS = [
+            HELP_FLAG,
+          ]
+
+          def self.metadata : CommandInfo
+            CommandInfo.new(
+              name: NAME,
+              description: DESCRIPTION,
+              flags: FLAGS,
+              positional_args: POSITIONAL_ARGS,
+              positional_choices: POSITIONAL_CHOICES
+            )
+          end
+
           # Structure to hold link information
           record Link, file : String, url : String
           # Structure to hold check result

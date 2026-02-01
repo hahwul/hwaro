@@ -6,6 +6,7 @@
 #   hwaro tool convert toTOML  - Convert all frontmatter to TOML format
 
 require "option_parser"
+require "../../metadata"
 require "../../../services/frontmatter_converter"
 require "../../../utils/logger"
 
@@ -14,6 +15,28 @@ module Hwaro
     module Commands
       module Tool
         class ConvertCommand
+          # Single source of truth for command metadata
+          NAME               = "convert"
+          DESCRIPTION        = "Convert frontmatter format (YAML <-> TOML)"
+          POSITIONAL_ARGS    = ["format"]
+          POSITIONAL_CHOICES = ["toYAML", "toTOML"]
+
+          # Flags defined here are used both for OptionParser and completion generation
+          FLAGS = [
+            FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR"),
+            HELP_FLAG,
+          ]
+
+          def self.metadata : CommandInfo
+            CommandInfo.new(
+              name: NAME,
+              description: DESCRIPTION,
+              flags: FLAGS,
+              positional_args: POSITIONAL_ARGS,
+              positional_choices: POSITIONAL_CHOICES
+            )
+          end
+
           def run(args : Array(String))
             content_dir = "content"
             format : String? = nil
