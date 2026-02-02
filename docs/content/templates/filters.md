@@ -18,49 +18,49 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| upper | Uppercase | {{ "hello" | upper }} → HELLO |
-| lower | Lowercase | {{ "HELLO" | lower }} → hello |
-| capitalize | Capitalize first | {{ "hello" | capitalize }} → Hello |
-| trim | Remove whitespace | {{ "  hi  " | trim }} → hi |
-| replace | Replace text | {{ "hello" | replace("l", "x") }} → hexxo |
-| slugify | URL slug | {{ "Hello World" | slugify }} → hello-world |
-| truncate_words | Limit words | {{ text | truncate_words(20) }} |
+| upper | Uppercase | {{ "hello" \| upper }} → HELLO |
+| lower | Lowercase | {{ "HELLO" \| lower }} → hello |
+| capitalize | Capitalize first | {{ "hello" \| capitalize }} → Hello |
+| trim | Remove whitespace | {{ "  hi  " \| trim }} → hi |
+| replace | Replace text | {{ "hello" \| replace("l", "x") }} → hexxo |
+| slugify | URL slug | {{ "Hello World" \| slugify }} → hello-world |
+| truncate_words | Limit words | {{ text \| truncate_words(20) }} |
 
 ## HTML Filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| safe | Don't escape HTML | {{ content | safe }} |
-| strip_html | Remove HTML tags | {{ html | strip_html }} |
-| markdownify | Render Markdown | {{ text | markdownify }} |
-| xml_escape | XML escape | {{ text | xml_escape }} |
+| safe | Don't escape HTML | {{ content \| safe }} |
+| strip_html | Remove HTML tags | {{ html \| strip_html }} |
+| markdownify | Render Markdown | {{ text \| markdownify }} |
+| xml_escape | XML escape | {{ text \| xml_escape }} |
 
 ## Array Filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| length | Get length | {{ items | length }} |
-| first | First element | {{ items | first }} |
-| last | Last element | {{ items | last }} |
-| reverse | Reverse order | {{ items | reverse }} |
-| sort | Sort array | {{ items | sort }} |
-| join | Join elements | {{ tags | join(", ") }} |
-| split | Split string | {{ "a,b,c" | split(pat=",") }} |
+| length | Get length | {{ items \| length }} |
+| first | First element | {{ items \| first }} |
+| last | Last element | {{ items \| last }} |
+| reverse | Reverse order | {{ items \| reverse }} |
+| sort | Sort array | {{ items \| sort }} |
+| join | Join elements | {{ tags \| join(", ") }} |
+| split | Split string | {{ "a,b,c" \| split(pat=",") }} |
 
 ## URL Filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| absolute_url | Full URL with base | {{ "/about/" | absolute_url }} |
-| relative_url | Prefix base_url | {{ "/img.png" | relative_url }} |
+| absolute_url | Full URL with base | {{ "/about/" \| absolute_url }} |
+| relative_url | Prefix base_url | {{ "/img.png" \| relative_url }} |
 
 ## Data Filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| default | Fallback value | {{ value | default(value="N/A") }} |
-| jsonify | JSON encode | {{ data | jsonify }} |
-| date | Format date | {{ page.date | date("%Y-%m-%d") }} |
+| default | Fallback value | {{ value \| default(value="N/A") }} |
+| jsonify | JSON encode | {{ data \| jsonify }} |
+| date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
 
 ## Examples
 
