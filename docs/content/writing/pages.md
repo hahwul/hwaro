@@ -199,6 +199,34 @@ console.log("Hello");
 > Quote text
 ```
 
+## Asset Colocation
+
+You can keep related assets (images, PDFs, etc.) in the same directory as your content file. This is known as a **Page Bundle**.
+
+To use this feature, rename your markdown file to `index.md` (for regular pages) or `_index.md` (for section pages) and place it in a directory named after your page.
+
+**Example Structure:**
+
+```text
+content/
+└── blog/
+    ├── my-trip/
+    │   ├── index.md        <-- The page content
+    │   ├── photo.jpg       <-- Asset
+    │   └── data.json       <-- Asset
+    └── _index.md
+```
+
+Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path.
+
+In your markdown, you can link to these assets using relative paths:
+
+```markdown
+![My Trip Photo](photo.jpg)
+
+[Download Data](data.json)
+```
+
 ## URL Mapping
 
 | File | URL |

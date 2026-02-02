@@ -240,7 +240,7 @@ module Hwaro
           # Link lower/higher page navigation and build ancestors
           link_page_navigation(ctx)
           build_subsections(ctx)
-          collect_section_assets(ctx)
+          collect_assets(ctx)
           populate_taxonomies(ctx)
 
           # Phase: Transform
@@ -313,6 +313,9 @@ module Hwaro
             # Process raw files (JSON, XML)
             raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose)
             ctx.stats.raw_files_processed = raw_count
+
+            # Process co-located assets (images, etc. in page bundles)
+            process_assets(ctx.all_pages, output_dir, verbose)
           end
           profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
@@ -557,10 +560,14 @@ module Hwaro
           end
         end
 
-        # Collect assets for each section
-        private def collect_section_assets(ctx : Lifecycle::BuildContext)
+        # Collect assets for each section and page
+        private def collect_assets(ctx : Lifecycle::BuildContext)
           ctx.sections.each do |section|
             section.collect_assets("content")
+          end
+
+          ctx.pages.each do |page|
+            page.collect_assets("content")
           end
         end
 
@@ -1624,6 +1631,34 @@ module Hwaro
           end
 
           count
+        end
+
+        # Process co-located assets for pages
+        private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool)
+          pages.each do |page|
+            next if page.assets.empty?
+
+            # Source directory for assets is the page's directory
+            source_dir = File.dirname(File.join("content", page.path))
+
+            # Destination directory matches the page's URL structure
+            # page.url typically starts with / and ends with /, e.g., /blog/post/
+            url_path = page.url.sub(/^\//, "")
+            dest_dir = File.join(output_dir, url_path)
+
+            FileUtils.mkdir_p(dest_dir)
+
+            page.assets.each do |asset_relative_path|
+              source_path = File.join(source_dir, asset_relative_path)
+              dest_path = File.join(dest_dir, asset_relative_path)
+
+              next unless File.exists?(source_path)
+
+              FileUtils.mkdir_p(File.dirname(dest_path))
+              FileUtils.cp(source_path, dest_path)
+              Logger.action :copy, dest_path, :blue if verbose
+            end
+          end
         end
       end
     end

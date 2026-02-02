@@ -40,6 +40,9 @@ module Hwaro
       property generated : Bool
       property image : String?
 
+      # New: Assets - static files in this page directory
+      property assets : Array(String)
+
       # New: Authors field (array of author names)
       property authors : Array(String)
 
@@ -101,6 +104,7 @@ module Hwaro
         @toc = false
         @language = nil
         @translations = [] of TranslationLink
+        @assets = [] of String
 
         # New field defaults
         @authors = [] of String
@@ -114,6 +118,28 @@ module Hwaro
         @lower = nil
         @higher = nil
         @ancestors = [] of Page
+      end
+
+      # Collect assets from page directory
+      def collect_assets(content_dir : String) : Array(String)
+        # Assets are only collected for page bundles (directories)
+        # This usually means the page is an index.md (either _index.md or index.md)
+        return [] of String unless @is_index
+
+        # So we construct the directory path.
+        page_dir = File.dirname(File.join(content_dir, @path))
+
+        return [] of String unless Dir.exists?(page_dir)
+
+        @assets = Dir.glob(File.join(page_dir, "**", "*")).select do |file|
+          File.file?(file) &&
+            !file.ends_with?(".md") &&
+            !file.ends_with?(".markdown")
+        end.map do |file|
+          Path[file].relative_to(page_dir).to_s
+        end
+
+        @assets
       end
 
       # Calculate word count from raw content (excluding front matter)
