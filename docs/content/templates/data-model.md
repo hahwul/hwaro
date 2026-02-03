@@ -330,10 +330,14 @@ pros = ["Fast", "Reliable"]
 | og_tags | OpenGraph meta tags |
 | twitter_tags | Twitter Card meta tags |
 | og_all_tags | Both OG and Twitter tags |
+| canonical_tag | Canonical link tag |
+| hreflang_tags | Hreflang alternate link tags (multilingual) |
 
 ```jinja
 <head>
   {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
 </head>
 ```
 
