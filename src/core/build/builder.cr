@@ -1093,6 +1093,7 @@ module Hwaro
               "url"         => Crinja::Value.new(s.url),
               "pages"       => Crinja::Value.new(section_pages),
               "pages_count" => Crinja::Value.new(s.pages.size),
+              "assets"      => Crinja::Value.new(s.assets.map { |a| Crinja::Value.new(a) }),
             })
           end
           vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
@@ -1327,6 +1328,8 @@ module Hwaro
               section_title = section_page.title
               section_description = section_page.description || ""
               current_section = page.section
+              # Use the section page's assets
+              section_assets_array = section_page.assets.map { |a| Crinja::Value.new(a) }
             end
           end
 
