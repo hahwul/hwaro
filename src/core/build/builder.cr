@@ -20,6 +20,7 @@ require "../../content/seo/feeds"
 require "../../content/seo/sitemap"
 require "../../content/seo/robots"
 require "../../content/seo/llms"
+require "../../content/seo/tags"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
@@ -1416,6 +1417,12 @@ module Hwaro
           vars["og_tags"] = Crinja::Value.new(og_tags)
           vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
           vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
+
+          # Canonical and Hreflang tags
+          canonical_tag = Content::Seo::Tags.canonical_tag(page, config)
+          hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
+          vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
+          vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
           # Time-related variables
           now = Time.local
