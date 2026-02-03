@@ -166,6 +166,7 @@ An individual content file (`.md`).
 | page.word_count | Int | Word count |
 | page.reading_time | Int | Reading time (minutes) |
 | page.summary | String? | Content before <!-- more --> |
+| page.assets | Array<String> | Static files in page bundle |
 
 ### Boolean Flags
 
