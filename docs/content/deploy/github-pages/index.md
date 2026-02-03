@@ -5,8 +5,6 @@ weight = 2
 
 Deploy your Hwaro site to GitHub Pages for free hosting.
 
-{{ gallery() }}
-
 ## Prerequisites
 
 - GitHub repository
