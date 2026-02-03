@@ -227,6 +227,18 @@ In your markdown, you can link to these assets using relative paths:
 [Download Data](data.json)
 ```
 
+### Accessing Assets in Templates
+
+You can access the list of colocated assets in your templates using `page.assets`. This returns an array of relative paths to the files.
+
+```jinja
+{% for asset in page.assets %}
+  {% if asset is matching("[.](jpg|png)$") %}
+    <img src="{{ get_url(path=asset) }}" alt="Gallery Image">
+  {% endif %}
+{% endfor %}
+```
+
 ## URL Mapping
 
 | File | URL |
