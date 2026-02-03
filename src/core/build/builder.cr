@@ -240,7 +240,7 @@ module Hwaro
           # Link lower/higher page navigation and build ancestors
           link_page_navigation(ctx)
           build_subsections(ctx)
-          collect_section_assets(ctx)
+          collect_assets(ctx)
           populate_taxonomies(ctx)
 
           # Phase: Transform
@@ -313,6 +313,9 @@ module Hwaro
             # Process raw files (JSON, XML)
             raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose)
             ctx.stats.raw_files_processed = raw_count
+
+            # Process co-located assets (images, etc. in page bundles)
+            process_assets(ctx.all_pages, output_dir, verbose)
           end
           profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
@@ -557,10 +560,14 @@ module Hwaro
           end
         end
 
-        # Collect assets for each section
-        private def collect_section_assets(ctx : Lifecycle::BuildContext)
+        # Collect assets for each section and page
+        private def collect_assets(ctx : Lifecycle::BuildContext)
           ctx.sections.each do |section|
             section.collect_assets("content")
+          end
+
+          ctx.pages.each do |page|
+            page.collect_assets("content")
           end
         end
 
@@ -774,8 +781,11 @@ module Hwaro
             return
           end
 
+          # Build initial context for shortcodes (without content/toc)
+          shortcode_context = build_template_variables(page, site, "", "", "", "", nil, nil, global_vars)
+
           shortcode_results = {} of String => String
-          processed_content = process_shortcodes_jinja(page.raw_content, templates, shortcode_results)
+          processed_content = process_shortcodes_jinja(page.raw_content, templates, shortcode_context, shortcode_results)
 
           # Use anchor links if enabled
           html_content, toc_headers = if page.insert_anchor_links
@@ -1031,7 +1041,7 @@ module Hwaro
           vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginated_pages, global_vars)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
-          processed_template = process_shortcodes_jinja(template, templates)
+          processed_template = process_shortcodes_jinja(template, templates, vars)
 
           begin
             crinja_template = env.from_string(processed_template)
@@ -1174,6 +1184,9 @@ module Hwaro
           # Convert authors to Crinja array
           authors_array = page.authors.map { |a| Crinja::Value.new(a) }
 
+          # Convert assets to Crinja array
+          assets_array = page.assets.map { |a| Crinja::Value.new(a) }
+
           # Convert extra to Crinja hash
           extra_hash = {} of String => Crinja::Value
           page.extra.each do |k, v|
@@ -1243,6 +1256,7 @@ module Hwaro
             "translations" => Crinja::Value.new(translations),
             # New properties
             "authors"         => Crinja::Value.new(authors_array),
+            "assets"          => Crinja::Value.new(assets_array),
             "extra"           => Crinja::Value.new(extra_hash),
             "summary"         => Crinja::Value.new(page.effective_summary || ""),
             "word_count"      => Crinja::Value.new(page.word_count),
@@ -1277,7 +1291,8 @@ module Hwaro
 
           # Section-specific variables
           subsections_array = [] of Crinja::Value
-          assets_array = [] of Crinja::Value
+          # assets_array is already defined above for the page itself
+          section_assets_array = [] of Crinja::Value
           page_template_var = ""
           paginate_path_var = "page"
           redirect_to_var = ""
@@ -1303,8 +1318,8 @@ module Hwaro
               })
             end
 
-            # Build assets array
-            assets_array = page.assets.map { |a| Crinja::Value.new(a) }
+            # Use the page's assets as section assets
+            section_assets_array = assets_array
           elsif !page.section.empty?
             # For regular pages, find the parent section
             section_page = (site.pages + site.sections).find { |p| p.section == page.section && p.is_index }
@@ -1359,7 +1374,7 @@ module Hwaro
             "list"        => Crinja::Value.new(section_list),
             # New section properties
             "subsections"   => Crinja::Value.new(subsections_array),
-            "assets"        => Crinja::Value.new(assets_array),
+            "assets"        => Crinja::Value.new(section_assets_array),
             "page_template" => Crinja::Value.new(page_template_var),
             "paginate_path" => Crinja::Value.new(paginate_path_var),
             "redirect_to"   => Crinja::Value.new(redirect_to_var),
@@ -1418,7 +1433,7 @@ module Hwaro
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
         # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
-        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), shortcode_results : Hash(String, String)? = nil) : String
+        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil) : String
           # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
           # so documentation can show literal `{{ ... }}` examples safely.
           String.build do |io|
@@ -1437,7 +1452,7 @@ module Hwaro
               end
 
               if match = line.match(/^\s*(`{3,}|~{3,})/)
-                io << process_shortcodes_in_text(buffer.to_s, templates, shortcode_results)
+                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results)
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
@@ -1447,11 +1462,11 @@ module Hwaro
               end
             end
 
-            io << process_shortcodes_in_text(buffer.to_s, templates, shortcode_results)
+            io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results)
           end
         end
 
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), shortcode_results : Hash(String, String)? = nil) : String
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil) : String
           processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
             name = $1
             args_str = $2
@@ -1461,7 +1476,7 @@ module Hwaro
             if template = templates[template_key]?
               args = parse_shortcode_args_jinja(args_str)
               args["body"] = body
-              html = render_shortcode_jinja(template, args)
+              html = render_shortcode_jinja(template, args, context)
               if results = shortcode_results
                 placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
                 results[placeholder] = html
@@ -1477,12 +1492,12 @@ module Hwaro
 
           processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
             name = $1
-            args_str = $2
+            args_str = $2?
 
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
               args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args)
+              html = render_shortcode_jinja(template, args, context)
               if results = shortcode_results
                 placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
                 results[placeholder] = html
@@ -1503,7 +1518,7 @@ module Hwaro
             template_key = "shortcodes/#{name}"
             if template = templates[template_key]?
               args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args)
+              html = render_shortcode_jinja(template, args, context)
               if results = shortcode_results
                 placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
                 results[placeholder] = html
@@ -1532,9 +1547,9 @@ module Hwaro
         end
 
         # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String)) : String
+        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value)) : String
           env = crinja_env
-          vars = {} of String => Crinja::Value
+          vars = context.dup
           args.each do |key, value|
             vars[key] = Crinja::Value.new(value)
           end
@@ -1624,6 +1639,38 @@ module Hwaro
           end
 
           count
+        end
+
+        # Process co-located assets for pages
+        private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool)
+          pages.each do |page|
+            next if page.assets.empty?
+
+            # Page bundle directory relative to content/
+            page_bundle_dir = File.dirname(page.path)
+
+            # Destination directory matches the page's URL structure
+            # page.url typically starts with / and ends with /, e.g., /blog/post/
+            url_path = page.url.sub(/^\//, "")
+            dest_dir = File.join(output_dir, url_path)
+
+            FileUtils.mkdir_p(dest_dir)
+
+            page.assets.each do |asset_path|
+              # asset_path is relative to content/ (e.g. "blog/post/image.jpg")
+              source_path = File.join("content", asset_path)
+
+              # Calculate relative path inside the bundle (e.g. "image.jpg")
+              relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
+              dest_path = File.join(dest_dir, relative_to_bundle.to_s)
+
+              next unless File.exists?(source_path)
+
+              FileUtils.mkdir_p(File.dirname(dest_path))
+              FileUtils.cp(source_path, dest_path)
+              Logger.action :copy, dest_path, :blue if verbose
+            end
+          end
         end
       end
     end

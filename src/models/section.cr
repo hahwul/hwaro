@@ -26,9 +26,6 @@ module Hwaro
       # New: Subsections - child sections
       property subsections : Array(Section)
 
-      # New: Assets - static files in this section directory
-      property assets : Array(String)
-
       def initialize(path : String)
         super(path)
         @transparent = false
@@ -37,7 +34,6 @@ module Hwaro
         @paginate_path = "page"
         @redirect_to = nil
         @subsections = [] of Section
-        @assets = [] of String
       end
 
       # Check if section has redirect
@@ -48,20 +44,6 @@ module Hwaro
       # Get effective page template (for pages in this section)
       def effective_page_template : String?
         @page_template
-      end
-
-      # Collect assets from section directory
-      def collect_assets(content_dir : String) : Array(String)
-        section_dir = File.join(content_dir, @section)
-        return [] of String unless Dir.exists?(section_dir)
-
-        @assets = Dir.glob(File.join(section_dir, "*")).select do |file|
-          File.file?(file) && !file.ends_with?(".md") && !file.ends_with?(".markdown")
-        end.map do |file|
-          File.basename(file)
-        end
-
-        @assets
       end
 
       # Add a subsection
