@@ -3,9 +3,9 @@ title = "GitHub Pages"
 weight = 2
 +++
 
-{{ gallery() }}
-
 Deploy your Hwaro site to GitHub Pages for free hosting.
+
+{{ gallery() }}
 
 ## Prerequisites
 
