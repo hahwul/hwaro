@@ -123,6 +123,35 @@ transparent = true
 
 Pages appear in the parent's `section.pages` list.
 
+## Asset Colocation
+
+Just like regular pages, sections can have colocated assets. Place non-markdown files in the same directory as the `_index.md` file.
+
+**Example Structure:**
+
+```text
+content/
+└── gallery/
+    ├── _index.md       <-- The section index
+    ├── banner.jpg      <-- Section asset
+    └── icon.png        <-- Section asset
+```
+
+These assets are copied to the output directory relative to the section.
+
+### Accessing Assets in Templates
+
+You can access the list of section assets in your templates using `section.assets`. This returns an array of relative paths to the files (from the content directory).
+
+```jinja
+<!-- In section.html -->
+<div class="gallery">
+  {% for asset in section.assets %}
+    <img src="{{ get_url(path=asset) }}" alt="Section Asset">
+  {% endfor %}
+</div>
+```
+
 ## Section vs Page
 
 | File | Type | URL |
