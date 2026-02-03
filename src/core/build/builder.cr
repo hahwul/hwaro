@@ -874,7 +874,7 @@ module Hwaro
           # Get pages in this section using the site utility method
           section_name = Path[section.path].dirname
           section_name = "" if section_name == "."
-          section_pages = site.pages_for_section(section_name, section.language)
+          section_pages = site.pages_for_section(section_name, section.language).dup
 
           section_pages.sort_by! { |p| p.title }
 
@@ -1339,7 +1339,7 @@ module Hwaro
             section_pages = if paginated_pages
                               paginated_pages
                             else
-                              pages = site.pages_for_section(current_section, page.language)
+                              pages = site.pages_for_section(current_section, page.language).dup
                               # Exclude the current page if it was included
                               pages.reject! { |p| p == page }
                               pages.sort_by! { |p| p.title }
