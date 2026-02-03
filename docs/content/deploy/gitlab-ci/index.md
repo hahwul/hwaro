@@ -1,6 +1,6 @@
 +++
 title = "GitLab CI"
-weight = 4
+weight = 3
 +++
 
 Deploy your Hwaro site using GitLab CI/CD.

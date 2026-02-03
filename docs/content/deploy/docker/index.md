@@ -1,6 +1,6 @@
 +++
 title = "Docker"
-weight = 3
+weight = 4
 +++
 
 Deploy your Hwaro site using Docker.
