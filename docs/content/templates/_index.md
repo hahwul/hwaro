@@ -43,10 +43,3 @@ templates/
 </article>
 {% endblock %}
 ```
-
-## Documentation
-
-1. [Data Model](/templates/data-model/) — **Site, Section, Page hierarchy and types**
-2. [Syntax](/templates/syntax/) — Template syntax basics
-3. [Functions](/templates/functions/) — Built-in template functions
-4. [Filters](/templates/filters/) — Text and data transformation

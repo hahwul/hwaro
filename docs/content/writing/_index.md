@@ -23,11 +23,3 @@ date = "2024-01-15"
 
 Content in **Markdown**.
 ```
-
-## Documentation
-
-1. [Pages](/writing/pages/) — Create individual pages
-2. [Sections](/writing/sections/) — Group related content
-3. [Taxonomies](/writing/taxonomies/) — Tags, categories, and custom terms
-4. [Shortcodes](/writing/shortcodes/) — Reusable content components
-5. [Archetypes](/writing/archetypes/) — Content templates for `hwaro new`

@@ -29,7 +29,3 @@ Static sites can be deployed anywhere:
 1. Build the site: `hwaro build --minify`
 2. Upload `public/` directory to your host
 3. Configure your domain
-
-## Documentation
-
-- [GitHub Pages](/deploy/github-pages/) — Step-by-step GitHub Pages setup
