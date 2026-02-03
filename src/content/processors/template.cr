@@ -450,6 +450,17 @@ module Hwaro
               true
             end
           end
+
+          # Test if a string matches a regex
+          # Usage: {% if asset is matching("[.](jpg|png)$") %}
+          @env.tests["matching"] = Crinja.test do
+            regex = arguments.varargs.first?.try(&.to_s) || ""
+            begin
+              target.to_s.matches?(Regex.new(regex))
+            rescue
+              false
+            end
+          end
         end
 
         # Register custom functions
@@ -477,6 +488,9 @@ module Hwaro
               Crinja::Value.new(base_url.rstrip("/") + "/" + path)
             end
           end
+
+          # get_url() function - alias for url_for to match Zola
+          @env.functions["get_url"] = @env.functions["url_for"]
 
           # get_page() function - get page data by path
           # Usage: {% set about = get_page(path="about.md") %}
@@ -579,10 +593,18 @@ module Hwaro
             height = arguments["height"].as_number.to_i
             op = arguments["op"].to_s
 
-            # For now, just return the original path
+            # Resolve URL
+            base_url = env.resolve("base_url").to_s
+            final_url = if path.starts_with?("/")
+                          base_url.rstrip("/") + path
+                        else
+                          base_url.rstrip("/") + "/" + path
+                        end
+
+            # For now, just return the original path (resolved)
             # TODO: Implement actual image resizing with an image processing library
             Crinja::Value.new({
-              "url"    => Crinja::Value.new(path),
+              "url"    => Crinja::Value.new(final_url),
               "width"  => Crinja::Value.new(width),
               "height" => Crinja::Value.new(height),
             })

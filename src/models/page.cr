@@ -136,7 +136,7 @@ module Hwaro
             !file.ends_with?(".md") &&
             !file.ends_with?(".markdown")
         end.map do |file|
-          Path[file].relative_to(page_dir).to_s
+          Path[file].relative_to(content_dir).to_s
         end
 
         @assets
