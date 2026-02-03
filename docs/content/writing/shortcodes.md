@@ -91,6 +91,33 @@ Use in content:
 {%raw%}{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
 ```
 
+### Example: Image Gallery (Asset Colocation)
+
+You can create a gallery that automatically lists images found in the same directory as the page (Page Bundle).
+
+Create `templates/shortcodes/gallery.html`:
+
+```jinja
+<div class="gallery">
+{% for asset in page.assets -%}
+  {%- if asset is matching("[.](jpg|png)$") -%}
+    {% set image = resize_image(path=asset, width=240, height=180) %}
+    <a href="{{ get_url(path=asset) }}" target="_blank">
+      <img src="{{ image.url }}" alt="{{ asset }}" />
+    </a>
+  {%- endif %}
+{%- endfor %}
+</div>
+```
+
+Use in content (inside a Page Bundle directory):
+
+```markdown
+{%raw%}{{ gallery() }}{%endraw%}
+```
+
+This will render a grid of all JPG and PNG images found alongside the Markdown file.
+
 ## Argument Syntax
 
 Arguments support multiple quote styles:
