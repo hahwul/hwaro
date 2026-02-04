@@ -40,12 +40,6 @@ module Hwaro
                 str << "    <lastmod>#{date.to_s("%Y-%m-%d")}</lastmod>\n"
               end
 
-              # Add changefreq
-              str << "    <changefreq>#{site.config.sitemap.changefreq}</changefreq>\n"
-
-              # Add priority
-              str << "    <priority>#{site.config.sitemap.priority}</priority>\n"
-
               str << "  </url>\n"
             end
 
