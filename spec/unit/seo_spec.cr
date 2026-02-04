@@ -37,8 +37,8 @@ describe Hwaro::Content::Seo::Sitemap do
         content.should contain("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
         content.should contain("<urlset")
         content.should contain("https://example.com/test/")
-        content.should contain("<changefreq>")
-        content.should contain("<priority>")
+        content.should_not contain("<changefreq>")
+        content.should_not contain("<priority>")
       end
     end
 
