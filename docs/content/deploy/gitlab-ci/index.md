@@ -14,7 +14,7 @@ image: ghcr.io/hahwul/hwaro:latest
 
 pages:
   script:
-    - hwaro build --minify
+    - hwaro build
   artifacts:
     paths:
       - public

@@ -20,6 +20,7 @@ module Hwaro
           FlagInfo.new(short: "-p", long: "--port", description: "Port to listen on (default: 3000)", takes_value: true, value_hint: "PORT"),
           FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL"),
           FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content"),
+          FlagInfo.new(short: nil, long: "--minify", description: "Minify HTML output (and minified json, xml)"),
           FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server"),
           FlagInfo.new(short: "-v", long: "--verbose", description: "Show detailed output including generated files"),
           FlagInfo.new(short: nil, long: "--debug", description: "Print debug information after build"),
@@ -46,6 +47,7 @@ module Hwaro
           port = 3000
           base_url = nil.as(String?)
           drafts = false
+          minify = false
           open_browser = false
           verbose = false
           debug = false
@@ -56,6 +58,7 @@ module Hwaro
             parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             parser.on("--base-url URL", "Override base_url from config.toml") { |url| base_url = url }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
+            parser.on("--minify", "Minify HTML output (and minified json, xml)") { minify = true }
             parser.on("--open", "Open browser after starting server") { open_browser = true }
             parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
             parser.on("--debug", "Print debug information after build") { debug = true }
@@ -67,6 +70,7 @@ module Hwaro
             port: port,
             base_url: base_url,
             drafts: drafts,
+            minify: minify,
             open_browser: open_browser,
             verbose: verbose,
             debug: debug

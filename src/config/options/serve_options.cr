@@ -6,6 +6,7 @@ module Hwaro
         property port : Int32
         property base_url : String?
         property drafts : Bool
+        property minify : Bool
         property open_browser : Bool
         property verbose : Bool
         property debug : Bool
@@ -15,6 +16,7 @@ module Hwaro
           @port : Int32 = 3000,
           @base_url : String? = nil,
           @drafts : Bool = false,
+          @minify : Bool = false,
           @open_browser : Bool = false,
           @verbose : Bool = false,
           @debug : Bool = false,
@@ -27,7 +29,7 @@ module Hwaro
             output_dir: "public",
             base_url: @base_url,
             drafts: @drafts,
-            minify: false,
+            minify: @minify,
             parallel: true,
             verbose: @verbose,
             debug: @debug

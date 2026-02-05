@@ -89,7 +89,7 @@ hwaro build --minify
 |------|-------------|
 | -o, --output-dir DIR | Output directory (default: public) |
 | -d, --drafts | Include draft content |
-| --minify | Minify HTML, JSON, XML output |
+| --minify | Minify HTML, JSON, XML output (experimental) |
 | --no-parallel | Disable parallel processing |
 | --cache | Enable build caching |
 | --skip-highlighting | Disable syntax highlighting |
@@ -144,7 +144,7 @@ hwaro deploy --dry-run
 hwaro serve --drafts --verbose
 
 # Production build
-hwaro build --minify
+hwaro build
 
 # Custom output directory
 hwaro build -o dist

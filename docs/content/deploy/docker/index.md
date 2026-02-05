@@ -26,8 +26,8 @@ FROM ghcr.io/hahwul/hwaro:latest AS builder
 WORKDIR /site
 COPY . .
 
-# Build with production settings
-RUN hwaro build --minify
+# Build the site
+RUN hwaro build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine

@@ -53,7 +53,7 @@ jobs:
           sudo mv bin/hwaro /usr/local/bin/
       
       - name: Build site
-        run: hwaro build --minify
+        run: hwaro build
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -95,7 +95,7 @@ base_url = "https://username.github.io/repo"
 ### Build Locally
 
 ```bash
-hwaro build --minify
+hwaro build
 ```
 
 ### Push to gh-pages Branch

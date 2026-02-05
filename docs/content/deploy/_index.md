@@ -8,10 +8,12 @@ Deploy your Hwaro site to any static hosting provider.
 ## Build for Production
 
 ```bash
-hwaro build --minify
+hwaro build
 ```
 
-This generates optimized static files in `public/`.
+This generates static files in `public/`.
+
+> **Note:** The `--minify` flag is available for reducing file sizes, but it's experimental and may cause issues with some JavaScript or complex HTML structures. Use with caution.
 
 ## Hosting Options
 
@@ -26,6 +28,6 @@ Static sites can be deployed anywhere:
 
 ## General Steps
 
-1. Build the site: `hwaro build --minify`
+1. Build the site: `hwaro build`
 2. Upload `public/` directory to your host
 3. Configure your domain

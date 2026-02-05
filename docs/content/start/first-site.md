@@ -105,7 +105,7 @@ Visit `http://localhost:3000/blog/`.
 ## 7. Build for Production
 
 ```bash
-hwaro build --minify
+hwaro build
 ```
 
 Deploy the `public/` directory to any static host.
