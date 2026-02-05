@@ -41,9 +41,9 @@ module Hwaro
             # Previous button
             if paginated_page.has_prev
               prev_full_url = HTML.escape("#{@base_url}#{paginated_page.prev_url}")
-              str << "    <li class=\"pagination-prev\"><a href=\"#{prev_full_url}\" rel=\"prev\">Previous</a></li>\n"
+              str << "    <li class=\"pagination-prev\"><a href=\"#{prev_full_url}\" rel=\"prev\">Prev</a></li>\n"
             else
-              str << "    <li class=\"pagination-prev pagination-disabled\"><span>Previous</span></li>\n"
+              str << "    <li class=\"pagination-prev pagination-disabled\"><span>Prev</span></li>\n"
             end
 
             # Page numbers
