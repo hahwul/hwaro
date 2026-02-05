@@ -788,11 +788,13 @@ module Hwaro
           shortcode_results = {} of String => String
           processed_content = process_shortcodes_jinja(page.raw_content, templates, shortcode_context, shortcode_results)
 
+          lazy_loading = site.config.markdown.lazy_loading
+
           # Use anchor links if enabled
           html_content, toc_headers = if page.insert_anchor_links
-                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after")
+                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading)
                                       else
-                                        Processor::Markdown.render(processed_content, highlight, safe)
+                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading)
                                       end
 
           # Replace shortcode placeholders with their rendered HTML content

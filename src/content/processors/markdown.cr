@@ -44,16 +44,20 @@ module Hwaro
         # Returns {html_content, toc_headers}
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
-        def render(content : String, highlight : Bool = true, safe : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        # @param lazy_loading - if true, adds loading="lazy" to img tags
+        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
           # Use SyntaxHighlighter for rendering with highlighting support
           html = SyntaxHighlighter.render(content, highlight, safe)
 
-          # Optimization: If no headers, don't parse XML
-          unless html.includes?("<h")
+          has_headers = html.includes?("<h")
+          has_images = lazy_loading && html.includes?("<img")
+
+          # Optimization: If no headers and no images (or lazy loading disabled), don't parse XML
+          unless has_headers || has_images
             return {html, [] of Models::TocHeader}
           end
 
-          process_html_headers(html)
+          post_process_html(html, has_headers, has_images)
         rescue ex
           # Fallback in case of XML parsing error
           {(html || ""), [] of Models::TocHeader}
@@ -372,8 +376,8 @@ module Hwaro
         end
 
         # Render with anchor links inserted into headings
-        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading") : Tuple(String, Array(Models::TocHeader))
-          html, toc = render(content, highlight, safe)
+        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
+          html, toc = render(content, highlight, safe, lazy_loading)
           html_with_anchors = insert_anchor_links_to_html(html, anchor_style)
           {html_with_anchors, toc}
         end
@@ -409,52 +413,62 @@ module Hwaro
           result
         end
 
-        private def process_html_headers(html : String) : Tuple(String, Array(Models::TocHeader))
+        private def post_process_html(html : String, generate_toc : Bool, process_images : Bool) : Tuple(String, Array(Models::TocHeader))
           # XML.parse_html wraps content in <html><body>...</body></html>
           doc = XML.parse_html(html)
           body = doc.xpath_node("//body")
 
           return {html, [] of Models::TocHeader} unless body
 
-          headers = [] of {XML::Node, Models::TocHeader}
+          if process_images
+            body.xpath_nodes("//img").each do |node|
+              unless node["loading"]?
+                node["loading"] = "lazy"
+              end
+            end
+          end
+
           roots = [] of Models::TocHeader
-          stack = [] of Models::TocHeader
 
-          # Iterate through h1-h6 tags
-          body.xpath_nodes("//*[starts-with(name(), 'h') and string-length(name()) = 2]").each do |node|
-            next unless node.name =~ /^h[1-6]$/
+          if generate_toc
+            stack = [] of Models::TocHeader
 
-            level = node.name[1].to_i
-            title = node.content
+            # Iterate through h1-h6 tags
+            body.xpath_nodes("//*[starts-with(name(), 'h') and string-length(name()) = 2]").each do |node|
+              next unless node.name =~ /^h[1-6]$/
 
-            # Generate ID
-            existing_id = node["id"]?
-            id = existing_id || Utils::TextUtils.slugify(title)
+              level = node.name[1].to_i
+              title = node.content
 
-            unless existing_id
-              node["id"] = id
+              # Generate ID
+              existing_id = node["id"]?
+              id = existing_id || Utils::TextUtils.slugify(title)
+
+              unless existing_id
+                node["id"] = id
+              end
+
+              permalink = "##{id}"
+
+              toc_item = Models::TocHeader.new(
+                level: level,
+                id: id,
+                title: title,
+                permalink: permalink
+              )
+
+              # Build Tree
+              while stack.any? && stack.last.level >= level
+                stack.pop
+              end
+
+              if stack.empty?
+                roots << toc_item
+              else
+                stack.last.children << toc_item
+              end
+              stack.push(toc_item)
             end
-
-            permalink = "##{id}"
-
-            toc_item = Models::TocHeader.new(
-              level: level,
-              id: id,
-              title: title,
-              permalink: permalink
-            )
-
-            # Build Tree
-            while stack.any? && stack.last.level >= level
-              stack.pop
-            end
-
-            if stack.empty?
-              roots << toc_item
-            else
-              stack.last.children << toc_item
-            end
-            stack.push(toc_item)
           end
 
           final_html = body.children.map(&.to_xml).join
@@ -539,8 +553,9 @@ module Hwaro
       # Renders Markdown to HTML and generates a Table of Contents
       # @param highlight - whether to enable syntax highlighting for code blocks
       # @param safe - if true, raw HTML will not be passed through (replaced by comments)
-      def render(content : String, highlight : Bool = true, safe : Bool = false) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight, safe)
+      # @param lazy_loading - if true, adds loading="lazy" to img tags
+      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight, safe, lazy_loading)
       end
 
       # Returns parsed metadata and content
