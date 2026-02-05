@@ -13,7 +13,19 @@ hwaro build
 
 This generates static files in `public/`.
 
-> **Note:** The `--minify` flag is available for reducing file sizes, but it's experimental and may cause issues with some JavaScript or complex HTML structures. Use with caution.
+### Optional: Minification
+
+You can optionally minify output files:
+
+```bash
+hwaro build --minify
+```
+
+This performs conservative optimization:
+- **HTML**: Removes comments and trailing whitespace
+- **JSON/XML**: Compacts whitespace for smaller files
+
+All code blocks and content structure are preserved. See [CLI Reference](/start/cli/#build) for details.
 
 ## Hosting Options
 

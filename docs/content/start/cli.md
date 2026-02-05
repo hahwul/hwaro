@@ -89,11 +89,21 @@ hwaro build --minify
 |------|-------------|
 | -o, --output-dir DIR | Output directory (default: public) |
 | -d, --drafts | Include draft content |
-| --minify | Minify HTML, JSON, XML output (experimental) |
+| --minify | Minify output files (see below) |
 | --no-parallel | Disable parallel processing |
 | --cache | Enable build caching |
 | --skip-highlighting | Disable syntax highlighting |
 | -v, --verbose | Show detailed output |
+
+**About `--minify`:**
+
+The minify flag performs conservative optimization on generated files:
+
+- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, and content structure.
+- **JSON**: Removes whitespace and newlines for compact output.
+- **XML**: Removes whitespace between tags for smaller file sizes.
+
+Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
 
 ### serve
 
