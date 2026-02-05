@@ -54,18 +54,20 @@ Pre-rendered pagination HTML:
 
 ### paginator
 
-Pagination object for custom rendering:
+Pagination object for custom rendering (compatible with Zola's Paginator):
 
 | Property | Type | Description |
 |----------|------|-------------|
-| paginator.current_page | Int | Current page number |
-| paginator.total_pages | Int | Total number of pages |
-| paginator.per_page | Int | Items per page |
-| paginator.total_items | Int | Total items |
-| paginator.first_page | String | URL to first page |
-| paginator.last_page | String | URL to last page |
-| paginator.previous_page | String? | URL to previous page |
-| paginator.next_page | String? | URL to next page |
+| paginator.paginate_by | Int | Items per page |
+| paginator.base_url | String | Base URL for pagination |
+| paginator.number_pagers | Int | Total number of pagers (pages) |
+| paginator.first | String | URL to first pager |
+| paginator.last | String | URL to last pager |
+| paginator.previous | String? | URL to previous pager |
+| paginator.next | String? | URL to next pager |
+| paginator.pages | Array | Array of pages for the current pager |
+| paginator.current_index | Int | Current pager index (1-indexed) |
+| paginator.total_pages | Int | Total number of items across all pagers |
 
 ## Template Examples
 
@@ -94,18 +96,18 @@ Use the pre-rendered `pagination` variable:
 Build your own pagination UI:
 
 ```jinja
-{% if paginator.total_pages > 1 %}
+{% if paginator.number_pagers > 1 %}
 <nav class="pagination">
-  {% if paginator.previous_page %}
-  <a href="{{ paginator.previous_page }}" class="prev">← Previous</a>
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}" class="prev">← Previous</a>
   {% endif %}
   
   <span class="current">
-    Page {{ paginator.current_page }} of {{ paginator.total_pages }}
+    Page {{ paginator.current_index }} of {{ paginator.number_pagers }}
   </span>
   
-  {% if paginator.next_page %}
-  <a href="{{ paginator.next_page }}" class="next">Next →</a>
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}" class="next">Next →</a>
   {% endif %}
 </nav>
 {% endif %}
@@ -114,29 +116,29 @@ Build your own pagination UI:
 ### Full Pagination with Page Numbers
 
 ```jinja
-{% if paginator.total_pages > 1 %}
+{% if paginator.number_pagers > 1 %}
 <nav class="pagination">
   {# First page #}
-  {% if paginator.current_page > 1 %}
-  <a href="{{ paginator.first_page }}">« First</a>
+  {% if paginator.current_index > 1 %}
+  <a href="{{ paginator.first }}">« First</a>
   {% endif %}
   
   {# Previous #}
-  {% if paginator.previous_page %}
-  <a href="{{ paginator.previous_page }}">‹ Prev</a>
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}">‹ Prev</a>
   {% endif %}
   
   {# Current #}
-  <span class="current">{{ paginator.current_page }} / {{ paginator.total_pages }}</span>
+  <span class="current">{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
   
   {# Next #}
-  {% if paginator.next_page %}
-  <a href="{{ paginator.next_page }}">Next ›</a>
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}">Next ›</a>
   {% endif %}
   
   {# Last page #}
-  {% if paginator.current_page < paginator.total_pages %}
-  <a href="{{ paginator.last_page }}">Last »</a>
+  {% if paginator.current_index < paginator.number_pagers %}
+  <a href="{{ paginator.last }}">Last »</a>
   {% endif %}
 </nav>
 {% endif %}

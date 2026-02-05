@@ -100,7 +100,8 @@ describe Hwaro::Content::Pagination::Renderer do
       prev_url: nil,
       next_url: nil,
       first_url: "/wiki/",
-      last_url: "/wiki/"
+      last_url: "/wiki/",
+      base_url: "/wiki/page/"
     )
 
     renderer = Hwaro::Content::Pagination::Renderer.new(config)
@@ -125,7 +126,8 @@ describe Hwaro::Content::Pagination::Renderer do
       prev_url: nil,
       next_url: "/wiki/page/2/",
       first_url: "/wiki/",
-      last_url: "/wiki/page/3/"
+      last_url: "/wiki/page/3/",
+      base_url: "/wiki/page/"
     )
 
     renderer = Hwaro::Content::Pagination::Renderer.new(config)
@@ -150,7 +152,8 @@ describe Hwaro::Content::Pagination::Renderer do
       prev_url: nil,
       next_url: nil,
       first_url: "/wiki/",
-      last_url: "/wiki/"
+      last_url: "/wiki/",
+      base_url: "/wiki/page/"
     )
 
     renderer = Hwaro::Content::Pagination::Renderer.new(config)

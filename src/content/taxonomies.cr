@@ -129,7 +129,7 @@ module Hwaro
           pagination_html = Content::Pagination::Renderer.new(site.config).render_pagination_nav(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
@@ -161,11 +161,13 @@ module Hwaro
           next_url: nil,
           first_url: index_page.url,
           last_url: index_page.url,
+          base_url: "#{index_page.url.rstrip("/")}/page/",
         )] if per_page <= 0 || pages.size <= per_page
 
         total_items = pages.size
         total_pages = [(total_items.to_f / per_page).ceil.to_i, 1].max
         paginated_pages = [] of Content::Pagination::PaginatedPage
+        paginator_base_url = "#{index_page.url.rstrip("/")}/page/"
 
         (1..total_pages).each do |page_number|
           start_idx = (page_number - 1) * per_page
@@ -191,6 +193,7 @@ module Hwaro
             next_url: next_url,
             first_url: first_url,
             last_url: last_url,
+            base_url: paginator_base_url,
           )
         end
 
@@ -233,11 +236,34 @@ module Hwaro
         page : Models::Section,
         site : Models::Site,
         templates : Hash(String, String),
+        paginator : Content::Pagination::PaginatedPage? = nil,
       ) : String
         return html_content unless template_content
 
+        # Determine current URL for this pager if provided
+        current_url = if paginator
+                        if paginator.page_number == 1
+                          page.url
+                        else
+                          "#{page.url.rstrip("/")}/page/#{paginator.page_number}/"
+                        end
+                      else
+                        page.url
+                      end
+
         builder = Core::Build::Builder.new
-        builder.apply_template(template_content, html_content, page, site, "", "", templates)
+        builder.apply_template(
+          template: template_content,
+          content: html_content,
+          page: page,
+          site: site,
+          section_list: "",
+          toc: "",
+          templates: templates,
+          pagination: "", # We don't pass pre-rendered pagination here as it is embedded in content? Wait.
+          page_url_override: current_url,
+          paginator: paginator
+        )
       end
 
       private def self.generate_taxonomy_feed(

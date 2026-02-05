@@ -897,7 +897,7 @@ module Hwaro
                           end
 
             final_html = if template_content
-                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page.pages, global_vars)
+                           apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page, global_vars)
                          else
                            Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
                            html_content
@@ -1032,14 +1032,14 @@ module Hwaro
           templates : Hash(String, String),
           pagination : String = "",
           page_url_override : String? = nil,
-          paginated_pages : Array(Models::Page)? = nil,
+          paginator : Content::Pagination::PaginatedPage? = nil,
           global_vars : Hash(String, Crinja::Value)? = nil,
         ) : String
           # Use Crinja for Jinja2-style templates
           env = crinja_env
 
           # Build template variables
-          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginated_pages, global_vars)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars)
 
           # Process shortcodes in template first (convert to Jinja2 include syntax)
           processed_template = process_shortcodes_jinja(template, templates, vars)
@@ -1147,7 +1147,7 @@ module Hwaro
           toc : String,
           pagination : String = "",
           page_url_override : String? = nil,
-          paginated_pages : Array(Models::Page)? = nil,
+          paginator : Content::Pagination::PaginatedPage? = nil,
           global_vars : Hash(String, Crinja::Value)? = nil,
         ) : Hash(String, Crinja::Value)
           config = site.config
@@ -1337,8 +1337,8 @@ module Hwaro
           if !current_section.empty?
             # Use paginated pages if provided (for section pages with pagination)
             # Otherwise, fall back to full section pages list
-            section_pages = if paginated_pages
-                              paginated_pages
+            section_pages = if paginator
+                              paginator.pages
                             else
                               pages = site.pages_for_section(current_section, page.language).dup
                               # Exclude the current page if it was included
@@ -1399,6 +1399,43 @@ module Hwaro
           vars["toc_obj"] = Crinja::Value.new(toc_obj)
 
           vars["pagination"] = Crinja::Value.new(pagination)
+
+          if paginator
+            paginator_obj = {
+              "paginate_by"   => Crinja::Value.new(paginator.per_page),
+              "base_url"      => Crinja::Value.new(paginator.base_url),
+              "number_pagers" => Crinja::Value.new(paginator.total_pages),
+              "first"         => Crinja::Value.new(paginator.first_url),
+              "last"          => Crinja::Value.new(paginator.last_url),
+              "previous"      => Crinja::Value.new(paginator.prev_url),
+              "next"          => Crinja::Value.new(paginator.next_url),
+              "pages"         => Crinja::Value.new(paginator.pages.map do |p|
+                Crinja::Value.new({
+                  "title"       => Crinja::Value.new(p.title),
+                  "description" => Crinja::Value.new(p.description || ""),
+                  "url"         => Crinja::Value.new(p.url),
+                  "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                  "image"       => Crinja::Value.new(p.image || ""),
+                  "draft"       => Crinja::Value.new(p.draft),
+                  "toc"         => Crinja::Value.new(p.toc),
+                  "render"      => Crinja::Value.new(p.render),
+                  "is_index"    => Crinja::Value.new(p.is_index),
+                  "generated"   => Crinja::Value.new(p.generated),
+                  "in_sitemap"  => Crinja::Value.new(p.in_sitemap),
+                  "language"    => Crinja::Value.new(p.language || config.default_language),
+                  "summary"     => Crinja::Value.new(p.effective_summary || ""),
+                  "word_count"  => Crinja::Value.new(p.word_count),
+                  "reading_time"=> Crinja::Value.new(p.reading_time),
+                  "permalink"   => Crinja::Value.new(p.permalink || ""),
+                  "weight"      => Crinja::Value.new(p.weight),
+                  "authors"     => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+                })
+              end),
+              "current_index" => Crinja::Value.new(paginator.page_number),
+              "total_pages"   => Crinja::Value.new(paginator.total_items),
+            }
+            vars["paginator"] = Crinja::Value.new(paginator_obj)
+          end
 
           # Highlight tags
           vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag)
