@@ -26,6 +26,7 @@ module Hwaro
         property next_url : String?
         property first_url : String
         property last_url : String
+        property base_url : String
 
         def initialize(
           @pages : Array(Models::Page),
@@ -39,6 +40,7 @@ module Hwaro
           @next_url : String?,
           @first_url : String,
           @last_url : String,
+          @base_url : String,
         )
         end
       end
@@ -82,7 +84,8 @@ module Hwaro
               prev_url: nil,
               next_url: nil,
               first_url: section.url,
-              last_url: section.url
+              last_url: section.url,
+              base_url: "#{section.url.rstrip("/")}/#{section.paginate_path}/"
             )
             return PaginationResult.new(
               paginated_pages: [single_page],
@@ -103,6 +106,7 @@ module Hwaro
 
           # Get custom paginate_path from section (defaults to "page")
           paginate_path = section.paginate_path
+          paginator_base_url = "#{base_url.rstrip("/")}/#{paginate_path}/"
 
           (1..total_pages).each do |page_num|
             start_idx = (page_num - 1) * per_page
@@ -130,7 +134,8 @@ module Hwaro
               prev_url: prev_url,
               next_url: next_url,
               first_url: first_url,
-              last_url: last_url
+              last_url: last_url,
+              base_url: paginator_base_url
             )
           end
 
@@ -144,9 +149,15 @@ module Hwaro
         # Check if pagination is enabled for a section
         private def pagination_enabled_for_section?(section : Models::Section) : Bool
           # Section-level override takes precedence
-          if section_enabled = section.pagination_enabled
-            return section_enabled
+          if !section.pagination_enabled.nil?
+            return section.pagination_enabled.not_nil!
           end
+
+          # If paginate (per_page) is explicitly set, enable pagination
+          if section.paginate
+            return true
+          end
+
           # Fall back to global config
           @config.pagination.enabled
         end
