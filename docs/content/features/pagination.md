@@ -54,7 +54,7 @@ Pre-rendered pagination HTML:
 
 ### paginator
 
-Pagination object for custom rendering (compatible with Zola's Paginator):
+Pagination object for custom rendering:
 
 | Property | Type | Description |
 |----------|------|-------------|

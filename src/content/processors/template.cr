@@ -489,7 +489,7 @@ module Hwaro
             end
           end
 
-          # get_url() function - alias for url_for to match Zola
+          # get_url() function - alias for url_for to match
           @env.functions["get_url"] = @env.functions["url_for"]
 
           # get_page() function - get page data by path
