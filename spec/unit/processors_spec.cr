@@ -562,4 +562,32 @@ describe Hwaro::Processor::Markdown do
       result[:reverse].should be_nil
     end
   end
+
+  describe "lazy loading images" do
+    it "adds loading='lazy' attribute when enabled" do
+      content = "![Alt text](image.jpg)"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true)
+      html.should contain("loading=\"lazy\"")
+    end
+
+    it "does not add loading='lazy' attribute when disabled" do
+      content = "![Alt text](image.jpg)"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: false)
+      html.should_not contain("loading=\"lazy\"")
+    end
+
+    it "preserves existing loading attribute" do
+      content = "<img src='image.jpg' loading='eager'>"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)
+      html.should contain("loading=\"eager\"")
+      html.should_not contain("loading=\"lazy\"")
+    end
+
+    it "works with render_with_anchors" do
+      content = "# Title\n![Img](img.jpg)"
+      html, _ = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, lazy_loading: true)
+      html.should contain("loading=\"lazy\"")
+      html.should contain("id=\"title\"")
+    end
+  end
 end

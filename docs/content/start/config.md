@@ -52,11 +52,13 @@ hooks.post = ["npm run minify"]
 ```toml
 [markdown]
 safe = false
+lazy_loading = true
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | safe | bool | false | Strip raw HTML from markdown |
+| lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
 
 ## SEO
 

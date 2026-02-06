@@ -404,9 +404,11 @@ module Hwaro
     # Maps to Markd::Options for controlling markdown parsing behavior
     class MarkdownConfig
       property safe : Bool # If true, raw HTML will not be passed through (replaced by comments)
+      property lazy_loading : Bool # If true, adds loading="lazy" to img tags
 
       def initialize
         @safe = false
+        @lazy_loading = false
       end
     end
 
@@ -715,6 +717,10 @@ module Hwaro
             if markdown_section.has_key?("safe")
               safe_val = markdown_section["safe"]?.try(&.as_bool?)
               config.markdown.safe = safe_val unless safe_val.nil?
+            end
+            if markdown_section.has_key?("lazy_loading")
+              lazy_val = markdown_section["lazy_loading"]?.try(&.as_bool?)
+              config.markdown.lazy_loading = lazy_val unless lazy_val.nil?
             end
           end
 

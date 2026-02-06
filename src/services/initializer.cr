@@ -241,6 +241,14 @@ module Hwaro
           str << "processors = [\"markdown\"]\n\n"
 
           str << "# =============================================================================\n"
+          str << "# Markdown Configuration\n"
+          str << "# =============================================================================\n"
+          str << "# Configure markdown parser behavior\n\n"
+          str << "[markdown]\n"
+          str << "safe = false          # If true, raw HTML in markdown will be stripped\n"
+          str << "lazy_loading = false  # If true, automatically add loading=\"lazy\" to img tags\n\n"
+
+          str << "# =============================================================================\n"
           str << "# Content Files\n"
           str << "# =============================================================================\n"
           str << "# Publish non-Markdown files from `content/` into the output directory.\n"

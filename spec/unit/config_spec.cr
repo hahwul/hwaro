@@ -313,13 +313,16 @@ describe Hwaro::Models::Config do
     it "has default markdown configuration" do
       config = Hwaro::Models::Config.new
       config.markdown.safe.should eq(false)
+      config.markdown.lazy_loading.should eq(false)
     end
 
     it "can update markdown settings" do
       config = Hwaro::Models::Config.new
       config.markdown.safe = true
+      config.markdown.lazy_loading = true
 
       config.markdown.safe.should be_true
+      config.markdown.lazy_loading.should be_true
     end
   end
 
