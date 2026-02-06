@@ -489,8 +489,9 @@ module Hwaro
           # =============================================================================
           # Configure markdown parser behavior
 
-          # [markdown]
-          # safe = false    # If true, raw HTML in markdown will be stripped (replaced by comments)
+          [markdown]
+          safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
+          lazy_loading = false  # If true, automatically add loading="lazy" to img tags
 
           TOML
         end
