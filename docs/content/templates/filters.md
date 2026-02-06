@@ -46,6 +46,9 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 | sort | Sort array | {{ items \| sort }} |
 | join | Join elements | {{ tags \| join(", ") }} |
 | split | Split string | {{ "a,b,c" \| split(pat=",") }} |
+| where | Filter objects by field value | {{ posts \| where(attribute="draft", value=false) }} |
+| sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
+| group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
 
 ## URL Filters
 
@@ -120,6 +123,22 @@ Format codes:
 {{ page.authors | join(" & ") }}
 ```
 
+### Collection Querying
+
+```jinja
+{% set published = site.pages | where(attribute="draft", value=false) %}
+{% set newest = published | sort_by(attribute="date", reverse=true) %}
+
+{% for group in newest | group_by(attribute="section") %}
+  <h3>{{ group.grouper }}</h3>
+  <ul>
+  {% for p in group.list %}
+    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  {% endfor %}
+  </ul>
+{% endfor %}
+```
+
 ### Chaining
 
 ```jinja
@@ -139,6 +158,7 @@ Tests evaluate conditions in `{% if %}` statements.
 | startswith | Starts with | {% if page.url is startswith("/blog/") %} |
 | endswith | Ends with | {% if page.url is endswith("/") %} |
 | containing | Contains | {% if page.url is containing("docs") %} |
+| matching | Regex match | {% if asset is matching("[.](jpg|png)$") %} |
 | empty | Is empty | {% if page.description is empty %} |
 | present | Is not empty | {% if page.title is present %} |
 
@@ -155,6 +175,10 @@ Tests evaluate conditions in `{% if %}` statements.
 
 {% if page.image is present %}
 <meta property="og:image" content="{{ page.image | absolute_url }}">
+{% endif %}
+
+{% if "hero.jpg" is matching("[.](jpg|png)$") %}
+<span>Image file</span>
 {% endif %}
 ```
 

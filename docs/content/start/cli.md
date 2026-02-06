@@ -88,12 +88,15 @@ hwaro build --minify
 | Flag | Description |
 |------|-------------|
 | -o, --output-dir DIR | Output directory (default: public) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
 | -d, --drafts | Include draft content |
 | --minify | Minify output files (see below) |
 | --no-parallel | Disable parallel processing |
 | --cache | Enable build caching |
 | --skip-highlighting | Disable syntax highlighting |
 | -v, --verbose | Show detailed output |
+| --profile | Print phase-by-phase build timing |
+| --debug | Print debug information after build |
 
 **About `--minify`:**
 
@@ -121,9 +124,12 @@ hwaro serve --open
 |------|-------------|
 | -b, --bind HOST | Bind address (default: 0.0.0.0) |
 | -p, --port PORT | Port number (default: 3000) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| --minify | Serve minified output |
 | --open | Open browser after starting |
 | -d, --drafts | Include draft content |
 | -v, --verbose | Show detailed output |
+| --debug | Print debug information after each rebuild |
 
 The server watches for file changes and rebuilds automatically.
 

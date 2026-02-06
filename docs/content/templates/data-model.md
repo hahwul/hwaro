@@ -40,6 +40,9 @@ The root container. Configured in `config.toml`.
 | site.title | String | Site title |
 | site.description | String | Site description |
 | site.base_url | String | Base URL (no trailing slash) |
+| site.pages | Array<Page> | All non-section pages |
+| site.sections | Array<Section> | All section index pages |
+| site.taxonomies | Object | All taxonomy groups and terms |
 
 ### Flat Aliases
 
@@ -68,14 +71,16 @@ A directory with `_index.md` that groups related content.
 |----------|------|-------------|
 | section.title | String | Section title |
 | section.description | String? | Section description |
-| section.url | String | Section URL path |
 | section.pages | Array<Page> | Pages in this section |
 | section.pages_count | Int | Number of pages |
+| section.list | String | Pre-rendered HTML list (`section_list`) |
 | section.subsections | Array<Section> | Child sections |
 | section.assets | Array<String> | Static files in section |
 | section.page_template | String? | Default template for pages |
 | section.paginate_path | String | Pagination URL pattern |
 | section.redirect_to | String? | Redirect URL |
+
+For the current section URL in `section.html`, use `page.url`.
 
 ### Flat Aliases
 
@@ -145,8 +150,10 @@ An individual content file (`.md`).
 | page.section | String | Parent section name |
 | page.date | String? | Publication date (YYYY-MM-DD) |
 | page.updated | String? | Last updated date |
-| page.content | String | Rendered HTML content |
-| page.raw_content | String | Original markdown |
+| page.language | String | Effective language code |
+| page.translations | Array<TranslationLink> | Language variants |
+
+Rendered HTML content is available as the top-level `content` variable.
 
 ### Metadata Properties
 
@@ -156,8 +163,7 @@ An individual content file (`.md`).
 | page.weight | Int | Sort weight |
 | page.image | String? | Featured image path |
 | page.authors | Array<String> | Author names |
-| page.tags | Array<String> | Tags |
-| page.language | String? | Language code |
+| page.extra | Object | Custom front matter fields |
 
 ### Computed Properties
 
@@ -178,7 +184,6 @@ An individual content file (`.md`).
 | page.generated | Bool | false | Auto-generated page |
 | page.in_sitemap | Bool | true | Include in sitemap |
 | page.in_search_index | Bool | true | Include in search |
-| page.insert_anchor_links | Bool | false | Add heading anchors |
 
 ### Navigation Properties
 
@@ -211,6 +216,10 @@ An individual content file (`.md`).
 | page_permalink | page.permalink |
 | page_authors | page.authors |
 | page_weight | page.weight |
+| page_language | page.language |
+| page_translations | page.translations |
+| taxonomy_name | Current taxonomy name (taxonomy pages) |
+| taxonomy_term | Current taxonomy term (taxonomy term pages) |
 | content | Rendered HTML content |
 
 ---
@@ -373,6 +382,7 @@ pros = ["Fast", "Reliable"]
 | Variable | Type | Description |
 |----------|------|-------------|
 | toc | String | Generated TOC HTML |
+| toc_obj.html | String | Same TOC HTML in object form |
 
 Only available when `toc = true` in front matter:
 

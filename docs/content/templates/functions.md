@@ -10,7 +10,7 @@ Built-in functions for retrieving data and generating URLs in templates.
 
 ### get_page()
 
-Retrieve any page by path:
+Retrieve any page by path or URL:
 
 ```jinja
 {% set about = get_page(path="about.md") %}
@@ -23,7 +23,7 @@ Retrieve any page by path:
 
 | Name | Type | Description |
 |------|------|-------------|
-| path | String | Path relative to content/ |
+| path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
 
 **Returns:** Page? (nil if not found)
 
@@ -50,13 +50,16 @@ Retrieve any page by path:
 
 {# Page in section #}
 {% set intro = get_page(path="docs/introduction.md") %}
+
+{# Match by URL #}
+{% set intro_by_url = get_page(path="/docs/introduction/") %}
 ```
 
 ---
 
 ### get_section()
 
-Retrieve a section and its pages:
+Retrieve a section by section name, source path, or URL:
 
 ```jinja
 {% set blog = get_section(path="blog") %}
@@ -74,7 +77,7 @@ Retrieve a section and its pages:
 
 | Name | Type | Description |
 |------|------|-------------|
-| path | String | Section name or path |
+| path | String | Section name (`blog`), path (`blog/_index.md`), or URL (`/blog/`) |
 
 **Returns:** Section? (nil if not found)
 
@@ -85,8 +88,11 @@ Retrieve a section and its pages:
 | title | String |
 | description | String? |
 | url | String |
+| path | String |
+| name | String |
 | pages | Array<Page> |
 | pages_count | Int |
+| assets | Array<String> |
 
 **Examples:**
 
@@ -96,6 +102,9 @@ Retrieve a section and its pages:
 
 {# Nested section #}
 {% set guides = get_section(path="docs/guides") %}
+
+{# Match by URL #}
+{% set blog = get_section(path="/blog/") %}
 
 {# Display count #}
 <p>{{ docs.pages_count }} articles</p>
@@ -255,6 +264,16 @@ Generate URL with base_url:
 
 ---
 
+### get_url()
+
+Alias for `url_for()`. You can use either name:
+
+```jinja
+<a href="{{ get_url(path='/about/') }}">About</a>
+```
+
+---
+
 ### now()
 
 Get current datetime:
@@ -288,6 +307,32 @@ Get current datetime:
 | %H | Hour (00-23) | 14 |
 | %M | Minute | 30 |
 | %S | Second | 45 |
+
+---
+
+## Media Functions
+
+### resize_image()
+
+Returns an image object with a resolved URL and requested dimensions.
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1200, height=630) %}
+<img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}">
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Image path |
+| width | Int | Requested width |
+| height | Int | Requested height |
+| op | String | Operation name (default: `"fill"`) |
+
+**Returns:** Object (`url`, `width`, `height`)
+
+**Current behavior:** placeholder implementation. It resolves the URL and echoes requested dimensions, but does not perform actual image processing yet.
 
 ---
 

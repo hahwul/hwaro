@@ -107,7 +107,50 @@ Access subsections in templates:
 ```jinja
 {% for sub in section.subsections %}
 <a href="{{ sub.url }}">{{ sub.title }}</a>
+<small>({{ sub.pages_count }})</small>
 {% endfor %}
+```
+
+## Template Variables
+
+When rendering a section page (`_index.md`), these variables are available:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| section.title | String | Current section title |
+| section.description | String | Current section description |
+| section.pages | Array<Page> | Pages shown in the current section list |
+| section.pages_count | Int | Number of items in `section.pages` |
+| section.list | String | Pre-rendered HTML list (same value as `section_list`) |
+| section.subsections | Array<Section> | Direct child sections (`title`, `description`, `url`, `pages_count`) |
+| section.assets | Array<String> | Colocated section assets |
+| section.page_template | String | Default template name for child pages |
+| section.paginate_path | String | Pagination path segment |
+| section.redirect_to | String | Redirect target if configured |
+| section_list | String | Same as `section.list` |
+| pagination | String | Pre-rendered pagination HTML |
+| paginator | Object | Structured pagination object |
+
+Use `page.url` for the current section URL.
+
+### `section.list` / `section_list`
+
+```jinja
+<ul class="auto-list">
+  {{ section.list | safe }}
+</ul>
+```
+
+### `paginator` (custom pagination UI)
+
+```jinja
+{% if paginator is defined and paginator.number_pagers > 1 %}
+<nav>
+  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+</nav>
+{% endif %}
 ```
 
 ## Transparent Sections
