@@ -22,7 +22,7 @@ describe "Asset Colocation" do
   end
 
   it "copies assets co-located with section _index.md (Section Bundle)" do
-     Dir.mktmpdir do |dir|
+    Dir.mktmpdir do |dir|
       FileUtils.cd(dir) do
         # Setup basic structure
         FileUtils.mkdir_p("content/gallery")

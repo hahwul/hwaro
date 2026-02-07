@@ -403,7 +403,7 @@ module Hwaro
     # Markdown parser configuration
     # Maps to Markd::Options for controlling markdown parsing behavior
     class MarkdownConfig
-      property safe : Bool # If true, raw HTML will not be passed through (replaced by comments)
+      property safe : Bool         # If true, raw HTML will not be passed through (replaced by comments)
       property lazy_loading : Bool # If true, adds loading="lazy" to img tags
 
       def initialize

@@ -46,8 +46,8 @@ module Hwaro
           # This handles cases like: <pre>\n  <code>content</code>\n</pre>
           # Converting to: <pre><code>content</code></pre>
           cleaned = html
-            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code")  # <pre>\n  <code> -> <pre><code>
-            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")     # </code>\n</pre> -> </code></pre>
+            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
+            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")   # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
           # Also preserve <!-- more --> markers used for content summaries

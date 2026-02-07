@@ -96,7 +96,7 @@ describe Hwaro::Content::Seo::Tags do
 
       expected_tags = [
         %(<link rel="alternate" hreflang="en" href="https://example.com/test/">),
-        %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/test/">)
+        %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/test/">),
       ]
 
       tags.should eq expected_tags.sort.join("\n")
@@ -125,7 +125,7 @@ describe Hwaro::Content::Seo::Tags do
 
       expected_tags = [
         %(<link rel="alternate" hreflang="en" href="https://example.com/test/">),
-        %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/test/">)
+        %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/test/">),
       ]
 
       tags.should eq expected_tags.sort.join("\n")

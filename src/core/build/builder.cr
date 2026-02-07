@@ -1413,24 +1413,24 @@ module Hwaro
               "next"          => Crinja::Value.new(paginator.next_url),
               "pages"         => Crinja::Value.new(paginator.pages.map do |p|
                 Crinja::Value.new({
-                  "title"       => Crinja::Value.new(p.title),
-                  "description" => Crinja::Value.new(p.description || ""),
-                  "url"         => Crinja::Value.new(p.url),
-                  "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-                  "image"       => Crinja::Value.new(p.image || ""),
-                  "draft"       => Crinja::Value.new(p.draft),
-                  "toc"         => Crinja::Value.new(p.toc),
-                  "render"      => Crinja::Value.new(p.render),
-                  "is_index"    => Crinja::Value.new(p.is_index),
-                  "generated"   => Crinja::Value.new(p.generated),
-                  "in_sitemap"  => Crinja::Value.new(p.in_sitemap),
-                  "language"    => Crinja::Value.new(p.language || config.default_language),
-                  "summary"     => Crinja::Value.new(p.effective_summary || ""),
-                  "word_count"  => Crinja::Value.new(p.word_count),
-                  "reading_time"=> Crinja::Value.new(p.reading_time),
-                  "permalink"   => Crinja::Value.new(p.permalink || ""),
-                  "weight"      => Crinja::Value.new(p.weight),
-                  "authors"     => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+                  "title"        => Crinja::Value.new(p.title),
+                  "description"  => Crinja::Value.new(p.description || ""),
+                  "url"          => Crinja::Value.new(p.url),
+                  "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                  "image"        => Crinja::Value.new(p.image || ""),
+                  "draft"        => Crinja::Value.new(p.draft),
+                  "toc"          => Crinja::Value.new(p.toc),
+                  "render"       => Crinja::Value.new(p.render),
+                  "is_index"     => Crinja::Value.new(p.is_index),
+                  "generated"    => Crinja::Value.new(p.generated),
+                  "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
+                  "language"     => Crinja::Value.new(p.language || config.default_language),
+                  "summary"      => Crinja::Value.new(p.effective_summary || ""),
+                  "word_count"   => Crinja::Value.new(p.word_count),
+                  "reading_time" => Crinja::Value.new(p.reading_time),
+                  "permalink"    => Crinja::Value.new(p.permalink || ""),
+                  "weight"       => Crinja::Value.new(p.weight),
+                  "authors"      => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
                 })
               end),
               "current_index" => Crinja::Value.new(paginator.page_number),
@@ -1628,8 +1628,8 @@ module Hwaro
           # This handles cases like: <pre>\n  <code>content</code>\n</pre>
           # Converting to: <pre><code>content</code></pre>
           cleaned = html
-            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code")  # <pre>\n  <code> -> <pre><code>
-            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")     # </code>\n</pre> -> </code></pre>
+            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
+            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")   # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
           # Also preserve <!-- more --> markers used for content summaries
