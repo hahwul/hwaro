@@ -1,4 +1,4 @@
-# Hwaro - GitHub Copilot Instructions
+# Hwaro - Agent Instructions
 
 ## Project Overview
 
