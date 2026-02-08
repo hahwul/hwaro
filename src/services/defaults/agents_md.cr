@@ -12,6 +12,42 @@ module Hwaro
 
           This is a static website built with [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator written in Crystal.
 
+          ## Hwaro Usage
+
+          ### Installation
+
+          **Homebrew:**
+          ```bash
+          brew tap hahwul/hwaro
+          brew install hwaro
+          ```
+
+          **From Source (Crystal):**
+          ```bash
+          git clone https://github.com/hahwul/hwaro.git
+          cd hwaro
+          shards install
+          shards build --release --no-debug --production
+          # Binary: ./bin/hwaro
+          ```
+
+          ### Essential Commands
+
+          | Command | Description |
+          |---------|-------------|
+          | `hwaro init [DIR]` | Initialize a new site |
+          | `hwaro build` | Build the site to `public/` directory |
+          | `hwaro serve` | Start development server with live reload |
+          | `hwaro version` | Show version information |
+          | `hwaro deploy` | Deploy the site (requires configuration) |
+
+          ### Build & Serve Options
+
+          - **Drafts:** `hwaro build --drafts` / `hwaro serve --drafts` (Include content with `draft = true`)
+          - **Port:** `hwaro serve -p 8080` (Default: 3000)
+          - **Open:** `hwaro serve --open` (Open browser automatically)
+          - **Base URL:** `hwaro build --base-url "https://example.com"`
+
           ## Directory Structure
 
           ```
@@ -36,16 +72,35 @@ module Hwaro
 
           ### Creating New Pages
 
-          Create a new `.md` file in the `content/` directory:
+          Create a new `.md` file in the `content/` directory.
 
-          ```markdown
+          **Example Front Matter (TOML):**
+          ```toml
           +++
           title = "Page Title"
           date = "2024-01-01"
           draft = false
+          tags = ["tag1", "tag2"]
           +++
 
           Your markdown content here.
+          ```
+
+          ### Creating Sections
+
+          1. Create a directory under `content/` (e.g., `content/projects/`)
+          2. Add `_index.md` for the section listing page
+          3. Add individual `.md` files for section items
+
+          **Section `_index.md` Example:**
+          ```toml
+          +++
+          title = "Projects"
+          paginate = 10
+          pagination_enabled = true
+          sort_by = "date"   # "date" | "title" | "weight"
+          reverse = false
+          +++
           ```
 
           ### Front Matter Fields
@@ -64,161 +119,52 @@ module Hwaro
           | slug        | string   | Custom URL slug                          |
           | aliases     | array    | URL redirects to this page               |
 
-          ### Creating Sections
+          ### Markdown Features
 
-          1. Create a directory under `content/` (e.g., `content/projects/`)
-          2. Add `_index.md` for the section listing page
-          3. Add individual `.md` files for section items
+          - **Standard Markdown:** Headers, lists, code blocks, etc.
+          - **Tables:** Supported.
+          - **Footnotes:** Supported.
+          - **Raw HTML:** Supported (unless `safe = true` in config).
 
           ## Template Development
 
           ### Template Location
 
           All templates are in the `templates/` directory using Jinja2 syntax (powered by Crinja).
-          Supported extensions: `.html`, `.j2`, `.jinja2`, `.jinja`
 
-          ### Jinja2 Syntax Basics
+          ### Key Variables
 
-          - `{{ variable }}` - Print a variable
-          - `{% if condition %}...{% endif %}` - Conditionals
-          - `{% for item in items %}...{% endfor %}` - Loops
-          - `{% include "partial.html" %}` - Include another template
-          - `{% extends "base.html" %}` - Template inheritance
-          - `{{ value | filter }}` - Apply a filter
-          - `{# comment #}` - Comments (not rendered)
-
-          ### Available Template Variables
-
-          #### Site Variables
-          - `{{ site_title }}` - Site title from config
-          - `{{ site_description }}` - Site description from config
-          - `{{ base_url }}` - Base URL of the site
-          - `{{ site.title }}`, `{{ site.description }}`, `{{ site.base_url }}` - Site object
+          #### Global Objects
+          - `site`: Site configuration and metadata (`site.title`, `site.base_url`).
+          - `page`: Current page object (available in page templates).
+          - `section`: Current section object (available in section templates).
 
           #### Page Variables
-          Variables can be accessed both as flat variables and via the page object:
-          - `{{ page_title }}` / `{{ page.title }}` - Current page title
-          - `{{ page_description }}` / `{{ page.description }}` - Page description (falls back to site description)
-          - `{{ page_url }}` / `{{ page.url }}` - Page URL
-          - `{{ page_section }}` / `{{ page.section }}` - Current section name
-          - `{{ page_date }}` / `{{ page.date }}` - Page date
-          - `{{ page_image }}` / `{{ page.image }}` - Page image URL
-          - `{{ content }}` - Rendered page content
+          Variables can be accessed via the `page` object:
+          - `{{ page.title }}` - Page title
+          - `{{ page.content }}` - Rendered content
+          - `{{ page.date }}` - Date object
+          - `{{ page.url }}` - Relative URL (e.g., `/blog/post/`)
+          - `{{ page.permalink }}` - Absolute URL
+          - `{{ page.section }}` - Section name
+          - `{{ page.params.custom_field }}` - Access extra front matter fields
 
-          #### Page Object Properties
-          - `{{ page.draft }}` - Is draft (boolean)
-          - `{{ page.toc }}` - Show table of contents (boolean)
+          ### Common Jinja2 Syntax
 
-          #### Section Variables (in section.html)
-          Variables can be accessed both as flat variables and via the section object:
-          - `{{ section_title }}` / `{{ section.title }}` - Section title
-          - `{{ section_description }}` / `{{ section.description }}` - Section description
-          - `{{ section_list }}` / `{{ section.list }}` - HTML list of pages in section
-          - `{{ section.pages }}` - Array of page objects for iteration
-          - `{{ pagination }}` - Pagination navigation HTML (empty if disabled or single page)
-          - `{{ toc }}` / `{{ toc_obj.html }}` - Table of contents HTML
-
-          #### Taxonomy Variables
-          - `{{ taxonomy_name }}` - Name of taxonomy (e.g., "tags")
-          - `{{ taxonomy_term }}` - Current taxonomy term
-
-          #### Navigation & SEO
-          - `{{ og_tags }}` - OpenGraph meta tags
-          - `{{ twitter_tags }}` - Twitter Card meta tags
-          - `{{ og_all_tags }}` - Both OG and Twitter tags
-          - `{{ auto_includes_css }}` - Auto-included CSS files
-          - `{{ auto_includes_js }}` - Auto-included JS files
-          - `{{ auto_includes }}` - Both CSS and JS includes
-          - `{{ highlight_css }}` - Syntax highlighting CSS
-          - `{{ highlight_js }}` - Syntax highlighting JS
-
-          ### Including Partials
-
-          ```jinja
-          {% include "header.html" %}
-          {% include "footer.html" %}
-          ```
-
-          ### Pagination
-
-          Enable global pagination in `config.toml`:
-
-          ```toml
-          [pagination]
-          enabled = true
-          per_page = 10
-          ```
-
-          Override per section in a section `_index.md` front matter:
-
-          ```toml
-          +++
-          paginate = 10
-          pagination_enabled = true
-          sort_by = "date"   # "date" | "title" | "weight"
-          reverse = false
-          +++
-          ```
-
-          ### Conditional Rendering
-
-          ```jinja
-          {% if page.draft %}
-            <span class="draft-badge">Draft</span>
-          {% endif %}
-
-          {% if page.section == "blog" %}
-            <article class="blog-post">{{ content }}</article>
-          {% else %}
-            <main>{{ content }}</main>
-          {% endif %}
-
-          {% if page.description %}
-            <meta name="description" content="{{ page.description }}">
-          {% endif %}
-          ```
-
-          ### Loops
-
-          ```jinja
-          {% for tag in tags %}
-            <span class="tag">{{ tag }}</span>
-          {% endfor %}
-          ```
-
-          ### Filters
-
-          Built-in filters:
-          - `{{ text | upper }}` - Uppercase
-          - `{{ text | lower }}` - Lowercase
-          - `{{ text | title }}` - Title case
-          - `{{ text | trim }}` - Remove whitespace
-          - `{{ text | escape }}` - HTML escape
-          - `{{ list | join(", ") }}` - Join array
-          - `{{ list | first }}` - First item
-          - `{{ list | last }}` - Last item
-          - `{{ list | length }}` - Array length
-          - `{{ text | default("fallback") }}` - Default value
-
-          Custom Hwaro filters:
-          - `{{ date | date("%Y-%m-%d") }}` - Format date
-          - `{{ text | truncate_words(50) }}` - Truncate by words
-          - `{{ text | slugify }}` - Convert to URL slug
-          - `{{ url | absolute_url }}` - Make URL absolute
-          - `{{ url | relative_url }}` - Prefix with base_url
-          - `{{ html | strip_html }}` - Remove HTML tags
-          - `{{ markdown | markdownify }}` - Render markdown
-          - `{{ text | xml_escape }}` - XML escape
-          - `{{ data | jsonify }}` - JSON encode
+          - **Output:** `{{ variable }}`
+          - **Logic:** `{% if condition %}...{% endif %}`
+          - **Loops:** `{% for item in items %}...{% endfor %}`
+          - **Comments:** `{# comment #}`
+          - **Filters:** `{{ value | filter }}`
 
           ### Template Inheritance
 
-          Base template (`templates/base.html`):
+          **Base Template (`templates/base.html`):**
           ```jinja
           <!DOCTYPE html>
           <html>
           <head>
-            <title>{% block title %}{{ site_title }}{% endblock %}</title>
+            <title>{% block title %}{{ site.title }}{% endblock %}</title>
           </head>
           <body>
             {% block content %}{% endblock %}
@@ -226,147 +172,57 @@ module Hwaro
           </html>
           ```
 
-          Child template (`templates/page.html`):
+          **Child Template (`templates/page.html`):**
           ```jinja
           {% extends "base.html" %}
 
           {% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
 
           {% block content %}
-            <main>{{ content }}</main>
+            <article>
+              <h1>{{ page.title }}</h1>
+              {{ content }}
+            </article>
           {% endblock %}
           ```
 
-          ### Template Best Practices
+          ### Partials
 
-          1. **Use Template Inheritance**: Create a base layout for consistency
-          2. **Semantic HTML**: Use proper HTML5 semantic elements
-          3. **Responsive Design**: Include viewport meta tag and responsive CSS
-          4. **Accessibility**: Include proper ARIA labels and alt text
-          5. **Keep Templates Clean**: Move complex logic to macros
+          Include reusable components:
+          ```jinja
+          {% include "header.html" %}
+          {% include "footer.html" %}
+          ```
 
-          ## Styling Guidelines
+          ### Custom Filters
+
+          - `{{ date | date("%Y-%m-%d") }}` - Format date
+          - `{{ text | truncate_words(50) }}` - Truncate text
+          - `{{ text | slugify }}` - Convert to slug
+          - `{{ url | absolute_url }}` - Make URL absolute
+          - `{{ url | relative_url }}` - Prefix with base_url
+          - `{{ html | strip_html }}` - Remove HTML tags
+          - `{{ markdown | markdownify }}` - Render markdown
+
+          ## Styling & Assets
 
           ### CSS Location
+          - Place CSS files in `static/css/`.
+          - Reference in templates: `<link rel="stylesheet" href="{{ base_url }}/css/style.css">`.
 
-          - Place CSS files in `static/assets/css/` or `static/css/`
-          - Use numeric prefixes for load order: `01-reset.css`, `02-main.css`
-          - Enable auto-includes in `config.toml` for automatic loading
-
-          ### Recommended CSS Structure
-
-          ```css
-          /* Reset/Normalize */
-          /* Typography */
-          /* Layout */
-          /* Components */
-          /* Utilities */
-          ```
-
-          ## Building & Previewing
-
-          ```bash
-          # Build the site
-          hwaro build
-
-          # Build with drafts included
-          hwaro build --drafts
-
-          # Start development server with live reload
-          hwaro serve
-
-          # Start server and open browser
-          hwaro serve --open
-          ```
-
-          ## Common Tasks
-
-          ### Adding a Blog Post
-
-          1. Create `content/blog/my-new-post.md`
-          2. Add front matter with title and date
-          3. Write content in Markdown
-          4. Run `hwaro serve` to preview
-
-          ### Customizing the Design
-
-          1. Edit `templates/header.html` for site header and navigation
-          2. Edit `templates/footer.html` for site footer
-          3. Modify `<style>` section in header.html or create CSS files
-          4. Edit `templates/page.html` for page layout
-
-          ### Adding Navigation Links
-
-          Edit the `<nav>` section in `templates/header.html`:
-
-          ```html
-          <nav>
-            <a href="{{ base_url }}/">Home</a>
-            <a href="{{ base_url }}/about/">About</a>
-            <a href="{{ base_url }}/blog/">Blog</a>
-            <!-- Add more links here -->
-          </nav>
-          ```
-
-          ### Active Navigation Links
-
-          ```jinja
-          <nav>
-            <a href="{{ base_url }}/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
-            <a href="{{ base_url }}/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
-          </nav>
-          ```
-
-          ### Enabling Features
-
-          Edit `config.toml` to enable/disable features:
-
-          - **Search**: Set `[search] enabled = true`
-          - **RSS Feed**: Set `[feeds] enabled = true`
-          - **Sitemap**: Set `[sitemap] enabled = true`
-          - **Taxonomies**: Add `[[taxonomies]]` sections
-          - **Safe Markdown**: Set `[markdown] safe = true` to strip raw HTML
-
-          ### Markdown Configuration
-
-          Control how markdown is parsed in `config.toml`:
-
-          ```toml
-          [markdown]
-          safe = true   # Strip raw HTML from markdown (default: false)
-          ```
-
-          When `safe = true`, raw HTML in markdown files is replaced with `<!-- raw HTML omitted -->` comments. This is useful for user-generated content or when you want to ensure only markdown syntax is used.
-
-          ## Shortcodes
-
-          Shortcodes provide reusable template snippets. Place them in `templates/shortcodes/`.
-
-          ### Using Shortcodes in Content
-
-          ```markdown
-          {{ shortcode("alert", type="warning", message="Be careful!") }}
-          ```
-
-          ### Creating Shortcodes
-
-          Create `templates/shortcodes/alert.html`:
-          ```jinja
-          <div class="alert alert-{{ type | default('info') }}">
-            <strong>{{ type | upper }}:</strong> {{ message }}
-          </div>
-          ```
+          ### Static Files
+          - Any file in `static/` is copied to the root of the output directory.
+          - Example: `static/robots.txt` -> `public/robots.txt`.
 
           ## Notes for AI Agents
 
-          1. **Always preserve front matter** when editing content files
-          2. **Test changes** with `hwaro serve` before finalizing
-          3. **Use consistent formatting** in Markdown files
-          4. **Check template syntax** - Jinja2 uses `{{ }}` for output, `{% %}` for logic
-          5. **Validate TOML syntax** in config.toml after edits
-          6. **Keep URLs relative** using `{{ base_url }}` prefix
-          7. **Use filters** for data transformation instead of complex logic
-          8. **Escape user content** with `{{ value | escape }}` when needed
+          1. **Always preserve front matter** when editing content files.
+          2. **Use `hwaro serve`** to preview changes.
+          3. **Check `config.toml`** for site-wide settings (e.g., markdown safety, pagination).
+          4. **Template Syntax:** Use standard Jinja2 syntax.
+          5. **Validate TOML syntax** in config.toml after edits.
+          6. **Keep URLs relative** using `{{ base_url }}` prefix where appropriate, or `page.url`.
+          7. **Escape user content** with `{{ value | escape }}` when needed.
           CONTENT
         end
       end
