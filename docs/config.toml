@@ -51,7 +51,7 @@ allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
 
 [highlight]
 enabled = true
-theme = "github-dark"
+theme = "github-dark-dimmed"
 use_cdn = true
 
 # =============================================================================

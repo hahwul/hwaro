@@ -1,114 +1,73 @@
 /* =============================================================================
-   Info Boxes with Terminal Style
+   Info Boxes — Clean Modern Style
    ============================================================================= */
 
 .info-box {
-    font-family: var(--font-mono);
     padding: 1rem 1.25rem;
     margin: 1.5rem 0;
-    border: var(--pixel-border) solid;
-    font-size: 0.85rem;
+    border-left: 3px solid;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    line-height: 1.7;
     position: relative;
+    background: rgba(255, 255, 255, 0.02);
 }
 
-.info-box::before {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    position: absolute;
-    top: -0.6rem;
-    left: 0.75rem;
-    padding: 0 0.5rem;
-    background: var(--bg);
+.info-box p {
+    margin: 0;
 }
 
 .info-box.note {
-    background: rgba(59, 130, 246, 0.05);
-    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.06);
+    border-left-color: #3b82f6;
     color: #93c5fd;
 }
 
-.info-box.note::before {
-    content: "[NOTE]";
-    color: #3b82f6;
-}
-
 .info-box.warning {
-    background: rgba(234, 179, 8, 0.05);
-    border-color: #eab308;
-    color: #fde047;
-}
-
-.info-box.warning::before {
-    content: "[WARN]";
-    color: #eab308;
+    background: rgba(234, 179, 8, 0.06);
+    border-left-color: #eab308;
+    color: #fde68a;
 }
 
 .info-box.tip {
-    background: rgba(0, 255, 136, 0.05);
-    border-color: var(--accent);
+    background: rgba(34, 197, 94, 0.06);
+    border-left-color: #22c55e;
     color: #86efac;
 }
 
-.info-box.tip::before {
-    content: "[TIP]";
-    color: var(--accent);
-}
-
 .info-box.danger {
-    background: var(--primary-dim);
-    border-color: var(--primary);
-    color: #fca5a5;
-}
-
-.info-box.danger::before {
-    content: "[ERROR]";
-    color: var(--primary);
+    background: rgba(176, 80, 80, 0.08);
+    border-left-color: var(--primary);
+    color: #f0a8a8;
 }
 
 /* =============================================================================
-   Section List with Card Style
+   Section List — Card Style
    ============================================================================= */
 
 ul.section-list {
     list-style: none;
     padding: 0;
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
     margin: 1.5rem 0;
 }
 
 ul.section-list li {
-    padding: 1rem 1.25rem;
+    padding: 0.875rem 1.125rem;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    border-radius: 8px;
     transition: all 0.15s ease;
     position: relative;
 }
 
-ul.section-list li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--primary);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
 ul.section-list li:hover {
     border-color: var(--border-light);
-    background: var(--bg-subtle);
-}
-
-ul.section-list li:hover::before {
-    opacity: 1;
+    background: var(--bg-hover);
 }
 
 ul.section-list li a {
-    font-family: var(--font-mono);
     font-weight: 500;
     color: var(--text);
     font-size: 0.9rem;
@@ -120,27 +79,54 @@ ul.section-list li a:hover {
 }
 
 /* =============================================================================
-   Footer with Terminal Style
+   Page List — Section index pages
+   ============================================================================= */
+
+ul.page-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+}
+
+ul.page-list li {
+    padding: 0.875rem 1.125rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+ul.page-list li:hover {
+    border-color: var(--border-light);
+    background: var(--bg-hover);
+}
+
+ul.page-list li a {
+    font-weight: 500;
+    color: var(--text);
+    font-size: 0.9rem;
+    border-bottom: none;
+}
+
+ul.page-list li a:hover {
+    color: var(--primary);
+}
+
+/* =============================================================================
+   Footer
    ============================================================================= */
 
 .docs-footer {
     margin-top: 4rem;
     padding-top: 1.5rem;
-    border-top: 1px dashed var(--border);
+    border-top: 1px solid var(--border);
     color: var(--text-dim);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-.docs-footer::before {
-    content: "// EOF";
-    position: absolute;
-    margin-top: -2.5rem;
-    color: var(--text-dim);
-    opacity: 0.3;
 }
 
 .docs-footer p {
@@ -150,6 +136,7 @@ ul.section-list li a:hover {
 .docs-footer a {
     color: var(--text-muted);
     border-bottom: none;
+    transition: color 0.15s ease;
 }
 
 .docs-footer a:hover {

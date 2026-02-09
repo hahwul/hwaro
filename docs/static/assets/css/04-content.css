@@ -3,95 +3,83 @@
    ============================================================================= */
 
 .docs-main > h1:first-child {
-  font-family: var(--font-mono);
-  font-size: 1.75rem;
-  margin: 0 0 0.5rem 0;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--text);
-}
-
-.docs-main > h1:first-child::before {
-  content: '$ ';
-  color: var(--primary);
-  opacity: 0.6;
-  font-weight: 400;
+    font-family: var(--font-sans);
+    font-size: 1.85rem;
+    margin: 0 0 0.75rem 0;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    line-height: 1.25;
 }
 
 .docs-main h1 {
-  font-family: var(--font-mono);
-  font-size: 1.5rem;
-  margin: 2.5rem 0 1rem 0;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+    font-family: var(--font-sans);
+    font-size: 1.6rem;
+    margin: 2.5rem 0 1rem 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
 }
 
 .docs-main h2 {
-  font-family: var(--font-mono);
-  font-size: 1.15rem;
-  margin: 2.5rem 0 1rem 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed var(--border);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-
-.docs-main h2::before {
-  content: '## ';
-  color: var(--primary);
-  opacity: 0.4;
-  font-size: 0.9em;
+    font-family: var(--font-sans);
+    font-size: 1.25rem;
+    margin: 2.5rem 0 0.75rem 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
 }
 
 .docs-main h3 {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  margin: 2rem 0 0.75rem 0;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.docs-main h3::before {
-  content: '### ';
-  color: var(--text-dim);
-  opacity: 0.4;
-  font-size: 0.85em;
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    margin: 2rem 0 0.6rem 0;
+    font-weight: 600;
+    color: var(--text);
 }
 
 .docs-main h4 {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  margin: 1.5rem 0 0.5rem 0;
-  font-weight: 600;
-  color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    margin: 1.5rem 0 0.5rem 0;
+    font-weight: 600;
+    color: var(--text-muted);
 }
 
 .docs-main p {
-  margin: 0 0 1rem 0;
-  color: var(--text-muted);
-  line-height: 1.8;
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+    line-height: 1.75;
 }
 
 .docs-main ul,
 .docs-main ol {
-  margin: 0 0 1rem 0;
-  padding-left: 1.5rem;
-  color: var(--text-muted);
+    margin: 0 0 1rem 0;
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
 }
 
 .docs-main li {
-  margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.7;
 }
 
 .docs-main li::marker {
-  color: var(--primary);
-  opacity: 0.6;
+    color: var(--text-dim);
 }
 
 .docs-main strong {
-  color: var(--text);
-  font-weight: 600;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.docs-main img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
 }
 
 /* =============================================================================
@@ -104,33 +92,35 @@
 .docs-main h4[id],
 .docs-main h5[id],
 .docs-main h6[id] {
-  position: relative;
-  scroll-margin-top: calc(var(--header-h) + 1rem);
+    position: relative;
+    scroll-margin-top: calc(var(--header-h) + 1.5rem);
 }
 
 .heading-anchor {
-  opacity: 0;
-  color: var(--text-dim);
-  text-decoration: none;
-  padding: 0.15rem 0.3rem;
-  margin-left: 0.5rem;
-  transition: all 0.1s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  border: 1px solid transparent;
+    opacity: 0;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 0.15rem 0.3rem;
+    margin-left: 0.4rem;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    border-radius: 4px;
+    border: 1px solid transparent;
 }
 
 .heading-anchor svg {
-  width: 14px;
-  height: 14px;
+    width: 14px;
+    height: 14px;
 }
 
 .heading-anchor:hover {
-  color: var(--primary);
-  border-color: var(--border);
-  background: var(--bg-subtle);
+    color: var(--primary);
+    border-color: var(--border);
+    background: var(--bg-hover);
+    border-bottom-color: var(--border);
 }
 
 .docs-main h1:hover .heading-anchor,
@@ -139,194 +129,171 @@
 .docs-main h4:hover .heading-anchor,
 .docs-main h5:hover .heading-anchor,
 .docs-main h6:hover .heading-anchor {
-  opacity: 1;
+    opacity: 1;
 }
 
 .heading-anchor.copied {
-  color: var(--accent);
-  border-color: var(--accent);
+    color: var(--success);
+    border-color: var(--success);
 }
 
 /* =============================================================================
-   Code Blocks with Terminal Style
+   Code Blocks
    ============================================================================= */
 
 .code-wrapper {
-  position: relative;
-  margin: 1rem 0 1.5rem 0;
+    position: relative;
+    margin: 1rem 0 1.5rem 0;
 }
 
 .code-wrapper pre {
-  margin: 0;
+    margin: 0;
 }
 
 .code-copy-btn {
-  font-family: var(--font-mono);
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  padding: 0.3rem 0.5rem;
-  cursor: pointer;
-  font-size: 0.65rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  opacity: 0;
-  transition: all 0.1s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+    font-family: var(--font-mono);
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    opacity: 0;
+    transition: all 0.15s ease;
+    border-radius: 6px;
 }
 
 .code-copy-btn svg {
-  width: 12px;
-  height: 12px;
+    width: 12px;
+    height: 12px;
 }
 
 .code-wrapper:hover .code-copy-btn {
-  opacity: 1;
+    opacity: 1;
 }
 
 .code-copy-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-  border-color: var(--border-light);
+    background: var(--bg-hover);
+    color: var(--text);
+    border-color: var(--border-light);
 }
 
 .code-copy-btn.copied {
-  color: var(--accent);
-  border-color: var(--accent);
+    color: var(--success);
+    border-color: var(--success);
 }
 
-/* Inline code with pixel style */
+/* Inline code */
 code {
-  font-family: var(--font-mono);
-  background: var(--code-bg);
-  padding: 0.2rem 0.45rem;
-  font-size: 0.85em;
-  color: var(--primary-hover);
-  border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    background: var(--bg-subtle);
+    padding: 0.15rem 0.4rem;
+    font-size: 0.85em;
+    color: var(--primary-light);
+    border: 1px solid var(--border);
+    border-radius: 5px;
 }
 
 pre {
-  font-family: var(--font-mono);
-  background: var(--code-bg);
-  padding: 1.25rem;
-  overflow-x: auto;
-  border: var(--pixel-border) solid var(--border);
-  margin: 1rem 0 1.5rem 0;
-  position: relative;
-}
-
-pre::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--primary), transparent);
-  opacity: 0.5;
+    font-family: var(--font-mono);
+    background: var(--code-bg);
+    padding: 1.25rem;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 1rem 0 1.5rem 0;
+    position: relative;
 }
 
 pre code {
-  background: none;
-  padding: 0;
-  color: var(--text);
-  border: none;
-  font-size: 0.8rem;
-  line-height: 1.6;
+    background: none;
+    padding: 0;
+    color: var(--text);
+    border: none;
+    border-radius: 0;
+    font-size: 0.8rem;
+    line-height: 1.65;
 }
 
 /* =============================================================================
-   Tables with Grid Style
+   Tables
    ============================================================================= */
 
 table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0 1.5rem 0;
-  font-size: 0.8rem;
-  font-family: var(--font-mono);
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem 0;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
 }
 
-th, td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  border: 1px solid var(--border);
+th,
+td {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
 }
 
 th {
-  background: var(--bg-subtle);
-  font-weight: 600;
-  color: var(--text);
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
+    background: var(--bg-elevated);
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
 }
 
 td {
-  color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 td code {
-  font-size: 0.75rem;
+    font-size: 0.8rem;
+}
+
+tr:last-child td {
+    border-bottom: none;
 }
 
 tr:hover td {
-  background: var(--bg-subtle);
+    background: var(--bg-hover);
 }
 
 /* =============================================================================
-   Blockquote with Terminal Style
+   Blockquote
    ============================================================================= */
 
 blockquote {
-  font-family: var(--font-mono);
-  margin: 1rem 0 1.5rem 0;
-  padding: 0.75rem 1.25rem;
-  border-left: 2px solid var(--primary);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  font-size: 0.9rem;
-  font-style: normal;
-}
-
-blockquote::before {
-  content: '>';
-  color: var(--primary);
-  margin-right: 0.5rem;
-  opacity: 0.5;
+    margin: 1rem 0 1.5rem 0;
+    padding: 0.75rem 1.25rem;
+    border-left: 3px solid var(--primary);
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    border-radius: 0 8px 8px 0;
+    font-style: normal;
 }
 
 blockquote p {
-  margin: 0;
-  display: inline;
+    margin: 0;
+}
+
+blockquote p + p {
+    margin-top: 0.5rem;
 }
 
 /* =============================================================================
-   HR with Pixel Style
+   Horizontal Rule
    ============================================================================= */
 
 hr {
-  border: none;
-  border-top: 1px dashed var(--border);
-  margin: 2rem 0;
-  position: relative;
-}
-
-hr::after {
-  content: '---';
-  font-family: var(--font-mono);
-  position: absolute;
-  top: -0.6rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg);
-  padding: 0 0.5rem;
-  color: var(--text-dim);
-  font-size: 0.7rem;
-  opacity: 0.5;
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
 }
