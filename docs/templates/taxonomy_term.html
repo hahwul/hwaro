@@ -1,7 +1,33 @@
-{% include "header.html" %}
-  <main class="site-main">
-    <h1>{{ page.title }}</h1>
-    <p class="taxonomy-desc">Posts tagged with this term:</p>
-    {{ content }}
-  </main>
+{% include "header.html" %} {% include "nav.html" %}
+<div class="docs-container">
+    <main class="docs-main no-toc" style="margin-left: 0; max-width: 100%">
+        <h1>{{ page.title }}</h1>
+        <p
+            class="taxonomy-desc"
+            style="color: var(--text-muted); margin-bottom: 1.5rem"
+        >
+            Posts tagged with this term:
+        </p>
+        {{ content }}
+        <footer class="docs-footer">
+            <p>
+                Built with
+                <a
+                    href="https://github.com/hahwul/hwaro"
+                    target="_blank"
+                    rel="noopener"
+                    >Hwaro</a
+                >
+            </p>
+            <p>
+                <a
+                    href="https://github.com/hahwul/hwaro"
+                    target="_blank"
+                    rel="noopener"
+                    >GitHub</a
+                >
+            </p>
+        </footer>
+    </main>
+</div>
 {% include "footer.html" %}

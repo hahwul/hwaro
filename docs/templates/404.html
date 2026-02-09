@@ -1,7 +1,73 @@
 {% include "header.html" %}
-  <main class="site-main">
-    <h1>404 Not Found</h1>
-    <p>The page you are looking for does not exist.</p>
-    <p><a href="{{ base_url }}/">Return to Home</a></p>
-  </main>
+<div class="docs-container">
+    <main
+        class="docs-main no-toc"
+        style="
+            margin-left: 0;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - var(--header-h) - 4rem);
+            text-align: center;
+        "
+    >
+        <div style="max-width: 420px">
+            <h1
+                style="
+                    font-size: 4rem;
+                    margin: 0 0 0.5rem;
+                    color: var(--text-dim);
+                    font-weight: 800;
+                    letter-spacing: -0.04em;
+                "
+            >
+                404
+            </h1>
+            <p
+                style="
+                    font-size: 1.15rem;
+                    color: var(--text-muted);
+                    margin: 0 0 1.5rem;
+                    line-height: 1.6;
+                "
+            >
+                The page you are looking for doesn't exist or has been moved.
+            </p>
+            <a
+                href="{{ base_url }}/"
+                style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    padding: 0.65rem 1.25rem;
+                    background: var(--primary-dim);
+                    color: var(--primary);
+                    border: 1px solid rgba(179, 84, 84, 0.3);
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    text-decoration: none;
+                    transition: all 0.2s ease;
+                "
+            >
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M8 1L1 8l7 7" />
+                    <path d="M1 8h14" />
+                </svg>
+                Back to Home
+            </a>
+        </div>
+    </main>
+</div>
 {% include "footer.html" %}
