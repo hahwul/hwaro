@@ -36,7 +36,7 @@ module Hwaro
           Services::Creator.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Config::Options::NewOptions
+        def parse_options(args : Array(String)) : Config::Options::NewOptions
           path = nil
           title = nil
           archetype = nil
