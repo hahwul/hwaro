@@ -18,7 +18,7 @@ module Hwaro
         end
       end
 
-      def self.print(site : Models::Site)
+      def self.print(site : Models::Site, io : IO = STDOUT)
         root = Node.new("root")
 
         # Build tree from pages
@@ -51,21 +51,21 @@ module Hwaro
           current.section = section
         end
 
-        puts "\nSite Structure (Debug):".colorize(:cyan).mode(:bold)
-        print_node(root, "", true)
-        puts ""
+        io.puts "\nSite Structure (Debug):".colorize(:cyan).mode(:bold)
+        print_node(root, "", true, io)
+        io.puts ""
       end
 
-      private def self.print_node(node : Node, prefix : String, is_root : Bool)
+      private def self.print_node(node : Node, prefix : String, is_root : Bool, io : IO)
         unless is_root
           # Determine label
           label = node.name
           if section = node.section
             label += " (Section: #{section.title})"
-            puts "#{prefix}#{label}".colorize(:blue).mode(:bold)
+            io.puts "#{prefix}#{label}".colorize(:blue).mode(:bold)
           else
             label += " (Dir)"
-            puts "#{prefix}#{label}".colorize(:blue)
+            io.puts "#{prefix}#{label}".colorize(:blue)
           end
         end
 
@@ -73,13 +73,13 @@ module Hwaro
 
         # Print pages
         node.pages.sort_by!(&.title).each do |page|
-          puts "#{indent}- #{page.title} (#{page.path})".colorize(:green)
+          io.puts "#{indent}- #{page.title} (#{page.path})".colorize(:green)
         end
 
         # Print children
         sorted_children = node.children.keys.sort
         sorted_children.each do |key|
-          print_node(node.children[key], indent, false)
+          print_node(node.children[key], indent, false, io)
         end
       end
     end
