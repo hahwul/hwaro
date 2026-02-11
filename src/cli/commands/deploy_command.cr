@@ -47,7 +47,7 @@ module Hwaro
           exit(1) unless ok
         end
 
-        private def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool}
+        def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool}
           source_dir = nil.as(String?)
           dry_run = nil.as(Bool?)
           confirm = nil.as(Bool?)
