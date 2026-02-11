@@ -28,7 +28,11 @@ module Hwaro
           end
 
           filename = File.basename(path)
-          full_path = path.starts_with?("content/") ? path : File.join("content", path)
+          if base_dir == "content/drafts"
+            full_path = File.join(base_dir, filename)
+          else
+            full_path = path.starts_with?("content/") ? path : File.join("content", path)
+          end
           base_dir = File.dirname(full_path)
         else
           base_dir = path || "content/drafts"
