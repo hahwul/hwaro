@@ -57,7 +57,7 @@ module Hwaro
           builder.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Config::Options::BuildOptions
+        def parse_options(args : Array(String)) : Config::Options::BuildOptions
           output_dir = "public"
           base_url = nil.as(String?)
           drafts = false
