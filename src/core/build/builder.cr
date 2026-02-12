@@ -38,6 +38,7 @@ require "../../models/toc"
 require "../../models/site"
 require "../lifecycle"
 require "../../utils/debug_printer"
+require "../../utils/path_utils"
 
 module Hwaro
   module Core
@@ -51,6 +52,13 @@ module Hwaro
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
         @crinja_env : Crinja?
+
+        # Regex constants for HTML minification
+        private REGEX_PRE_OPEN = /<pre([^>]*)>\s*<code/
+        private REGEX_PRE_CLOSE = /<\/code>\s*<\/pre>/
+        private REGEX_COMMENTS = /<!--(?!\[if|\s*more\s*-->).*?-->/m
+        private REGEX_BLANK_LINES = /\n{3,}/
+        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -625,7 +633,7 @@ module Hwaro
 
             # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
             clean_stem = if page.language
-                           stem.sub(/\.#{page.language}$/, "")
+                           stem.chomp(".#{page.language}")
                          else
                            stem
                          end
@@ -918,7 +926,7 @@ module Hwaro
 
         private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool)
           # Sanitize URL to prevent path traversal
-          url_path = sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
+          url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
           output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
 
           # Ensure output path is within output directory
@@ -932,19 +940,6 @@ module Hwaro
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, content)
           Logger.action :create, output_path if verbose
-        end
-
-        # Sanitize path to prevent directory traversal
-        # Uses Crystal's Path normalization and filters out unsafe components
-        private def sanitize_path(path : String) : String
-          # URL-decode the path first to handle encoded traversal attempts
-          decoded = URI.decode(path)
-          # Remove any parent directory references, null bytes, and normalize slashes
-          decoded
-            .gsub(/\.\./, "")       # Remove parent directory references
-            .gsub(/\0/, "")         # Remove null bytes
-            .gsub(/\/+/, "/")       # Normalize multiple slashes
-            .gsub(/^\/+|^\/+$/, "") # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
@@ -1587,7 +1582,7 @@ module Hwaro
           return args unless args_str
 
           # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/) do |match|
+          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
             key = match[1]
             value = match[2]? || match[3]? || match[4]? || ""
             args[key] = value
@@ -1628,18 +1623,15 @@ module Hwaro
           # This handles cases like: <pre>\n  <code>content</code>\n</pre>
           # Converting to: <pre><code>content</code></pre>
           cleaned = html
-            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
-            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")   # </code>\n</pre> -> </code></pre>
+            .gsub(REGEX_PRE_OPEN, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
+            .gsub(REGEX_PRE_CLOSE, "</code></pre>")   # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
           # Also preserve <!-- more --> markers used for content summaries
-          minified = cleaned.gsub(/<!--(?!\[if|\s*more\s*-->).*?-->/m, "")
-
-          # Remove trailing whitespace on each line
-          minified = minified.gsub(/[ \t]+$/, "")
+          minified = cleaned.gsub(REGEX_COMMENTS, "")
 
           # Collapse 3+ consecutive blank lines to 2
-          minified = minified.gsub(/\n{3,}/, "\n\n")
+          minified = minified.gsub(REGEX_BLANK_LINES, "\n\n")
 
           minified.strip
         end
