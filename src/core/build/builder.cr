@@ -419,13 +419,15 @@ module Hwaro
           end
         end
 
+        LANGUAGE_FILENAME_PATTERN = /^(.+)\.([a-z]{2,3})\.md$/
+
         # Extract language code from filename if it matches configured languages
         private def extract_language_from_filename(basename : String, config : Models::Config?) : String?
           return nil unless config
           return nil unless config.multilingual?
 
           # Match pattern: filename.lang.md (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
-          if match = basename.match(/^(.+)\.([a-z]{2,3})\.md$/)
+          if match = basename.match(LANGUAGE_FILENAME_PATTERN)
             lang_code = match[2]
             return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
           end
