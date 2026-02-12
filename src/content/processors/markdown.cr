@@ -435,9 +435,12 @@ module Hwaro
 
             # Iterate through h1-h6 tags
             body.xpath_nodes("//*[starts-with(name(), 'h') and string-length(name()) = 2]").each do |node|
-              next unless node.name =~ /^h[1-6]$/
+              # Optimization: Avoid regex for simple char check.
+              # XPath already ensures starts with 'h' and length 2.
+              c = node.name[1]
+              next unless c >= '1' && c <= '6'
 
-              level = node.name[1].to_i
+              level = c.to_i
               title = node.content
 
               # Generate ID
