@@ -82,6 +82,13 @@ module Hwaro
       # New: Ancestors - parent sections chain
       property ancestors : Array(Page)
 
+      # Regex constants for word count calculation
+      # Compile regexes once at startup instead of every time the method is called
+      REGEX_FRONT_MATTER    = /\A(\+\+\+|---)\s*\n.*?\n\1\s*\n/m
+      REGEX_HTML_TAGS       = /<[^>]+>/
+      REGEX_MARKDOWN_SYNTAX = /[#*_`\[\]()~>|]/
+      REGEX_WHITESPACE      = /\s+/
+
       def initialize(@path : String)
         @title = "Untitled"
         @draft = false
@@ -145,13 +152,13 @@ module Hwaro
       # Calculate word count from raw content (excluding front matter)
       def calculate_word_count : Int32
         # Remove front matter
-        content_only = @raw_content.gsub(/\A(\+\+\+|---)\s*\n.*?\n\1\s*\n/m, "")
+        content_only = @raw_content.gsub(REGEX_FRONT_MATTER, "")
         # Remove HTML tags
-        content_only = content_only.gsub(/<[^>]+>/, " ")
+        content_only = content_only.gsub(REGEX_HTML_TAGS, " ")
         # Remove markdown syntax elements
-        content_only = content_only.gsub(/[#*_`\[\]()~>|]/, " ")
+        content_only = content_only.gsub(REGEX_MARKDOWN_SYNTAX, " ")
         # Split by whitespace and count non-empty words
-        words = content_only.split(/\s+/).reject(&.empty?)
+        words = content_only.split(REGEX_WHITESPACE).reject(&.empty?)
         @word_count = words.size
         @word_count
       end
