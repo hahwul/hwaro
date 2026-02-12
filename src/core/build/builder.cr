@@ -52,6 +52,11 @@ module Hwaro
         @profiler : Profiler?
         @crinja_env : Crinja?
 
+        # Regex constants for HTML minification
+        private REGEX_PRE_OPEN = /<pre([^>]*)>\s*<code/
+        private REGEX_PRE_CLOSE = /<\/code>\s*<\/pre>/
+        private REGEX_COMMENTS = /<!--(?!\[if|\s*more\s*-->).*?-->/m
+        private REGEX_BLANK_LINES = /\n{3,}/
         SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
 
         def initialize
@@ -1630,18 +1635,15 @@ module Hwaro
           # This handles cases like: <pre>\n  <code>content</code>\n</pre>
           # Converting to: <pre><code>content</code></pre>
           cleaned = html
-            .gsub(/<pre([^>]*)>\s*<code/, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
-            .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")   # </code>\n</pre> -> </code></pre>
+            .gsub(REGEX_PRE_OPEN, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
+            .gsub(REGEX_PRE_CLOSE, "</code></pre>")   # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
           # Also preserve <!-- more --> markers used for content summaries
-          minified = cleaned.gsub(/<!--(?!\[if|\s*more\s*-->).*?-->/m, "")
-
-          # Remove trailing whitespace on each line
-          minified = minified.gsub(/[ \t]+$/, "")
+          minified = cleaned.gsub(REGEX_COMMENTS, "")
 
           # Collapse 3+ consecutive blank lines to 2
-          minified = minified.gsub(/\n{3,}/, "\n\n")
+          minified = minified.gsub(REGEX_BLANK_LINES, "\n\n")
 
           minified.strip
         end
