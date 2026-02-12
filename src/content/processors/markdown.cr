@@ -21,6 +21,9 @@ module Hwaro
     module Processors
       # Markdown processor implementation
       class Markdown < Base
+        # Regex for matching h1-h6 tags with IDs to insert anchor links
+        ANCHOR_LINK_REGEX = /<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m
+
         def name : String
           "markdown"
         end
@@ -390,7 +393,7 @@ module Hwaro
           result = html
 
           # Match h1-h6 tags with id attributes and insert anchor links
-          result = result.gsub(/<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m) do |match|
+          result = result.gsub(ANCHOR_LINK_REGEX) do |match|
             tag = $1
             attrs = $2
             id = $3
