@@ -40,7 +40,7 @@ module Hwaro
           Services::Initializer.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Config::Options::InitOptions
+        def parse_options(args : Array(String)) : Config::Options::InitOptions
           path = "."
           force = false
           skip_agents_md = false
