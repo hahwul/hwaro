@@ -43,6 +43,13 @@ module Hwaro
   module Core
     module Build
       class Builder
+        # Regex constants for shortcode processing
+        private SHORTCODE_BLOCK_REGEX = /\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m
+        private SHORTCODE_INLINE_REGEX = /\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/
+        private SHORTCODE_DIRECT_REGEX = /\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/
+        private SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+        private SHORTCODE_PLACEHOLDER_REGEX = /HWARO-SHORTCODE-PLACEHOLDER-\d+/
+
         @site : Models::Site?
         @templates : Hash(String, String)?
         @cache : Cache?
@@ -1516,7 +1523,7 @@ module Hwaro
         end
 
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil) : String
-          processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
+          processed = content.gsub(SHORTCODE_BLOCK_REGEX) do |match|
             name = $1
             args_str = $2
             body = $3.strip
@@ -1539,7 +1546,7 @@ module Hwaro
             end
           end
 
-          processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
+          processed = processed.gsub(SHORTCODE_INLINE_REGEX) do |match|
             name = $1
             args_str = $2?
 
@@ -1560,7 +1567,7 @@ module Hwaro
             end
           end
 
-          processed = processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
+          processed = processed.gsub(SHORTCODE_DIRECT_REGEX) do |match|
             name = $1
             args_str = $2
 
@@ -1587,7 +1594,7 @@ module Hwaro
           return args unless args_str
 
           # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/) do |match|
+          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
             key = match[1]
             value = match[2]? || match[3]? || match[4]? || ""
             args[key] = value
@@ -1615,7 +1622,7 @@ module Hwaro
         # Replace shortcode placeholders with their rendered HTML content
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
-          html.gsub(/HWARO-SHORTCODE-PLACEHOLDER-\d+/) do |match|
+          html.gsub(SHORTCODE_PLACEHOLDER_REGEX) do |match|
             shortcode_results[match]? || match
           end
         end
