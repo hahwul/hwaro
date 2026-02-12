@@ -39,6 +39,13 @@ module Hwaro
       YAML_DELIMITER = "---"
       TOML_DELIMITER = "+++"
 
+      private enum ConversionStatus
+        Converted
+        Skipped
+        Failed
+        Error
+      end
+
       # Content directory path
       @content_dir : String
 
@@ -68,18 +75,23 @@ module Hwaro
 
       # Convert a single file's frontmatter
       def convert_file(file_path : String, target_format : FrontmatterFormat) : Bool
+        status = convert_file_with_status(file_path, target_format, log_skipped: true)
+        status == ConversionStatus::Converted
+      end
+
+      private def convert_file_with_status(file_path : String, target_format : FrontmatterFormat, log_skipped : Bool = true) : ConversionStatus
         content = File.read(file_path)
         current_format = detect_format(content)
 
         # Skip if already in target format or unknown format
         if current_format == target_format
-          Logger.info "  Skipped (already #{target_format}): #{file_path}"
-          return false
+          Logger.info "  Skipped (already #{target_format}): #{file_path}" if log_skipped
+          return ConversionStatus::Skipped
         end
 
         if current_format == FrontmatterFormat::Unknown
-          Logger.warn "  Skipped (no frontmatter): #{file_path}"
-          return false
+          Logger.warn "  Skipped (no frontmatter): #{file_path}" if log_skipped
+          return ConversionStatus::Skipped
         end
 
         converted_content = convert_content(content, current_format, target_format)
@@ -87,14 +99,14 @@ module Hwaro
         if converted_content
           File.write(file_path, converted_content)
           Logger.success "  Converted: #{file_path}"
-          true
+          ConversionStatus::Converted
         else
           Logger.error "  Failed to convert: #{file_path}"
-          false
+          ConversionStatus::Failed
         end
       rescue ex
         Logger.error "  Error converting #{file_path}: #{ex.message}"
-        false
+        ConversionStatus::Error
       end
 
       private def convert_files(target_format : FrontmatterFormat) : ConversionResult
@@ -114,32 +126,14 @@ module Hwaro
         Logger.info ""
 
         find_content_files.each do |file_path|
-          content = File.read(file_path)
-          current_format = detect_format(content)
+          status = convert_file_with_status(file_path, target_format, log_skipped: false)
 
-          if current_format == target_format
+          case status
+          when ConversionStatus::Converted
+            converted += 1
+          when ConversionStatus::Skipped
             skipped += 1
-            next
-          end
-
-          if current_format == FrontmatterFormat::Unknown
-            skipped += 1
-            next
-          end
-
-          begin
-            converted_content = convert_content(content, current_format, target_format)
-
-            if converted_content
-              File.write(file_path, converted_content)
-              Logger.success "  Converted: #{file_path}"
-              converted += 1
-            else
-              Logger.error "  Failed: #{file_path}"
-              errors += 1
-            end
-          rescue ex
-            Logger.error "  Error: #{file_path} - #{ex.message}"
+          when ConversionStatus::Failed, ConversionStatus::Error
             errors += 1
           end
         end
