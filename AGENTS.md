@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Hwaro is a fast and lightweight static site generator written in Crystal. It provides a flexible, extensible architecture for building static websites with support for markdown content, templates, SEO features, and lifecycle hooks.
+Hwaro is a fast and lightweight static site generator written in Crystal. It provides a flexible, extensible architecture for building static websites with support for markdown content, templates, SEO features, multilingual support, deployment, and lifecycle hooks.
 
 ## Core Architecture
 
@@ -11,20 +11,24 @@ Hwaro is a fast and lightweight static site generator written in Crystal. It pro
 ```
 src/
 ├── cli/              # Command-line interface and command registry
-│   └── commands/     # Individual CLI commands (init, build, serve, new)
+│   └── commands/     # Individual CLI commands (init, build, serve, new, deploy, tool)
+│       └── tool/     # Tool subcommands (convert, list, check)
 ├── config/           # Configuration loading and options
-│   └── options/      # Command option structs
+│   └── options/      # Command option structs (build, serve, init, new, deploy)
 ├── content/          # Content processing domain
-│   ├── hooks/        # Lifecycle hook implementations
-│   ├── pagination/   # Content pagination logic
-│   ├── processors/   # Content processors (markdown, html, etc.)
-│   └── seo/          # SEO generators (sitemap, feeds, robots, llms)
+│   ├── hooks/        # Lifecycle hook implementations (markdown, seo, taxonomy)
+│   ├── pagination/   # Content pagination logic (paginator, renderer)
+│   ├── processors/   # Content processors (markdown, html, json, xml, template, etc.)
+│   └── seo/          # SEO generators (sitemap, feeds, robots, llms, tags)
 ├── core/             # Core build orchestration
 │   ├── build/        # Builder, cache, and parallel processing
-│   └── lifecycle/    # Lifecycle management system
-├── models/           # Data structures (config, page, site, section, toc)
-├── services/         # Non-build features (init, new, serve)
-└── utils/            # Utility modules (logger, command_runner, etc.)
+│   └── lifecycle/    # Lifecycle management system (manager, hooks, phases, context)
+├── models/           # Data structures (config, page, site, section, toc, deployment)
+├── services/         # Non-build features
+│   ├── defaults/     # Default file generators (agents_md, config, content, templates)
+│   ├── scaffolds/    # Project scaffolding (base, simple, blog, docs, registry)
+│   └── server/       # Development server
+└── utils/            # Utility modules (logger, command_runner, profiler, debug_printer, sort_utils, text_utils)
 ```
 
 ### Key Architectural Patterns
@@ -46,6 +50,10 @@ src/
 3. **Command Registry Pattern**: CLI commands use a registry system for dynamic command management, supporting potential plugin-based command extensions.
 
 4. **Builder Pattern**: The main builder (`src/core/build/builder.cr`) orchestrates content collection, template rendering, and parallel processing with caching.
+
+5. **Scaffold Registry Pattern**: Project scaffolds use a registry pattern for managing available scaffold types (simple, blog, docs). See `src/services/scaffolds/registry.cr`.
+
+6. **Build Context Pattern**: A `BuildContext` object (`src/core/lifecycle/context.cr`) carries shared state across the entire build lifecycle, including pages, sections, raw files, templates, metadata, and build statistics.
 
 ## Code Style & Conventions
 
@@ -93,7 +101,7 @@ shards install
 # Build the project
 shards build
 
-# Run tests (when available)
+# Run tests
 crystal spec
 ```
 
@@ -178,6 +186,19 @@ end
 
 When you modify `FLAGS` in any command file, the shell completion scripts automatically reflect the changes.
 
+##### Tool Subcommands
+
+To add a new tool subcommand:
+
+1. Create a new file in `src/cli/commands/tool/`
+2. Follow the same metadata pattern as regular commands
+3. Register in `ToolCommand.subcommands` and `run` method in `src/cli/commands/tool_command.cr`
+
+Existing tool subcommands:
+- `convert` - Convert frontmatter between YAML and TOML formats
+- `list` - List content files by status (all, drafts, published)
+- `check` - Check for dead links in content files
+
 #### 3. Lifecycle Hooks
 
 To add new hooks:
@@ -194,6 +215,7 @@ SEO-related features live in `src/content/seo/`:
 - `sitemap.cr` - Sitemap XML generation
 - `robots.cr` - Robots.txt generation
 - `llms.cr` - LLM instructions file generator for AI/LLM crawler instructions
+- `tags.cr` - Canonical URL and hreflang tag generation for multilingual sites
 
 #### 5. Search Feature
 
@@ -445,6 +467,13 @@ Page object (with boolean properties):
 - `{{ page.draft }}` - Is draft (boolean)
 - `{{ page.toc }}` - Show TOC (boolean)
 - `{{ page.is_index }}`, `{{ page.render }}`, `{{ page.generated }}`, `{{ page.in_sitemap }}`
+- `{{ page.word_count }}` - Word count of the content
+- `{{ page.reading_time }}` - Estimated reading time in minutes
+- `{{ page.permalink }}` - Absolute URL with base_url
+- `{{ page.summary }}` - Content summary (before `<!-- more -->` marker)
+- `{{ page.authors }}` - List of author names
+- `{{ page.language }}` - Language code (for multilingual sites)
+- `{{ page.translations }}` - List of translation links
 
 Site variables:
 - `{{ site_title }}`, `{{ site_description }}`, `{{ base_url }}`
@@ -599,6 +628,249 @@ Shortcode arguments support:
 - `src/core/build/builder.cr` - Template rendering in `apply_template()` method, shortcode processing in `process_shortcodes_jinja()`
 - Templates are loaded from `templates/` directory with FileSystemLoader
 
+#### 13. Deployment
+
+Hwaro includes a built-in deployment system for publishing built sites to various targets.
+
+**CLI Usage:**
+```bash
+# Deploy to default target
+hwaro deploy
+
+# Deploy to specific target(s)
+hwaro deploy prod staging
+
+# Deploy with options
+hwaro deploy --dry-run --confirm
+hwaro deploy --force --max-deletes -1
+
+# List configured targets
+hwaro deploy --list-targets
+```
+
+**Configuration in `config.toml`:**
+```toml
+[deployment]
+confirm = false           # Ask for confirmation before deploying
+dry_run = false            # Show changes without writing
+force = false              # Force upload (ignore file comparisons)
+max_deletes = 256          # Maximum number of deletes (-1 to disable limit)
+source_dir = "public"      # Source directory to deploy
+
+[[deployment.targets]]
+name = "prod"
+url = "file:///var/www/mysite"   # Local directory deployment
+
+[[deployment.targets]]
+name = "staging"
+url = "s3://my-bucket"
+command = "aws s3 sync {source}/ {url} --delete"  # Custom command deployment
+```
+
+**Implementation details:**
+- `src/services/deployer.cr` - Core deployment logic with directory sync, file comparison, and command execution
+- `src/models/deployment.cr` - `DeploymentConfig`, `DeploymentTarget`, `DeploymentMatcher` models
+- `src/config/options/deploy_options.cr` - Deploy command options
+- `src/cli/commands/deploy_command.cr` - Deploy CLI command
+
+**Deploy target types:**
+- **Local directory** (`file://` or plain path) - File-by-file sync with MD5 comparison
+- **Custom command** - Execute arbitrary shell commands with placeholder expansion (`{source}`, `{url}`, `{target}`)
+
+**Target options:**
+- `name` - Target identifier
+- `url` - Destination URL or path
+- `command` - Custom deploy command (overrides URL-based deployment)
+- `include` - Glob pattern for files to include
+- `exclude` - Glob pattern for files to exclude
+- `strip_index_html` - Remove `index.html` from paths (for object stores)
+
+**Safety features:**
+- `max_deletes` limit prevents accidental mass deletion
+- `--confirm` flag for interactive confirmation
+- `--dry-run` shows planned changes without writing
+- Source/destination overlap detection
+- Environment variables set for custom commands: `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL`, `HWARO_DEPLOY_SOURCE`
+
+#### 14. Multilingual Support (i18n)
+
+Hwaro supports building multilingual sites with translation linking and language-specific features.
+
+**Configuration in `config.toml`:**
+```toml
+default_language = "en"
+
+[languages.ko]
+language_name = "한국어"
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = ["tags", "categories"]
+
+[languages.ja]
+language_name = "日本語"
+weight = 3
+```
+
+**Content structure:**
+```
+content/
+├── posts/
+│   ├── hello.md       # Default language (en)
+│   ├── hello.ko.md    # Korean translation
+│   └── hello.ja.md    # Japanese translation
+```
+
+**Implementation details:**
+- `src/content/multilingual.cr` - Translation key generation, language detection, translation linking
+- `src/content/seo/tags.cr` - Canonical URLs and hreflang tag generation
+- `src/models/config.cr` - `LanguageConfig` class, `multilingual?`, `sorted_languages` methods
+- `src/models/page.cr` - `language`, `translations` properties, `TranslationLink` struct
+
+**Key functions:**
+- `Multilingual.translation_key` - Derives a canonical key from a page path (strips language suffix)
+- `Multilingual.link_translations!` - Links translated pages to each other
+- `Multilingual.language_code` - Determines the language code for a page
+- `Seo::Tags.canonical_tag` - Generates `<link rel="canonical">` tag
+- `Seo::Tags.hreflang_tags` - Generates `<link rel="alternate" hreflang="...">` tags
+
+**Template variables for multilingual:**
+- `{{ page.language }}` - Current page language code
+- `{{ page.translations }}` - Array of `TranslationLink` objects with `code`, `url`, `title`, `is_current`, `is_default`
+
+**Init with multilingual:**
+```bash
+hwaro init --include-multilingual en,ko,ja
+```
+
+#### 15. Scaffolds
+
+Scaffolds provide pre-configured project templates for `hwaro init`. Three scaffold types are available:
+
+- **simple** (default) - Basic pages structure with homepage and about page
+- **blog** - Blog-focused structure with posts, archives, and taxonomies
+- **docs** - Documentation-focused structure with organized sections and sidebar
+
+**Usage:**
+```bash
+hwaro init mysite --scaffold blog
+hwaro init mysite --scaffold docs
+hwaro init mysite  # defaults to simple
+```
+
+**Implementation details:**
+- `src/services/scaffolds/base.cr` - Abstract base class defining scaffold interface
+- `src/services/scaffolds/simple.cr` - Simple scaffold implementation
+- `src/services/scaffolds/blog.cr` - Blog scaffold implementation
+- `src/services/scaffolds/docs.cr` - Documentation scaffold implementation
+- `src/services/scaffolds/registry.cr` - Registry for scaffold management
+- `src/config/options/init_options.cr` - `ScaffoldType` enum and `InitOptions`
+
+**Base scaffold provides:**
+- Common templates (header, footer, page, section, 404, taxonomy)
+- Base CSS styles
+- Navigation template
+- Config sections (plugins, pagination, content files, highlight, OG, search, sitemap, robots, llms, taxonomies, feeds, auto includes, markdown, build hooks, deployment)
+
+#### 16. Content Files Publishing
+
+Non-Markdown files in the `content/` directory can be automatically published to the output directory.
+
+**Configuration in `config.toml`:**
+```toml
+[content.files]
+allow_extensions = [".jpg", ".png", ".gif", ".svg", ".pdf"]
+disallow_extensions = [".psd", ".ai"]
+disallow_paths = ["drafts/**"]
+```
+
+**Implementation details:**
+- `src/models/config.cr` - `ContentFilesConfig` class with `publish?` method
+- `src/content/processors/content_files.cr` - Content file publishing helper module
+- Files are copied preserving their directory structure: `content/about/photo.jpg` → `/about/photo.jpg`
+- Extension normalization ensures consistent matching (with or without leading dot)
+- Path normalization strips `content/` prefix and normalizes separators
+
+#### 17. Syntax Highlighting
+
+Code syntax highlighting with configurable themes via highlight.js.
+
+**Configuration in `config.toml`:**
+```toml
+[highlight]
+enabled = true
+theme = "github-dark"      # highlight.js theme name
+use_cdn = true             # Use CDN for highlight.js assets
+```
+
+**Implementation details:**
+- `src/models/config.cr` - `HighlightConfig` class with `css_tag()`, `js_tag()`, `tags()` methods
+- `src/content/processors/syntax_highlighter.cr` - Integrates highlighting into markdown processing
+
+**Template variables:**
+- `{{ highlight_css }}` - CSS link tag for highlight.js theme
+- `{{ highlight_js }}` - JavaScript script tag for highlight.js
+- `{{ highlight_tags }}` - Both CSS and JS tags combined
+
+#### 18. Tool Commands
+
+The `hwaro tool` command provides utility subcommands for content management.
+
+**Frontmatter Converter (`hwaro tool convert`):**
+```bash
+hwaro tool convert toYAML              # Convert all frontmatter to YAML
+hwaro tool convert toTOML              # Convert all frontmatter to TOML
+hwaro tool convert toYAML -c posts     # Convert in specific directory
+```
+
+Implementation:
+- `src/services/frontmatter_converter.cr` - `FrontmatterConverter` class with YAML↔TOML conversion
+- `src/cli/commands/tool/convert_command.cr` - CLI command
+
+**Content Lister (`hwaro tool list`):**
+```bash
+hwaro tool list all                    # List all content files
+hwaro tool list drafts                 # List only draft files
+hwaro tool list published              # List only published files
+hwaro tool list all -c posts           # List in specific directory
+```
+
+Implementation:
+- `src/services/content_lister.cr` - `ContentLister` class with filtering and formatted display
+- `src/cli/commands/tool/list_command.cr` - CLI command
+
+**Dead Link Checker (`hwaro tool check`):**
+```bash
+hwaro tool check                       # Check all external links in content/
+```
+
+Implementation:
+- `src/cli/commands/tool/check_command.cr` - Finds external URLs in markdown files and checks them concurrently using HEAD requests
+
+#### 19. Build Profiling & Debug
+
+**Build Profiler:**
+
+The `--profile` flag shows detailed timing information for each build phase.
+
+```bash
+hwaro build --profile
+```
+
+Implementation:
+- `src/utils/profiler.cr` - `Profiler` class with phase timing, bar chart rendering, and formatted report output
+
+**Debug Printer:**
+
+The `--debug` flag prints site structure information after build.
+
+```bash
+hwaro build --debug
+```
+
+Implementation:
+- `src/utils/debug_printer.cr` - `DebugPrinter` module that renders a tree view of the site structure (sections, pages, paths)
+
 ### Configuration
 
 Configuration is managed through TOML files (`config.toml`). The structure is defined in `src/models/config.cr` with support for:
@@ -610,7 +882,12 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Build hooks (pre/post build commands)
 - Auto includes (automatic CSS/JS loading)
 - OpenGraph & Twitter Cards (social sharing meta tags)
-- Markdown parser options (safe mode)
+- Markdown parser options (safe mode, lazy loading)
+- Syntax highlighting configuration
+- Content files publishing
+- Pagination settings
+- Multilingual / language configuration
+- Deployment targets and options
 
 #### Markdown Configuration
 
@@ -618,16 +895,18 @@ The `[markdown]` section controls markdown parsing behavior:
 
 ```toml
 [markdown]
-safe = false    # If true, raw HTML in markdown will be stripped (replaced by comments)
+safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
+lazy_loading = false  # If true, adds loading="lazy" to img tags
 ```
 
 Options mapped from [markd](https://github.com/icyleaf/markd):
 - `safe` (Bool, default: false) - If true, raw HTML will not be passed through to HTML output (replaced by `<!-- raw HTML omitted -->` comments)
+- `lazy_loading` (Bool, default: false) - If true, `loading="lazy"` attribute is added to `<img>` tags for performance
 
 Implementation:
 - `src/models/config.cr` - `MarkdownConfig` class
 - `src/content/processors/syntax_highlighter.cr` - Passes options to `Markd::Options`
-- `src/core/build/builder.cr` - `render_page()` uses config's markdown.safe option
+- `src/core/build/builder.cr` - `render_page()` uses config's markdown options
 
 #### GFM Table Support
 
@@ -690,30 +969,31 @@ The project is designed with extensibility in mind:
 
 2. **Future Extension Points**:
    - Template engine plugins
-   - Custom shortcodes
    - Build optimization plugins
-   - Deployment adapters
    - Custom SEO generators
    - Search engine backends
    - Asset pipeline processors
 
-5. **User-defined Build Hooks**: Run custom shell commands before/after builds:
+3. **User-defined Build Hooks**: Run custom shell commands before/after builds:
    - Pre-build hooks for setup tasks (dependency installation, preprocessing)
    - Post-build hooks for deployment and optimization
    - Implemented in `src/utils/command_runner.cr`
 
-3. **Parallel Processing**: The builder supports parallel content processing with caching for performance optimization
+4. **Parallel Processing**: The builder supports parallel content processing with caching for performance optimization
 
-4. **Caching System**: Implemented in `src/core/build/cache.cr` for build optimization:
+5. **Caching System**: Implemented in `src/core/build/cache.cr` for build optimization:
    - File-based caching to skip unchanged content
    - Cache invalidation based on file modification times
    - Configurable cache enabling/disabling
 
 ## Testing
 
-- Tests are located in `spec/` directory
+- Tests are organized in `spec/` directory with subdirectories:
+  - `spec/unit/` - Unit tests for individual modules and classes
+  - `spec/functional/` - Functional/integration tests (asset colocation, CLI, site vars)
+  - `spec/content/` - Content processing tests (SEO, etc.)
+- Top-level test files: `spec/hwaro_spec.cr`, `spec/lifecycle_spec.cr`, `spec/spec_helper.cr`
 - Follow Crystal's testing conventions with `crystal spec`
-- Main test files: `hwaro_spec.cr`, `lifecycle_spec.cr`
 - Use descriptive test names and organize tests logically
 
 ## Common Patterns
@@ -722,25 +1002,34 @@ The project is designed with extensibility in mind:
 
 - Use Crystal's exception system
 - Provide meaningful error messages through the Logger
-- Return result objects for operations that can fail gracefully (e.g., `ProcessorResult`)
+- Return result objects for operations that can fail gracefully (e.g., `ProcessorResult`, `ConversionResult`)
 
 ### Logging
 
 - Use the `Logger` utility from `src/utils/logger.cr`
-- Levels: `Logger.info`, `Logger.error`, `Logger.success`, `Logger.debug`, `Logger.action`
+- Levels: `Logger.info`, `Logger.error`, `Logger.success`, `Logger.debug`, `Logger.action`, `Logger.warn`, `Logger.progress`
 - `Logger.action` for file operations (conditionally shown based on verbose flag)
+- `Logger.progress` for progress indicators during deploy and other bulk operations
 - Keep user-facing messages clear and actionable
 
 ### Type Safety
 
 - Leverage Crystal's strong type system
 - Use explicit type annotations for public APIs
-- Define structs for data transfer objects (e.g., `ProcessorContext`, `ProcessorResult`)
-- Use enums for fixed sets of options (e.g., `Phase`, `HookPoint`, `HookResult`)
+- Define structs for data transfer objects (e.g., `ProcessorContext`, `ProcessorResult`, `BuildStats`, `ContentInfo`)
+- Use enums for fixed sets of options (e.g., `Phase`, `HookPoint`, `HookResult`, `ScaffoldType`, `ContentFilter`, `FrontmatterFormat`)
+
+### Utility Modules
+
+- `src/utils/sort_utils.cr` - Reusable page sorting utilities (`sort_by_date`, `sort_by_title`, `sort_by_weight`, `sort_pages`)
+- `src/utils/text_utils.cr` - Common text operations (`slugify`, `escape_xml`, `strip_html`)
+- `src/utils/command_runner.cr` - Shell command execution utility
+- `src/utils/profiler.cr` - Build phase timing and reporting
+- `src/utils/debug_printer.cr` - Site structure tree visualization
 
 ## Dependencies
 
-Current external dependencies:
+Current external dependencies (Crystal >= 1.19.0):
 - `markd` - Markdown parsing
 - `toml` - TOML configuration parsing
 - `crinja` - Jinja2 template engine
@@ -755,16 +1044,44 @@ Common CLI options across commands:
 
 Build-specific options:
 - `-o DIR, --output-dir DIR` - Output directory (default: public)
+- `--base-url URL` - Override base_url from config.toml
 - `-d, --drafts` - Include draft content
 - `--minify` - Minify HTML output (and minified json, xml)
 - `--no-parallel` - Disable parallel file processing
 - `--cache` - Enable build caching
 - `--skip-highlighting` - Disable syntax highlighting
+- `--profile` - Show build timing profile for each phase
+- `--debug` - Print debug information after build
 
 Serve-specific options:
 - `-b HOST, --bind HOST` - Bind address (default: 0.0.0.0)
 - `-p PORT, --port PORT` - Port to listen on (default: 3000)
+- `--base-url URL` - Override base_url from config.toml
+- `-d, --drafts` - Include draft content
+- `--minify` - Minify HTML output (and minified json, xml)
 - `--open` - Open browser after starting server
+- `--debug` - Print debug information after build
+
+Init-specific options:
+- `-f, --force` - Force creation even if directory is not empty
+- `--scaffold TYPE` - Scaffold type: simple, blog, docs (default: simple)
+- `--skip-agents-md` - Skip creating AGENTS.md file
+- `--skip-sample-content` - Skip creating sample content files
+- `--skip-taxonomies` - Skip taxonomies configuration and templates
+- `--include-multilingual LANGS` - Enable multilingual support (e.g., en,ko)
+
+Deploy-specific options:
+- `-s DIR, --source DIR` - Source directory to deploy (default: deployment.source_dir or public)
+- `--dry-run` - Show planned changes without writing
+- `--confirm` - Ask for confirmation before deploying
+- `--force` - Force upload/copy (ignore file comparisons)
+- `--max-deletes N` - Maximum number of deletes (default: 256, -1 disables)
+- `--list-targets` - List configured deployment targets and exit
+
+Tool subcommands:
+- `hwaro tool convert <toYAML|toTOML>` - Convert frontmatter format
+- `hwaro tool list <all|drafts|published>` - List content files by status
+- `hwaro tool check` - Check for dead links in content files
 
 Completion command:
 - `hwaro completion bash` - Generate bash completion script
@@ -788,13 +1105,15 @@ hwaro completion fish | source
 - The builder uses caching to avoid reprocessing unchanged content
 - Parallel processing is implemented for content generation
 - File watching in serve mode for automatic rebuilds
+- Build profiling available via `--profile` flag for performance analysis
 - Be mindful of I/O operations and consider batching when possible
+- Deployment uses MD5 comparison to skip unchanged files
 
 ## Contributing
 
 When contributing:
 1. Follow the established code style and patterns
-2. Add tests for new features
+2. Add tests for new features (in appropriate `spec/` subdirectory)
 3. Update documentation as needed
 4. Consider backward compatibility
 5. Think about extensibility for future features
@@ -805,17 +1124,15 @@ When contributing:
 Areas with room for expansion:
 - Enhanced plugin system with dynamic loading
 - More content processors (AsciiDoc, reStructuredText, etc.)
-- Template engine alternatives (beyond ECR)
+- Template engine alternatives
 - Advanced caching strategies
 - Asset pipeline (CSS/JS processing, minification)
 - Incremental builds optimization
 - Live reload improvements
 - Theme system
 - Content management helpers
-- Deployment integrations
-- Multi-language support (i18n)
 - Advanced search backends (beyond Fuse.js)
 - Custom taxonomy types
-- Content internationalization (i18n)
 - Image processing and optimization
 - API endpoints for dynamic content
+- Remote deployment targets (S3, GCS, Azure Blob via native support)
