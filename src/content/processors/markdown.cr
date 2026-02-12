@@ -21,6 +21,14 @@ module Hwaro
     module Processors
       # Markdown processor implementation
       class Markdown < Base
+        # Regex for matching h1-h6 tags with IDs to insert anchor links
+        ANCHOR_LINK_REGEX = /<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m
+        # Regex for TOML front matter
+        TOML_FRONT_MATTER_REGEX = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m
+
+        # Regex for YAML front matter
+        YAML_FRONT_MATTER_REGEX = /\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m
+
         def name : String
           "markdown"
         end
@@ -100,7 +108,7 @@ module Hwaro
           weight = 0
 
           # Try TOML Front Matter (+++)
-          if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
+          if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
             begin
               toml_fm = TOML.parse(match[1])
               title = toml_fm["title"]?.try(&.as_s) || title
@@ -193,7 +201,7 @@ module Hwaro
             end
             markdown_content = match[2]
             # Try YAML Front Matter (---)
-          elsif match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+          elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
             begin
               yaml_fm = YAML.parse(match[1])
               if yaml_fm.as_h?
@@ -390,7 +398,7 @@ module Hwaro
           result = html
 
           # Match h1-h6 tags with id attributes and insert anchor links
-          result = result.gsub(/<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m) do |match|
+          result = result.gsub(ANCHOR_LINK_REGEX) do |match|
             tag = $1
             attrs = $2
             id = $3
@@ -435,9 +443,12 @@ module Hwaro
 
             # Iterate through h1-h6 tags
             body.xpath_nodes("//*[starts-with(name(), 'h') and string-length(name()) = 2]").each do |node|
-              next unless node.name =~ /^h[1-6]$/
+              # Optimization: Avoid regex for simple char check.
+              # XPath already ensures starts with 'h' and length 2.
+              c = node.name[1]
+              next unless c >= '1' && c <= '6'
 
-              level = node.name[1].to_i
+              level = c.to_i
               title = node.content
 
               # Generate ID
