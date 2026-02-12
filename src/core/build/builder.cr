@@ -43,6 +43,8 @@ module Hwaro
   module Core
     module Build
       class Builder
+        TEMPLATE_EXTENSION_REGEX = /\.(html|j2|jinja2|jinja|ecr)$/
+
         @site : Models::Site?
         @templates : Hash(String, String)?
         @cache : Cache?
@@ -678,7 +680,7 @@ module Hwaro
             extensions.each do |ext|
               Dir.glob("templates/**/*.#{ext}") do |path|
                 relative = Path[path].relative_to("templates")
-                name = relative.to_s.gsub(/\.(html|j2|jinja2|jinja|ecr)$/, "")
+                name = relative.to_s.gsub(TEMPLATE_EXTENSION_REGEX, "")
                 # Don't overwrite if already loaded (priority: html > j2 > jinja2 > jinja > ecr)
                 templates[name] ||= File.read(path)
               end
