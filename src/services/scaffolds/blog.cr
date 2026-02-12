@@ -202,71 +202,72 @@ module Hwaro
         end
 
         # Content files
-        private def index_content(skip_taxonomies : Bool) : String
-          if skip_taxonomies
-            <<-CONTENT
-+++
-title = "Home"
-+++
-
-# Welcome to My Blog
-
-This is a blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
-
-Check out the latest posts in the [Posts](/posts/) section.
-CONTENT
-          else
-            <<-CONTENT
-+++
-title = "Home"
-tags = ["home"]
-+++
-
-# Welcome to My Blog
-
-This is a blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
-
-Check out the latest posts in the [Posts](/posts/) section, or browse by:
-
-- [Tags](/tags/)
-- [Categories](/categories/)
-- [Authors](/authors/)
-CONTENT
+        private def render_page(
+          title : String,
+          body : String,
+          skip_taxonomies : Bool,
+          date : String? = nil,
+          description : String? = nil,
+          tags : Array(String)? = nil,
+          categories : Array(String)? = nil,
+          authors : Array(String)? = nil
+        ) : String
+          String.build do |str|
+            str << "+++\n"
+            str << "title = \"#{title}\"\n"
+            str << "date = \"#{date}\"\n" if date
+            unless skip_taxonomies
+              str << "tags = #{tags.inspect}\n" if tags
+              str << "categories = #{categories.inspect}\n" if categories
+              str << "authors = #{authors.inspect}\n" if authors
+            end
+            str << "description = \"#{description}\"\n" if description
+            str << "+++\n\n"
+            str << body
           end
         end
 
-        private def about_content(skip_taxonomies : Bool) : String
-          if skip_taxonomies
-            <<-CONTENT
-+++
-title = "About"
-+++
+        private def index_content(skip_taxonomies : Bool) : String
+          body = String.build do |str|
+            str << "# Welcome to My Blog\n\n"
+            str << "This is a blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.\n\n"
 
-# About Me
-
-Welcome to my blog! I write about technology, programming, and other interesting topics.
-
-## Contact
-
-Feel free to reach out through social media or email.
-CONTENT
-          else
-            <<-CONTENT
-+++
-title = "About"
-tags = ["about"]
-categories = ["pages"]
-+++
-
-# About Me
-
-Welcome to my blog! I write about technology, programming, and other interesting topics.
-
-## Contact
-
-Feel free to reach out through social media or email.
-CONTENT
+            if skip_taxonomies
+              str << "Check out the latest posts in the [Posts](/posts/) section.\n"
+            else
+              str << "Check out the latest posts in the [Posts](/posts/) section, or browse by:\n\n"
+              str << "- [Tags](/tags/)\n"
+              str << "- [Categories](/categories/)\n"
+              str << "- [Authors](/authors/)\n"
+            end
           end
+
+          render_page(
+            title: "Home",
+            body: body,
+            skip_taxonomies: skip_taxonomies,
+            tags: ["home"]
+          )
+        end
+
+        private def about_content(skip_taxonomies : Bool) : String
+          body = <<-BODY
+          # About Me
+
+          Welcome to my blog! I write about technology, programming, and other interesting topics.
+
+          ## Contact
+
+          Feel free to reach out through social media or email.
+          BODY
+
+          render_page(
+            title: "About",
+            body: body,
+            skip_taxonomies: skip_taxonomies,
+            tags: ["about"],
+            categories: ["pages"]
+          )
         end
 
         private def posts_index_content : String
@@ -284,244 +285,134 @@ CONTENT
         end
 
         private def sample_post_1(skip_taxonomies : Bool) : String
-          if skip_taxonomies
-            <<-CONTENT
-+++
-title = "Hello World"
-date = "2024-01-15"
-description = "My first blog post using Hwaro static site generator."
-+++
+          body = <<-BODY
+          # Hello World
 
-# Hello World
+          Welcome to my first blog post! This blog is powered by Hwaro, a fast and lightweight static site generator written in Crystal.
 
-Welcome to my first blog post! This blog is powered by Hwaro, a fast and lightweight static site generator written in Crystal.
+          ## Why Hwaro?
 
-## Why Hwaro?
+          Hwaro offers a simple yet powerful way to create static websites:
 
-Hwaro offers a simple yet powerful way to create static websites:
+          - **Fast**: Built with Crystal for blazing fast build times
+          - **Simple**: Easy to understand directory structure
+          - **Flexible**: Supports custom templates and shortcodes
 
-- **Fast**: Built with Crystal for blazing fast build times
-- **Simple**: Easy to understand directory structure
-- **Flexible**: Supports custom templates and shortcodes
+          Stay tuned for more posts!
+          BODY
 
-Stay tuned for more posts!
-CONTENT
-          else
-            <<-CONTENT
-+++
-title = "Hello World"
-date = "2024-01-15"
-tags = ["introduction", "hello"]
-categories = ["general"]
-authors = ["admin"]
-description = "My first blog post using Hwaro static site generator."
-+++
-
-# Hello World
-
-Welcome to my first blog post! This blog is powered by Hwaro, a fast and lightweight static site generator written in Crystal.
-
-## Why Hwaro?
-
-Hwaro offers a simple yet powerful way to create static websites:
-
-- **Fast**: Built with Crystal for blazing fast build times
-- **Simple**: Easy to understand directory structure
-- **Flexible**: Supports custom templates and shortcodes
-
-Stay tuned for more posts!
-CONTENT
-          end
+          render_page(
+            title: "Hello World",
+            body: body,
+            skip_taxonomies: skip_taxonomies,
+            date: "2024-01-15",
+            description: "My first blog post using Hwaro static site generator.",
+            tags: ["introduction", "hello"],
+            categories: ["general"],
+            authors: ["admin"]
+          )
         end
 
         private def sample_post_2(skip_taxonomies : Bool) : String
-          if skip_taxonomies
-            <<-CONTENT
-+++
-title = "Getting Started with Hwaro"
-date = "2024-01-20"
-description = "A beginner's guide to building websites with Hwaro."
-+++
+          body = <<-BODY
+          # Getting Started with Hwaro
 
-# Getting Started with Hwaro
+          In this post, I'll walk you through the basics of setting up and using Hwaro.
 
-In this post, I'll walk you through the basics of setting up and using Hwaro.
+          ## Installation
 
-## Installation
+          First, make sure you have Crystal installed. Then:
 
-First, make sure you have Crystal installed. Then:
+          ```bash
+          git clone https://github.com/hahwul/hwaro
+          cd hwaro
+          shards build
+          ```
 
-```bash
-git clone https://github.com/hahwul/hwaro
-cd hwaro
-shards build
-```
+          ## Creating Your First Site
 
-## Creating Your First Site
+          ```bash
+          hwaro init my-blog --scaffold blog
+          cd my-blog
+          hwaro serve
+          ```
 
-```bash
-hwaro init my-blog --scaffold blog
-cd my-blog
-hwaro serve
-```
+          That's it! Your blog is now running at `http://localhost:3000`.
 
-That's it! Your blog is now running at `http://localhost:3000`.
+          ## Next Steps
 
-## Next Steps
+          - Customize your templates in the `templates/` directory
+          - Add new posts in `content/posts/`
+          - Configure your site in `config.toml`
+          BODY
 
-- Customize your templates in the `templates/` directory
-- Add new posts in `content/posts/`
-- Configure your site in `config.toml`
-CONTENT
-          else
-            <<-CONTENT
-+++
-title = "Getting Started with Hwaro"
-date = "2024-01-20"
-tags = ["tutorial", "getting-started", "hwaro"]
-categories = ["tutorials"]
-authors = ["admin"]
-description = "A beginner's guide to building websites with Hwaro."
-+++
-
-# Getting Started with Hwaro
-
-In this post, I'll walk you through the basics of setting up and using Hwaro.
-
-## Installation
-
-First, make sure you have Crystal installed. Then:
-
-```bash
-git clone https://github.com/hahwul/hwaro
-cd hwaro
-shards build
-```
-
-## Creating Your First Site
-
-```bash
-hwaro init my-blog --scaffold blog
-cd my-blog
-hwaro serve
-```
-
-That's it! Your blog is now running at `http://localhost:3000`.
-
-## Next Steps
-
-- Customize your templates in the `templates/` directory
-- Add new posts in `content/posts/`
-- Configure your site in `config.toml`
-CONTENT
-          end
+          render_page(
+            title: "Getting Started with Hwaro",
+            body: body,
+            skip_taxonomies: skip_taxonomies,
+            date: "2024-01-20",
+            description: "A beginner's guide to building websites with Hwaro.",
+            tags: ["tutorial", "getting-started", "hwaro"],
+            categories: ["tutorials"],
+            authors: ["admin"]
+          )
         end
 
         private def sample_post_3(skip_taxonomies : Bool) : String
-          if skip_taxonomies
-            <<-CONTENT
-+++
-title = "Markdown Tips and Tricks"
-date = "2024-01-25"
-description = "Learn useful Markdown formatting techniques for your blog posts."
-+++
+          body = <<-BODY
+          # Markdown Tips and Tricks
 
-# Markdown Tips and Tricks
+          Hwaro uses Markdown for content. Here are some useful formatting tips.
 
-Hwaro uses Markdown for content. Here are some useful formatting tips.
+          ## Text Formatting
 
-## Text Formatting
+          - **Bold text** using `**bold**`
+          - *Italic text* using `*italic*`
+          - `Inline code` using backticks
 
-- **Bold text** using `**bold**`
-- *Italic text* using `*italic*`
-- `Inline code` using backticks
+          ## Code Blocks
 
-## Code Blocks
+          Use triple backticks for code blocks:
 
-Use triple backticks for code blocks:
+          ```crystal
+          puts "Hello from Crystal!"
+          ```
 
-```crystal
-puts "Hello from Crystal!"
-```
+          ## Lists
 
-## Lists
+          Ordered lists:
+          1. First item
+          2. Second item
+          3. Third item
 
-Ordered lists:
-1. First item
-2. Second item
-3. Third item
+          Unordered lists:
+          - Item one
+          - Item two
+          - Item three
 
-Unordered lists:
-- Item one
-- Item two
-- Item three
+          ## Links and Images
 
-## Links and Images
+          - [Link text](https://example.com)
+          - ![Alt text](/path/to/image.jpg)
 
-- [Link text](https://example.com)
-- ![Alt text](/path/to/image.jpg)
+          ## Blockquotes
 
-## Blockquotes
+          > This is a blockquote.
+          > It can span multiple lines.
 
-> This is a blockquote.
-> It can span multiple lines.
+          Happy writing!
+          BODY
 
-Happy writing!
-CONTENT
-          else
-            <<-CONTENT
-+++
-title = "Markdown Tips and Tricks"
-date = "2024-01-25"
-tags = ["markdown", "writing", "tips"]
-categories = ["tutorials"]
-authors = ["admin"]
-description = "Learn useful Markdown formatting techniques for your blog posts."
-+++
-
-# Markdown Tips and Tricks
-
-Hwaro uses Markdown for content. Here are some useful formatting tips.
-
-## Text Formatting
-
-- **Bold text** using `**bold**`
-- *Italic text* using `*italic*`
-- `Inline code` using backticks
-
-## Code Blocks
-
-Use triple backticks for code blocks:
-
-```crystal
-puts "Hello from Crystal!"
-```
-
-## Lists
-
-Ordered lists:
-1. First item
-2. Second item
-3. Third item
-
-Unordered lists:
-- Item one
-- Item two
-- Item three
-
-## Links and Images
-
-- [Link text](https://example.com)
-- ![Alt text](/path/to/image.jpg)
-
-## Blockquotes
-
-> This is a blockquote.
-> It can span multiple lines.
-
-Happy writing!
-CONTENT
-          end
+          render_page(
+            title: "Markdown Tips and Tricks",
+            body: body,
+            skip_taxonomies: skip_taxonomies,
+            date: "2024-01-25",
+            description: "Learn useful Markdown formatting techniques for your blog posts.",
+            tags: ["markdown", "writing", "tips"],
+            categories: ["tutorials"],
+            authors: ["admin"]
+          )
         end
 
         private def archives_content : String
