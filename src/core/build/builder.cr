@@ -57,6 +57,7 @@ module Hwaro
         private REGEX_PRE_CLOSE = /<\/code>\s*<\/pre>/
         private REGEX_COMMENTS = /<!--(?!\[if|\s*more\s*-->).*?-->/m
         private REGEX_BLANK_LINES = /\n{3,}/
+        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -631,7 +632,7 @@ module Hwaro
 
             # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
             clean_stem = if page.language
-                           stem.sub(/\.#{page.language}$/, "")
+                           stem.chomp(".#{page.language}")
                          else
                            stem
                          end
@@ -1593,7 +1594,7 @@ module Hwaro
           return args unless args_str
 
           # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/) do |match|
+          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
             key = match[1]
             value = match[2]? || match[3]? || match[4]? || ""
             args[key] = value

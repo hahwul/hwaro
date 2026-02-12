@@ -21,6 +21,12 @@ module Hwaro
     module Processors
       # Markdown processor implementation
       class Markdown < Base
+        # Regex for TOML front matter
+        TOML_FRONT_MATTER_REGEX = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m
+
+        # Regex for YAML front matter
+        YAML_FRONT_MATTER_REGEX = /\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m
+
         def name : String
           "markdown"
         end
@@ -100,7 +106,7 @@ module Hwaro
           weight = 0
 
           # Try TOML Front Matter (+++)
-          if match = raw_content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
+          if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
             begin
               toml_fm = TOML.parse(match[1])
               title = toml_fm["title"]?.try(&.as_s) || title
@@ -193,7 +199,7 @@ module Hwaro
             end
             markdown_content = match[2]
             # Try YAML Front Matter (---)
-          elsif match = raw_content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+          elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
             begin
               yaml_fm = YAML.parse(match[1])
               if yaml_fm.as_h?
