@@ -625,7 +625,7 @@ module Hwaro
 
             # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
             clean_stem = if page.language
-                           stem.sub(/\.#{page.language}$/, "")
+                           stem.chomp(".#{page.language}")
                          else
                            stem
                          end
