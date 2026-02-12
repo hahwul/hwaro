@@ -52,6 +52,8 @@ module Hwaro
         @profiler : Profiler?
         @crinja_env : Crinja?
 
+        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+
         def initialize
           @lifecycle = Lifecycle::Manager.new
         end
@@ -1587,7 +1589,7 @@ module Hwaro
           return args unless args_str
 
           # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(/(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/) do |match|
+          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
             key = match[1]
             value = match[2]? || match[3]? || match[4]? || ""
             args[key] = value
