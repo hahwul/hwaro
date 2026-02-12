@@ -38,6 +38,7 @@ require "../../models/toc"
 require "../../models/site"
 require "../lifecycle"
 require "../../utils/debug_printer"
+require "../../utils/path_utils"
 
 module Hwaro
   module Core
@@ -918,7 +919,7 @@ module Hwaro
 
         private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool)
           # Sanitize URL to prevent path traversal
-          url_path = sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
+          url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
           output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
 
           # Ensure output path is within output directory
@@ -932,19 +933,6 @@ module Hwaro
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, content)
           Logger.action :create, output_path if verbose
-        end
-
-        # Sanitize path to prevent directory traversal
-        # Uses Crystal's Path normalization and filters out unsafe components
-        private def sanitize_path(path : String) : String
-          # URL-decode the path first to handle encoded traversal attempts
-          decoded = URI.decode(path)
-          # Remove any parent directory references, null bytes, and normalize slashes
-          decoded
-            .gsub(/\.\./, "")       # Remove parent directory references
-            .gsub(/\0/, "")         # Remove null bytes
-            .gsub(/\/+/, "/")       # Normalize multiple slashes
-            .gsub(/^\/+|^\/+$/, "") # Strip leading/trailing slashes
         end
 
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
