@@ -44,8 +44,7 @@ module Hwaro
           end
 
           if title.empty?
-            Logger.error "Title cannot be empty."
-            exit(1)
+            raise "Title cannot be empty."
           end
 
           filename = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-") + ".md"
@@ -67,8 +66,7 @@ module Hwaro
                   end
 
         if File.exists?(full_path)
-          Logger.error "File already exists: #{full_path}"
-          exit(1)
+          raise "File already exists: #{full_path}"
         end
 
         File.write(full_path, content)
@@ -83,8 +81,7 @@ module Hwaro
             Logger.debug "Using archetype: #{archetype_path}"
             return File.read(archetype_path)
           else
-            Logger.error "Archetype not found: #{archetype_path}"
-            exit(1)
+            raise "Archetype not found: #{archetype_path}"
           end
         end
 
