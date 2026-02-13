@@ -379,6 +379,69 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
   end
+
+  describe "error handling" do
+    it "handles file read errors gracefully" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "non_existent.md")
+
+        # Should return false and not raise exception
+        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result.should be_false
+      end
+    end
+
+    it "handles file write errors gracefully" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "readonly.md")
+
+        # Create a file with YAML frontmatter
+        File.write(file_path, "---\ntitle: Test\n---\n\nContent")
+
+        # Make it read-only
+        File.chmod(file_path, 0o400)
+
+        begin
+          # Attempt to convert to TOML
+          result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+          result.should be_false
+        ensure
+          # Restore permissions so it can be cleaned up
+          File.chmod(file_path, 0o600)
+        end
+      end
+    end
+
+    it "reports errors correctly in batch conversion" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        # Create one good file
+        good_file = File.join(content_dir, "good.md")
+        File.write(good_file, "---\ntitle: Good\n---\n\nGood content")
+
+        # Create one bad file (read-only)
+        bad_file = File.join(content_dir, "bad.md")
+        File.write(bad_file, "---\ntitle: Bad\n---\n\nBad content")
+        File.chmod(bad_file, 0o400)
+
+        converter = Hwaro::Services::FrontmatterConverter.new(content_dir)
+
+        begin
+          result = converter.convert_to_toml
+
+          result.success.should be_false
+          result.converted_count.should eq(1) # The good file
+          result.error_count.should eq(1)     # The bad file
+        ensure
+          File.chmod(bad_file, 0o600)
+        end
+      end
+    end
+  end
 end
 
 describe Hwaro::Services::FrontmatterFormat do
