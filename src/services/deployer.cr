@@ -19,8 +19,8 @@ module Hwaro
         end
       end
 
-      def run(options : Config::Options::DeployOptions) : Bool
-        config = Models::Config.load
+      def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
+        config ||= Models::Config.load
         deployment = config.deployment
 
         source_dir = options.source_dir || deployment.source_dir
