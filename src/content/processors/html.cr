@@ -54,7 +54,7 @@ module Hwaro
           minified = cleaned.gsub(/<!--(?!\[if|\s*more\s*-->).*?-->/m, "")
 
           # Remove trailing whitespace on each line
-          minified = minified.gsub(/[ \t]+$/, "")
+          minified = minified.gsub(/[ \t]+$/m, "")
 
           # Collapse 3+ consecutive blank lines to 2
           minified = minified.gsub(/\n{3,}/, "\n\n")
