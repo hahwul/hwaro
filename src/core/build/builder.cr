@@ -1062,8 +1062,11 @@ module Hwaro
 
           # Hidden variables for get_page/get_section/get_taxonomy functions
           # These are prefixed with __ to indicate they're internal
-          all_pages_array = site.pages.map do |p|
-            Crinja::Value.new({
+          all_pages_array = [] of Crinja::Value
+          pages_by_path = {} of String => Crinja::Value
+
+          site.pages.each do |p|
+            page_val = Crinja::Value.new({
               "path"         => Crinja::Value.new(p.path),
               "title"        => Crinja::Value.new(p.title),
               "description"  => Crinja::Value.new(p.description || ""),
@@ -1076,8 +1079,21 @@ module Hwaro
               "word_count"   => Crinja::Value.new(p.word_count),
               "reading_time" => Crinja::Value.new(p.reading_time),
             })
+            all_pages_array << page_val
+
+            # Build O(1) lookup map
+            # Use ||= to preserve first-match behavior (consistent with linear search)
+            pages_by_path[p.path] ||= page_val
+            pages_by_path[p.url] ||= page_val
+
+            # Handle URL without trailing slash for flexible matching
+            if p.url.ends_with?("/") && p.url.size > 1
+              pages_by_path[p.url.rstrip("/")] ||= page_val
+            end
           end
+
           vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
+          vars["__pages_by_path__"] = Crinja::Value.new(pages_by_path)
 
           all_sections_array = site.sections.map do |s|
             section_pages = s.pages.map do |sp|
