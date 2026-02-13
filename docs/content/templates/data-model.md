@@ -43,6 +43,8 @@ The root container. Configured in `config.toml`.
 | site.pages | Array<Page> | All non-section pages |
 | site.sections | Array<Section> | All section index pages |
 | site.taxonomies | Object | All taxonomy groups and terms |
+| site.data | Object | Data loaded from `data/` directory |
+| site.authors | Object | Aggregated author data |
 
 ### Flat Aliases
 
@@ -51,6 +53,92 @@ The root container. Configured in `config.toml`.
 | site_title | site.title |
 | site_description | site.description |
 | base_url | site.base_url |
+
+### Data Directory
+
+Hwaro allows you to store auxiliary data in the `data/` directory. Files ending in `.yml`, `.yaml`, `.json`, or `.toml` are automatically loaded and exposed via `site.data`.
+
+#### File Structure
+
+```text
+data/
+├── authors.yml
+├── products.json
+└── config.toml
+```
+
+#### Accessing Data
+
+Data is accessed by the filename (without extension).
+
+For example, `data/products.json`:
+
+```json
+[
+  {"name": "Widget", "price": 10},
+  {"name": "Gadget", "price": 20}
+]
+```
+
+Can be accessed in templates:
+
+```jinja
+{% for product in site.data.products %}
+  <h2>{{ product.name }}</h2>
+  <p>{{ product.price }}</p>
+{% endfor %}
+```
+
+### Site Authors
+
+Hwaro automatically aggregates all authors defined in the `authors` front matter field (`authors = ["id"]`) into `site.authors`.
+
+#### Defining Authors
+
+You can enrich author data by creating a `data/authors.yml` (or `.json`, `.toml`) file. Keys must match the author IDs used in the page front matter.
+
+**content/my-post.md**
+
+```yaml
+---
+title: "My Post"
+authors: ["john-doe"]
+---
+```
+
+**data/authors.yml**
+
+```yaml
+john-doe:
+  name: "John Doe"
+  bio: "Creator of things."
+  avatar: "/images/john.jpg"
+```
+
+#### Usage in Templates
+
+The `site.authors` object contains all authors found on the site. Each author object has:
+- `key`: The author ID (e.g., "john-doe")
+- `name`: The author name (from data or ID fallback)
+- `pages`: List of pages by this author (sorted by date)
+- Any custom fields from `data/authors.yml`
+
+```jinja
+{% for id, author in site.authors %}
+  <div class="author">
+    <img src="{{ author.avatar }}" alt="{{ author.name }}">
+    <h3>{{ author.name }}</h3>
+    <p>{{ author.bio }}</p>
+
+    <h4>Recent Posts</h4>
+    <ul>
+    {% for p in author.pages %}
+      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    {% endfor %}
+    </ul>
+  </div>
+{% endfor %}
+```
 
 ### Example
 

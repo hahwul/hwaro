@@ -1,3 +1,4 @@
+require "crinja"
 require "./config"
 require "./page"
 require "./section"
@@ -10,6 +11,10 @@ module Hwaro
       property sections : Array(Section)
       property taxonomies : Hash(String, Hash(String, Array(Page)))
 
+      # New properties for data and authors
+      property data : Hash(String, Crinja::Value)
+      property authors : Hash(String, Crinja::Value)
+
       # Lookup indices for performance
       property pages_by_section : Hash(String, Array(Page))
       property sections_by_parent : Hash(String, Array(Section))
@@ -20,6 +25,9 @@ module Hwaro
         @pages = [] of Page
         @sections = [] of Section
         @taxonomies = {} of String => Hash(String, Array(Page))
+
+        @data = {} of String => Crinja::Value
+        @authors = {} of String => Crinja::Value
 
         @pages_by_section = {} of String => Array(Page)
         @sections_by_parent = {} of String => Array(Section)

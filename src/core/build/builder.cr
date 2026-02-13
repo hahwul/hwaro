@@ -12,6 +12,7 @@
 require "file_utils"
 require "set"
 require "toml"
+require "json"
 require "uri"
 require "crinja"
 require "./cache"
@@ -209,6 +210,8 @@ module Hwaro
               config.base_url = override unless override.empty?
             end
             @site = Models::Site.new(config)
+            load_data_files(@site.not_nil!)
+
             @config = config
             ctx.site = @site
             ctx.config = config
@@ -265,6 +268,8 @@ module Hwaro
           # Populate site with pages and sections from context
           site.pages = ctx.pages
           site.sections = ctx.sections
+
+          aggregate_site_authors(site)
 
           # Build optimized lookup indices
           site.build_lookup_index
@@ -418,6 +423,228 @@ module Hwaro
               next unless Content::Processors::ContentFiles.publish?(relative_path, config)
               add_raw_file.call(file_path)
             end
+          end
+        end
+
+        # Load data files from data/ directory
+        private def load_data_files(site : Models::Site)
+          site.data.clear
+
+          return unless Dir.exists?("data")
+
+          Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
+            next if File.directory?(path)
+
+            relative_path = Path[path].relative_to("data")
+            key = relative_path.stem
+            ext = relative_path.extension.downcase
+
+            content = File.read(path)
+
+            begin
+              value = case ext
+                      when ".yml", ".yaml"
+                        if parsed = YAML.parse(content)
+                          to_crinja(parsed)
+                        else
+                          Crinja::Value.new(nil)
+                        end
+                      when ".json"
+                         if parsed = JSON.parse(content)
+                           to_crinja(parsed)
+                         else
+                           Crinja::Value.new(nil)
+                         end
+                      when ".toml"
+                         if parsed = TOML.parse(content)
+                           to_crinja(parsed)
+                         else
+                           Crinja::Value.new(nil)
+                         end
+                      else
+                        Crinja::Value.new(nil)
+                      end
+
+              site.data[key] = value
+              Logger.debug "Loaded data file: #{path} as site.data.#{key}"
+            rescue ex
+              Logger.warn "Failed to parse data file #{path}: #{ex.message}"
+            end
+          end
+        end
+
+        # Aggregate authors from pages and data
+        private def aggregate_site_authors(site : Models::Site)
+          site.authors.clear
+
+          # Temporary storage to build author data
+          temp_authors = {} of String => NamedTuple(
+            name: String,
+            pages: Array(Models::Page),
+            extra: Hash(String, Crinja::Value)
+          )
+
+          # 1. Collect authors from all pages
+          site.pages.each do |page|
+             page.authors.each do |author_id|
+               # Normalize ID: lower case, stripped
+               id = author_id.strip.downcase
+
+               unless temp_authors.has_key?(id)
+                 temp_authors[id] = {
+                   name: author_id, # Default name is the ID as it appeared first
+                   pages: [] of Models::Page,
+                   extra: {} of String => Crinja::Value
+                 }
+               end
+               temp_authors[id][:pages] << page
+             end
+          end
+
+          # 2. Enrich with data from site.data["authors"]
+          # We expect site.data["authors"] to be a Hash(String, Crinja::Value)
+          # where keys match author IDs
+          if authors_data = site.data["authors"]?
+            temp_authors.each_key do |id|
+               # Crinja::Value#[] returns generic Value
+               author_info = authors_data[id]
+
+               # Check if it has data
+               next if author_info.raw.nil?
+
+               if info_hash = author_info.raw.as?(Hash(Crinja::Value, Crinja::Value))
+                  info_hash.each do |k_val, v|
+                     k = k_val.to_s
+                     if k == "name"
+                        current = temp_authors[id]
+                        temp_authors[id] = {
+                          name: v.to_s,
+                          pages: current[:pages],
+                          extra: current[:extra]
+                        }
+                     else
+                        temp_authors[id][:extra][k] = v
+                     end
+                  end
+               elsif info_hash = author_info.raw.as?(Hash(String, Crinja::Value))
+                  info_hash.each do |k, v|
+                     if k == "name"
+                        current = temp_authors[id]
+                        temp_authors[id] = {
+                          name: v.to_s,
+                          pages: current[:pages],
+                          extra: current[:extra]
+                        }
+                     else
+                        temp_authors[id][:extra][k] = v
+                     end
+                  end
+               end
+            end
+          end
+
+          # 3. Convert to Crinja Values and store in site.authors
+          temp_authors.each do |id, data|
+             # Sort pages by date descending
+             sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
+
+             page_values = sorted_pages.map do |p|
+                Crinja::Value.new({
+                  "title" => Crinja::Value.new(p.title),
+                  "url"   => Crinja::Value.new(p.url),
+                  "date"  => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                  "description" => Crinja::Value.new(p.description || "")
+                })
+             end
+
+             # Construct the final author object
+             author_hash = {} of String => Crinja::Value
+             author_hash["key"] = Crinja::Value.new(id)
+             author_hash["name"] = Crinja::Value.new(data[:name])
+             author_hash["pages"] = Crinja::Value.new(page_values)
+
+             # Merge extra data
+             data[:extra].each do |k, v|
+               author_hash[k] = v
+             end
+
+             site.authors[id] = Crinja::Value.new(author_hash)
+          end
+        end
+
+        private def to_crinja(value : YAML::Any) : Crinja::Value
+          if arr = value.as_a?
+            Crinja::Value.new(arr.map { |v| to_crinja(v) })
+          elsif h = value.as_h?
+            converted = {} of String => Crinja::Value
+            h.each do |k, v|
+              converted[k.as_s] = to_crinja(v)
+            end
+            Crinja::Value.new(converted)
+          elsif s = value.as_s?
+            Crinja::Value.new(s)
+          elsif i = value.as_i64?
+            Crinja::Value.new(i)
+          elsif f = value.as_f?
+            Crinja::Value.new(f)
+          elsif b = value.as_bool?
+            Crinja::Value.new(b)
+          else
+            Crinja::Value.new(nil)
+          end
+        end
+
+        private def to_crinja(value : Hash(String, TOML::Any)) : Crinja::Value
+           converted = {} of String => Crinja::Value
+           value.each do |k, v|
+             converted[k] = to_crinja(v)
+           end
+           Crinja::Value.new(converted)
+        end
+
+        private def to_crinja(value : TOML::Any) : Crinja::Value
+           if arr = value.as_a?
+            Crinja::Value.new(arr.map { |v| to_crinja(v) })
+          elsif h = value.as_h?
+            converted = {} of String => Crinja::Value
+            h.each do |k, v|
+              converted[k] = to_crinja(v)
+            end
+            Crinja::Value.new(converted)
+          elsif s = value.as_s?
+            Crinja::Value.new(s)
+          elsif i = value.as_i?
+            Crinja::Value.new(i.to_i64)
+          elsif f = value.as_f?
+            Crinja::Value.new(f)
+          elsif b = value.as_bool?
+            Crinja::Value.new(b)
+          elsif (t = value.raw).is_a?(Time)
+            Crinja::Value.new(t.to_s)
+          else
+            Crinja::Value.new(nil)
+          end
+        end
+
+        private def to_crinja(value : JSON::Any) : Crinja::Value
+          if arr = value.as_a?
+            Crinja::Value.new(arr.map { |v| to_crinja(v) })
+          elsif h = value.as_h?
+            converted = {} of String => Crinja::Value
+            h.each do |k, v|
+              converted[k] = to_crinja(v)
+            end
+            Crinja::Value.new(converted)
+          elsif s = value.as_s?
+            Crinja::Value.new(s)
+          elsif i = value.as_i64?
+            Crinja::Value.new(i)
+          elsif f = value.as_f?
+            Crinja::Value.new(f)
+          elsif b = value.as_bool?
+            Crinja::Value.new(b)
+          else
+            Crinja::Value.new(nil)
           end
         end
 
@@ -1149,6 +1376,8 @@ module Hwaro
             "pages"       => Crinja::Value.new(all_pages_array),
             "sections"    => Crinja::Value.new(all_sections_array),
             "taxonomies"  => Crinja::Value.new(taxonomies_hash),
+            "data"        => Crinja::Value.new(site.data),
+            "authors"     => Crinja::Value.new(site.authors),
           }
           vars["site"] = Crinja::Value.new(site_obj)
 
