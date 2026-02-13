@@ -497,19 +497,36 @@ module Hwaro
           #        {{ about.title }}
           @env.functions["get_page"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
-            pages_val = env.resolve("__all_pages__")
 
+            # Optimised O(1) lookup
+            pages_map = env.resolve("__pages_by_path__")
+            if !pages_map.raw.nil? && pages_map.raw.is_a?(Hash)
+              raw_map = pages_map.raw.as(Hash)
+              if found = raw_map[path_arg]?
+                return found
+              elsif found = raw_map["/#{path_arg.chomp(".md")}/"]?
+                return found
+              end
+              # If map is present but page not found, return nil (miss)
+              # This avoids falling back to linear search on miss when we have the index.
+              return Crinja::Value.new(nil)
+            end
+
+            # Fallback to linear search O(N) if map is not available
+            pages_val = env.resolve("__all_pages__")
             result = Crinja::Value.new(nil)
 
             raw_pages = pages_val.raw
             if raw_pages.is_a?(Array)
               raw_pages.each do |page_val|
-                if page_val.is_a?(Hash)
-                  page_path = page_val["path"]?.try(&.to_s) || ""
-                  page_url = page_val["url"]?.try(&.to_s) || ""
+                # Handle Crinja::Value wrapping a Hash
+                raw_page = page_val.raw
+                if raw_page.is_a?(Hash)
+                  page_path = raw_page["path"]?.try(&.to_s) || ""
+                  page_url = raw_page["url"]?.try(&.to_s) || ""
 
                   if page_path == path_arg || page_url == path_arg || page_url == "/#{path_arg.chomp(".md")}/"
-                    result = Crinja::Value.new(page_val)
+                    result = page_val
                     break
                   end
                 end
