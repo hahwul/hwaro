@@ -57,7 +57,13 @@ module Hwaro
               data["title"] = page.title
             when "content"
               # Convert markdown to plain text
-              html_content, _ = Processor::Markdown.render(page.raw_content)
+              # Optimization: Reuse rendered content if available
+              if !page.content.empty?
+                html_content = page.content
+              else
+                html_content, _ = Processor::Markdown.render(page.raw_content)
+              end
+
               # Strip HTML tags to get plain text
               text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
               data["content"] = text_content
