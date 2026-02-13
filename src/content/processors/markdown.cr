@@ -296,7 +296,7 @@ module Hwaro
                     key = key_any.as_s?
                     next unless key
                     next if known_keys.includes?(key)
-                    extra[key] = extract_extra_value_yaml(value)
+                    extra[key] = extract_extra_value(value)
                   end
                 end
 
@@ -349,25 +349,8 @@ module Hwaro
           }
         end
 
-        # Extract extra value from TOML::Any
-        private def extract_extra_value(value : TOML::Any) : String | Bool | Int64 | Float64 | Array(String)
-          if str = value.as_s?
-            str
-          elsif bool = value.as_bool?
-            bool
-          elsif int = value.as_i?
-            int.to_i64
-          elsif float = value.as_f?
-            float
-          elsif arr = value.as_a?
-            arr.compact_map(&.as_s?)
-          else
-            value.to_s
-          end
-        end
-
-        # Extract extra value from YAML::Any
-        private def extract_extra_value_yaml(value : YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
+        # Extract extra value from TOML::Any or YAML::Any
+        private def extract_extra_value(value : TOML::Any | YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
           if str = value.as_s?
             str
           elsif bool = value.as_bool?

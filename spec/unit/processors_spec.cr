@@ -590,4 +590,56 @@ describe Hwaro::Processor::Markdown do
       html.should contain("id=\"title\"")
     end
   end
+
+  describe "extra values extraction" do
+    it "extracts extra values from TOML" do
+      content = <<-MARKDOWN
+      +++
+      title = "Test Page"
+      extra_string = "hello"
+      extra_int = 42
+      extra_float = 3.14
+      extra_bool = true
+      extra_array = ["a", "b"]
+      +++
+
+      # Content
+      MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      extra["extra_string"].should eq("hello")
+      extra["extra_int"].should eq(42_i64)
+      extra["extra_float"].should eq(3.14)
+      extra["extra_bool"].should eq(true)
+      extra["extra_array"].should eq(["a", "b"])
+    end
+
+    it "extracts extra values from YAML" do
+      content = <<-MARKDOWN
+      ---
+      title: Test Page
+      extra_string: hello
+      extra_int: 42
+      extra_float: 3.14
+      extra_bool: true
+      extra_array:
+        - a
+        - b
+      ---
+
+      # Content
+      MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      extra["extra_string"].should eq("hello")
+      extra["extra_int"].should eq(42_i64)
+      extra["extra_float"].should eq(3.14)
+      extra["extra_bool"].should eq(true)
+      extra["extra_array"].should eq(["a", "b"])
+    end
+  end
 end
