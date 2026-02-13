@@ -451,12 +451,18 @@ module Hwaro
             end
           end
 
+          regex_cache = {} of String => Regex
+          regex_mutex = Mutex.new
+
           # Test if a string matches a regex
           # Usage: {% if asset is matching("[.](jpg|png)$") %}
           @env.tests["matching"] = Crinja.test do
-            regex = arguments.varargs.first?.try(&.to_s) || ""
+            regex_str = arguments.varargs.first?.try(&.to_s) || ""
             begin
-              target.to_s.matches?(Regex.new(regex))
+              regex = regex_mutex.synchronize do
+                regex_cache[regex_str] ||= Regex.new(regex_str)
+              end
+              target.to_s.matches?(regex)
             rescue
               false
             end
