@@ -168,5 +168,93 @@ describe Hwaro::Services::Creator do
         end
       end
     end
+
+    it "creates a file when path starts with content/" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/blog")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "content/blog/post.md", title: "Blog Post")
+          creator = Hwaro::Services::Creator.new
+
+          creator.run(options)
+
+          expected_path = "content/blog/post.md"
+          File.exists?(expected_path).should be_true
+        end
+      end
+    end
+
+    it "creates a file in drafts when path is nil but title is provided" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(title: "My Draft Post")
+          creator = Hwaro::Services::Creator.new
+
+          creator.run(options)
+
+          expected_path = "content/drafts/my-draft-post.md"
+          File.exists?(expected_path).should be_true
+
+          content = File.read(expected_path)
+          content.should contain("title: My Draft Post")
+        end
+      end
+    end
+
+    it "raises an error if file already exists" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+          File.write("content/drafts/existing.md", "content")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "existing.md", title: "Existing Post")
+          creator = Hwaro::Services::Creator.new
+
+          expect_raises(Exception, "File already exists: content/drafts/existing.md") do
+            creator.run(options)
+          end
+        end
+      end
+    end
+
+    it "raises an error if explicit archetype is missing" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("archetypes")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Post", archetype: "missing")
+          creator = Hwaro::Services::Creator.new
+
+          expect_raises(Exception, "Archetype not found: archetypes/missing.md") do
+            creator.run(options)
+          end
+        end
+      end
+    end
+
+    it "creates a file from a directory path using title slug" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/news")
+
+          # Test with special characters in title
+          options = Hwaro::Config::Options::NewOptions.new(path: "news", title: "Breaking News! (2024)")
+          creator = Hwaro::Services::Creator.new
+
+          creator.run(options)
+
+          # "Breaking News! (2024)" -> "breaking-news-2024.md"
+          expected_path = "content/news/breaking-news-2024.md"
+          File.exists?(expected_path).should be_true
+
+          content = File.read(expected_path)
+          content.should contain("title: Breaking News! (2024)")
+        end
+      end
+    end
   end
 end
