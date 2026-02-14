@@ -593,6 +593,23 @@ describe Hwaro::Content::Processors::Template do
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should eq("https://example.com/about/")
     end
+
+    it "processes load_data function with JSON" do
+      Dir.mktmpdir do |dir|
+        json_path = File.join(dir, "data.json")
+        File.write(json_path, "{\"name\": \"Test\", \"value\": 123}")
+
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+        # Using set to load data into a variable
+        template = "{% set data = load_data(path=\"#{json_path}\") %}{{ data.name }} - {{ data.value }}"
+        result = Hwaro::Content::Processors::Template.process(template, context)
+        result.should eq("Test - 123")
+      end
+    end
   end
 
   describe "Time-related Variables" do
