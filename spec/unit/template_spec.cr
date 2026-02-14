@@ -517,6 +517,186 @@ describe Hwaro::Content::Processors::Template do
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should eq("&lt;tag attr=&quot;value&quot;&gt;content&lt;/tag&gt;")
     end
+
+    it "processes date filter with format" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      time = Time.utc(2023, 10, 5, 12, 0, 0)
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("my_date", Crinja::Value.new(time))
+
+      template = "{{ my_date | date(format=\"%Y/%m/%d\") }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("2023/10/05")
+    end
+
+    it "processes date filter with string input" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("date_str", "2023-10-05")
+
+      template = "{{ date_str | date(format=\"%d-%m-%Y\") }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("05-10-2023")
+    end
+
+    it "processes absolute_url filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("path", "/about/")
+
+      template = "{{ path | absolute_url }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("https://example.com/about/")
+    end
+
+    it "processes relative_url filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/blog"
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("path", "/post/1/")
+
+      template = "{{ path | relative_url }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("https://example.com/blog/post/1/")
+    end
+
+    it "processes markdownify filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("markdown", "**Bold**")
+
+      template = "{{ markdown | markdownify }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should contain("<strong>Bold</strong>")
+    end
+
+    it "processes jsonify filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("data", "test string")
+
+      template = "{{ data | jsonify }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should contain("\"test string\"")
+    end
+
+    it "processes where filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      items = [
+        {"name" => "A", "type" => "fruit"},
+        {"name" => "B", "type" => "vegetable"},
+        {"name" => "C", "type" => "fruit"}
+      ]
+      items_val = items.map do |item|
+        h = {} of String => Crinja::Value
+        item.each { |k, v| h[k] = Crinja::Value.new(v) }
+        Crinja::Value.new(h)
+      end
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("items", Crinja::Value.new(items_val))
+
+      template = "{% for item in items | where(attribute=\"type\", value=\"fruit\") %}{{ item.name }},{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("A,C,")
+    end
+
+    it "processes sort_by filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      items = [
+        {"name" => "C"},
+        {"name" => "A"},
+        {"name" => "B"}
+      ]
+      items_val = items.map do |item|
+        h = {} of String => Crinja::Value
+        item.each { |k, v| h[k] = Crinja::Value.new(v) }
+        Crinja::Value.new(h)
+      end
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("items", Crinja::Value.new(items_val))
+
+      template = "{% for item in items | sort_by(attribute=\"name\") %}{{ item.name }}{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("ABC")
+    end
+
+    it "processes group_by filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      items = [
+        {"name" => "Apple", "type" => "fruit"},
+        {"name" => "Carrot", "type" => "vegetable"},
+        {"name" => "Banana", "type" => "fruit"}
+      ]
+      items_val = items.map do |item|
+        h = {} of String => Crinja::Value
+        item.each { |k, v| h[k] = Crinja::Value.new(v) }
+        Crinja::Value.new(h)
+      end
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("items", Crinja::Value.new(items_val))
+
+      template = "{% for group in items | group_by(attribute=\"type\") %}{{ group.grouper }}:{% for item in group.list %}{{ item.name }},{% endfor %};{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should contain("fruit:Apple,Banana,;")
+      result.should contain("vegetable:Carrot,;")
+    end
+
+    it "processes split filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("text", "a,b,c")
+
+      template = "{% for part in text | split(pat=\",\") %}{{ part }}-{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("a-b-c-")
+    end
+
+    it "processes safe filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("html", "<b>Bold</b>")
+
+      # Since autoescape is disabled globally in TemplateEngine, we might need to test environment behavior
+      # But safe filter explicitly returns SafeString.
+      template = "{{ html | safe }}"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("<b>Bold</b>")
+    end
+
+    it "processes trim filter" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      tpl_context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      tpl_context.add("text", "  hello  ")
+
+      template = "'{{ text | trim }}'"
+      result = Hwaro::Content::Processors::Template.process(template, tpl_context)
+      result.should eq("'hello'")
+    end
   end
 
   describe "Custom Tests" do
