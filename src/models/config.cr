@@ -451,6 +451,7 @@ module Hwaro
       property build : BuildConfig
       property markdown : MarkdownConfig
       property deployment : DeploymentConfig
+      property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
 
       def initialize
@@ -474,6 +475,7 @@ module Hwaro
         @build = BuildConfig.new
         @markdown = MarkdownConfig.new
         @deployment = DeploymentConfig.new
+        @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
 
@@ -721,6 +723,15 @@ module Hwaro
             if markdown_section.has_key?("lazy_loading")
               lazy_val = markdown_section["lazy_loading"]?.try(&.as_bool?)
               config.markdown.lazy_loading = lazy_val unless lazy_val.nil?
+            end
+          end
+
+          # Load permalinks configuration
+          if permalinks_section = config.raw["permalinks"]?.try(&.as_h?)
+            permalinks_section.each do |k, v|
+              if target = v.as_s?
+                config.permalinks[k] = target
+              end
             end
           end
 

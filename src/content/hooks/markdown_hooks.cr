@@ -95,7 +95,20 @@ module Hwaro
 
         private def calculate_page_url(page : Models::Page, config : Models::Config)
           relative_path = page.path
-          path_parts = Path[relative_path].parts
+
+          # Apply permalinks mapping
+          directory_path = Path[relative_path].dirname.to_s
+          effective_dir = directory_path
+
+          config.permalinks.each do |source, target|
+            if directory_path == source
+              effective_dir = target
+              break
+            elsif directory_path.starts_with?("#{source}/")
+              effective_dir = directory_path.sub(/^#{Regex.escape(source)}\//, "#{target}/")
+              break
+            end
+          end
 
           # For multilingual sites, include language prefix for non-default languages
           lang_prefix = if page.language && page.language != config.default_language
@@ -109,14 +122,12 @@ module Hwaro
             page.url = "#{lang_prefix}/#{custom}"
             page.url += "/" unless page.url.ends_with?("/")
           elsif page.is_index
-            if path_parts.size == 1
+            if effective_dir == "." || effective_dir.empty?
               page.url = lang_prefix.empty? ? "/" : "#{lang_prefix}/"
             else
-              parent = Path[relative_path].dirname
-              page.url = "#{lang_prefix}/#{parent}/"
+              page.url = "#{lang_prefix}/#{effective_dir}/"
             end
           else
-            dir = Path[relative_path].dirname
             stem = Path[relative_path].stem
 
             # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
@@ -128,10 +139,10 @@ module Hwaro
 
             leaf = page.slug || clean_stem
 
-            if dir == "."
+            if effective_dir == "." || effective_dir.empty?
               page.url = "#{lang_prefix}/#{leaf}/"
             else
-              page.url = "#{lang_prefix}/#{dir}/#{leaf}/"
+              page.url = "#{lang_prefix}/#{effective_dir}/#{leaf}/"
             end
           end
         end
