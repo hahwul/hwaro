@@ -17,9 +17,6 @@ module Hwaro
       # New: Paginate path - custom path pattern for pagination (e.g., "page", "p")
       property paginate_path : String
 
-      # New: Redirect to - URL to redirect this section to
-      property redirect_to : String?
-
       # Pages in this section
       property pages : Array(Page) = [] of Page
 
@@ -32,13 +29,7 @@ module Hwaro
         @generate_feeds = false
         @page_template = nil
         @paginate_path = "page"
-        @redirect_to = nil
         @subsections = [] of Section
-      end
-
-      # Check if section has redirect
-      def has_redirect? : Bool
-        !@redirect_to.nil? && !@redirect_to.try(&.empty?)
       end
 
       # Get effective page template (for pages in this section)

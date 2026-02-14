@@ -82,6 +82,9 @@ module Hwaro
       # New: Ancestors - parent sections chain
       property ancestors : Array(Page)
 
+      # New: Redirect to - URL to redirect this page to
+      property redirect_to : String?
+
       # Regex constants for word count calculation
       # Compile regexes once at startup instead of every time the method is called
       REGEX_FRONT_MATTER    = /\A(\+\+\+|---)\s*\n.*?\n\1\s*\n/m
@@ -125,6 +128,12 @@ module Hwaro
         @lower = nil
         @higher = nil
         @ancestors = [] of Page
+        @redirect_to = nil
+      end
+
+      # Check if page has redirect
+      def has_redirect? : Bool
+        !@redirect_to.nil? && !@redirect_to.try(&.empty?)
       end
 
       # Collect assets from page directory

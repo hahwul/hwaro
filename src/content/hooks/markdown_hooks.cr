@@ -65,6 +65,7 @@ module Hwaro
           page.front_matter_keys = data[:front_matter_keys]
           page.taxonomy_name = nil
           page.taxonomy_term = nil
+          page.redirect_to = data[:redirect_to]
 
           if page.is_a?(Models::Section)
             page.transparent = data[:transparent]
