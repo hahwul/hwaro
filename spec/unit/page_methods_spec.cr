@@ -502,3 +502,35 @@ describe Hwaro::Models::TranslationLink do
     end
   end
 end
+
+  describe "#redirect_to" do
+    it "initializes as nil" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.redirect_to.should be_nil
+    end
+
+    it "can be set" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.redirect_to = "/some/path"
+      page.redirect_to.should eq("/some/path")
+    end
+  end
+
+  describe "#has_redirect?" do
+    it "returns false when redirect_to is nil" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.has_redirect?.should be_false
+    end
+
+    it "returns false when redirect_to is empty" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.redirect_to = ""
+      page.has_redirect?.should be_false
+    end
+
+    it "returns true when redirect_to is set" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.redirect_to = "/target"
+      page.has_redirect?.should be_true
+    end
+  end

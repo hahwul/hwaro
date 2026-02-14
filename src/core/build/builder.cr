@@ -1072,9 +1072,10 @@ module Hwaro
         )
           return unless page.render
 
-          # Handle redirect_to for sections
-          if page.is_a?(Models::Section) && page.has_redirect?
+          # Handle redirect_to for pages AND sections
+          if page.has_redirect?
             generate_redirect_page(page, output_dir, verbose)
+            generate_aliases(page, output_dir, verbose)
             return
           end
 
@@ -1129,11 +1130,11 @@ module Hwaro
 
         # Generate redirect page for sections with redirect_to
         private def generate_redirect_page(
-          section : Models::Section,
+          page : Models::Page,
           output_dir : String,
           verbose : Bool = false,
         )
-          redirect_url = section.redirect_to
+          redirect_url = page.redirect_to
           return unless redirect_url
 
           redirect_html = <<-HTML
@@ -1152,7 +1153,7 @@ module Hwaro
           </html>
           HTML
 
-          output_path = File.join(output_dir, section.url.sub(/^\//, ""), "index.html")
+          output_path = File.join(output_dir, page.url.sub(/^\//, ""), "index.html")
           FileUtils.mkdir_p(Path[output_path].dirname)
           File.write(output_path, redirect_html)
           Logger.action :create, output_path if verbose
@@ -1271,7 +1272,7 @@ module Hwaro
             dest_path = File.join(output_dir, alias_clean, "index.html")
             FileUtils.mkdir_p(File.dirname(dest_path))
 
-            redirect_url = page.url
+            redirect_url = page.redirect_to || page.url
 
             content = <<-HTML
             <!DOCTYPE html>
