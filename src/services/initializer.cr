@@ -7,6 +7,7 @@ require "../config/options/init_options"
 require "../utils/logger"
 require "../services/scaffolds/registry"
 require "./defaults/agents_md"
+require "file_utils"
 
 module Hwaro
   module Services
@@ -30,7 +31,7 @@ module Hwaro
         skip_sample_content : Bool = false,
         skip_taxonomies : Bool = false,
         multilingual_languages : Array(String) = [] of String,
-        scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
+        scaffold_type : String = "simple",
       )
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
@@ -42,43 +43,115 @@ module Hwaro
           exit(1)
         end
 
-        scaffold = Scaffolds::Registry.get(scaffold_type)
-        Logger.info "Initializing new Hwaro project in #{target_path}..."
-        Logger.info "Using scaffold: #{scaffold_type} - #{scaffold.description}"
+        if scaffold_type.starts_with?("http")
+          create_from_url(target_path, scaffold_type)
+        else
+          begin
+            type = Config::Options::ScaffoldType.from_string(scaffold_type)
+            scaffold = Scaffolds::Registry.get(type)
+            Logger.info "Initializing new Hwaro project in #{target_path}..."
+            Logger.info "Using scaffold: #{type} - #{scaffold.description}"
 
-        is_multilingual = multilingual_languages.size > 1
+            is_multilingual = multilingual_languages.size > 1
 
-        # Create content structure
-        create_directory(File.join(target_path, "content"))
+            # Create content structure
+            create_directory(File.join(target_path, "content"))
 
-        unless skip_sample_content
-          if is_multilingual
-            create_multilingual_content(target_path, multilingual_languages, skip_taxonomies, scaffold)
-          else
-            create_scaffold_content(target_path, scaffold, skip_taxonomies)
+            unless skip_sample_content
+              if is_multilingual
+                create_multilingual_content(target_path, multilingual_languages, skip_taxonomies, scaffold)
+              else
+                create_scaffold_content(target_path, scaffold, skip_taxonomies)
+              end
+            end
+
+            # Create templates
+            create_scaffold_templates(target_path, scaffold, skip_taxonomies)
+
+            # Create static directory
+            create_directory(File.join(target_path, "static"))
+
+            # Create config.toml
+            config_content = if is_multilingual
+                               create_multilingual_config(multilingual_languages, skip_taxonomies, scaffold)
+                             else
+                               scaffold.config_content(skip_taxonomies)
+                             end
+            create_file(File.join(target_path, "config.toml"), config_content)
+
+            # Create AGENTS.md unless skipped
+            unless skip_agents_md
+              create_file(File.join(target_path, "AGENTS.md"), Defaults::AgentsMd.content)
+            end
+
+            Logger.success "Done! Run `hwaro build` to generate the site."
+          rescue ex : ArgumentError
+            Logger.error ex.message.not_nil!
+            Logger.info "Available scaffolds:"
+            Logger.info "  simple  - Basic pages structure with homepage and about page"
+            Logger.info "  blog    - Blog-focused structure with posts, archives, and taxonomies"
+            Logger.info "  docs    - Documentation-focused structure with organized sections and sidebar"
+            exit(1)
           end
         end
+      end
 
-        # Create templates
-        create_scaffold_templates(target_path, scaffold, skip_taxonomies)
+      private def create_from_url(target_path : String, url : String)
+        Logger.info "Initializing new Hwaro project in #{target_path}..."
+        Logger.info "Using scaffold from URL: #{url}"
 
-        # Create static directory
-        create_directory(File.join(target_path, "static"))
+        # Create a temporary directory for cloning
+        temp_dir = File.join(Dir.tempdir, "hwaro-scaffold-#{Random.new.hex(4)}")
+        begin
+          Logger.info "Cloning scaffold..."
+          status = Process.run("git", ["clone", "--depth", "1", url, temp_dir])
 
-        # Create config.toml
-        config_content = if is_multilingual
-                           create_multilingual_config(multilingual_languages, skip_taxonomies, scaffold)
-                         else
-                           scaffold.config_content(skip_taxonomies)
-                         end
-        create_file(File.join(target_path, "config.toml"), config_content)
+          unless status.success?
+            Logger.error "Failed to clone scaffold from #{url}"
+            exit(1)
+          end
 
-        # Create AGENTS.md unless skipped
-        unless skip_agents_md
-          create_file(File.join(target_path, "AGENTS.md"), Defaults::AgentsMd.content)
+          Logger.info "Copying scaffold files..."
+          copy_scaffold_from_path(temp_dir, target_path)
+
+          Logger.success "Done! Run `hwaro build` to generate the site."
+        ensure
+          # Cleanup temporary directory
+          FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
         end
+      end
 
-        Logger.success "Done! Run `hwaro build` to generate the site."
+      private def copy_scaffold_from_path(source_path : String, target_path : String)
+        Dir.glob(File.join(source_path, "**", "*"), match_hidden: true) do |path|
+          relative_path = path[source_path.size..-1]
+          relative_path = relative_path.lchop(File::SEPARATOR)
+
+          # Skip .git directory and files
+          next if relative_path.starts_with?(".git")
+
+          dest_path = File.join(target_path, relative_path)
+
+          if File.directory?(path)
+            # Always create directories (including inside content) to preserve structure
+            create_directory(dest_path) unless Dir.exists?(dest_path)
+            next
+          end
+
+          dest_dir = File.dirname(dest_path)
+
+          if relative_path.starts_with?("content")
+            filename = File.basename(relative_path)
+            # Only copy _index.md files in content directory
+            if filename == "_index.md"
+              create_directory(dest_dir) unless Dir.exists?(dest_dir)
+              create_file(dest_path, File.read(path))
+            end
+          else
+            # Copy all other files
+            create_directory(dest_dir) unless Dir.exists?(dest_dir)
+            create_file(dest_path, File.read(path))
+          end
+        end
       end
 
       private def create_scaffold_content(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)

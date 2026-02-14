@@ -16,7 +16,7 @@ describe "base_url override" do
         skip_sample_content: false,
         skip_taxonomies: true,
         multilingual_languages: [] of String,
-        scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple
+        scaffold_type: "simple"
       )
 
       Dir.cd(project_dir) do

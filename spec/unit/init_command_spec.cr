@@ -13,7 +13,7 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.skip_sample_content.should be_false
       options.skip_taxonomies.should be_false
       options.multilingual_languages.should be_empty
-      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
+      options.scaffold.should eq("simple")
     end
 
     it "parses path argument" do
@@ -35,13 +35,13 @@ describe Hwaro::CLI::Commands::InitCommand do
       cmd = Hwaro::CLI::Commands::InitCommand.new
 
       options = cmd.parse_options(["--scaffold", "simple"])
-      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
+      options.scaffold.should eq("simple")
 
       options = cmd.parse_options(["--scaffold", "blog"])
-      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Blog)
+      options.scaffold.should eq("blog")
 
       options = cmd.parse_options(["--scaffold", "docs"])
-      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Docs)
+      options.scaffold.should eq("docs")
     end
 
     it "parses skip flags" do
@@ -84,7 +84,7 @@ describe Hwaro::CLI::Commands::InitCommand do
 
       options.path.should eq("new-site")
       options.force.should be_true
-      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Blog)
+      options.scaffold.should eq("blog")
       options.multilingual_languages.should eq(["en", "es"])
     end
 

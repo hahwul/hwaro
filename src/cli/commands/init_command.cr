@@ -47,22 +47,13 @@ module Hwaro
           skip_sample_content = false
           skip_taxonomies = false
           multilingual_languages = [] of String
-          scaffold = Config::Options::ScaffoldType::Simple
+          scaffold = "simple"
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
-            parser.on("--scaffold TYPE", "Scaffold type: simple, blog, docs (default: simple)") do |type|
-              begin
-                scaffold = Config::Options::ScaffoldType.from_string(type)
-              rescue ex : ArgumentError
-                Logger.error ex.message.not_nil!
-                Logger.info "Available scaffolds:"
-                Logger.info "  simple  - Basic pages structure with homepage and about page"
-                Logger.info "  blog    - Blog-focused structure with posts, archives, and taxonomies"
-                Logger.info "  docs    - Documentation-focused structure with organized sections and sidebar"
-                exit(1)
-              end
+            parser.on("--scaffold TYPE", "Scaffold type: simple, blog, docs or URL (default: simple)") do |type|
+              scaffold = type
             end
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
