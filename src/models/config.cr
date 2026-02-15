@@ -64,12 +64,14 @@ module Hwaro
       property format : String
       property fields : Array(String)
       property filename : String
+      property exclude : Array(String)
 
       def initialize
         @enabled = false
         @format = "fuse_json"
         @fields = ["title", "content"]
         @filename = "search.json"
+        @exclude = [] of String
       end
     end
 
@@ -591,6 +593,9 @@ module Hwaro
             config.search.filename = search_section["filename"]?.try(&.as_s?) || config.search.filename
             if fields = search_section["fields"]?.try(&.as_a?)
               config.search.fields = fields.compact_map(&.as_s?)
+            end
+            if exclude_arr = search_section["exclude"]?.try(&.as_a?)
+              config.search.exclude = exclude_arr.compact_map(&.as_s?)
             end
           end
 

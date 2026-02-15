@@ -13,6 +13,18 @@ module Hwaro
         # Filter out draft pages and pages with in_search_index = false
         search_pages = pages.reject { |p| p.draft || !p.in_search_index }
 
+        # Filter out excluded paths
+        unless config.search.exclude.empty?
+          excluded_paths = config.search.exclude.map do |path|
+            path.starts_with?('/') ? path : "/#{path}"
+          end
+
+          search_pages.reject! do |page|
+            page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+            excluded_paths.any? { |excluded| page_url.starts_with?(excluded) }
+          end
+        end
+
         if search_pages.empty?
           Logger.info "  No pages to include in search index."
           return

@@ -119,6 +119,7 @@ describe Hwaro::Models::Config do
       config.search.format.should eq("fuse_json")
       config.search.fields.should eq(["title", "content"])
       config.search.filename.should eq("search.json")
+      config.search.exclude.should eq([] of String)
     end
 
     it "can update search settings" do
@@ -127,11 +128,13 @@ describe Hwaro::Models::Config do
       config.search.format = "fuse_javascript"
       config.search.fields = ["title", "content", "tags", "url"]
       config.search.filename = "search-index.json"
+      config.search.exclude = ["/private"]
 
       config.search.enabled.should be_true
       config.search.format.should eq("fuse_javascript")
       config.search.fields.should eq(["title", "content", "tags", "url"])
       config.search.filename.should eq("search-index.json")
+      config.search.exclude.should eq(["/private"])
     end
   end
 
