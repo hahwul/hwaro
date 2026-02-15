@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Functions - Hwaro</title>
+  <meta property="og:title" content="Functions">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/templates/functions/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Functions">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/" class="active">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      <li><a href="/templates/functions/" class="active">Functions</a></li>
+      <li><a href="/templates/filters/">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Functions</h1>
+    <p>Built-in functions for retrieving data and generating URLs in templates.</p>
+<h2 id="data-retrieval">Data Retrieval</h2>
+<h3 id="getpage">get_page()</h3>
+<p>Retrieve any page by path or URL:</p>
+<pre>
+  <code class="language-jinja hljs">{% set about = get_page(path="about.md") %}
+{% if about %}
+&lt;a href="{{ about.url }}"&gt;{{ about.title }}&lt;/a&gt;
+{% endif %}
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Page? (nil if not found)</p>
+<p>
+  <strong>Returned Properties:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>String</td>
+</tr>
+<tr>
+<td>description</td>
+<td>String?</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+</tr>
+<tr>
+<td>date</td>
+<td>String?</td>
+</tr>
+<tr>
+<td>section</td>
+<td>String</td>
+</tr>
+<tr>
+<td>draft</td>
+<td>Bool</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>Int</td>
+</tr>
+<tr>
+<td>summary</td>
+<td>String?</td>
+</tr>
+<tr>
+<td>word_count</td>
+<td>Int</td>
+</tr>
+<tr>
+<td>reading_time</td>
+<td>Int</td>
+</tr>
+</tbody>
+</table>
+<p>
+  <strong>Examples:</strong>
+</p>
+<pre>
+  <code class="language-jinja hljs">{# Page in root #}
+{% set contact = get_page(path="contact.md") %}
+
+{# Page in section #}
+{% set intro = get_page(path="docs/introduction.md") %}
+
+{# Match by URL #}
+{% set intro_by_url = get_page(path="/docs/introduction/") %}
+</code>
+</pre>
+<hr/>
+<h3 id="getsection">get_section()</h3>
+<p>Retrieve a section by section name, source path, or URL:</p>
+<pre>
+  <code class="language-jinja hljs">{% set blog = get_section(path="blog") %}
+{% if blog %}
+&lt;h2&gt;{{ blog.title }}&lt;/h2&gt;
+&lt;ul&gt;
+{% for p in blog.pages %}
+  &lt;li&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/li&gt;
+{% endfor %}
+&lt;/ul&gt;
+{% endif %}
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Section name (`blog`), path (`blog/_index.md`), or URL (`/blog/`)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Section? (nil if not found)</p>
+<p>
+  <strong>Returned Properties:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>String</td>
+</tr>
+<tr>
+<td>description</td>
+<td>String?</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+</tr>
+<tr>
+<td>path</td>
+<td>String</td>
+</tr>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>pages</td>
+<td>Array&lt;Page&gt;</td>
+</tr>
+<tr>
+<td>pages_count</td>
+<td>Int</td>
+</tr>
+<tr>
+<td>assets</td>
+<td>Array&lt;String&gt;</td>
+</tr>
+</tbody>
+</table>
+<p>
+  <strong>Examples:</strong>
+</p>
+<pre>
+  <code class="language-jinja hljs">{# Top-level section #}
+{% set docs = get_section(path="docs") %}
+
+{# Nested section #}
+{% set guides = get_section(path="docs/guides") %}
+
+{# Match by URL #}
+{% set blog = get_section(path="/blog/") %}
+
+{# Display count #}
+&lt;p&gt;{{ docs.pages_count }} articles&lt;/p&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="gettaxonomy">get_taxonomy()</h3>
+<p>Access taxonomy terms and their pages:</p>
+<pre>
+  <code class="language-jinja hljs">{% set tags = get_taxonomy(kind="tags") %}
+{% if tags %}
+&lt;ul class="tag-cloud"&gt;
+{% for term in tags.items %}
+  &lt;li&gt;
+    &lt;a href="/tags/{{ term.slug }}/"&gt;
+      {{ term.name }} ({{ term.count }})
+    &lt;/a&gt;
+  &lt;/li&gt;
+{% endfor %}
+&lt;/ul&gt;
+{% endif %}
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kind</td>
+<td>String</td>
+<td>Taxonomy name (e.g., "tags", "categories")</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Taxonomy? (nil if not found)</p>
+<p>
+  <strong>Returned Properties:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>items</td>
+<td>Array&lt;Term&gt;</td>
+</tr>
+</tbody>
+</table>
+<p>
+  <strong>Term Properties:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>slug</td>
+<td>String</td>
+</tr>
+<tr>
+<td>pages</td>
+<td>Array&lt;Page&gt;</td>
+</tr>
+<tr>
+<td>count</td>
+<td>Int</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h3 id="gettaxonomyurl">get_taxonomy_url()</h3>
+<p>Generate URL for a taxonomy term:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}"&gt;
+  Crystal articles
+&lt;/a&gt;
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kind</td>
+<td>String</td>
+<td>Taxonomy name</td>
+</tr>
+<tr>
+<td>term</td>
+<td>String</td>
+<td>Term name</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String (absolute URL)</p>
+<hr/>
+<h2 id="data-loading">Data Loading</h2>
+<h3 id="loaddata">load_data()</h3>
+<p>Load external data files (JSON, TOML, YAML, CSV):</p>
+<pre>
+  <code class="language-jinja hljs">{% set menu = load_data(path="data/menu.json") %}
+{% for item in menu %}
+&lt;a href="{{ item.url }}"&gt;{{ item.title }}&lt;/a&gt;
+{% endfor %}
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Path to data file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Parsed data or nil</p>
+<p>
+  <strong>Supported Formats:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.json</td>
+<td>JSON</td>
+</tr>
+<tr>
+<td>.toml</td>
+<td>TOML</td>
+</tr>
+<tr>
+<td>.yaml, .yml</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td>.csv</td>
+<td>CSV (array of arrays)</td>
+</tr>
+</tbody>
+</table>
+<p>
+  <strong>Examples:</strong>
+</p>
+<p>JSON (<code>data/team.json</code>):</p>
+<pre>
+  <code class="language-json hljs">[
+  {"name": "Alice", "role": "Developer"},
+  {"name": "Bob", "role": "Designer"}
+]
+</code>
+</pre>
+<pre>
+  <code class="language-jinja hljs">{% set team = load_data(path="data/team.json") %}
+&lt;ul&gt;
+{% for member in team %}
+  &lt;li&gt;{{ member.name }} - {{ member.role }}&lt;/li&gt;
+{% endfor %}
+&lt;/ul&gt;
+</code>
+</pre>
+<p>TOML (<code>data/social.toml</code>):</p>
+<pre>
+  <code class="language-toml hljs">[[links]]
+name = "Twitter"
+url = "https://twitter.com/example"
+</code>
+</pre>
+<pre>
+  <code class="language-jinja hljs">{% set social = load_data(path="data/social.toml") %}
+{% for link in social.links %}
+&lt;a href="{{ link.url }}"&gt;{{ link.name }}&lt;/a&gt;
+{% endfor %}
+</code>
+</pre>
+<hr/>
+<h2 id="url-functions">URL Functions</h2>
+<h3 id="urlfor">url_for()</h3>
+<p>Generate URL with base_url:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;a href="{{ url_for(path='/about/') }}"&gt;About&lt;/a&gt;
+&lt;img src="{{ url_for(path='/images/logo.png') }}"&gt;
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Path to convert</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String (absolute URL)</p>
+<hr/>
+<h3 id="geturl">get_url()</h3>
+<p>Alias for <code>url_for()</code>. You can use either name:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;a href="{{ get_url(path='/about/') }}"&gt;About&lt;/a&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="now">now()</h3>
+<p>Get current datetime:</p>
+<pre>
+  <code class="language-jinja hljs">{# Default format #}
+&lt;p&gt;Generated: {{ now() }}&lt;/p&gt;
+
+{# Custom format #}
+&lt;p&gt;Year: {{ now(format="%Y") }}&lt;/p&gt;
+&lt;p&gt;Date: {{ now(format="%B %d, %Y") }}&lt;/p&gt;
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>format</td>
+<td>String?</td>
+<td>Date format string (optional)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String</p>
+<p>
+  <strong>Format Codes:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>%Y</td>
+<td>Year</td>
+<td>2025</td>
+</tr>
+<tr>
+<td>%m</td>
+<td>Month (01-12)</td>
+<td>01</td>
+</tr>
+<tr>
+<td>%d</td>
+<td>Day (01-31)</td>
+<td>15</td>
+</tr>
+<tr>
+<td>%B</td>
+<td>Month name</td>
+<td>January</td>
+</tr>
+<tr>
+<td>%b</td>
+<td>Month abbr</td>
+<td>Jan</td>
+</tr>
+<tr>
+<td>%H</td>
+<td>Hour (00-23)</td>
+<td>14</td>
+</tr>
+<tr>
+<td>%M</td>
+<td>Minute</td>
+<td>30</td>
+</tr>
+<tr>
+<td>%S</td>
+<td>Second</td>
+<td>45</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="media-functions">Media Functions</h2>
+<h3 id="resizeimage">resize_image()</h3>
+<p>Returns an image object with a resolved URL and requested dimensions.</p>
+<pre>
+  <code class="language-jinja hljs">{% set img = resize_image(path="/images/hero.jpg", width=1200, height=630) %}
+&lt;img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"&gt;
+</code>
+</pre>
+<p>
+  <strong>Parameters:</strong>
+</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Image path</td>
+</tr>
+<tr>
+<td>width</td>
+<td>Int</td>
+<td>Requested width</td>
+</tr>
+<tr>
+<td>height</td>
+<td>Int</td>
+<td>Requested height</td>
+</tr>
+<tr>
+<td>op</td>
+<td>String</td>
+<td>Operation name (default: `"fill"`)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Object (<code>url</code>, <code>width</code>, <code>height</code>)</p>
+<p><strong>Current behavior:</strong> placeholder implementation. It resolves the URL and echoes requested dimensions, but does not perform actual image processing yet.</p>
+<hr/>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="always-check-for-nil">Always Check for nil</h3>
+<pre>
+  <code class="language-jinja hljs">{% set page = get_page(path="featured.md") %}
+{% if page %}
+{{ page.title }}
+{% else %}
+&lt;p&gt;Coming soon&lt;/p&gt;
+{% endif %}
+</code>
+</pre>
+<h3 id="cache-function-results">Cache Function Results</h3>
+<pre>
+  <code class="language-jinja hljs">{# Good: Single lookup #}
+{% set blog = get_section(path="blog") %}
+&lt;h2&gt;{{ blog.title }}&lt;/h2&gt;
+&lt;p&gt;{{ blog.pages_count }} posts&lt;/p&gt;
+
+{# Avoid: Multiple lookups #}
+&lt;h2&gt;{{ get_section(path="blog").title }}&lt;/h2&gt;
+&lt;p&gt;{{ get_section(path="blog").pages_count }} posts&lt;/p&gt;
+</code>
+</pre>
+<h3 id="organize-data-files">Organize Data Files</h3>
+<pre>
+  <code>data/
+├── navigation/
+│   ├── main.json
+│   └── footer.json
+├── team.yaml
+└── products.toml
+</code>
+</pre>
+<hr/>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/data-model/">Data Model</a> — Site, Section, Page types</li>
+<li><a href="/templates/filters/">Filters</a> — Value transformation</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#data-retrieval">Data Retrieval</a><ul><li><a href="#getpage">get_page()</a></li><li><a href="#getsection">get_section()</a></li><li><a href="#gettaxonomy">get_taxonomy()</a></li><li><a href="#gettaxonomyurl">get_taxonomy_url()</a></li></ul></li><li><a href="#data-loading">Data Loading</a><ul><li><a href="#loaddata">load_data()</a></li></ul></li><li><a href="#url-functions">URL Functions</a><ul><li><a href="#urlfor">url_for()</a></li><li><a href="#geturl">get_url()</a></li><li><a href="#now">now()</a></li></ul></li><li><a href="#media-functions">Media Functions</a><ul><li><a href="#resizeimage">resize_image()</a></li></ul></li><li><a href="#best-practices">Best Practices</a><ul><li><a href="#always-check-for-nil">Always Check for nil</a></li><li><a href="#cache-function-results">Cache Function Results</a></li><li><a href="#organize-data-files">Organize Data Files</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>

@@ -1,0 +1,4380 @@
+# Hwaro
+Fast and lightweight static site generator built with Crystal
+
+
+This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license.
+
+---
+
+Title: Hwaro Documentation
+URL: /
+Source: content/index.md
+
+Hwaro(화로) is a fast, lightweight static site generator built with Crystal.
+
+## Features
+
+- **Fast builds** — Parallel processing with smart caching
+- **Markdown content** — Write with TOML front matter
+- **Jinja2 templates** — Flexible templating with Crinja
+- **SEO built-in** — Sitemaps, RSS feeds, OpenGraph tags
+- **Extensible** — Lifecycle hooks and custom processors
+
+## Quick Start
+
+```bash
+# Install
+git clone https://github.com/hahwul/hwaro
+cd hwaro && shards build --release
+
+# Create site
+./bin/hwaro init my-site --scaffold blog
+cd my-site
+
+# Start server
+hwaro serve
+```
+
+Open `http://localhost:3000` to preview your site.
+
+## Documentation
+
+<div class="doc-grid">
+
+### [Start](/start/)
+Installation, first site, CLI commands, and configuration.
+
+### [Writing](/writing/)
+Pages, sections, taxonomies, and shortcodes.
+
+### [Templates](/templates/)
+Data model, syntax, functions, and filters.
+
+### [Features](/features/)
+SEO, search, syntax highlighting, and pagination.
+
+### [Deploy](/deploy/)
+Build and deploy to GitHub Pages and other hosts.
+
+</div>
+
+## How It Works
+
+```
+content/           →   public/
+├── index.md            ├── index.html
+├── about.md            ├── about/index.html
+└── blog/               └── blog/
+    ├── _index.md           ├── index.html
+    └── post.md             └── post/index.html
+```
+
+1. Write content in `content/` using Markdown
+2. Design templates in `templates/` using Jinja2
+3. Build with `hwaro build`
+4. Deploy `public/` anywhere
+
+---
+
+Title: Deploy
+URL: /deploy/
+Source: content/deploy/_index.md
+
+Deploy your Hwaro site to any static hosting provider.
+
+## Build for Production
+
+```bash
+hwaro build
+```
+
+This generates static files in `public/`.
+
+### Optional: Minification
+
+You can optionally minify output files:
+
+```bash
+hwaro build --minify
+```
+
+This performs conservative optimization:
+- **HTML**: Removes comments and trailing whitespace
+- **JSON/XML**: Compacts whitespace for smaller files
+
+All code blocks and content structure are preserved. See [CLI Reference](/start/cli/#build) for details.
+
+## Hosting Options
+
+Static sites can be deployed anywhere:
+
+- [GitHub Pages](/deploy/github-pages/) — Free hosting from GitHub
+- **Netlify** — Drag and drop or Git integration
+- **Vercel** — Zero-config deployments
+- **Cloudflare Pages** — Fast global CDN
+- **AWS S3 + CloudFront** — Scalable hosting
+- **Any web server** — Nginx, Apache, etc.
+
+## General Steps
+
+1. Build the site: `hwaro build`
+2. Upload `public/` directory to your host
+3. Configure your domain
+
+---
+
+Title: Docker
+URL: /deploy/docker/
+Source: content/deploy/docker/index.md
+
+Deploy your Hwaro site using Docker.
+
+## Official Image
+
+The official Docker image is available at `ghcr.io/hahwul/hwaro`.
+
+```bash
+docker pull ghcr.io/hahwul/hwaro:latest
+```
+
+## Multi-stage Build
+
+You can use a multi-stage build to compile your site and serve it with a lightweight web server like Nginx.
+
+Create a `Dockerfile` in your project root:
+
+```dockerfile
+# Stage 1: Build the site
+FROM ghcr.io/hahwul/hwaro:latest AS builder
+
+WORKDIR /site
+COPY . .
+
+# Build the site
+RUN hwaro build
+
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
+
+# Copy built assets from builder stage
+COPY --from=builder /site/public /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Build and Run
+
+```bash
+# Build the image
+docker build -t my-hwaro-site .
+
+# Run the container
+docker run -d -p 8080:80 my-hwaro-site
+```
+
+Visit `http://localhost:8080` to see your site.
+
+## CLI Usage
+
+You can run Hwaro commands directly using the Docker image without installing Crystal or Hwaro locally.
+
+```bash
+# Build the site
+docker run --rm -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro build
+
+# Interactive shell
+docker run --rm -it -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro /bin/sh
+```
+
+---
+
+Title: GitHub Pages
+URL: /deploy/github-pages/
+Source: content/deploy/github-pages/index.md
+
+Deploy your Hwaro site to GitHub Pages for free hosting.
+
+## Prerequisites
+
+- GitHub repository
+- Hwaro site ready to build
+
+## Method 1: GitHub Actions (Recommended)
+
+### Create Workflow
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      
+      - name: Install Hwaro
+        run: |
+          git clone https://github.com/hahwul/hwaro /tmp/hwaro
+          cd /tmp/hwaro
+          shards install
+          shards build --release
+          sudo mv bin/hwaro /usr/local/bin/
+      
+      - name: Build site
+        run: hwaro build
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+### Configure GitHub Pages
+
+1. Go to repository **Settings** → **Pages**
+2. Under "Build and deployment", select **GitHub Actions**
+3. Push to `main` branch to trigger deployment
+
+### Set Base URL
+
+Update `config.toml`:
+
+```toml
+# For user/org site (username.github.io)
+base_url = "https://username.github.io"
+
+# For project site (username.github.io/repo)
+base_url = "https://username.github.io/repo"
+```
+
+## Method 2: Deploy from Branch
+
+### Build Locally
+
+```bash
+hwaro build
+```
+
+### Push to gh-pages Branch
+
+```bash
+# Create orphan branch
+git checkout --orphan gh-pages
+
+# Remove all files
+git rm -rf .
+
+# Copy built site
+cp -r public/* .
+
+# Commit and push
+git add .
+git commit -m "Deploy site"
+git push origin gh-pages --force
+
+# Return to main branch
+git checkout main
+```
+
+### Configure GitHub Pages
+
+1. Go to repository **Settings** → **Pages**
+2. Under "Build and deployment", select **Deploy from a branch**
+3. Choose `gh-pages` branch, `/ (root)` folder
+4. Click **Save**
+
+## Custom Domain
+
+### Configure DNS
+
+Add a CNAME record pointing to `username.github.io`:
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | www | username.github.io |
+| A | @ | 185.199.108.153 |
+| A | @ | 185.199.109.153 |
+| A | @ | 185.199.110.153 |
+| A | @ | 185.199.111.153 |
+
+### Add CNAME File
+
+Create `static/CNAME`:
+
+```
+www.yourdomain.com
+```
+
+### Update Config
+
+```toml
+base_url = "https://www.yourdomain.com"
+```
+
+### Enable HTTPS
+
+1. Go to repository **Settings** → **Pages**
+2. Check **Enforce HTTPS**
+
+## Troubleshooting
+
+### 404 Errors
+
+- Check `base_url` matches your GitHub Pages URL
+- Ensure CNAME file is in `static/` directory
+- Wait a few minutes for deployment to complete
+
+### Assets Not Loading
+
+- Verify `base_url` has no trailing slash
+- Check asset paths use `{{ base_url }}` prefix
+
+### Build Failures
+
+- Check Crystal version compatibility
+- Review Actions logs for error messages
+- Ensure `shards.yml` dependencies are correct
+
+## Example Repository Structure
+
+```
+my-site/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml
+├── content/
+├── templates/
+├── static/
+│   └── CNAME
+├── config.toml
+└── README.md
+```
+
+---
+
+Title: GitLab CI
+URL: /deploy/gitlab-ci/
+Source: content/deploy/gitlab-ci/index.md
+
+Deploy your Hwaro site using GitLab CI/CD.
+
+## Configuration
+
+Add `.gitlab-ci.yml` to your repository:
+
+```yaml
+image: ghcr.io/hahwul/hwaro:latest
+
+pages:
+  script:
+    - hwaro build
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+```
+
+This configuration uses the official Hwaro Docker image to build your site and deploys the `public` directory to GitLab Pages.
+
+---
+
+Title: Features
+URL: /features/
+Source: content/features/_index.md
+
+Hwaro includes powerful features out of the box.
+
+---
+
+Title: Pagination
+URL: /features/pagination/
+Source: content/features/pagination.md
+
+Split large content lists into multiple pages.
+
+## Configuration
+
+### Section Pagination
+
+Enable in section front matter:
+
+```toml
++++
+title = "Blog"
+paginate = 10
+paginate_path = "page"
++++
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| paginate | int | — | Items per page |
+| paginate_path | string | "page" | URL pattern for pages |
+
+### Generated URLs
+
+For a section at `/blog/`:
+
+| Page | URL |
+|------|-----|
+| 1 | /blog/ |
+| 2 | /blog/page/2/ |
+| 3 | /blog/page/3/ |
+
+With `paginate_path = "p"`:
+
+| Page | URL |
+|------|-----|
+| 1 | /blog/ |
+| 2 | /blog/p/2/ |
+| 3 | /blog/p/3/ |
+
+## Template Variables
+
+### pagination
+
+Pre-rendered pagination HTML:
+
+```jinja
+{{ pagination | safe }}
+```
+
+### paginator
+
+Pagination object for custom rendering:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| paginator.paginate_by | Int | Items per page |
+| paginator.base_url | String | Base URL for pagination |
+| paginator.number_pagers | Int | Total number of pagers (pages) |
+| paginator.first | String | URL to first pager |
+| paginator.last | String | URL to last pager |
+| paginator.previous | String? | URL to previous pager |
+| paginator.next | String? | URL to next pager |
+| paginator.pages | Array | Array of pages for the current pager |
+| paginator.current_index | Int | Current pager index (1-indexed) |
+| paginator.total_pages | Int | Total number of items across all pagers |
+
+## Template Examples
+
+### Simple Navigation
+
+Use the pre-rendered `pagination` variable:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ section.title }}</h1>
+
+<ul>
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+
+{{ pagination | safe }}
+{% endblock %}
+```
+
+### Custom Pagination
+
+Build your own pagination UI:
+
+```jinja
+{% if paginator.number_pagers > 1 %}
+<nav class="pagination">
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}" class="prev">← Previous</a>
+  {% endif %}
+  
+  <span class="current">
+    Page {{ paginator.current_index }} of {{ paginator.number_pagers }}
+  </span>
+  
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}" class="next">Next →</a>
+  {% endif %}
+</nav>
+{% endif %}
+```
+
+### Full Pagination with Page Numbers
+
+```jinja
+{% if paginator.number_pagers > 1 %}
+<nav class="pagination">
+  {# First page #}
+  {% if paginator.current_index > 1 %}
+  <a href="{{ paginator.first }}">« First</a>
+  {% endif %}
+  
+  {# Previous #}
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}">‹ Prev</a>
+  {% endif %}
+  
+  {# Current #}
+  <span class="current">{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  
+  {# Next #}
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}">Next ›</a>
+  {% endif %}
+  
+  {# Last page #}
+  {% if paginator.current_index < paginator.number_pagers %}
+  <a href="{{ paginator.last }}">Last »</a>
+  {% endif %}
+</nav>
+{% endif %}
+```
+
+## Taxonomy Pagination
+
+Taxonomies also support pagination in `config.toml`:
+
+```toml
+[[taxonomies]]
+name = "tags"
+paginate = 20
+```
+
+## CSS Example
+
+```css
+.pagination {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.pagination a {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  background: #f0f0f0;
+}
+
+.pagination .current {
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+}
+```
+
+## See Also
+
+- [Sections](/writing/sections/) — Section configuration
+- [Taxonomies](/writing/taxonomies/) — Taxonomy pagination
+- [Data Model](/templates/data-model/) — Section variables
+
+---
+
+Title: Search
+URL: /features/search/
+Source: content/features/search.md
+
+Hwaro generates a search index that works with Fuse.js for client-side search.
+
+## Configuration
+
+Enable in `config.toml`:
+
+```toml
+[search]
+enabled = true
+include_content = true
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate search index |
+| include_content | bool | true | Include page content in index |
+| exclude | array | [] | Paths (prefixes) to exclude from search index |
+
+## Generated Files
+
+When enabled, Hwaro generates `/search_index.json`:
+
+```json
+[
+  {
+    "title": "My Post",
+    "url": "/blog/my-post/",
+    "content": "Page content...",
+    "description": "Post description",
+    "section": "blog",
+    "tags": ["tutorial"]
+  }
+]
+```
+
+## Fields Indexed
+
+| Field | Description |
+|-------|-------------|
+| title | Page title |
+| url | Page URL |
+| content | Page content (if `include_content = true`) |
+| description | Page description |
+| section | Section name |
+| tags | Page tags |
+
+## Client-Side Implementation
+
+### Using Fuse.js
+
+Add to your template:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+<script>
+let searchIndex = [];
+
+// Load index
+fetch('/search_index.json')
+  .then(res => res.json())
+  .then(data => {
+    searchIndex = data;
+  });
+
+// Initialize Fuse.js
+function search(query) {
+  const fuse = new Fuse(searchIndex, {
+    keys: ['title', 'content', 'description', 'tags'],
+    threshold: 0.3
+  });
+  return fuse.search(query);
+}
+</script>
+```
+
+### Search Form
+
+```html
+<form id="search-form">
+  <input type="search" id="search-input" placeholder="Search...">
+</form>
+
+<div id="search-results"></div>
+
+<script>
+const input = document.getElementById('search-input');
+const results = document.getElementById('search-results');
+
+input.addEventListener('input', (e) => {
+  const query = e.target.value;
+  if (query.length < 2) {
+    results.innerHTML = '';
+    return;
+  }
+  
+  const matches = search(query);
+  results.innerHTML = matches
+    .slice(0, 10)
+    .map(m => `
+      <a href="${m.item.url}">
+        <h3>${m.item.title}</h3>
+        <p>${m.item.description || ''}</p>
+      </a>
+    `)
+    .join('');
+});
+</script>
+```
+
+## Excluding Pages
+
+### Front Matter
+
+Exclude individual pages from search with front matter:
+
+```markdown
++++
+title = "Terms of Service"
+in_search_index = false
++++
+```
+
+### Configuration
+
+Exclude entire sections or paths using `config.toml`:
+
+```toml
+[search]
+exclude = ["/private", "/drafts"]
+```
+
+## Performance Tips
+
+### Large Sites
+
+For sites with many pages:
+
+1. Set `include_content = false` to reduce index size
+2. Use Fuse.js `ignoreLocation` option
+3. Implement debounced search
+
+```javascript
+function debounce(fn, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
+
+input.addEventListener('input', debounce((e) => {
+  // search logic
+}, 200));
+```
+
+### Lazy Loading
+
+Load index only when search is focused:
+
+```javascript
+let indexLoaded = false;
+
+input.addEventListener('focus', async () => {
+  if (indexLoaded) return;
+  const res = await fetch('/search_index.json');
+  searchIndex = await res.json();
+  indexLoaded = true;
+});
+```
+
+## Alternative: Pagefind
+
+For larger sites, consider [Pagefind](https://pagefind.app/):
+
+```bash
+# After build
+npx pagefind --site public
+```
+
+Add to config as post-build hook:
+
+```toml
+[build]
+hooks.post = ["npx pagefind --site public"]
+```
+
+---
+
+Title: SEO
+URL: /features/seo/
+Source: content/features/seo.md
+
+Hwaro includes built-in SEO features: sitemaps, RSS feeds, robots.txt, and social sharing meta tags.
+
+## Sitemap
+
+Automatically generates `sitemap.xml` for search engines.
+
+### Configuration
+
+```toml
+[sitemap]
+enabled = true
+exclude = ["/private", "/drafts"]
+```
+
+- `enabled`: Generate `sitemap.xml`.
+- `exclude`: List of path prefixes to exclude (e.g., `["/private"]` excludes `/private`, `/private/page.html`).
+
+### Output
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.com/</loc>
+    <lastmod>2024-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://example.com/about/</loc>
+  </url>
+</urlset>
+```
+
+### Excluding Pages
+
+Set `in_sitemap = false` in front matter:
+
+```markdown
++++
+title = "Private Page"
+in_sitemap = false
++++
+```
+
+---
+
+## RSS Feeds
+
+Generate RSS feeds for your site and sections.
+
+### Configuration
+
+```toml
+[feeds]
+enabled = true
+limit = 20
+```
+
+### Section Feeds
+
+Enable per-section feeds:
+
+```markdown
++++
+title = "Blog"
+generate_feeds = true
++++
+```
+
+Generates `/blog/rss.xml`.
+
+### Output
+
+- `/rss.xml` — Site-wide feed
+- `/blog/rss.xml` — Section feed (if enabled)
+
+### Template Links
+
+```jinja
+<link rel="alternate" type="application/rss+xml" 
+      href="{{ base_url }}/rss.xml" 
+      title="{{ site.title }}">
+```
+
+---
+
+## Robots.txt
+
+Control search engine crawling.
+
+### Configuration
+
+```toml
+[robots]
+enabled = true
+```
+
+### Output
+
+```
+User-agent: *
+Allow: /
+Sitemap: https://example.com/sitemap.xml
+```
+
+---
+
+## OpenGraph Tags
+
+Social sharing meta tags for Facebook, LinkedIn, etc.
+
+### Configuration
+
+```toml
+[og]
+default_image = "/images/og-default.png"
+type = "website"
+fb_app_id = "your_fb_app_id"
+```
+
+| Key | Description |
+|-----|-------------|
+| default_image | Fallback image when page has none |
+| type | OpenGraph type (website, article) |
+| fb_app_id | Facebook App ID (optional) |
+
+### Page-Level Override
+
+```markdown
++++
+title = "My Article"
+description = "Article description"
+image = "/images/article-cover.png"
++++
+```
+
+### Template Usage
+
+```jinja
+<head>
+  {{ og_tags | safe }}
+</head>
+```
+
+### Output
+
+```html
+<meta property="og:title" content="My Article">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://example.com/my-article/">
+<meta property="og:description" content="Article description">
+<meta property="og:image" content="https://example.com/images/article-cover.png">
+```
+
+---
+
+## Twitter Cards
+
+Twitter-specific sharing tags.
+
+### Configuration
+
+```toml
+[og]
+twitter_card = "summary_large_image"
+twitter_site = "@yourusername"
+twitter_creator = "@authorusername"
+```
+
+| Key | Description |
+|-----|-------------|
+| twitter_card | Card type: summary, summary_large_image |
+| twitter_site | Site's Twitter handle |
+| twitter_creator | Author's Twitter handle |
+
+### Template Usage
+
+```jinja
+<head>
+  {{ twitter_tags | safe }}
+</head>
+```
+
+Or include both OG and Twitter:
+
+```jinja
+<head>
+  {{ og_all_tags | safe }}
+</head>
+```
+
+### Output
+
+```html
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="My Article">
+<meta name="twitter:description" content="Article description">
+<meta name="twitter:image" content="https://example.com/images/article-cover.png">
+<meta name="twitter:site" content="@yourusername">
+```
+
+---
+
+## Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
+| page_description | Page description (fallback: site) |
+| page_image | Page image (fallback: og.default_image) |
+
+---
+
+## Complete Example
+
+### config.toml
+
+```toml
+title = "My Site"
+description = "A great site"
+base_url = "https://example.com"
+
+[sitemap]
+enabled = true
+
+[feeds]
+enabled = true
+limit = 20
+
+[robots]
+enabled = true
+
+[og]
+default_image = "/images/og-default.png"
+type = "website"
+twitter_card = "summary_large_image"
+twitter_site = "@mysite"
+```
+
+### templates/base.html
+
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }} - {{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default(value=site.description) }}">
+  {{ og_all_tags | safe }}
+  <link rel="alternate" type="application/rss+xml" href="{{ base_url }}/rss.xml">
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>
+```
+
+---
+
+Title: Syntax Highlighting
+URL: /features/syntax-highlighting/
+Source: content/features/syntax-highlighting.md
+
+Code blocks in Markdown are automatically syntax highlighted.
+
+## Usage
+
+Use fenced code blocks with a language identifier:
+
+````markdown
+```javascript
+function greet(name) {
+  console.log(`Hello, ${name}!`);
+}
+```
+````
+
+## Supported Languages
+
+Common languages:
+
+| Language | Identifiers |
+|----------|-------------|
+| JavaScript | javascript, js |
+| TypeScript | typescript, ts |
+| Python | python, py |
+| Ruby | ruby, rb |
+| Go | go, golang |
+| Rust | rust, rs |
+| Crystal | crystal, cr |
+| HTML | html |
+| CSS | css |
+| JSON | json |
+| YAML | yaml, yml |
+| TOML | toml |
+| Markdown | markdown, md |
+| Shell | bash, sh, shell |
+| SQL | sql |
+
+## Configuration
+
+Configure in `config.toml`:
+
+```toml
+[highlight]
+enabled = true
+theme = "monokai"
+line_numbers = false
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | true | Enable syntax highlighting |
+| theme | string | "monokai" | Color theme |
+| line_numbers | bool | false | Show line numbers |
+
+## Themes
+
+Available themes:
+
+- `monokai` — Dark theme (default)
+- `github` — Light GitHub style
+- `dracula` — Dark purple theme
+- `solarized-dark` — Solarized dark
+- `solarized-light` — Solarized light
+
+## Template Integration
+
+Include highlighting assets in templates:
+
+```jinja
+<head>
+  {{ highlight_css | safe }}
+</head>
+<body>
+  ...
+  {{ highlight_js | safe }}
+</body>
+```
+
+Or combined:
+
+```jinja
+<head>
+  {{ highlight_tags | safe }}
+</head>
+```
+
+## Build Options
+
+Disable highlighting for faster builds:
+
+```bash
+hwaro build --skip-highlighting
+```
+
+## Plain Text Blocks
+
+For no highlighting, omit the language or use `text`:
+
+````markdown
+```text
+Plain text content
+No highlighting applied
+```
+````
+
+## Inline Code
+
+Inline code uses backticks and is not highlighted:
+
+```markdown
+Use the `console.log()` function.
+```
+
+---
+
+Title: Start
+URL: /start/
+Source: content/start/_index.md
+
+Get Hwaro installed and create your first site in minutes.
+
+## Steps
+
+1. [Installation](/start/installation/) — Install Hwaro on your system
+2. [First Site](/start/first-site/) — Create and run your first site
+3. [CLI](/start/cli/) — Command-line interface reference
+4. [Configuration](/start/config/) — Configure your site with `config.toml`
+
+---
+
+Title: CLI
+URL: /start/cli/
+Source: content/start/cli.md
+
+Hwaro provides commands for creating, building, and serving your site.
+
+## Commands
+
+### init
+
+Create a new site:
+
+```bash
+hwaro init my-site
+hwaro init my-site --scaffold blog
+hwaro init my-site --scaffold docs
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| --scaffold NAME | Use a scaffold template: simple, blog, docs |
+
+### new
+
+Create a new content file:
+
+```bash
+hwaro new content/about.md
+hwaro new content/blog/my-post.md
+hwaro new -t "My Post Title"
+hwaro new posts/my-post.md -a posts
+```
+
+Creates a Markdown file with front matter template. Supports **archetypes** for customizable templates.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -t, --title TITLE | Content title |
+| -a, --archetype NAME | Archetype to use |
+
+**Archetypes:**
+
+Archetypes are template files in `archetypes/` directory that define default front matter for new content:
+
+- `archetypes/default.md` - Default template for all content
+- `archetypes/posts.md` - Used for `hwaro new posts/...`
+- `archetypes/tools/develop.md` - Used for `hwaro new tools/develop/...`
+
+Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`
+
+Example archetype (`archetypes/posts.md`):
+```
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+tags: []
+---
+
+# {{ title }}
+```
+
+Archetype matching priority:
+1. Explicit `-a` flag (e.g., `-a posts` uses `archetypes/posts.md`)
+2. Path-based matching (e.g., `posts/hello.md` checks `archetypes/posts.md`)
+3. Nested paths try parent archetypes (e.g., `tools/dev/x.md` tries `tools/dev.md`, then `tools.md`)
+4. Falls back to `archetypes/default.md`
+5. Uses built-in template if no archetype found
+
+### build
+
+Build the site to `public/`:
+
+```bash
+hwaro build
+hwaro build --drafts
+hwaro build --minify
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -o, --output-dir DIR | Output directory (default: public) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| -d, --drafts | Include draft content |
+| --minify | Minify output files (see below) |
+| --no-parallel | Disable parallel processing |
+| --cache | Enable build caching |
+| --skip-highlighting | Disable syntax highlighting |
+| -v, --verbose | Show detailed output |
+| --profile | Print phase-by-phase build timing |
+| --debug | Print debug information after build |
+
+**About `--minify`:**
+
+The minify flag performs conservative optimization on generated files:
+
+- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, and content structure.
+- **JSON**: Removes whitespace and newlines for compact output.
+- **XML**: Removes whitespace between tags for smaller file sizes.
+
+Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
+
+### serve
+
+Start a development server with live reload:
+
+```bash
+hwaro serve
+hwaro serve --port 8080
+hwaro serve --open
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -b, --bind HOST | Bind address (default: 0.0.0.0) |
+| -p, --port PORT | Port number (default: 3000) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| --minify | Serve minified output |
+| --open | Open browser after starting |
+| -d, --drafts | Include draft content |
+| -v, --verbose | Show detailed output |
+| --debug | Print debug information after each rebuild |
+
+The server watches for file changes and rebuilds automatically.
+
+### deploy
+
+Deploy the generated site to configured targets.
+
+```bash
+hwaro deploy [target ...]
+hwaro deploy --dry-run
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -s, --source DIR | Source directory to deploy (default: deployment.source_dir or public) |
+| --dry-run | Show planned changes without writing |
+| --confirm | Ask for confirmation before deploying |
+| --force | Force upload/copy (ignore file comparisons) |
+| --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
+| --list-targets | List configured deployment targets and exit |
+
+## Examples
+
+```bash
+# Development workflow
+hwaro serve --drafts --verbose
+
+# Production build
+hwaro build
+
+# Custom output directory
+hwaro build -o dist
+
+# Preview on specific port
+hwaro serve -p 8000 --open
+```
+
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| -h, --help | Show help |
+| -v, --verbose | Verbose output |
+
+---
+
+Title: Configuration
+URL: /start/config/
+Source: content/start/config.md
+
+All site configuration lives in `config.toml` at the project root.
+
+## Site Settings
+
+```toml
+title = "My Site"
+description = "Site description for SEO"
+base_url = "https://example.com"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| title | string | Site title |
+| description | string | Site description |
+| base_url | string | Production URL (no trailing slash) |
+
+## Build Options
+
+```toml
+[build]
+output_dir = "public"
+drafts = false
+parallel = true
+cache = false
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| output_dir | string | "public" | Output directory |
+| drafts | bool | false | Include draft content |
+| parallel | bool | true | Parallel processing |
+| cache | bool | false | Enable build caching |
+
+### Build Hooks
+
+Run commands before/after build:
+
+```toml
+[build]
+hooks.pre = ["npm install", "npx tsc"]
+hooks.post = ["npm run minify"]
+```
+
+## Markdown
+
+```toml
+[markdown]
+safe = false
+lazy_loading = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| safe | bool | false | Strip raw HTML from markdown |
+| lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
+
+## Permalinks
+
+Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.
+
+```toml
+[permalinks]
+"old/posts" = "posts"
+"2023/drafts" = "archive/2023"
+```
+
+| Source (Directory) | Target (URL Path) | Example Effect |
+|-------------------|-------------------|----------------|
+| `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
+
+## SEO
+
+### Feeds
+
+```toml
+[feeds]
+enabled = true
+limit = 20
+```
+
+### Sitemap
+
+```toml
+[sitemap]
+enabled = true
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable sitemap generation |
+| exclude | array | [] | Exclude paths (prefixes) from sitemap |
+
+### Robots.txt
+
+```toml
+[robots]
+enabled = true
+```
+
+### OpenGraph
+
+```toml
+[og]
+default_image = "/images/og.png"
+type = "website"
+twitter_card = "summary_large_image"
+twitter_site = "@username"
+```
+
+## Search
+
+```toml
+[search]
+enabled = true
+include_content = true
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate search index |
+| include_content | bool | true | Include content in index |
+| exclude | array | [] | Exclude paths (prefixes) from search index |
+
+## Taxonomies
+
+```toml
+[[taxonomies]]
+name = "tags"
+feed = true
+paginate = 10
+
+[[taxonomies]]
+name = "categories"
+feed = true
+```
+
+## Syntax Highlighting
+
+```toml
+[highlight]
+enabled = true
+theme = "monokai"
+line_numbers = false
+```
+
+## Auto Includes
+
+Automatically include CSS/JS from static directories:
+
+```toml
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]
+```
+
+## Multilingual
+
+```toml
+default_language = "en"
+
+[[languages]]
+code = "en"
+name = "English"
+
+[[languages]]
+code = "ko"
+name = "한국어"
+```
+
+## Deployment
+
+Configure deployment targets for the `hwaro deploy` command.
+
+```toml
+[deployment]
+target = "prod" # Default target
+
+[[deployment.targets]]
+name = "prod"
+url = "file://./out"
+
+[[deployment.targets]]
+name = "s3"
+url = "s3://your-bucket"
+command = "aws s3 sync {source}/ {url} --delete"
+```
+
+## Full Example
+
+```toml
+title = "My Blog"
+description = "A blog about programming"
+base_url = "https://myblog.com"
+default_language = "en"
+
+[build]
+output_dir = "public"
+drafts = false
+parallel = true
+hooks.pre = ["npm ci"]
+hooks.post = ["npm run optimize"]
+
+[markdown]
+safe = false
+
+[feeds]
+enabled = true
+limit = 20
+
+[sitemap]
+enabled = true
+
+[robots]
+enabled = true
+
+[og]
+default_image = "/images/og-default.png"
+twitter_card = "summary_large_image"
+twitter_site = "@myblog"
+
+[search]
+enabled = true
+include_content = true
+exclude = ["/private"]
+
+[highlight]
+enabled = true
+theme = "monokai"
+
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]
+
+[[taxonomies]]
+name = "tags"
+feed = true
+
+[[taxonomies]]
+name = "categories"
+```
+
+## Environment-Specific Config
+
+For different environments, use separate config files:
+
+```bash
+hwaro build --config config.production.toml
+```
+
+---
+
+Title: First Site
+URL: /start/first-site/
+Source: content/start/first-site.md
+
+Create your first Hwaro site in 5 minutes.
+
+## 1. Create Project
+
+```bash
+hwaro init my-site --scaffold blog
+cd my-site
+```
+
+Scaffolds available:
+- `simple` — Landing pages, small sites
+- `blog` — Posts with tags and categories
+- `docs` — Documentation with sidebar
+
+## 2. Start Development Server
+
+```bash
+hwaro serve
+```
+
+Open `http://localhost:3000`. Changes reload automatically.
+
+## 3. Project Structure
+
+```
+my-site/
+├── config.toml      # Site configuration
+├── content/         # Markdown content
+│   ├── index.md     # Homepage
+│   └── blog/        # Blog section
+│       ├── _index.md
+│       └── hello.md
+├── templates/       # Jinja2 templates
+├── static/          # Static files (CSS, JS, images)
+└── public/          # Generated output
+```
+
+## 4. Edit Configuration
+
+Open `config.toml`:
+
+```toml
+title = "My Site"
+description = "A site built with Hwaro"
+base_url = "https://example.com"
+```
+
+## 5. Create a Page
+
+```bash
+hwaro new content/about.md
+```
+
+Edit `content/about.md`:
+
+```markdown
++++
+title = "About"
++++
+
+Welcome to my site!
+```
+
+Visit `http://localhost:3000/about/`.
+
+## 6. Create a Section
+
+Sections group related content. Create a blog section:
+
+```bash
+mkdir -p content/blog
+```
+
+Create `content/blog/_index.md`:
+
+```markdown
++++
+title = "Blog"
+sort_by = "date"
++++
+
+My blog posts.
+```
+
+Create `content/blog/first-post.md`:
+
+```markdown
++++
+title = "My First Post"
+date = "2024-01-15"
+tags = ["hello"]
++++
+
+Hello, world!
+```
+
+Visit `http://localhost:3000/blog/`.
+
+## 7. Build for Production
+
+```bash
+hwaro build
+```
+
+Deploy the `public/` directory to any static host.
+
+## Next Steps
+
+- [CLI Commands](/start/cli/) — All available commands
+- [Configuration](/start/config/) — Full config reference
+- [Writing Content](/writing/) — Pages, sections, taxonomies
+
+---
+
+Title: Installation
+URL: /start/installation/
+Source: content/start/installation.md
+
+Hwaro is written in Crystal. You can install it from source or use a pre-built binary.
+
+## Homebrew
+
+```bash
+brew tap hwaro/hwaro
+brew install hwaro
+```
+
+## From Source
+
+### Prerequisites
+
+- [Crystal](https://crystal-lang.org/install/) 1.19+
+- Git
+
+### Build
+
+```bash
+git clone https://github.com/hahwul/hwaro
+cd hwaro
+shards install
+shards build --release
+```
+
+The binary is created at `./bin/hwaro`.
+
+### Add to PATH (Optional)
+
+```bash
+# Copy to a directory in your PATH
+sudo cp ./bin/hwaro /usr/local/bin/
+
+# Or add the bin directory to PATH
+export PATH="$PATH:$(pwd)/bin"
+```
+
+## Verify Installation
+
+```bash
+hwaro --version
+```
+
+## Next Steps
+
+- [Create your first site →](/start/first-site/)
+
+---
+
+Title: Templates
+URL: /templates/
+Source: content/templates/_index.md
+
+Templates define how content becomes HTML. Hwaro uses Crinja, a Jinja2-compatible engine.
+
+## Template Directory
+
+```
+templates/
+├── base.html           # Base layout
+├── page.html           # Regular pages
+├── section.html        # Section index pages
+├── index.html          # Homepage (optional)
+├── taxonomy.html       # Taxonomy listing
+├── taxonomy_term.html  # Taxonomy term page
+├── 404.html            # Error page
+└── shortcodes/         # Shortcode templates
+```
+
+## Template Selection
+
+| Content | Template |
+|---------|----------|
+| content/index.md | index.html or page.html |
+| content/about.md | page.html |
+| content/blog/_index.md | section.html |
+| content/blog/post.md | page.html |
+| Taxonomy index | taxonomy.html |
+| Taxonomy term | taxonomy_term.html |
+
+## Quick Example
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  <time>{{ page.date }}</time>
+  {{ content | safe }}
+</article>
+{% endblock %}
+```
+
+---
+
+Title: Data Model
+URL: /templates/data-model/
+Source: content/templates/data-model.md
+
+Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. Understanding their hierarchy is essential for building templates.
+
+## Hierarchy
+
+```
+Site
+├── Config (title, base_url, ...)
+├── Pages[] (standalone pages)
+├── Sections[]
+│   ├── Pages[] (pages in section)
+│   └── Subsections[]
+│       ├── Pages[]
+│       └── Subsections[] (recursive)
+└── Taxonomies{}
+    └── Terms{}
+        └── Pages[]
+```
+
+### Relationships
+
+- A **Site** contains multiple **Sections** and standalone **Pages**
+- A **Section** contains **Pages** and child **Subsections**
+- **Subsections** can nest indefinitely
+- **Taxonomies** group **Pages** by terms
+
+## Site
+
+The root container. Configured in `config.toml`.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| site.title | String | Site title |
+| site.description | String | Site description |
+| site.base_url | String | Base URL (no trailing slash) |
+| site.pages | Array<Page> | All non-section pages |
+| site.sections | Array<Section> | All section index pages |
+| site.taxonomies | Object | All taxonomy groups and terms |
+| site.data | Object | Data loaded from `data/` directory |
+| site.authors | Object | Aggregated author data |
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| site_title | site.title |
+| site_description | site.description |
+| base_url | site.base_url |
+
+### Data Directory
+
+Hwaro allows you to store auxiliary data in the `data/` directory. Files ending in `.yml`, `.yaml`, `.json`, or `.toml` are automatically loaded and exposed via `site.data`.
+
+#### File Structure
+
+```text
+data/
+├── authors.yml
+├── products.json
+└── config.toml
+```
+
+#### Accessing Data
+
+Data is accessed by the filename (without extension).
+
+For example, `data/products.json`:
+
+```json
+[
+  {"name": "Widget", "price": 10},
+  {"name": "Gadget", "price": 20}
+]
+```
+
+Can be accessed in templates:
+
+```jinja
+{% for product in site.data.products %}
+  <h2>{{ product.name }}</h2>
+  <p>{{ product.price }}</p>
+{% endfor %}
+```
+
+### Site Authors
+
+Hwaro automatically aggregates all authors defined in the `authors` front matter field (`authors = ["id"]`) into `site.authors`.
+
+#### Defining Authors
+
+You can enrich author data by creating a `data/authors.yml` (or `.json`, `.toml`) file. Keys must match the author IDs used in the page front matter.
+
+**content/my-post.md**
+
+```yaml
+---
+title: "My Post"
+authors: ["john-doe"]
+---
+```
+
+**data/authors.yml**
+
+```yaml
+john-doe:
+  name: "John Doe"
+  bio: "Creator of things."
+  avatar: "/images/john.jpg"
+```
+
+#### Usage in Templates
+
+The `site.authors` object contains all authors found on the site. Each author object has:
+- `key`: The author ID (e.g., "john-doe")
+- `name`: The author name (from data or ID fallback)
+- `pages`: List of pages by this author (sorted by date)
+- Any custom fields from `data/authors.yml`
+
+```jinja
+{% for id, author in site.authors %}
+  <div class="author">
+    <img src="{{ author.avatar }}" alt="{{ author.name }}">
+    <h3>{{ author.name }}</h3>
+    <p>{{ author.bio }}</p>
+
+    <h4>Recent Posts</h4>
+    <ul>
+    {% for p in author.pages %}
+      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    {% endfor %}
+    </ul>
+  </div>
+{% endfor %}
+```
+
+### Example
+
+```jinja
+<title>{{ site.title }}</title>
+<link rel="canonical" href="{{ site.base_url }}{{ page.url }}">
+```
+
+---
+
+## Section
+
+A directory with `_index.md` that groups related content.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| section.title | String | Section title |
+| section.description | String? | Section description |
+| section.pages | Array<Page> | Pages in this section |
+| section.pages_count | Int | Number of pages |
+| section.list | String | Pre-rendered HTML list (`section_list`) |
+| section.subsections | Array<Section> | Child sections |
+| section.assets | Array<String> | Static files in section |
+| section.page_template | String? | Default template for pages |
+| section.paginate_path | String | Pagination URL pattern |
+| section.redirect_to | String? | Redirect URL |
+
+For the current section URL in `section.html`, use `page.url`.
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| section_title | section.title |
+| section_description | section.description |
+| section_list | Pre-rendered HTML list of pages |
+
+### From Front Matter
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| sort_by | String? | "date" | Sort by: date, weight, title |
+| reverse | Bool? | false | Reverse sort order |
+| paginate | Int? | — | Pages per page |
+| transparent | Bool | false | Pass pages to parent |
+| generate_feeds | Bool | false | Generate RSS feed |
+
+### Iterating Pages
+
+```jinja
+{% for p in section.pages %}
+<article>
+  <h2><a href="{{ p.url }}">{{ p.title }}</a></h2>
+  <time>{{ p.date }}</time>
+  {% if p.description %}
+  <p>{{ p.description }}</p>
+  {% endif %}
+</article>
+{% endfor %}
+```
+
+### Iterating Subsections
+
+```jinja
+{% for sub in section.subsections %}
+<div class="category">
+  <a href="{{ sub.url }}">{{ sub.title }}</a>
+  <span>({{ sub.pages_count }} articles)</span>
+</div>
+{% endfor %}
+```
+
+### Using section_list
+
+For simple listings, use the pre-rendered HTML:
+
+```jinja
+<ul>{{ section_list | safe }}</ul>
+```
+
+---
+
+## Page
+
+An individual content file (`.md`).
+
+### Core Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.title | String | Page title |
+| page.description | String? | Page description |
+| page.url | String | Relative URL path |
+| page.permalink | String? | Absolute URL with base_url |
+| page.section | String | Parent section name |
+| page.date | String? | Publication date (YYYY-MM-DD) |
+| page.updated | String? | Last updated date |
+| page.language | String | Effective language code |
+| page.translations | Array<TranslationLink> | Language variants |
+
+Rendered HTML content is available as the top-level `content` variable.
+
+### Metadata Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.draft | Bool | Is draft |
+| page.weight | Int | Sort weight |
+| page.image | String? | Featured image path |
+| page.authors | Array<String> | Author names |
+| page.extra | Object | Custom front matter fields |
+
+### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.word_count | Int | Word count |
+| page.reading_time | Int | Reading time (minutes) |
+| page.summary | String? | Content before <!-- more --> |
+| page.assets | Array<String> | Static files in page bundle |
+
+### Boolean Flags
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| page.toc | Bool | false | Show table of contents |
+| page.render | Bool | true | Should render |
+| page.is_index | Bool | — | Is index file |
+| page.generated | Bool | false | Auto-generated page |
+| page.in_sitemap | Bool | true | Include in sitemap |
+| page.in_search_index | Bool | true | Include in search |
+
+### Navigation Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.lower | Page? | Previous page in section |
+| page.higher | Page? | Next page in section |
+| page.ancestors | Array<Page> | Parent section chain |
+| page.translations | Array<TranslationLink> | Language variants |
+
+### Custom Metadata
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.extra | Object | Custom front matter fields |
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| page_title | page.title |
+| page_description | page.description |
+| page_url | page.url |
+| page_section | page.section |
+| page_date | page.date |
+| page_image | page.image |
+| page_summary | page.summary |
+| page_word_count | page.word_count |
+| page_reading_time | page.reading_time |
+| page_permalink | page.permalink |
+| page_authors | page.authors |
+| page_weight | page.weight |
+| page_language | page.language |
+| page_translations | page.translations |
+| taxonomy_name | Current taxonomy name (taxonomy pages) |
+| taxonomy_term | Current taxonomy term (taxonomy term pages) |
+| content | Rendered HTML content |
+
+---
+
+## Navigation Objects
+
+### page.lower / page.higher
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .title | String | Page title |
+| .url | String | Page URL |
+| .description | String? | Page description |
+| .date | String? | Page date |
+
+```jinja
+<nav class="post-nav">
+  {% if page.lower %}
+  <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  {% endif %}
+  
+  {% if page.higher %}
+  <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  {% endif %}
+</nav>
+```
+
+### page.ancestors
+
+Parent sections for breadcrumbs:
+
+```jinja
+<nav class="breadcrumbs">
+  <a href="/">Home</a>
+  {% for ancestor in page.ancestors %}
+  / <a href="{{ ancestor.url }}">{{ ancestor.title }}</a>
+  {% endfor %}
+  / <span>{{ page.title }}</span>
+</nav>
+```
+
+### page.translations
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .code | String | Language code (e.g., "en") |
+| .url | String | Translated page URL |
+| .title | String | Title in that language |
+| .is_current | Bool | Current page's language |
+| .is_default | Bool | Default language |
+
+```jinja
+{% if page.translations %}
+<nav class="lang-switcher">
+{% for t in page.translations %}
+  {% if t.is_current %}
+  <span>{{ t.code | upper }}</span>
+  {% else %}
+  <a href="{{ t.url }}">{{ t.code | upper }}</a>
+  {% endif %}
+{% endfor %}
+</nav>
+{% endif %}
+```
+
+---
+
+## Accessing page.extra
+
+Custom metadata from front matter:
+
+```markdown
++++
+title = "Review"
+
+[extra]
+rating = 4.5
+featured = true
+pros = ["Fast", "Reliable"]
++++
+```
+
+```jinja
+{% if page.extra.featured %}
+<span class="badge">Featured</span>
+{% endif %}
+
+<div class="rating">{{ page.extra.rating }} / 5</div>
+
+<ul>
+{% for pro in page.extra.pros %}
+  <li>{{ pro }}</li>
+{% endfor %}
+</ul>
+```
+
+---
+
+### Time Variables
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| current_year | Int | Current year (e.g., 2025) |
+| current_date | String | Current date (YYYY-MM-DD) |
+| current_datetime | String | Current datetime |
+
+```jinja
+<footer>&copy; {{ current_year }} {{ site.title }}</footer>
+```
+
+---
+
+### SEO Variables
+
+| Variable | Description |
+|----------|-------------|
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
+| canonical_tag | Canonical link tag |
+| hreflang_tags | Hreflang alternate link tags (multilingual) |
+
+```jinja
+<head>
+  {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+</head>
+```
+
+---
+
+### Asset Variables
+
+| Variable | Description |
+|----------|-------------|
+| highlight_css | Syntax highlighting CSS |
+| highlight_js | Syntax highlighting JS |
+| highlight_tags | Both CSS and JS |
+| auto_includes_css | Auto-included CSS |
+| auto_includes_js | Auto-included JS |
+| auto_includes | All auto-includes |
+
+```jinja
+<head>
+  {{ highlight_css | safe }}
+  {{ auto_includes_css | safe }}
+</head>
+<body>
+  ...
+  {{ highlight_js | safe }}
+  {{ auto_includes_js | safe }}
+</body>
+```
+
+---
+
+### Table of Contents
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| toc | String | Generated TOC HTML |
+| toc_obj.html | String | Same TOC HTML in object form |
+
+Only available when `toc = true` in front matter:
+
+```jinja
+{% if page.toc %}
+<aside class="toc">
+  {{ toc | safe }}
+</aside>
+{% endif %}
+```
+
+---
+
+### Taxonomy Variables
+
+Available in taxonomy templates:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name (e.g., "tags") |
+| taxonomy_term | String | Current term name |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
+| taxonomy_pages | Array<Page> | Pages for term |
+
+---
+
+## Type Reference
+
+### Quick Reference
+
+| Type | Description |
+|------|-------------|
+| String | Text value |
+| String? | Optional text (may be nil) |
+| Int | Integer number |
+| Bool | true/false |
+| Array<T> | List of type T |
+| Object | Key-value map |
+
+### Template Checking
+
+```jinja
+{# Check for nil #}
+{% if page.description %}...{% endif %}
+
+{# Check for empty array #}
+{% if page.authors %}...{% endif %}
+
+{# Check for empty string #}
+{% if page.description is present %}...{% endif %}
+
+{# Default value #}
+{{ page.description | default(value=site.description) }}
+```
+
+---
+
+## Example Templates
+
+### page.html
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  
+  <div class="meta">
+    <time>{{ page.date }}</time>
+    {% if page.authors %}
+    <span>by {{ page.authors | join(", ") }}</span>
+    {% endif %}
+    <span>{{ page.reading_time }} min read</span>
+  </div>
+  
+  {% if page.toc %}
+  <nav class="toc">{{ toc | safe }}</nav>
+  {% endif %}
+  
+  <div class="content">
+    {{ content | safe }}
+  </div>
+  
+  {% if page.lower or page.higher %}
+  <nav class="post-nav">
+    {% if page.lower %}
+    <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+    {% endif %}
+    {% if page.higher %}
+    <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</article>
+{% endblock %}
+```
+
+### section.html
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h1>{{ section.title }}</h1>
+  {% if section.description %}
+  <p class="lead">{{ section.description }}</p>
+  {% endif %}
+  
+  {{ content | safe }}
+  
+  <h2>Articles ({{ section.pages_count }})</h2>
+  <ul class="article-list">
+  {% for p in section.pages %}
+    <li>
+      <a href="{{ p.url }}">{{ p.title }}</a>
+      {% if p.date %}<time>{{ p.date }}</time>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  
+  {% if section.subsections %}
+  <h2>Categories</h2>
+  <ul>
+  {% for sub in section.subsections %}
+    <li>
+      <a href="{{ sub.url }}">{{ sub.title }}</a>
+      ({{ sub.pages_count }})
+    </li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+  
+  {{ pagination | safe }}
+</section>
+{% endblock %}
+```
+
+---
+
+## See Also
+
+- [Template Syntax](/templates/syntax/) — Jinja2 basics
+- [Functions](/templates/functions/) — Data retrieval functions
+- [Filters](/templates/filters/) — Value transformation
+
+---
+
+Title: Filters
+URL: /templates/filters/
+Source: content/templates/filters.md
+
+Filters transform values in templates. Apply with the pipe `|` operator.
+
+## Syntax
+
+```jinja
+{{ value | filter }}
+{{ value | filter(arg="value") }}
+{{ value | filter1 | filter2 }}
+```
+
+## Text Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| upper | Uppercase | {{ "hello" \| upper }} → HELLO |
+| lower | Lowercase | {{ "HELLO" \| lower }} → hello |
+| capitalize | Capitalize first | {{ "hello" \| capitalize }} → Hello |
+| trim | Remove whitespace | {{ "  hi  " \| trim }} → hi |
+| replace | Replace text | {{ "hello" \| replace("l", "x") }} → hexxo |
+| slugify | URL slug | {{ "Hello World" \| slugify }} → hello-world |
+| truncate_words | Limit words | {{ text \| truncate_words(20) }} |
+
+## HTML Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| safe | Don't escape HTML | {{ content \| safe }} |
+| strip_html | Remove HTML tags | {{ html \| strip_html }} |
+| markdownify | Render Markdown | {{ text \| markdownify }} |
+| xml_escape | XML escape | {{ text \| xml_escape }} |
+
+## Array Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| length | Get length | {{ items \| length }} |
+| first | First element | {{ items \| first }} |
+| last | Last element | {{ items \| last }} |
+| reverse | Reverse order | {{ items \| reverse }} |
+| sort | Sort array | {{ items \| sort }} |
+| join | Join elements | {{ tags \| join(", ") }} |
+| split | Split string | {{ "a,b,c" \| split(pat=",") }} |
+| where | Filter objects by field value | {{ posts \| where(attribute="draft", value=false) }} |
+| sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
+| group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
+
+## URL Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| absolute_url | Full URL with base | {{ "/about/" \| absolute_url }} |
+| relative_url | Prefix base_url | {{ "/img.png" \| relative_url }} |
+
+## Data Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| default | Fallback value | {{ value \| default(value="N/A") }} |
+| jsonify | JSON encode | {{ data \| jsonify }} |
+| date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
+
+## Examples
+
+### Safe HTML
+
+Always use `safe` for rendered content:
+
+```jinja
+{{ content | safe }}
+{{ og_tags | safe }}
+{{ toc | safe }}
+```
+
+### Default Values
+
+```jinja
+{{ page.description | default(value=site.description) }}
+{{ page.image | default(value="/images/default.png") }}
+```
+
+### Date Formatting
+
+```jinja
+<time>{{ page.date | date("%B %d, %Y") }}</time>
+```
+
+Format codes:
+- `%Y` — Year (2024)
+- `%m` — Month (01-12)
+- `%d` — Day (01-31)
+- `%B` — Month name (January)
+- `%b` — Month abbr (Jan)
+
+### URL Handling
+
+```jinja
+<a href="{{ page.url | absolute_url }}">Permalink</a>
+<img src="{{ "/logo.png" | relative_url }}">
+```
+
+### String Processing
+
+```jinja
+{{ page.title | upper }}
+{{ page.title | slugify }}
+{{ long_text | truncate_words(50) }}
+```
+
+### Array Operations
+
+```jinja
+{% set tags = "a,b,c" | split(pat=",") %}
+{% for tag in tags %}
+  <span>{{ tag | trim }}</span>
+{% endfor %}
+
+{{ page.authors | join(" & ") }}
+```
+
+### Collection Querying
+
+```jinja
+{% set published = site.pages | where(attribute="draft", value=false) %}
+{% set newest = published | sort_by(attribute="date", reverse=true) %}
+
+{% for group in newest | group_by(attribute="section") %}
+  <h3>{{ group.grouper }}</h3>
+  <ul>
+  {% for p in group.list %}
+    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  {% endfor %}
+  </ul>
+{% endfor %}
+```
+
+### Chaining
+
+```jinja
+{{ page.title | lower | slugify }}
+{{ content | strip_html | truncate_words(100) }}
+{{ description | default(value="No description") | upper }}
+```
+
+---
+
+## Tests
+
+Tests evaluate conditions in `{% if %}` statements.
+
+| Test | Description | Example |
+|------|-------------|---------|
+| startswith | Starts with | {% if page.url is startswith("/blog/") %} |
+| endswith | Ends with | {% if page.url is endswith("/") %} |
+| containing | Contains | {% if page.url is containing("docs") %} |
+| matching | Regex match | {% if asset is matching("[.](jpg|png)$") %} |
+| empty | Is empty | {% if page.description is empty %} |
+| present | Is not empty | {% if page.title is present %} |
+
+### Test Examples
+
+```jinja
+{% if page.url is startswith("/blog/") %}
+<span class="badge">Blog</span>
+{% endif %}
+
+{% if page.description is empty %}
+<meta name="description" content="{{ site.description }}">
+{% endif %}
+
+{% if page.image is present %}
+<meta property="og:image" content="{{ page.image | absolute_url }}">
+{% endif %}
+
+{% if "hero.jpg" is matching("[.](jpg|png)$") %}
+<span>Image file</span>
+{% endif %}
+```
+
+### Built-in Tests
+
+```jinja
+{% if value is defined %}
+{% if value is none %}
+{% if value is number %}
+{% if value is string %}
+{% if value is iterable %}
+{% if value is even %}
+{% if value is odd %}
+```
+
+---
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Available variables
+- [Functions](/templates/functions/) — Template functions
+- [Syntax](/templates/syntax/) — Template basics
+
+---
+
+Title: Functions
+URL: /templates/functions/
+Source: content/templates/functions.md
+
+Built-in functions for retrieving data and generating URLs in templates.
+
+## Data Retrieval
+
+### get_page()
+
+Retrieve any page by path or URL:
+
+```jinja
+{% set about = get_page(path="about.md") %}
+{% if about %}
+<a href="{{ about.url }}">{{ about.title }}</a>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
+
+**Returns:** Page? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| title | String |
+| description | String? |
+| url | String |
+| date | String? |
+| section | String |
+| draft | Bool |
+| weight | Int |
+| summary | String? |
+| word_count | Int |
+| reading_time | Int |
+
+**Examples:**
+
+```jinja
+{# Page in root #}
+{% set contact = get_page(path="contact.md") %}
+
+{# Page in section #}
+{% set intro = get_page(path="docs/introduction.md") %}
+
+{# Match by URL #}
+{% set intro_by_url = get_page(path="/docs/introduction/") %}
+```
+
+---
+
+### get_section()
+
+Retrieve a section by section name, source path, or URL:
+
+```jinja
+{% set blog = get_section(path="blog") %}
+{% if blog %}
+<h2>{{ blog.title }}</h2>
+<ul>
+{% for p in blog.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Section name (`blog`), path (`blog/_index.md`), or URL (`/blog/`) |
+
+**Returns:** Section? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| title | String |
+| description | String? |
+| url | String |
+| path | String |
+| name | String |
+| pages | Array<Page> |
+| pages_count | Int |
+| assets | Array<String> |
+
+**Examples:**
+
+```jinja
+{# Top-level section #}
+{% set docs = get_section(path="docs") %}
+
+{# Nested section #}
+{% set guides = get_section(path="docs/guides") %}
+
+{# Match by URL #}
+{% set blog = get_section(path="/blog/") %}
+
+{# Display count #}
+<p>{{ docs.pages_count }} articles</p>
+```
+
+---
+
+### get_taxonomy()
+
+Access taxonomy terms and their pages:
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+{% if tags %}
+<ul class="tag-cloud">
+{% for term in tags.items %}
+  <li>
+    <a href="/tags/{{ term.slug }}/">
+      {{ term.name }} ({{ term.count }})
+    </a>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| kind | String | Taxonomy name (e.g., "tags", "categories") |
+
+**Returns:** Taxonomy? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| name | String |
+| items | Array<Term> |
+
+**Term Properties:**
+
+| Property | Type |
+|----------|------|
+| name | String |
+| slug | String |
+| pages | Array<Page> |
+| count | Int |
+
+---
+
+### get_taxonomy_url()
+
+Generate URL for a taxonomy term:
+
+```jinja
+<a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}">
+  Crystal articles
+</a>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| kind | String | Taxonomy name |
+| term | String | Term name |
+
+**Returns:** String (absolute URL)
+
+---
+
+## Data Loading
+
+### load_data()
+
+Load external data files (JSON, TOML, YAML, CSV):
+
+```jinja
+{% set menu = load_data(path="data/menu.json") %}
+{% for item in menu %}
+<a href="{{ item.url }}">{{ item.title }}</a>
+{% endfor %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Path to data file |
+
+**Returns:** Parsed data or nil
+
+**Supported Formats:**
+
+| Extension | Format |
+|-----------|--------|
+| .json | JSON |
+| .toml | TOML |
+| .yaml, .yml | YAML |
+| .csv | CSV (array of arrays) |
+
+**Examples:**
+
+JSON (`data/team.json`):
+```json
+[
+  {"name": "Alice", "role": "Developer"},
+  {"name": "Bob", "role": "Designer"}
+]
+```
+
+```jinja
+{% set team = load_data(path="data/team.json") %}
+<ul>
+{% for member in team %}
+  <li>{{ member.name }} - {{ member.role }}</li>
+{% endfor %}
+</ul>
+```
+
+TOML (`data/social.toml`):
+```toml
+[[links]]
+name = "Twitter"
+url = "https://twitter.com/example"
+```
+
+```jinja
+{% set social = load_data(path="data/social.toml") %}
+{% for link in social.links %}
+<a href="{{ link.url }}">{{ link.name }}</a>
+{% endfor %}
+```
+
+---
+
+## URL Functions
+
+### url_for()
+
+Generate URL with base_url:
+
+```jinja
+<a href="{{ url_for(path='/about/') }}">About</a>
+<img src="{{ url_for(path='/images/logo.png') }}">
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Path to convert |
+
+**Returns:** String (absolute URL)
+
+---
+
+### get_url()
+
+Alias for `url_for()`. You can use either name:
+
+```jinja
+<a href="{{ get_url(path='/about/') }}">About</a>
+```
+
+---
+
+### now()
+
+Get current datetime:
+
+```jinja
+{# Default format #}
+<p>Generated: {{ now() }}</p>
+
+{# Custom format #}
+<p>Year: {{ now(format="%Y") }}</p>
+<p>Date: {{ now(format="%B %d, %Y") }}</p>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| format | String? | Date format string (optional) |
+
+**Returns:** String
+
+**Format Codes:**
+
+| Code | Description | Example |
+|------|-------------|---------|
+| %Y | Year | 2025 |
+| %m | Month (01-12) | 01 |
+| %d | Day (01-31) | 15 |
+| %B | Month name | January |
+| %b | Month abbr | Jan |
+| %H | Hour (00-23) | 14 |
+| %M | Minute | 30 |
+| %S | Second | 45 |
+
+---
+
+## Media Functions
+
+### resize_image()
+
+Returns an image object with a resolved URL and requested dimensions.
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1200, height=630) %}
+<img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}">
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Image path |
+| width | Int | Requested width |
+| height | Int | Requested height |
+| op | String | Operation name (default: `"fill"`) |
+
+**Returns:** Object (`url`, `width`, `height`)
+
+**Current behavior:** placeholder implementation. It resolves the URL and echoes requested dimensions, but does not perform actual image processing yet.
+
+---
+
+## Best Practices
+
+### Always Check for nil
+
+```jinja
+{% set page = get_page(path="featured.md") %}
+{% if page %}
+{{ page.title }}
+{% else %}
+<p>Coming soon</p>
+{% endif %}
+```
+
+### Cache Function Results
+
+```jinja
+{# Good: Single lookup #}
+{% set blog = get_section(path="blog") %}
+<h2>{{ blog.title }}</h2>
+<p>{{ blog.pages_count }} posts</p>
+
+{# Avoid: Multiple lookups #}
+<h2>{{ get_section(path="blog").title }}</h2>
+<p>{{ get_section(path="blog").pages_count }} posts</p>
+```
+
+### Organize Data Files
+
+```
+data/
+├── navigation/
+│   ├── main.json
+│   └── footer.json
+├── team.yaml
+└── products.toml
+```
+
+---
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Site, Section, Page types
+- [Filters](/templates/filters/) — Value transformation
+
+---
+
+Title: Syntax
+URL: /templates/syntax/
+Source: content/templates/syntax.md
+
+Hwaro uses Crinja, a Jinja2-compatible template engine. This page covers the essential syntax.
+
+## Variables
+
+Print values with double braces:
+
+```jinja
+{{ page.title }}
+{{ site.description }}
+{{ content }}
+```
+
+## Comments
+
+```jinja
+{# This is a comment #}
+```
+
+## Conditionals
+
+```jinja
+{% if page.description %}
+<meta name="description" content="{{ page.description }}">
+{% endif %}
+```
+
+With else:
+
+```jinja
+{% if page.draft %}
+<span class="badge">Draft</span>
+{% else %}
+<span class="badge">Published</span>
+{% endif %}
+```
+
+With elif:
+
+```jinja
+{% if page.section == "blog" %}
+<article class="post">{{ content | safe }}</article>
+{% elif page.section == "docs" %}
+<div class="documentation">{{ content | safe }}</div>
+{% else %}
+<main>{{ content | safe }}</main>
+{% endif %}
+```
+
+## Loops
+
+```jinja
+{% for p in section.pages %}
+<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+```
+
+With index:
+
+```jinja
+{% for tag in page.tags %}
+{% if not loop.first %}, {% endif %}
+{{ tag }}
+{% endfor %}
+```
+
+Loop variables:
+
+| Variable | Description |
+|----------|-------------|
+| loop.index | Current iteration (1-based) |
+| loop.index0 | Current iteration (0-based) |
+| loop.first | True on first iteration |
+| loop.last | True on last iteration |
+| loop.length | Total items |
+
+## Template Inheritance
+
+### Base Template
+
+`templates/base.html`:
+
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  {{ highlight_css | safe }}
+</head>
+<body>
+  {% block content %}{% endblock %}
+  {{ highlight_js | safe }}
+</body>
+</html>
+```
+
+### Child Template
+
+`templates/page.html`:
+
+```jinja
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  {{ content | safe }}
+</article>
+{% endblock %}
+```
+
+## Includes
+
+Include partial templates:
+
+```jinja
+{% include "partials/header.html" %}
+<main>{{ content | safe }}</main>
+{% include "partials/footer.html" %}
+```
+
+## Variables
+
+Set variables:
+
+```jinja
+{% set author = page.authors | first %}
+<span>By {{ author }}</span>
+```
+
+## Filters
+
+Transform values with the pipe operator:
+
+```jinja
+{{ page.title | upper }}
+{{ content | safe }}
+{{ page.date | date("%B %d, %Y") }}
+{{ page.authors | join(", ") }}
+```
+
+See [Filters](/templates/filters/) for all available filters.
+
+## Tests
+
+Evaluate conditions:
+
+```jinja
+{% if page.url is startswith("/blog/") %}
+<span>Blog post</span>
+{% endif %}
+
+{% if page.description is empty %}
+<meta name="description" content="{{ site.description }}">
+{% endif %}
+```
+
+See [Filters](/templates/filters/) for all available tests.
+
+## Whitespace Control
+
+Trim whitespace with minus signs:
+
+```jinja
+{%- if condition -%}
+trimmed
+{%- endif -%}
+```
+
+## Raw Blocks
+
+Output literal Jinja syntax:
+
+```jinja
+{% raw %}
+{{ this will not be parsed }}
+{% endraw %}
+```
+
+## Operators
+
+### Comparison
+
+| Operator | Description |
+|----------|-------------|
+| `==` | Equal |
+| `!=` | Not equal |
+| `<` | Less than |
+| `>` | Greater than |
+| `<=` | Less or equal |
+| `>=` | Greater or equal |
+
+### Logical
+
+| Operator | Description |
+|----------|-------------|
+| `and` | Both true |
+| `or` | Either true |
+| `not` | Negation |
+
+```jinja
+{% if page.section == "blog" and not page.draft %}
+<article>{{ content | safe }}</article>
+{% endif %}
+```
+
+### Membership
+
+```jinja
+{% if "tutorial" in page.tags %}
+<span class="badge">Tutorial</span>
+{% endif %}
+```
+
+## Common Patterns
+
+### Active Navigation
+
+```jinja
+<nav>
+  <a href="/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
+</nav>
+```
+
+### Conditional Meta Tags
+
+```jinja
+<head>
+  {% if page.description %}
+  <meta name="description" content="{{ page.description }}">
+  {% endif %}
+  {{ og_all_tags | safe }}
+</head>
+```
+
+### Section-Based Layout
+
+```jinja
+<body data-section="{{ page.section }}">
+  {% if page.section == "docs" %}
+  {% include "partials/sidebar.html" %}
+  {% endif %}
+  
+  <main>{{ content | safe }}</main>
+</body>
+```
+
+### Loop with Empty Check
+
+```jinja
+{% if section.pages %}
+<ul>
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No articles yet.</p>
+{% endif %}
+```
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Available variables
+- [Functions](/templates/functions/) — Built-in functions
+- [Filters](/templates/filters/) — Filters and tests
+
+---
+
+Title: Writing
+URL: /writing/
+Source: content/writing/_index.md
+
+Content lives in the `content/` directory. Write Markdown with TOML front matter.
+
+## Content Types
+
+| Type | File | URL |
+|------|------|-----|
+| Page | about.md | /about/ |
+| Section | blog/_index.md | /blog/ |
+| Section Page | blog/post.md | /blog/post/ |
+
+## Basic Content File
+
+```markdown
++++
+title = "My Page"
+date = "2024-01-15"
++++
+
+Content in **Markdown**.
+```
+
+---
+
+Title: Archetypes
+URL: /writing/archetypes/
+Source: content/writing/archetypes.md
+
+Archetypes are content templates that define default front matter and content structure for new pages. When you create content with `hwaro new`, archetypes provide consistent starting points.
+
+## Overview
+
+Archetypes live in the `archetypes/` directory at your project root:
+
+```
+my-site/
+├── archetypes/
+│   ├── default.md      # Default template
+│   ├── posts.md        # For content/posts/
+│   └── tools/
+│       └── develop.md  # For content/tools/develop/
+├── content/
+├── templates/
+└── config.toml
+```
+
+## Creating Archetypes
+
+An archetype is a Markdown file with front matter and optional content. Use placeholders that get replaced when creating new content.
+
+### Available Placeholders
+
+| Placeholder | Description |
+|-------------|-------------|
+| `{{ title }}` | Content title (from `-t` flag or filename) |
+| `{{ date }}` | Current date and time |
+| `{{ draft }}` | Draft status (`true` for drafts/ directory) |
+
+### Example Archetype
+
+Create `archetypes/posts.md`:
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: "Your Name"
+tags: []
+categories: []
+---
+
+# {{ title }}
+
+Write your introduction here.
+
+## Main Content
+
+Add your content...
+```
+
+## Archetype Matching
+
+When you run `hwaro new`, archetypes are matched in this order:
+
+### 1. Explicit Flag (`-a`)
+
+```bash
+hwaro new -t "My Article" -a posts
+```
+
+Uses `archetypes/posts.md` regardless of the output path.
+
+### 2. Path-Based Matching
+
+```bash
+hwaro new posts/hello-world.md
+```
+
+Checks for `archetypes/posts.md`.
+
+### 3. Nested Path Matching
+
+```bash
+hwaro new tools/develop/mytool.md
+```
+
+Tries in order:
+1. `archetypes/tools/develop.md`
+2. `archetypes/tools.md`
+3. `archetypes/default.md`
+
+### 4. Default Archetype
+
+If no specific archetype matches, uses `archetypes/default.md`.
+
+### 5. Built-in Template
+
+If no archetypes exist, uses the built-in default template.
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+# Uses path-based archetype matching
+hwaro new posts/my-first-post.md
+
+# Specify title explicitly
+hwaro new posts/my-post.md -t "My First Post"
+
+# Use specific archetype
+hwaro new -t "Quick Note" -a posts
+```
+
+### Creating Different Content Types
+
+```bash
+# Blog post (uses archetypes/posts.md)
+hwaro new posts/new-article.md
+
+# Documentation (uses archetypes/docs.md)
+hwaro new docs/getting-started.md
+
+# Tool page (uses archetypes/tools.md or archetypes/tools/develop.md)
+hwaro new tools/develop/my-tool.md
+```
+
+## Recommended Archetypes
+
+### Blog Posts (`archetypes/posts.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: ""
+tags: []
+categories: []
+description: ""
+image: ""
+---
+
+# {{ title }}
+
+Introduction paragraph.
+
+## Content
+```
+
+### Documentation (`archetypes/docs.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+weight: 10
+toc: true
+---
+
+Brief description of this documentation page.
+
+## Overview
+
+## Usage
+
+## Examples
+```
+
+### Default (`archetypes/default.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: {{ draft }}
+---
+
+# {{ title }}
+```
+
+## Tips
+
+- **Consistent metadata**: Define all commonly used front matter fields in archetypes
+- **Section-specific**: Create archetypes for each content section with relevant defaults
+- **Nested organization**: Use subdirectories in `archetypes/` to match your content structure
+- **Draft handling**: The `{{ draft }}` placeholder is `true` when creating in `drafts/` directory
+
+---
+
+Title: Pages
+URL: /writing/pages/
+Source: content/writing/pages.md
+
+Pages are Markdown files that become HTML pages on your site.
+
+## Basic Structure
+
+```markdown
++++
+title = "My Page"
+date = "2024-01-15"
++++
+
+Your content in **Markdown**.
+```
+
+The `+++` block is TOML front matter. Content below becomes HTML.
+
+## Front Matter
+
+### Required
+
+| Field | Type | Description |
+|-------|------|-------------|
+| title | string | Page title |
+
+### Common Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| date | string | — | Publication date (YYYY-MM-DD) |
+| description | string | — | SEO description |
+| draft | bool | false | Exclude from production builds |
+| template | string | "page" | Template to use |
+| weight | int | 0 | Sort order (lower = first) |
+| image | string | — | Featured image for social sharing |
+| tags | array | [] | Tag taxonomy terms |
+| categories | array | [] | Category taxonomy terms |
+
+### All Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| updated | string | Last updated date |
+| slug | string | Custom URL slug |
+| path | string | Custom URL path |
+| aliases | array | Redirect URLs to this page |
+| authors | array | Author names |
+| toc | bool | Show table of contents |
+| in_search_index | bool | Include in search |
+| in_sitemap | bool | Include in sitemap |
+| insert_anchor_links | bool | Add heading anchors |
+| redirect_to | string | Redirect page to this URL |
+| extra | table | Custom metadata |
+
+## Examples
+
+### Blog Post
+
+```markdown
++++
+title = "Getting Started with Crystal"
+date = "2024-01-15"
+description = "Learn Crystal programming basics"
+tags = ["crystal", "tutorial"]
+authors = ["Alice Smith"]
+image = "/images/crystal-guide.png"
++++
+
+Crystal is a fast, compiled language...
+```
+
+### Draft
+
+```markdown
++++
+title = "Work in Progress"
+draft = true
++++
+
+Not visible in production.
+```
+
+Build with drafts: `hwaro build --drafts`
+
+### Custom Template
+
+```markdown
++++
+title = "Landing Page"
+template = "landing"
++++
+
+Uses `templates/landing.html` instead of `page.html`.
+```
+
+### Weighted Order
+
+```markdown
++++
+title = "Introduction"
+weight = 1
++++
+```
+
+```markdown
++++
+title = "Getting Started"
+weight = 2
++++
+```
+
+Lower weight appears first.
+
+### URL Aliases
+
+```markdown
++++
+title = "New Page"
+aliases = ["/old-url/", "/another-old-url/"]
++++
+
+Redirects from old URLs to this page.
+```
+
+### Custom Metadata
+
+```markdown
++++
+title = "Product Review"
+
+[extra]
+rating = 4.5
+featured = true
+pros = ["Fast", "Reliable"]
++++
+```
+
+Access in templates: `{{ page.extra.rating }}`
+
+## Content Summary
+
+Use `<!-- more -->` to define a summary:
+
+```markdown
++++
+title = "Long Article"
++++
+
+This is the summary shown in listings.
+
+<!-- more -->
+
+The full article continues here...
+```
+
+## Markdown Syntax
+
+### Text
+
+```markdown
+**bold** and *italic*
+`inline code`
+[link](https://example.com)
+![image](/img.jpg)
+```
+
+### Lists
+
+```markdown
+- Unordered
+- Items
+
+1. Ordered
+2. Items
+```
+
+### Code Blocks
+
+````markdown
+```javascript
+console.log("Hello");
+```
+````
+
+### Tables
+
+```markdown
+| Header | Header |
+|--------|--------|
+| Cell   | Cell   |
+```
+
+### Blockquotes
+
+```markdown
+> Quote text
+```
+
+## Asset Colocation
+
+You can keep related assets (images, PDFs, etc.) in the same directory as your content file. This is known as a **Page Bundle**.
+
+To use this feature, rename your markdown file to `index.md` (for regular pages) or `_index.md` (for section pages) and place it in a directory named after your page.
+
+**Example Structure:**
+
+```text
+content/
+└── blog/
+    ├── my-trip/
+    │   ├── index.md        <-- The page content
+    │   ├── photo.jpg       <-- Asset
+    │   └── data.json       <-- Asset
+    └── _index.md
+```
+
+Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path.
+
+In your markdown, you can link to these assets using relative paths:
+
+```markdown
+![My Trip Photo](photo.jpg)
+
+[Download Data](data.json)
+```
+
+### Accessing Assets in Templates
+
+You can access the list of colocated assets in your templates using `page.assets`. This returns an array of relative paths to the files.
+
+```jinja
+{% for asset in page.assets %}
+  {% if asset is matching("[.](jpg|png)$") %}
+    <img src="{{ get_url(path=asset) }}" alt="Gallery Image">
+  {% endif %}
+{% endfor %}
+```
+
+## URL Mapping
+
+| File | URL |
+|------|-----|
+| content/index.md | `/` |
+| content/about.md | `/about/` |
+| content/blog/post.md | `/blog/post/` |
+
+## See Also
+
+- [Sections](/writing/sections/) — Group related pages
+- [Data Model](/templates/data-model/) — Page properties in templates
+
+---
+
+Title: Sections
+URL: /writing/sections/
+Source: content/writing/sections.md
+
+Sections are directories that group related content. They require an `_index.md` file.
+
+## Creating a Section
+
+```
+content/
+└── blog/
+    ├── _index.md     # Section index → /blog/
+    ├── first.md      # Page → /blog/first/
+    └── second.md     # Page → /blog/second/
+```
+
+## Section Index
+
+Every section needs an `_index.md`:
+
+```markdown
++++
+title = "Blog"
+description = "Latest articles"
+sort_by = "date"
++++
+
+Welcome to my blog.
+```
+
+## Front Matter
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| title | string | — | Section title (required) |
+| description | string | — | Section description |
+| template | string | "section" | Template to use |
+| page_template | string | — | Default template for pages |
+| sort_by | string | "date" | Sort by: date, weight, title |
+| reverse | bool | false | Reverse sort order |
+| paginate | int | — | Pages per page |
+| paginate_path | string | "page" | Pagination URL pattern |
+| transparent | bool | false | Pass pages to parent |
+| generate_feeds | bool | false | Generate RSS feed |
+| redirect_to | string | — | Redirect URL |
+| draft | bool | false | Exclude from production |
+| weight | int | 0 | Section sort order |
+
+## Examples
+
+### Blog with Pagination
+
+```toml
++++
+title = "Blog"
+sort_by = "date"
+paginate = 10
+paginate_path = "p"
++++
+```
+
+Generates: `/blog/`, `/blog/p/2/`, `/blog/p/3/`
+
+### Documentation
+
+```toml
++++
+title = "Docs"
+page_template = "doc-page"
+sort_by = "weight"
++++
+```
+
+All pages use `doc-page.html` template and sort by weight.
+
+### Section with Feed
+
+```toml
++++
+title = "News"
+generate_feeds = true
++++
+```
+
+Generates `/news/rss.xml`.
+
+## Nested Sections
+
+Sections can contain other sections:
+
+```
+content/
+└── docs/
+    ├── _index.md           # /docs/
+    ├── getting-started/
+    │   ├── _index.md       # /docs/getting-started/
+    │   └── install.md      # /docs/getting-started/install/
+    └── guides/
+        ├── _index.md       # /docs/guides/
+        └── deploy.md       # /docs/guides/deploy/
+```
+
+Access subsections in templates:
+
+```jinja
+{% for sub in section.subsections %}
+<a href="{{ sub.url }}">{{ sub.title }}</a>
+<small>({{ sub.pages_count }})</small>
+{% endfor %}
+```
+
+## Template Variables
+
+When rendering a section page (`_index.md`), these variables are available:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| section.title | String | Current section title |
+| section.description | String | Current section description |
+| section.pages | Array<Page> | Pages shown in the current section list |
+| section.pages_count | Int | Number of items in `section.pages` |
+| section.list | String | Pre-rendered HTML list (same value as `section_list`) |
+| section.subsections | Array<Section> | Direct child sections (`title`, `description`, `url`, `pages_count`) |
+| section.assets | Array<String> | Colocated section assets |
+| section.page_template | String | Default template name for child pages |
+| section.paginate_path | String | Pagination path segment |
+| section.redirect_to | String | Redirect target if configured |
+| section_list | String | Same as `section.list` |
+| pagination | String | Pre-rendered pagination HTML |
+| paginator | Object | Structured pagination object |
+
+Use `page.url` for the current section URL.
+
+### `section.list` / `section_list`
+
+```jinja
+<ul class="auto-list">
+  {{ section.list | safe }}
+</ul>
+```
+
+### `paginator` (custom pagination UI)
+
+```jinja
+{% if paginator is defined and paginator.number_pagers > 1 %}
+<nav>
+  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+```
+
+## Transparent Sections
+
+Use `transparent = true` to merge pages into parent section:
+
+```toml
++++
+title = "2024 Posts"
+transparent = true
++++
+```
+
+Pages appear in the parent's `section.pages` list.
+
+## Asset Colocation
+
+Just like regular pages, sections can have colocated assets. Place non-markdown files in the same directory as the `_index.md` file.
+
+**Example Structure:**
+
+```text
+content/
+└── gallery/
+    ├── _index.md       <-- The section index
+    ├── banner.jpg      <-- Section asset
+    └── icon.png        <-- Section asset
+```
+
+These assets are copied to the output directory relative to the section.
+
+### Accessing Assets in Templates
+
+You can access the list of section assets in your templates using `section.assets`. This returns an array of relative paths to the files (from the content directory).
+
+```jinja
+<!-- In section.html -->
+<div class="gallery">
+  {% for asset in section.assets %}
+    <img src="{{ get_url(path=asset) }}" alt="Section Asset">
+  {% endfor %}
+</div>
+```
+
+## Section vs Page
+
+| File | Type | URL |
+|------|------|-----|
+| _index.md | Section index | `/blog/` |
+| index.md | Regular page | `/blog/` |
+
+Use `_index.md` when you need to list child pages.
+
+---
+
+Title: Shortcodes
+URL: /writing/shortcodes/
+Source: content/writing/shortcodes.md
+
+Shortcodes are reusable template snippets you can use in Markdown content.
+
+## Using Shortcodes
+
+Two syntax patterns work in content files:
+
+```markdown
+{%raw%}{{ shortcode_name(arg1="value", arg2="value") }}{%endraw%}
+```
+
+Or explicitly:
+
+```markdown
+{%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
+```
+
+## Creating Shortcodes
+
+Shortcode templates live in `templates/shortcodes/`.
+
+### Example: Alert Box
+
+Create `templates/shortcodes/alert.html`:
+
+```jinja
+{% if type and message %}
+<div class="alert alert-{{ type }}">
+  {{ message | safe }}
+</div>
+{% endif %}
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ alert(type="warning", message="This is important!") }}{%endraw%}
+```
+
+Output:
+
+```html
+<div class="alert alert-warning">
+  This is important!
+</div>
+```
+
+### Example: YouTube Embed
+
+Create `templates/shortcodes/youtube.html`:
+
+```jinja
+{% if id %}
+<div class="video-container">
+  <iframe 
+    src="https://www.youtube.com/embed/{{ id }}"
+    frameborder="0"
+    allowfullscreen>
+  </iframe>
+</div>
+{% endif %}
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}{%endraw%}
+```
+
+### Example: Figure with Caption
+
+Create `templates/shortcodes/figure.html`:
+
+```jinja
+<figure>
+  <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+  {% if caption %}
+  <figcaption>{{ caption }}</figcaption>
+  {% endif %}
+</figure>
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+```
+
+### Example: Image Gallery (Asset Colocation)
+
+You can create a gallery that automatically lists images found in the same directory as the page (Page Bundle).
+
+Create `templates/shortcodes/gallery.html`:
+
+```jinja
+<div class="gallery">
+{% for asset in page.assets -%}
+  {%- if asset is matching("[.](jpg|png)$") -%}
+    {% set image = resize_image(path=asset, width=240, height=180) %}
+    <a href="{{ get_url(path=asset) }}" target="_blank">
+      <img src="{{ image.url }}" alt="{{ asset }}" />
+    </a>
+  {%- endif %}
+{%- endfor %}
+</div>
+```
+
+Use in content (inside a Page Bundle directory):
+
+```markdown
+{%raw%}{{ gallery() }}{%endraw%}
+```
+
+This will render a grid of all JPG and PNG images found alongside the Markdown file.
+
+## Argument Syntax
+
+Arguments support multiple quote styles:
+
+```markdown
+{%raw%}{{ alert(type="warning", message="Double quotes") }}
+{{ alert(type='info', message='Single quotes') }}
+{{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+```
+
+## Built-in Variables
+
+Shortcodes have access to:
+
+- All passed arguments
+- `site` object
+- `page` object
+- Standard filters and functions
+
+```jinja
+{# In shortcode template #}
+<a href="{{ site.base_url }}/{{ url }}">{{ text }}</a>
+```
+
+## Tips
+
+### Validate Arguments
+
+Always check for required arguments:
+
+```jinja
+{% if not url %}
+<p class="error">Missing url parameter</p>
+{% else %}
+<a href="{{ url }}">{{ text | default(value="Link") }}</a>
+{% endif %}
+```
+
+### Use Safe Filter for HTML
+
+When passing HTML content:
+
+```jinja
+{{ content | safe }}
+```
+
+### Organize Shortcodes
+
+Group related shortcodes:
+
+```
+templates/shortcodes/
+├── alert.html
+├── youtube.html
+├── figure.html
+├── code/
+│   ├── tabs.html
+│   └── snippet.html
+└── social/
+    ├── twitter.html
+    └── github.html
+```
+
+---
+
+Title: Taxonomies
+URL: /writing/taxonomies/
+Source: content/writing/taxonomies.md
+
+Taxonomies organize content into groups like tags, categories, or authors.
+
+## Configuration
+
+Define taxonomies in `config.toml`:
+
+```toml
+[[taxonomies]]
+name = "tags"
+feed = true
+paginate = 10
+
+[[taxonomies]]
+name = "categories"
+feed = true
+
+[[taxonomies]]
+name = "authors"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `name` | string | Taxonomy name (used in front matter) |
+| `feed` | bool | Generate RSS feed for each term |
+| `paginate` | int | Pages per pagination page |
+
+## Using Taxonomies
+
+Assign terms in front matter:
+
+```markdown
++++
+title = "My Post"
+tags = ["crystal", "tutorial"]
+categories = ["Programming"]
+authors = ["Alice"]
++++
+```
+
+## Generated URLs
+
+For a taxonomy named `tags` with term `crystal`:
+
+| URL | Content |
+|-----|---------|
+| `/tags/` | List of all tags |
+| `/tags/crystal/` | Pages tagged "crystal" |
+
+## Templates
+
+### Taxonomy Index
+
+`templates/taxonomy.html` — List of all terms:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ taxonomy_name | capitalize }}</h1>
+<ul>
+{% for term in taxonomy_terms %}
+  <li>
+    <a href="/{{ taxonomy_name }}/{{ term.slug }}/">
+      {{ term.name }} ({{ term.count }})
+    </a>
+  </li>
+{% endfor %}
+</ul>
+{% endblock %}
+```
+
+### Taxonomy Term
+
+`templates/taxonomy_term.html` — Pages for a specific term:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ taxonomy_name }}: {{ taxonomy_term }}</h1>
+<ul>
+{% for p in taxonomy_pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    <time>{{ p.date }}</time>
+  </li>
+{% endfor %}
+</ul>
+{% endblock %}
+```
+
+## Template Variables
+
+### In taxonomy.html
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name ("tags") |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
+
+### In taxonomy_term.html
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name |
+| taxonomy_term | String | Current term name |
+| taxonomy_pages | Array<Page> | Pages for term |
+
+### Term Object
+
+| Property | Type | Description |
+|----------|------|-------------|
+| name | String | Term name |
+| slug | String | URL-safe name |
+| count | Int | Number of pages |
+
+## get_taxonomy() Function
+
+Access taxonomy data anywhere:
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+{% if tags %}
+<div class="tag-cloud">
+{% for term in tags.items %}
+  <a href="/tags/{{ term.slug }}/">{{ term.name }}</a>
+{% endfor %}
+</div>
+{% endif %}
+```
+
+## get_taxonomy_url() Function
+
+Generate taxonomy term URL:
+
+```jinja
+<a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}">
+  Crystal articles
+</a>
+```
+
+## Common Patterns
+
+### Tag Cloud
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+<div class="tags">
+{% for term in tags.items %}
+  <a href="/tags/{{ term.slug }}/" 
+     class="tag count-{{ term.count }}">
+    {{ term.name }}
+  </a>
+{% endfor %}
+</div>
+```
+
+### Display Page Tags
+
+```jinja
+{% if page.extra.tags %}
+<div class="post-tags">
+{% for tag in page.extra.tags %}
+  <a href="/tags/{{ tag | slugify }}/">{{ tag }}</a>
+{% endfor %}
+</div>
+{% endif %}
+```
+
+### Category Navigation
+
+```jinja
+{% set categories = get_taxonomy(kind="categories") %}
+<nav class="categories">
+{% for cat in categories.items %}
+  <a href="/categories/{{ cat.slug }}/">
+    {{ cat.name }} ({{ cat.count }})
+  </a>
+{% endfor %}
+</nav>
+```

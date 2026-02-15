@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Data Model - Hwaro</title>
+  <meta property="og:title" content="Data Model">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/templates/data-model/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Data Model">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/" class="active">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/" class="active">Data Model</a></li>
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      <li><a href="/templates/functions/">Functions</a></li>
+      <li><a href="/templates/filters/">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Data Model</h1>
+    <p>Hwaro's template system centers on three core types: <strong>Site</strong>, <strong>Section</strong>, and <strong>Page</strong>. Understanding their hierarchy is essential for building templates.</p>
+<h2 id="hierarchy">Hierarchy</h2>
+<pre>
+  <code>Site
+├── Config (title, base_url, ...)
+├── Pages[] (standalone pages)
+├── Sections[]
+│   ├── Pages[] (pages in section)
+│   └── Subsections[]
+│       ├── Pages[]
+│       └── Subsections[] (recursive)
+└── Taxonomies{}
+    └── Terms{}
+        └── Pages[]
+</code>
+</pre>
+<h3 id="relationships">Relationships</h3>
+<ul>
+<li>A <strong>Site</strong> contains multiple <strong>Sections</strong> and standalone <strong>Pages</strong></li>
+<li>A <strong>Section</strong> contains <strong>Pages</strong> and child <strong>Subsections</strong></li>
+<li><strong>Subsections</strong> can nest indefinitely</li>
+<li><strong>Taxonomies</strong> group <strong>Pages</strong> by terms</li>
+</ul>
+<h2 id="site">Site</h2>
+<p>The root container. Configured in <code>config.toml</code>.</p>
+<h3 id="properties">Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>site.title</td>
+<td>String</td>
+<td>Site title</td>
+</tr>
+<tr>
+<td>site.description</td>
+<td>String</td>
+<td>Site description</td>
+</tr>
+<tr>
+<td>site.base_url</td>
+<td>String</td>
+<td>Base URL (no trailing slash)</td>
+</tr>
+<tr>
+<td>site.pages</td>
+<td>Array&lt;Page&gt;</td>
+<td>All non-section pages</td>
+</tr>
+<tr>
+<td>site.sections</td>
+<td>Array&lt;Section&gt;</td>
+<td>All section index pages</td>
+</tr>
+<tr>
+<td>site.taxonomies</td>
+<td>Object</td>
+<td>All taxonomy groups and terms</td>
+</tr>
+<tr>
+<td>site.data</td>
+<td>Object</td>
+<td>Data loaded from `data/` directory</td>
+</tr>
+<tr>
+<td>site.authors</td>
+<td>Object</td>
+<td>Aggregated author data</td>
+</tr>
+</tbody>
+</table>
+<h3 id="flat-aliases">Flat Aliases</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>site_title</td>
+<td>site.title</td>
+</tr>
+<tr>
+<td>site_description</td>
+<td>site.description</td>
+</tr>
+<tr>
+<td>base_url</td>
+<td>site.base_url</td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-directory">Data Directory</h3>
+<p>Hwaro allows you to store auxiliary data in the <code>data/</code> directory. Files ending in <code>.yml</code>, <code>.yaml</code>, <code>.json</code>, or <code>.toml</code> are automatically loaded and exposed via <code>site.data</code>.</p>
+<h4 id="file-structure">File Structure</h4>
+<pre>
+  <code class="language-text hljs">data/
+├── authors.yml
+├── products.json
+└── config.toml
+</code>
+</pre>
+<h4 id="accessing-data">Accessing Data</h4>
+<p>Data is accessed by the filename (without extension).</p>
+<p>For example, <code>data/products.json</code>:</p>
+<pre>
+  <code class="language-json hljs">[
+  {"name": "Widget", "price": 10},
+  {"name": "Gadget", "price": 20}
+]
+</code>
+</pre>
+<p>Can be accessed in templates:</p>
+<pre>
+  <code class="language-jinja hljs">{% for product in site.data.products %}
+  &lt;h2&gt;{{ product.name }}&lt;/h2&gt;
+  &lt;p&gt;{{ product.price }}&lt;/p&gt;
+{% endfor %}
+</code>
+</pre>
+<h3 id="site-authors">Site Authors</h3>
+<p>Hwaro automatically aggregates all authors defined in the <code>authors</code> front matter field (<code>authors = ["id"]</code>) into <code>site.authors</code>.</p>
+<h4 id="defining-authors">Defining Authors</h4>
+<p>You can enrich author data by creating a <code>data/authors.yml</code> (or <code>.json</code>, <code>.toml</code>) file. Keys must match the author IDs used in the page front matter.</p>
+<p>
+  <strong>content/my-post.md</strong>
+</p>
+<pre>
+  <code class="language-yaml hljs">---
+title: "My Post"
+authors: ["john-doe"]
+---
+</code>
+</pre>
+<p>
+  <strong>data/authors.yml</strong>
+</p>
+<pre>
+  <code class="language-yaml hljs">john-doe:
+  name: "John Doe"
+  bio: "Creator of things."
+  avatar: "/images/john.jpg"
+</code>
+</pre>
+<h4 id="usage-in-templates">Usage in Templates</h4>
+<p>The <code>site.authors</code> object contains all authors found on the site. Each author object has:</p>
+<ul>
+<li><code>key</code>: The author ID (e.g., "john-doe")</li>
+<li><code>name</code>: The author name (from data or ID fallback)</li>
+<li><code>pages</code>: List of pages by this author (sorted by date)</li>
+<li>Any custom fields from <code>data/authors.yml</code></li>
+</ul>
+<pre>
+  <code class="language-jinja hljs">{% for id, author in site.authors %}
+  &lt;div class="author"&gt;
+    &lt;img src="{{ author.avatar }}" alt="{{ author.name }}"&gt;
+    &lt;h3&gt;{{ author.name }}&lt;/h3&gt;
+    &lt;p&gt;{{ author.bio }}&lt;/p&gt;
+
+    &lt;h4&gt;Recent Posts&lt;/h4&gt;
+    &lt;ul&gt;
+    {% for p in author.pages %}
+      &lt;li&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/li&gt;
+    {% endfor %}
+    &lt;/ul&gt;
+  &lt;/div&gt;
+{% endfor %}
+</code>
+</pre>
+<h3 id="example">Example</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;title&gt;{{ site.title }}&lt;/title&gt;
+&lt;link rel="canonical" href="{{ site.base_url }}{{ page.url }}"&gt;
+</code>
+</pre>
+<hr/>
+<h2 id="section">Section</h2>
+<p>A directory with <code>_index.md</code> that groups related content.</p>
+<h3 id="properties">Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>section.title</td>
+<td>String</td>
+<td>Section title</td>
+</tr>
+<tr>
+<td>section.description</td>
+<td>String?</td>
+<td>Section description</td>
+</tr>
+<tr>
+<td>section.pages</td>
+<td>Array&lt;Page&gt;</td>
+<td>Pages in this section</td>
+</tr>
+<tr>
+<td>section.pages_count</td>
+<td>Int</td>
+<td>Number of pages</td>
+</tr>
+<tr>
+<td>section.list</td>
+<td>String</td>
+<td>Pre-rendered HTML list (`section_list`)</td>
+</tr>
+<tr>
+<td>section.subsections</td>
+<td>Array&lt;Section&gt;</td>
+<td>Child sections</td>
+</tr>
+<tr>
+<td>section.assets</td>
+<td>Array&lt;String&gt;</td>
+<td>Static files in section</td>
+</tr>
+<tr>
+<td>section.page_template</td>
+<td>String?</td>
+<td>Default template for pages</td>
+</tr>
+<tr>
+<td>section.paginate_path</td>
+<td>String</td>
+<td>Pagination URL pattern</td>
+</tr>
+<tr>
+<td>section.redirect_to</td>
+<td>String?</td>
+<td>Redirect URL</td>
+</tr>
+</tbody>
+</table>
+<p>For the current section URL in <code>section.html</code>, use <code>page.url</code>.</p>
+<h3 id="flat-aliases">Flat Aliases</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>section_title</td>
+<td>section.title</td>
+</tr>
+<tr>
+<td>section_description</td>
+<td>section.description</td>
+</tr>
+<tr>
+<td>section_list</td>
+<td>Pre-rendered HTML list of pages</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-front-matter">From Front Matter</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sort_by</td>
+<td>String?</td>
+<td>"date"</td>
+<td>Sort by: date, weight, title</td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>Bool?</td>
+<td>false</td>
+<td>Reverse sort order</td>
+</tr>
+<tr>
+<td>paginate</td>
+<td>Int?</td>
+<td>—</td>
+<td>Pages per page</td>
+</tr>
+<tr>
+<td>transparent</td>
+<td>Bool</td>
+<td>false</td>
+<td>Pass pages to parent</td>
+</tr>
+<tr>
+<td>generate_feeds</td>
+<td>Bool</td>
+<td>false</td>
+<td>Generate RSS feed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iterating-pages">Iterating Pages</h3>
+<pre>
+  <code class="language-jinja hljs">{% for p in section.pages %}
+&lt;article&gt;
+  &lt;h2&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/h2&gt;
+  &lt;time&gt;{{ p.date }}&lt;/time&gt;
+  {% if p.description %}
+  &lt;p&gt;{{ p.description }}&lt;/p&gt;
+  {% endif %}
+&lt;/article&gt;
+{% endfor %}
+</code>
+</pre>
+<h3 id="iterating-subsections">Iterating Subsections</h3>
+<pre>
+  <code class="language-jinja hljs">{% for sub in section.subsections %}
+&lt;div class="category"&gt;
+  &lt;a href="{{ sub.url }}"&gt;{{ sub.title }}&lt;/a&gt;
+  &lt;span&gt;({{ sub.pages_count }} articles)&lt;/span&gt;
+&lt;/div&gt;
+{% endfor %}
+</code>
+</pre>
+<h3 id="using-sectionlist">Using section_list</h3>
+<p>For simple listings, use the pre-rendered HTML:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;ul&gt;{{ section_list | safe }}&lt;/ul&gt;
+</code>
+</pre>
+<hr/>
+<h2 id="page">Page</h2>
+<p>An individual content file (<code>.md</code>).</p>
+<h3 id="core-properties">Core Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.title</td>
+<td>String</td>
+<td>Page title</td>
+</tr>
+<tr>
+<td>page.description</td>
+<td>String?</td>
+<td>Page description</td>
+</tr>
+<tr>
+<td>page.url</td>
+<td>String</td>
+<td>Relative URL path</td>
+</tr>
+<tr>
+<td>page.permalink</td>
+<td>String?</td>
+<td>Absolute URL with base_url</td>
+</tr>
+<tr>
+<td>page.section</td>
+<td>String</td>
+<td>Parent section name</td>
+</tr>
+<tr>
+<td>page.date</td>
+<td>String?</td>
+<td>Publication date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td>page.updated</td>
+<td>String?</td>
+<td>Last updated date</td>
+</tr>
+<tr>
+<td>page.language</td>
+<td>String</td>
+<td>Effective language code</td>
+</tr>
+<tr>
+<td>page.translations</td>
+<td>Array&lt;TranslationLink&gt;</td>
+<td>Language variants</td>
+</tr>
+</tbody>
+</table>
+<p>Rendered HTML content is available as the top-level <code>content</code> variable.</p>
+<h3 id="metadata-properties">Metadata Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.draft</td>
+<td>Bool</td>
+<td>Is draft</td>
+</tr>
+<tr>
+<td>page.weight</td>
+<td>Int</td>
+<td>Sort weight</td>
+</tr>
+<tr>
+<td>page.image</td>
+<td>String?</td>
+<td>Featured image path</td>
+</tr>
+<tr>
+<td>page.authors</td>
+<td>Array&lt;String&gt;</td>
+<td>Author names</td>
+</tr>
+<tr>
+<td>page.extra</td>
+<td>Object</td>
+<td>Custom front matter fields</td>
+</tr>
+</tbody>
+</table>
+<h3 id="computed-properties">Computed Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.word_count</td>
+<td>Int</td>
+<td>Word count</td>
+</tr>
+<tr>
+<td>page.reading_time</td>
+<td>Int</td>
+<td>Reading time (minutes)</td>
+</tr>
+<tr>
+<td>page.summary</td>
+<td>String?</td>
+<td>Content before &lt;!-- more --&gt;</td>
+</tr>
+<tr>
+<td>page.assets</td>
+<td>Array&lt;String&gt;</td>
+<td>Static files in page bundle</td>
+</tr>
+</tbody>
+</table>
+<h3 id="boolean-flags">Boolean Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.toc</td>
+<td>Bool</td>
+<td>false</td>
+<td>Show table of contents</td>
+</tr>
+<tr>
+<td>page.render</td>
+<td>Bool</td>
+<td>true</td>
+<td>Should render</td>
+</tr>
+<tr>
+<td>page.is_index</td>
+<td>Bool</td>
+<td>—</td>
+<td>Is index file</td>
+</tr>
+<tr>
+<td>page.generated</td>
+<td>Bool</td>
+<td>false</td>
+<td>Auto-generated page</td>
+</tr>
+<tr>
+<td>page.in_sitemap</td>
+<td>Bool</td>
+<td>true</td>
+<td>Include in sitemap</td>
+</tr>
+<tr>
+<td>page.in_search_index</td>
+<td>Bool</td>
+<td>true</td>
+<td>Include in search</td>
+</tr>
+</tbody>
+</table>
+<h3 id="navigation-properties">Navigation Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.lower</td>
+<td>Page?</td>
+<td>Previous page in section</td>
+</tr>
+<tr>
+<td>page.higher</td>
+<td>Page?</td>
+<td>Next page in section</td>
+</tr>
+<tr>
+<td>page.ancestors</td>
+<td>Array&lt;Page&gt;</td>
+<td>Parent section chain</td>
+</tr>
+<tr>
+<td>page.translations</td>
+<td>Array&lt;TranslationLink&gt;</td>
+<td>Language variants</td>
+</tr>
+</tbody>
+</table>
+<h3 id="custom-metadata">Custom Metadata</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page.extra</td>
+<td>Object</td>
+<td>Custom front matter fields</td>
+</tr>
+</tbody>
+</table>
+<h3 id="flat-aliases">Flat Aliases</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page_title</td>
+<td>page.title</td>
+</tr>
+<tr>
+<td>page_description</td>
+<td>page.description</td>
+</tr>
+<tr>
+<td>page_url</td>
+<td>page.url</td>
+</tr>
+<tr>
+<td>page_section</td>
+<td>page.section</td>
+</tr>
+<tr>
+<td>page_date</td>
+<td>page.date</td>
+</tr>
+<tr>
+<td>page_image</td>
+<td>page.image</td>
+</tr>
+<tr>
+<td>page_summary</td>
+<td>page.summary</td>
+</tr>
+<tr>
+<td>page_word_count</td>
+<td>page.word_count</td>
+</tr>
+<tr>
+<td>page_reading_time</td>
+<td>page.reading_time</td>
+</tr>
+<tr>
+<td>page_permalink</td>
+<td>page.permalink</td>
+</tr>
+<tr>
+<td>page_authors</td>
+<td>page.authors</td>
+</tr>
+<tr>
+<td>page_weight</td>
+<td>page.weight</td>
+</tr>
+<tr>
+<td>page_language</td>
+<td>page.language</td>
+</tr>
+<tr>
+<td>page_translations</td>
+<td>page.translations</td>
+</tr>
+<tr>
+<td>taxonomy_name</td>
+<td>Current taxonomy name (taxonomy pages)</td>
+</tr>
+<tr>
+<td>taxonomy_term</td>
+<td>Current taxonomy term (taxonomy term pages)</td>
+</tr>
+<tr>
+<td>content</td>
+<td>Rendered HTML content</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="navigation-objects">Navigation Objects</h2>
+<h3 id="pagelower-pagehigher">page.lower / page.higher</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.title</td>
+<td>String</td>
+<td>Page title</td>
+</tr>
+<tr>
+<td>.url</td>
+<td>String</td>
+<td>Page URL</td>
+</tr>
+<tr>
+<td>.description</td>
+<td>String?</td>
+<td>Page description</td>
+</tr>
+<tr>
+<td>.date</td>
+<td>String?</td>
+<td>Page date</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">&lt;nav class="post-nav"&gt;
+  {% if page.lower %}
+  &lt;a href="{{ page.lower.url }}"&gt;← {{ page.lower.title }}&lt;/a&gt;
+  {% endif %}
+  
+  {% if page.higher %}
+  &lt;a href="{{ page.higher.url }}"&gt;{{ page.higher.title }} →&lt;/a&gt;
+  {% endif %}
+&lt;/nav&gt;
+</code>
+</pre>
+<h3 id="pageancestors">page.ancestors</h3>
+<p>Parent sections for breadcrumbs:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;nav class="breadcrumbs"&gt;
+  &lt;a href="/"&gt;Home&lt;/a&gt;
+  {% for ancestor in page.ancestors %}
+  / &lt;a href="{{ ancestor.url }}"&gt;{{ ancestor.title }}&lt;/a&gt;
+  {% endfor %}
+  / &lt;span&gt;{{ page.title }}&lt;/span&gt;
+&lt;/nav&gt;
+</code>
+</pre>
+<h3 id="pagetranslations">page.translations</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.code</td>
+<td>String</td>
+<td>Language code (e.g., "en")</td>
+</tr>
+<tr>
+<td>.url</td>
+<td>String</td>
+<td>Translated page URL</td>
+</tr>
+<tr>
+<td>.title</td>
+<td>String</td>
+<td>Title in that language</td>
+</tr>
+<tr>
+<td>.is_current</td>
+<td>Bool</td>
+<td>Current page's language</td>
+</tr>
+<tr>
+<td>.is_default</td>
+<td>Bool</td>
+<td>Default language</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">{% if page.translations %}
+&lt;nav class="lang-switcher"&gt;
+{% for t in page.translations %}
+  {% if t.is_current %}
+  &lt;span&gt;{{ t.code | upper }}&lt;/span&gt;
+  {% else %}
+  &lt;a href="{{ t.url }}"&gt;{{ t.code | upper }}&lt;/a&gt;
+  {% endif %}
+{% endfor %}
+&lt;/nav&gt;
+{% endif %}
+</code>
+</pre>
+<hr/>
+<h2 id="accessing-pageextra">Accessing page.extra</h2>
+<p>Custom metadata from front matter:</p>
+<pre>
+  <code class="language-markdown hljs">+++
+title = "Review"
+
+[extra]
+rating = 4.5
+featured = true
+pros = ["Fast", "Reliable"]
++++
+</code>
+</pre>
+<pre>
+  <code class="language-jinja hljs">{% if page.extra.featured %}
+&lt;span class="badge"&gt;Featured&lt;/span&gt;
+{% endif %}
+
+&lt;div class="rating"&gt;{{ page.extra.rating }} / 5&lt;/div&gt;
+
+&lt;ul&gt;
+{% for pro in page.extra.pros %}
+  &lt;li&gt;{{ pro }}&lt;/li&gt;
+{% endfor %}
+&lt;/ul&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="time-variables">Time Variables</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>current_year</td>
+<td>Int</td>
+<td>Current year (e.g., 2025)</td>
+</tr>
+<tr>
+<td>current_date</td>
+<td>String</td>
+<td>Current date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td>current_datetime</td>
+<td>String</td>
+<td>Current datetime</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">&lt;footer&gt;&amp;copy; {{ current_year }} {{ site.title }}&lt;/footer&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="seo-variables">SEO Variables</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>og_tags</td>
+<td>OpenGraph meta tags</td>
+</tr>
+<tr>
+<td>twitter_tags</td>
+<td>Twitter Card meta tags</td>
+</tr>
+<tr>
+<td>og_all_tags</td>
+<td>Both OG and Twitter tags</td>
+</tr>
+<tr>
+<td>canonical_tag</td>
+<td>Canonical link tag</td>
+</tr>
+<tr>
+<td>hreflang_tags</td>
+<td>Hreflang alternate link tags (multilingual)</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">&lt;head&gt;
+  {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+&lt;/head&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="asset-variables">Asset Variables</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>highlight_css</td>
+<td>Syntax highlighting CSS</td>
+</tr>
+<tr>
+<td>highlight_js</td>
+<td>Syntax highlighting JS</td>
+</tr>
+<tr>
+<td>highlight_tags</td>
+<td>Both CSS and JS</td>
+</tr>
+<tr>
+<td>auto_includes_css</td>
+<td>Auto-included CSS</td>
+</tr>
+<tr>
+<td>auto_includes_js</td>
+<td>Auto-included JS</td>
+</tr>
+<tr>
+<td>auto_includes</td>
+<td>All auto-includes</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">&lt;head&gt;
+  {{ highlight_css | safe }}
+  {{ auto_includes_css | safe }}
+&lt;/head&gt;
+&lt;body&gt;
+  ...
+  {{ highlight_js | safe }}
+  {{ auto_includes_js | safe }}
+&lt;/body&gt;
+</code>
+</pre>
+<hr/>
+<h3 id="table-of-contents">Table of Contents</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>toc</td>
+<td>String</td>
+<td>Generated TOC HTML</td>
+</tr>
+<tr>
+<td>toc_obj.html</td>
+<td>String</td>
+<td>Same TOC HTML in object form</td>
+</tr>
+</tbody>
+</table>
+<p>Only available when <code>toc = true</code> in front matter:</p>
+<pre>
+  <code class="language-jinja hljs">{% if page.toc %}
+&lt;aside class="toc"&gt;
+  {{ toc | safe }}
+&lt;/aside&gt;
+{% endif %}
+</code>
+</pre>
+<hr/>
+<h3 id="taxonomy-variables">Taxonomy Variables</h3>
+<p>Available in taxonomy templates:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>taxonomy_name</td>
+<td>String</td>
+<td>Taxonomy name (e.g., "tags")</td>
+</tr>
+<tr>
+<td>taxonomy_term</td>
+<td>String</td>
+<td>Current term name</td>
+</tr>
+<tr>
+<td>taxonomy_terms</td>
+<td>Array</td>
+<td>All terms (in taxonomy.html)</td>
+</tr>
+<tr>
+<td>taxonomy_pages</td>
+<td>Array&lt;Page&gt;</td>
+<td>Pages for term</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="type-reference">Type Reference</h2>
+<h3 id="quick-reference">Quick Reference</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>String</td>
+<td>Text value</td>
+</tr>
+<tr>
+<td>String?</td>
+<td>Optional text (may be nil)</td>
+</tr>
+<tr>
+<td>Int</td>
+<td>Integer number</td>
+</tr>
+<tr>
+<td>Bool</td>
+<td>true/false</td>
+</tr>
+<tr>
+<td>Array&lt;T&gt;</td>
+<td>List of type T</td>
+</tr>
+<tr>
+<td>Object</td>
+<td>Key-value map</td>
+</tr>
+</tbody>
+</table>
+<h3 id="template-checking">Template Checking</h3>
+<pre>
+  <code class="language-jinja hljs">{# Check for nil #}
+{% if page.description %}...{% endif %}
+
+{# Check for empty array #}
+{% if page.authors %}...{% endif %}
+
+{# Check for empty string #}
+{% if page.description is present %}...{% endif %}
+
+{# Default value #}
+{{ page.description | default(value=site.description) }}
+</code>
+</pre>
+<hr/>
+<h2 id="example-templates">Example Templates</h2>
+<h3 id="pagehtml">page.html</h3>
+<pre>
+  <code class="language-jinja hljs">{% extends "base.html" %}
+
+{% block content %}
+&lt;article&gt;
+  &lt;h1&gt;{{ page.title }}&lt;/h1&gt;
+  
+  &lt;div class="meta"&gt;
+    &lt;time&gt;{{ page.date }}&lt;/time&gt;
+    {% if page.authors %}
+    &lt;span&gt;by {{ page.authors | join(", ") }}&lt;/span&gt;
+    {% endif %}
+    &lt;span&gt;{{ page.reading_time }} min read&lt;/span&gt;
+  &lt;/div&gt;
+  
+  {% if page.toc %}
+  &lt;nav class="toc"&gt;{{ toc | safe }}&lt;/nav&gt;
+  {% endif %}
+  
+  &lt;div class="content"&gt;
+    {{ content | safe }}
+  &lt;/div&gt;
+  
+  {% if page.lower or page.higher %}
+  &lt;nav class="post-nav"&gt;
+    {% if page.lower %}
+    &lt;a href="{{ page.lower.url }}"&gt;← {{ page.lower.title }}&lt;/a&gt;
+    {% endif %}
+    {% if page.higher %}
+    &lt;a href="{{ page.higher.url }}"&gt;{{ page.higher.title }} →&lt;/a&gt;
+    {% endif %}
+  &lt;/nav&gt;
+  {% endif %}
+&lt;/article&gt;
+{% endblock %}
+</code>
+</pre>
+<h3 id="sectionhtml">section.html</h3>
+<pre>
+  <code class="language-jinja hljs">{% extends "base.html" %}
+
+{% block content %}
+&lt;section&gt;
+  &lt;h1&gt;{{ section.title }}&lt;/h1&gt;
+  {% if section.description %}
+  &lt;p class="lead"&gt;{{ section.description }}&lt;/p&gt;
+  {% endif %}
+  
+  {{ content | safe }}
+  
+  &lt;h2&gt;Articles ({{ section.pages_count }})&lt;/h2&gt;
+  &lt;ul class="article-list"&gt;
+  {% for p in section.pages %}
+    &lt;li&gt;
+      &lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;
+      {% if p.date %}&lt;time&gt;{{ p.date }}&lt;/time&gt;{% endif %}
+    &lt;/li&gt;
+  {% endfor %}
+  &lt;/ul&gt;
+  
+  {% if section.subsections %}
+  &lt;h2&gt;Categories&lt;/h2&gt;
+  &lt;ul&gt;
+  {% for sub in section.subsections %}
+    &lt;li&gt;
+      &lt;a href="{{ sub.url }}"&gt;{{ sub.title }}&lt;/a&gt;
+      ({{ sub.pages_count }})
+    &lt;/li&gt;
+  {% endfor %}
+  &lt;/ul&gt;
+  {% endif %}
+  
+  {{ pagination | safe }}
+&lt;/section&gt;
+{% endblock %}
+</code>
+</pre>
+<hr/>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/syntax/">Template Syntax</a> — Jinja2 basics</li>
+<li><a href="/templates/functions/">Functions</a> — Data retrieval functions</li>
+<li><a href="/templates/filters/">Filters</a> — Value transformation</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#hierarchy">Hierarchy</a><ul><li><a href="#relationships">Relationships</a></li></ul></li><li><a href="#site">Site</a><ul><li><a href="#properties">Properties</a></li><li><a href="#flat-aliases">Flat Aliases</a></li><li><a href="#data-directory">Data Directory</a><ul><li><a href="#file-structure">File Structure</a></li><li><a href="#accessing-data">Accessing Data</a></li></ul></li><li><a href="#site-authors">Site Authors</a><ul><li><a href="#defining-authors">Defining Authors</a></li><li><a href="#usage-in-templates">Usage in Templates</a></li></ul></li><li><a href="#example">Example</a></li></ul></li><li><a href="#section">Section</a><ul><li><a href="#properties">Properties</a></li><li><a href="#flat-aliases">Flat Aliases</a></li><li><a href="#from-front-matter">From Front Matter</a></li><li><a href="#iterating-pages">Iterating Pages</a></li><li><a href="#iterating-subsections">Iterating Subsections</a></li><li><a href="#using-sectionlist">Using section_list</a></li></ul></li><li><a href="#page">Page</a><ul><li><a href="#core-properties">Core Properties</a></li><li><a href="#metadata-properties">Metadata Properties</a></li><li><a href="#computed-properties">Computed Properties</a></li><li><a href="#boolean-flags">Boolean Flags</a></li><li><a href="#navigation-properties">Navigation Properties</a></li><li><a href="#custom-metadata">Custom Metadata</a></li><li><a href="#flat-aliases">Flat Aliases</a></li></ul></li><li><a href="#navigation-objects">Navigation Objects</a><ul><li><a href="#pagelower-pagehigher">page.lower / page.higher</a></li><li><a href="#pageancestors">page.ancestors</a></li><li><a href="#pagetranslations">page.translations</a></li></ul></li><li><a href="#accessing-pageextra">Accessing page.extra</a><ul><li><a href="#time-variables">Time Variables</a></li><li><a href="#seo-variables">SEO Variables</a></li><li><a href="#asset-variables">Asset Variables</a></li><li><a href="#table-of-contents">Table of Contents</a></li><li><a href="#taxonomy-variables">Taxonomy Variables</a></li></ul></li><li><a href="#type-reference">Type Reference</a><ul><li><a href="#quick-reference">Quick Reference</a></li><li><a href="#template-checking">Template Checking</a></li></ul></li><li><a href="#example-templates">Example Templates</a><ul><li><a href="#pagehtml">page.html</a></li><li><a href="#sectionhtml">section.html</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>

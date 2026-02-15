@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Syntax - Hwaro</title>
+  <meta property="og:title" content="Syntax">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/templates/syntax/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Syntax">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/" class="active">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      <li><a href="/templates/syntax/" class="active">Syntax</a></li>
+      <li><a href="/templates/functions/">Functions</a></li>
+      <li><a href="/templates/filters/">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Syntax</h1>
+    <p>Hwaro uses Crinja, a Jinja2-compatible template engine. This page covers the essential syntax.</p>
+<h2 id="variables">Variables</h2>
+<p>Print values with double braces:</p>
+<pre>
+  <code class="language-jinja hljs">{{ page.title }}
+{{ site.description }}
+{{ content }}
+</code>
+</pre>
+<h2 id="comments">Comments</h2>
+<pre>
+  <code class="language-jinja hljs">{# This is a comment #}
+</code>
+</pre>
+<h2 id="conditionals">Conditionals</h2>
+<pre>
+  <code class="language-jinja hljs">{% if page.description %}
+&lt;meta name="description" content="{{ page.description }}"&gt;
+{% endif %}
+</code>
+</pre>
+<p>With else:</p>
+<pre>
+  <code class="language-jinja hljs">{% if page.draft %}
+&lt;span class="badge"&gt;Draft&lt;/span&gt;
+{% else %}
+&lt;span class="badge"&gt;Published&lt;/span&gt;
+{% endif %}
+</code>
+</pre>
+<p>With elif:</p>
+<pre>
+  <code class="language-jinja hljs">{% if page.section == "blog" %}
+&lt;article class="post"&gt;{{ content | safe }}&lt;/article&gt;
+{% elif page.section == "docs" %}
+&lt;div class="documentation"&gt;{{ content | safe }}&lt;/div&gt;
+{% else %}
+&lt;main&gt;{{ content | safe }}&lt;/main&gt;
+{% endif %}
+</code>
+</pre>
+<h2 id="loops">Loops</h2>
+<pre>
+  <code class="language-jinja hljs">{% for p in section.pages %}
+&lt;li&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/li&gt;
+{% endfor %}
+</code>
+</pre>
+<p>With index:</p>
+<pre>
+  <code class="language-jinja hljs">{% for tag in page.tags %}
+{% if not loop.first %}, {% endif %}
+{{ tag }}
+{% endfor %}
+</code>
+</pre>
+<p>Loop variables:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>loop.index</td>
+<td>Current iteration (1-based)</td>
+</tr>
+<tr>
+<td>loop.index0</td>
+<td>Current iteration (0-based)</td>
+</tr>
+<tr>
+<td>loop.first</td>
+<td>True on first iteration</td>
+</tr>
+<tr>
+<td>loop.last</td>
+<td>True on last iteration</td>
+</tr>
+<tr>
+<td>loop.length</td>
+<td>Total items</td>
+</tr>
+</tbody>
+</table>
+<h2 id="template-inheritance">Template Inheritance</h2>
+<h3 id="base-template">Base Template</h3>
+<p><code>templates/base.html</code>:</p>
+<pre>
+  <code class="language-jinja hljs">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;{% block title %}{{ site.title }}{% endblock %}&lt;/title&gt;
+  {{ highlight_css | safe }}
+&lt;/head&gt;
+&lt;body&gt;
+  {% block content %}{% endblock %}
+  {{ highlight_js | safe }}
+&lt;/body&gt;
+&lt;/html&gt;
+</code>
+</pre>
+<h3 id="child-template">Child Template</h3>
+<p><code>templates/page.html</code>:</p>
+<pre>
+  <code class="language-jinja hljs">{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+
+{% block content %}
+&lt;article&gt;
+  &lt;h1&gt;{{ page.title }}&lt;/h1&gt;
+  {{ content | safe }}
+&lt;/article&gt;
+{% endblock %}
+</code>
+</pre>
+<h2 id="includes">Includes</h2>
+<p>Include partial templates:</p>
+<pre>
+  <code class="language-jinja hljs">{% include "partials/header.html" %}
+&lt;main&gt;{{ content | safe }}&lt;/main&gt;
+{% include "partials/footer.html" %}
+</code>
+</pre>
+<h2 id="variables">Variables</h2>
+<p>Set variables:</p>
+<pre>
+  <code class="language-jinja hljs">{% set author = page.authors | first %}
+&lt;span&gt;By {{ author }}&lt;/span&gt;
+</code>
+</pre>
+<h2 id="filters">Filters</h2>
+<p>Transform values with the pipe operator:</p>
+<pre>
+  <code class="language-jinja hljs">{{ page.title | upper }}
+{{ content | safe }}
+{{ page.date | date("%B %d, %Y") }}
+{{ page.authors | join(", ") }}
+</code>
+</pre>
+<p>See <a href="/templates/filters/">Filters</a> for all available filters.</p>
+<h2 id="tests">Tests</h2>
+<p>Evaluate conditions:</p>
+<pre>
+  <code class="language-jinja hljs">{% if page.url is startswith("/blog/") %}
+&lt;span&gt;Blog post&lt;/span&gt;
+{% endif %}
+
+{% if page.description is empty %}
+&lt;meta name="description" content="{{ site.description }}"&gt;
+{% endif %}
+</code>
+</pre>
+<p>See <a href="/templates/filters/">Filters</a> for all available tests.</p>
+<h2 id="whitespace-control">Whitespace Control</h2>
+<p>Trim whitespace with minus signs:</p>
+<pre>
+  <code class="language-jinja hljs">{%- if condition -%}
+trimmed
+{%- endif -%}
+</code>
+</pre>
+<h2 id="raw-blocks">Raw Blocks</h2>
+<p>Output literal Jinja syntax:</p>
+<pre>
+  <code class="language-jinja hljs">{% raw %}
+{{ this will not be parsed }}
+{% endraw %}
+</code>
+</pre>
+<h2 id="operators">Operators</h2>
+<h3 id="comparison">Comparison</h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>`==`</td>
+<td>Equal</td>
+</tr>
+<tr>
+<td>`!=`</td>
+<td>Not equal</td>
+</tr>
+<tr>
+<td>`&lt;`</td>
+<td>Less than</td>
+</tr>
+<tr>
+<td>`&gt;`</td>
+<td>Greater than</td>
+</tr>
+<tr>
+<td>`&lt;=`</td>
+<td>Less or equal</td>
+</tr>
+<tr>
+<td>`&gt;=`</td>
+<td>Greater or equal</td>
+</tr>
+</tbody>
+</table>
+<h3 id="logical">Logical</h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>`and`</td>
+<td>Both true</td>
+</tr>
+<tr>
+<td>`or`</td>
+<td>Either true</td>
+</tr>
+<tr>
+<td>`not`</td>
+<td>Negation</td>
+</tr>
+</tbody>
+</table>
+<pre>
+  <code class="language-jinja hljs">{% if page.section == "blog" and not page.draft %}
+&lt;article&gt;{{ content | safe }}&lt;/article&gt;
+{% endif %}
+</code>
+</pre>
+<h3 id="membership">Membership</h3>
+<pre>
+  <code class="language-jinja hljs">{% if "tutorial" in page.tags %}
+&lt;span class="badge"&gt;Tutorial&lt;/span&gt;
+{% endif %}
+</code>
+</pre>
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="active-navigation">Active Navigation</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;nav&gt;
+  &lt;a href="/"{% if page.url == "/" %} class="active"{% endif %}&gt;Home&lt;/a&gt;
+  &lt;a href="/blog/"{% if page.section == "blog" %} class="active"{% endif %}&gt;Blog&lt;/a&gt;
+&lt;/nav&gt;
+</code>
+</pre>
+<h3 id="conditional-meta-tags">Conditional Meta Tags</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;head&gt;
+  {% if page.description %}
+  &lt;meta name="description" content="{{ page.description }}"&gt;
+  {% endif %}
+  {{ og_all_tags | safe }}
+&lt;/head&gt;
+</code>
+</pre>
+<h3 id="section-based-layout">Section-Based Layout</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;body data-section="{{ page.section }}"&gt;
+  {% if page.section == "docs" %}
+  {% include "partials/sidebar.html" %}
+  {% endif %}
+  
+  &lt;main&gt;{{ content | safe }}&lt;/main&gt;
+&lt;/body&gt;
+</code>
+</pre>
+<h3 id="loop-with-empty-check">Loop with Empty Check</h3>
+<pre>
+  <code class="language-jinja hljs">{% if section.pages %}
+&lt;ul&gt;
+{% for p in section.pages %}
+  &lt;li&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/li&gt;
+{% endfor %}
+&lt;/ul&gt;
+{% else %}
+&lt;p&gt;No articles yet.&lt;/p&gt;
+{% endif %}
+</code>
+</pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/data-model/">Data Model</a> — Available variables</li>
+<li><a href="/templates/functions/">Functions</a> — Built-in functions</li>
+<li><a href="/templates/filters/">Filters</a> — Filters and tests</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#variables">Variables</a></li><li><a href="#comments">Comments</a></li><li><a href="#conditionals">Conditionals</a></li><li><a href="#loops">Loops</a></li><li><a href="#template-inheritance">Template Inheritance</a><ul><li><a href="#base-template">Base Template</a></li><li><a href="#child-template">Child Template</a></li></ul></li><li><a href="#includes">Includes</a></li><li><a href="#variables">Variables</a></li><li><a href="#filters">Filters</a></li><li><a href="#tests">Tests</a></li><li><a href="#whitespace-control">Whitespace Control</a></li><li><a href="#raw-blocks">Raw Blocks</a></li><li><a href="#operators">Operators</a><ul><li><a href="#comparison">Comparison</a></li><li><a href="#logical">Logical</a></li><li><a href="#membership">Membership</a></li></ul></li><li><a href="#common-patterns">Common Patterns</a><ul><li><a href="#active-navigation">Active Navigation</a></li><li><a href="#conditional-meta-tags">Conditional Meta Tags</a></li><li><a href="#section-based-layout">Section-Based Layout</a></li><li><a href="#loop-with-empty-check">Loop with Empty Check</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>

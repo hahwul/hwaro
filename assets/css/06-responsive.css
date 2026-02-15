@@ -1,0 +1,154 @@
+/* =============================================================================
+   Responsive Styles
+   ============================================================================= */
+
+/* Hide TOC on medium screens */
+@media (max-width: 1200px) {
+    .docs-toc {
+        display: none;
+    }
+
+    .docs-main {
+        margin-right: 0;
+        max-width: calc(100% - var(--sidebar-w));
+    }
+}
+
+/* Adjust main padding on smaller screens */
+@media (max-width: 1024px) {
+    .docs-main {
+        padding: 2rem 2rem;
+    }
+}
+
+/* Mobile layout */
+@media (max-width: 768px) {
+    .docs-sidebar {
+        position: fixed;
+        left: -100%;
+        width: 280px;
+        z-index: 200;
+        transition: left 0.25s ease;
+        background: var(--bg-elevated);
+        box-shadow: none;
+    }
+
+    .docs-sidebar.is-open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 150;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+
+    .sidebar-overlay.is-visible {
+        display: block;
+    }
+
+    .docs-toc {
+        display: none;
+    }
+
+    .docs-main {
+        margin-left: 0;
+        margin-right: 0;
+        padding: 1.75rem 1.25rem;
+        max-width: 100%;
+    }
+
+    .docs-main.no-toc {
+        max-width: 100%;
+    }
+
+    .docs-header nav {
+        display: none;
+    }
+
+    .docs-header .mobile-menu-btn {
+        display: flex;
+    }
+
+    .heading-anchor {
+        position: static;
+        display: inline-flex;
+        transform: none;
+        opacity: 0.4;
+        margin-left: 0.4rem;
+    }
+
+    /* Landing page mobile adjustments */
+    .hero {
+        padding: 9rem 1.25rem 3rem;
+    }
+
+    .hero h1 {
+        font-size: 1.75rem;
+    }
+
+    .hero p {
+        font-size: 0.95rem;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .landing-header {
+        padding: 0 1rem;
+    }
+
+    .landing-header nav {
+        gap: 0.25rem;
+    }
+
+    .landing-header nav a {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.5rem;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .code-content pre {
+        font-size: 0.75rem;
+    }
+
+    .ascii-decoration {
+        display: none;
+    }
+
+    .docs-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .hero h1 {
+        font-size: 1.5rem;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .docs-main {
+        padding: 1.25rem 1rem;
+    }
+
+    .docs-main > h1:first-child {
+        font-size: 1.35rem;
+    }
+}

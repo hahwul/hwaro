@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Sections - Hwaro</title>
+  <meta property="og:title" content="Sections">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/writing/sections/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sections">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="writing">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/" class="active">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/" class="active">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      <li><a href="/templates/functions/">Functions</a></li>
+      <li><a href="/templates/filters/">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Sections</h1>
+    <p>Sections are directories that group related content. They require an <code>_index.md</code> file.</p>
+<h2 id="creating-a-section">Creating a Section</h2>
+<pre>
+  <code>content/
+└── blog/
+    ├── _index.md     # Section index → /blog/
+    ├── first.md      # Page → /blog/first/
+    └── second.md     # Page → /blog/second/
+</code>
+</pre>
+<h2 id="section-index">Section Index</h2>
+<p>Every section needs an <code>_index.md</code>:</p>
+<pre>
+  <code class="language-markdown hljs">+++
+title = "Blog"
+description = "Latest articles"
+sort_by = "date"
++++
+
+Welcome to my blog.
+</code>
+</pre>
+<h2 id="front-matter">Front Matter</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>string</td>
+<td>—</td>
+<td>Section title (required)</td>
+</tr>
+<tr>
+<td>description</td>
+<td>string</td>
+<td>—</td>
+<td>Section description</td>
+</tr>
+<tr>
+<td>template</td>
+<td>string</td>
+<td>"section"</td>
+<td>Template to use</td>
+</tr>
+<tr>
+<td>page_template</td>
+<td>string</td>
+<td>—</td>
+<td>Default template for pages</td>
+</tr>
+<tr>
+<td>sort_by</td>
+<td>string</td>
+<td>"date"</td>
+<td>Sort by: date, weight, title</td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>bool</td>
+<td>false</td>
+<td>Reverse sort order</td>
+</tr>
+<tr>
+<td>paginate</td>
+<td>int</td>
+<td>—</td>
+<td>Pages per page</td>
+</tr>
+<tr>
+<td>paginate_path</td>
+<td>string</td>
+<td>"page"</td>
+<td>Pagination URL pattern</td>
+</tr>
+<tr>
+<td>transparent</td>
+<td>bool</td>
+<td>false</td>
+<td>Pass pages to parent</td>
+</tr>
+<tr>
+<td>generate_feeds</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate RSS feed</td>
+</tr>
+<tr>
+<td>redirect_to</td>
+<td>string</td>
+<td>—</td>
+<td>Redirect URL</td>
+</tr>
+<tr>
+<td>draft</td>
+<td>bool</td>
+<td>false</td>
+<td>Exclude from production</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>int</td>
+<td>0</td>
+<td>Section sort order</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<h3 id="blog-with-pagination">Blog with Pagination</h3>
+<pre>
+  <code class="language-toml hljs">+++
+title = "Blog"
+sort_by = "date"
+paginate = 10
+paginate_path = "p"
++++
+</code>
+</pre>
+<p>Generates: <code>/blog/</code>, <code>/blog/p/2/</code>, <code>/blog/p/3/</code></p>
+<h3 id="documentation">Documentation</h3>
+<pre>
+  <code class="language-toml hljs">+++
+title = "Docs"
+page_template = "doc-page"
+sort_by = "weight"
++++
+</code>
+</pre>
+<p>All pages use <code>doc-page.html</code> template and sort by weight.</p>
+<h3 id="section-with-feed">Section with Feed</h3>
+<pre>
+  <code class="language-toml hljs">+++
+title = "News"
+generate_feeds = true
++++
+</code>
+</pre>
+<p>Generates <code>/news/rss.xml</code>.</p>
+<h2 id="nested-sections">Nested Sections</h2>
+<p>Sections can contain other sections:</p>
+<pre>
+  <code>content/
+└── docs/
+    ├── _index.md           # /docs/
+    ├── getting-started/
+    │   ├── _index.md       # /docs/getting-started/
+    │   └── install.md      # /docs/getting-started/install/
+    └── guides/
+        ├── _index.md       # /docs/guides/
+        └── deploy.md       # /docs/guides/deploy/
+</code>
+</pre>
+<p>Access subsections in templates:</p>
+<pre>
+  <code class="language-jinja hljs">{% for sub in section.subsections %}
+&lt;a href="{{ sub.url }}"&gt;{{ sub.title }}&lt;/a&gt;
+&lt;small&gt;({{ sub.pages_count }})&lt;/small&gt;
+{% endfor %}
+</code>
+</pre>
+<h2 id="template-variables">Template Variables</h2>
+<p>When rendering a section page (<code>_index.md</code>), these variables are available:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>section.title</td>
+<td>String</td>
+<td>Current section title</td>
+</tr>
+<tr>
+<td>section.description</td>
+<td>String</td>
+<td>Current section description</td>
+</tr>
+<tr>
+<td>section.pages</td>
+<td>Array&lt;Page&gt;</td>
+<td>Pages shown in the current section list</td>
+</tr>
+<tr>
+<td>section.pages_count</td>
+<td>Int</td>
+<td>Number of items in `section.pages`</td>
+</tr>
+<tr>
+<td>section.list</td>
+<td>String</td>
+<td>Pre-rendered HTML list (same value as `section_list`)</td>
+</tr>
+<tr>
+<td>section.subsections</td>
+<td>Array&lt;Section&gt;</td>
+<td>Direct child sections (`title`, `description`, `url`, `pages_count`)</td>
+</tr>
+<tr>
+<td>section.assets</td>
+<td>Array&lt;String&gt;</td>
+<td>Colocated section assets</td>
+</tr>
+<tr>
+<td>section.page_template</td>
+<td>String</td>
+<td>Default template name for child pages</td>
+</tr>
+<tr>
+<td>section.paginate_path</td>
+<td>String</td>
+<td>Pagination path segment</td>
+</tr>
+<tr>
+<td>section.redirect_to</td>
+<td>String</td>
+<td>Redirect target if configured</td>
+</tr>
+<tr>
+<td>section_list</td>
+<td>String</td>
+<td>Same as `section.list`</td>
+</tr>
+<tr>
+<td>pagination</td>
+<td>String</td>
+<td>Pre-rendered pagination HTML</td>
+</tr>
+<tr>
+<td>paginator</td>
+<td>Object</td>
+<td>Structured pagination object</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>page.url</code> for the current section URL.</p>
+<h3 id="sectionlist-sectionlist"><code>section.list</code> / <code>section_list</code></h3>
+<pre>
+  <code class="language-jinja hljs">&lt;ul class="auto-list"&gt;
+  {{ section.list | safe }}
+&lt;/ul&gt;
+</code>
+</pre>
+<h3 id="paginator-custom-pagination-ui"><code>paginator</code> (custom pagination UI)</h3>
+<pre>
+  <code class="language-jinja hljs">{% if paginator is defined and paginator.number_pagers &gt; 1 %}
+&lt;nav&gt;
+  {% if paginator.previous %}&lt;a href="{{ paginator.previous }}"&gt;Prev&lt;/a&gt;{% endif %}
+  &lt;span&gt;{{ paginator.current_index }} / {{ paginator.number_pagers }}&lt;/span&gt;
+  {% if paginator.next %}&lt;a href="{{ paginator.next }}"&gt;Next&lt;/a&gt;{% endif %}
+&lt;/nav&gt;
+{% endif %}
+</code>
+</pre>
+<h2 id="transparent-sections">Transparent Sections</h2>
+<p>Use <code>transparent = true</code> to merge pages into parent section:</p>
+<pre>
+  <code class="language-toml hljs">+++
+title = "2024 Posts"
+transparent = true
++++
+</code>
+</pre>
+<p>Pages appear in the parent's <code>section.pages</code> list.</p>
+<h2 id="asset-colocation">Asset Colocation</h2>
+<p>Just like regular pages, sections can have colocated assets. Place non-markdown files in the same directory as the <code>_index.md</code> file.</p>
+<p>
+  <strong>Example Structure:</strong>
+</p>
+<pre>
+  <code class="language-text hljs">content/
+└── gallery/
+    ├── _index.md       &lt;-- The section index
+    ├── banner.jpg      &lt;-- Section asset
+    └── icon.png        &lt;-- Section asset
+</code>
+</pre>
+<p>These assets are copied to the output directory relative to the section.</p>
+<h3 id="accessing-assets-in-templates">Accessing Assets in Templates</h3>
+<p>You can access the list of section assets in your templates using <code>section.assets</code>. This returns an array of relative paths to the files (from the content directory).</p>
+<pre>
+  <code class="language-jinja hljs">&lt;!-- In section.html --&gt;
+&lt;div class="gallery"&gt;
+  {% for asset in section.assets %}
+    &lt;img src="{{ get_url(path=asset) }}" alt="Section Asset"&gt;
+  {% endfor %}
+&lt;/div&gt;
+</code>
+</pre>
+<h2 id="section-vs-page">Section vs Page</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Type</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>_index.md</td>
+<td>Section index</td>
+<td>`/blog/`</td>
+</tr>
+<tr>
+<td>index.md</td>
+<td>Regular page</td>
+<td>`/blog/`</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>_index.md</code> when you need to list child pages.</p>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#creating-a-section">Creating a Section</a></li><li><a href="#section-index">Section Index</a></li><li><a href="#front-matter">Front Matter</a></li><li><a href="#examples">Examples</a><ul><li><a href="#blog-with-pagination">Blog with Pagination</a></li><li><a href="#documentation">Documentation</a></li><li><a href="#section-with-feed">Section with Feed</a></li></ul></li><li><a href="#nested-sections">Nested Sections</a></li><li><a href="#template-variables">Template Variables</a><ul><li><a href="#sectionlist-sectionlist">section.list / section_list</a></li><li><a href="#paginator-custom-pagination-ui">paginator (custom pagination UI)</a></li></ul></li><li><a href="#transparent-sections">Transparent Sections</a></li><li><a href="#asset-colocation">Asset Colocation</a><ul><li><a href="#accessing-assets-in-templates">Accessing Assets in Templates</a></li></ul></li><li><a href="#section-vs-page">Section vs Page</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>

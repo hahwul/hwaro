@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Archetypes - Hwaro</title>
+  <meta property="og:title" content="Archetypes">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/writing/archetypes/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Archetypes">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="writing">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/" class="active">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/" class="active">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      <li><a href="/templates/functions/">Functions</a></li>
+      <li><a href="/templates/filters/">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Archetypes</h1>
+    <p>Archetypes are content templates that define default front matter and content structure for new pages. When you create content with <code>hwaro new</code>, archetypes provide consistent starting points.</p>
+<h2 id="overview">Overview</h2>
+<p>Archetypes live in the <code>archetypes/</code> directory at your project root:</p>
+<pre>
+  <code>my-site/
+├── archetypes/
+│   ├── default.md      # Default template
+│   ├── posts.md        # For content/posts/
+│   └── tools/
+│       └── develop.md  # For content/tools/develop/
+├── content/
+├── templates/
+└── config.toml
+</code>
+</pre>
+<h2 id="creating-archetypes">Creating Archetypes</h2>
+<p>An archetype is a Markdown file with front matter and optional content. Use placeholders that get replaced when creating new content.</p>
+<h3 id="available-placeholders">Available Placeholders</h3>
+<table>
+<thead>
+<tr>
+<th>Placeholder</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>`{{ title }}`</td>
+<td>Content title (from `-t` flag or filename)</td>
+</tr>
+<tr>
+<td>`{{ date }}`</td>
+<td>Current date and time</td>
+</tr>
+<tr>
+<td>`{{ draft }}`</td>
+<td>Draft status (`true` for drafts/ directory)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-archetype">Example Archetype</h3>
+<p>Create <code>archetypes/posts.md</code>:</p>
+<pre>
+  <code class="language-markdown hljs">---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: "Your Name"
+tags: []
+categories: []
+---
+
+# {{ title }}
+
+Write your introduction here.
+
+## Main Content
+
+Add your content...
+</code>
+</pre>
+<h2 id="archetype-matching">Archetype Matching</h2>
+<p>When you run <code>hwaro new</code>, archetypes are matched in this order:</p>
+<h3 id="1-explicit-flag--a">1. Explicit Flag (<code>-a</code>)</h3>
+<pre>
+  <code class="language-bash hljs">hwaro new -t "My Article" -a posts
+</code>
+</pre>
+<p>Uses <code>archetypes/posts.md</code> regardless of the output path.</p>
+<h3 id="2-path-based-matching">2. Path-Based Matching</h3>
+<pre>
+  <code class="language-bash hljs">hwaro new posts/hello-world.md
+</code>
+</pre>
+<p>Checks for <code>archetypes/posts.md</code>.</p>
+<h3 id="3-nested-path-matching">3. Nested Path Matching</h3>
+<pre>
+  <code class="language-bash hljs">hwaro new tools/develop/mytool.md
+</code>
+</pre>
+<p>Tries in order:</p>
+<ol>
+<li><code>archetypes/tools/develop.md</code></li>
+<li><code>archetypes/tools.md</code></li>
+<li><code>archetypes/default.md</code></li>
+</ol>
+<h3 id="4-default-archetype">4. Default Archetype</h3>
+<p>If no specific archetype matches, uses <code>archetypes/default.md</code>.</p>
+<h3 id="5-built-in-template">5. Built-in Template</h3>
+<p>If no archetypes exist, uses the built-in default template.</p>
+<h2 id="usage-examples">Usage Examples</h2>
+<h3 id="basic-usage">Basic Usage</h3>
+<pre>
+  <code class="language-bash hljs"># Uses path-based archetype matching
+hwaro new posts/my-first-post.md
+
+# Specify title explicitly
+hwaro new posts/my-post.md -t "My First Post"
+
+# Use specific archetype
+hwaro new -t "Quick Note" -a posts
+</code>
+</pre>
+<h3 id="creating-different-content-types">Creating Different Content Types</h3>
+<pre>
+  <code class="language-bash hljs"># Blog post (uses archetypes/posts.md)
+hwaro new posts/new-article.md
+
+# Documentation (uses archetypes/docs.md)
+hwaro new docs/getting-started.md
+
+# Tool page (uses archetypes/tools.md or archetypes/tools/develop.md)
+hwaro new tools/develop/my-tool.md
+</code>
+</pre>
+<h2 id="recommended-archetypes">Recommended Archetypes</h2>
+<h3 id="blog-posts-archetypespostsmd">Blog Posts (<code>archetypes/posts.md</code>)</h3>
+<pre>
+  <code class="language-markdown hljs">---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: ""
+tags: []
+categories: []
+description: ""
+image: ""
+---
+
+# {{ title }}
+
+Introduction paragraph.
+
+## Content
+</code>
+</pre>
+<h3 id="documentation-archetypesdocsmd">Documentation (<code>archetypes/docs.md</code>)</h3>
+<pre>
+  <code class="language-markdown hljs">---
+title: "{{ title }}"
+date: {{ date }}
+weight: 10
+toc: true
+---
+
+Brief description of this documentation page.
+
+## Overview
+
+## Usage
+
+## Examples
+</code>
+</pre>
+<h3 id="default-archetypesdefaultmd">Default (<code>archetypes/default.md</code>)</h3>
+<pre>
+  <code class="language-markdown hljs">---
+title: "{{ title }}"
+date: {{ date }}
+draft: {{ draft }}
+---
+
+# {{ title }}
+</code>
+</pre>
+<h2 id="tips">Tips</h2>
+<ul>
+<li><strong>Consistent metadata</strong>: Define all commonly used front matter fields in archetypes</li>
+<li><strong>Section-specific</strong>: Create archetypes for each content section with relevant defaults</li>
+<li><strong>Nested organization</strong>: Use subdirectories in <code>archetypes/</code> to match your content structure</li>
+<li><strong>Draft handling</strong>: The <code>{{ draft }}</code> placeholder is <code>true</code> when creating in <code>drafts/</code> directory</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#overview">Overview</a></li><li><a href="#creating-archetypes">Creating Archetypes</a><ul><li><a href="#available-placeholders">Available Placeholders</a></li><li><a href="#example-archetype">Example Archetype</a></li></ul></li><li><a href="#archetype-matching">Archetype Matching</a><ul><li><a href="#1-explicit-flag--a">1. Explicit Flag (-a)</a></li><li><a href="#2-path-based-matching">2. Path-Based Matching</a></li><li><a href="#3-nested-path-matching">3. Nested Path Matching</a></li><li><a href="#4-default-archetype">4. Default Archetype</a></li><li><a href="#5-built-in-template">5. Built-in Template</a></li></ul></li><li><a href="#usage-examples">Usage Examples</a><ul><li><a href="#basic-usage">Basic Usage</a></li><li><a href="#creating-different-content-types">Creating Different Content Types</a></li></ul></li><li><a href="#recommended-archetypes">Recommended Archetypes</a><ul><li><a href="#blog-posts-archetypespostsmd">Blog Posts (archetypes/posts.md)</a></li><li><a href="#documentation-archetypesdocsmd">Documentation (archetypes/docs.md)</a></li><li><a href="#default-archetypesdefaultmd">Default (archetypes/default.md)</a></li></ul></li><li><a href="#tips">Tips</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>

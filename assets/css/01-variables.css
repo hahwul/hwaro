@@ -1,0 +1,60 @@
+/* =============================================================================
+   CSS Variables - Hwaro Documentation Theme
+   Clean dark theme with muted red accent (GitButler-inspired)
+   ============================================================================= */
+
+:root {
+    /* Primary Colors - Muted Red */
+    --primary: #b35454;
+    --primary-hover: #c46262;
+    --primary-dark: #944545;
+    --primary-dim: rgba(179, 84, 84, 0.1);
+    --primary-glow: rgba(179, 84, 84, 0.25);
+
+    /* Accent Colors */
+    --accent: #6bb886;
+    --accent-dim: rgba(107, 184, 134, 0.08);
+
+    /* Text Colors */
+    --text: #ececf0;
+    --text-secondary: #b4b4be;
+    --text-muted: #a0a0ab;
+    --text-dim: #64646e;
+
+    /* Background Colors */
+    --bg: #101012;
+    --bg-elevated: #16161a;
+    --bg-subtle: #1c1c21;
+    --bg-hover: #222228;
+    --bg-card: #18181c;
+    --code-bg: #22272e;
+
+    /* Border Colors */
+    --border: #26262c;
+    --border-light: #37373f;
+
+    /* Semantic Colors */
+    --primary-light: #c87a7a;
+    --success: #22c55e;
+
+    /* Layout Dimensions */
+    --header-h: 56px;
+    --sidebar-w: 260px;
+    --toc-w: 220px;
+
+    /* Typography */
+    --font-mono:
+        "JetBrains Mono", "SF Mono", "Fira Code", "Monaco", Consolas, monospace;
+    --font-sans:
+        "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        sans-serif;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+
+    /* Transitions */
+    --transition-fast: 0.12s ease;
+    --transition-normal: 0.2s ease;
+}

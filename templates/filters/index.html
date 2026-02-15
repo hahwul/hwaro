@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Filters - Hwaro</title>
+  <meta property="og:title" content="Filters">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/templates/filters/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Filters">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css">
+<link rel="stylesheet" href="/assets/css/02-base.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+<link rel="stylesheet" href="/assets/css/04-content.css">
+<link rel="stylesheet" href="/assets/css/05-components.css">
+<link rel="stylesheet" href="/assets/css/06-responsive.css">
+<link rel="stylesheet" href="/assets/css/07-landing.css">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.png" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/" class="active">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      <li><a href="/start/">Overview</a></li>
+      <li><a href="/start/installation/">Installation</a></li>
+      <li><a href="/start/first-site/">First Site</a></li>
+      <li><a href="/start/cli/">CLI</a></li>
+      <li><a href="/start/config/">Configuration</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      <li><a href="/writing/">Overview</a></li>
+      <li><a href="/writing/pages/">Pages</a></li>
+      <li><a href="/writing/sections/">Sections</a></li>
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      <li><a href="/templates/">Overview</a></li>
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      <li><a href="/templates/functions/">Functions</a></li>
+      <li><a href="/templates/filters/" class="active">Filters</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      <li><a href="/features/">Overview</a></li>
+      <li><a href="/features/seo/">SEO</a></li>
+      <li><a href="/features/search/">Search</a></li>
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      <li><a href="/features/pagination/">Pagination</a></li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      <li><a href="/deploy/">Overview</a></li>
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      <li><a href="/deploy/docker/">Docker</a></li>
+    </ul>
+  </div>
+</aside>
+  <main class="docs-main">
+    <h1>Filters</h1>
+    <p>Filters transform values in templates. Apply with the pipe <code>|</code> operator.</p>
+<h2 id="syntax">Syntax</h2>
+<pre>
+  <code class="language-jinja hljs">{{ value | filter }}
+{{ value | filter(arg="value") }}
+{{ value | filter1 | filter2 }}
+</code>
+</pre>
+<h2 id="text-filters">Text Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>upper</td>
+<td>Uppercase</td>
+<td>{{ "hello" | upper }} → HELLO</td>
+</tr>
+<tr>
+<td>lower</td>
+<td>Lowercase</td>
+<td>{{ "HELLO" | lower }} → hello</td>
+</tr>
+<tr>
+<td>capitalize</td>
+<td>Capitalize first</td>
+<td>{{ "hello" | capitalize }} → Hello</td>
+</tr>
+<tr>
+<td>trim</td>
+<td>Remove whitespace</td>
+<td>{{ "  hi  " | trim }} → hi</td>
+</tr>
+<tr>
+<td>replace</td>
+<td>Replace text</td>
+<td>{{ "hello" | replace("l", "x") }} → hexxo</td>
+</tr>
+<tr>
+<td>slugify</td>
+<td>URL slug</td>
+<td>{{ "Hello World" | slugify }} → hello-world</td>
+</tr>
+<tr>
+<td>truncate_words</td>
+<td>Limit words</td>
+<td>{{ text | truncate_words(20) }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="html-filters">HTML Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>safe</td>
+<td>Don't escape HTML</td>
+<td>{{ content | safe }}</td>
+</tr>
+<tr>
+<td>strip_html</td>
+<td>Remove HTML tags</td>
+<td>{{ html | strip_html }}</td>
+</tr>
+<tr>
+<td>markdownify</td>
+<td>Render Markdown</td>
+<td>{{ text | markdownify }}</td>
+</tr>
+<tr>
+<td>xml_escape</td>
+<td>XML escape</td>
+<td>{{ text | xml_escape }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="array-filters">Array Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>length</td>
+<td>Get length</td>
+<td>{{ items | length }}</td>
+</tr>
+<tr>
+<td>first</td>
+<td>First element</td>
+<td>{{ items | first }}</td>
+</tr>
+<tr>
+<td>last</td>
+<td>Last element</td>
+<td>{{ items | last }}</td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>Reverse order</td>
+<td>{{ items | reverse }}</td>
+</tr>
+<tr>
+<td>sort</td>
+<td>Sort array</td>
+<td>{{ items | sort }}</td>
+</tr>
+<tr>
+<td>join</td>
+<td>Join elements</td>
+<td>{{ tags | join(", ") }}</td>
+</tr>
+<tr>
+<td>split</td>
+<td>Split string</td>
+<td>{{ "a,b,c" | split(pat=",") }}</td>
+</tr>
+<tr>
+<td>where</td>
+<td>Filter objects by field value</td>
+<td>{{ posts | where(attribute="draft", value=false) }}</td>
+</tr>
+<tr>
+<td>sort_by</td>
+<td>Sort objects by field</td>
+<td>{{ posts | sort_by(attribute="date", reverse=true) }}</td>
+</tr>
+<tr>
+<td>group_by</td>
+<td>Group objects by field</td>
+<td>{{ posts | group_by(attribute="section") }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="url-filters">URL Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>absolute_url</td>
+<td>Full URL with base</td>
+<td>{{ "/about/" | absolute_url }}</td>
+</tr>
+<tr>
+<td>relative_url</td>
+<td>Prefix base_url</td>
+<td>{{ "/img.png" | relative_url }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-filters">Data Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default</td>
+<td>Fallback value</td>
+<td>{{ value | default(value="N/A") }}</td>
+</tr>
+<tr>
+<td>jsonify</td>
+<td>JSON encode</td>
+<td>{{ data | jsonify }}</td>
+</tr>
+<tr>
+<td>date</td>
+<td>Format date</td>
+<td>{{ page.date | date("%Y-%m-%d") }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<h3 id="safe-html">Safe HTML</h3>
+<p>Always use <code>safe</code> for rendered content:</p>
+<pre>
+  <code class="language-jinja hljs">{{ content | safe }}
+{{ og_tags | safe }}
+{{ toc | safe }}
+</code>
+</pre>
+<h3 id="default-values">Default Values</h3>
+<pre>
+  <code class="language-jinja hljs">{{ page.description | default(value=site.description) }}
+{{ page.image | default(value="/images/default.png") }}
+</code>
+</pre>
+<h3 id="date-formatting">Date Formatting</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;time&gt;{{ page.date | date("%B %d, %Y") }}&lt;/time&gt;
+</code>
+</pre>
+<p>Format codes:</p>
+<ul>
+<li><code>%Y</code> — Year (2024)</li>
+<li><code>%m</code> — Month (01-12)</li>
+<li><code>%d</code> — Day (01-31)</li>
+<li><code>%B</code> — Month name (January)</li>
+<li><code>%b</code> — Month abbr (Jan)</li>
+</ul>
+<h3 id="url-handling">URL Handling</h3>
+<pre>
+  <code class="language-jinja hljs">&lt;a href="{{ page.url | absolute_url }}"&gt;Permalink&lt;/a&gt;
+&lt;img src="{{ "/logo.png" | relative_url }}"&gt;
+</code>
+</pre>
+<h3 id="string-processing">String Processing</h3>
+<pre>
+  <code class="language-jinja hljs">{{ page.title | upper }}
+{{ page.title | slugify }}
+{{ long_text | truncate_words(50) }}
+</code>
+</pre>
+<h3 id="array-operations">Array Operations</h3>
+<pre>
+  <code class="language-jinja hljs">{% set tags = "a,b,c" | split(pat=",") %}
+{% for tag in tags %}
+  &lt;span&gt;{{ tag | trim }}&lt;/span&gt;
+{% endfor %}
+
+{{ page.authors | join(" &amp; ") }}
+</code>
+</pre>
+<h3 id="collection-querying">Collection Querying</h3>
+<pre>
+  <code class="language-jinja hljs">{% set published = site.pages | where(attribute="draft", value=false) %}
+{% set newest = published | sort_by(attribute="date", reverse=true) %}
+
+{% for group in newest | group_by(attribute="section") %}
+  &lt;h3&gt;{{ group.grouper }}&lt;/h3&gt;
+  &lt;ul&gt;
+  {% for p in group.list %}
+    &lt;li&gt;&lt;a href="{{ p.url }}"&gt;{{ p.title }}&lt;/a&gt;&lt;/li&gt;
+  {% endfor %}
+  &lt;/ul&gt;
+{% endfor %}
+</code>
+</pre>
+<h3 id="chaining">Chaining</h3>
+<pre>
+  <code class="language-jinja hljs">{{ page.title | lower | slugify }}
+{{ content | strip_html | truncate_words(100) }}
+{{ description | default(value="No description") | upper }}
+</code>
+</pre>
+<hr/>
+<h2 id="tests">Tests</h2>
+<p>Tests evaluate conditions in <code>{% if %}</code> statements.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>startswith</td>
+<td>Starts with</td>
+<td>{% if page.url is startswith("/blog/") %}</td>
+</tr>
+<tr>
+<td>endswith</td>
+<td>Ends with</td>
+<td>{% if page.url is endswith("/") %}</td>
+</tr>
+<tr>
+<td>containing</td>
+<td>Contains</td>
+<td>{% if page.url is containing("docs") %}</td>
+</tr>
+<tr>
+<td>matching</td>
+<td>Regex match</td>
+<td>{% if asset is matching("[.](jpg</td>
+<td>png)$") %}</td>
+</tr>
+<tr>
+<td>empty</td>
+<td>Is empty</td>
+<td>{% if page.description is empty %}</td>
+</tr>
+<tr>
+<td>present</td>
+<td>Is not empty</td>
+<td>{% if page.title is present %}</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-examples">Test Examples</h3>
+<pre>
+  <code class="language-jinja hljs">{% if page.url is startswith("/blog/") %}
+&lt;span class="badge"&gt;Blog&lt;/span&gt;
+{% endif %}
+
+{% if page.description is empty %}
+&lt;meta name="description" content="{{ site.description }}"&gt;
+{% endif %}
+
+{% if page.image is present %}
+&lt;meta property="og:image" content="{{ page.image | absolute_url }}"&gt;
+{% endif %}
+
+{% if "hero.jpg" is matching("[.](jpg|png)$") %}
+&lt;span&gt;Image file&lt;/span&gt;
+{% endif %}
+</code>
+</pre>
+<h3 id="built-in-tests">Built-in Tests</h3>
+<pre>
+  <code class="language-jinja hljs">{% if value is defined %}
+{% if value is none %}
+{% if value is number %}
+{% if value is string %}
+{% if value is iterable %}
+{% if value is even %}
+{% if value is odd %}
+</code>
+</pre>
+<hr/>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/data-model/">Data Model</a> — Available variables</li>
+<li><a href="/templates/functions/">Functions</a> — Template functions</li>
+<li><a href="/templates/syntax/">Syntax</a> — Template basics</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#syntax">Syntax</a></li><li><a href="#text-filters">Text Filters</a></li><li><a href="#html-filters">HTML Filters</a></li><li><a href="#array-filters">Array Filters</a></li><li><a href="#url-filters">URL Filters</a></li><li><a href="#data-filters">Data Filters</a></li><li><a href="#examples">Examples</a><ul><li><a href="#safe-html">Safe HTML</a></li><li><a href="#default-values">Default Values</a></li><li><a href="#date-formatting">Date Formatting</a></li><li><a href="#url-handling">URL Handling</a></li><li><a href="#string-processing">String Processing</a></li><li><a href="#array-operations">Array Operations</a></li><li><a href="#collection-querying">Collection Querying</a></li><li><a href="#chaining">Chaining</a></li></ul></li><li><a href="#tests">Tests</a><ul><li><a href="#test-examples">Test Examples</a></li><li><a href="#built-in-tests">Built-in Tests</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js"></script>
+<script src="/assets/js/02-shortcodes-market.js"></script>
+<script src="/assets/js/mermaid.min.js"></script>
+<script src="/assets/js/mermaidinit.js"></script>
+<script src="/assets/js/search.js"></script>
+</body>
+</html>
