@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <a href="https://hwaro.hahwul.com/getting-started/">Documentation</a> •
-  <a href="https://hwaro.hahwul.com/getting-started/installation/">Installation</a> •
-  <a href="https://hwaro.hahwul.com/deployment/github-pages/#github-actions">Github Action</a> •
+  <a href="https://hwaro.hahwul.com/start/">Documentation</a> •
+  <a href="https://hwaro.hahwul.com/start/installation/">Installation</a> •
+  <a href="https://hwaro.hahwul.com/deploy/github-pages/">Github Action</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
