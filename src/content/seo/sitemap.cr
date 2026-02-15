@@ -12,6 +12,18 @@ module Hwaro
 
           sitemap_pages = pages.select { |p| p.in_sitemap && p.render }
 
+          # Filter out excluded paths
+          unless site.config.sitemap.exclude.empty?
+            excluded_paths = site.config.sitemap.exclude.map do |path|
+              path.starts_with?('/') ? path : "/#{path}"
+            end
+
+            sitemap_pages.reject! do |page|
+              page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+              excluded_paths.any? { |excluded| page_url.starts_with?(excluded) }
+            end
+          end
+
           if sitemap_pages.empty?
             Logger.info "  No pages to include in sitemap."
             return

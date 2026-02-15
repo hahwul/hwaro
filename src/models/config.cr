@@ -8,12 +8,14 @@ module Hwaro
       property filename : String
       property changefreq : String
       property priority : Float64
+      property exclude : Array(String)
 
       def initialize
         @enabled = false
         @filename = "sitemap.xml"
         @changefreq = "weekly"
         @priority = 0.5
+        @exclude = [] of String
       end
     end
 
@@ -513,6 +515,9 @@ module Hwaro
             config.sitemap.filename = sitemap_section["filename"]?.try(&.as_s?) || config.sitemap.filename
             config.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
             config.sitemap.priority = sitemap_section["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
+            if exclude_arr = sitemap_section["exclude"]?.try(&.as_a?)
+              config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
+            end
           end
 
           # Load Robots configuration
