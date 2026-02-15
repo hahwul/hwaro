@@ -62,6 +62,40 @@ describe Hwaro::Content::Search do
       end
     end
 
+    it "excludes pages matching exclude patterns" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+      config.search.exclude = ["/private", "/drafts"]
+
+      page1 = Hwaro::Models::Page.new("public.md")
+      page1.title = "Public"
+      page1.url = "/public/"
+      page1.draft = false
+      page1.raw_content = "Content"
+
+      page2 = Hwaro::Models::Page.new("private.md")
+      page2.title = "Private"
+      page2.url = "/private/doc"
+      page2.draft = false
+      page2.raw_content = "Private Content"
+
+      page3 = Hwaro::Models::Page.new("drafts.md")
+      page3.title = "Drafts"
+      page3.url = "/drafts/wip"
+      page3.draft = false
+      page3.raw_content = "WIP Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page1, page2, page3], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Public")
+        content.should_not contain("Private")
+        content.should_not contain("Drafts")
+      end
+    end
+
     it "uses custom filename" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true
