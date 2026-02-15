@@ -89,7 +89,13 @@ limit = 20
 ```toml
 [sitemap]
 enabled = true
+exclude = ["/private", "/drafts"]
 ```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable sitemap generation |
+| exclude | array | [] | Exclude paths (prefixes) from sitemap |
 
 ### Robots.txt
 
