@@ -135,24 +135,28 @@ module Hwaro
 
       private def print_help
         art = [
-          "     ████████████     ",
-          "   ████████████████   ",
-          "   █              █   ",
-          "   █ ████████████ █   ",
-          "   █ ████████████ █   ",
-          "   █ █ ██ ██ ██ █ █   ",
-          "   █ █ ██ ██ ██ █ █   ",
-          "   ████████████████   ",
+          "                             ",
+          "    █████████████████████    ",
+          "    ██                 ██    ",
+          "    ██ ███████████████ ██    ",
+          "    ██ ███████████████ ██    ",
+          "    ██ █ █ █ █ █ █ █ █ ██    ",
+          "                             ",
+          "    █████████████████████    ",
         ]
 
         info = [
           "",
-          "  #{"Hwaro".colorize(:red).bold} v#{Hwaro::VERSION}",
+          "",
+          "",
+          "  #{"Hwaro".colorize(:cyan).bold} v#{Hwaro::VERSION}",
           "",
           "  A fast and lightweight static site",
           "  generator written in Crystal.",
           "",
           "  Usage: hwaro <command> [options]",
+          "",
+          "",
           "",
         ]
 
