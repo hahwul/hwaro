@@ -600,7 +600,7 @@ describe Hwaro::Content::Processors::Template do
       items = [
         {"name" => "A", "type" => "fruit"},
         {"name" => "B", "type" => "vegetable"},
-        {"name" => "C", "type" => "fruit"}
+        {"name" => "C", "type" => "fruit"},
       ]
       items_val = items.map do |item|
         h = {} of String => Crinja::Value
@@ -622,7 +622,7 @@ describe Hwaro::Content::Processors::Template do
       items = [
         {"name" => "C"},
         {"name" => "A"},
-        {"name" => "B"}
+        {"name" => "B"},
       ]
       items_val = items.map do |item|
         h = {} of String => Crinja::Value
@@ -644,7 +644,7 @@ describe Hwaro::Content::Processors::Template do
       items = [
         {"name" => "Apple", "type" => "fruit"},
         {"name" => "Carrot", "type" => "vegetable"},
-        {"name" => "Banana", "type" => "fruit"}
+        {"name" => "Banana", "type" => "fruit"},
       ]
       items_val = items.map do |item|
         h = {} of String => Crinja::Value

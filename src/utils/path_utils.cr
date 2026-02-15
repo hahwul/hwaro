@@ -23,10 +23,10 @@ module Hwaro
 
         # Remove any parent directory references, null bytes, and normalize slashes
         decoded
-          .gsub("..", "")         # Remove parent directory references
-          .gsub("\0", "")         # Remove null bytes
-          .squeeze("/")           # Normalize multiple slashes
-          .strip("/")             # Strip leading/trailing slashes
+          .gsub("..", "") # Remove parent directory references
+          .gsub("\0", "") # Remove null bytes
+          .squeeze("/")   # Normalize multiple slashes
+          .strip("/")     # Strip leading/trailing slashes
       end
     end
   end

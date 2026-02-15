@@ -46,8 +46,8 @@ describe Hwaro::Content::Hooks::TaxonomyHooks do
         ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
         ctx.site = site
         ctx.templates = {
-          "taxonomy" => "<html>{{ content }}</html>",
-          "taxonomy_term" => "<html>{{ content }}</html>"
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
         }
 
         # Trigger hook manually
@@ -61,16 +61,16 @@ describe Hwaro::Content::Hooks::TaxonomyHooks do
     end
 
     it "handles missing site context gracefully" do
-       manager = Hwaro::Core::Lifecycle::Manager.new
-       hook = Hwaro::Content::Hooks::TaxonomyHooks.new
-       hook.register_hooks(manager)
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      hook = Hwaro::Content::Hooks::TaxonomyHooks.new
+      hook.register_hooks(manager)
 
-       options = Hwaro::Config::Options::BuildOptions.new
-       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-       # ctx.site is nil by default
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      # ctx.site is nil by default
 
-       result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, ctx)
-       result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, ctx)
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
     end
   end
 end

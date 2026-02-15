@@ -57,10 +57,10 @@ module Hwaro
         @crinja_env : Crinja?
 
         # Regex constants for HTML minification
-        private REGEX_PRE_OPEN = /<pre([^>]*)>\s*<code/
-        private REGEX_PRE_CLOSE = /<\/code>\s*<\/pre>/
-        private REGEX_COMMENTS = /<!--(?!\[if|\s*more\s*-->).*?-->/m
-        private REGEX_BLANK_LINES = /\n{3,}/
+        private REGEX_PRE_OPEN       = /<pre([^>]*)>\s*<code/
+        private REGEX_PRE_CLOSE      = /<\/code>\s*<\/pre>/
+        private REGEX_COMMENTS       = /<!--(?!\[if|\s*more\s*-->).*?-->/m
+        private REGEX_BLANK_LINES    = /\n{3,}/
         SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
 
         def initialize
@@ -401,7 +401,6 @@ module Hwaro
           result
         end
 
-
         # Collect content file paths without parsing
         private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
           config = ctx.config
@@ -507,17 +506,17 @@ module Hwaro
                           Crinja::Value.new(nil)
                         end
                       when ".json"
-                         if parsed = JSON.parse(content)
-                           to_crinja(parsed)
-                         else
-                           Crinja::Value.new(nil)
-                         end
+                        if parsed = JSON.parse(content)
+                          to_crinja(parsed)
+                        else
+                          Crinja::Value.new(nil)
+                        end
                       when ".toml"
-                         if parsed = TOML.parse(content)
-                           to_crinja(parsed)
-                         else
-                           Crinja::Value.new(nil)
-                         end
+                        if parsed = TOML.parse(content)
+                          to_crinja(parsed)
+                        else
+                          Crinja::Value.new(nil)
+                        end
                       else
                         Crinja::Value.new(nil)
                       end
@@ -538,24 +537,23 @@ module Hwaro
           temp_authors = {} of String => NamedTuple(
             name: String,
             pages: Array(Models::Page),
-            extra: Hash(String, Crinja::Value)
-          )
+            extra: Hash(String, Crinja::Value))
 
           # 1. Collect authors from all pages
           site.pages.each do |page|
-             page.authors.each do |author_id|
-               # Normalize ID: lower case, stripped
-               id = author_id.strip.downcase
+            page.authors.each do |author_id|
+              # Normalize ID: lower case, stripped
+              id = author_id.strip.downcase
 
-               unless temp_authors.has_key?(id)
-                 temp_authors[id] = {
-                   name: author_id, # Default name is the ID as it appeared first
-                   pages: [] of Models::Page,
-                   extra: {} of String => Crinja::Value
-                 }
-               end
-               temp_authors[id][:pages] << page
-             end
+              unless temp_authors.has_key?(id)
+                temp_authors[id] = {
+                  name:  author_id, # Default name is the ID as it appeared first
+                  pages: [] of Models::Page,
+                  extra: {} of String => Crinja::Value,
+                }
+              end
+              temp_authors[id][:pages] << page
+            end
           end
 
           # 2. Enrich with data from site.data["authors"]
@@ -563,69 +561,69 @@ module Hwaro
           # where keys match author IDs
           if authors_data = site.data["authors"]?
             temp_authors.each_key do |id|
-               # Crinja::Value#[] returns generic Value
-               author_info = authors_data[id]
+              # Crinja::Value#[] returns generic Value
+              author_info = authors_data[id]
 
-               # Check if it has data
-               next if author_info.raw.nil?
+              # Check if it has data
+              next if author_info.raw.nil?
 
-               if info_hash = author_info.raw.as?(Hash(Crinja::Value, Crinja::Value))
-                  info_hash.each do |k_val, v|
-                     k = k_val.to_s
-                     if k == "name"
-                        current = temp_authors[id]
-                        temp_authors[id] = {
-                          name: v.to_s,
-                          pages: current[:pages],
-                          extra: current[:extra]
-                        }
-                     else
-                        temp_authors[id][:extra][k] = v
-                     end
+              if info_hash = author_info.raw.as?(Hash(Crinja::Value, Crinja::Value))
+                info_hash.each do |k_val, v|
+                  k = k_val.to_s
+                  if k == "name"
+                    current = temp_authors[id]
+                    temp_authors[id] = {
+                      name:  v.to_s,
+                      pages: current[:pages],
+                      extra: current[:extra],
+                    }
+                  else
+                    temp_authors[id][:extra][k] = v
                   end
-               elsif info_hash = author_info.raw.as?(Hash(String, Crinja::Value))
-                  info_hash.each do |k, v|
-                     if k == "name"
-                        current = temp_authors[id]
-                        temp_authors[id] = {
-                          name: v.to_s,
-                          pages: current[:pages],
-                          extra: current[:extra]
-                        }
-                     else
-                        temp_authors[id][:extra][k] = v
-                     end
+                end
+              elsif info_hash = author_info.raw.as?(Hash(String, Crinja::Value))
+                info_hash.each do |k, v|
+                  if k == "name"
+                    current = temp_authors[id]
+                    temp_authors[id] = {
+                      name:  v.to_s,
+                      pages: current[:pages],
+                      extra: current[:extra],
+                    }
+                  else
+                    temp_authors[id][:extra][k] = v
                   end
-               end
+                end
+              end
             end
           end
 
           # 3. Convert to Crinja Values and store in site.authors
           temp_authors.each do |id, data|
-             # Sort pages by date descending
-             sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
+            # Sort pages by date descending
+            sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
 
-             page_values = sorted_pages.map do |p|
-                Crinja::Value.new({
-                  "title" => Crinja::Value.new(p.title),
-                  "url"   => Crinja::Value.new(p.url),
-                  "date"  => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-                  "description" => Crinja::Value.new(p.description || "")
-                })
-             end
+            page_values = sorted_pages.map do |p|
+              Crinja::Value.new({
+                "title"       => Crinja::Value.new(p.title),
+                "url"         => Crinja::Value.new(p.url),
+                "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                "description" => Crinja::Value.new(p.description || ""),
+              })
+            end
 
-             # Construct the final author object
-             author_hash = {} of String => Crinja::Value
-             author_hash["key"] = Crinja::Value.new(id)
-             author_hash["name"] = Crinja::Value.new(data[:name])
-             author_hash["pages"] = Crinja::Value.new(page_values)
+            # Construct the final author object
+            author_hash = {} of String => Crinja::Value
+            author_hash["key"] = Crinja::Value.new(id)
+            author_hash["name"] = Crinja::Value.new(data[:name])
+            author_hash["pages"] = Crinja::Value.new(page_values)
 
-             # Merge extra data
-             data[:extra].each do |k, v|
-               author_hash[k] = v
-             end
+            # Merge extra data
+            data[:extra].each do |k, v|
+              author_hash[k] = v
+            end
 
-             site.authors[id] = Crinja::Value.new(author_hash)
+            site.authors[id] = Crinja::Value.new(author_hash)
           end
         end
 
@@ -652,15 +650,15 @@ module Hwaro
         end
 
         private def to_crinja(value : Hash(String, TOML::Any)) : Crinja::Value
-           converted = {} of String => Crinja::Value
-           value.each do |k, v|
-             converted[k] = to_crinja(v)
-           end
-           Crinja::Value.new(converted)
+          converted = {} of String => Crinja::Value
+          value.each do |k, v|
+            converted[k] = to_crinja(v)
+          end
+          Crinja::Value.new(converted)
         end
 
         private def to_crinja(value : TOML::Any) : Crinja::Value
-           if arr = value.as_a?
+          if arr = value.as_a?
             Crinja::Value.new(arr.map { |v| to_crinja(v) })
           elsif h = value.as_h?
             converted = {} of String => Crinja::Value
@@ -1943,8 +1941,8 @@ module Hwaro
           # This handles cases like: <pre>\n  <code>content</code>\n</pre>
           # Converting to: <pre><code>content</code></pre>
           cleaned = html
-            .gsub(REGEX_PRE_OPEN, "<pre\\1><code") # <pre>\n  <code> -> <pre><code>
-            .gsub(REGEX_PRE_CLOSE, "</code></pre>")   # </code>\n</pre> -> </code></pre>
+            .gsub(REGEX_PRE_OPEN, "<pre\\1><code")  # <pre>\n  <code> -> <pre><code>
+            .gsub(REGEX_PRE_CLOSE, "</code></pre>") # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
           # Also preserve <!-- more --> markers used for content summaries

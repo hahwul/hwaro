@@ -72,12 +72,12 @@ module Hwaro::Core::Build
 
           john = site.authors["john-doe"]
           john["name"].as_s.should eq("John Doe")
-          john["pages"].as_a.size.should eq(2) # Post 1 and Post 2
+          john["pages"].as_a.size.should eq(2)       # Post 1 and Post 2
           john["twitter"].as_s.should eq("@johndoe") # Extra data merged
 
           jane = site.authors["jane-smith"]
           jane["name"].as_s.should eq("Jane Smith")
-          jane["pages"].as_a.size.should eq(1) # Post 2 only
+          jane["pages"].as_a.size.should eq(1)    # Post 2 only
           jane["role"].as_s.should eq("Designer") # Extra data merged
         end
       end

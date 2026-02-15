@@ -42,7 +42,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
         "--cache",
         "--verbose",
         "--profile",
-        "--debug"
+        "--debug",
       ])
 
       options.drafts.should be_true

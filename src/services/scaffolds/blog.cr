@@ -211,7 +211,7 @@ module Hwaro
           description : String? = nil,
           tags : Array(String)? = nil,
           categories : Array(String)? = nil,
-          authors : Array(String)? = nil
+          authors : Array(String)? = nil,
         ) : String
           String.build do |str|
             str << "+++\n"

@@ -49,7 +49,7 @@ describe Hwaro::CLI::Commands::InitCommand do
       options = cmd.parse_options([
         "--skip-agents-md",
         "--skip-sample-content",
-        "--skip-taxonomies"
+        "--skip-taxonomies",
       ])
 
       options.skip_agents_md.should be_true
@@ -79,7 +79,7 @@ describe Hwaro::CLI::Commands::InitCommand do
         "new-site",
         "--force",
         "--scaffold", "blog",
-        "--include-multilingual", "en,es"
+        "--include-multilingual", "en,es",
       ])
 
       options.path.should eq("new-site")
