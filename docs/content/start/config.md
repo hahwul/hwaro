@@ -60,6 +60,20 @@ lazy_loading = true
 | safe | bool | false | Strip raw HTML from markdown |
 | lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
 
+## Permalinks
+
+Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.
+
+```toml
+[permalinks]
+"old/posts" = "posts"
+"2023/drafts" = "archive/2023"
+```
+
+| Source (Directory) | Target (URL Path) | Example Effect |
+|-------------------|-------------------|----------------|
+| `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
+
 ## SEO
 
 ### Feeds
