@@ -13,12 +13,14 @@ Enable in `config.toml`:
 [search]
 enabled = true
 include_content = true
+exclude = ["/private", "/drafts"]
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | enabled | bool | false | Generate search index |
 | include_content | bool | true | Include page content in index |
+| exclude | array | [] | Paths (prefixes) to exclude from search index |
 
 ## Generated Files
 
@@ -113,13 +115,24 @@ input.addEventListener('input', (e) => {
 
 ## Excluding Pages
 
-Exclude pages from search with front matter:
+### Front Matter
+
+Exclude individual pages from search with front matter:
 
 ```markdown
 +++
 title = "Terms of Service"
 in_search_index = false
 +++
+```
+
+### Configuration
+
+Exclude entire sections or paths using `config.toml`:
+
+```toml
+[search]
+exclude = ["/private", "/drafts"]
 ```
 
 ## Performance Tips

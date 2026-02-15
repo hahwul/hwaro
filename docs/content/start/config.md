@@ -120,7 +120,14 @@ twitter_site = "@username"
 [search]
 enabled = true
 include_content = true
+exclude = ["/private", "/drafts"]
 ```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate search index |
+| include_content | bool | true | Include content in index |
+| exclude | array | [] | Exclude paths (prefixes) from search index |
 
 ## Taxonomies
 
@@ -222,6 +229,7 @@ twitter_site = "@myblog"
 [search]
 enabled = true
 include_content = true
+exclude = ["/private"]
 
 [highlight]
 enabled = true
