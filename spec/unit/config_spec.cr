@@ -20,6 +20,7 @@ describe Hwaro::Models::Config do
       config.sitemap.filename.should eq("sitemap.xml")
       config.sitemap.changefreq.should eq("weekly")
       config.sitemap.priority.should eq(0.5)
+      config.sitemap.exclude.should eq([] of String)
     end
 
     it "can update sitemap settings" do
@@ -28,11 +29,13 @@ describe Hwaro::Models::Config do
       config.sitemap.filename = "custom-sitemap.xml"
       config.sitemap.changefreq = "daily"
       config.sitemap.priority = 0.8
+      config.sitemap.exclude = ["/private"]
 
       config.sitemap.enabled.should be_true
       config.sitemap.filename.should eq("custom-sitemap.xml")
       config.sitemap.changefreq.should eq("daily")
       config.sitemap.priority.should eq(0.8)
+      config.sitemap.exclude.should eq(["/private"])
     end
   end
 
@@ -442,6 +445,7 @@ describe Hwaro::Models::SitemapConfig do
     config.filename.should eq("sitemap.xml")
     config.changefreq.should eq("weekly")
     config.priority.should eq(0.5)
+    config.exclude.should eq([] of String)
   end
 end
 

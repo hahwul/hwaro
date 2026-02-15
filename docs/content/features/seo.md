@@ -14,7 +14,11 @@ Automatically generates `sitemap.xml` for search engines.
 ```toml
 [sitemap]
 enabled = true
+exclude = ["/private", "/drafts"]
 ```
+
+- `enabled`: Generate `sitemap.xml`.
+- `exclude`: List of path prefixes to exclude (e.g., `["/private"]` excludes `/private`, `/private/page.html`).
 
 ### Output
 

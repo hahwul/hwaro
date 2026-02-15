@@ -151,6 +151,39 @@ describe Hwaro::Content::Seo::Sitemap do
         content.should contain("<lastmod>2024-06-15</lastmod>")
       end
     end
+
+    it "excludes paths defined in config" do
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.sitemap.exclude = ["/private", "/secret"]
+      config.base_url = "https://example.com"
+
+      site = Hwaro::Models::Site.new(config)
+
+      page1 = Hwaro::Models::Page.new("public.md")
+      page1.url = "/public/"
+      page1.render = true
+      page1.in_sitemap = true
+
+      page2 = Hwaro::Models::Page.new("private.md")
+      page2.url = "/private/doc"
+      page2.render = true
+      page2.in_sitemap = true
+
+      page3 = Hwaro::Models::Page.new("secret.md")
+      page3.url = "/secret/"
+      page3.render = true
+      page3.in_sitemap = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Sitemap.generate([page1, page2, page3], site, output_dir)
+
+        content = File.read(File.join(output_dir, "sitemap.xml"))
+        content.should contain("/public/")
+        content.should_not contain("/private/doc")
+        content.should_not contain("/secret/")
+      end
+    end
   end
 end
 
