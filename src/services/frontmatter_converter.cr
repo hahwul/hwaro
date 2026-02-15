@@ -219,60 +219,112 @@ module Hwaro
       end
 
       private def convert_yaml_to_toml_string(yaml : YAML::Any, indent : Int32 = 0) : String
-        return "" unless yaml.as_h?
+        TomlBuilder.new.build(yaml)
+      end
 
-        result = String::Builder.new
+      private class TomlBuilder
+        def initialize
+          @output = String::Builder.new
+        end
 
-        yaml.as_h.each do |key, value|
-          key_str = key.as_s? || key.to_s
+        def build(yaml : YAML::Any) : String
+          return "" unless yaml.as_h?
+          process_table(yaml, [] of String, true)
+          @output.to_s
+        end
 
-          case
-          when value.as_h?
-            # Nested table - use [section] notation
-            result << "[#{key_str}]\n"
-            value.as_h.each do |nested_key, nested_value|
-              nested_key_str = nested_key.as_s? || nested_key.to_s
-              result << "#{nested_key_str} = #{to_toml_value(nested_value)}\n"
+        private def process_table(yaml : YAML::Any, path : Array(String), print_header : Bool)
+          return unless yaml.as_h?
+
+          simple_values = {} of String => YAML::Any
+          tables = {} of String => YAML::Any
+          array_tables = {} of String => YAML::Any
+
+          yaml.as_h.each do |key, value|
+            key_str = key.as_s? || key.to_s
+
+            if value.as_h?
+              tables[key_str] = value
+            elsif is_array_of_tables?(value)
+              array_tables[key_str] = value
+            else
+              simple_values[key_str] = value
             end
-          else
-            result << "#{key_str} = #{to_toml_value(value)}\n"
+          end
+
+          if !simple_values.empty? && print_header && !path.empty?
+            @output << "\n" unless @output.empty?
+            @output << "[" << format_path(path) << "]\n"
+          end
+
+          simple_values.each do |k, v|
+            @output << format_key(k) << " = " << to_toml_value(v) << "\n"
+          end
+
+          tables.each do |k, v|
+            process_table(v, path + [k], true)
+          end
+
+          array_tables.each do |k, v|
+            v.as_a.each do |item|
+              new_path = path + [k]
+              @output << "\n" unless @output.empty?
+              @output << "[[" << format_path(new_path) << "]]\n"
+              process_table(item, new_path, false)
+            end
           end
         end
 
-        result.to_s
-      end
-
-      private def to_toml_value(value : YAML::Any) : String
-        raw = value.raw
-
-        case raw
-        when Bool
-          raw.to_s
-        when Int32, Int64
-          raw.to_s
-        when Float32, Float64
-          raw.to_s
-        when Time
-          raw.to_rfc3339
-        when Array
-          items = value.as_a.map { |v| to_toml_value(v) }
-          "[#{items.join(", ")}]"
-        when String
-          "\"#{escape_toml_string(raw)}\""
-        when Nil
-          "\"\""
-        else
-          "\"#{escape_toml_string(value.to_s)}\""
+        private def is_array_of_tables?(value : YAML::Any) : Bool
+          return false unless value.as_a?
+          return false if value.as_a.empty?
+          value.as_a.all? { |v| v.as_h? }
         end
-      end
 
-      private def escape_toml_string(str : String) : String
-        str
-          .gsub("\\", "\\\\")
-          .gsub("\"", "\\\"")
-          .gsub("\n", "\\n")
-          .gsub("\t", "\\t")
-          .gsub("\r", "\\r")
+        private def format_path(path : Array(String)) : String
+          path.map { |k| format_key(k) }.join(".")
+        end
+
+        private def format_key(key : String) : String
+          if key =~ /^[A-Za-z0-9_-]+$/
+            key
+          else
+            "\"#{escape_toml_string(key)}\""
+          end
+        end
+
+        private def to_toml_value(value : YAML::Any) : String
+          raw = value.raw
+
+          case raw
+          when Bool
+            raw.to_s
+          when Int32, Int64
+            raw.to_s
+          when Float32, Float64
+            raw.to_s
+          when Time
+            raw.to_rfc3339
+          when Array
+            items = value.as_a.map { |v| to_toml_value(v) }
+            "[#{items.join(", ")}]"
+          when String
+            "\"#{escape_toml_string(raw)}\""
+          when Nil
+            "\"\""
+          else
+            "\"#{escape_toml_string(value.to_s)}\""
+          end
+        end
+
+        private def escape_toml_string(str : String) : String
+          str
+            .gsub("\\", "\\\\")
+            .gsub("\"", "\\\"")
+            .gsub("\n", "\\n")
+            .gsub("\t", "\\t")
+            .gsub("\r", "\\r")
+        end
       end
 
       private def convert_toml_to_yaml_string(toml : TOML::Table) : String

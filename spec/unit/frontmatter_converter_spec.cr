@@ -442,6 +442,70 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
   end
+  describe "nested structure support" do
+    it "converts nested YAML maps to TOML tables" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "nested.md")
+
+        yaml_content = <<-YAML
+title: Nested Test
+owner:
+  name: John Doe
+  details:
+    age: 30
+    city: New York
+YAML
+        File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
+
+        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result.should be_true
+
+        converted = File.read(file_path)
+
+        # Parse the result to verify validity
+        toml_content = converted.match(/\+\+\+\n(.*?)\n\+\+\+/m).try(&.[1])
+        toml_content.should_not be_nil
+
+        toml = TOML.parse(toml_content.not_nil!)
+        toml["owner"]["name"].as_s.should eq("John Doe")
+        toml["owner"]["details"]["age"].as_i.should eq(30)
+        toml["owner"]["details"]["city"].as_s.should eq("New York")
+      end
+    end
+
+    it "converts array of maps to TOML array of tables" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "array_tables.md")
+
+        yaml_content = <<-YAML
+title: Array Tables
+servers:
+  - name: alpha
+    ip: 10.0.0.1
+  - name: beta
+    ip: 10.0.0.2
+YAML
+        File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
+
+        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result.should be_true
+
+        converted = File.read(file_path)
+
+        toml_content = converted.match(/\+\+\+\n(.*?)\n\+\+\+/m).try(&.[1])
+        toml_content.should_not be_nil
+
+        toml = TOML.parse(toml_content.not_nil!)
+        servers = toml["servers"].as_a
+        servers.size.should eq(2)
+        servers[0]["name"].as_s.should eq("alpha")
+        servers[0]["ip"].as_s.should eq("10.0.0.1")
+        servers[1]["name"].as_s.should eq("beta")
+      end
+    end
+  end
 end
 
 describe Hwaro::Services::FrontmatterFormat do
