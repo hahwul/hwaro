@@ -134,8 +134,34 @@ module Hwaro
       end
 
       private def print_help
-        Logger.info "Usage: hwaro <command> [options]"
-        Logger.info "Hwaro is a fast and lightweight static site generator written in Crystal."
+        art = [
+          "     ████████████     ",
+          "   ████████████████   ",
+          "   █              █   ",
+          "   █ ████████████ █   ",
+          "   █ ████████████ █   ",
+          "   █ █ ██ ██ ██ █ █   ",
+          "   █ █ ██ ██ ██ █ █   ",
+          "   ████████████████   ",
+        ]
+
+        info = [
+          "",
+          "  #{"Hwaro".colorize(:red).bold} v#{Hwaro::VERSION}",
+          "",
+          "  A fast and lightweight static site",
+          "  generator written in Crystal.",
+          "",
+          "  Usage: hwaro <command> [options]",
+          "",
+        ]
+
+        Logger.info ""
+        art.each_with_index do |line, i|
+          right = info[i]? || ""
+          Logger.info "#{line.colorize(:light_red)}#{right}"
+        end
+
         Logger.info ""
         Logger.info "Commands:"
 
