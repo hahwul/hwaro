@@ -288,7 +288,8 @@ module Hwaro
           str << "enabled = true\n"
           str << "format = \"fuse_json\"\n"
           str << "fields = [\"title\", \"content\"]\n"
-          str << "filename = \"search.json\"\n\n"
+          str << "filename = \"search.json\"\n"
+          str << "exclude = []              # Exclude paths or patterns from search index\n\n"
 
           str << "# =============================================================================\n"
           str << "# Pagination\n"
@@ -315,7 +316,8 @@ module Hwaro
           str << "enabled = true\n"
           str << "filename = \"sitemap.xml\"\n"
           str << "changefreq = \"weekly\"\n"
-          str << "priority = 0.5\n\n"
+          str << "priority = 0.5\n"
+          str << "exclude = []              # Exclude paths or patterns from sitemap\n\n"
 
           str << "# =============================================================================\n"
           str << "# SEO: Robots.txt\n"
@@ -354,6 +356,16 @@ module Hwaro
           str << "sections = []             # Limit to specific sections, e.g., [\"posts\"]\n\n"
 
           # Optional features
+          str << "# =============================================================================\n"
+          str << "# Permalinks (Optional)\n"
+          str << "# =============================================================================\n"
+          str << "# Override the output path for specific sections or taxonomies.\n"
+          str << "# Placeholders: :year, :month, :day, :title, :slug, :section\n"
+          str << "#\n"
+          str << "# [permalinks]\n"
+          str << "# posts = \"/posts/:year/:month/:slug/\"\n"
+          str << "# tags = \"/topic/:slug/\"\n\n"
+
           str << "# =============================================================================\n"
           str << "# Auto Includes (Optional)\n"
           str << "# =============================================================================\n"
