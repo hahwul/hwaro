@@ -362,6 +362,7 @@ module Hwaro
           format = "fuse_json"
           fields = ["title", "content"]
           filename = "search.json"
+          exclude = []              # Exclude paths or patterns from search index
 
           TOML
         end
@@ -379,6 +380,7 @@ module Hwaro
           filename = "sitemap.xml"
           changefreq = "weekly"
           priority = 0.5
+          exclude = []              # Exclude paths or patterns from sitemap
 
           TOML
         end
@@ -460,6 +462,22 @@ module Hwaro
           truncate = 0              # Truncate content to N characters (0 = full content)
           limit = 10                # Maximum number of items in feed
           sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
+
+          TOML
+        end
+
+        protected def permalinks_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Permalinks (Optional)
+          # =============================================================================
+          # Override the output path for specific sections or taxonomies.
+          # Placeholders: :year, :month, :day, :title, :slug, :section
+          #
+          # [permalinks]
+          # posts = "/posts/:year/:month/:slug/"
+          # tags = "/topic/:slug/"
 
           TOML
         end

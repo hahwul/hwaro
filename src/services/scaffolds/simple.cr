@@ -70,6 +70,7 @@ module Hwaro
             str << feeds_config
 
             # Optional features (commented out by default)
+            str << permalinks_config
             str << auto_includes_config
             str << markdown_config
             str << build_hooks_config
