@@ -65,6 +65,9 @@ module Hwaro
         # Create static directory
         create_directory(File.join(target_path, "static"))
 
+        # Create static files
+        create_scaffold_static_files(target_path, scaffold)
+
         # Create config.toml
         config_content = if is_multilingual
                            create_multilingual_config(multilingual_languages, skip_taxonomies, scaffold)
@@ -114,6 +117,21 @@ module Hwaro
         shortcode_files = scaffold.shortcode_files
         shortcode_files.each do |relative_path, content|
           full_path = File.join(templates_dir, relative_path)
+          create_file(full_path, content)
+        end
+      end
+
+      private def create_scaffold_static_files(target_path : String, scaffold : Scaffolds::Base)
+        static_dir = File.join(target_path, "static")
+
+        scaffold.static_files.each do |relative_path, content|
+          full_path = File.join(static_dir, relative_path)
+          dir_path = File.dirname(full_path)
+
+          unless Dir.exists?(dir_path)
+            create_directory(dir_path)
+          end
+
           create_file(full_path, content)
         end
       end

@@ -104,80 +104,90 @@ module Hwaro
         # Override styles for blog
         protected def styles : String
           <<-CSS
-            <style>
-              :root {
-                --primary: #0070f3;
-                --text: #24292f;
-                --text-muted: #57606a;
-                --border: #d0d7de;
-                --bg: #ffffff;
-                --bg-subtle: #f6f8fa;
-              }
-              *, *::before, *::after { box-sizing: border-box; }
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; margin: 0; color: var(--text); background: var(--bg); }
+            <link rel="stylesheet" href="{{ base_url }}/css/style.css">
+          CSS
+        end
 
-              /* Layout */
-              .site-wrapper { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
-              .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
-              .site-logo { font-weight: 600; font-size: 1.1rem; color: var(--text); text-decoration: none; }
-              .site-logo:hover { color: var(--primary); }
-              .site-header nav { display: flex; gap: 1.25rem; }
-              .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
-              .site-header nav a:hover { color: var(--primary); }
-              .site-main { min-height: calc(100vh - 200px); }
-              .site-footer { margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; text-align: center; }
+        def static_files : Hash(String, String)
+          {
+            "css/style.css" => css_content,
+          }
+        end
 
-              /* Typography */
-              h1, h2, h3 { line-height: 1.3; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
-              h1 { font-size: 1.75rem; margin-top: 0; }
-              h2 { font-size: 1.35rem; }
-              h3 { font-size: 1.1rem; }
-              p { margin: 1em 0; }
-              a { color: var(--primary); text-decoration: none; }
-              a:hover { text-decoration: underline; }
-              code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
-              pre { background: var(--bg-subtle); padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
-              pre code { background: none; padding: 0; }
+        private def css_content : String
+          <<-CSS
+          :root {
+            --primary: #0070f3;
+            --text: #24292f;
+            --text-muted: #57606a;
+            --border: #d0d7de;
+            --bg: #ffffff;
+            --bg-subtle: #f6f8fa;
+          }
+          *, *::before, *::after { box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; margin: 0; color: var(--text); background: var(--bg); }
 
-              /* Post list */
-              .post-list { list-style: none; padding: 0; margin: 0; }
-              .post-item { padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
-              .post-item:first-child { padding-top: 0; }
-              .post-item:last-child { border-bottom: none; }
-              .post-title { margin: 0 0 0.4rem 0; font-size: 1.2rem; font-weight: 600; }
-              .post-title a { color: var(--text); text-decoration: none; }
-              .post-title a:hover { color: var(--primary); }
-              .post-meta { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem; }
-              .post-excerpt { color: var(--text-muted); font-size: 0.95rem; margin: 0; line-height: 1.5; }
+          /* Layout */
+          .site-wrapper { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
+          .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+          .site-logo { font-weight: 600; font-size: 1.1rem; color: var(--text); text-decoration: none; }
+          .site-logo:hover { color: var(--primary); }
+          .site-header nav { display: flex; gap: 1.25rem; }
+          .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
+          .site-header nav a:hover { color: var(--primary); }
+          .site-main { min-height: calc(100vh - 200px); }
+          .site-footer { margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; text-align: center; }
 
-              /* Post detail */
-              .post-header { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
-              .post-header h1 { margin-bottom: 0.75rem; }
-              .post-content { line-height: 1.7; }
-              .post-content h2 { margin-top: 2rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+          /* Typography */
+          h1, h2, h3 { line-height: 1.3; margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+          h1 { font-size: 1.75rem; margin-top: 0; }
+          h2 { font-size: 1.35rem; }
+          h3 { font-size: 1.1rem; }
+          p { margin: 1em 0; }
+          a { color: var(--primary); text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+          pre { background: var(--bg-subtle); padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
+          pre code { background: none; padding: 0; }
 
-              /* Tags */
-              .tag { display: inline-block; background: var(--bg-subtle); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); }
-              .tag:hover { background: var(--primary); color: white; border-color: var(--primary); text-decoration: none; }
+          /* Post list */
+          .post-list { list-style: none; padding: 0; margin: 0; }
+          .post-item { padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
+          .post-item:first-child { padding-top: 0; }
+          .post-item:last-child { border-bottom: none; }
+          .post-title { margin: 0 0 0.4rem 0; font-size: 1.2rem; font-weight: 600; }
+          .post-title a { color: var(--text); text-decoration: none; }
+          .post-title a:hover { color: var(--primary); }
+          .post-meta { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem; }
+          .post-excerpt { color: var(--text-muted); font-size: 0.95rem; margin: 0; line-height: 1.5; }
 
-              /* Section list */
-              ul.section-list { list-style: none; padding: 0; margin: 1.5rem 0; }
-              ul.section-list li { margin-bottom: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-subtle); border-radius: 6px; border: 1px solid var(--border); }
-              ul.section-list li a { font-weight: 500; }
-              .taxonomy-desc { color: var(--text-muted); margin-bottom: 1.5rem; }
-              nav.pagination { margin: 1.5rem 0; }
-              nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-              nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); text-decoration: none; }
-              nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
-              .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
-              .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
+          /* Post detail */
+          .post-header { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+          .post-header h1 { margin-bottom: 0.75rem; }
+          .post-content { line-height: 1.7; }
+          .post-content h2 { margin-top: 2rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
 
-              /* Responsive */
-              @media (max-width: 600px) {
-                .site-header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
-                .site-wrapper { padding: 0 1rem; }
-              }
-            </style>
+          /* Tags */
+          .tag { display: inline-block; background: var(--bg-subtle); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); }
+          .tag:hover { background: var(--primary); color: white; border-color: var(--primary); text-decoration: none; }
+
+          /* Section list */
+          ul.section-list { list-style: none; padding: 0; margin: 1.5rem 0; }
+          ul.section-list li { margin-bottom: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-subtle); border-radius: 6px; border: 1px solid var(--border); }
+          ul.section-list li a { font-weight: 500; }
+          .taxonomy-desc { color: var(--text-muted); margin-bottom: 1.5rem; }
+          nav.pagination { margin: 1.5rem 0; }
+          nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+          nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); text-decoration: none; }
+          nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
+          .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+          .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
+
+          /* Responsive */
+          @media (max-width: 600px) {
+            .site-header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+            .site-wrapper { padding: 0 1rem; }
+          }
           CSS
         end
 

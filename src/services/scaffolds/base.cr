@@ -30,6 +30,11 @@ module Hwaro
         # Returns template files as a hash of path => content
         abstract def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
 
+        # Returns static files as a hash of path => content
+        def static_files : Hash(String, String)
+          {} of String => String
+        end
+
         # Returns shortcode files as a hash of path => content
         def shortcode_files : Hash(String, String)
           {
