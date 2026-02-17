@@ -98,7 +98,7 @@ def run_build
   end
 end
 
-count = 1000
+count = 5000
 force = false
 OptionParser.parse do |parser|
   parser.on("-c COUNT", "--count=COUNT", "Number of pages") { |c| count = c.to_i }
