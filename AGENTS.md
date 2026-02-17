@@ -1104,10 +1104,44 @@ hwaro completion fish | source
 
 - The builder uses caching to avoid reprocessing unchanged content
 - Parallel processing is implemented for content generation
-- File watching in serve mode for automatic rebuilds
+- File watching in serve mode with **incremental rebuild** for content-only changes
+- Serve mode uses smart change detection to pick the cheapest rebuild strategy
 - Build profiling available via `--profile` flag for performance analysis
 - Be mindful of I/O operations and consider batching when possible
 - Deployment uses MD5 comparison to skip unchanged files
+
+### Incremental Build in Serve Mode
+
+During `hwaro serve`, the file watcher categorises detected changes into a `ChangeSet` and picks the cheapest rebuild strategy automatically:
+
+| Change type | Strategy | What happens |
+|---|---|---|
+| **Config changed** (`config.toml`) | Full rebuild | Everything is rebuilt from scratch |
+| **Files added or deleted** | Full rebuild | Structural change affects section lists, navigation, taxonomies |
+| **Template files modified** | Template re-render (`run_rerender`) | Templates are reloaded from disk; all pages are re-rendered with existing parsed content (no re-parsing or re-transforming) |
+| **Content files modified** (no add/delete) | Incremental build (`run_incremental`) | Only changed pages are re-parsed and re-rendered, along with their section index pages and prev/next navigation neighbours |
+| **Static files modified** | Static copy (`copy_changed_static`) | Only the changed static files are copied to the output directory |
+| **Content + static modified** | Incremental + static copy | Content is rebuilt incrementally, then changed static files are copied |
+| **Mixed (content + template, etc.)** | Full rebuild | Falls back to full rebuild for safety |
+
+**Implementation details:**
+
+- `src/services/server/server.cr` — `ChangeSet` struct categorises file changes; `detect_changes()` diffs two mtime snapshots; `apply_changeset()` selects the rebuild strategy
+- `src/core/build/builder.cr` — Three new public methods:
+  - `run_incremental(changed_files, options)` — Re-parses only the changed content pages, identifies affected pages (section indices, prev/next neighbours), rebuilds taxonomies, re-renders only the affected subset, and regenerates SEO/search files
+  - `run_rerender(options)` — Reloads templates from disk, clears the compiled template cache, re-renders all pages without re-parsing content, and regenerates taxonomy/404 pages
+  - `copy_changed_static(changed_files, output_dir, verbose)` — Copies only the specified static files to the output directory
+
+**How affected pages are determined during incremental build:**
+
+1. The changed content file's corresponding `Page` object is found in the existing site state
+2. The page is re-parsed (front matter, content, URL recalculated)
+3. The section containing the page is marked as affected → its `_index.md` section page is re-rendered
+4. The page's `lower` (previous) and `higher` (next) navigation neighbours are re-rendered (their nav links may reference the changed page)
+5. Taxonomies are rebuilt from scratch (a page may have added/removed tags)
+6. SEO files (sitemap, feeds, robots, llms, search index) are regenerated
+
+**Fallback behaviour:** If `run_incremental` or `run_rerender` is called before any full build has occurred (i.e. `@site`, `@config`, or `@templates` are not yet initialised), they automatically fall back to a full build via `run(options)`.
 
 ## Contributing
 

@@ -94,6 +94,204 @@ module Hwaro
           )
         end
 
+        # Incremental build: only re-parse and re-render pages whose source
+        # files have been modified.  Falls back to a full build when the
+        # necessary state from a previous build is not available.
+        def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+          config = @config
+          site   = @site
+          templates = @templates
+
+          # First build hasn't happened yet – fall back to full build
+          unless config && site && templates
+            return run(options)
+          end
+
+          Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..."
+          start_time = Time.instant
+
+          output_dir = options.output_dir
+          minify     = options.minify
+          highlight  = options.highlight && site.config.highlight.enabled
+          verbose    = options.verbose
+          safe       = site.config.markdown.safe
+          lazy_loading = site.config.markdown.lazy_loading
+          include_drafts = options.drafts
+
+          # --- 1. Identify the Page objects that correspond to changed files ---
+          changed_pages = [] of Models::Page
+          affected_sections = Set(String).new
+
+          changed_content_files.each do |file|
+            relative_path = begin
+              Path[file].relative_to("content").to_s
+            rescue
+              file.sub(/^content\//, "")
+            end
+
+            page = site.pages.find  { |p| p.path == relative_path } ||
+                   site.sections.find { |s| s.path == relative_path }
+
+            next unless page
+
+            # Re-read, re-parse front-matter and recalculate URL
+            parse_single_page(page)
+            page.generate_permalink(config.base_url)
+
+            changed_pages << page
+            affected_sections << page.section
+          end
+
+          if changed_pages.empty?
+            Logger.info "  No matching pages found – skipping."
+            return
+          end
+
+          # Filter out drafts if not including them
+          unless include_drafts
+            changed_pages.reject! { |p| p.draft }
+          end
+
+          # --- 2. Rebuild relationships that depend on the changed pages ---
+          # Re-populate taxonomies (a changed page may have new/removed tags)
+          site.taxonomies.clear
+          (site.pages + site.sections).each do |p|
+            p.taxonomies.each do |name, terms|
+              site.taxonomies[name] ||= {} of String => Array(Models::Page)
+              terms.each do |term|
+                site.taxonomies[name][term] ||= [] of Models::Page
+                site.taxonomies[name][term] << p
+              end
+            end
+          end
+          site.taxonomies.each_value do |terms|
+            terms.each_value do |pages|
+              sorted = Utils::SortUtils.sort_pages(pages, "date", false)
+              pages.clear
+              pages.concat(sorted)
+            end
+          end
+
+          # Rebuild lookup index (page data may have changed)
+          site.build_lookup_index
+
+          # --- 3. Determine the full set of pages that need re-rendering ---
+          pages_to_render = Set(Models::Page).new(changed_pages)
+
+          # Section index pages whose content lists include the changed pages
+          affected_sections.each do |section_name|
+            section = site.sections.find { |s| s.section == section_name }
+            pages_to_render << section if section
+          end
+
+          # Previous / next pages whose navigation links reference changed pages
+          changed_pages.each do |page|
+            pages_to_render << page.lower.not_nil!  if page.lower
+            pages_to_render << page.higher.not_nil! if page.higher
+          end
+
+          render_list = pages_to_render.to_a
+
+          # --- 4. Re-render the affected pages ---
+          global_vars = build_global_vars(site)
+          cache = @cache || Cache.new(enabled: false)
+
+          render_list.each do |page|
+            next unless page.render
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
+            source_path = File.join("content", page.path)
+            output_path = get_output_path(page, output_dir)
+            cache.update(source_path, output_path)
+          end
+
+          cache.save if options.cache
+
+          # --- 5. Regenerate lightweight SEO / search files ---
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose)
+          Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose)
+          Content::Seo::Robots.generate(site.config, output_dir, verbose)
+          Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose)
+          Content::Search.generate(all_pages, site.config, output_dir, verbose)
+
+          elapsed = Time.instant - start_time
+          Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
+        end
+
+        # Re-render all pages using reloaded templates without re-parsing
+        # content.  Useful when only template files have been modified.
+        def run_rerender(options : Config::Options::BuildOptions)
+          config    = @config
+          site      = @site
+
+          unless config && site
+            return run(options)
+          end
+
+          Logger.info "Template change detected. Re-rendering all pages..."
+          start_time = Time.instant
+
+          # Reload templates from disk & reset compiled template cache
+          @templates = nil
+          @compiled_templates_cache.clear
+          templates = load_templates
+          @templates = templates
+
+          output_dir = options.output_dir
+          minify     = options.minify
+          highlight  = options.highlight && site.config.highlight.enabled
+          verbose    = options.verbose
+          safe       = site.config.markdown.safe
+
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+
+          global_vars = build_global_vars(site)
+          cache = @cache || Cache.new(enabled: false)
+
+          count = 0
+          all_pages.each do |page|
+            next unless page.render
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
+            source_path = File.join("content", page.path)
+            output_path = get_output_path(page, output_dir)
+            cache.update(source_path, output_path)
+            count += 1
+          end
+
+          # Re-generate 404 page with new template
+          generate_404_page(site, templates, output_dir, minify, verbose)
+
+          # Re-generate taxonomy pages with new templates
+          Content::Taxonomies.generate(site, output_dir, templates, verbose)
+
+          cache.save if options.cache
+
+          elapsed = Time.instant - start_time
+          Logger.success "Re-render complete! Rendered #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
+        end
+
+        # Copy only the specified static files to the output directory.
+        # Used by serve mode when only static files have changed.
+        def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
+          copied = 0
+          changed_files.each do |src_path|
+            next unless File.exists?(src_path)
+            next if File.directory?(src_path)
+
+            relative = begin
+              Path[src_path].relative_to("static").to_s
+            rescue
+              src_path.sub(/^static\//, "")
+            end
+            dest_path = File.join(output_dir, relative)
+
+            FileUtils.mkdir_p(File.dirname(dest_path))
+            FileUtils.cp(src_path, dest_path)
+            copied += 1
+          end
+          Logger.success "Copied #{copied} static file(s)." if copied > 0
+        end
+
         def run(
           output_dir : String = "public",
           base_url : String? = nil,

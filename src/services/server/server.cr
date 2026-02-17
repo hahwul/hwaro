@@ -5,6 +5,9 @@
 # - Directory index handling
 # - File watching for automatic rebuilds
 # - 404 page handling
+# - Incremental rebuild for content-only changes
+# - Template-only re-render when only templates change
+# - Static-only copy when only static files change
 
 require "http/server"
 require "../../core/build/builder"
@@ -58,6 +61,82 @@ module Hwaro
         else
           context.response.print "404 Not Found"
         end
+      end
+    end
+
+    # Categorised set of file-system changes detected by the watcher.
+    #
+    # Changes are split into four buckets so the server can pick the
+    # cheapest rebuild strategy.
+    struct ChangeSet
+      # Content files (.md under content/) that were *modified* (not added/deleted)
+      getter modified_content : Array(String)
+      # Template files that were *modified*
+      getter modified_templates : Array(String)
+      # Static files that were *modified*
+      getter modified_static : Array(String)
+      # Files that were added (new) – present in current scan but not previous
+      getter added_files : Array(String)
+      # Files that were removed – present in previous scan but not current
+      getter removed_files : Array(String)
+      # Whether config.toml itself changed
+      getter config_changed : Bool
+
+      def initialize(
+        @modified_content : Array(String),
+        @modified_templates : Array(String),
+        @modified_static : Array(String),
+        @added_files : Array(String),
+        @removed_files : Array(String),
+        @config_changed : Bool,
+      )
+      end
+
+      # True when the change set is empty (nothing actually changed)
+      def empty? : Bool
+        @modified_content.empty? &&
+          @modified_templates.empty? &&
+          @modified_static.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
+      end
+
+      # True when a full rebuild is unavoidable:
+      # config changed, or files were added / deleted (which affects
+      # section lists, navigation, taxonomy indices, etc.)
+      def needs_full_rebuild? : Bool
+        @config_changed || !@added_files.empty? || !@removed_files.empty?
+      end
+
+      # True when only template files were modified (no content / static / structural changes)
+      def templates_only? : Bool
+        !@modified_templates.empty? &&
+          @modified_content.empty? &&
+          @modified_static.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
+      end
+
+      # True when only static files were modified
+      def static_only? : Bool
+        !@modified_static.empty? &&
+          @modified_content.empty? &&
+          @modified_templates.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
+      end
+
+      # True when content was modified (possibly alongside static changes)
+      # but no structural / config / template changes occurred.
+      def content_incremental? : Bool
+        !@modified_content.empty? &&
+          @modified_templates.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
       end
     end
 
@@ -133,14 +212,120 @@ module Hwaro
 
           current_mtimes = scan_mtimes
           if current_mtimes != last_mtimes
-            Logger.info "\n[Watch] Change detected. Rebuilding..."
-            begin
-              @builder.run(build_options)
-            rescue ex
-              Logger.error "[Watch] Build failed: #{ex.message}"
+            changeset = detect_changes(last_mtimes, current_mtimes)
+
+            unless changeset.empty?
+              begin
+                apply_changeset(changeset, build_options)
+              rescue ex
+                Logger.error "[Watch] Build failed: #{ex.message}"
+              end
             end
+
             last_mtimes = current_mtimes
           end
+        end
+      end
+
+      # Diff two mtime snapshots and return a categorised ChangeSet.
+      private def detect_changes(
+        old_mtimes : Hash(String, Time),
+        new_mtimes : Hash(String, Time),
+      ) : ChangeSet
+        modified_content   = [] of String
+        modified_templates = [] of String
+        modified_static    = [] of String
+        added_files        = [] of String
+        removed_files      = [] of String
+        config_changed     = false
+
+        # --- Files that exist in both snapshots but with different mtime ---
+        new_mtimes.each do |path, new_mtime|
+          if old_mtime = old_mtimes[path]?
+            next if old_mtime == new_mtime  # unchanged
+
+            if path == "config.toml"
+              config_changed = true
+            else
+              classify_modified(path, modified_content, modified_templates, modified_static)
+            end
+          else
+            # New file (exists now, didn't before)
+            added_files << path
+          end
+        end
+
+        # --- Files that existed before but are now gone ---
+        old_mtimes.each_key do |path|
+          unless new_mtimes.has_key?(path)
+            removed_files << path
+          end
+        end
+
+        ChangeSet.new(
+          modified_content:   modified_content,
+          modified_templates: modified_templates,
+          modified_static:    modified_static,
+          added_files:        added_files,
+          removed_files:      removed_files,
+          config_changed:     config_changed,
+        )
+      end
+
+      # Put a modified path into the right bucket.
+      private def classify_modified(
+        path : String,
+        content : Array(String),
+        templates : Array(String),
+        static : Array(String),
+      )
+        if path.starts_with?("content/")
+          content << path
+        elsif path.starts_with?("templates/")
+          templates << path
+        elsif path.starts_with?("static/")
+          static << path
+        end
+      end
+
+      # Choose the cheapest rebuild strategy for a given ChangeSet.
+      private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
+        if changeset.needs_full_rebuild?
+          reason = if changeset.config_changed
+                     "config"
+                   elsif !changeset.added_files.empty?
+                     "new files"
+                   else
+                     "deleted files"
+                   end
+          Logger.info "\n[Watch] Structural change detected (#{reason}). Full rebuild..."
+          @builder.run(build_options)
+
+        elsif changeset.templates_only?
+          Logger.info "\n[Watch] Template change detected (#{changeset.modified_templates.size} file(s)). Re-rendering..."
+          @builder.run_rerender(build_options)
+
+        elsif changeset.content_incremental?
+          count = changeset.modified_content.size
+          Logger.info "\n[Watch] Content change detected (#{count} file(s)). Incremental rebuild..."
+          @builder.run_incremental(changeset.modified_content, build_options)
+
+          # Also copy any static files that changed alongside content
+          unless changeset.modified_static.empty?
+            output_dir = sanitize_output_dir(build_options.output_dir)
+            @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+          end
+
+        elsif changeset.static_only?
+          Logger.info "\n[Watch] Static file change detected (#{changeset.modified_static.size} file(s)). Copying..."
+          output_dir = sanitize_output_dir(build_options.output_dir)
+          @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+
+        else
+          # Mixed changes that don't fit neatly into one category
+          # (e.g. content + template changes simultaneously) → full rebuild
+          Logger.info "\n[Watch] Multiple change types detected. Full rebuild..."
+          @builder.run(build_options)
         end
       end
 
