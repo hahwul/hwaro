@@ -12,19 +12,23 @@ Enable in `config.toml`:
 ```toml
 [search]
 enabled = true
-include_content = true
+format = "fuse_json"
+fields = ["title", "content", "description", "tags", "url", "section"]
+filename = "search.json"
 exclude = ["/private", "/drafts"]
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | enabled | bool | false | Generate search index |
-| include_content | bool | true | Include page content in index |
+| format | string | "fuse_json" | Search index format |
+| fields | array | ["title", "content"] | Fields to include in index |
+| filename | string | "search.json" | Output filename |
 | exclude | array | [] | Paths (prefixes) to exclude from search index |
 
 ## Generated Files
 
-When enabled, Hwaro generates `/search_index.json`:
+When enabled, Hwaro generates `/search.json` (configurable via `filename`):
 
 ```json
 [
@@ -45,7 +49,7 @@ When enabled, Hwaro generates `/search_index.json`:
 |-------|-------------|
 | title | Page title |
 | url | Page URL |
-| content | Page content (if `include_content = true`) |
+| content | Page content (if `"content"` is in `fields`) |
 | description | Page description |
 | section | Section name |
 | tags | Page tags |
@@ -62,7 +66,7 @@ Add to your template:
 let searchIndex = [];
 
 // Load index
-fetch('/search_index.json')
+fetch('/search.json')
   .then(res => res.json())
   .then(data => {
     searchIndex = data;
@@ -135,13 +139,27 @@ Exclude entire sections or paths using `config.toml`:
 exclude = ["/private", "/drafts"]
 ```
 
+### Field Selection
+
+Control which fields appear in the search index by specifying `fields`:
+
+```toml
+[search]
+enabled = true
+fields = ["title", "description", "tags", "url"]
+```
+
+Available fields: `title`, `content`, `description`, `tags`, `url`, `section`.
+
+Omitting `content` from `fields` significantly reduces the index file size for large sites.
+
 ## Performance Tips
 
 ### Large Sites
 
 For sites with many pages:
 
-1. Set `include_content = false` to reduce index size
+1. Remove `"content"` from `fields` to reduce index size
 2. Use Fuse.js `ignoreLocation` option
 3. Implement debounced search
 
@@ -168,7 +186,7 @@ let indexLoaded = false;
 
 input.addEventListener('focus', async () => {
   if (indexLoaded) return;
-  const res = await fetch('/search_index.json');
+  const res = await fetch('/search.json');
   searchIndex = await res.json();
   indexLoaded = true;
 });

@@ -7,10 +7,12 @@ Hwaro(화로) is a fast, lightweight static site generator built with Crystal.
 ## Features
 
 - **Fast builds** — Parallel processing with smart caching
-- **Markdown content** — Write with TOML front matter
+- **Markdown content** — Write with TOML or YAML front matter
 - **Jinja2 templates** — Flexible templating with Crinja
-- **SEO built-in** — Sitemaps, RSS feeds, OpenGraph tags
-- **Extensible** — Lifecycle hooks and custom processors
+- **SEO built-in** — Sitemaps, RSS feeds, OpenGraph, LLMs.txt
+- **Multilingual** — Translation linking, hreflang tags
+- **Extensible** — Lifecycle hooks, build hooks, custom processors
+- **Developer tools** — Shell completion, content lister, link checker
 
 ## Quick Start
 
@@ -43,7 +45,7 @@ Pages, sections, taxonomies, and shortcodes.
 Data model, syntax, functions, and filters.
 
 ### [Features](/features/)
-SEO, search, syntax highlighting, and pagination.
+SEO, search, syntax highlighting, pagination, multilingual, and more.
 
 ### [Deploy](/deploy/)
 Build and deploy to GitHub Pages and other hosts.

@@ -454,39 +454,78 @@ Hwaro uses the Crinja library for Jinja2-compatible templating. Templates suppor
 
 **Available Variables:**
 
-Page variables:
+Page variables (flat aliases):
 - `{{ page_url }}` - Page URL (e.g., "/about/")
 - `{{ page_section }}` - Page section (e.g., "blog")
 - `{{ page_title }}` - Page title
 - `{{ page_description }}` - Page description
 - `{{ page_date }}` - Page date
 - `{{ page_image }}` - Page image
+- `{{ page_summary }}` - Content summary
+- `{{ page_word_count }}` - Word count
+- `{{ page_reading_time }}` - Reading time in minutes
+- `{{ page_permalink }}` - Absolute URL with base_url
+- `{{ page_authors }}` - List of author names
+- `{{ page_weight }}` - Page weight
+- `{{ page_language }}` - Language code
+- `{{ page_translations }}` - Translation links
 
-Page object (with boolean properties):
+Page object (with all properties):
 - `{{ page.title }}`, `{{ page.url }}`, `{{ page.section }}`
+- `{{ page.description }}` - Page description
 - `{{ page.draft }}` - Is draft (boolean)
 - `{{ page.toc }}` - Show TOC (boolean)
 - `{{ page.is_index }}`, `{{ page.render }}`, `{{ page.generated }}`, `{{ page.in_sitemap }}`
+- `{{ page.in_search_index }}` - Include in search index (boolean)
+- `{{ page.insert_anchor_links }}` - Add anchor links to headings (boolean)
 - `{{ page.word_count }}` - Word count of the content
 - `{{ page.reading_time }}` - Estimated reading time in minutes
 - `{{ page.permalink }}` - Absolute URL with base_url
 - `{{ page.summary }}` - Content summary (before `<!-- more -->` marker)
 - `{{ page.authors }}` - List of author names
 - `{{ page.language }}` - Language code (for multilingual sites)
-- `{{ page.translations }}` - List of translation links
+- `{{ page.translations }}` - List of translation links (`code`, `url`, `title`, `is_current`, `is_default`)
+- `{{ page.extra }}` - Custom metadata from front matter `[extra]` table
+- `{{ page.assets }}` - List of colocated static files (page bundles)
+- `{{ page.lower }}` - Previous page in section (by date or weight) — has `.title`, `.url`, `.description`, `.date`
+- `{{ page.higher }}` - Next page in section — has `.title`, `.url`, `.description`, `.date`
+- `{{ page.ancestors }}` - Parent section chain for breadcrumbs — each has `.title`, `.url`
+- `{{ page.redirect_to }}` - Redirect target URL (if configured)
+- `{{ page.aliases }}` - Redirect URLs that point to this page
 
 Site variables:
 - `{{ site_title }}`, `{{ site_description }}`, `{{ base_url }}`
 - `{{ site.title }}`, `{{ site.description }}`, `{{ site.base_url }}`
+- `{{ site.pages }}` - All non-section pages
+- `{{ site.sections }}` - All section index pages
+- `{{ site.taxonomies }}` - All taxonomy groups and terms
+- `{{ site.data }}` - Data loaded from `data/` directory (see Data Directory below)
+- `{{ site.authors }}` - Aggregated author data (see Site Authors below)
+
+Section variables (in `section.html`):
+- `{{ section.title }}`, `{{ section.description }}`, `{{ section.pages }}`, `{{ section.pages_count }}`
+- `{{ section.list }}` - Pre-rendered HTML list of pages (same as `{{ section_list }}`)
+- `{{ section.subsections }}` - Child sections (each has `.title`, `.description`, `.url`, `.pages_count`)
+- `{{ section.assets }}` - Colocated static files in section directory
+- `{{ section.page_template }}` - Default template for child pages
+- `{{ section.paginate_path }}` - Pagination URL pattern
+- `{{ section.redirect_to }}` - Redirect target URL
 
 Content variables:
 - `{{ content }}` - Rendered page content
 - `{{ section_list }}` - HTML list of pages in section
 - `{{ toc }}` - Table of contents HTML
+- `{{ toc_obj.html }}` - Same TOC HTML in object form
 - `{{ taxonomy_name }}`, `{{ taxonomy_term }}`
+- `{{ taxonomy_terms }}` - All terms (in taxonomy.html)
+- `{{ taxonomy_pages }}` - Pages for a term (in taxonomy_term.html)
+- `{{ pagination }}` - Pre-rendered pagination HTML
+- `{{ paginator }}` - Pagination object (see Pagination section)
 
 SEO/Meta variables:
 - `{{ og_tags }}`, `{{ twitter_tags }}`, `{{ og_all_tags }}`
+- `{{ canonical_tag }}` - Canonical link tag
+- `{{ hreflang_tags }}` - Hreflang alternate link tags (multilingual)
 - `{{ highlight_css }}`, `{{ highlight_js }}`, `{{ highlight_tags }}`
 - `{{ auto_includes_css }}`, `{{ auto_includes_js }}`, `{{ auto_includes }}`
 
@@ -567,26 +606,65 @@ Child template (`templates/page.html`):
 ```
 
 **Custom Filters:**
+
+Text filters:
 - `{{ text | slugify }}` - Convert to URL slug
 - `{{ text | truncate_words(50) }}` - Truncate by word count
-- `{{ url | absolute_url }}` - Make URL absolute with base_url
-- `{{ url | relative_url }}` - Prefix with base_url
+- `{{ text | trim }}` - Remove leading/trailing whitespace
+- `{{ text | split(pat=",") }}` - Split string by separator
+
+HTML filters:
+- `{{ html | safe }}` - Mark content as safe (no escaping)
 - `{{ html | strip_html }}` - Remove HTML tags
 - `{{ text | markdownify }}` - Render markdown
 - `{{ text | xml_escape }}` - XML escape
+
+URL filters:
+- `{{ url | absolute_url }}` - Make URL absolute with base_url
+- `{{ url | relative_url }}` - Prefix with base_url
+
+Data filters:
 - `{{ data | jsonify }}` - JSON encode
 - `{{ date | date("%Y-%m-%d") }}` - Format date
-- `{{ text | split(pat=",") }}` - Split string by separator
-- `{{ html | safe }}` - Mark content as safe (no escaping)
-- `{{ text | trim }}` - Remove leading/trailing whitespace
 - `{{ value | default(value="fallback") }}` - Provide default value if empty
+
+Collection filters:
+- `{{ posts | where(attribute="draft", value=false) }}` - Filter objects by field value
+- `{{ posts | sort_by(attribute="date", reverse=true) }}` - Sort objects by field
+- `{{ posts | group_by(attribute="section") }}` - Group objects by field (returns `.grouper` and `.list`)
+
+Filter implementations: `src/content/processors/filters/`
+- `collection_filter.cr` - `where`, `sort_by`, `group_by`
+- `date_filter.cr` - `date`
+- `html_filter.cr` - `safe`, `strip_html`, `markdownify`, `xml_escape`
+- `misc_filter.cr` - `jsonify`, `default`
+- `string_filter.cr` - `slugify`, `truncate_words`, `trim`, `split`
+- `url_filter.cr` - `absolute_url`, `relative_url`
 
 **Custom Tests:**
 - `{% if page_url is startswith("/blog/") %}` - String starts with
 - `{% if page_title is endswith("!") %}` - String ends with
 - `{% if page_url is containing("products") %}` - String contains
+- `{% if asset is matching("[.](jpg|png)$") %}` - Regex match
 - `{% if page_description is empty %}` - Value is empty
 - `{% if page_title is present %}` - Value is not empty
+
+**Template Functions:**
+
+Data retrieval:
+- `get_page(path="about.md")` - Retrieve a page by source path or URL; returns Page object or nil
+- `get_section(path="blog")` - Retrieve a section by name, path, or URL; returns Section object or nil
+- `get_taxonomy(kind="tags")` - Access taxonomy terms and pages; returns object with `.name` and `.items` array
+- `get_taxonomy_url(kind="tags", term="crystal")` - Generate URL for a taxonomy term
+- `load_data(path="data/menu.json")` - Load external data files (JSON, TOML, YAML, CSV)
+
+URL functions:
+- `url_for(path="/about/")` - Generate URL with base_url
+- `get_url(path="/about/")` - Alias for `url_for()`
+- `now(format="%Y")` - Get current datetime with optional format
+
+Media functions:
+- `resize_image(path="/images/hero.jpg", width=1200, height=630)` - Returns image object with `.url`, `.width`, `.height` (placeholder implementation)
 
 **Shortcodes:**
 
@@ -628,7 +706,157 @@ Shortcode arguments support:
 - `src/core/build/builder.cr` - Template rendering in `apply_template()` method, shortcode processing in `process_shortcodes_jinja()`
 - Templates are loaded from `templates/` directory with FileSystemLoader
 
-#### 13. Deployment
+#### 13. Data Directory
+
+Hwaro loads auxiliary data from the `data/` directory and exposes it via `site.data` in templates.
+
+**Supported formats:** `.json`, `.toml`, `.yaml`, `.yml`, `.csv`
+
+**Directory structure:**
+```
+data/
+├── authors.yml
+├── products.json
+├── navigation.toml
+└── config/
+    └── social.json
+```
+
+**Accessing data in templates:**
+Data is accessed by filename (without extension):
+```jinja
+{% for product in site.data.products %}
+  <h2>{{ product.name }}</h2>
+{% endfor %}
+
+{% set social = load_data(path="data/social.json") %}
+{% for link in social %}
+  <a href="{{ link.url }}">{{ link.name }}</a>
+{% endfor %}
+```
+
+**Implementation details:**
+- `src/core/build/builder.cr` - Data loading during build
+- `src/content/processors/template.cr` - Exposing `site.data` to templates
+
+#### 14. Site Authors
+
+Hwaro automatically aggregates all authors from page front matter (`authors = ["id"]`) into `site.authors`.
+
+**Enriching author data** with `data/authors.yml`:
+```yaml
+john-doe:
+  name: "John Doe"
+  bio: "Creator of things."
+  avatar: "/images/john.jpg"
+```
+
+**Author object properties:**
+- `key` - Author ID (e.g., "john-doe")
+- `name` - Author name (from data file or ID fallback)
+- `pages` - List of pages by this author (sorted by date)
+- Custom fields from data file (e.g., `bio`, `avatar`)
+
+**Template usage:**
+```jinja
+{% for id, author in site.authors %}
+  <h3>{{ author.name }}</h3>
+  <p>{{ author.bio }}</p>
+  {% for p in author.pages %}
+    <a href="{{ p.url }}">{{ p.title }}</a>
+  {% endfor %}
+{% endfor %}
+```
+
+#### 15. Asset Colocation (Page Bundles)
+
+Assets (images, PDFs, etc.) can be colocated with content files in the same directory.
+
+**Page bundle structure:**
+```
+content/
+└── blog/
+    ├── my-trip/
+    │   ├── index.md        # The page content
+    │   ├── photo.jpg       # Colocated asset
+    │   └── data.json       # Colocated asset
+    └── _index.md
+```
+
+Non-markdown files are automatically copied to the output directory. In markdown, reference with relative paths:
+```markdown
+![My Trip Photo](photo.jpg)
+[Download Data](data.json)
+```
+
+**Template access via `page.assets`:**
+```jinja
+{% for asset in page.assets %}
+  {% if asset is matching("[.](jpg|png)$") %}
+    <img src="{{ get_url(path=asset) }}" alt="Gallery Image">
+  {% endif %}
+{% endfor %}
+```
+
+**Section assets** work the same way — `section.assets` returns colocated files next to `_index.md`.
+
+**Implementation details:**
+- `src/models/page.cr` - `collect_assets()` method, `assets` property
+- `src/core/build/builder.cr` - Asset copying during build
+
+#### 16. Page Redirects
+
+Pages support two redirect mechanisms:
+
+**`redirect_to`** — Redirect this page to another URL:
+```toml
++++
+title = "Old Page"
+redirect_to = "/new-page/"
++++
+```
+
+**`aliases`** — Redirect old URLs to this page:
+```toml
++++
+title = "New Page"
+aliases = ["/old-url/", "/another-old-url/"]
++++
+```
+
+**Implementation:** `src/models/page.cr` - `redirect_to`, `aliases`, `has_redirect?` properties
+
+#### 17. Permalinks
+
+Rewrite content directory paths to custom URL paths. Configured in `config.toml`:
+
+```toml
+[permalinks]
+"old/posts" = "posts"
+"2023/drafts" = "archive/2023"
+```
+
+| Source (Directory) | Target (URL Path) | Effect |
+|---|---|---|
+| `content/old/posts/a.md` | `posts/` | `/old/posts/a/` → `/posts/a/` |
+| `content/2023/drafts/b.md` | `archive/2023/` | `/2023/drafts/b/` → `/archive/2023/b/` |
+
+**Implementation:** `src/models/config.cr` - `permalinks` property (Hash)
+
+#### 18. Transparent Sections
+
+Sections with `transparent = true` pass their pages up to the parent section's page list:
+
+```toml
++++
+title = "2024 Posts"
+transparent = true
++++
+```
+
+Pages in a transparent section appear in the parent's `section.pages` list, useful for organizing content by year while displaying all posts together.
+
+#### 19. Deployment
 
 Hwaro includes a built-in deployment system for publishing built sites to various targets.
 
@@ -692,7 +920,7 @@ command = "aws s3 sync {source}/ {url} --delete"  # Custom command deployment
 - Source/destination overlap detection
 - Environment variables set for custom commands: `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL`, `HWARO_DEPLOY_SOURCE`
 
-#### 14. Multilingual Support (i18n)
+#### 20. Multilingual Support (i18n)
 
 Hwaro supports building multilingual sites with translation linking and language-specific features.
 
@@ -743,7 +971,7 @@ content/
 hwaro init --include-multilingual en,ko,ja
 ```
 
-#### 15. Scaffolds
+#### 21. Scaffolds
 
 Scaffolds provide pre-configured project templates for `hwaro init`. Three scaffold types are available:
 
@@ -772,7 +1000,7 @@ hwaro init mysite  # defaults to simple
 - Navigation template
 - Config sections (plugins, pagination, content files, highlight, OG, search, sitemap, robots, llms, taxonomies, feeds, auto includes, markdown, build hooks, deployment)
 
-#### 16. Content Files Publishing
+#### 22. Content Files Publishing
 
 Non-Markdown files in the `content/` directory can be automatically published to the output directory.
 
@@ -791,7 +1019,7 @@ disallow_paths = ["drafts/**"]
 - Extension normalization ensures consistent matching (with or without leading dot)
 - Path normalization strips `content/` prefix and normalizes separators
 
-#### 17. Syntax Highlighting
+#### 23. Syntax Highlighting
 
 Code syntax highlighting with configurable themes via highlight.js.
 
@@ -812,7 +1040,7 @@ use_cdn = true             # Use CDN for highlight.js assets
 - `{{ highlight_js }}` - JavaScript script tag for highlight.js
 - `{{ highlight_tags }}` - Both CSS and JS tags combined
 
-#### 18. Tool Commands
+#### 24. Tool Commands
 
 The `hwaro tool` command provides utility subcommands for content management.
 
@@ -847,7 +1075,7 @@ hwaro tool check                       # Check all external links in content/
 Implementation:
 - `src/cli/commands/tool/check_command.cr` - Finds external URLs in markdown files and checks them concurrently using HEAD requests
 
-#### 19. Build Profiling & Debug
+#### 25. Build Profiling & Debug
 
 **Build Profiler:**
 
@@ -888,6 +1116,8 @@ Configuration is managed through TOML files (`config.toml`). The structure is de
 - Pagination settings
 - Multilingual / language configuration
 - Deployment targets and options
+- Permalinks (URL path rewriting)
+- Data directory (auxiliary data files)
 
 #### Markdown Configuration
 
@@ -1026,6 +1256,7 @@ The project is designed with extensibility in mind:
 - `src/utils/command_runner.cr` - Shell command execution utility
 - `src/utils/profiler.cr` - Build phase timing and reporting
 - `src/utils/debug_printer.cr` - Site structure tree visualization
+- `src/utils/path_utils.cr` - Path sanitization utilities (`sanitize_path` — URL-decodes, removes `..` traversal, null bytes, normalizes slashes)
 
 ## Dependencies
 
@@ -1153,6 +1384,52 @@ When contributing:
 5. Think about extensibility for future features
 6. Keep changes focused and atomic
 
+## Documentation Site
+
+The project includes a self-hosted documentation site in `docs/`:
+
+```
+docs/
+├── config.toml
+├── content/
+│   ├── index.md              # Homepage
+│   ├── start/                # Getting started guides
+│   │   ├── installation.md
+│   │   ├── first-site.md
+│   │   ├── cli.md
+│   │   ├── config.md
+│   │   └── tools.md          # Tool commands & shell completion
+│   ├── writing/              # Content authoring
+│   │   ├── pages.md
+│   │   ├── sections.md
+│   │   ├── shortcodes.md
+│   │   ├── taxonomies.md
+│   │   └── archetypes.md
+│   ├── templates/            # Template system
+│   │   ├── data-model.md
+│   │   ├── syntax.md
+│   │   ├── functions.md
+│   │   └── filters.md
+│   ├── features/             # Built-in features
+│   │   ├── seo.md
+│   │   ├── search.md
+│   │   ├── syntax-highlighting.md
+│   │   ├── pagination.md
+│   │   ├── multilingual.md
+│   │   ├── auto-includes.md
+│   │   ├── content-files.md
+│   │   ├── build-hooks.md
+│   │   └── llms-txt.md
+│   └── deploy/              # Deployment guides
+│       ├── github-pages/
+│       ├── docker/
+│       └── gitlab-ci/
+├── templates/
+└── static/
+```
+
+When adding new features, ensure the corresponding documentation page is created or updated in the `docs/` directory.
+
 ## Future Development Areas
 
 Areas with room for expansion:
@@ -1167,6 +1444,6 @@ Areas with room for expansion:
 - Content management helpers
 - Advanced search backends (beyond Fuse.js)
 - Custom taxonomy types
-- Image processing and optimization
+- Image processing and optimization (replace `resize_image` placeholder)
 - API endpoints for dynamic content
 - Remote deployment targets (S3, GCS, Azure Blob via native support)

@@ -23,6 +23,11 @@ hwaro init my-site --scaffold docs
 | Flag | Description |
 |------|-------------|
 | --scaffold NAME | Use a scaffold template: simple, blog, docs |
+| -f, --force | Force creation even if directory is not empty |
+| --skip-agents-md | Skip creating AGENTS.md file |
+| --skip-sample-content | Skip creating sample content files |
+| --skip-taxonomies | Skip taxonomies configuration and templates |
+| --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`) |
 
 ### new
 
@@ -152,6 +157,61 @@ hwaro deploy --dry-run
 | --force | Force upload/copy (ignore file comparisons) |
 | --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
+
+### tool
+
+Utility tools for content management:
+
+```bash
+hwaro tool convert toYAML       # Convert frontmatter to YAML
+hwaro tool convert toTOML       # Convert frontmatter to TOML
+hwaro tool list all             # List all content files
+hwaro tool list drafts          # List draft files
+hwaro tool list published       # List published files
+hwaro tool check                # Check for dead external links
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| convert | Convert frontmatter between YAML and TOML formats |
+| list | List content files by status (all, drafts, published) |
+| check | Check for dead links in content files |
+
+**Common Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Limit to specific content directory |
+| -h, --help | Show help |
+
+See [Tools & Completion](/start/tools/) for detailed usage.
+
+### completion
+
+Generate shell completion scripts:
+
+```bash
+hwaro completion bash    # Bash completion script
+hwaro completion zsh     # Zsh completion script
+hwaro completion fish    # Fish completion script
+```
+
+**Installation:**
+
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(hwaro completion bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(hwaro completion zsh)"
+
+# Fish (add to ~/.config/fish/config.fish)
+hwaro completion fish | source
+```
+
+See [Tools & Completion](/start/tools/) for detailed installation instructions.
 
 ## Examples
 

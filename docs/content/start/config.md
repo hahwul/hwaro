@@ -114,19 +114,46 @@ twitter_card = "summary_large_image"
 twitter_site = "@username"
 ```
 
+## LLMs.txt
+
+Generate instruction files for AI/LLM crawlers:
+
+```toml
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This site's content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `llms.txt` |
+| filename | string | "llms.txt" | Output filename |
+| instructions | string | "" | Instructions text for LLM crawlers |
+| full_enabled | bool | false | Generate full content version (`llms-full.txt`) |
+| full_filename | string | "llms-full.txt" | Full version filename |
+
+See [LLMs.txt](/features/llms-txt/) for details.
+
 ## Search
 
 ```toml
 [search]
 enabled = true
-include_content = true
+format = "fuse_json"
+fields = ["title", "content", "description"]
+filename = "search.json"
 exclude = ["/private", "/drafts"]
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | enabled | bool | false | Generate search index |
-| include_content | bool | true | Include content in index |
+| format | string | "fuse_json" | Search index format |
+| fields | array | ["title", "content", "description"] | Fields to include in index |
+| filename | string | "search.json" | Output filename |
 | exclude | array | [] | Exclude paths (prefixes) from search index |
 
 ## Taxonomies
@@ -147,8 +174,8 @@ feed = true
 ```toml
 [highlight]
 enabled = true
-theme = "monokai"
-line_numbers = false
+theme = "github-dark"
+use_cdn = true
 ```
 
 ## Auto Includes
@@ -166,14 +193,28 @@ dirs = ["assets/css", "assets/js"]
 ```toml
 default_language = "en"
 
-[[languages]]
-code = "en"
-name = "English"
+[languages.en]
+language_name = "English"
+weight = 1
 
-[[languages]]
-code = "ko"
-name = "한국어"
+[languages.ko]
+language_name = "한국어"
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = ["tags", "categories"]
 ```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| default_language | string | "en" | Default language code |
+| language_name | string | — | Human-readable language name |
+| weight | int | 0 | Sort order (lower = first) |
+| generate_feed | bool | false | Generate RSS feed for this language |
+| build_search_index | bool | false | Include in search index |
+| taxonomies | array | [] | Taxonomies for this language |
+
+See [Multilingual](/features/multilingual/) for content structure and template usage.
 
 ## Deployment
 
@@ -181,17 +222,61 @@ Configure deployment targets for the `hwaro deploy` command.
 
 ```toml
 [deployment]
-target = "prod" # Default target
+confirm = false
+dry_run = false
+force = false
+max_deletes = 256
+source_dir = "public"
 
 [[deployment.targets]]
 name = "prod"
-url = "file://./out"
+url = "file:///var/www/mysite"
 
 [[deployment.targets]]
 name = "s3"
 url = "s3://your-bucket"
 command = "aws s3 sync {source}/ {url} --delete"
 ```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| confirm | bool | false | Ask for confirmation before deploying |
+| dry_run | bool | false | Show changes without writing |
+| force | bool | false | Force upload (ignore file comparisons) |
+| max_deletes | int | 256 | Maximum deletions allowed (-1 to disable) |
+| source_dir | string | "public" | Source directory to deploy |
+
+### Target Options
+
+| Key | Type | Description |
+|-----|------|-------------|
+| name | string | Target identifier |
+| url | string | Destination URL or path |
+| command | string | Custom deploy command (overrides URL-based deployment) |
+| include | string | Glob pattern for files to include |
+| exclude | string | Glob pattern for files to exclude |
+| strip_index_html | bool | Remove `index.html` from paths |
+
+Custom commands support placeholders: `{source}`, `{url}`, `{target}`.
+
+## Content Files
+
+Publish non-Markdown files from `content/` to the output directory:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "pdf"]
+disallow_extensions = ["psd", "ai"]
+disallow_paths = ["drafts/**", "**/_*"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| allow_extensions | array | [] | File extensions to publish |
+| disallow_extensions | array | [] | File extensions to exclude |
+| disallow_paths | array | [] | Glob patterns for paths to exclude |
+
+See [Content Files](/features/content-files/) for details.
 
 ## Full Example
 
@@ -210,6 +295,10 @@ hooks.post = ["npm run optimize"]
 
 [markdown]
 safe = false
+lazy_loading = true
+
+[permalinks]
+"old/posts" = "posts"
 
 [feeds]
 enabled = true
@@ -221,6 +310,11 @@ enabled = true
 [robots]
 enabled = true
 
+[llms]
+enabled = true
+instructions = "Content under MIT license."
+full_enabled = true
+
 [og]
 default_image = "/images/og-default.png"
 twitter_card = "summary_large_image"
@@ -228,16 +322,20 @@ twitter_site = "@myblog"
 
 [search]
 enabled = true
-include_content = true
-exclude = ["/private"]
+format = "fuse_json"
+fields = ["title", "content", "description"]
 
 [highlight]
 enabled = true
-theme = "monokai"
+theme = "github-dark"
+use_cdn = true
 
 [auto_includes]
 enabled = true
 dirs = ["assets/css", "assets/js"]
+
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
 
 [[taxonomies]]
 name = "tags"
@@ -245,12 +343,19 @@ feed = true
 
 [[taxonomies]]
 name = "categories"
+
+[deployment]
+source_dir = "public"
+
+[[deployment.targets]]
+name = "prod"
+url = "file:///var/www/myblog"
 ```
 
-## Environment-Specific Config
+## See Also
 
-For different environments, use separate config files:
-
-```bash
-hwaro build --config config.production.toml
-```
+- [Features](/features/) — All built-in features
+- [CLI](/start/cli/) — Command-line options that override config
+- [Multilingual](/features/multilingual/) — Multilingual configuration details
+- [LLMs.txt](/features/llms-txt/) — LLM instructions configuration
+- [Build Hooks](/features/build-hooks/) — Pre/post build commands

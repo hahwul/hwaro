@@ -109,6 +109,40 @@ Sitemap: https://example.com/sitemap.xml
 
 ---
 
+## LLMs.txt
+
+Generate instruction files for AI/LLM crawlers following the [llms.txt standard](https://llmstxt.org/).
+
+### Configuration
+
+```toml
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This site's content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `llms.txt` |
+| filename | string | "llms.txt" | Output filename |
+| instructions | string | "" | Instructions for LLM crawlers |
+| full_enabled | bool | false | Generate full content version |
+| full_filename | string | "llms-full.txt" | Full version filename |
+
+### Output
+
+- `/llms.txt` — Instructions text only
+- `/llms-full.txt` — Full site content with metadata (title, URL, source path per page)
+
+The full version includes all rendered pages sorted by URL, separated by `---` delimiters.
+
+See [LLMs.txt](/features/llms-txt/) for detailed documentation.
+
+---
+
 ## OpenGraph Tags
 
 Social sharing meta tags for Facebook, LinkedIn, etc.
@@ -253,6 +287,8 @@ twitter_site = "@mysite"
   <title>{{ page.title }} - {{ site.title }}</title>
   <meta name="description" content="{{ page.description | default(value=site.description) }}">
   {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
   <link rel="alternate" type="application/rss+xml" href="{{ base_url }}/rss.xml">
 </head>
 <body>
@@ -260,3 +296,9 @@ twitter_site = "@mysite"
 </body>
 </html>
 ```
+
+## See Also
+
+- [LLMs.txt](/features/llms-txt/) — AI/LLM crawler instructions
+- [Multilingual](/features/multilingual/) — Hreflang and canonical tags for i18n
+- [Configuration](/start/config/) — Full config reference

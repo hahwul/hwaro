@@ -46,25 +46,49 @@ Configure in `config.toml`:
 ```toml
 [highlight]
 enabled = true
-theme = "monokai"
-line_numbers = false
+theme = "github-dark"
+use_cdn = true
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | enabled | bool | true | Enable syntax highlighting |
-| theme | string | "monokai" | Color theme |
-| line_numbers | bool | false | Show line numbers |
+| theme | string | "github" | Highlight.js theme name |
+| use_cdn | bool | true | Load assets from CDN (false = local files) |
 
 ## Themes
 
-Available themes:
+Hwaro uses [Highlight.js](https://highlightjs.org/) themes. Any valid Highlight.js theme name works. Popular choices:
 
-- `monokai` — Dark theme (default)
-- `github` — Light GitHub style
+- `github` — Light GitHub style (default)
+- `github-dark` — Dark GitHub style
+- `github-dark-dimmed` — Dimmed dark GitHub style
+- `monokai` — Classic dark theme
 - `dracula` — Dark purple theme
 - `solarized-dark` — Solarized dark
 - `solarized-light` — Solarized light
+- `nord` — Arctic color palette
+- `tokyo-night-dark` — Tokyo Night dark
+
+Browse all available themes at [highlightjs.org/demo](https://highlightjs.org/demo).
+
+## CDN vs Local
+
+When `use_cdn = true` (default), assets are loaded from cdnjs:
+
+```html
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+```
+
+When `use_cdn = false`, assets are loaded from local paths:
+
+```html
+<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css">
+<script src="/assets/js/highlight.min.js"></script>
+```
+
+You must provide the local files yourself when using `use_cdn = false`.
 
 ## Template Integration
 

@@ -4,3 +4,15 @@ description = "Built-in features for SEO, search, and more"
 +++
 
 Hwaro includes powerful features out of the box.
+
+## Built-in Features
+
+- [SEO](/features/seo/) — Sitemaps, RSS feeds, robots.txt, OpenGraph, and Twitter Cards
+- [Search](/features/search/) — Client-side search index generation (Fuse.js compatible)
+- [Syntax Highlighting](/features/syntax-highlighting/) — Code block highlighting with Highlight.js
+- [Pagination](/features/pagination/) — Split large content lists into multiple pages
+- [Multilingual](/features/multilingual/) — Build multilingual sites with translation linking and hreflang tags
+- [Auto Includes](/features/auto-includes/) — Automatically load CSS and JS files from static directories
+- [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
+- [Build Hooks](/features/build-hooks/) — Run custom shell commands before and after builds
+- [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers
