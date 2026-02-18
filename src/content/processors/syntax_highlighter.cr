@@ -11,6 +11,7 @@
 
 require "markd"
 require "./table_parser"
+require "set"
 
 module Hwaro
   module Content
@@ -84,14 +85,14 @@ module Hwaro
         end
 
         # List of supported languages for highlight.js (common ones)
-        SUPPORTED_LANGUAGES = %w[
+        SUPPORTED_LANGUAGES = Set.new(%w[
           bash c cpp csharp css crystal dart diff dockerfile elixir elm
           erlang go graphql groovy haskell html http ini java javascript
           json julia kotlin latex less lisp lua makefile markdown matlab
           nginx nim nix objectivec ocaml perl php plaintext powershell
           python r ruby rust scala scss shell sql swift toml typescript
           vim xml yaml zig
-        ]
+        ])
 
         # Check if a language is supported
         def language_supported?(lang : String) : Bool
@@ -99,7 +100,7 @@ module Hwaro
         end
 
         # Get CSS themes available for highlight.js
-        THEMES = %w[
+        THEMES = Set.new(%w[
           default a11y-dark a11y-light agate androidstudio an-old-hope
           arduino-light arta ascetic atom-one-dark atom-one-dark-reasonable
           atom-one-light brown-paper codepen-embed color-brewer dark
@@ -113,7 +114,7 @@ module Hwaro
           shades-of-purple srcery stackoverflow-dark stackoverflow-light sunburst
           tokyo-night-dark tokyo-night-light tomorrow-night-blue
           tomorrow-night-bright vs vs2015 xcode xt256 zenburn
-        ]
+        ])
 
         # Check if a theme is valid
         def theme_valid?(theme : String) : Bool
