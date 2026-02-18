@@ -232,17 +232,17 @@ module Hwaro
         old_mtimes : Hash(String, Time),
         new_mtimes : Hash(String, Time),
       ) : ChangeSet
-        modified_content   = [] of String
+        modified_content = [] of String
         modified_templates = [] of String
-        modified_static    = [] of String
-        added_files        = [] of String
-        removed_files      = [] of String
-        config_changed     = false
+        modified_static = [] of String
+        added_files = [] of String
+        removed_files = [] of String
+        config_changed = false
 
         # --- Files that exist in both snapshots but with different mtime ---
         new_mtimes.each do |path, new_mtime|
           if old_mtime = old_mtimes[path]?
-            next if old_mtime == new_mtime  # unchanged
+            next if old_mtime == new_mtime # unchanged
 
             if path == "config.toml"
               config_changed = true
@@ -263,12 +263,12 @@ module Hwaro
         end
 
         ChangeSet.new(
-          modified_content:   modified_content,
+          modified_content: modified_content,
           modified_templates: modified_templates,
-          modified_static:    modified_static,
-          added_files:        added_files,
-          removed_files:      removed_files,
-          config_changed:     config_changed,
+          modified_static: modified_static,
+          added_files: added_files,
+          removed_files: removed_files,
+          config_changed: config_changed,
         )
       end
 
@@ -300,11 +300,9 @@ module Hwaro
                    end
           Logger.info "\n[Watch] Structural change detected (#{reason}). Full rebuild..."
           @builder.run(build_options)
-
         elsif changeset.templates_only?
           Logger.info "\n[Watch] Template change detected (#{changeset.modified_templates.size} file(s)). Re-rendering..."
           @builder.run_rerender(build_options)
-
         elsif changeset.content_incremental?
           count = changeset.modified_content.size
           Logger.info "\n[Watch] Content change detected (#{count} file(s)). Incremental rebuild..."
@@ -315,12 +313,10 @@ module Hwaro
             output_dir = sanitize_output_dir(build_options.output_dir)
             @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
           end
-
         elsif changeset.static_only?
           Logger.info "\n[Watch] Static file change detected (#{changeset.modified_static.size} file(s)). Copying..."
           output_dir = sanitize_output_dir(build_options.output_dir)
           @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
-
         else
           # Mixed changes that don't fit neatly into one category
           # (e.g. content + template changes simultaneously) → full rebuild

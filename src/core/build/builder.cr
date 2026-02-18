@@ -99,7 +99,7 @@ module Hwaro
         # necessary state from a previous build is not available.
         def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions)
           config = @config
-          site   = @site
+          site = @site
           templates = @templates
 
           # First build hasn't happened yet – fall back to full build
@@ -111,10 +111,10 @@ module Hwaro
           start_time = Time.instant
 
           output_dir = options.output_dir
-          minify     = options.minify
-          highlight  = options.highlight && site.config.highlight.enabled
-          verbose    = options.verbose
-          safe       = site.config.markdown.safe
+          minify = options.minify
+          highlight = options.highlight && site.config.highlight.enabled
+          verbose = options.verbose
+          safe = site.config.markdown.safe
           lazy_loading = site.config.markdown.lazy_loading
           include_drafts = options.drafts
 
@@ -129,7 +129,7 @@ module Hwaro
               file.sub(/^content\//, "")
             end
 
-            page = site.pages.find  { |p| p.path == relative_path } ||
+            page = site.pages.find { |p| p.path == relative_path } ||
                    site.sections.find { |s| s.path == relative_path }
 
             next unless page
@@ -186,7 +186,7 @@ module Hwaro
 
           # Previous / next pages whose navigation links reference changed pages
           changed_pages.each do |page|
-            pages_to_render << page.lower.not_nil!  if page.lower
+            pages_to_render << page.lower.not_nil! if page.lower
             pages_to_render << page.higher.not_nil! if page.higher
           end
 
@@ -221,8 +221,8 @@ module Hwaro
         # Re-render all pages using reloaded templates without re-parsing
         # content.  Useful when only template files have been modified.
         def run_rerender(options : Config::Options::BuildOptions)
-          config    = @config
-          site      = @site
+          config = @config
+          site = @site
 
           unless config && site
             return run(options)
@@ -238,10 +238,10 @@ module Hwaro
           @templates = templates
 
           output_dir = options.output_dir
-          minify     = options.minify
-          highlight  = options.highlight && site.config.highlight.enabled
-          verbose    = options.verbose
-          safe       = site.config.markdown.safe
+          minify = options.minify
+          highlight = options.highlight && site.config.highlight.enabled
+          verbose = options.verbose
+          safe = site.config.markdown.safe
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
 

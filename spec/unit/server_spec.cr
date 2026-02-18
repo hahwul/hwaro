@@ -764,7 +764,7 @@ describe "Incremental build integration" do
         builder.run(options)
 
         alpha_path = File.join(dir, "public", "posts", "alpha", "index.html")
-        beta_path  = File.join(dir, "public", "posts", "beta", "index.html")
+        beta_path = File.join(dir, "public", "posts", "beta", "index.html")
         about_path = File.join(dir, "public", "about", "index.html")
 
         File.exists?(alpha_path).should be_true
@@ -772,7 +772,7 @@ describe "Incremental build integration" do
         File.exists?(about_path).should be_true
 
         original_alpha = File.read(alpha_path)
-        original_beta  = File.read(beta_path)
+        original_beta = File.read(beta_path)
         original_about = File.read(about_path)
 
         original_alpha.should contain("Alpha original content")
@@ -848,7 +848,7 @@ describe "Incremental build integration" do
         builder.run(options)
 
         section_path = File.join(dir, "public", "blog", "index.html")
-        post_path    = File.join(dir, "public", "blog", "post1", "index.html")
+        post_path = File.join(dir, "public", "blog", "post1", "index.html")
 
         File.exists?(section_path).should be_true
         File.exists?(post_path).should be_true
