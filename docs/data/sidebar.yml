@@ -1,0 +1,60 @@
+- title: Start
+  items:
+    - title: Overview
+      url: /start/
+    - title: Installation
+      url: /start/installation/
+    - title: First Site
+      url: /start/first-site/
+    - title: CLI
+      url: /start/cli/
+    - title: Configuration
+      url: /start/config/
+- title: Writing
+  items:
+    - title: Overview
+      url: /writing/
+    - title: Pages
+      url: /writing/pages/
+    - title: Sections
+      url: /writing/sections/
+    - title: Taxonomies
+      url: /writing/taxonomies/
+    - title: Shortcodes
+      url: /writing/shortcodes/
+    - title: Archetypes
+      url: /writing/archetypes/
+- title: Templates
+  items:
+    - title: Overview
+      url: /templates/
+    - title: Data Model
+      url: /templates/data-model/
+    - title: Syntax
+      url: /templates/syntax/
+    - title: Functions
+      url: /templates/functions/
+    - title: Filters
+      url: /templates/filters/
+- title: Features
+  items:
+    - title: Overview
+      url: /features/
+    - title: SEO
+      url: /features/seo/
+    - title: Search
+      url: /features/search/
+    - title: Syntax Highlighting
+      url: /features/syntax-highlighting/
+    - title: Pagination
+      url: /features/pagination/
+- title: Deploy
+  items:
+    - title: Overview
+      url: /deploy/
+    - title: GitHub Pages
+      url: /deploy/github-pages/
+    - title: GitLab CI
+      url: /deploy/gitlab-ci/
+    - title: Docker
+      url: /deploy/docker/

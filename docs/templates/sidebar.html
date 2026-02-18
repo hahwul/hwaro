@@ -1,52 +1,12 @@
 <aside class="docs-sidebar">
+  {% for section in site.data.sidebar %}
   <div class="sidebar-section">
-    <div class="sidebar-title">Start</div>
+    <div class="sidebar-title">{{ section.title }}</div>
     <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/start/"{% if page.url == "/start/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/start/installation/"{% if page.url == "/start/installation/" %} class="active"{% endif %}>Installation</a></li>
-      <li><a href="{{ base_url }}/start/first-site/"{% if page.url == "/start/first-site/" %} class="active"{% endif %}>First Site</a></li>
-      <li><a href="{{ base_url }}/start/cli/"{% if page.url == "/start/cli/" %} class="active"{% endif %}>CLI</a></li>
-      <li><a href="{{ base_url }}/start/config/"{% if page.url == "/start/config/" %} class="active"{% endif %}>Configuration</a></li>
+      {% for item in section.items %}
+      <li><a href="{{ base_url }}{{ item.url }}"{% if page.url == item.url %} class="active"{% endif %}>{{ item.title }}</a></li>
+      {% endfor %}
     </ul>
   </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Writing</div>
-    <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/writing/"{% if page.url == "/writing/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/writing/pages/"{% if page.url == "/writing/pages/" %} class="active"{% endif %}>Pages</a></li>
-      <li><a href="{{ base_url }}/writing/sections/"{% if page.url == "/writing/sections/" %} class="active"{% endif %}>Sections</a></li>
-      <li><a href="{{ base_url }}/writing/taxonomies/"{% if page.url == "/writing/taxonomies/" %} class="active"{% endif %}>Taxonomies</a></li>
-      <li><a href="{{ base_url }}/writing/shortcodes/"{% if page.url == "/writing/shortcodes/" %} class="active"{% endif %}>Shortcodes</a></li>
-      <li><a href="{{ base_url }}/writing/archetypes/"{% if page.url == "/writing/archetypes/" %} class="active"{% endif %}>Archetypes</a></li>
-    </ul>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Templates</div>
-    <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/templates/"{% if page.url == "/templates/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/templates/data-model/"{% if page.url == "/templates/data-model/" %} class="active"{% endif %}>Data Model</a></li>
-      <li><a href="{{ base_url }}/templates/syntax/"{% if page.url == "/templates/syntax/" %} class="active"{% endif %}>Syntax</a></li>
-      <li><a href="{{ base_url }}/templates/functions/"{% if page.url == "/templates/functions/" %} class="active"{% endif %}>Functions</a></li>
-      <li><a href="{{ base_url }}/templates/filters/"{% if page.url == "/templates/filters/" %} class="active"{% endif %}>Filters</a></li>
-    </ul>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Features</div>
-    <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/features/"{% if page.url == "/features/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/features/seo/"{% if page.url == "/features/seo/" %} class="active"{% endif %}>SEO</a></li>
-      <li><a href="{{ base_url }}/features/search/"{% if page.url == "/features/search/" %} class="active"{% endif %}>Search</a></li>
-      <li><a href="{{ base_url }}/features/syntax-highlighting/"{% if page.url == "/features/syntax-highlighting/" %} class="active"{% endif %}>Syntax Highlighting</a></li>
-      <li><a href="{{ base_url }}/features/pagination/"{% if page.url == "/features/pagination/" %} class="active"{% endif %}>Pagination</a></li>
-    </ul>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Deploy</div>
-    <ul class="sidebar-links">
-      <li><a href="{{ base_url }}/deploy/"{% if page.url == "/deploy/" %} class="active"{% endif %}>Overview</a></li>
-      <li><a href="{{ base_url }}/deploy/github-pages/"{% if page.url == "/deploy/github-pages/" %} class="active"{% endif %}>GitHub Pages</a></li>
-      <li><a href="{{ base_url }}/deploy/gitlab-ci/"{% if page.url == "/deploy/gitlab-ci/" %} class="active"{% endif %}>GitLab CI</a></li>
-      <li><a href="{{ base_url }}/deploy/docker/"{% if page.url == "/deploy/docker/" %} class="active"{% endif %}>Docker</a></li>
-    </ul>
-  </div>
+  {% endfor %}
 </aside>
