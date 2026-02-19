@@ -196,8 +196,14 @@ module Hwaro
         end
 
         private def self.get_content_for_feed(page : Models::Page, truncate : Int32) : String
-          # Convert markdown to HTML for feed
-          html_content, _ = Processor::Markdown.render(page.raw_content)
+          # Reuse already-rendered HTML from the Render phase when available,
+          # avoiding an expensive duplicate Markdown → HTML conversion.
+          html_content = if !page.content.empty?
+                           page.content
+                         else
+                           rendered, _ = Processor::Markdown.render(page.raw_content)
+                           rendered
+                         end
 
           # Truncate if needed
           if truncate > 0

@@ -502,325 +502,365 @@ module Hwaro
 
       def self.load(config_path : String = "config.toml") : Config
         config = new
-        if File.exists?(config_path)
-          config.raw = TOML.parse_file(config_path)
-          config.title = config.raw["title"]?.try(&.as_s?) || config.title
-          config.description = config.raw["description"]?.try(&.as_s?) || config.description
-          config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url
+        return config unless File.exists?(config_path)
 
-          # Load Sitemap configuration
-          # Handle backward compatibility where sitemap was just a boolean
-          if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
-            config.sitemap.enabled = sitemap_bool
-          elsif sitemap_section = config.raw["sitemap"]?.try(&.as_h?)
-            config.sitemap.enabled = sitemap_section["enabled"]?.try(&.as_bool?) || config.sitemap.enabled
-            config.sitemap.filename = sitemap_section["filename"]?.try(&.as_s?) || config.sitemap.filename
-            config.sitemap.changefreq = sitemap_section["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
-            config.sitemap.priority = sitemap_section["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
-            if exclude_arr = sitemap_section["exclude"]?.try(&.as_a?)
-              config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
-            end
+        config.raw = TOML.parse_file(config_path)
+        config.title = config.raw["title"]?.try(&.as_s?) || config.title
+        config.description = config.raw["description"]?.try(&.as_s?) || config.description
+        config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url
+        config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
+
+        load_sitemap(config)
+        load_robots(config)
+        load_llms(config)
+        load_feeds(config)
+        load_search(config)
+        load_plugins(config)
+        load_content_files(config)
+        load_pagination(config)
+        load_highlight(config)
+        load_auto_includes(config)
+        load_og(config)
+        load_taxonomies(config)
+        load_languages(config)
+        load_build(config)
+        load_markdown(config)
+        load_permalinks(config)
+        load_deployment(config)
+
+        config
+      end
+
+      # --- Private section loaders ---------------------------------------------------
+
+      private def self.load_sitemap(config : Config)
+        # Handle backward compatibility where sitemap was just a boolean
+        if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
+          config.sitemap.enabled = sitemap_bool
+        elsif s = config.raw["sitemap"]?.try(&.as_h?)
+          config.sitemap.enabled = s["enabled"]?.try(&.as_bool?) || config.sitemap.enabled
+          config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
+          config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
+          config.sitemap.priority = s["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
+          if exclude_arr = s["exclude"]?.try(&.as_a?)
+            config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
           end
+        end
+      end
 
-          # Load Robots configuration
-          if robots_section = config.raw["robots"]?.try(&.as_h?)
-            config.robots.enabled = robots_section["enabled"]?.try(&.as_bool?) || config.robots.enabled
-            config.robots.filename = robots_section["filename"]?.try(&.as_s?) || config.robots.filename
+      private def self.load_robots(config : Config)
+        return unless s = config.raw["robots"]?.try(&.as_h?)
 
-            if rules = robots_section["rules"]?.try(&.as_a?)
-              config.robots.rules = rules.compact_map do |rule_any|
-                if rule_h = rule_any.as_h?
-                  user_agent = rule_h["user_agent"]?.try(&.as_s?) || "*"
-                  rule = RobotsRule.new(user_agent)
+        config.robots.enabled = s["enabled"]?.try(&.as_bool?) || config.robots.enabled
+        config.robots.filename = s["filename"]?.try(&.as_s?) || config.robots.filename
 
-                  if allow = rule_h["allow"]?
-                    if allow_arr = allow.as_a?
-                      rule.allow = allow_arr.compact_map(&.as_s?)
-                    elsif allow_str = allow.as_s?
-                      rule.allow = [allow_str]
-                    end
-                  end
+        if rules = s["rules"]?.try(&.as_a?)
+          config.robots.rules = rules.compact_map do |rule_any|
+            if rule_h = rule_any.as_h?
+              user_agent = rule_h["user_agent"]?.try(&.as_s?) || "*"
+              rule = RobotsRule.new(user_agent)
 
-                  if disallow = rule_h["disallow"]?
-                    if disallow_arr = disallow.as_a?
-                      rule.disallow = disallow_arr.compact_map(&.as_s?)
-                    elsif disallow_str = disallow.as_s?
-                      rule.disallow = [disallow_str]
-                    end
-                  end
-                  rule
-                else
-                  nil
+              if allow = rule_h["allow"]?
+                if allow_arr = allow.as_a?
+                  rule.allow = allow_arr.compact_map(&.as_s?)
+                elsif allow_str = allow.as_s?
+                  rule.allow = [allow_str]
                 end
               end
-            end
-          end
 
-          # Load LLMs configuration
-          if llms_section = config.raw["llms"]?.try(&.as_h?)
-            config.llms.enabled = llms_section["enabled"]?.try(&.as_bool?) || config.llms.enabled
-            config.llms.filename = llms_section["filename"]?.try(&.as_s?) || config.llms.filename
-            config.llms.instructions = llms_section["instructions"]?.try(&.as_s?) || config.llms.instructions
-            config.llms.full_enabled = llms_section["full_enabled"]?.try(&.as_bool?) || config.llms.full_enabled
-            config.llms.full_filename = llms_section["full_filename"]?.try(&.as_s?) || config.llms.full_filename
-          end
-
-          # Load Feeds configuration
-          if feeds_section = config.raw["feeds"]?.try(&.as_h?)
-            # Backward compatibility for 'generate' property
-            enabled = feeds_section["enabled"]?.try(&.as_bool?)
-            generate = feeds_section["generate"]?.try(&.as_bool?)
-
-            if !enabled.nil?
-              config.feeds.enabled = enabled
-            elsif !generate.nil?
-              config.feeds.enabled = generate
-            end
-
-            config.feeds.filename = feeds_section["filename"]?.try(&.as_s?) || config.feeds.filename
-            config.feeds.type = feeds_section["type"]?.try(&.as_s?) || config.feeds.type
-            config.feeds.truncate = feeds_section["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
-            config.feeds.limit = feeds_section["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
-            if sections = feeds_section["sections"]?.try(&.as_a?)
-              config.feeds.sections = sections.compact_map(&.as_s?)
-            end
-          end
-
-          # Load search configuration
-          if search_section = config.raw["search"]?.try(&.as_h?)
-            config.search.enabled = search_section["enabled"]?.try(&.as_bool?) || config.search.enabled
-            config.search.format = search_section["format"]?.try(&.as_s?) || config.search.format
-            config.search.filename = search_section["filename"]?.try(&.as_s?) || config.search.filename
-            if fields = search_section["fields"]?.try(&.as_a?)
-              config.search.fields = fields.compact_map(&.as_s?)
-            end
-            if exclude_arr = search_section["exclude"]?.try(&.as_a?)
-              config.search.exclude = exclude_arr.compact_map(&.as_s?)
-            end
-          end
-
-          # Load plugins configuration
-          if plugins_section = config.raw["plugins"]?.try(&.as_h?)
-            if processors = plugins_section["processors"]?.try(&.as_a?)
-              config.plugins.processors = processors.compact_map(&.as_s?)
-            end
-          end
-
-          # Load content files publishing configuration
-          if content_section = config.raw["content"]?.try(&.as_h?)
-            if files_section = content_section["files"]?.try(&.as_h?)
-              allow_any = files_section["allow_extensions"]? || files_section["extensions"]?
-              disallow_any = files_section["disallow_extensions"]?
-              disallow_paths_any = files_section["disallow_paths"]?
-
-              if allow_any
-                values = allow_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                         allow_any.as_s?.try { |s| [s] } ||
-                         ([] of String)
-                config.content_files.allow_extensions = ContentFilesConfig.normalize_extensions(values)
-              end
-
-              if disallow_any
-                values = disallow_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                         disallow_any.as_s?.try { |s| [s] } ||
-                         ([] of String)
-                config.content_files.disallow_extensions = ContentFilesConfig.normalize_extensions(values)
-              end
-
-              if disallow_paths_any
-                values = disallow_paths_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                         disallow_paths_any.as_s?.try { |s| [s] } ||
-                         ([] of String)
-                config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(values)
-              end
-            end
-          end
-
-          # Load pagination configuration
-          if pagination_section = config.raw["pagination"]?.try(&.as_h?)
-            config.pagination.enabled = pagination_section["enabled"]?.try(&.as_bool?) || config.pagination.enabled
-            config.pagination.per_page = pagination_section["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
-          end
-
-          # Load highlight (syntax highlighting) configuration
-          if highlight_section = config.raw["highlight"]?.try(&.as_h?)
-            if highlight_section.has_key?("enabled")
-              enabled_val = highlight_section["enabled"]?.try(&.as_bool?)
-              config.highlight.enabled = enabled_val unless enabled_val.nil?
-            end
-            config.highlight.theme = highlight_section["theme"]?.try(&.as_s?) || config.highlight.theme
-            if highlight_section.has_key?("use_cdn")
-              use_cdn_val = highlight_section["use_cdn"]?.try(&.as_bool?)
-              config.highlight.use_cdn = use_cdn_val unless use_cdn_val.nil?
-            end
-          end
-
-          # Load auto_includes configuration
-          if auto_includes_section = config.raw["auto_includes"]?.try(&.as_h?)
-            config.auto_includes.enabled = auto_includes_section["enabled"]?.try(&.as_bool?) || config.auto_includes.enabled
-            if dirs = auto_includes_section["dirs"]?.try(&.as_a?)
-              config.auto_includes.dirs = dirs.compact_map(&.as_s?)
-            end
-          end
-
-          # Load OpenGraph configuration
-          if og_section = config.raw["og"]?.try(&.as_h?)
-            config.og.default_image = og_section["default_image"]?.try(&.as_s?)
-            config.og.twitter_card = og_section["twitter_card"]?.try(&.as_s?) || config.og.twitter_card
-            config.og.twitter_site = og_section["twitter_site"]?.try(&.as_s?)
-            config.og.twitter_creator = og_section["twitter_creator"]?.try(&.as_s?)
-            config.og.fb_app_id = og_section["fb_app_id"]?.try(&.as_s?)
-            config.og.og_type = og_section["type"]?.try(&.as_s?) || config.og.og_type
-          end
-
-          # Load taxonomies configuration
-          if taxonomies_section = config.raw["taxonomies"]?.try(&.as_a?)
-            config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
-              taxonomy_hash = taxonomy_any.as_h?
-              next unless taxonomy_hash
-
-              name = taxonomy_hash["name"]?.try(&.as_s?)
-              next unless name
-
-              taxonomy = TaxonomyConfig.new(name)
-              taxonomy.feed = taxonomy_hash["feed"]?.try(&.as_bool?) || taxonomy.feed
-              taxonomy.sitemap = taxonomy_hash["sitemap"]?.try(&.as_bool?) || taxonomy.sitemap
-              taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
-              taxonomy
-            end
-          end
-
-          # Load default language
-          config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
-
-          # Load languages configuration
-          if languages_section = config.raw["languages"]?.try(&.as_h?)
-            languages_section.each do |lang_code, lang_data|
-              next unless lang_hash = lang_data.as_h?
-
-              lang_config = LanguageConfig.new(lang_code)
-              lang_config.language_name = lang_hash["language_name"]?.try(&.as_s?) || lang_code
-              lang_config.weight = lang_hash["weight"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || lang_config.weight
-              lang_config.generate_feed = lang_hash["generate_feed"]?.try(&.as_bool?) || lang_config.generate_feed
-              lang_config.build_search_index = lang_hash["build_search_index"]?.try(&.as_bool?) || lang_config.build_search_index
-
-              if taxonomies = lang_hash["taxonomies"]?.try(&.as_a?)
-                lang_config.taxonomies = taxonomies.compact_map(&.as_s?)
-              end
-
-              config.languages[lang_code] = lang_config
-            end
-          end
-
-          # Load build configuration (hooks)
-          if build_section = config.raw["build"]?.try(&.as_h?)
-            if hooks_section = build_section["hooks"]?.try(&.as_h?)
-              if pre_hooks = hooks_section["pre"]?.try(&.as_a?)
-                config.build.hooks.pre = pre_hooks.compact_map(&.as_s?)
-              end
-              if post_hooks = hooks_section["post"]?.try(&.as_a?)
-                config.build.hooks.post = post_hooks.compact_map(&.as_s?)
-              end
-            end
-          end
-
-          # Load markdown configuration
-          if markdown_section = config.raw["markdown"]?.try(&.as_h?)
-            if markdown_section.has_key?("safe")
-              safe_val = markdown_section["safe"]?.try(&.as_bool?)
-              config.markdown.safe = safe_val unless safe_val.nil?
-            end
-            if markdown_section.has_key?("lazy_loading")
-              lazy_val = markdown_section["lazy_loading"]?.try(&.as_bool?)
-              config.markdown.lazy_loading = lazy_val unless lazy_val.nil?
-            end
-          end
-
-          # Load permalinks configuration
-          if permalinks_section = config.raw["permalinks"]?.try(&.as_h?)
-            permalinks_section.each do |k, v|
-              if target = v.as_s?
-                config.permalinks[k] = target
-              end
-            end
-          end
-
-          # Load deployment configuration (inspired by Hugo deploy configuration)
-          if deployment_section = config.raw["deployment"]?.try(&.as_h?)
-            config.deployment.target = deployment_section["target"]?.try(&.as_s?)
-            config.deployment.confirm = deployment_section["confirm"]?.try(&.as_bool?) || config.deployment.confirm
-
-            dry_any = deployment_section["dryRun"]? || deployment_section["dry_run"]?
-            if dry_val = dry_any.try(&.as_bool?)
-              config.deployment.dry_run = dry_val
-            end
-
-            force_any = deployment_section["force"]?
-            if force_val = force_any.try(&.as_bool?)
-              config.deployment.force = force_val
-            end
-
-            max_deletes_any = deployment_section["maxDeletes"]? || deployment_section["max_deletes"]?
-            if max_deletes_val = max_deletes_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
-              config.deployment.max_deletes = max_deletes_val
-            end
-
-            workers_any = deployment_section["workers"]?
-            if workers_val = workers_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
-              config.deployment.workers = workers_val
-            end
-
-            source_any = deployment_section["source_dir"]? || deployment_section["source"]?
-            if source_val = source_any.try(&.as_s?)
-              config.deployment.source_dir = source_val
-            end
-
-            if targets_any = deployment_section["targets"]?.try(&.as_a?)
-              config.deployment.targets = targets_any.compact_map do |target_any|
-                next unless target_h = target_any.as_h?
-
-                name = target_h["name"]?.try(&.as_s?)
-                next unless name
-
-                target = DeploymentTarget.new
-                target.name = name
-                target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || ""
-                target.command = target_h["command"]?.try(&.as_s?)
-                target.include = target_h["include"]?.try(&.as_s?)
-                target.exclude = target_h["exclude"]?.try(&.as_s?)
-
-                strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
-                if strip_val = strip_any.try(&.as_bool?)
-                  target.strip_index_html = strip_val
+              if disallow = rule_h["disallow"]?
+                if disallow_arr = disallow.as_a?
+                  rule.disallow = disallow_arr.compact_map(&.as_s?)
+                elsif disallow_str = disallow.as_s?
+                  rule.disallow = [disallow_str]
                 end
-
-                target
               end
-            end
-
-            if matchers_any = deployment_section["matchers"]?.try(&.as_a?)
-              config.deployment.matchers = matchers_any.compact_map do |matcher_any|
-                next unless matcher_h = matcher_any.as_h?
-
-                pattern = matcher_h["pattern"]?.try(&.as_s?)
-                next unless pattern
-
-                matcher = DeploymentMatcher.new
-                matcher.pattern = pattern
-                matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
-                matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
-                if gzip_val = matcher_h["gzip"]?.try(&.as_bool?)
-                  matcher.gzip = gzip_val
-                end
-                if force_val = matcher_h["force"]?.try(&.as_bool?)
-                  matcher.force = force_val
-                end
-                matcher
-              end
+              rule
+            else
+              nil
             end
           end
         end
-        config
+      end
+
+      private def self.load_llms(config : Config)
+        return unless s = config.raw["llms"]?.try(&.as_h?)
+
+        config.llms.enabled = s["enabled"]?.try(&.as_bool?) || config.llms.enabled
+        config.llms.filename = s["filename"]?.try(&.as_s?) || config.llms.filename
+        config.llms.instructions = s["instructions"]?.try(&.as_s?) || config.llms.instructions
+        config.llms.full_enabled = s["full_enabled"]?.try(&.as_bool?) || config.llms.full_enabled
+        config.llms.full_filename = s["full_filename"]?.try(&.as_s?) || config.llms.full_filename
+      end
+
+      private def self.load_feeds(config : Config)
+        return unless s = config.raw["feeds"]?.try(&.as_h?)
+
+        # Backward compatibility for 'generate' property
+        enabled = s["enabled"]?.try(&.as_bool?)
+        generate = s["generate"]?.try(&.as_bool?)
+
+        if !enabled.nil?
+          config.feeds.enabled = enabled
+        elsif !generate.nil?
+          config.feeds.enabled = generate
+        end
+
+        config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename
+        config.feeds.type = s["type"]?.try(&.as_s?) || config.feeds.type
+        config.feeds.truncate = s["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
+        config.feeds.limit = s["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
+        if sections = s["sections"]?.try(&.as_a?)
+          config.feeds.sections = sections.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_search(config : Config)
+        return unless s = config.raw["search"]?.try(&.as_h?)
+
+        config.search.enabled = s["enabled"]?.try(&.as_bool?) || config.search.enabled
+        config.search.format = s["format"]?.try(&.as_s?) || config.search.format
+        config.search.filename = s["filename"]?.try(&.as_s?) || config.search.filename
+        if fields = s["fields"]?.try(&.as_a?)
+          config.search.fields = fields.compact_map(&.as_s?)
+        end
+        if exclude_arr = s["exclude"]?.try(&.as_a?)
+          config.search.exclude = exclude_arr.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_plugins(config : Config)
+        return unless s = config.raw["plugins"]?.try(&.as_h?)
+
+        if processors = s["processors"]?.try(&.as_a?)
+          config.plugins.processors = processors.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_content_files(config : Config)
+        return unless content_section = config.raw["content"]?.try(&.as_h?)
+        return unless s = content_section["files"]?.try(&.as_h?)
+
+        allow_any = s["allow_extensions"]? || s["extensions"]?
+        disallow_any = s["disallow_extensions"]?
+        disallow_paths_any = s["disallow_paths"]?
+
+        if allow_any
+          values = allow_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                   allow_any.as_s?.try { |v| [v] } ||
+                   ([] of String)
+          config.content_files.allow_extensions = ContentFilesConfig.normalize_extensions(values)
+        end
+
+        if disallow_any
+          values = disallow_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                   disallow_any.as_s?.try { |v| [v] } ||
+                   ([] of String)
+          config.content_files.disallow_extensions = ContentFilesConfig.normalize_extensions(values)
+        end
+
+        if disallow_paths_any
+          values = disallow_paths_any.as_a?.try(&.compact_map(&.as_s?)) ||
+                   disallow_paths_any.as_s?.try { |v| [v] } ||
+                   ([] of String)
+          config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(values)
+        end
+      end
+
+      private def self.load_pagination(config : Config)
+        return unless s = config.raw["pagination"]?.try(&.as_h?)
+
+        config.pagination.enabled = s["enabled"]?.try(&.as_bool?) || config.pagination.enabled
+        config.pagination.per_page = s["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
+      end
+
+      private def self.load_highlight(config : Config)
+        return unless s = config.raw["highlight"]?.try(&.as_h?)
+
+        if s.has_key?("enabled")
+          enabled_val = s["enabled"]?.try(&.as_bool?)
+          config.highlight.enabled = enabled_val unless enabled_val.nil?
+        end
+        config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
+        if s.has_key?("use_cdn")
+          use_cdn_val = s["use_cdn"]?.try(&.as_bool?)
+          config.highlight.use_cdn = use_cdn_val unless use_cdn_val.nil?
+        end
+      end
+
+      private def self.load_auto_includes(config : Config)
+        return unless s = config.raw["auto_includes"]?.try(&.as_h?)
+
+        config.auto_includes.enabled = s["enabled"]?.try(&.as_bool?) || config.auto_includes.enabled
+        if dirs = s["dirs"]?.try(&.as_a?)
+          config.auto_includes.dirs = dirs.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_og(config : Config)
+        return unless s = config.raw["og"]?.try(&.as_h?)
+
+        config.og.default_image = s["default_image"]?.try(&.as_s?)
+        config.og.twitter_card = s["twitter_card"]?.try(&.as_s?) || config.og.twitter_card
+        config.og.twitter_site = s["twitter_site"]?.try(&.as_s?)
+        config.og.twitter_creator = s["twitter_creator"]?.try(&.as_s?)
+        config.og.fb_app_id = s["fb_app_id"]?.try(&.as_s?)
+        config.og.og_type = s["type"]?.try(&.as_s?) || config.og.og_type
+      end
+
+      private def self.load_taxonomies(config : Config)
+        return unless taxonomies_section = config.raw["taxonomies"]?.try(&.as_a?)
+
+        config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
+          taxonomy_hash = taxonomy_any.as_h?
+          next unless taxonomy_hash
+
+          name = taxonomy_hash["name"]?.try(&.as_s?)
+          next unless name
+
+          taxonomy = TaxonomyConfig.new(name)
+          taxonomy.feed = taxonomy_hash["feed"]?.try(&.as_bool?) || taxonomy.feed
+          taxonomy.sitemap = taxonomy_hash["sitemap"]?.try(&.as_bool?) || taxonomy.sitemap
+          taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+          taxonomy
+        end
+      end
+
+      private def self.load_languages(config : Config)
+        return unless s = config.raw["languages"]?.try(&.as_h?)
+
+        s.each do |lang_code, lang_data|
+          next unless lang_hash = lang_data.as_h?
+
+          lang_config = LanguageConfig.new(lang_code)
+          lang_config.language_name = lang_hash["language_name"]?.try(&.as_s?) || lang_code
+          lang_config.weight = lang_hash["weight"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || lang_config.weight
+          lang_config.generate_feed = lang_hash["generate_feed"]?.try(&.as_bool?) || lang_config.generate_feed
+          lang_config.build_search_index = lang_hash["build_search_index"]?.try(&.as_bool?) || lang_config.build_search_index
+
+          if taxonomies = lang_hash["taxonomies"]?.try(&.as_a?)
+            lang_config.taxonomies = taxonomies.compact_map(&.as_s?)
+          end
+
+          config.languages[lang_code] = lang_config
+        end
+      end
+
+      private def self.load_build(config : Config)
+        return unless s = config.raw["build"]?.try(&.as_h?)
+
+        if hooks_section = s["hooks"]?.try(&.as_h?)
+          if pre_hooks = hooks_section["pre"]?.try(&.as_a?)
+            config.build.hooks.pre = pre_hooks.compact_map(&.as_s?)
+          end
+          if post_hooks = hooks_section["post"]?.try(&.as_a?)
+            config.build.hooks.post = post_hooks.compact_map(&.as_s?)
+          end
+        end
+      end
+
+      private def self.load_markdown(config : Config)
+        return unless s = config.raw["markdown"]?.try(&.as_h?)
+
+        if s.has_key?("safe")
+          safe_val = s["safe"]?.try(&.as_bool?)
+          config.markdown.safe = safe_val unless safe_val.nil?
+        end
+        if s.has_key?("lazy_loading")
+          lazy_val = s["lazy_loading"]?.try(&.as_bool?)
+          config.markdown.lazy_loading = lazy_val unless lazy_val.nil?
+        end
+      end
+
+      private def self.load_permalinks(config : Config)
+        return unless s = config.raw["permalinks"]?.try(&.as_h?)
+
+        s.each do |k, v|
+          if target = v.as_s?
+            config.permalinks[k] = target
+          end
+        end
+      end
+
+      private def self.load_deployment(config : Config)
+        return unless s = config.raw["deployment"]?.try(&.as_h?)
+
+        config.deployment.target = s["target"]?.try(&.as_s?)
+        config.deployment.confirm = s["confirm"]?.try(&.as_bool?) || config.deployment.confirm
+
+        dry_any = s["dryRun"]? || s["dry_run"]?
+        if dry_val = dry_any.try(&.as_bool?)
+          config.deployment.dry_run = dry_val
+        end
+
+        if force_val = s["force"]?.try(&.as_bool?)
+          config.deployment.force = force_val
+        end
+
+        max_deletes_any = s["maxDeletes"]? || s["max_deletes"]?
+        if max_deletes_val = max_deletes_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+          config.deployment.max_deletes = max_deletes_val
+        end
+
+        if workers_val = s["workers"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+          config.deployment.workers = workers_val
+        end
+
+        source_any = s["source_dir"]? || s["source"]?
+        if source_val = source_any.try(&.as_s?)
+          config.deployment.source_dir = source_val
+        end
+
+        load_deployment_targets(config, s)
+        load_deployment_matchers(config, s)
+      end
+
+      private def self.load_deployment_targets(config : Config, s : Hash(String, TOML::Any))
+        return unless targets_any = s["targets"]?.try(&.as_a?)
+
+        config.deployment.targets = targets_any.compact_map do |target_any|
+          next unless target_h = target_any.as_h?
+
+          name = target_h["name"]?.try(&.as_s?)
+          next unless name
+
+          target = DeploymentTarget.new
+          target.name = name
+          target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || ""
+          target.command = target_h["command"]?.try(&.as_s?)
+          target.include = target_h["include"]?.try(&.as_s?)
+          target.exclude = target_h["exclude"]?.try(&.as_s?)
+
+          strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
+          if strip_val = strip_any.try(&.as_bool?)
+            target.strip_index_html = strip_val
+          end
+
+          target
+        end
+      end
+
+      private def self.load_deployment_matchers(config : Config, s : Hash(String, TOML::Any))
+        return unless matchers_any = s["matchers"]?.try(&.as_a?)
+
+        config.deployment.matchers = matchers_any.compact_map do |matcher_any|
+          next unless matcher_h = matcher_any.as_h?
+
+          pattern = matcher_h["pattern"]?.try(&.as_s?)
+          next unless pattern
+
+          matcher = DeploymentMatcher.new
+          matcher.pattern = pattern
+          matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
+          matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
+          if gzip_val = matcher_h["gzip"]?.try(&.as_bool?)
+            matcher.gzip = gzip_val
+          end
+          if force_val = matcher_h["force"]?.try(&.as_bool?)
+            matcher.force = force_val
+          end
+          matcher
+        end
       end
     end
   end

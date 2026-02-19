@@ -29,6 +29,9 @@ require "./utils/profiler"
 require "./utils/command_runner"
 require "./utils/text_utils"
 require "./utils/sort_utils"
+require "./utils/path_utils"
+require "./utils/debug_printer"
+require "./utils/crinja_utils"
 
 # Load options
 require "./config/options/init_options"

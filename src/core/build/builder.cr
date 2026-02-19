@@ -40,6 +40,7 @@ require "../../models/site"
 require "../lifecycle"
 require "../../utils/debug_printer"
 require "../../utils/path_utils"
+require "../../utils/crinja_utils"
 
 module Hwaro
   module Core
@@ -154,23 +155,8 @@ module Hwaro
 
           # --- 2. Rebuild relationships that depend on the changed pages ---
           # Re-populate taxonomies (a changed page may have new/removed tags)
-          site.taxonomies.clear
-          (site.pages + site.sections).each do |p|
-            p.taxonomies.each do |name, terms|
-              site.taxonomies[name] ||= {} of String => Array(Models::Page)
-              terms.each do |term|
-                site.taxonomies[name][term] ||= [] of Models::Page
-                site.taxonomies[name][term] << p
-              end
-            end
-          end
-          site.taxonomies.each_value do |terms|
-            terms.each_value do |pages|
-              sorted = Utils::SortUtils.sort_pages(pages, "date", false)
-              pages.clear
-              pages.concat(sorted)
-            end
-          end
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          rebuild_taxonomies(site, all_pages)
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
@@ -207,7 +193,6 @@ module Hwaro
           cache.save if options.cache
 
           # --- 5. Regenerate lightweight SEO / search files ---
-          all_pages = (site.pages + site.sections).as(Array(Models::Page))
           Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose)
           Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose)
           Content::Seo::Robots.generate(site.config, output_dir, verbose)
@@ -828,80 +813,21 @@ module Hwaro
           end
         end
 
+        # Delegate to shared CrinjaUtils for YAML/TOML/JSON → Crinja::Value conversion
         private def to_crinja(value : YAML::Any) : Crinja::Value
-          if arr = value.as_a?
-            Crinja::Value.new(arr.map { |v| to_crinja(v) })
-          elsif h = value.as_h?
-            converted = {} of String => Crinja::Value
-            h.each do |k, v|
-              converted[k.as_s] = to_crinja(v)
-            end
-            Crinja::Value.new(converted)
-          elsif s = value.as_s?
-            Crinja::Value.new(s)
-          elsif i = value.as_i64?
-            Crinja::Value.new(i)
-          elsif f = value.as_f?
-            Crinja::Value.new(f)
-          elsif b = value.as_bool?
-            Crinja::Value.new(b)
-          else
-            Crinja::Value.new(nil)
-          end
+          Utils::CrinjaUtils.from_yaml(value)
         end
 
         private def to_crinja(value : Hash(String, TOML::Any)) : Crinja::Value
-          converted = {} of String => Crinja::Value
-          value.each do |k, v|
-            converted[k] = to_crinja(v)
-          end
-          Crinja::Value.new(converted)
+          Utils::CrinjaUtils.from_toml(value)
         end
 
         private def to_crinja(value : TOML::Any) : Crinja::Value
-          if arr = value.as_a?
-            Crinja::Value.new(arr.map { |v| to_crinja(v) })
-          elsif h = value.as_h?
-            converted = {} of String => Crinja::Value
-            h.each do |k, v|
-              converted[k] = to_crinja(v)
-            end
-            Crinja::Value.new(converted)
-          elsif s = value.as_s?
-            Crinja::Value.new(s)
-          elsif i = value.as_i?
-            Crinja::Value.new(i.to_i64)
-          elsif f = value.as_f?
-            Crinja::Value.new(f)
-          elsif b = value.as_bool?
-            Crinja::Value.new(b)
-          elsif (t = value.raw).is_a?(Time)
-            Crinja::Value.new(t.to_s)
-          else
-            Crinja::Value.new(nil)
-          end
+          Utils::CrinjaUtils.from_toml(value)
         end
 
         private def to_crinja(value : JSON::Any) : Crinja::Value
-          if arr = value.as_a?
-            Crinja::Value.new(arr.map { |v| to_crinja(v) })
-          elsif h = value.as_h?
-            converted = {} of String => Crinja::Value
-            h.each do |k, v|
-              converted[k] = to_crinja(v)
-            end
-            Crinja::Value.new(converted)
-          elsif s = value.as_s?
-            Crinja::Value.new(s)
-          elsif i = value.as_i64?
-            Crinja::Value.new(i)
-          elsif f = value.as_f?
-            Crinja::Value.new(f)
-          elsif b = value.as_bool?
-            Crinja::Value.new(b)
-          else
-            Crinja::Value.new(nil)
-          end
+          Utils::CrinjaUtils.from_json(value)
         end
 
         LANGUAGE_FILENAME_PATTERN = /^(.+)\.([a-z]{2,3})\.md$/
@@ -1118,12 +1044,17 @@ module Hwaro
           end
         end
 
-        # Populate site.taxonomies from all pages
+        # Populate site.taxonomies from all pages (lifecycle context variant)
         private def populate_taxonomies(ctx : Lifecycle::BuildContext)
-          site = ctx.site.not_nil!
+          rebuild_taxonomies(ctx.site.not_nil!, ctx.all_pages)
+        end
+
+        # Rebuild site.taxonomies from the given set of pages.
+        # Shared by both full-build (via populate_taxonomies) and incremental build.
+        private def rebuild_taxonomies(site : Models::Site, pages : Array(Models::Page))
           site.taxonomies.clear
 
-          ctx.all_pages.each do |page|
+          pages.each do |page|
             page.taxonomies.each do |name, terms|
               site.taxonomies[name] ||= {} of String => Array(Models::Page)
               terms.each do |term|
@@ -1135,10 +1066,10 @@ module Hwaro
 
           # Sort pages in taxonomies (default by date)
           site.taxonomies.each_value do |terms|
-            terms.each_value do |pages|
-              sorted = Utils::SortUtils.sort_pages(pages, "date", false)
-              pages.clear
-              pages.concat(sorted)
+            terms.each_value do |term_pages|
+              sorted = Utils::SortUtils.sort_pages(term_pages, "date", false)
+              term_pages.clear
+              term_pages.concat(sorted)
             end
           end
         end
@@ -2147,68 +2078,58 @@ module Hwaro
         end
 
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil) : String
+          # 1. Block shortcodes: {% name(args) %}body{% end %}
           processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
             name = $1
             args_str = $2
             body = $3.strip
 
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              args["body"] = body
-              html = render_shortcode_jinja(template, args, context)
-              if results = shortcode_results
-                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-                results[placeholder] = html
-                placeholder
-              else
-                html
-              end
-            else
-              Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
-              match
-            end
+            extra_args = {"body" => body}
+            render_shortcode_result(name, args_str, templates, context, shortcode_results, match, warn_missing: true, extra_args: extra_args)
           end
 
+          # 2. Explicit call: {{ shortcode("name", args) }}
           processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
-            name = $1
-            args_str = $2?
-
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args, context)
-              if results = shortcode_results
-                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-                results[placeholder] = html
-                placeholder
-              else
-                html
-              end
-            else
-              Logger.warn "  [WARN] Shortcode template '#{template_key}' not found."
-              match
-            end
+            render_shortcode_result($1, $2?, templates, context, shortcode_results, match, warn_missing: true)
           end
 
+          # 3. Direct call: {{ name(args) }}
           processed = processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
-            name = $1
-            args_str = $2
+            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: false)
+          end
+        end
 
-            template_key = "shortcodes/#{name}"
-            if template = templates[template_key]?
-              args = parse_shortcode_args_jinja(args_str)
-              html = render_shortcode_jinja(template, args, context)
-              if results = shortcode_results
-                placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-                results[placeholder] = html
-                placeholder
-              else
-                html
-              end
-            else
-              match
-            end
+        # Shared helper: look up a shortcode template, render it, and either
+        # return the HTML directly or store it behind a placeholder so that
+        # Markdown processing doesn't mangle it.
+        private def render_shortcode_result(
+          name : String,
+          args_str : String?,
+          templates : Hash(String, String),
+          context : Hash(String, Crinja::Value),
+          shortcode_results : Hash(String, String)?,
+          fallback : String,
+          warn_missing : Bool = true,
+          extra_args : Hash(String, String)? = nil,
+        ) : String
+          template_key = "shortcodes/#{name}"
+          template = templates[template_key]?
+
+          unless template
+            Logger.warn "  [WARN] Shortcode template '#{template_key}' not found." if warn_missing
+            return fallback
+          end
+
+          args = parse_shortcode_args_jinja(args_str)
+          extra_args.try &.each { |k, v| args[k] = v }
+          html = render_shortcode_jinja(template, args, context)
+
+          if results = shortcode_results
+            placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+            results[placeholder] = html
+            placeholder
+          else
+            html
           end
         end
 

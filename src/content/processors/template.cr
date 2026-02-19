@@ -14,6 +14,7 @@
 
 require "crinja"
 require "./filters/*"
+require "../../utils/crinja_utils"
 
 module Hwaro
   module Content
@@ -480,83 +481,21 @@ module Hwaro
           end
         end
 
-        # Helper to convert JSON to Crinja value
+        # Delegate to shared CrinjaUtils for JSON/TOML/YAML → Crinja::Value conversion
         private def json_to_crinja(json : JSON::Any) : Crinja::Value
-          case json.raw
-          when Hash
-            hash = {} of String => Crinja::Value
-            json.as_h.each { |k, v| hash[k] = json_to_crinja(v) }
-            Crinja::Value.new(hash)
-          when Array
-            arr = json.as_a.map { |v| json_to_crinja(v) }
-            Crinja::Value.new(arr)
-          when String
-            Crinja::Value.new(json.as_s)
-          when Int64
-            Crinja::Value.new(json.as_i64)
-          when Float64
-            Crinja::Value.new(json.as_f)
-          when Bool
-            Crinja::Value.new(json.as_bool)
-          when Nil
-            Crinja::Value.new(nil)
-          else
-            Crinja::Value.new(json.to_s)
-          end
+          Utils::CrinjaUtils.from_json(json)
         end
 
-        # Helper to convert TOML to Crinja value
         private def toml_to_crinja(toml : TOML::Table) : Crinja::Value
-          hash = {} of String => Crinja::Value
-          toml.each do |k, v|
-            hash[k] = toml_any_to_crinja(v)
-          end
-          Crinja::Value.new(hash)
+          Utils::CrinjaUtils.from_toml(toml)
         end
 
         private def toml_any_to_crinja(value : TOML::Any) : Crinja::Value
-          if str = value.as_s?
-            Crinja::Value.new(str)
-          elsif int = value.as_i?
-            Crinja::Value.new(int.to_i64)
-          elsif float = value.as_f?
-            Crinja::Value.new(float)
-          elsif bool = value.as_bool?
-            Crinja::Value.new(bool)
-          elsif arr = value.as_a?
-            Crinja::Value.new(arr.map { |v| toml_any_to_crinja(v) })
-          elsif hash = value.as_h?
-            h = {} of String => Crinja::Value
-            hash.each { |k, v| h[k] = toml_any_to_crinja(v) }
-            Crinja::Value.new(h)
-          else
-            Crinja::Value.new(value.to_s)
-          end
+          Utils::CrinjaUtils.from_toml(value)
         end
 
-        # Helper to convert YAML to Crinja value
         private def yaml_to_crinja(yaml : YAML::Any) : Crinja::Value
-          case yaml.raw
-          when Hash
-            hash = {} of String => Crinja::Value
-            yaml.as_h.each { |k, v| hash[k.to_s] = yaml_to_crinja(v) }
-            Crinja::Value.new(hash)
-          when Array
-            arr = yaml.as_a.map { |v| yaml_to_crinja(v) }
-            Crinja::Value.new(arr)
-          when String
-            Crinja::Value.new(yaml.as_s)
-          when Int64
-            Crinja::Value.new(yaml.as_i64)
-          when Float64
-            Crinja::Value.new(yaml.as_f)
-          when Bool
-            Crinja::Value.new(yaml.as_bool)
-          when Nil
-            Crinja::Value.new(nil)
-          else
-            Crinja::Value.new(yaml.to_s)
-          end
+          Utils::CrinjaUtils.from_yaml(yaml)
         end
       end
 
