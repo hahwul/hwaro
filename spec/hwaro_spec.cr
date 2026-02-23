@@ -41,6 +41,7 @@ describe Hwaro do
       options.port.should eq(3000)
       options.drafts.should eq(false)
       options.open_browser.should eq(false)
+      options.access_log.should eq(false)
     end
 
     it "converts to build options" do

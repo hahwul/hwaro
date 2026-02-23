@@ -154,15 +154,15 @@ module Hwaro
 
       def run(options : Config::Options::ServeOptions)
         build_options = options.to_build_options
-        run_with_options(options.host, options.port, options.open_browser, build_options)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, build_options)
       end
 
       def run(host : String = "0.0.0.0", port : Int32 = 3000, drafts : Bool = false)
         build_options = Config::Options::BuildOptions.new(drafts: drafts)
-        run_with_options(host, port, false, build_options)
+        run_with_options(host, port, false, false, build_options)
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool, build_options : Config::Options::BuildOptions)
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, build_options : Config::Options::BuildOptions)
         Logger.info "Performing initial build..."
         @builder.run(build_options)
 
@@ -183,12 +183,13 @@ module Hwaro
 
         output_dir = sanitize_output_dir(build_options.output_dir)
 
-        server = HTTP::Server.new([
-          HTTP::LogHandler.new,
-          IndexRewriteHandler.new(output_dir),
-          HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true),
-          NotFoundHandler.new(output_dir),
-        ])
+        handlers = [] of HTTP::Handler
+        handlers << HTTP::LogHandler.new if access_log
+        handlers << IndexRewriteHandler.new(output_dir)
+        handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
+        handlers << NotFoundHandler.new(output_dir)
+
+        server = HTTP::Server.new(handlers)
 
         address = server.bind_tcp host, port
         server.listen

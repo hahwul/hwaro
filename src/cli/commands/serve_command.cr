@@ -25,6 +25,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server"),
           FlagInfo.new(short: "-v", long: "--verbose", description: "Show detailed output including generated files"),
           FlagInfo.new(short: nil, long: "--debug", description: "Print debug information after build"),
+          FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           HELP_FLAG,
         ]
 
@@ -63,6 +64,7 @@ module Hwaro
           open_browser = false
           verbose = false
           debug = false
+          access_log = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -75,6 +77,7 @@ module Hwaro
             parser.on("--open", "Open browser after starting server") { open_browser = true }
             parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
             parser.on("--debug", "Print debug information after build") { debug = true }
+            parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -86,7 +89,8 @@ module Hwaro
             minify: minify,
             open_browser: open_browser,
             verbose: verbose,
-            debug: debug
+            debug: debug,
+            access_log: access_log
           )}
         end
       end

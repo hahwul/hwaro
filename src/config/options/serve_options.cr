@@ -10,6 +10,7 @@ module Hwaro
         property open_browser : Bool
         property verbose : Bool
         property debug : Bool
+        property access_log : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
@@ -20,6 +21,7 @@ module Hwaro
           @open_browser : Bool = false,
           @verbose : Bool = false,
           @debug : Bool = false,
+          @access_log : Bool = false,
         )
         end
 

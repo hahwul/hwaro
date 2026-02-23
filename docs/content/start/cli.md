@@ -133,6 +133,7 @@ Start a development server with live reload:
 hwaro serve
 hwaro serve --port 8080
 hwaro serve --open
+hwaro serve --access-log
 hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
@@ -150,6 +151,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | -d, --drafts | Include draft content |
 | -v, --verbose | Show detailed output |
 | --debug | Print debug information after each rebuild |
+| --access-log | Show HTTP access log (e.g. GET requests) |
 
 The server watches for file changes and rebuilds automatically.
 
@@ -235,6 +237,9 @@ See [Tools & Completion](/start/tools/) for detailed installation instructions.
 ```bash
 # Development workflow
 hwaro serve --drafts --verbose
+
+# Development with HTTP access log
+hwaro serve --access-log
 
 # Production build
 hwaro build

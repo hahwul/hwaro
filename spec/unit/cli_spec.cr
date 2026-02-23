@@ -133,6 +133,7 @@ describe Hwaro::CLI::Commands::ServeCommand do
     flag_names.should contain("--bind")
     flag_names.should contain("--port")
     flag_names.should contain("--open")
+    flag_names.should contain("--access-log")
   end
 end
 
