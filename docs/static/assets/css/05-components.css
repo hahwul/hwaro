@@ -142,3 +142,13 @@ ul.page-list li a:hover {
 .docs-footer a:hover {
     color: var(--primary);
 }
+
+.hahwul-img {
+    width: 50px;
+    filter: grayscale(100%) brightness(0.5);
+    transition: filter 0.3s ease; /* 부드럽게 변하게 해줌 */
+}
+
+.hahwul-img:hover {
+    filter: grayscale(0%) brightness(1.2); /* 원래 색상 + 조금 더 밝게 */
+}
