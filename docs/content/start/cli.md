@@ -86,12 +86,15 @@ Build the site to `public/`:
 hwaro build
 hwaro build --drafts
 hwaro build --minify
+hwaro build -i /path/to/my-site
+hwaro build -i /path/to/my-site -o ./dist
 ```
 
 **Options:**
 
 | Flag | Description |
 |------|-------------|
+| -i, --input DIR | Project directory to build (default: current directory) |
 | -o, --output-dir DIR | Output directory (default: public) |
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
 | -d, --drafts | Include draft content |
@@ -113,6 +116,15 @@ The minify flag performs conservative optimization on generated files:
 
 Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
 
+**About `-i, --input`:**
+
+When specified, Hwaro changes its working directory to the given path before building. This lets you build a site located in another directory without `cd`-ing into it first.
+
+- All site sources (`config.toml`, `content/`, `templates/`, `static/`) are read from the input directory.
+- **Without `-o`:** The default output directory `public/` is created inside the input directory (i.e., the site's own `public/` folder). This is the natural behavior — `hwaro build -i ../my-site` produces `../my-site/public/`.
+- **With `-o`:** The output path is resolved relative to **your current directory** (not the input directory), so `hwaro build -i ../my-site -o ./dist` writes output to `./dist` in your shell's CWD.
+- If `-i` is omitted, behavior is unchanged — the current directory is used.
+
 ### serve
 
 Start a development server with live reload:
@@ -121,12 +133,15 @@ Start a development server with live reload:
 hwaro serve
 hwaro serve --port 8080
 hwaro serve --open
+hwaro serve -i /path/to/my-site
+hwaro serve -i /path/to/my-site -p 8080
 ```
 
 **Options:**
 
 | Flag | Description |
 |------|-------------|
+| -i, --input DIR | Project directory to serve (default: current directory) |
 | -b, --bind HOST | Bind address (default: 0.0.0.0) |
 | -p, --port PORT | Port number (default: 3000) |
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
@@ -137,6 +152,8 @@ hwaro serve --open
 | --debug | Print debug information after each rebuild |
 
 The server watches for file changes and rebuilds automatically.
+
+When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
 
 ### deploy
 
@@ -227,6 +244,15 @@ hwaro build -o dist
 
 # Preview on specific port
 hwaro serve -p 8000 --open
+
+# Build a site in another directory
+hwaro build -i ~/projects/my-blog
+
+# Build a remote project and output to current directory
+hwaro build -i ~/projects/my-blog -o ./output
+
+# Serve a site from another directory
+hwaro serve -i ~/projects/my-blog --open
 ```
 
 ## Global Options

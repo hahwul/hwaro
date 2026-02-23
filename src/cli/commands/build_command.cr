@@ -17,6 +17,7 @@ module Hwaro
 
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
+          FlagInfo.new(short: "-i", long: "--input", description: "Project directory to build (default: current directory)", takes_value: true, value_hint: "DIR"),
           FlagInfo.new(short: "-o", long: "--output-dir", description: "Output directory (default: public)", takes_value: true, value_hint: "DIR"),
           FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL"),
           FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content"),
@@ -41,7 +42,25 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          options = parse_options(args)
+          result, input_dir = parse_options(args)
+          options, output_dir_explicit = result
+
+          if dir = input_dir
+            unless Dir.exists?(dir)
+              Logger.error "Input directory does not exist: #{dir}"
+              exit(1)
+            end
+
+            # Only resolve output_dir to absolute path when -o was explicitly
+            # specified, so it stays relative to the original CWD.
+            # The default "public" should remain relative to the input directory.
+            if output_dir_explicit && !Path[options.output_dir].absolute?
+              options.output_dir = File.expand_path(options.output_dir)
+            end
+
+            Dir.cd(dir)
+          end
+
           builder = Core::Build::Builder.new
 
           # Set logger level based on verbose option
@@ -57,8 +76,10 @@ module Hwaro
           builder.run(options)
         end
 
-        def parse_options(args : Array(String)) : Config::Options::BuildOptions
+        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?}
+          input_dir = nil.as(String?)
           output_dir = "public"
+          output_dir_explicit = false
           base_url = nil.as(String?)
           drafts = false
           minify = false
@@ -71,7 +92,8 @@ module Hwaro
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
-            parser.on("-o DIR", "--output-dir DIR", "Output directory (default: public)") { |dir| output_dir = dir }
+            parser.on("-i DIR", "--input DIR", "Project directory to build (default: current directory)") { |dir| input_dir = dir }
+            parser.on("-o DIR", "--output-dir DIR", "Output directory (default: public)") { |dir| output_dir = dir; output_dir_explicit = true }
             parser.on("--base-url URL", "Override base_url from config.toml") { |url| base_url = url }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--minify", "Minify HTML output (and minified json, xml)") { minify = true }
@@ -84,7 +106,7 @@ module Hwaro
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
-          Config::Options::BuildOptions.new(
+          { {Config::Options::BuildOptions.new(
             output_dir: output_dir,
             base_url: base_url,
             drafts: drafts,
@@ -95,7 +117,7 @@ module Hwaro
             verbose: verbose,
             profile: profile,
             debug: debug
-          )
+          ), output_dir_explicit}, input_dir}
         end
       end
     end

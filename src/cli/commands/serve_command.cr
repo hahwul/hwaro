@@ -16,6 +16,7 @@ module Hwaro
 
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
+          FlagInfo.new(short: "-i", long: "--input", description: "Input directory (default: current directory)", takes_value: true, value_hint: "DIR"),
           FlagInfo.new(short: "-b", long: "--bind", description: "Bind address (default: 0.0.0.0)", takes_value: true, value_hint: "HOST"),
           FlagInfo.new(short: "-p", long: "--port", description: "Port to listen on (default: 3000)", takes_value: true, value_hint: "PORT"),
           FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL"),
@@ -38,11 +39,22 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          options = parse_options(args)
+          input_dir, options = parse_options(args)
+
+          if input_dir
+            unless Dir.exists?(input_dir)
+              Logger.error "Input directory does not exist: #{input_dir}"
+              exit(1)
+            end
+            Logger.info "Changing working directory to: #{input_dir}"
+            Dir.cd(input_dir)
+          end
+
           Services::Server.new.run(options)
         end
 
-        private def parse_options(args : Array(String)) : Config::Options::ServeOptions
+        private def parse_options(args : Array(String)) : {String?, Config::Options::ServeOptions}
+          input_dir = nil.as(String?)
           host = "0.0.0.0"
           port = 3000
           base_url = nil.as(String?)
@@ -54,6 +66,7 @@ module Hwaro
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
+            parser.on("-i DIR", "--input DIR", "Input directory (default: current directory)") { |dir| input_dir = dir }
             parser.on("-b HOST", "--bind HOST", "Bind address (default: 0.0.0.0)") { |h| host = h }
             parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             parser.on("--base-url URL", "Override base_url from config.toml") { |url| base_url = url }
@@ -65,7 +78,7 @@ module Hwaro
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
-          Config::Options::ServeOptions.new(
+          {input_dir, Config::Options::ServeOptions.new(
             host: host,
             port: port,
             base_url: base_url,
@@ -74,7 +87,7 @@ module Hwaro
             open_browser: open_browser,
             verbose: verbose,
             debug: debug
-          )
+          )}
         end
       end
     end
