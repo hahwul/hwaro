@@ -41,14 +41,33 @@ inputs:
     default: ${{ github.token }}
 
 runs:
-  using: "docker"
-  image: "docker://ghcr.io/hahwul/hwaro:latest"
-  env:
-    PAGES_BRANCH: ${{ inputs.pages_branch }}
-    BUILD_DIR: ${{ inputs.build_dir }}
-    OUT_DIR: ${{ inputs.output_dir }}
-    BUILD_FLAGS: ${{ inputs.build_flags }}
-    BUILD_ONLY: ${{ inputs.build_only }}
-    REPOSITORY: ${{ inputs.repository }}
-    GITHUB_HOSTNAME: ${{ inputs.github_hostname }}
-    INPUT_TOKEN: ${{ inputs.token }}
+  using: "composite"
+  steps:
+    - name: Resolve Hwaro image tag
+      id: resolve
+      shell: bash
+      run: |
+        REF="${{ github.action_ref }}"
+        # Strip leading 'v' prefix (v0.1.0 -> 0.1.0, main -> main)
+        TAG="${REF#v}"
+        echo "image=ghcr.io/hahwul/hwaro:${TAG}" >> "$GITHUB_OUTPUT"
+        echo "Using Hwaro image: ghcr.io/hahwul/hwaro:${TAG}"
+
+    - name: Run Hwaro
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "${{ github.workspace }}":"/github/workspace" \
+          -w /github/workspace \
+          -e GITHUB_ACTIONS=true \
+          -e GITHUB_REPOSITORY="${{ github.repository }}" \
+          -e GITHUB_ACTOR="${{ github.actor }}" \
+          -e PAGES_BRANCH="${{ inputs.pages_branch }}" \
+          -e BUILD_DIR="${{ inputs.build_dir }}" \
+          -e OUT_DIR="${{ inputs.output_dir }}" \
+          -e BUILD_FLAGS="${{ inputs.build_flags }}" \
+          -e BUILD_ONLY="${{ inputs.build_only }}" \
+          -e REPOSITORY="${{ inputs.repository }}" \
+          -e GITHUB_HOSTNAME="${{ inputs.github_hostname }}" \
+          -e INPUT_TOKEN="${{ inputs.token }}" \
+          "${{ steps.resolve.outputs.image }}"
