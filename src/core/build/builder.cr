@@ -1193,8 +1193,13 @@ module Hwaro
           done = Channel(Nil).new(files_to_copy.size)
           files_to_copy.each do |src, dest|
             spawn do
-              FileUtils.cp(src, dest)
-              done.send(nil)
+              begin
+                FileUtils.cp(src, dest)
+              rescue ex
+                Log.error { "Copy failed: #{ex}" }
+              ensure
+                done.send(nil)
+              end
             end
           end
           files_to_copy.size.times { done.receive }
