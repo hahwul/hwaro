@@ -76,7 +76,7 @@ module Hwaro
           builder.run(options)
         end
 
-        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?}
+        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String? }
           input_dir = nil.as(String?)
           output_dir = "public"
           output_dir_explicit = false
@@ -117,7 +117,7 @@ module Hwaro
             verbose: verbose,
             profile: profile,
             debug: debug
-          ), output_dir_explicit}, input_dir}
+          ), output_dir_explicit}, input_dir }
         end
       end
     end
