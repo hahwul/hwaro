@@ -40,6 +40,16 @@ module Hwaro
         # Regex for YAML front matter
         YAML_FRONT_MATTER_REGEX = /\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m
 
+        # Known front-matter keys (shared between TOML and YAML parsers).
+        # Using a Set for O(1) lookup instead of Array#includes? O(n).
+        KNOWN_FRONT_MATTER_KEYS = Set{
+          "title", "description", "image", "draft", "template", "in_sitemap",
+          "toc", "date", "updated", "render", "slug", "path", "aliases", "tags",
+          "transparent", "generate_feeds", "paginate", "pagination_enabled",
+          "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
+          "page_template", "paginate_path", "redirect_to", "weight", "categories",
+        }
+
         def name : String
           "markdown"
         end
@@ -191,13 +201,8 @@ module Hwaro
               end
 
               # Extract extra fields (all keys not in known list)
-              known_keys = ["title", "description", "image", "draft", "template", "in_sitemap",
-                            "toc", "date", "updated", "render", "slug", "path", "aliases", "tags",
-                            "transparent", "generate_feeds", "paginate", "pagination_enabled",
-                            "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
-                            "page_template", "paginate_path", "redirect_to", "weight", "categories"]
               toml_fm.each do |key, value|
-                next if known_keys.includes?(key)
+                next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
                 extra[key] = extract_extra_value(value)
               end
 
@@ -297,16 +302,11 @@ module Hwaro
                 end
 
                 # Extract extra fields for YAML
-                known_keys = ["title", "description", "image", "draft", "template", "in_sitemap",
-                              "toc", "date", "updated", "render", "slug", "path", "aliases", "tags",
-                              "transparent", "generate_feeds", "paginate", "pagination_enabled",
-                              "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
-                              "page_template", "paginate_path", "redirect_to", "weight", "categories"]
                 if fm_hash = yaml_fm.as_h?
                   fm_hash.each do |key_any, value|
                     key = key_any.as_s?
                     next unless key
-                    next if known_keys.includes?(key)
+                    next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
                     extra[key] = extract_extra_value(value)
                   end
                 end

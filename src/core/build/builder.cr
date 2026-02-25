@@ -194,12 +194,15 @@ module Hwaro
 
           cache.save if options.cache
 
-          # --- 5. Regenerate lightweight SEO / search files ---
-          Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose)
-          Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose)
-          Content::Seo::Robots.generate(site.config, output_dir, verbose)
-          Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose)
-          Content::Search.generate(all_pages, site.config, output_dir, verbose)
+          # --- 5. Regenerate lightweight SEO / search files in parallel ---
+          seo_tasks = [
+            -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose); nil },
+            -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
+          ] of Proc(Nil)
+          ParallelHelper.execute(seo_tasks, options.parallel)
 
           elapsed = Time.instant - start_time
           Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
@@ -228,22 +231,18 @@ module Hwaro
           minify = options.minify
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
-          safe = site.config.markdown.safe
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          renderable_pages = all_pages.select(&.render)
 
           global_vars = build_global_vars(site)
           cache = @cache || Cache.new(enabled: false)
 
-          count = 0
-          all_pages.each do |page|
-            next unless page.render
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
-            source_path = File.join("content", page.path)
-            output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path)
-            count += 1
-          end
+          count = if options.parallel && renderable_pages.size > 1
+                    process_files_parallel(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars)
+                  else
+                    process_files_sequential(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars)
+                  end
 
           # Re-generate 404 page with new template
           generate_404_page(site, templates, output_dir, minify, verbose)
@@ -546,11 +545,15 @@ module Hwaro
               output_dir = ctx.options.output_dir
               all_pages = ctx.all_pages
 
-              Content::Seo::Sitemap.generate(all_pages, site, output_dir)
-              Content::Seo::Feeds.generate(all_pages, site.config, output_dir)
-              Content::Seo::Robots.generate(site.config, output_dir)
-              Content::Seo::Llms.generate(site.config, all_pages, output_dir)
-              Content::Search.generate(all_pages, site.config, output_dir)
+              # Run independent SEO/search generators in parallel
+              tasks = [
+                -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir); nil },
+                -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir); nil },
+                -> { Content::Seo::Robots.generate(site.config, output_dir); nil },
+                -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir); nil },
+                -> { Content::Search.generate(all_pages, site.config, output_dir); nil },
+              ] of Proc(Nil)
+              ParallelHelper.execute(tasks, ctx.options.parallel)
             end
           end
           profiler.end_phase
@@ -640,32 +643,25 @@ module Hwaro
           collect_raw_files(ctx)
         end
 
-        # Collect JSON and XML files from content directory
+        # Collect JSON, XML, and configured content files from content directory
         private def collect_raw_files(ctx : Lifecycle::BuildContext)
           seen = Set(String).new
+          config = ctx.config
+          content_files_enabled = config.try(&.content_files.enabled?) || false
 
-          add_raw_file = ->(file_path : String) do
+          # Single pass: collect JSON/XML directly, and content files if enabled
+          Dir.glob("content/**/*") do |file_path|
+            next if File.directory?(file_path)
             relative_path = Path[file_path].relative_to("content").to_s
-            return if seen.includes?(relative_path)
-            ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
-            seen << relative_path
-          end
+            next if seen.includes?(relative_path)
 
-          # JSON files
-          Dir.glob("content/**/*.json") { |file_path| add_raw_file.call(file_path) }
+            ext = Path[file_path].extension.downcase
+            is_raw = ext == ".json" || ext == ".xml"
+            is_content_file = content_files_enabled && config && Content::Processors::ContentFiles.publish?(relative_path, config)
 
-          # XML files
-          Dir.glob("content/**/*.xml") { |file_path| add_raw_file.call(file_path) }
-
-          # Publish configured non-Markdown content files as-is (images, PDFs, etc.)
-          if config = ctx.config
-            return unless config.content_files.enabled?
-
-            Dir.glob("content/**/*") do |file_path|
-              next if File.directory?(file_path)
-              relative_path = Path[file_path].relative_to("content").to_s
-              next unless Content::Processors::ContentFiles.publish?(relative_path, config)
-              add_raw_file.call(file_path)
+            if is_raw || is_content_file
+              ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
+              seen << relative_path
             end
           end
         end
@@ -1068,12 +1064,10 @@ module Hwaro
             end
           end
 
-          # Sort pages in taxonomies (default by date)
+          # Sort pages in taxonomies in-place (default by date)
           site.taxonomies.each_value do |terms|
-            terms.each_value do |term_pages|
-              sorted = Utils::SortUtils.sort_pages(term_pages, "date", false)
-              term_pages.clear
-              term_pages.concat(sorted)
+            terms.each_key do |term|
+              terms[term] = Utils::SortUtils.sort_pages(terms[term], "date", false)
             end
           end
         end
@@ -1170,9 +1164,10 @@ module Hwaro
           end
         end
 
-        # Copy only changed static files by comparing mtime
+        # Copy only changed static files by comparing mtime, using parallel I/O
         private def copy_static_files_incremental(src_dir : String, output_dir : String, verbose : Bool)
-          copied = 0
+          # First pass: collect files that need copying (sequential, fast stat calls)
+          files_to_copy = [] of {String, String} # {src, dest}
           Dir.glob(File.join(src_dir, "**", "*")) do |src_path|
             next if File.directory?(src_path)
 
@@ -1185,13 +1180,43 @@ module Hwaro
                            true
                          end
 
-            if needs_copy
-              FileUtils.mkdir_p(File.dirname(dest_path))
-              FileUtils.cp(src_path, dest_path)
-              copied += 1
+            files_to_copy << {src_path, dest_path} if needs_copy
+          end
+
+          return if files_to_copy.empty?
+
+          # Ensure destination directories exist (must be sequential to avoid races)
+          files_to_copy.each { |_, dest| FileUtils.mkdir_p(File.dirname(dest)) }
+
+          # Second pass: copy files in parallel using worker pool
+          config = ParallelConfig.new(enabled: true)
+          worker_count = config.calculate_workers(files_to_copy.size)
+
+          work_queue = Channel({String, String}).new(files_to_copy.size)
+          done = Channel(Nil).new(worker_count)
+
+          files_to_copy.each { |pair| work_queue.send(pair) }
+          work_queue.close
+
+          worker_count.times do
+            spawn do
+              begin
+                while pair = work_queue.receive?
+                  src, dest = pair
+                  begin
+                    FileUtils.cp(src, dest)
+                  rescue ex
+                    Log.error { "Copy failed: #{ex}" }
+                  end
+                end
+              ensure
+                done.send(nil)
+              end
             end
           end
-          Logger.action :copy, "static files (#{copied} updated)", :blue if verbose && copied > 0
+          worker_count.times { done.receive }
+
+          Logger.action :copy, "static files (#{files_to_copy.size} updated)", :blue if verbose
         end
 
         private def load_templates : Hash(String, String)
@@ -1199,16 +1224,17 @@ module Hwaro
 
           templates = {} of String => String
           if Dir.exists?("templates")
-            # Support multiple template extensions: .html (recommended), .j2, .jinja2, .jinja
-            # Note: .ecr files are loaded but processed as Jinja2 templates (legacy filename support only)
-            extensions = ["html", "j2", "jinja2", "jinja", "ecr"]
-            extensions.each do |ext|
-              Dir.glob("templates/**/*.#{ext}") do |path|
-                relative = Path[path].relative_to("templates")
-                name = relative.to_s.gsub(TEMPLATE_EXTENSION_REGEX, "")
-                # Don't overwrite if already loaded (priority: html > j2 > jinja2 > jinja > ecr)
-                templates[name] ||= File.read(path)
-              end
+            # Single glob for all supported template extensions.
+            # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
+            extension_priority = {"html" => 0, "j2" => 1, "jinja2" => 2, "jinja" => 3, "ecr" => 4}
+            all_template_files = Dir.glob("templates/**/*.{html,j2,jinja2,jinja,ecr}")
+            # Sort by extension priority so higher-priority extensions are loaded first
+            all_template_files.sort_by! { |path| extension_priority[Path[path].extension.lchop('.')] || 99 }
+            all_template_files.each do |path|
+              relative = Path[path].relative_to("templates")
+              name = relative.to_s.gsub(TEMPLATE_EXTENSION_REGEX, "")
+              # Don't overwrite if already loaded (higher priority extensions loaded first)
+              templates[name] ||= File.read(path)
             end
           end
 

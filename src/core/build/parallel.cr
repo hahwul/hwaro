@@ -157,8 +157,11 @@ module Hwaro
           done = Channel(Nil).new(tasks.size)
           tasks.each do |task|
             spawn do
-              task.call
-              done.send(nil)
+              begin
+                task.call
+              ensure
+                done.send(nil)
+              end
             end
           end
           tasks.size.times { done.receive }

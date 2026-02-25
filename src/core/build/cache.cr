@@ -69,8 +69,9 @@ module Hwaro
         end
 
         # Update cache entry for a file
-        # Uses mtime as primary change indicator; hash is stored lazily
-        # (only computed when explicitly needed, not on every update).
+        # Uses mtime as the sole change indicator. Hash computation is skipped
+        # on the hot path since changed? only compares mtime, making the
+        # expensive File.read + MD5 unnecessary during normal builds.
         def update(file_path : String, output_path : String = "")
           return unless @enabled
           return unless File.exists?(file_path)
@@ -78,18 +79,16 @@ module Hwaro
           begin
             mtime = File.info(file_path).modification_time.to_unix_ms
 
-            # Reuse existing hash if mtime hasn't changed to avoid File.read
+            # Reuse existing entry if mtime hasn't changed
             existing = @entries[file_path]?
-            hash = if existing && existing.mtime == mtime
-                     existing.hash
-                   else
-                     compute_hash(file_path)
-                   end
+            if existing && existing.mtime == mtime && existing.output_path == output_path
+              return
+            end
 
             @entries[file_path] = CacheEntry.new(
               path: file_path,
               mtime: mtime,
-              hash: hash,
+              hash: "",
               output_path: output_path
             )
           rescue ex
