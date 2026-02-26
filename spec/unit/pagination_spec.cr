@@ -161,4 +161,95 @@ describe Hwaro::Content::Pagination::Renderer do
 
     html.should eq("")
   end
+
+  it "renders middle page nav with both prev and next active" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://example.com"
+
+    paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+      pages: [] of Hwaro::Models::Page,
+      page_number: 2,
+      total_pages: 3,
+      per_page: 10,
+      total_items: 25,
+      has_prev: true,
+      has_next: true,
+      prev_url: "/wiki/",
+      next_url: "/wiki/page/3/",
+      first_url: "/wiki/",
+      last_url: "/wiki/page/3/",
+      base_url: "/wiki/page/"
+    )
+
+    renderer = Hwaro::Content::Pagination::Renderer.new(config)
+    html = renderer.render_pagination_nav(paginated_page)
+
+    # Both prev and next should be links, not disabled
+    html.should contain("rel=\"prev\"")
+    html.should contain("rel=\"next\"")
+    # No pagination-disabled on prev or next lines
+    html.split("\n").each do |line|
+      if line.includes?("pagination-prev")
+        line.should_not contain("pagination-disabled")
+      end
+      if line.includes?("pagination-next")
+        line.should_not contain("pagination-disabled")
+      end
+    end
+  end
+
+  it "uses first_url for page 1 and /page/N/ for page 2+" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://example.com"
+
+    paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+      pages: [] of Hwaro::Models::Page,
+      page_number: 2,
+      total_pages: 3,
+      per_page: 10,
+      total_items: 25,
+      has_prev: true,
+      has_next: true,
+      prev_url: "/wiki/",
+      next_url: "/wiki/page/3/",
+      first_url: "/wiki/",
+      last_url: "/wiki/page/3/",
+      base_url: "/wiki/page/"
+    )
+
+    renderer = Hwaro::Content::Pagination::Renderer.new(config)
+    html = renderer.render_pagination_nav(paginated_page)
+
+    # Page 1 link should use first_url
+    html.should contain("https://example.com/wiki/\">1</a>")
+    # Page 2 and 3 use base_url pattern
+    html.should contain("https://example.com/wiki/page/3/")
+  end
+
+  it "has exactly one pagination-current element" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://example.com"
+
+    paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+      pages: [] of Hwaro::Models::Page,
+      page_number: 2,
+      total_pages: 4,
+      per_page: 10,
+      total_items: 35,
+      has_prev: true,
+      has_next: true,
+      prev_url: "/wiki/",
+      next_url: "/wiki/page/3/",
+      first_url: "/wiki/",
+      last_url: "/wiki/page/4/",
+      base_url: "/wiki/page/"
+    )
+
+    renderer = Hwaro::Content::Pagination::Renderer.new(config)
+    html = renderer.render_pagination_nav(paginated_page)
+
+    # Count occurrences of pagination-current
+    count = html.scan(/pagination-current/).size
+    count.should eq(1)
+  end
 end

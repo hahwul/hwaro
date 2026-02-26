@@ -451,3 +451,206 @@ describe Hwaro::Models::TocHeader do
     end
   end
 end
+
+describe Hwaro::Models::Config do
+  describe ".new defaults" do
+    it "has correct default title" do
+      config = Hwaro::Models::Config.new
+      config.title.should eq("Hwaro Site")
+    end
+
+    it "has empty description" do
+      config = Hwaro::Models::Config.new
+      config.description.should eq("")
+    end
+
+    it "has empty base_url" do
+      config = Hwaro::Models::Config.new
+      config.base_url.should eq("")
+    end
+
+    it "has default_language 'en'" do
+      config = Hwaro::Models::Config.new
+      config.default_language.should eq("en")
+    end
+  end
+
+  describe "#multilingual?" do
+    it "returns false for single language (default only)" do
+      config = Hwaro::Models::Config.new
+      config.multilingual?.should be_false
+    end
+
+    it "returns true when multiple languages are configured" do
+      config = Hwaro::Models::Config.new
+      en = Hwaro::Models::LanguageConfig.new("en")
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      config.languages["en"] = en
+      config.languages["ko"] = ko
+      config.multilingual?.should be_true
+    end
+  end
+
+  describe "#language" do
+    it "returns LanguageConfig for existing code" do
+      config = Hwaro::Models::Config.new
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      ko.language_name = "Korean"
+      config.languages["ko"] = ko
+
+      result = config.language("ko")
+      result.should_not be_nil
+      result.not_nil!.language_name.should eq("Korean")
+    end
+
+    it "returns nil for non-existent code" do
+      config = Hwaro::Models::Config.new
+      config.language("fr").should be_nil
+    end
+  end
+
+  describe "#sorted_languages" do
+    it "sorts by weight ascending" do
+      config = Hwaro::Models::Config.new
+      en = Hwaro::Models::LanguageConfig.new("en")
+      en.weight = 2
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      ko.weight = 1
+      ja = Hwaro::Models::LanguageConfig.new("ja")
+      ja.weight = 3
+
+      config.languages["en"] = en
+      config.languages["ko"] = ko
+      config.languages["ja"] = ja
+
+      sorted = config.sorted_languages
+      sorted[0].code.should eq("ko")
+      sorted[1].code.should eq("en")
+      sorted[2].code.should eq("ja")
+    end
+  end
+end
+
+describe Hwaro::Models::SitemapConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::SitemapConfig.new
+    c.enabled.should be_false
+    c.filename.should eq("sitemap.xml")
+    c.changefreq.should eq("weekly")
+    c.priority.should eq(0.5)
+    c.exclude.should be_empty
+  end
+end
+
+describe Hwaro::Models::RobotsConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::RobotsConfig.new
+    c.enabled.should be_true
+    c.filename.should eq("robots.txt")
+    c.rules.should be_empty
+  end
+end
+
+describe Hwaro::Models::LlmsConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::LlmsConfig.new
+    c.enabled.should be_true
+    c.full_enabled.should be_false
+    c.filename.should eq("llms.txt")
+    c.full_filename.should eq("llms-full.txt")
+    c.instructions.should eq("")
+  end
+end
+
+describe Hwaro::Models::SearchConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::SearchConfig.new
+    c.enabled.should be_false
+    c.format.should eq("fuse_json")
+    c.fields.should eq(["title", "content"])
+    c.filename.should eq("search.json")
+    c.exclude.should be_empty
+  end
+end
+
+describe Hwaro::Models::FeedConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::FeedConfig.new
+    c.enabled.should be_false
+    c.type.should eq("rss")
+    c.limit.should eq(10)
+    c.truncate.should eq(0)
+    c.sections.should be_empty
+    c.default_language_only.should be_true
+  end
+end
+
+describe Hwaro::Models::PaginationConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::PaginationConfig.new
+    c.enabled.should be_false
+    c.per_page.should eq(10)
+  end
+end
+
+describe Hwaro::Models::HighlightConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::HighlightConfig.new
+    c.enabled.should be_true
+    c.theme.should eq("github")
+    c.use_cdn.should be_true
+  end
+end
+
+describe Hwaro::Models::MarkdownConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::MarkdownConfig.new
+    c.safe.should be_false
+    c.lazy_loading.should be_false
+  end
+end
+
+describe Hwaro::Models::DeploymentConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::DeploymentConfig.new
+    c.target.should be_nil
+    c.confirm.should be_false
+    c.dry_run.should be_false
+    c.force.should be_false
+    c.max_deletes.should eq(256)
+    c.workers.should eq(10)
+    c.source_dir.should eq("public")
+    c.targets.should be_empty
+    c.matchers.should be_empty
+  end
+
+  it "#target_named returns matching target" do
+    c = Hwaro::Models::DeploymentConfig.new
+    target = Hwaro::Models::DeploymentTarget.new
+    target.name = "prod"
+    c.targets << target
+
+    c.target_named("prod").should_not be_nil
+    c.target_named("staging").should be_nil
+  end
+end
+
+describe Hwaro::Models::OpenGraphConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::OpenGraphConfig.new
+    c.twitter_card.should eq("summary_large_image")
+    c.og_type.should eq("article")
+    c.default_image.should be_nil
+    c.twitter_site.should be_nil
+    c.twitter_creator.should be_nil
+    c.fb_app_id.should be_nil
+  end
+end
+
+describe Hwaro::Models::BuildConfig do
+  it "has correct defaults" do
+    c = Hwaro::Models::BuildConfig.new
+    c.hooks.pre.should be_empty
+    c.hooks.post.should be_empty
+  end
+end

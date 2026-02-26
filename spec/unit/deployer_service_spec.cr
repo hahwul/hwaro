@@ -103,6 +103,63 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "dry_run for directory deployment does not copy files" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+        File.write(File.join(src_dir, "style.css"), "body { color: red; }")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        # Files should not have been copied to destination
+        File.exists?(File.join(dest_dir, "index.html")).should be_false
+        File.exists?(File.join(dest_dir, "style.css")).should be_false
+      end
+    end
+
+    it "dry_run for command deployment does not execute command" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        sentinel_file = File.join(dir, "sentinel.txt")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "echo 'executed' > #{sentinel_file}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["cmd"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        # Sentinel file should not exist
+        File.exists?(sentinel_file).should be_false
+      end
+    end
+
     it "strips index.html when configured" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")
