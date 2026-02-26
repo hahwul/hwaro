@@ -10,6 +10,7 @@
 # through hooks at various phases of the build process.
 
 require "file_utils"
+require "html"
 require "set"
 require "toml"
 require "json"
@@ -1137,8 +1138,18 @@ module Hwaro
         end
 
         private def get_output_path(page : Models::Page, output_dir : String) : String
-          url_path = page.url.sub(/^\//, "")
-          File.join(output_dir, url_path, "index.html")
+          url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, ""))
+          output_path = File.join(output_dir, url_path, "index.html")
+
+          # Ensure output path is within output directory
+          canonical_output = File.expand_path(output_path)
+          canonical_output_dir = File.expand_path(output_dir)
+          unless canonical_output.starts_with?(canonical_output_dir)
+            Logger.warn "  [WARN] Skipping output outside output directory: #{output_path}"
+            return File.join(output_dir, "index.html")
+          end
+
+          output_path
         end
 
         private def setup_output_dir(output_dir : String, incremental : Bool = false)
@@ -1462,7 +1473,7 @@ module Hwaro
             current_url = if paginated_page.page_number == 1
                             "#{base}/"
                           else
-                            "#{base}/page/#{paginated_page.page_number}/"
+                            "#{base}/#{section.paginate_path}/#{paginated_page.page_number}/"
                           end
 
             final_html = if template_content
@@ -1478,15 +1489,15 @@ module Hwaro
             if paginated_page.page_number == 1
               write_output(section, output_dir, final_html, verbose)
             else
-              write_paginated_output(section, paginated_page.page_number, output_dir, final_html, verbose)
+              write_paginated_output(section, paginated_page.page_number, output_dir, final_html, verbose, section.paginate_path)
             end
           end
         end
 
-        private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool)
+        private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool, paginate_path : String = "page")
           # Sanitize URL to prevent path traversal
           url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, "").rstrip("/"))
-          output_path = File.join(output_dir, url_path, "page", page_number.to_s, "index.html")
+          output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
 
           # Ensure output path is within output directory
           canonical_output = File.expand_path(output_path)
@@ -1530,29 +1541,40 @@ module Hwaro
 
           String.build do |str|
             section_pages.each do |p|
-              full_url = "#{site.config.base_url}#{p.url}"
-              str << "<li><a href=\"#{full_url}\">#{p.title}</a></li>\n"
+              full_url = HTML.escape("#{site.config.base_url}#{p.url}")
+              escaped_title = HTML.escape(p.title)
+              str << "<li><a href=\"#{full_url}\">#{escaped_title}</a></li>\n"
             end
           end
         end
 
         private def generate_aliases(page : Models::Page, output_dir : String, verbose : Bool)
           page.aliases.each do |alias_path|
-            alias_clean = alias_path.sub(/^\//, "")
+            alias_clean = Utils::PathUtils.sanitize_path(alias_path.sub(/^\//, ""))
             dest_path = File.join(output_dir, alias_clean, "index.html")
+
+            # Ensure output path is within output directory
+            canonical_dest = File.expand_path(dest_path)
+            canonical_output_dir = File.expand_path(output_dir)
+            unless canonical_dest.starts_with?(canonical_output_dir)
+              Logger.warn "  [WARN] Skipping alias outside output directory: #{dest_path}"
+              next
+            end
+
             FileUtils.mkdir_p(File.dirname(dest_path))
 
             redirect_url = page.redirect_to || page.url
+            escaped_url = HTML.escape(redirect_url)
 
             content = <<-HTML
             <!DOCTYPE html>
             <html>
             <head>
-              <meta http-equiv="refresh" content="0; url=#{redirect_url}" />
-              <title>Redirecting to #{redirect_url}</title>
+              <meta http-equiv="refresh" content="0; url=#{escaped_url}" />
+              <title>Redirecting to #{escaped_url}</title>
             </head>
             <body>
-              <p>Redirecting to <a href="#{redirect_url}">#{redirect_url}</a>.</p>
+              <p>Redirecting to <a href="#{escaped_url}">#{escaped_url}</a>.</p>
             </body>
             </html>
             HTML

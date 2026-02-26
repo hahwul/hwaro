@@ -10,6 +10,7 @@ require "../models/page"
 require "../models/section"
 require "../models/config"
 require "../utils/logger"
+require "../utils/path_utils"
 require "../utils/text_utils"
 require "../utils/sort_utils"
 require "../content/pagination/renderer"
@@ -134,7 +135,7 @@ module Hwaro
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
           else
-            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose)
+            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose, index_page.paginate_path)
           end
         end
 
@@ -161,13 +162,13 @@ module Hwaro
           next_url: nil,
           first_url: index_page.url,
           last_url: index_page.url,
-          base_url: "#{index_page.url.rstrip("/")}/page/",
+          base_url: "#{index_page.url.rstrip("/")}/#{index_page.paginate_path}/",
         )] if per_page <= 0 || pages.size <= per_page
 
         total_items = pages.size
         total_pages = [(total_items.to_f / per_page).ceil.to_i, 1].max
         paginated_pages = [] of Content::Pagination::PaginatedPage
-        paginator_base_url = "#{index_page.url.rstrip("/")}/page/"
+        paginator_base_url = "#{index_page.url.rstrip("/")}/#{index_page.paginate_path}/"
 
         (1..total_pages).each do |page_number|
           start_idx = (page_number - 1) * per_page
@@ -176,10 +177,10 @@ module Hwaro
 
           has_prev = page_number > 1
           has_next = page_number < total_pages
-          prev_url = has_prev ? page_url(index_page.url, page_number - 1) : nil
-          next_url = has_next ? page_url(index_page.url, page_number + 1) : nil
-          first_url = page_url(index_page.url, 1)
-          last_url = page_url(index_page.url, total_pages)
+          prev_url = has_prev ? page_url(index_page.url, page_number - 1, index_page.paginate_path) : nil
+          next_url = has_next ? page_url(index_page.url, page_number + 1, index_page.paginate_path) : nil
+          first_url = page_url(index_page.url, 1, index_page.paginate_path)
+          last_url = page_url(index_page.url, total_pages, index_page.paginate_path)
 
           paginated_pages << Content::Pagination::PaginatedPage.new(
             pages: page_items,
@@ -245,7 +246,7 @@ module Hwaro
                         if paginator.page_number == 1
                           page.url
                         else
-                          "#{page.url.rstrip("/")}/page/#{paginator.page_number}/"
+                          "#{page.url.rstrip("/")}/#{page.paginate_path}/#{paginator.page_number}/"
                         end
                       else
                         page.url
@@ -299,11 +300,11 @@ module Hwaro
         )
       end
 
-      private def self.page_url(base_url : String, page_number : Int32) : String
+      private def self.page_url(base_url : String, page_number : Int32, paginate_path : String = "page") : String
         if page_number == 1
           base_url
         else
-          "#{base_url}page/#{page_number}/"
+          "#{base_url}#{paginate_path}/#{page_number}/"
         end
       end
 
@@ -341,14 +342,34 @@ module Hwaro
       end
 
       private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
-        output_path = File.join(output_dir, page.url.sub(/^\//, ""), "index.html")
+        url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, ""))
+        output_path = File.join(output_dir, url_path, "index.html")
+
+        # Ensure output path is within output directory
+        canonical_output = File.expand_path(output_path)
+        canonical_output_dir = File.expand_path(output_dir)
+        unless canonical_output.starts_with?(canonical_output_dir)
+          Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
+          return
+        end
+
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
         Logger.action :create, output_path if verbose
       end
 
-      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false)
-        output_path = File.join(output_dir, page.url.sub(/^\//, ""), "page", page_number.to_s, "index.html")
+      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page")
+        url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, ""))
+        output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
+
+        # Ensure output path is within output directory
+        canonical_output = File.expand_path(output_path)
+        canonical_output_dir = File.expand_path(output_dir)
+        unless canonical_output.starts_with?(canonical_output_dir)
+          Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
+          return
+        end
+
         FileUtils.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
         Logger.action :create, output_path if verbose

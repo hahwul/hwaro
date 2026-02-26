@@ -51,8 +51,7 @@ module Hwaro
               page_url = if page_num == 1
                            HTML.escape("#{@base_url}#{paginated_page.first_url}")
                          else
-                           base = paginated_page.first_url.rstrip("/")
-                           HTML.escape("#{@base_url}#{base}/page/#{page_num}/")
+                           HTML.escape("#{@base_url}#{paginated_page.base_url}#{page_num}/")
                          end
 
               if page_num == paginated_page.page_number
