@@ -28,6 +28,7 @@ require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/logger"
 require "../../utils/profiler"
+require "../../utils/text_utils"
 require "../../config/options/build_options"
 require "../../content/processors/markdown"
 require "../../content/processors/content_files"
@@ -1217,7 +1218,7 @@ module Hwaro
                   begin
                     FileUtils.cp(src, dest)
                   rescue ex
-                    Log.error { "Copy failed: #{ex}" }
+                    Logger.error "Copy failed: #{ex}"
                   end
                 end
               ensure
@@ -1418,18 +1419,20 @@ module Hwaro
           redirect_url = page.redirect_to
           return unless redirect_url
 
+          escaped_url = Utils::TextUtils.escape_xml(redirect_url)
+
           redirect_html = <<-HTML
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="utf-8">
-            <meta http-equiv="refresh" content="0; url=#{redirect_url}">
-            <link rel="canonical" href="#{redirect_url}">
+            <meta http-equiv="refresh" content="0; url=#{escaped_url}">
+            <link rel="canonical" href="#{escaped_url}">
             <title>Redirecting...</title>
           </head>
           <body>
-            <p>Redirecting to <a href="#{redirect_url}">#{redirect_url}</a>...</p>
-            <script>window.location.href = "#{redirect_url}";</script>
+            <p>Redirecting to <a href="#{escaped_url}">#{escaped_url}</a>...</p>
+            <script>window.location.href = "#{escaped_url}";</script>
           </body>
           </html>
           HTML

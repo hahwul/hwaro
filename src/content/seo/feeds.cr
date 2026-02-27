@@ -283,7 +283,7 @@ module Hwaro
           # Truncate if needed
           if truncate > 0
             # Strip HTML tags to get plain text for safe truncation
-            text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+            text_content = Utils::TextUtils.strip_html(html_content)
             if text_content.size > truncate
               text_content[0...truncate] + "..."
             else

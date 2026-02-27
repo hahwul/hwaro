@@ -1,6 +1,7 @@
 require "../../models/page"
 require "../../models/site"
 require "../../utils/logger"
+require "../../utils/text_utils"
 
 module Hwaro
   module Content
@@ -42,7 +43,7 @@ module Hwaro
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base.empty? ? path : base + path
 
-              escaped_url = escape_xml(full_url)
+              escaped_url = Utils::TextUtils.escape_xml(full_url)
 
               str << "  <url>\n"
               str << "    <loc>#{escaped_url}</loc>\n"
@@ -65,18 +66,6 @@ module Hwaro
           Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
         end
 
-        private def self.escape_xml(text : String) : String
-          text.gsub(/[&<>"']/) do |match|
-            case match
-            when "&"  then "&amp;"
-            when "<"  then "&lt;"
-            when ">"  then "&gt;"
-            when "\"" then "&quot;"
-            when "'"  then "&apos;"
-            else           match
-            end
-          end
-        end
       end
     end
   end

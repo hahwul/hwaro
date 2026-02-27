@@ -1,6 +1,7 @@
 require "../models/page"
 require "../models/config"
 require "../utils/logger"
+require "../utils/text_utils"
 require "./processors/markdown"
 require "json"
 
@@ -77,7 +78,7 @@ module Hwaro
               end
 
               # Strip HTML tags to get plain text
-              text_content = html_content.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+              text_content = Utils::TextUtils.strip_html(html_content)
               data["content"] = text_content
             when "tags"
               data["tags"] = page.tags
