@@ -77,9 +77,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # main 브랜치 push → :main + :latest
+            # main 브랜치 push → :main
             type=ref,event=branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
             # GitHub Release (태그 push) → v1.2.3, 1.2, latest
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
