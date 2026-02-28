@@ -421,6 +421,150 @@ describe Hwaro::Content::Processors::TableParser do
       result.should contain("<em>italic</em>")
       result.should contain("<code>code</code>")
     end
+
+    it "blocks data: URLs in links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](data:text/html,test) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"data:")
+    end
+
+    it "blocks vbscript: URLs in links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](vbscript:msgbox) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"vbscript:")
+    end
+
+    it "blocks case-variant dangerous URLs" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](JavaScript:alert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=")
+    end
+
+    it "blocks percent-encoded javascript URLs" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](javascript%3Aalert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=")
+    end
+
+    it "blocks javascript: URLs in image src" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![img](javascript:alert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<img")
+    end
+
+    it "does not italicize underscores inside words" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | some_var_name |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td>some_var_name</td>")
+      result.should_not contain("<em>")
+    end
+
+    it "allows mailto: links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [email](mailto:test@example.com) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"mailto:test@example.com\">email</a>")
+    end
+
+    it "allows fragment anchor links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [section](#heading) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"#heading\">section</a>")
+    end
+
+    it "allows relative path links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [page](./page.html) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"./page.html\">page</a>")
+    end
+
+    it "renders bold inside link text" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [**bold link**](https://example.com) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"https://example.com\"><strong>bold link</strong></a>")
+    end
+
+    it "renders image with empty alt text" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![](https://example.com/img.png) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<img src=\"https://example.com/img.png\" alt=\"\">")
+    end
+
+    it "renders multiple code spans in one cell" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | `foo` and `bar` |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<code>foo</code> and <code>bar</code>")
+    end
+
+    it "blocks data: URLs in images" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![photo](data:image/png;base64,abc) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<img")
+    end
   end
 
   describe Hwaro::Content::Processors::TableParser::Table do

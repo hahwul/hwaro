@@ -165,9 +165,11 @@ module Hwaro
 
           private def safe_url?(url : String) : Bool
             stripped = url.strip.downcase
-            return true if stripped.starts_with?("http://") || stripped.starts_with?("https://") || stripped.starts_with?("mailto:")
-            return true if stripped.starts_with?("/") || stripped.starts_with?("#") || stripped.starts_with?("./") || stripped.starts_with?("../")
-            !stripped.includes?(":")
+            # Decode percent-encoded colons to prevent scheme bypass (e.g. javascript%3A)
+            decoded = stripped.gsub("%3a", ":")
+            return true if decoded.starts_with?("http://") || decoded.starts_with?("https://") || decoded.starts_with?("mailto:")
+            return true if decoded.starts_with?("/") || decoded.starts_with?("#") || decoded.starts_with?("./") || decoded.starts_with?("../")
+            !decoded.includes?(":")
           end
         end
 
