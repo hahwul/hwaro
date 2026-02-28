@@ -65,7 +65,6 @@ module Hwaro
           Logger.action :create, sitemap_path if verbose
           Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs."
         end
-
       end
     end
   end
