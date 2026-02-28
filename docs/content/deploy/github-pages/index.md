@@ -12,6 +12,8 @@ Deploy your Hwaro site to GitHub Pages for free hosting.
 
 ## Method 1: GitHub Actions (Recommended)
 
+Use the official [`hahwul/hwaro`](https://github.com/hahwul/hwaro) action to build and deploy without installing Hwaro manually.
+
 ### Create Workflow
 
 Create `.github/workflows/deploy.yml`:
@@ -25,58 +27,58 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Crystal
-        uses: crystal-lang/install-crystal@v1
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Only
+        uses: hahwul/hwaro@main
         with:
-          crystal: latest
-      
-      - name: Install Hwaro
-        run: |
-          git clone https://github.com/hahwul/hwaro /tmp/hwaro
-          cd /tmp/hwaro
-          shards install
-          shards build --release
-          sudo mv bin/hwaro /usr/local/bin/
-      
-      - name: Build site
-        run: hwaro build
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
+          build_only: true
 
   deploy:
-    needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build and Deploy
+        uses: hahwul/hwaro@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `build_dir` | Directory containing the Hwaro site | `.` (repository root) |
+| `build_only` | Only build without deploying | `false` |
+| `token` | GitHub token for deployment | — |
+
+If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
+
+```yaml
+- name: Build and Deploy
+  uses: hahwul/hwaro@main
+  with:
+    build_dir: "docs"
+    token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Configure GitHub Pages
 
 1. Go to repository **Settings** → **Pages**
-2. Under "Build and deployment", select **GitHub Actions**
-3. Push to `main` branch to trigger deployment
+2. Under "Build and deployment", select **Deploy from a branch**
+3. Choose `gh-pages` branch, `/ (root)` folder
+4. Push to `main` branch to trigger deployment
 
 ### Set Base URL
 
@@ -174,9 +176,8 @@ base_url = "https://www.yourdomain.com"
 
 ### Build Failures
 
-- Check Crystal version compatibility
 - Review Actions logs for error messages
-- Ensure `shards.yml` dependencies are correct
+- Check that `build_dir` points to the correct directory
 
 ## Example Repository Structure
 
