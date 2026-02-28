@@ -42,6 +42,16 @@ module Hwaro
           def initialize(@headers, @alignments, @rows)
           end
 
+          # Inline markdown regex patterns
+          CODE_SPAN_REGEX         = /`([^`]+)`/
+          IMAGE_REGEX             = /!\[([^\]]*)\]\(([^)]*)\)/
+          LINK_REGEX              = /\[([^\]]+)\]\(([^)]*)\)/
+          BOLD_ASTERISK_REGEX     = /\*\*(.+?)\*\*/
+          BOLD_UNDERSCORE_REGEX   = /__(.+?)__/
+          ITALIC_ASTERISK_REGEX   = /\*(.+?)\*/
+          ITALIC_UNDERSCORE_REGEX = /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/
+          STRIKETHROUGH_REGEX     = /~~(.+?)~~/
+
           # Convert table to HTML
           def to_html : String
             html = String.build do |str|
@@ -51,7 +61,7 @@ module Hwaro
               @headers.each_with_index do |header, i|
                 alignment = @alignments[i]? || Alignment::Left
                 align_attr = alignment_attr(alignment)
-                str << "<th#{align_attr}>#{escape_html(header.strip)}</th>\n"
+                str << "<th#{align_attr}>#{render_inline_markdown(header.strip)}</th>\n"
               end
 
               str << "</tr>\n</thead>\n"
@@ -63,7 +73,7 @@ module Hwaro
                   row.each_with_index do |cell, i|
                     alignment = @alignments[i]? || Alignment::Left
                     align_attr = alignment_attr(alignment)
-                    str << "<td#{align_attr}>#{escape_html(cell.strip)}</td>\n"
+                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip)}</td>\n"
                   end
                   # Fill missing cells if row has fewer columns than headers
                   if row.size < @headers.size
@@ -100,6 +110,66 @@ module Hwaro
               .gsub("<", "&lt;")
               .gsub(">", "&gt;")
               .gsub("\"", "&quot;")
+          end
+
+          private def render_inline_markdown(text : String) : String
+            result = escape_html(text)
+
+            # Extract code spans and replace with placeholders
+            code_spans = [] of String
+            result = result.gsub(CODE_SPAN_REGEX) do
+              code_spans << $1
+              "\x00CODESPAN#{code_spans.size - 1}\x00"
+            end
+
+            # Images ![alt](url) → <img> (before links)
+            result = result.gsub(IMAGE_REGEX) do
+              alt = $1
+              url = $2
+              if safe_url?(url)
+                "<img src=\"#{url}\" alt=\"#{alt}\">"
+              else
+                "![#{alt}](#{url})"
+              end
+            end
+
+            # Links [text](url) → <a>
+            result = result.gsub(LINK_REGEX) do
+              link_text = $1
+              url = $2
+              if safe_url?(url)
+                "<a href=\"#{url}\">#{link_text}</a>"
+              else
+                "[#{link_text}](#{url})"
+              end
+            end
+
+            # Bold **text** / __text__ → <strong>
+            result = result.gsub(BOLD_ASTERISK_REGEX) { "<strong>#{$1}</strong>" }
+            result = result.gsub(BOLD_UNDERSCORE_REGEX) { "<strong>#{$1}</strong>" }
+
+            # Italic *text* / _text_ → <em>
+            result = result.gsub(ITALIC_ASTERISK_REGEX) { "<em>#{$1}</em>" }
+            result = result.gsub(ITALIC_UNDERSCORE_REGEX) { "<em>#{$1}</em>" }
+
+            # Strikethrough ~~text~~ → <del>
+            result = result.gsub(STRIKETHROUGH_REGEX) { "<del>#{$1}</del>" }
+
+            # Restore code span placeholders
+            code_spans.each_with_index do |content, idx|
+              result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")
+            end
+
+            result
+          end
+
+          private def safe_url?(url : String) : Bool
+            stripped = url.strip.downcase
+            # Decode percent-encoded colons to prevent scheme bypass (e.g. javascript%3A)
+            decoded = stripped.gsub("%3a", ":")
+            return true if decoded.starts_with?("http://") || decoded.starts_with?("https://") || decoded.starts_with?("mailto:")
+            return true if decoded.starts_with?("/") || decoded.starts_with?("#") || decoded.starts_with?("./") || decoded.starts_with?("../")
+            !decoded.includes?(":")
           end
         end
 

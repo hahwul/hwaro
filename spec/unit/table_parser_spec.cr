@@ -294,6 +294,277 @@ describe Hwaro::Content::Processors::TableParser do
       result.should contain("<th>Spaced</th>")
       result.should contain("<td>Value</td>")
     end
+
+    it "renders bold text in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | **bold** text |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td><strong>bold</strong> text</td>")
+    end
+
+    it "renders italic text in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | *italic* text |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td><em>italic</em> text</td>")
+    end
+
+    it "renders code spans in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | `code` text |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td><code>code</code> text</td>")
+    end
+
+    it "renders links in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [link](https://example.com) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"https://example.com\">link</a>")
+    end
+
+    it "renders images in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![alt](https://example.com/img.png) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<img src=\"https://example.com/img.png\" alt=\"alt\">")
+    end
+
+    it "renders strikethrough in table cells" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ~~deleted~~ text |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td><del>deleted</del> text</td>")
+    end
+
+    it "renders inline markdown in header cells" do
+      content = <<-MD
+      | **Bold Header** | *Italic Header* |
+      |-----------------|-----------------|
+      | cell1           | cell2           |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<th><strong>Bold Header</strong></th>")
+      result.should contain("<th><em>Italic Header</em></th>")
+    end
+
+    it "blocks javascript: URLs in links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](javascript:alert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"javascript:")
+      result.should_not contain("href=\"javascript:")
+    end
+
+    it "does not process markdown inside code spans" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | `**not bold**` |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<code>**not bold**</code>")
+      result.should_not contain("<strong>")
+    end
+
+    it "renders underscore bold and italic" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | __bold__ and _italic_ |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<strong>bold</strong>")
+      result.should contain("<em>italic</em>")
+    end
+
+    it "renders multiple inline elements in one cell" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | **bold** and *italic* and `code` |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<strong>bold</strong>")
+      result.should contain("<em>italic</em>")
+      result.should contain("<code>code</code>")
+    end
+
+    it "blocks data: URLs in links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](data:text/html,test) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"data:")
+    end
+
+    it "blocks vbscript: URLs in links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](vbscript:msgbox) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"vbscript:")
+    end
+
+    it "blocks case-variant dangerous URLs" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](JavaScript:alert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=")
+    end
+
+    it "blocks percent-encoded javascript URLs" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [click](javascript%3Aalert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=")
+    end
+
+    it "blocks javascript: URLs in image src" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![img](javascript:alert(1)) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<img")
+    end
+
+    it "does not italicize underscores inside words" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | some_var_name |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td>some_var_name</td>")
+      result.should_not contain("<em>")
+    end
+
+    it "allows mailto: links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [email](mailto:test@example.com) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"mailto:test@example.com\">email</a>")
+    end
+
+    it "allows fragment anchor links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [section](#heading) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"#heading\">section</a>")
+    end
+
+    it "allows relative path links" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [page](./page.html) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"./page.html\">page</a>")
+    end
+
+    it "renders bold inside link text" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | [**bold link**](https://example.com) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<a href=\"https://example.com\"><strong>bold link</strong></a>")
+    end
+
+    it "renders image with empty alt text" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![](https://example.com/img.png) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<img src=\"https://example.com/img.png\" alt=\"\">")
+    end
+
+    it "renders multiple code spans in one cell" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | `foo` and `bar` |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<code>foo</code> and <code>bar</code>")
+    end
+
+    it "blocks data: URLs in images" do
+      content = <<-MD
+      | Header |
+      |--------|
+      | ![photo](data:image/png;base64,abc) |
+      MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<img")
+    end
   end
 
   describe Hwaro::Content::Processors::TableParser::Table do
