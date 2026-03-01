@@ -596,6 +596,41 @@ describe Hwaro::Processor::Markdown do
     end
   end
 
+  describe "emoji shortcode conversion" do
+    it "converts emoji shortcodes when enabled" do
+      content = "Hello :wave: World :smile:"
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: true)
+      html.should_not contain(":wave:")
+      html.should_not contain(":smile:")
+    end
+
+    it "does not convert emoji shortcodes when disabled" do
+      content = "Hello :wave: World"
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: false)
+      html.should contain(":wave:")
+    end
+
+    it "does not convert shortcodes inside code blocks" do
+      content = "Normal :wave: text\n\n```\n:smile: in code\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: true)
+      html.should_not contain(">:wave:<")
+      html.should contain(":smile:")
+    end
+
+    it "does not convert shortcodes inside inline code" do
+      content = "Normal :wave: and `code :smile: here`"
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: true)
+      html.should_not contain(">:wave:<")
+      html.should contain(":smile:")
+    end
+
+    it "works with render_with_anchors" do
+      content = "# Hello :wave:\nSome :smile: text"
+      html, _ = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, emoji: true)
+      html.should_not contain(":smile:")
+    end
+  end
+
   describe "extra values extraction" do
     it "extracts extra values from TOML" do
       content = <<-MARKDOWN

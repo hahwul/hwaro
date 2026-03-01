@@ -411,10 +411,12 @@ module Hwaro
     class MarkdownConfig
       property safe : Bool         # If true, raw HTML will not be passed through (replaced by comments)
       property lazy_loading : Bool # If true, adds loading="lazy" to img tags
+      property emoji : Bool        # If true, converts emoji shortcodes (e.g. :smile:) to emoji characters
 
       def initialize
         @safe = false
         @lazy_loading = false
+        @emoji = false
       end
     end
 
@@ -770,6 +772,7 @@ module Hwaro
 
         config.markdown.safe = bool_value(s["safe"]?, config.markdown.safe)
         config.markdown.lazy_loading = bool_value(s["lazy_loading"]?, config.markdown.lazy_loading)
+        config.markdown.emoji = bool_value(s["emoji"]?, config.markdown.emoji)
       end
 
       private def self.load_permalinks(config : Config)

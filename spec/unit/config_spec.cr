@@ -910,15 +910,18 @@ describe Hwaro::Models::Config do
       config = Hwaro::Models::Config.new
       config.markdown.safe.should eq(false)
       config.markdown.lazy_loading.should eq(false)
+      config.markdown.emoji.should eq(false)
     end
 
     it "can update markdown settings" do
       config = Hwaro::Models::Config.new
       config.markdown.safe = true
       config.markdown.lazy_loading = true
+      config.markdown.emoji = true
 
       config.markdown.safe.should be_true
       config.markdown.lazy_loading.should be_true
+      config.markdown.emoji.should be_true
     end
 
     it "loads all markdown settings from TOML" do
@@ -928,10 +931,12 @@ describe Hwaro::Models::Config do
       [markdown]
       safe = true
       lazy_loading = true
+      emoji = true
       TOML
 
       config.markdown.safe.should be_true
       config.markdown.lazy_loading.should be_true
+      config.markdown.emoji.should be_true
     end
 
     it "loads markdown safe = false from TOML" do
@@ -976,6 +981,28 @@ describe Hwaro::Models::Config do
       TOML
 
       config.markdown.lazy_loading.should be_true
+    end
+
+    it "loads markdown emoji = false from TOML" do
+      config = load_config(<<-TOML)
+      title = "Test"
+
+      [markdown]
+      emoji = false
+      TOML
+
+      config.markdown.emoji.should be_false
+    end
+
+    it "loads markdown emoji = true from TOML (overrides default false)" do
+      config = load_config(<<-TOML)
+      title = "Test"
+
+      [markdown]
+      emoji = true
+      TOML
+
+      config.markdown.emoji.should be_true
     end
   end
 
@@ -1240,6 +1267,7 @@ describe Hwaro::Models::Config do
       #   auto_includes.enabled        false -> true
       #   markdown.safe                false -> true
       #   markdown.lazy_loading        false -> true
+      #   markdown.emoji               false -> true
       #   deployment.confirm           false -> true
       #   taxonomy.feed                false -> true
       #   taxonomy.sitemap             true  -> false
@@ -1278,6 +1306,7 @@ describe Hwaro::Models::Config do
       [markdown]
       safe = true
       lazy_loading = true
+      emoji = true
 
       [deployment]
       confirm = true
@@ -1306,6 +1335,7 @@ describe Hwaro::Models::Config do
       config.auto_includes.enabled.should be_true
       config.markdown.safe.should be_true
       config.markdown.lazy_loading.should be_true
+      config.markdown.emoji.should be_true
       config.deployment.confirm.should be_true
 
       config.taxonomies[0].feed.should be_true
@@ -1350,6 +1380,7 @@ describe Hwaro::Models::Config do
       [markdown]
       safe = false
       lazy_loading = false
+      emoji = false
 
       [deployment]
       confirm = false
@@ -1378,6 +1409,7 @@ describe Hwaro::Models::Config do
       config.auto_includes.enabled.should be_false
       config.markdown.safe.should be_false
       config.markdown.lazy_loading.should be_false
+      config.markdown.emoji.should be_false
       config.deployment.confirm.should be_false
 
       config.taxonomies[0].feed.should be_false
@@ -1430,6 +1462,7 @@ describe Hwaro::Models::Config do
       config.auto_includes.enabled.should be_false # default: false
       config.markdown.safe.should be_false         # default: false
       config.markdown.lazy_loading.should be_false # default: false
+      config.markdown.emoji.should be_false        # default: false
       config.deployment.confirm.should be_false    # default: false
     end
   end
@@ -1586,6 +1619,7 @@ describe Hwaro::Models::MarkdownConfig do
     config = Hwaro::Models::MarkdownConfig.new
     config.safe.should eq(false)
     config.lazy_loading.should eq(false)
+    config.emoji.should eq(false)
   end
 end
 

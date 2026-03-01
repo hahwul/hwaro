@@ -19,6 +19,8 @@ dependencies:
     github: crystal-community/toml.cr
   crinja:
     github: straight-shoota/crinja
+  emoji:
+    github: veelenga/emoji.cr
 
 #development_dependencies:
 #  ameba:

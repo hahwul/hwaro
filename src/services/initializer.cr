@@ -264,7 +264,8 @@ module Hwaro
           str << "# Configure markdown parser behavior\n\n"
           str << "[markdown]\n"
           str << "safe = false          # If true, raw HTML in markdown will be stripped\n"
-          str << "lazy_loading = false  # If true, automatically add loading=\"lazy\" to img tags\n\n"
+          str << "lazy_loading = false  # If true, automatically add loading=\"lazy\" to img tags\n"
+          str << "emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters\n\n"
 
           str << "# =============================================================================\n"
           str << "# Content Files\n"

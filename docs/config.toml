@@ -152,6 +152,7 @@ enabled = false
 
 [markdown]
 safe = false
+emoji = false
 
 # =============================================================================
 # Auto Includes
