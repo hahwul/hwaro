@@ -194,6 +194,19 @@ console.log("Hello");
 | Cell   | Cell   |
 ```
 
+Table cells support inline Markdown: **bold**, *italic*, `code spans`, [links](url), ![images](url), and ~~strikethrough~~.
+
+```markdown
+| Feature        | Example                          |
+|----------------|----------------------------------|
+| Bold           | **important**                    |
+| Italic         | *emphasis*                       |
+| Code           | `config.toml`                    |
+| Link           | [Hwaro](https://example.com)     |
+| Image          | ![logo](/img/logo.png)           |
+| Strikethrough  | ~~deprecated~~                   |
+```
+
 ### Blockquotes
 
 ```markdown

@@ -10,6 +10,8 @@
       url: /start/cli/
     - title: Configuration
       url: /start/config/
+    - title: Tools & Completion
+      url: /start/tools/
 - title: Writing
   items:
     - title: Overview
@@ -48,6 +50,16 @@
       url: /features/syntax-highlighting/
     - title: Pagination
       url: /features/pagination/
+    - title: Multilingual
+      url: /features/multilingual/
+    - title: Auto Includes
+      url: /features/auto-includes/
+    - title: Content Files
+      url: /features/content-files/
+    - title: Build Hooks
+      url: /features/build-hooks/
+    - title: LLMs.txt
+      url: /features/llms-txt/
 - title: Deploy
   items:
     - title: Overview
