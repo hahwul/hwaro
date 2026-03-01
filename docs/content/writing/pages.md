@@ -194,6 +194,24 @@ console.log("Hello");
 | Cell   | Cell   |
 ```
 
+### Internal Links
+
+Use `@/` to link to other content pages by their source path. Hwaro resolves these to the correct output URL at build time.
+
+```markdown
+[Read the post](@/blog/my-post.md)
+[About section](@/about/_index.md)
+[With anchor](@/blog/my-post.md#introduction)
+```
+
+This is useful because you don't need to know the final URL — Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
+
+| Syntax | Resolved URL |
+|--------|-------------|
+| `@/blog/post.md` | `/blog/post/` |
+| `@/blog/_index.md` | `/blog/` |
+| `@/blog/post.md#section` | `/blog/post/#section` |
+
 ### Blockquotes
 
 ```markdown

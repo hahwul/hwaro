@@ -59,6 +59,7 @@ module Hwaro
         @profiler : Profiler?
         @crinja_env : Crinja?
         @compiled_templates_cache : Hash(UInt64, Crinja::Template) = {} of UInt64 => Crinja::Template
+        @pages_by_path : Hash(String, Models::Page)?
 
         # Regex constants for HTML minification
         private REGEX_PRE_OPEN       = /<pre([^>]*)>\s*<code/
@@ -184,6 +185,7 @@ module Hwaro
 
           # --- 4. Re-render the affected pages ---
           global_vars = build_global_vars(site)
+          @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
           render_list.each do |page|
@@ -238,6 +240,7 @@ module Hwaro
           renderable_pages = all_pages.select(&.render)
 
           global_vars = build_global_vars(site)
+          @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
           count = if options.parallel && renderable_pages.size > 1
@@ -527,6 +530,7 @@ module Hwaro
           profiler.start_phase("Render")
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             global_vars = build_global_vars(site)
+            @pages_by_path = build_pages_by_path(site)
             count = if parallel && pages_to_build.size > 1
                       process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars)
                     else
@@ -1422,6 +1426,11 @@ module Hwaro
           # Replace shortcode placeholders with their rendered HTML content
           html_content = replace_shortcode_placeholders(html_content, shortcode_results)
 
+          # Resolve internal @/ links to actual page URLs
+          if pages_by_path = @pages_by_path
+            html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path)
+          end
+
           # Store rendered HTML in page.content for reuse by Feed/Search generators
           # (avoids expensive re-rendering of Markdown in Generate phase)
           page.content = html_content
@@ -1700,6 +1709,14 @@ module Hwaro
         end
 
         # Build global template variables once
+        # Build a lookup map from content path → Page for internal link resolution.
+        private def build_pages_by_path(site : Models::Site) : Hash(String, Models::Page)
+          map = {} of String => Models::Page
+          site.pages.each { |p| map[p.path] ||= p }
+          site.sections.each { |s| map[s.path] ||= s }
+          map
+        end
+
         private def build_global_vars(site : Models::Site) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
