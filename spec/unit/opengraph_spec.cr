@@ -648,6 +648,7 @@ describe Hwaro::Models::MarkdownConfig do
       config = Hwaro::Models::MarkdownConfig.new
       config.safe.should be_false
       config.lazy_loading.should be_false
+      config.emoji.should be_false
     end
   end
 
@@ -662,6 +663,12 @@ describe Hwaro::Models::MarkdownConfig do
       config = Hwaro::Models::MarkdownConfig.new
       config.lazy_loading = true
       config.lazy_loading.should be_true
+    end
+
+    it "can set emoji" do
+      config = Hwaro::Models::MarkdownConfig.new
+      config.emoji = true
+      config.emoji.should be_true
     end
   end
 end

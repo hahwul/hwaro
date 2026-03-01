@@ -177,6 +177,47 @@ describe Hwaro::Content::Hooks::MarkdownHooks do
       page.content.should contain("<h1 id=\"hello-world\">Hello World</h1>")
     end
 
+    it "converts emoji shortcodes when emoji is enabled" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      hooks = Hwaro::Content::Hooks::MarkdownHooks.new
+      hooks.register_hooks(manager)
+
+      config = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(config)
+      ctx.config = Hwaro::Models::Config.new
+      ctx.config.not_nil!.markdown.emoji = true
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Hello :wave: World :smile:"
+      page.render = true
+      ctx.pages << page
+
+      manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+      page.content.should_not contain(":wave:")
+      page.content.should_not contain(":smile:")
+    end
+
+    it "does not convert emoji shortcodes when emoji is disabled" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      hooks = Hwaro::Content::Hooks::MarkdownHooks.new
+      hooks.register_hooks(manager)
+
+      config = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(config)
+      ctx.config = Hwaro::Models::Config.new
+      ctx.config.not_nil!.markdown.emoji = false
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Hello :wave: World"
+      page.render = true
+      ctx.pages << page
+
+      manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+      page.content.should contain(":wave:")
+    end
+
     it "skips transform if render is false" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       hooks = Hwaro::Content::Hooks::MarkdownHooks.new

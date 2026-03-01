@@ -53,12 +53,14 @@ hooks.post = ["npm run minify"]
 [markdown]
 safe = false
 lazy_loading = true
+emoji = true
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | safe | bool | false | Strip raw HTML from markdown |
 | lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
+| emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
 
 ## Permalinks
 
@@ -330,6 +332,7 @@ hooks.post = ["npm run optimize"]
 [markdown]
 safe = false
 lazy_loading = true
+emoji = false
 
 [permalinks]
 "old/posts" = "posts"

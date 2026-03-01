@@ -1415,12 +1415,13 @@ module Hwaro
                               end
 
           lazy_loading = site.config.markdown.lazy_loading
+          emoji = site.config.markdown.emoji
 
           # Use anchor links if enabled
           html_content, toc_headers = if page.insert_anchor_links
-                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading)
+                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji)
                                       else
-                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading)
+                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji)
                                       end
 
           # Replace shortcode placeholders with their rendered HTML content

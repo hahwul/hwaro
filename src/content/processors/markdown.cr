@@ -74,7 +74,8 @@ module Hwaro
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
         # @param lazy_loading - if true, adds loading="lazy" to img tags
-        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        # @param emoji - if true, converts emoji shortcodes to emoji characters
+        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
           # Use SyntaxHighlighter for rendering with highlighting support
           html = SyntaxHighlighter.render(content, highlight, safe)
 
@@ -83,10 +84,13 @@ module Hwaro
 
           # Optimization: If no headers and no images (or lazy loading disabled), don't parse XML
           unless has_headers || has_images
-            return {html, [] of Models::TocHeader}
+            result_html = emoji ? apply_emoji(html) : html
+            return {result_html, [] of Models::TocHeader}
           end
 
-          post_process_html(html, has_headers, has_images)
+          result_html, toc = post_process_html(html, has_headers, has_images)
+          result_html = apply_emoji(result_html) if emoji
+          {result_html, toc}
         rescue ex
           # Fallback in case of XML parsing error
           {(html || ""), [] of Models::TocHeader}
@@ -378,8 +382,8 @@ module Hwaro
         end
 
         # Render with anchor links inserted into headings
-        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
-          html, toc = render(content, highlight, safe, lazy_loading)
+        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
+          html, toc = render(content, highlight, safe, lazy_loading, emoji)
           html_with_anchors = insert_anchor_links_to_html(html, anchor_style)
           {html_with_anchors, toc}
         end
@@ -498,6 +502,56 @@ module Hwaro
           {result, roots}
         end
 
+        # Apply emoji shortcode conversion to HTML, skipping <code> and <pre> blocks
+        private def apply_emoji(html : String) : String
+          return html unless html.includes?(":")
+
+          result = String::Builder.new(html.bytesize)
+          pos = 0
+          len = html.bytesize
+
+          while pos < len
+            # Check for <code or <pre tags
+            if html[pos] == '<' && pos + 1 < len
+              rest = html[pos..]
+              if rest.starts_with?("<code") || rest.starts_with?("<pre")
+                # Find the closing tag
+                close_tag = rest.starts_with?("<code") ? "</code>" : "</pre>"
+                end_pos = rest.index(close_tag)
+                if end_pos
+                  block = rest[0, end_pos + close_tag.bytesize]
+                  result << block
+                  pos += block.bytesize
+                  next
+                end
+              end
+            end
+
+            # Find next tag or end
+            next_tag = html.index('<', pos + 1)
+            chunk_end = next_tag || len
+
+            if html[pos] == '<'
+              # Inside a tag, don't transform
+              tag_end = html.index('>', pos)
+              if tag_end
+                result << html[pos..tag_end]
+                pos = tag_end + 1
+              else
+                result << html[pos]
+                pos += 1
+              end
+            else
+              # Text content — apply emoji conversion
+              chunk = html[pos...chunk_end]
+              result << Emoji.emojize(chunk)
+              pos = chunk_end
+            end
+          end
+
+          result.to_s
+        end
+
         private def parse_time(time_str : String?) : Time?
           return nil unless time_str
 
@@ -576,8 +630,9 @@ module Hwaro
       # @param highlight - whether to enable syntax highlighting for code blocks
       # @param safe - if true, raw HTML will not be passed through (replaced by comments)
       # @param lazy_loading - if true, adds loading="lazy" to img tags
-      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight, safe, lazy_loading)
+      # @param emoji - if true, converts emoji shortcodes to emoji characters
+      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight, safe, lazy_loading, emoji)
       end
 
       # Returns parsed metadata and content

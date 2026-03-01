@@ -607,6 +607,7 @@ describe Hwaro::Models::MarkdownConfig do
     c = Hwaro::Models::MarkdownConfig.new
     c.safe.should be_false
     c.lazy_loading.should be_false
+    c.emoji.should be_false
   end
 end
 

@@ -22,6 +22,7 @@ require "crinja"
 require "http/server"
 require "markd"
 require "toml"
+require "emoji"
 
 # Load utilities
 require "./utils/logger"
