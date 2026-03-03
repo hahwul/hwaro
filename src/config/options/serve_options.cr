@@ -14,6 +14,7 @@ module Hwaro
         property error_overlay : Bool
         property live_reload : Bool
         property profile : Bool
+        property cache_busting : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
@@ -28,6 +29,7 @@ module Hwaro
           @error_overlay : Bool = true,
           @live_reload : Bool = false,
           @profile : Bool = false,
+          @cache_busting : Bool = true,
         )
         end
 
@@ -43,6 +45,7 @@ module Hwaro
             profile: @profile,
             debug: @debug,
             error_overlay: @error_overlay,
+            cache_busting: @cache_busting,
           )
         end
       end

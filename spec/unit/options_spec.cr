@@ -10,6 +10,7 @@ describe Hwaro::Config::Options::BuildOptions do
     options.parallel.should eq(true)
     options.cache.should eq(false)
     options.profile.should eq(false)
+    options.cache_busting.should eq(true)
   end
 
   it "accepts custom values" do
@@ -20,7 +21,8 @@ describe Hwaro::Config::Options::BuildOptions do
       minify: true,
       parallel: false,
       cache: true,
-      profile: true
+      profile: true,
+      cache_busting: false
     )
     options.output_dir.should eq("dist")
     options.base_url.should eq("https://example.com")
@@ -29,6 +31,7 @@ describe Hwaro::Config::Options::BuildOptions do
     options.parallel.should eq(false)
     options.cache.should eq(true)
     options.profile.should eq(true)
+    options.cache_busting.should eq(false)
   end
 end
 
@@ -40,6 +43,7 @@ describe Hwaro::Config::Options::ServeOptions do
     options.base_url.should be_nil
     options.drafts.should eq(false)
     options.open_browser.should eq(false)
+    options.cache_busting.should eq(true)
   end
 
   it "converts to build options" do
@@ -48,6 +52,13 @@ describe Hwaro::Config::Options::ServeOptions do
     build_options.drafts.should eq(true)
     build_options.output_dir.should eq("public")
     build_options.base_url.should eq("https://example.com")
+    build_options.cache_busting.should eq(true)
+  end
+
+  it "passes cache_busting to build options" do
+    options = Hwaro::Config::Options::ServeOptions.new(cache_busting: false)
+    build_options = options.to_build_options
+    build_options.cache_busting.should eq(false)
   end
 end
 

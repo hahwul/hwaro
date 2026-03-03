@@ -174,10 +174,11 @@ module Hwaro
       end
 
       # Generate CSS link tags for files in configured directories
-      def css_tags(base_url : String = "") : String
+      def css_tags(base_url : String = "", cache_bust : String = "") : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
+        suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
         tags = [] of String
         @dirs.each do |dir|
           static_dir = File.join("static", dir)
@@ -186,17 +187,18 @@ module Hwaro
           Dir.glob(File.join(static_dir, "**", "*.css")).sort.each do |file|
             # Convert static/assets/css/style.css to /assets/css/style.css
             relative_path = file.sub(/^static\/?/, "/")
-            tags << %(<link rel="stylesheet" href="#{base_url}#{relative_path}">)
+            tags << %(<link rel="stylesheet" href="#{base_url}#{relative_path}#{suffix}">)
           end
         end
         tags.join("\n")
       end
 
       # Generate JS script tags for files in configured directories
-      def js_tags(base_url : String = "") : String
+      def js_tags(base_url : String = "", cache_bust : String = "") : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
+        suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
         tags = [] of String
         @dirs.each do |dir|
           static_dir = File.join("static", dir)
@@ -205,16 +207,16 @@ module Hwaro
           Dir.glob(File.join(static_dir, "**", "*.js")).sort.each do |file|
             # Convert static/assets/js/main.js to /assets/js/main.js
             relative_path = file.sub(/^static\/?/, "/")
-            tags << %(<script src="#{base_url}#{relative_path}"></script>)
+            tags << %(<script src="#{base_url}#{relative_path}#{suffix}"></script>)
           end
         end
         tags.join("\n")
       end
 
       # Generate both CSS and JS tags
-      def all_tags(base_url : String = "") : String
-        css = css_tags(base_url)
-        js = js_tags(base_url)
+      def all_tags(base_url : String = "", cache_bust : String = "") : String
+        css = css_tags(base_url, cache_bust)
+        js = js_tags(base_url, cache_bust)
         [css, js].reject(&.empty?).join("\n")
       end
     end
@@ -347,29 +349,31 @@ module Hwaro
       end
 
       # Generate the CSS link tag for highlighting
-      def css_tag : String
+      def css_tag(cache_bust : String = "") : String
         return "" unless @enabled
         if @use_cdn
           %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{@theme}.min.css">)
         else
-          %(<link rel="stylesheet" href="/assets/css/highlight/#{@theme}.min.css">)
+          suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
+          %(<link rel="stylesheet" href="/assets/css/highlight/#{@theme}.min.css#{suffix}">)
         end
       end
 
       # Generate the JS script tag for highlighting
-      def js_tag : String
+      def js_tag(cache_bust : String = "") : String
         return "" unless @enabled
         if @use_cdn
           %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
         else
-          %(<script src="/assets/js/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+          suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
+          %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
         end
       end
 
       # Generate both CSS and JS tags
-      def tags : String
+      def tags(cache_bust : String = "") : String
         return "" unless @enabled
-        "#{css_tag}\n#{js_tag}"
+        "#{css_tag(cache_bust)}\n#{js_tag(cache_bust)}"
       end
     end
 
