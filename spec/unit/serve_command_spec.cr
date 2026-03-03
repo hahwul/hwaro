@@ -67,6 +67,18 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.verbose.should be_true
       options.port.should eq(4000)
     end
+
+    it "defaults live_reload to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.live_reload.should be_false
+    end
+
+    it "sets live_reload to true when --live-reload is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--live-reload"])
+      options.live_reload.should be_true
+    end
   end
 
 
@@ -149,6 +161,19 @@ describe Hwaro::CLI::Commands::ServeCommand do
     it "no-error-overlay flag does not take a value" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata
       flag = meta.flags.find { |f| f.long == "--no-error-overlay" }
+      flag.should_not be_nil
+      flag.not_nil!.takes_value.should be_false
+    end
+
+    it "has live-reload flag" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag_longs = meta.flags.map(&.long)
+      flag_longs.should contain("--live-reload")
+    end
+
+    it "live-reload flag does not take a value" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag = meta.flags.find { |f| f.long == "--live-reload" }
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_false
     end

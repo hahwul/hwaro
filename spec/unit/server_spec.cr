@@ -1,5 +1,6 @@
 require "../spec_helper"
 require "../../src/services/server/server"
+require "../../src/services/server/live_reload_handler"
 require "../../src/core/build/builder"
 require "../../src/content/hooks"
 
@@ -1067,5 +1068,93 @@ describe "Incremental build integration" do
         updated.should contain("Hello world")
       end
     end
+  end
+end
+
+describe Hwaro::Services::LiveReloadInjectHandler do
+  it "injects script before </body>" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "test.html"), "<html><body><p>Hello</p></body></html>")
+
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/test.html")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+      response.close
+
+      io.rewind
+      content = io.to_s
+      content.should contain("__hwaro_livereload")
+      content.should contain("location.reload()")
+      # Script should be before </body>
+      script_pos = content.index("__hwaro_livereload").not_nil!
+      body_pos = content.rindex("</body>").not_nil!
+      script_pos.should be < body_pos
+      dummy.called.should be_false
+    end
+  end
+
+  it "appends script when no </body> exists" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "test.html"), "<p>Simple content</p>")
+
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/test.html")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+      response.close
+
+      io.rewind
+      content = io.to_s
+      content.should contain("__hwaro_livereload")
+      content.should contain("<p>Simple content</p>")
+      dummy.called.should be_false
+    end
+  end
+
+  it "passes non-HTML requests through" do
+    Dir.mktmpdir do |dir|
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/style.css")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      dummy.called.should be_true
+    end
+  end
+end
+
+describe Hwaro::Services::LiveReloadHandler do
+  it "passes non-matching paths through" do
+    handler = Hwaro::Services::LiveReloadHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    request = HTTP::Request.new("GET", "/index.html")
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    dummy.called.should be_true
   end
 end

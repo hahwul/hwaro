@@ -16,6 +16,7 @@ require "../../utils/logger"
 require "../../config/options/serve_options"
 require "../../config/options/build_options"
 require "../../utils/command_runner"
+require "./live_reload_handler"
 
 module Hwaro
   module Services
@@ -142,6 +143,7 @@ module Hwaro
 
     class Server
       @builder : Core::Build::Builder
+      @live_reload_handler : LiveReloadHandler?
 
       def initialize
         @builder = Core::Build::Builder.new
@@ -154,15 +156,15 @@ module Hwaro
 
       def run(options : Config::Options::ServeOptions)
         build_options = options.to_build_options
-        run_with_options(options.host, options.port, options.open_browser, options.access_log, build_options)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options)
       end
 
       def run(host : String = "0.0.0.0", port : Int32 = 3000, drafts : Bool = false)
         build_options = Config::Options::BuildOptions.new(drafts: drafts)
-        run_with_options(host, port, false, false, build_options)
+        run_with_options(host, port, false, false, false, build_options)
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, build_options : Config::Options::BuildOptions)
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions)
         Logger.info "Performing initial build..."
         @builder.run(build_options)
 
@@ -185,7 +187,16 @@ module Hwaro
 
         handlers = [] of HTTP::Handler
         handlers << HTTP::LogHandler.new if access_log
-        handlers << IndexRewriteHandler.new(output_dir)
+        if live_reload
+          lr_handler = LiveReloadHandler.new
+          @live_reload_handler = lr_handler
+          handlers << lr_handler
+          handlers << IndexRewriteHandler.new(output_dir)
+          handlers << LiveReloadInjectHandler.new(output_dir)
+          Logger.info "Live reload enabled"
+        else
+          handlers << IndexRewriteHandler.new(output_dir)
+        end
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
         handlers << NotFoundHandler.new(output_dir)
 
@@ -324,6 +335,8 @@ module Hwaro
           Logger.info "\n[Watch] Multiple change types detected. Full rebuild..."
           @builder.run(build_options)
         end
+
+        @live_reload_handler.try(&.notify_reload)
       end
 
       private def open_browser_url(url : String)
