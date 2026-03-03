@@ -14,5 +14,6 @@ Hwaro includes powerful features out of the box.
 - [Multilingual](/features/multilingual/) — Build multilingual sites with translation linking and hreflang tags
 - [Auto Includes](/features/auto-includes/) — Automatically load CSS and JS files from static directories
 - [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
+- [Cache Busting](/features/cache-busting/) — Content-hash based browser cache invalidation for CSS/JS resources
 - [Build Hooks](/features/build-hooks/) — Run custom shell commands before and after builds
 - [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers

@@ -29,6 +29,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
           FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes"),
           FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile"),
+          FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources"),
           HELP_FLAG,
         ]
 
@@ -71,6 +72,7 @@ module Hwaro
           error_overlay = true
           live_reload = false
           profile = false
+          cache_busting = true
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -87,6 +89,7 @@ module Hwaro
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--live-reload", "Enable live reload on file changes") { live_reload = true }
             parser.on("--profile", "Show build timing profile") { profile = true }
+            parser.on("--skip-cache-busting", "Disable cache busting query parameters on CSS/JS resources") { cache_busting = false }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -103,6 +106,7 @@ module Hwaro
             error_overlay: error_overlay,
             live_reload: live_reload,
             profile: profile,
+            cache_busting: cache_busting,
           )}
         end
       end

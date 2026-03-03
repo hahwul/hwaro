@@ -13,6 +13,7 @@ module Hwaro
         property profile : Bool
         property debug : Bool
         property error_overlay : Bool
+        property cache_busting : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -26,6 +27,7 @@ module Hwaro
           @profile : Bool = false,
           @debug : Bool = false,
           @error_overlay : Bool = false,
+          @cache_busting : Bool = true,
         )
         end
       end

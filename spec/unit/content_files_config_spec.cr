@@ -269,6 +269,27 @@ describe Hwaro::Models::HighlightConfig do
       tag = config.css_tag
       tag.should eq("")
     end
+
+    it "adds cache bust query parameter to local URL" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.use_cdn = false
+      tag = config.css_tag("a1b2c3d4")
+      tag.should contain("/assets/css/highlight/github.min.css?v=a1b2c3d4")
+    end
+
+    it "does not add cache bust to CDN URL" do
+      config = Hwaro::Models::HighlightConfig.new
+      tag = config.css_tag("a1b2c3d4")
+      tag.should_not contain("?v=")
+      tag.should contain("cdnjs.cloudflare.com")
+    end
+
+    it "does not add cache bust when empty string" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.use_cdn = false
+      tag = config.css_tag("")
+      tag.should_not contain("?v=")
+    end
   end
 
   describe "#js_tag" do
@@ -297,6 +318,19 @@ describe Hwaro::Models::HighlightConfig do
       tag = config.js_tag
       tag.should eq("")
     end
+
+    it "adds cache bust query parameter to local URL" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.use_cdn = false
+      tag = config.js_tag("a1b2c3d4")
+      tag.should contain("/assets/js/highlight.min.js?v=a1b2c3d4")
+    end
+
+    it "does not add cache bust to CDN URL" do
+      config = Hwaro::Models::HighlightConfig.new
+      tag = config.js_tag("a1b2c3d4")
+      tag.should_not contain("?v=")
+    end
   end
 
   describe "#tags" do
@@ -320,6 +354,16 @@ describe Hwaro::Models::HighlightConfig do
       css = config.css_tag
       js = config.js_tag
       combined = config.tags
+      combined.should eq("#{css}\n#{js}")
+    end
+
+    it "passes cache bust to both css_tag and js_tag" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.use_cdn = false
+      combined = config.tags("a1b2c3d4")
+      combined.should contain("?v=a1b2c3d4")
+      css = config.css_tag("a1b2c3d4")
+      js = config.js_tag("a1b2c3d4")
       combined.should eq("#{css}\n#{js}")
     end
   end

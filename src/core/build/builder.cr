@@ -9,6 +9,7 @@
 # The Builder uses the Lifecycle system to allow extensibility
 # through hooks at various phases of the build process.
 
+require "digest/md5"
 require "file_utils"
 require "html"
 require "set"
@@ -187,7 +188,7 @@ module Hwaro
           render_list = pages_to_render.to_a
 
           # --- 4. Re-render the affected pages ---
-          global_vars = build_global_vars(site)
+          global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
@@ -243,7 +244,7 @@ module Hwaro
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           renderable_pages = all_pages.select(&.render)
 
-          global_vars = build_global_vars(site)
+          global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
@@ -539,7 +540,7 @@ module Hwaro
 
           profiler.start_phase("Render")
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
-            global_vars = build_global_vars(site)
+            global_vars = build_global_vars(site, ctx.options.cache_busting)
             @pages_by_path = build_pages_by_path(site)
             count = if parallel && pages_to_build.size > 1
                       process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
@@ -1803,7 +1804,7 @@ module Hwaro
           map
         end
 
-        private def build_global_vars(site : Models::Site) : Hash(String, Crinja::Value)
+        private def build_global_vars(site : Models::Site, cache_busting : Bool = true) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
 
@@ -1907,15 +1908,18 @@ module Hwaro
           vars["site_description"] = Crinja::Value.new(config.description || "")
           vars["base_url"] = Crinja::Value.new(config.base_url)
 
+          # Cache busting (content hash of local CSS/JS files)
+          cache_bust = cache_busting ? compute_cache_bust(config) : ""
+
           # Highlight tags
-          vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag)
-          vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag)
-          vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags)
+          vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag(cache_bust))
+          vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust))
+          vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust))
 
           # Auto includes
-          vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url))
-          vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url))
-          vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url))
+          vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust))
+          vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust))
+          vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust))
 
           # Time-related variables (fixed per build, not per page)
           now = Time.local
@@ -1924,6 +1928,36 @@ module Hwaro
           vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
 
           vars
+        end
+
+        # Compute a content-based cache bust hash from local CSS/JS files.
+        # Returns an 8-character hex digest, or "" if no local files exist.
+        private def compute_cache_bust(config : Models::Config) : String
+          has_local_highlight = config.highlight.enabled && !config.highlight.use_cdn
+          has_auto_includes = config.auto_includes.enabled && config.auto_includes.dirs.any?
+
+          return "" unless has_local_highlight || has_auto_includes
+
+          digest = Digest::MD5.new
+
+          if has_local_highlight
+            css_path = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
+            digest.update(File.read(css_path)) if File.exists?(css_path)
+            js_path = File.join("static", "assets", "js", "highlight.min.js")
+            digest.update(File.read(js_path)) if File.exists?(js_path)
+          end
+
+          if has_auto_includes
+            config.auto_includes.dirs.each do |dir|
+              static_dir = File.join("static", dir)
+              next unless Dir.exists?(static_dir)
+              Dir.glob(File.join(static_dir, "**", "*.{css,js}")).sort.each do |file|
+                digest.update(File.read(file))
+              end
+            end
+          end
+
+          digest.hexfinal[0, 8]
         end
 
         # Build template variables hash for Crinja

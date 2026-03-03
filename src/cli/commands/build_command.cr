@@ -28,6 +28,7 @@ module Hwaro
           FlagInfo.new(short: "-v", long: "--verbose", description: "Show detailed output including generated files"),
           FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile for each phase"),
           FlagInfo.new(short: nil, long: "--debug", description: "Print debug information after build"),
+          FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources"),
           HELP_FLAG,
         ]
 
@@ -89,6 +90,7 @@ module Hwaro
           verbose = false
           profile = false
           debug = false
+          cache_busting = true
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -103,6 +105,7 @@ module Hwaro
             parser.on("-v", "--verbose", "Show detailed output including generated files") { verbose = true }
             parser.on("--profile", "Show build timing profile for each phase") { profile = true }
             parser.on("--debug", "Print debug information after build") { debug = true }
+            parser.on("--skip-cache-busting", "Disable cache busting query parameters on CSS/JS resources") { cache_busting = false }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -116,7 +119,8 @@ module Hwaro
             highlight: highlight,
             verbose: verbose,
             profile: profile,
-            debug: debug
+            debug: debug,
+            cache_busting: cache_busting
           ), output_dir_explicit}, input_dir }
         end
       end
