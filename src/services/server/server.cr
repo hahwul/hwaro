@@ -342,7 +342,8 @@ module Hwaro
         {% elsif flag?(:windows) %}
           Process.run("cmd", ["/c", "start", url])
         {% end %}
-      rescue
+      rescue ex
+        Logger.debug "Failed to open browser: #{ex.message}"
       end
 
       private def scan_mtimes : Hash(String, Time)
@@ -355,7 +356,8 @@ module Hwaro
             next if File.directory?(file)
             begin
               mtimes[file] = File.info(file).modification_time
-            rescue
+            rescue ex
+              Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
           end
         end
@@ -363,7 +365,8 @@ module Hwaro
         if File.exists?("config.toml")
           begin
             mtimes["config.toml"] = File.info("config.toml").modification_time
-          rescue
+          rescue ex
+            Logger.debug "Failed to read config.toml info: #{ex.message}"
           end
         end
 

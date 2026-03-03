@@ -57,7 +57,8 @@ module Hwaro
           begin
             current_mtime = File.info(file_path).modification_time.to_unix_ms
             return current_mtime != entry.mtime
-          rescue
+          rescue ex
+            Logger.debug "Cache: failed to read mtime for #{file_path}: #{ex.message}"
             return true
           end
         end
@@ -92,7 +93,7 @@ module Hwaro
               output_path: output_path
             )
           rescue ex
-            # Ignore errors for individual files
+            Logger.debug "Cache: failed to update entry for #{file_path}: #{ex.message}"
           end
         end
 
@@ -113,7 +114,7 @@ module Hwaro
           begin
             File.write(@cache_path, @entries.values.to_json)
           rescue ex
-            # Silently ignore save errors
+            Logger.debug "Cache: failed to save cache file: #{ex.message}"
           end
         end
 
@@ -127,7 +128,7 @@ module Hwaro
             entries = Array(CacheEntry).from_json(content)
             entries.each { |e| @entries[e.path] = e }
           rescue ex
-            # Start fresh if cache is corrupted
+            Logger.debug "Cache: failed to load cache file, starting fresh: #{ex.message}"
             @entries.clear
           end
         end
@@ -147,7 +148,8 @@ module Hwaro
         private def compute_hash(file_path : String) : String
           content = File.read(file_path)
           Digest::MD5.hexdigest(content)
-        rescue
+        rescue ex
+          Logger.debug "Cache: failed to compute hash for #{file_path}: #{ex.message}"
           ""
         end
       end

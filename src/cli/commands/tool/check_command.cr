@@ -97,8 +97,17 @@ module Hwaro
                   # Use HEAD request for efficiency
                   response = HTTP::Client.head(uri)
                   status = response.status_code
-                rescue ex : Exception
-                  status = -1 # Represents other errors
+                rescue ex : Socket::ConnectError
+                  status = -1
+                  error_message = "Connection failed: #{ex.message}"
+                rescue ex : IO::TimeoutError
+                  status = -1
+                  error_message = "Request timed out: #{ex.message}"
+                rescue ex : Socket::Addrinfo::Error
+                  status = -1
+                  error_message = "DNS resolution failed: #{ex.message}"
+                rescue ex
+                  status = -1
                   error_message = ex.message
                 end
                 results_channel.send(Result.new(link: link, status: status, error: error_message))

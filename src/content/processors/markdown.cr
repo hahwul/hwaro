@@ -134,196 +134,74 @@ module Hwaro
 
           # Try TOML Front Matter (+++)
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
-            begin
-              toml_fm = TOML.parse(match[1])
-              title = toml_fm["title"]?.try(&.as_s) || title
-              description = toml_fm["description"]?.try(&.as_s)
-              image = toml_fm["image"]?.try(&.as_s)
-              is_draft = toml_fm["draft"]?.try(&.as_bool) || false
-              template = toml_fm["template"]?.try(&.as_s)
-              if toml_fm.has_key?("in_sitemap")
-                in_sitemap = toml_fm["in_sitemap"].as_bool
-              end
-              toc = toml_fm["toc"]?.try(&.as_bool) || false
-
-              date = parse_time(toml_fm["date"]?.try(&.as_s))
-              updated = parse_time(toml_fm["updated"]?.try(&.as_s))
-
-              if toml_fm.has_key?("render")
-                render = toml_fm["render"].as_bool
-              end
-
-              if toml_fm.has_key?("transparent")
-                transparent = toml_fm["transparent"].as_bool
-              end
-              if toml_fm.has_key?("generate_feeds")
-                generate_feeds = toml_fm["generate_feeds"].as_bool
-              end
-
-              # Section-specific pagination settings
-              if toml_fm.has_key?("paginate")
-                paginate = toml_fm["paginate"].as_i
-              end
-              if toml_fm.has_key?("pagination_enabled")
-                pagination_enabled = toml_fm["pagination_enabled"].as_bool
-              end
-              if toml_fm.has_key?("sort_by")
-                sort_by = toml_fm["sort_by"].as_s
-              end
-              if toml_fm.has_key?("reverse")
-                reverse = toml_fm["reverse"].as_bool
-              end
-
-              slug = toml_fm["slug"]?.try(&.as_s)
-              custom_path = toml_fm["path"]?.try(&.as_s)
-
-              if toml_fm.has_key?("aliases")
-                aliases = toml_fm["aliases"].as_a.map(&.as_s)
-              end
-
-              # New fields parsing for TOML
-              if toml_fm.has_key?("authors")
-                authors = toml_fm["authors"].as_a.map(&.as_s)
-              end
-              if toml_fm.has_key?("in_search_index")
-                in_search_index = toml_fm["in_search_index"].as_bool
-              end
-              if toml_fm.has_key?("insert_anchor_links")
-                insert_anchor_links = toml_fm["insert_anchor_links"].as_bool
-              end
-              if toml_fm.has_key?("page_template")
-                page_template = toml_fm["page_template"].as_s
-              end
-              if toml_fm.has_key?("paginate_path")
-                paginate_path = toml_fm["paginate_path"].as_s
-              end
-              if toml_fm.has_key?("redirect_to")
-                redirect_to = toml_fm["redirect_to"].as_s
-              end
-              if toml_fm.has_key?("weight")
-                weight = toml_fm["weight"].as_i
-              end
-
-              # Extract extra fields (all keys not in known list)
-              toml_fm.each do |key, value|
-                next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
-                extra[key] = extract_extra_value(value)
-              end
-
-              front_matter_keys = toml_fm.keys
-              taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
-              if toml_fm.has_key?("tags")
-                tags = toml_fm["tags"].as_a.map(&.as_s)
-              end
-              taxonomies["tags"] = tags if tags.any?
-            rescue ex
-              Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
+            result = extract_from_toml(match[1], file_path)
+            if result
+              title = result[:title]
+              description = result[:description]
+              image = result[:image]
+              is_draft = result[:draft]
+              template = result[:template]
+              in_sitemap = result[:in_sitemap]
+              toc = result[:toc]
+              date = result[:date]
+              updated = result[:updated]
+              render = result[:render]
+              slug = result[:slug]
+              custom_path = result[:custom_path]
+              aliases = result[:aliases]
+              transparent = result[:transparent]
+              generate_feeds = result[:generate_feeds]
+              paginate = result[:paginate]
+              pagination_enabled = result[:pagination_enabled]
+              sort_by = result[:sort_by]
+              reverse = result[:reverse]
+              authors = result[:authors]
+              extra = result[:extra]
+              in_search_index = result[:in_search_index]
+              insert_anchor_links = result[:insert_anchor_links]
+              page_template = result[:page_template]
+              paginate_path = result[:paginate_path]
+              redirect_to = result[:redirect_to]
+              weight = result[:weight]
+              front_matter_keys = result[:front_matter_keys]
+              taxonomies = result[:taxonomies]
+              tags = result[:tags]
             end
             markdown_content = match[2]
             # Try YAML Front Matter (---)
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
-            begin
-              yaml_fm = YAML.parse(match[1])
-              if yaml_fm.as_h?
-                title = yaml_fm["title"]?.try(&.as_s?) || title
-                description = yaml_fm["description"]?.try(&.as_s?)
-                image = yaml_fm["image"]?.try(&.as_s?)
-                is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
-                template = yaml_fm["template"]?.try(&.as_s?)
-                if (val = yaml_fm["in_sitemap"]?)
-                  bool_val = val.as_bool?
-                  in_sitemap = bool_val unless bool_val.nil?
-                end
-                toc = yaml_fm["toc"]?.try(&.as_bool?) || false
-
-                date = parse_time(yaml_fm["date"]?.try(&.as_s?))
-                updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
-
-                if (val = yaml_fm["render"]?)
-                  bool_val = val.as_bool?
-                  render = bool_val unless bool_val.nil?
-                end
-
-                if (val = yaml_fm["transparent"]?)
-                  bool_val = val.as_bool?
-                  transparent = bool_val unless bool_val.nil?
-                end
-
-                if (val = yaml_fm["generate_feeds"]?)
-                  bool_val = val.as_bool?
-                  generate_feeds = bool_val unless bool_val.nil?
-                end
-
-                # Section-specific pagination settings
-                if (val = yaml_fm["paginate"]?)
-                  int_val = val.as_i?
-                  paginate = int_val unless int_val.nil?
-                end
-
-                if (val = yaml_fm["pagination_enabled"]?)
-                  bool_val = val.as_bool?
-                  pagination_enabled = bool_val unless bool_val.nil?
-                end
-                if (val = yaml_fm["sort_by"]?)
-                  sort_by = val.as_s?
-                end
-                if (val = yaml_fm["reverse"]?)
-                  bool_val = val.as_bool?
-                  reverse = bool_val unless bool_val.nil?
-                end
-
-                slug = yaml_fm["slug"]?.try(&.as_s?)
-                custom_path = yaml_fm["path"]?.try(&.as_s?)
-
-                if (val = yaml_fm["aliases"]?)
-                  aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-                end
-
-                # New fields parsing for YAML
-                if (val = yaml_fm["authors"]?)
-                  authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-                end
-                if (val = yaml_fm["in_search_index"]?)
-                  bool_val = val.as_bool?
-                  in_search_index = bool_val unless bool_val.nil?
-                end
-                if (val = yaml_fm["insert_anchor_links"]?)
-                  bool_val = val.as_bool?
-                  insert_anchor_links = bool_val unless bool_val.nil?
-                end
-                if (val = yaml_fm["page_template"]?)
-                  page_template = val.as_s?
-                end
-                if (val = yaml_fm["paginate_path"]?)
-                  paginate_path = val.as_s? || "page"
-                end
-                if (val = yaml_fm["redirect_to"]?)
-                  redirect_to = val.as_s?
-                end
-                if (val = yaml_fm["weight"]?)
-                  int_val = val.as_i?
-                  weight = int_val unless int_val.nil?
-                end
-
-                # Extract extra fields for YAML
-                if fm_hash = yaml_fm.as_h?
-                  fm_hash.each do |key_any, value|
-                    key = key_any.as_s?
-                    next unless key
-                    next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
-                    extra[key] = extract_extra_value(value)
-                  end
-                end
-
-                front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
-                taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
-                if (val = yaml_fm["tags"]?)
-                  tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-                end
-                taxonomies["tags"] = tags if tags.any?
-              end
-            rescue ex
-              Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
+            result = extract_from_yaml(match[1], file_path)
+            if result
+              title = result[:title]
+              description = result[:description]
+              image = result[:image]
+              is_draft = result[:draft]
+              template = result[:template]
+              in_sitemap = result[:in_sitemap]
+              toc = result[:toc]
+              date = result[:date]
+              updated = result[:updated]
+              render = result[:render]
+              slug = result[:slug]
+              custom_path = result[:custom_path]
+              aliases = result[:aliases]
+              transparent = result[:transparent]
+              generate_feeds = result[:generate_feeds]
+              paginate = result[:paginate]
+              pagination_enabled = result[:pagination_enabled]
+              sort_by = result[:sort_by]
+              reverse = result[:reverse]
+              authors = result[:authors]
+              extra = result[:extra]
+              in_search_index = result[:in_search_index]
+              insert_anchor_links = result[:insert_anchor_links]
+              page_template = result[:page_template]
+              paginate_path = result[:paginate_path]
+              redirect_to = result[:redirect_to]
+              weight = result[:weight]
+              front_matter_keys = result[:front_matter_keys]
+              taxonomies = result[:taxonomies]
+              tags = result[:tags]
             end
             markdown_content = match[2]
           end
@@ -362,6 +240,254 @@ module Hwaro
             redirect_to:         redirect_to,
             weight:              weight,
           }
+        end
+
+        # Extract front matter fields from TOML content
+        private def extract_from_toml(raw : String, file_path : String)
+          toml_fm = TOML.parse(raw)
+          title = toml_fm["title"]?.try(&.as_s) || "Untitled"
+          description = toml_fm["description"]?.try(&.as_s)
+          image = toml_fm["image"]?.try(&.as_s)
+          is_draft = toml_fm["draft"]?.try(&.as_bool) || false
+          template = toml_fm["template"]?.try(&.as_s)
+          in_sitemap = true
+          if toml_fm.has_key?("in_sitemap")
+            in_sitemap = toml_fm["in_sitemap"].as_bool
+          end
+          toc = toml_fm["toc"]?.try(&.as_bool) || false
+
+          date = parse_time(toml_fm["date"]?.try(&.as_s))
+          updated = parse_time(toml_fm["updated"]?.try(&.as_s))
+
+          render = true
+          if toml_fm.has_key?("render")
+            render = toml_fm["render"].as_bool
+          end
+
+          transparent = false
+          if toml_fm.has_key?("transparent")
+            transparent = toml_fm["transparent"].as_bool
+          end
+          generate_feeds = false
+          if toml_fm.has_key?("generate_feeds")
+            generate_feeds = toml_fm["generate_feeds"].as_bool
+          end
+
+          paginate = nil.as(Int32?)
+          if toml_fm.has_key?("paginate")
+            paginate = toml_fm["paginate"].as_i
+          end
+          pagination_enabled = nil.as(Bool?)
+          if toml_fm.has_key?("pagination_enabled")
+            pagination_enabled = toml_fm["pagination_enabled"].as_bool
+          end
+          sort_by = nil.as(String?)
+          if toml_fm.has_key?("sort_by")
+            sort_by = toml_fm["sort_by"].as_s
+          end
+          reverse = nil.as(Bool?)
+          if toml_fm.has_key?("reverse")
+            reverse = toml_fm["reverse"].as_bool
+          end
+
+          slug = toml_fm["slug"]?.try(&.as_s)
+          custom_path = toml_fm["path"]?.try(&.as_s)
+
+          aliases = [] of String
+          if toml_fm.has_key?("aliases")
+            aliases = toml_fm["aliases"].as_a.map(&.as_s)
+          end
+
+          authors = [] of String
+          if toml_fm.has_key?("authors")
+            authors = toml_fm["authors"].as_a.map(&.as_s)
+          end
+          in_search_index = true
+          if toml_fm.has_key?("in_search_index")
+            in_search_index = toml_fm["in_search_index"].as_bool
+          end
+          insert_anchor_links = false
+          if toml_fm.has_key?("insert_anchor_links")
+            insert_anchor_links = toml_fm["insert_anchor_links"].as_bool
+          end
+          page_template = nil.as(String?)
+          if toml_fm.has_key?("page_template")
+            page_template = toml_fm["page_template"].as_s
+          end
+          paginate_path = "page"
+          if toml_fm.has_key?("paginate_path")
+            paginate_path = toml_fm["paginate_path"].as_s
+          end
+          redirect_to = nil.as(String?)
+          if toml_fm.has_key?("redirect_to")
+            redirect_to = toml_fm["redirect_to"].as_s
+          end
+          weight = 0
+          if toml_fm.has_key?("weight")
+            weight = toml_fm["weight"].as_i
+          end
+
+          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          toml_fm.each do |key, value|
+            next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+            extra[key] = extract_extra_value(value)
+          end
+
+          front_matter_keys = toml_fm.keys
+          taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
+          tags = [] of String
+          if toml_fm.has_key?("tags")
+            tags = toml_fm["tags"].as_a.map(&.as_s)
+          end
+          taxonomies["tags"] = tags if tags.any?
+
+          {
+            title: title, description: description, image: image, draft: is_draft,
+            template: template, in_sitemap: in_sitemap, toc: toc, date: date,
+            updated: updated, render: render, slug: slug, custom_path: custom_path,
+            aliases: aliases, transparent: transparent, generate_feeds: generate_feeds,
+            paginate: paginate, pagination_enabled: pagination_enabled, sort_by: sort_by,
+            reverse: reverse, authors: authors, extra: extra, in_search_index: in_search_index,
+            insert_anchor_links: insert_anchor_links, page_template: page_template,
+            paginate_path: paginate_path, redirect_to: redirect_to, weight: weight,
+            front_matter_keys: front_matter_keys, taxonomies: taxonomies, tags: tags,
+          }
+        rescue ex
+          Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
+          nil
+        end
+
+        # Extract front matter fields from YAML content
+        private def extract_from_yaml(raw : String, file_path : String)
+          yaml_fm = YAML.parse(raw)
+          return nil unless yaml_fm.as_h?
+
+          title = yaml_fm["title"]?.try(&.as_s?) || "Untitled"
+          description = yaml_fm["description"]?.try(&.as_s?)
+          image = yaml_fm["image"]?.try(&.as_s?)
+          is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
+          template = yaml_fm["template"]?.try(&.as_s?)
+          in_sitemap = true
+          if (val = yaml_fm["in_sitemap"]?)
+            bool_val = val.as_bool?
+            in_sitemap = bool_val unless bool_val.nil?
+          end
+          toc = yaml_fm["toc"]?.try(&.as_bool?) || false
+
+          date = parse_time(yaml_fm["date"]?.try(&.as_s?))
+          updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
+
+          render = true
+          if (val = yaml_fm["render"]?)
+            bool_val = val.as_bool?
+            render = bool_val unless bool_val.nil?
+          end
+
+          transparent = false
+          if (val = yaml_fm["transparent"]?)
+            bool_val = val.as_bool?
+            transparent = bool_val unless bool_val.nil?
+          end
+
+          generate_feeds = false
+          if (val = yaml_fm["generate_feeds"]?)
+            bool_val = val.as_bool?
+            generate_feeds = bool_val unless bool_val.nil?
+          end
+
+          paginate = nil.as(Int32?)
+          if (val = yaml_fm["paginate"]?)
+            int_val = val.as_i?
+            paginate = int_val unless int_val.nil?
+          end
+
+          pagination_enabled = nil.as(Bool?)
+          if (val = yaml_fm["pagination_enabled"]?)
+            bool_val = val.as_bool?
+            pagination_enabled = bool_val unless bool_val.nil?
+          end
+          sort_by = nil.as(String?)
+          if (val = yaml_fm["sort_by"]?)
+            sort_by = val.as_s?
+          end
+          reverse = nil.as(Bool?)
+          if (val = yaml_fm["reverse"]?)
+            bool_val = val.as_bool?
+            reverse = bool_val unless bool_val.nil?
+          end
+
+          slug = yaml_fm["slug"]?.try(&.as_s?)
+          custom_path = yaml_fm["path"]?.try(&.as_s?)
+
+          aliases = [] of String
+          if (val = yaml_fm["aliases"]?)
+            aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+          end
+
+          authors = [] of String
+          if (val = yaml_fm["authors"]?)
+            authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+          end
+          in_search_index = true
+          if (val = yaml_fm["in_search_index"]?)
+            bool_val = val.as_bool?
+            in_search_index = bool_val unless bool_val.nil?
+          end
+          insert_anchor_links = false
+          if (val = yaml_fm["insert_anchor_links"]?)
+            bool_val = val.as_bool?
+            insert_anchor_links = bool_val unless bool_val.nil?
+          end
+          page_template = nil.as(String?)
+          if (val = yaml_fm["page_template"]?)
+            page_template = val.as_s?
+          end
+          paginate_path = "page"
+          if (val = yaml_fm["paginate_path"]?)
+            paginate_path = val.as_s? || "page"
+          end
+          redirect_to = nil.as(String?)
+          if (val = yaml_fm["redirect_to"]?)
+            redirect_to = val.as_s?
+          end
+          weight = 0
+          if (val = yaml_fm["weight"]?)
+            int_val = val.as_i?
+            weight = int_val unless int_val.nil?
+          end
+
+          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          if fm_hash = yaml_fm.as_h?
+            fm_hash.each do |key_any, value|
+              key = key_any.as_s?
+              next unless key
+              next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+              extra[key] = extract_extra_value(value)
+            end
+          end
+
+          front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
+          taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
+          tags = [] of String
+          if (val = yaml_fm["tags"]?)
+            tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
+          end
+          taxonomies["tags"] = tags if tags.any?
+
+          {
+            title: title, description: description, image: image, draft: is_draft,
+            template: template, in_sitemap: in_sitemap, toc: toc, date: date,
+            updated: updated, render: render, slug: slug, custom_path: custom_path,
+            aliases: aliases, transparent: transparent, generate_feeds: generate_feeds,
+            paginate: paginate, pagination_enabled: pagination_enabled, sort_by: sort_by,
+            reverse: reverse, authors: authors, extra: extra, in_search_index: in_search_index,
+            insert_anchor_links: insert_anchor_links, page_template: page_template,
+            paginate_path: paginate_path, redirect_to: redirect_to, weight: weight,
+            front_matter_keys: front_matter_keys, taxonomies: taxonomies, tags: tags,
+          }
+        rescue ex
+          Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
+          nil
         end
 
         # Extract extra value from TOML::Any or YAML::Any

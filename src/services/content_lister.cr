@@ -182,8 +182,8 @@ module Hwaro
                 date = parse_time(raw)
               end
             end
-          rescue
-            # Ignore parsing errors
+          rescue ex
+            Logger.debug "TOML front matter parsing failed for #{file_path}: #{ex.message}"
           end
           # Try YAML Front Matter (---)
         elsif match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?/m)
@@ -201,8 +201,8 @@ module Hwaro
                 end
               end
             end
-          rescue
-            # Ignore parsing errors
+          rescue ex
+            Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
           end
         end
 
@@ -212,7 +212,8 @@ module Hwaro
           draft: draft,
           date: date
         )
-      rescue
+      rescue ex
+        Logger.debug "Failed to read content file #{file_path}: #{ex.message}"
         nil
       end
 

@@ -544,6 +544,26 @@ module Hwaro
         val.nil? ? default : val
       end
 
+      # Safe integer loader: handles both integer and float TOML values.
+      private def self.int_value(raw : TOML::Any?, default : Int32) : Int32
+        return default unless raw
+        raw.as_i? || raw.as_f?.try(&.to_i) || default
+      end
+
+      # Safe float loader: handles both float and integer TOML values.
+      private def self.float_value(raw : TOML::Any?, default : Float64) : Float64
+        return default unless raw
+        raw.as_f? || raw.as_i?.try(&.to_f) || default
+      end
+
+      # Extracts a string-or-array TOML value into an Array(String).
+      private def self.string_or_array(raw : TOML::Any?) : Array(String)
+        return [] of String unless raw
+        raw.as_a?.try(&.compact_map(&.as_s?)) ||
+          raw.as_s?.try { |v| [v] } ||
+          [] of String
+      end
+
       # --- Private section loaders ---------------------------------------------------
 
       private def self.load_sitemap(config : Config)
@@ -554,7 +574,7 @@ module Hwaro
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
           config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
           config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
-          config.sitemap.priority = s["priority"]?.try { |v| v.as_f? || v.as_i?.try(&.to_f) } || config.sitemap.priority
+          config.sitemap.priority = float_value(s["priority"]?, config.sitemap.priority)
           if exclude_arr = s["exclude"]?.try(&.as_a?)
             config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
           end
@@ -621,8 +641,8 @@ module Hwaro
 
         config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename
         config.feeds.type = s["type"]?.try(&.as_s?) || config.feeds.type
-        config.feeds.truncate = s["truncate"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.truncate
-        config.feeds.limit = s["limit"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.feeds.limit
+        config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)
+        config.feeds.limit = int_value(s["limit"]?, config.feeds.limit)
         if sections = s["sections"]?.try(&.as_a?)
           config.feeds.sections = sections.compact_map(&.as_s?)
         end
@@ -660,24 +680,15 @@ module Hwaro
         disallow_paths_any = s["disallow_paths"]?
 
         if allow_any
-          values = allow_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                   allow_any.as_s?.try { |v| [v] } ||
-                   ([] of String)
-          config.content_files.allow_extensions = ContentFilesConfig.normalize_extensions(values)
+          config.content_files.allow_extensions = ContentFilesConfig.normalize_extensions(string_or_array(allow_any))
         end
 
         if disallow_any
-          values = disallow_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                   disallow_any.as_s?.try { |v| [v] } ||
-                   ([] of String)
-          config.content_files.disallow_extensions = ContentFilesConfig.normalize_extensions(values)
+          config.content_files.disallow_extensions = ContentFilesConfig.normalize_extensions(string_or_array(disallow_any))
         end
 
         if disallow_paths_any
-          values = disallow_paths_any.as_a?.try(&.compact_map(&.as_s?)) ||
-                   disallow_paths_any.as_s?.try { |v| [v] } ||
-                   ([] of String)
-          config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(values)
+          config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(string_or_array(disallow_paths_any))
         end
       end
 
@@ -685,7 +696,7 @@ module Hwaro
         return unless s = config.raw["pagination"]?.try(&.as_h?)
 
         config.pagination.enabled = bool_value(s["enabled"]?, config.pagination.enabled)
-        config.pagination.per_page = s["per_page"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || config.pagination.per_page
+        config.pagination.per_page = int_value(s["per_page"]?, config.pagination.per_page)
       end
 
       private def self.load_highlight(config : Config)
@@ -742,7 +753,7 @@ module Hwaro
 
           lang_config = LanguageConfig.new(lang_code)
           lang_config.language_name = lang_hash["language_name"]?.try(&.as_s?) || lang_code
-          lang_config.weight = lang_hash["weight"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) } || lang_config.weight
+          lang_config.weight = int_value(lang_hash["weight"]?, lang_config.weight)
           lang_config.generate_feed = bool_value(lang_hash["generate_feed"]?, lang_config.generate_feed)
           lang_config.build_search_index = bool_value(lang_hash["build_search_index"]?, lang_config.build_search_index)
 

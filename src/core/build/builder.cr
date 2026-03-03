@@ -18,6 +18,7 @@ require "uri"
 require "crinja"
 require "./cache"
 require "./parallel"
+require "./shortcode_processor"
 require "../../content/seo/feeds"
 require "../../content/seo/sitemap"
 require "../../content/seo/robots"
@@ -48,6 +49,8 @@ module Hwaro
   module Core
     module Build
       class Builder
+        include ShortcodeProcessor
+
         TEMPLATE_EXTENSION_REGEX = /\.(html|j2|jinja2|jinja|ecr)$/
 
         @site : Models::Site?
@@ -66,7 +69,6 @@ module Hwaro
         private REGEX_PRE_CLOSE      = /<\/code>\s*<\/pre>/
         private REGEX_COMMENTS       = /<!--(?!\[if|\s*more\s*-->).*?-->/m
         private REGEX_BLANK_LINES    = /\n{3,}/
-        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -1347,6 +1349,7 @@ module Hwaro
                   cache.update(source_path, output_path)
                   results.send(true)
                 rescue ex
+                  Logger.debug "Parallel render failed for #{page.path}: #{ex.message}"
                   results.send(false)
                 end
               end
@@ -2239,139 +2242,6 @@ module Hwaro
           end
 
           vars
-        end
-
-        # Process shortcodes in content (Jinja2/Crinja style)
-        # Supports two syntax patterns:
-        # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
-        # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
-        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil) : String
-          # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
-          # so documentation can show literal `{{ ... }}` examples safely.
-          String.build do |io|
-            in_fence = false
-            fence_marker = ""
-            buffer = String::Builder.new
-
-            content.each_line(chomp: false) do |line|
-              if in_fence
-                io << line
-                if line.match(/^\s*#{Regex.escape(fence_marker)}\s*$/)
-                  in_fence = false
-                  fence_marker = ""
-                end
-                next
-              end
-
-              if match = line.match(/^\s*(`{3,}|~{3,})/)
-                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override)
-                buffer = String::Builder.new
-                in_fence = true
-                fence_marker = match[1]
-                io << line
-              else
-                buffer << line
-              end
-            end
-
-            io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override)
-          end
-        end
-
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil) : String
-          # 1. Block shortcodes: {% name(args) %}body{% end %}
-          processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
-            name = $1
-            args_str = $2
-            body = $3.strip
-
-            extra_args = {"body" => body}
-            render_shortcode_result(name, args_str, templates, context, shortcode_results, match, warn_missing: true, extra_args: extra_args, crinja_env_override: crinja_env_override)
-          end
-
-          # 2. Explicit call: {{ shortcode("name", args) }}
-          processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
-            render_shortcode_result($1, $2?, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override)
-          end
-
-          # 3. Direct call: {{ name(args) }}
-          processed = processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
-            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: false, crinja_env_override: crinja_env_override)
-          end
-        end
-
-        # Shared helper: look up a shortcode template, render it, and either
-        # return the HTML directly or store it behind a placeholder so that
-        # Markdown processing doesn't mangle it.
-        private def render_shortcode_result(
-          name : String,
-          args_str : String?,
-          templates : Hash(String, String),
-          context : Hash(String, Crinja::Value),
-          shortcode_results : Hash(String, String)?,
-          fallback : String,
-          warn_missing : Bool = true,
-          extra_args : Hash(String, String)? = nil,
-          crinja_env_override : Crinja? = nil,
-        ) : String
-          template_key = "shortcodes/#{name}"
-          template = templates[template_key]?
-
-          unless template
-            Logger.warn "  [WARN] Shortcode template '#{template_key}' not found." if warn_missing
-            return fallback
-          end
-
-          args = parse_shortcode_args_jinja(args_str)
-          extra_args.try &.each { |k, v| args[k] = v }
-          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override)
-
-          if results = shortcode_results
-            placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
-            results[placeholder] = html
-            placeholder
-          else
-            html
-          end
-        end
-
-        # Parse shortcode arguments (key="value" or key='value' or key=value)
-        private def parse_shortcode_args_jinja(args_str : String?) : Hash(String, String)
-          args = {} of String => String
-          return args unless args_str
-
-          # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
-            key = match[1]
-            value = match[2]? || match[3]? || match[4]? || ""
-            args[key] = value
-          end
-          args
-        end
-
-        # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil) : String
-          env = crinja_env_override || crinja_env
-          vars = context.dup
-          args.each do |key, value|
-            vars[key] = Crinja::Value.new(value)
-          end
-
-          begin
-            crinja_template = env.from_string(template)
-            crinja_template.render(vars)
-          rescue ex : Crinja::TemplateError
-            Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
-            ""
-          end
-        end
-
-        # Replace shortcode placeholders with their rendered HTML content
-        private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
-          return html if shortcode_results.empty?
-          html.gsub(/HWARO-SHORTCODE-PLACEHOLDER-\d+/) do |match|
-            shortcode_results[match]? || match
-          end
         end
 
         # Very conservative HTML minification
