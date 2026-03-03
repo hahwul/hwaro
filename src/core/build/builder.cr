@@ -94,7 +94,8 @@ module Hwaro
             highlight: options.highlight,
             verbose: options.verbose,
             profile: options.profile,
-            debug: options.debug
+            debug: options.debug,
+            error_overlay: options.error_overlay,
           )
         end
 
@@ -188,9 +189,10 @@ module Hwaro
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
+          error_overlay = options.error_overlay
           render_list.each do |page|
             next unless page.render
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -243,10 +245,11 @@ module Hwaro
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
+          error_overlay = options.error_overlay
           count = if options.parallel && renderable_pages.size > 1
-                    process_files_parallel(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars)
+                    process_files_parallel(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay)
                   else
-                    process_files_sequential(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars)
+                    process_files_sequential(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay)
                   end
 
           # Re-generate 404 page with new template
@@ -294,6 +297,7 @@ module Hwaro
           verbose : Bool = false,
           profile : Bool = false,
           debug : Bool = false,
+          error_overlay : Bool = false,
         )
           # Load config once and reuse throughout the build
           config = Models::Config.load
@@ -328,7 +332,8 @@ module Hwaro
             highlight: highlight,
             verbose: verbose,
             profile: profile,
-            debug: debug
+            debug: debug,
+            error_overlay: error_overlay,
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -527,14 +532,16 @@ module Hwaro
           # Config setting takes precedence, but can be overridden by CLI flag
           use_highlight = highlight && (site.config.highlight.enabled)
 
+          error_overlay = ctx.options.error_overlay
+
           profiler.start_phase("Render")
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             global_vars = build_global_vars(site)
             @pages_by_path = build_pages_by_path(site)
             count = if parallel && pages_to_build.size > 1
-                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars)
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay)
                     else
-                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars)
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay)
                     end
             ctx.stats.pages_rendered = count
           end
@@ -1305,6 +1312,7 @@ module Hwaro
           highlight : Bool,
           verbose : Bool,
           global_vars : Hash(String, Crinja::Value),
+          error_overlay : Bool = false,
         ) : Int32
           return 0 if pages.empty?
 
@@ -1333,7 +1341,7 @@ module Hwaro
                 page, _idx = work_item
                 begin
                   render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
-                    crinja_env_override: env, template_cache_override: tmpl_cache)
+                    crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay)
                   source_path = File.join("content", page.path)
                   output_path = get_output_path(page, output_dir)
                   cache.update(source_path, output_path)
@@ -1363,11 +1371,12 @@ module Hwaro
           highlight : Bool,
           verbose : Bool,
           global_vars : Hash(String, Crinja::Value),
+          error_overlay : Bool = false,
         ) : Int32
           count = 0
           safe = site.config.markdown.safe
           pages.each do |page|
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
@@ -1388,8 +1397,12 @@ module Hwaro
           global_vars : Hash(String, Crinja::Value)? = nil,
           crinja_env_override : Crinja? = nil,
           template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
+          error_overlay : Bool = false,
         )
           return unless page.render
+
+          # Clear warnings from previous renders (important for incremental rebuilds)
+          page.build_warnings.clear
 
           # Handle redirect_to for pages AND sections
           if page.has_redirect?
@@ -1449,7 +1462,7 @@ module Hwaro
           # Handle section pages with pagination
           if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
             render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, verbose, global_vars,
-              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, error_overlay: error_overlay)
           else
             section_list_html = ""
 
@@ -1457,9 +1470,15 @@ module Hwaro
                            apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates, global_vars: global_vars,
                              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                          else
-                           Logger.warn "  [WARN] No template found for #{page.path}. Using raw content."
+                           msg = "No template found for #{page.path}. Using raw content."
+                           Logger.warn "  [WARN] #{msg}"
+                           page.build_warnings << msg
                            html_content
                          end
+
+            if error_overlay && !page.build_warnings.empty?
+              final_html = inject_error_overlay(final_html, page.build_warnings)
+            end
 
             final_html = minify_html(final_html) if minify
 
@@ -1515,6 +1534,7 @@ module Hwaro
           global_vars : Hash(String, Crinja::Value)? = nil,
           crinja_env_override : Crinja? = nil,
           template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
+          error_overlay : Bool = false,
         )
           # Get pages in this section using the site utility method
           section_name = Path[section.path].dirname
@@ -1544,9 +1564,15 @@ module Hwaro
                            apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page, global_vars,
                              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                          else
-                           Logger.warn "  [WARN] No template found for #{section.path}. Using raw content."
+                           msg = "No template found for #{section.path}. Using raw content."
+                           Logger.warn "  [WARN] #{msg}"
+                           section.build_warnings << msg
                            html_content
                          end
+
+            if error_overlay && !section.build_warnings.empty?
+              final_html = inject_error_overlay(final_html, section.build_warnings)
+            end
 
             final_html = minify_html(final_html) if minify
 
@@ -1580,7 +1606,9 @@ module Hwaro
         private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
           if custom = page.template
             return custom if templates.has_key?(custom)
-            Logger.warn "  [WARN] Custom template '#{custom}' not found for #{page.path}."
+            msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
+            Logger.warn "  [WARN] #{msg}"
+            page.build_warnings << msg
           end
 
           if page.is_a?(Models::Section)
@@ -1665,6 +1693,39 @@ module Hwaro
           end
         end
 
+        # Inject a dismissible error overlay into the HTML page for development feedback.
+        # The overlay shows build warnings collected during rendering so developers
+        # can spot template issues directly in the browser.
+        private def inject_error_overlay(html : String, warnings : Array(String)) : String
+          return html if warnings.empty?
+
+          escaped_warnings = warnings.map { |w| HTML.escape(w) }
+          list_items = escaped_warnings.map { |w|
+            "<li style=\"margin-bottom:8px;line-height:1.5;\">#{w}</li>"
+          }.join("\n")
+
+          overlay = <<-OVERLAY
+          <div id="hwaro-error-overlay" style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+            <div style="background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:24px;max-width:720px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h2 style="margin:0;color:#f38ba8;font-size:18px;">Build Warning</h2>
+                <button onclick="document.getElementById('hwaro-error-overlay').remove()" style="background:none;border:none;color:#cdd6f4;font-size:24px;cursor:pointer;padding:0 4px;">&times;</button>
+              </div>
+              <ul style="margin:0;padding:0 0 0 20px;">
+                #{list_items}
+              </ul>
+            </div>
+          </div>
+          OVERLAY
+
+          # Inject before </body> if present, otherwise append
+          if idx = html.rindex("</body>")
+            html.insert(idx, overlay)
+          else
+            html + overlay
+          end
+        end
+
         def apply_template(
           template : String,
           content : String,
@@ -1687,11 +1748,11 @@ module Hwaro
           # Build template variables
           vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars)
 
-          # Process shortcodes in template first (convert to Jinja2 include syntax)
-          processed_template = process_shortcodes_jinja(template, templates, vars,
-            crinja_env_override: crinja_env_override)
-
           begin
+            # Process shortcodes in template first (convert to Jinja2 include syntax)
+            processed_template = process_shortcodes_jinja(template, templates, vars,
+              crinja_env_override: crinja_env_override)
+
             # Cache compiled Crinja templates by content hash.
             # Most pages share the same base template string, so this avoids
             # re-parsing the template AST on every page render.
@@ -1702,9 +1763,15 @@ module Hwaro
               compiled
             end
             crinja_template.render(vars)
-          rescue ex : Crinja::TemplateError
-            Logger.warn "  [WARN] Template error for #{page.path}: #{ex.message}"
-            # Fallback to content only
+          rescue ex : Crinja::TemplateNotFoundError
+            msg = "Template error for #{page.path}: #{ex.message}"
+            Logger.warn "  [WARN] #{msg}"
+            page.build_warnings << msg
+            content
+          rescue ex : Crinja::Error
+            msg = "Template error for #{page.path}: #{ex.message}"
+            Logger.warn "  [WARN] #{msg}"
+            page.build_warnings << msg
             content
           end
         end

@@ -58,6 +58,9 @@ module Hwaro
       # New: Insert anchor links - whether to add anchor links to headings
       property insert_anchor_links : Bool
 
+      # Build warnings collected during rendering (used for error overlay in serve mode)
+      property build_warnings : Array(String)
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
@@ -129,6 +132,7 @@ module Hwaro
         @higher = nil
         @ancestors = [] of Page
         @redirect_to = nil
+        @build_warnings = [] of String
       end
 
       # Check if page has redirect

@@ -12,6 +12,7 @@ module Hwaro
         property verbose : Bool
         property profile : Bool
         property debug : Bool
+        property error_overlay : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -24,6 +25,7 @@ module Hwaro
           @verbose : Bool = false,
           @profile : Bool = false,
           @debug : Bool = false,
+          @error_overlay : Bool = false,
         )
         end
       end

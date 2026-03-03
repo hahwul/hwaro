@@ -73,6 +73,19 @@ describe Hwaro::CLI::Commands::ServeCommand do
       flag_longs.should contain("--help")
     end
 
+    it "has no-error-overlay flag" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag_longs = meta.flags.map(&.long)
+      flag_longs.should contain("--no-error-overlay")
+    end
+
+    it "no-error-overlay flag does not take a value" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag = meta.flags.find { |f| f.long == "--no-error-overlay" }
+      flag.should_not be_nil
+      flag.not_nil!.takes_value.should be_false
+    end
+
     it "has no positional args" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata
       meta.positional_args.should be_empty

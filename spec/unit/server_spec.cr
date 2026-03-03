@@ -14,6 +14,19 @@ module Hwaro
   end
 end
 
+# Reopen Builder to test private inject_error_overlay method
+module Hwaro
+  module Core
+    module Build
+      class Builder
+        def test_inject_error_overlay(html : String, warnings : Array(String)) : String
+          inject_error_overlay(html, warnings)
+        end
+      end
+    end
+  end
+end
+
 class DummyHandler
   include HTTP::Handler
 
@@ -471,6 +484,63 @@ module Hwaro
         detect_changes(old_mtimes, new_mtimes)
       end
     end
+  end
+end
+
+describe "Builder#inject_error_overlay" do
+  it "injects overlay before </body>" do
+    builder = Hwaro::Core::Build::Builder.new
+    html = "<html><body><p>Hello</p></body></html>"
+    warnings = ["No template found for test.md. Using raw content."]
+
+    result = builder.test_inject_error_overlay(html, warnings)
+    result.should contain("hwaro-error-overlay")
+    result.should contain("Build Warning")
+    result.should contain("No template found for test.md")
+    # Overlay should be before </body>
+    overlay_pos = result.index("hwaro-error-overlay").not_nil!
+    body_pos = result.rindex("</body>").not_nil!
+    overlay_pos.should be < body_pos
+  end
+
+  it "appends overlay when no </body> tag exists" do
+    builder = Hwaro::Core::Build::Builder.new
+    html = "<p>Simple content</p>"
+    warnings = ["Template error for page.md: undefined variable"]
+
+    result = builder.test_inject_error_overlay(html, warnings)
+    result.should contain("hwaro-error-overlay")
+    result.should start_with("<p>Simple content</p>")
+  end
+
+  it "returns html unchanged when warnings are empty" do
+    builder = Hwaro::Core::Build::Builder.new
+    html = "<html><body><p>Hello</p></body></html>"
+
+    result = builder.test_inject_error_overlay(html, [] of String)
+    result.should eq(html)
+  end
+
+  it "escapes HTML in warning messages" do
+    builder = Hwaro::Core::Build::Builder.new
+    html = "<html><body></body></html>"
+    warnings = ["Error with <script>alert('xss')</script>"]
+
+    result = builder.test_inject_error_overlay(html, warnings)
+    result.should_not contain("<script>alert")
+    result.should contain("&lt;script&gt;")
+  end
+
+  it "shows multiple warnings as list items" do
+    builder = Hwaro::Core::Build::Builder.new
+    html = "<html><body></body></html>"
+    warnings = ["Warning one", "Warning two"]
+
+    result = builder.test_inject_error_overlay(html, warnings)
+    result.should contain("Warning one")
+    result.should contain("Warning two")
+    # Should have two <li> items
+    result.scan(/<li /).size.should eq(2)
   end
 end
 
