@@ -103,7 +103,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | --cache | Enable build caching (see below) |
 | --skip-highlighting | Disable syntax highlighting |
 | -v, --verbose | Show detailed output |
-| --profile | Print phase-by-phase build timing |
+| --profile | Print phase-by-phase and per-template build timing |
 | --debug | Print debug information after build |
 
 **About `--minify`:**
@@ -158,6 +158,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests) |
 | --live-reload | Enable browser live reload on file changes |
+| --profile | Print phase-by-phase and per-template build timing |
 
 The server watches for file changes and rebuilds automatically. It uses **smart rebuild strategies** based on what changed:
 

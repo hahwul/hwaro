@@ -28,6 +28,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
           FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes"),
+          FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile"),
           HELP_FLAG,
         ]
 
@@ -69,6 +70,7 @@ module Hwaro
           access_log = false
           error_overlay = true
           live_reload = false
+          profile = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -84,6 +86,7 @@ module Hwaro
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--live-reload", "Enable live reload on file changes") { live_reload = true }
+            parser.on("--profile", "Show build timing profile") { profile = true }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -99,6 +102,7 @@ module Hwaro
             access_log: access_log,
             error_overlay: error_overlay,
             live_reload: live_reload,
+            profile: profile,
           )}
         end
       end
