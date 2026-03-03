@@ -16,17 +16,32 @@ module Hwaro
       end
     end
 
+    # Represents per-template profiling data
+    struct TemplateProfile
+      property template : String
+      property count : Int32
+      property total_bytes : Int64
+      property total_time_ms : Float64
+
+      def initialize(@template : String, @count : Int32 = 0, @total_bytes : Int64 = 0_i64, @total_time_ms : Float64 = 0.0)
+      end
+    end
+
     @enabled : Bool
     @phases : Array(PhaseTime)
     @current_phase : String?
     @phase_start : Time::Instant?
     @total_start : Time::Instant?
+    @template_profiles : Hash(String, TemplateProfile)
+    @template_mutex : Mutex
 
     def initialize(@enabled : Bool = false)
       @phases = [] of PhaseTime
       @current_phase = nil
       @phase_start = nil
       @total_start = nil
+      @template_profiles = {} of String => TemplateProfile
+      @template_mutex = Mutex.new
     end
 
     def enabled? : Bool
@@ -100,6 +115,74 @@ module Hwaro
       io.puts "─" * 50
       io.puts "  #{"Total".ljust(max_name_len + 2)} #{format_time(total).rjust(10)}"
       io.puts ""
+    end
+
+    # Record per-template profiling data
+    def record_template(template : String, bytes : Int64, time_ms : Float64)
+      return unless @enabled
+      @template_mutex.synchronize do
+        if existing = @template_profiles[template]?
+          @template_profiles[template] = TemplateProfile.new(
+            template: template,
+            count: existing.count + 1,
+            total_bytes: existing.total_bytes + bytes,
+            total_time_ms: existing.total_time_ms + time_ms,
+          )
+        else
+          @template_profiles[template] = TemplateProfile.new(
+            template: template,
+            count: 1,
+            total_bytes: bytes,
+            total_time_ms: time_ms,
+          )
+        end
+      end
+    end
+
+    # Print the per-template profiling report
+    def template_report(io : IO = STDOUT)
+      return unless @enabled
+      return if @template_profiles.empty?
+
+      sorted = @template_profiles.values.sort_by { |tp| -tp.total_time_ms }
+
+      # Calculate column widths
+      max_name_len = sorted.map { |tp| tp.template.size }.max
+      max_name_len = {max_name_len, 8}.max # minimum "Template" header width
+      header_width = max_name_len
+
+      io.puts ""
+      io.puts "Template Profile".colorize(:cyan).bold
+
+      # Header
+      io.puts "#{"Template".ljust(header_width)} | Count | #{" Bytes".rjust(10)} | #{"Time".rjust(10)}"
+      io.puts "#{"-" * header_width}-+-------+#{"-" * 12}+#{"-" * 11}"
+
+      # Rows
+      sorted.each do |tp|
+        name = tp.template.ljust(header_width)
+        count = tp.count.to_s.rjust(5)
+        bytes = format_bytes(tp.total_bytes).rjust(10)
+        time = format_time(tp.total_time_ms).rjust(10)
+        io.puts "#{name} | #{count} | #{bytes} | #{time}"
+      end
+
+      # Total row
+      total_time = sorted.sum(&.total_time_ms)
+      io.puts "#{" " * header_width}   #{" " * 5}   #{" " * 10}  #{"─" * 10}"
+      io.puts "#{" " * header_width}    Total#{" " * (10 + 5)} #{format_time(total_time).rjust(10)}"
+      io.puts ""
+    end
+
+    # Format byte sizes in human-readable form
+    private def format_bytes(bytes : Int64) : String
+      if bytes < 1024
+        "#{bytes}B"
+      elsif bytes < 1024 * 1024
+        "#{"%.2f" % (bytes / 1024.0)}K"
+      else
+        "#{"%.2f" % (bytes / (1024.0 * 1024.0))}M"
+      end
     end
 
     # Format time in appropriate units

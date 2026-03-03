@@ -13,6 +13,7 @@ module Hwaro
         property access_log : Bool
         property error_overlay : Bool
         property live_reload : Bool
+        property profile : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
@@ -26,6 +27,7 @@ module Hwaro
           @access_log : Bool = false,
           @error_overlay : Bool = true,
           @live_reload : Bool = false,
+          @profile : Bool = false,
         )
         end
 
@@ -38,6 +40,7 @@ module Hwaro
             minify: @minify,
             parallel: true,
             verbose: @verbose,
+            profile: @profile,
             debug: @debug,
             error_overlay: @error_overlay,
           )

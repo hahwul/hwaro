@@ -362,6 +362,7 @@ module Hwaro
 
           # Print profiling report if enabled
           profiler.report
+          profiler.template_report
 
           # Run post-build hooks
           unless post_hooks.empty?
@@ -541,9 +542,9 @@ module Hwaro
             global_vars = build_global_vars(site)
             @pages_by_path = build_pages_by_path(site)
             count = if parallel && pages_to_build.size > 1
-                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay)
+                      process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
                     else
-                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay)
+                      process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
                     end
             ctx.stats.pages_rendered = count
           end
@@ -1315,6 +1316,7 @@ module Hwaro
           verbose : Bool,
           global_vars : Hash(String, Crinja::Value),
           error_overlay : Bool = false,
+          profiler : Profiler? = nil,
         ) : Int32
           return 0 if pages.empty?
 
@@ -1342,8 +1344,14 @@ module Hwaro
               while work_item = work_queue.receive?
                 page, _idx = work_item
                 begin
+                  page_start = profiler ? Time.instant : nil
                   render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
                     crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay)
+                  if profiler && page_start
+                    elapsed_ms = (Time.instant - page_start).total_milliseconds
+                    template_name = determine_template(page, templates)
+                    profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
+                  end
                   source_path = File.join("content", page.path)
                   output_path = get_output_path(page, output_dir)
                   cache.update(source_path, output_path)
@@ -1375,11 +1383,18 @@ module Hwaro
           verbose : Bool,
           global_vars : Hash(String, Crinja::Value),
           error_overlay : Bool = false,
+          profiler : Profiler? = nil,
         ) : Int32
           count = 0
           safe = site.config.markdown.safe
           pages.each do |page|
+            page_start = profiler ? Time.instant : nil
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay)
+            if profiler && page_start
+              elapsed_ms = (Time.instant - page_start).total_milliseconds
+              template_name = determine_template(page, templates)
+              profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
+            end
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)

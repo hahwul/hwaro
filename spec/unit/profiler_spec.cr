@@ -74,6 +74,87 @@ describe Hwaro::Profiler do
     end
   end
 
+  describe "#record_template" do
+    it "records template data when enabled" do
+      profiler = Hwaro::Profiler.new(enabled: true)
+      profiler.record_template("page", 1024_i64, 10.5)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      result = output.to_s
+
+      result.should contain("page")
+      result.should contain("1")
+    end
+
+    it "does nothing when disabled" do
+      profiler = Hwaro::Profiler.new(enabled: false)
+      profiler.record_template("page", 1024_i64, 10.5)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      output.to_s.should eq("")
+    end
+
+    it "aggregates multiple calls for the same template" do
+      profiler = Hwaro::Profiler.new(enabled: true)
+      profiler.record_template("page", 512_i64, 5.0)
+      profiler.record_template("page", 256_i64, 3.0)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      result = output.to_s
+
+      result.should contain("page")
+      # Count should be 2
+      result.should contain("    2")
+    end
+  end
+
+  describe "#template_report" do
+    it "sorts by time descending" do
+      profiler = Hwaro::Profiler.new(enabled: true)
+      profiler.record_template("single", 100_i64, 1.0)
+      profiler.record_template("listing", 200_i64, 50.0)
+      profiler.record_template("archive", 150_i64, 25.0)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      result = output.to_s
+
+      listing_pos = result.index("listing").not_nil!
+      archive_pos = result.index("archive").not_nil!
+      single_pos = result.index("single").not_nil!
+
+      listing_pos.should be < archive_pos
+      archive_pos.should be < single_pos
+    end
+
+    it "shows header and total" do
+      profiler = Hwaro::Profiler.new(enabled: true)
+      profiler.record_template("page", 1024_i64, 10.0)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      result = output.to_s
+
+      result.should contain("Template Profile")
+      result.should contain("Template")
+      result.should contain("Count")
+      result.should contain("Bytes")
+      result.should contain("Time")
+      result.should contain("Total")
+    end
+
+    it "is empty when no templates recorded" do
+      profiler = Hwaro::Profiler.new(enabled: true)
+
+      output = IO::Memory.new
+      profiler.template_report(output)
+      output.to_s.should eq("")
+    end
+  end
+
   describe "#total_elapsed" do
     it "returns 0 if not started" do
       profiler = Hwaro::Profiler.new(enabled: true)
