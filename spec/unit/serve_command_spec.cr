@@ -2,7 +2,74 @@ require "../spec_helper"
 require "../../src/cli/commands/serve_command"
 require "../../src/cli/commands/completion_command"
 
+# Reopen ServeCommand to test private parse_options method
+module Hwaro
+  module CLI
+    module Commands
+      class ServeCommand
+        def test_parse_options(args : Array(String))
+          parse_options(args)
+        end
+      end
+    end
+  end
+end
+
 describe Hwaro::CLI::Commands::ServeCommand do
+  describe "#parse_options" do
+    it "defaults error_overlay to true" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.error_overlay.should be_true
+    end
+
+    it "sets error_overlay to false when --no-error-overlay is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--no-error-overlay"])
+      options.error_overlay.should be_false
+    end
+
+    it "defaults host to 0.0.0.0" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.host.should eq("0.0.0.0")
+    end
+
+    it "defaults port to 3000" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.port.should eq(3000)
+    end
+
+    it "parses --port flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--port", "8080"])
+      options.port.should eq(8080)
+    end
+
+    it "parses --bind flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--bind", "127.0.0.1"])
+      options.host.should eq("127.0.0.1")
+    end
+
+    it "parses --drafts flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--drafts"])
+      options.drafts.should be_true
+    end
+
+    it "parses combined flags" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--no-error-overlay", "--drafts", "--verbose", "--port", "4000"])
+      options.error_overlay.should be_false
+      options.drafts.should be_true
+      options.verbose.should be_true
+      options.port.should eq(4000)
+    end
+  end
+
+
   describe "metadata" do
     it "has correct name" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata

@@ -1472,7 +1472,7 @@ module Hwaro
                          else
                            msg = "No template found for #{page.path}. Using raw content."
                            Logger.warn "  [WARN] #{msg}"
-                           page.build_warnings << msg
+                           page.build_warnings << msg unless page.build_warnings.includes?(msg)
                            html_content
                          end
 
@@ -1566,7 +1566,7 @@ module Hwaro
                          else
                            msg = "No template found for #{section.path}. Using raw content."
                            Logger.warn "  [WARN] #{msg}"
-                           section.build_warnings << msg
+                           section.build_warnings << msg unless section.build_warnings.includes?(msg)
                            html_content
                          end
 
@@ -1608,7 +1608,7 @@ module Hwaro
             return custom if templates.has_key?(custom)
             msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
             Logger.warn "  [WARN] #{msg}"
-            page.build_warnings << msg
+            page.build_warnings << msg unless page.build_warnings.includes?(msg)
           end
 
           if page.is_a?(Models::Section)
@@ -1766,12 +1766,12 @@ module Hwaro
           rescue ex : Crinja::TemplateNotFoundError
             msg = "Template error for #{page.path}: #{ex.message}"
             Logger.warn "  [WARN] #{msg}"
-            page.build_warnings << msg
+            page.build_warnings << msg unless page.build_warnings.includes?(msg)
             content
           rescue ex : Crinja::Error
             msg = "Template error for #{page.path}: #{ex.message}"
             Logger.warn "  [WARN] #{msg}"
-            page.build_warnings << msg
+            page.build_warnings << msg unless page.build_warnings.includes?(msg)
             content
           end
         end
