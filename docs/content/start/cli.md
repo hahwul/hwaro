@@ -138,6 +138,7 @@ hwaro serve
 hwaro serve --port 8080
 hwaro serve --open
 hwaro serve --access-log
+hwaro serve --live-reload
 hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
@@ -156,6 +157,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | -v, --verbose | Show detailed output |
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests) |
+| --live-reload | Enable browser live reload on file changes |
 
 The server watches for file changes and rebuilds automatically. It uses **smart rebuild strategies** based on what changed:
 
@@ -166,6 +168,10 @@ The server watches for file changes and rebuilds automatically. It uses **smart 
 | `templates/` only | Template re-render | Re-renders all pages with existing content |
 | `static/` only | Static copy | Copies only changed static files |
 | Mixed / new / deleted files | Full rebuild | Rebuilds entire site |
+
+**About `--live-reload`:**
+
+When enabled, the server injects a small WebSocket client script into every HTML response. After each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
 
@@ -252,6 +258,9 @@ hwaro serve --drafts --verbose
 
 # Development with HTTP access log
 hwaro serve --access-log
+
+# Development with auto browser refresh
+hwaro serve --live-reload
 
 # Production build
 hwaro build
