@@ -12,6 +12,7 @@ module Hwaro
         property debug : Bool
         property access_log : Bool
         property error_overlay : Bool
+        property live_reload : Bool
 
         def initialize(
           @host : String = "0.0.0.0",
@@ -24,6 +25,7 @@ module Hwaro
           @debug : Bool = false,
           @access_log : Bool = false,
           @error_overlay : Bool = true,
+          @live_reload : Bool = false,
         )
         end
 
