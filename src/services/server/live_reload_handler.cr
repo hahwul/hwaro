@@ -1,5 +1,6 @@
 require "http/server"
 require "http/web_socket"
+require "../../utils/path_utils"
 
 module Hwaro
   module Services
@@ -73,16 +74,24 @@ module Hwaro
           return
         end
 
-        # Resolve file path from request
-        relative = path.sub(/^\//, "")
+        # Resolve file path from request, sanitizing to prevent directory traversal
+        relative = Utils::PathUtils.sanitize_path(path)
         file_path = File.join(@public_dir, relative)
 
-        unless File.exists?(file_path) && File.file?(file_path)
+        # Verify resolved path is within public_dir
+        resolved = File.realpath(file_path) rescue nil
+        public_real = File.realpath(@public_dir) rescue @public_dir
+        unless resolved && resolved.starts_with?(public_real + "/")
           call_next(context)
           return
         end
 
-        html = File.read(file_path)
+        unless File.file?(resolved)
+          call_next(context)
+          return
+        end
+
+        html = File.read(resolved)
         injected = inject_script(html)
 
         context.response.content_type = "text/html"

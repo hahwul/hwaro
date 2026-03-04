@@ -44,5 +44,23 @@ describe Hwaro::Utils::PathUtils do
       # /foo/../bar//baz/ -> foo/bar/baz
       Hwaro::Utils::PathUtils.sanitize_path("/foo/../bar//baz/").should eq("foo/bar/baz")
     end
+
+    it "prevents nested dot-dot bypass (....//)" do
+      Hwaro::Utils::PathUtils.sanitize_path("....//etc/passwd").should eq("etc/passwd")
+      Hwaro::Utils::PathUtils.sanitize_path("....//....//etc/passwd").should eq("etc/passwd")
+    end
+
+    it "prevents double-encoded traversal" do
+      # %252F%252E%252E = double-encoded /../
+      Hwaro::Utils::PathUtils.sanitize_path("%252E%252E%252Fetc%252Fpasswd").should eq("etc/passwd")
+    end
+
+    it "handles backslash traversal" do
+      Hwaro::Utils::PathUtils.sanitize_path("..\\..\\etc\\passwd").should eq("etc/passwd")
+    end
+
+    it "rejects dot segments" do
+      Hwaro::Utils::PathUtils.sanitize_path("/./foo/./bar").should eq("foo/bar")
+    end
   end
 end

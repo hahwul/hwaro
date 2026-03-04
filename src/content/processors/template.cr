@@ -448,8 +448,15 @@ module Hwaro
             result = Crinja::Value.new(nil)
 
             begin
-              if File.exists?(path)
-                content = File.read(path)
+              # Restrict file access to the project directory (cwd)
+              # to prevent reading arbitrary files via malicious templates
+              project_root = File.realpath(Dir.current)
+              resolved = File.expand_path(path, project_root)
+              resolved = File.realpath(resolved) if File.exists?(resolved)
+
+              if (resolved.starts_with?(project_root + "/") || resolved == project_root) &&
+                 File.exists?(resolved) && File.file?(resolved)
+                content = File.read(resolved)
 
                 if path.ends_with?(".json")
                   # Parse JSON
