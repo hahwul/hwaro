@@ -1,5 +1,14 @@
 require "../spec_helper"
 require "../../src/core/lifecycle/hooks"
+require "../../src/core/lifecycle/manager"
+
+# Test class that includes HookDSL - must be in the Lifecycle module
+# so the macro-expanded constants (HookPoint, etc.) resolve correctly
+module Hwaro::Core::Lifecycle
+  class TestHookDSLClass
+    include HookDSL
+  end
+end
 
 describe Hwaro::Core::Lifecycle::HookResult do
   it "has Continue value" do
@@ -101,6 +110,208 @@ describe Hwaro::Core::Lifecycle do
       before, after = Hwaro::Core::Lifecycle.hook_points_for(Hwaro::Core::Lifecycle::Phase::ParseContent)
       before.should eq(Hwaro::Core::Lifecycle::HookPoint::BeforeParseContent)
       after.should eq(Hwaro::Core::Lifecycle::HookPoint::AfterParseContent)
+    end
+  end
+end
+
+describe "HookDSL" do
+  # Clear pending hooks before each test to avoid cross-test pollution
+  before_each do
+    Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.clear
+  end
+
+  describe ".on" do
+    it "registers a hook at a specific hook point" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.size.should eq(1)
+      point, priority, name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      point.should eq(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize)
+      priority.should eq(0)
+      name.should eq("hook")
+    end
+
+    it "registers a hook with custom priority and name" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.on(
+        Hwaro::Core::Lifecycle::HookPoint::AfterRender,
+        priority: 10,
+        name: "my-custom-hook"
+      ) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.size.should eq(1)
+      point, priority, name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      point.should eq(Hwaro::Core::Lifecycle::HookPoint::AfterRender)
+      priority.should eq(10)
+      name.should eq("my-custom-hook")
+    end
+
+    it "accumulates multiple hooks" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.on(Hwaro::Core::Lifecycle::HookPoint::BeforeTransform) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      Hwaro::Core::Lifecycle::TestHookDSLClass.on(Hwaro::Core::Lifecycle::HookPoint::AfterTransform) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.size.should eq(2)
+    end
+  end
+
+  describe ".before" do
+    it "registers a hook at the before point of a phase" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.before(Hwaro::Core::Lifecycle::Phase::Transform) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.size.should eq(1)
+      point, _priority, _name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      point.should eq(Hwaro::Core::Lifecycle::HookPoint::BeforeTransform)
+    end
+
+    it "supports custom priority and name" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.before(Hwaro::Core::Lifecycle::Phase::Render, priority: 5, name: "pre-render") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      _point, priority, name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      priority.should eq(5)
+      name.should eq("pre-render")
+    end
+  end
+
+  describe ".after" do
+    it "registers a hook at the after point of a phase" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.after(Hwaro::Core::Lifecycle::Phase::Write) do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.size.should eq(1)
+      point, _priority, _name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      point.should eq(Hwaro::Core::Lifecycle::HookPoint::AfterWrite)
+    end
+
+    it "supports custom priority and name" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.after(Hwaro::Core::Lifecycle::Phase::Finalize, priority: 3, name: "cleanup") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      _point, priority, name, _handler = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.first
+      priority.should eq(3)
+      name.should eq("cleanup")
+    end
+  end
+
+  describe ".pending_hooks" do
+    it "returns empty array initially" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks.should be_empty
+    end
+
+    it "returns all registered hooks" do
+      Hwaro::Core::Lifecycle::TestHookDSLClass.before(Hwaro::Core::Lifecycle::Phase::Initialize, name: "init-hook") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      Hwaro::Core::Lifecycle::TestHookDSLClass.after(Hwaro::Core::Lifecycle::Phase::Initialize, name: "post-init") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      hooks = Hwaro::Core::Lifecycle::TestHookDSLClass.pending_hooks
+      hooks.size.should eq(2)
+      hooks[0][2].should eq("init-hook")
+      hooks[1][2].should eq("post-init")
+    end
+  end
+end
+
+describe Hwaro::Core::Lifecycle::Manager do
+  describe "#on" do
+    it "registers a hook at a specific point" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "test") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize).should be_true
+      manager.hook_count.should eq(1)
+    end
+  end
+
+  describe "#before and #after" do
+    it "registers before and after hooks for a phase" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.before(Hwaro::Core::Lifecycle::Phase::Transform, name: "pre") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      manager.after(Hwaro::Core::Lifecycle::Phase::Transform, name: "post") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeTransform).should be_true
+      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::AfterTransform).should be_true
+      manager.hook_count.should eq(2)
+    end
+  end
+
+  describe "#trigger" do
+    it "executes hooks and returns Continue" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      called = false
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "test") do |_ctx|
+        called = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+      called.should be_true
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+    end
+
+    it "returns Continue when no hooks registered" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+    end
+
+    it "stops on Skip result" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      second_called = false
+
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 10, name: "skipper") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Skip
+      end
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 0, name: "second") do |_ctx|
+        second_called = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
+      second_called.should be_false
+    end
+  end
+
+  describe "#clear" do
+    it "removes all hooks" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "test") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      manager.hook_count.should eq(1)
+      manager.clear
+      manager.hook_count.should eq(0)
     end
   end
 end
