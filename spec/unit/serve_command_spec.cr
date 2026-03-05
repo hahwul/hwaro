@@ -388,12 +388,20 @@ describe Hwaro::CLI::Commands::CompletionCommand do
       sub_names.should contain("list")
     end
 
-    it "tool command has check subcommand" do
+    it "tool command has deadlink subcommand" do
       commands = Hwaro::CLI::Commands::CompletionCommand.all_commands
       tool_cmd = commands.find { |c| c.name == "tool" }
       tool_cmd.should_not be_nil
       sub_names = tool_cmd.not_nil!.subcommands.map(&.name)
-      sub_names.should contain("check")
+      sub_names.should contain("deadlink")
+    end
+
+    it "tool command has doctor subcommand" do
+      commands = Hwaro::CLI::Commands::CompletionCommand.all_commands
+      tool_cmd = commands.find { |c| c.name == "tool" }
+      tool_cmd.should_not be_nil
+      sub_names = tool_cmd.not_nil!.subcommands.map(&.name)
+      sub_names.should contain("doctor")
     end
   end
 

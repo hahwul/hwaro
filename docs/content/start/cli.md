@@ -208,7 +208,8 @@ hwaro tool convert toTOML       # Convert frontmatter to TOML
 hwaro tool list all             # List all content files
 hwaro tool list drafts          # List draft files
 hwaro tool list published       # List published files
-hwaro tool check                # Check for dead external links
+hwaro tool deadlink             # Check for dead external links
+hwaro tool doctor               # Diagnose config and content issues
 ```
 
 **Subcommands:**
@@ -217,7 +218,8 @@ hwaro tool check                # Check for dead external links
 |------------|-------------|
 | convert | Convert frontmatter between YAML and TOML formats |
 | list | List content files by status (all, drafts, published) |
-| check | Check for dead links in content files |
+| deadlink | Check for dead links in content files |
+| doctor | Diagnose config and content issues |
 
 **Common Options:**
 

@@ -9,9 +9,9 @@ module Hwaro
   module CLI
     module Commands
       module Tool
-        class CheckCommand
+        class DeadlinkCommand
           # Single source of truth for command metadata
-          NAME               = "check"
+          NAME               = "deadlink"
           DESCRIPTION        = "Check for dead links in content files"
           POSITIONAL_ARGS    = [] of String
           POSITIONAL_CHOICES = [] of String
@@ -121,7 +121,7 @@ module Hwaro
           private def parse_options(args : Array(String))
             options = {} of String => String
             OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: hwaro tool check [options]"
+              parser.banner = "Usage: hwaro tool deadlink [options]"
               parser.on("-h", "--help", "Show this help") do
                 Logger.info parser.to_s
                 exit

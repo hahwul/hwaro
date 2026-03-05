@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 3 subcommands" do
+    it "returns 4 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(3)
+      subs.size.should eq(4)
     end
 
     it "includes convert subcommand" do
@@ -35,9 +35,14 @@ describe Hwaro::CLI::Commands::ToolCommand do
       subs.any? { |s| s.name == "list" }.should be_true
     end
 
-    it "includes check subcommand" do
+    it "includes deadlink subcommand" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.any? { |s| s.name == "check" }.should be_true
+      subs.any? { |s| s.name == "deadlink" }.should be_true
+    end
+
+    it "includes doctor subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "doctor" }.should be_true
     end
   end
 end
@@ -118,6 +123,48 @@ describe Hwaro::CLI::Commands::Tool::ListCommand do
 
     it "content-dir flag takes a value" do
       meta = Hwaro::CLI::Commands::Tool::ListCommand.metadata
+      flag = meta.flags.find { |f| f.long == "--content-dir" }
+      flag.should_not be_nil
+      flag.not_nil!.takes_value.should be_true
+      flag.not_nil!.value_hint.should eq("DIR")
+    end
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::DoctorCommand do
+  describe ".metadata" do
+    it "returns correct command name" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.name.should eq("doctor")
+    end
+
+    it "returns a description" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.description.should_not be_empty
+    end
+
+    it "includes content-dir flag" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.flags.any? { |f| f.long == "--content-dir" }.should be_true
+    end
+
+    it "includes help flag" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.flags.any? { |f| f.long == "--help" }.should be_true
+    end
+
+    it "has no positional args" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.positional_args.should be_empty
+    end
+
+    it "has no positional choices" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.positional_choices.should be_empty
+    end
+
+    it "content-dir flag takes a value" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
       flag = meta.flags.find { |f| f.long == "--content-dir" }
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_true

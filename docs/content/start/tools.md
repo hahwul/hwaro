@@ -93,12 +93,12 @@ hwaro tool list all -c posts
 | drafts | Show only files with `draft = true` |
 | published | Show only files with `draft = false` or no draft field |
 
-### check — Dead Link Checker
+### deadlink — Dead Link Checker
 
 Check for broken external links in your content files.
 
 ```bash
-hwaro tool check
+hwaro tool deadlink
 ```
 
 This command:
@@ -120,6 +120,62 @@ Found 42 external links in 15 files
 ✗ https://broken-link.invalid (Connection refused)
 
 Results: 40 OK, 2 broken
+```
+
+### doctor — Site Diagnostics
+
+Diagnose configuration and content issues in your Hwaro site.
+
+```bash
+hwaro tool doctor
+
+# Check only a specific content directory
+hwaro tool doctor -c posts
+```
+
+This command checks:
+
+**Config diagnostics:**
+
+- `base_url` is not set
+- `title` is still the default value
+- `feeds.enabled` is true but `feeds.filename` is empty
+- `sitemap.changefreq` has an invalid value
+- `sitemap.priority` is out of range (0.0–1.0)
+- Duplicate taxonomy names
+- Invalid `search.format` value
+
+**Content diagnostics:**
+
+- Missing `title` in frontmatter
+- Missing `description` in frontmatter
+- Missing `date` in frontmatter
+- Images without alt text (`![](url)`)
+- Frontmatter parse errors (TOML/YAML)
+- Draft files (reported as info)
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Content directory to check |
+| -h, --help | Show help |
+
+**Example output:**
+
+```
+Running diagnostics...
+
+Config:
+  ⚠ config.toml: base_url is not set
+  ⚠ config.toml: feeds.enabled is true but feeds.filename is not set
+
+Content:
+  ⚠ content/blog/draft.md: Missing description in frontmatter
+  ℹ content/blog/draft.md: File is marked as draft
+  ⚠ content/about.md: Image missing alt text: ![](photo.jpg)
+
+Found 0 error(s), 3 warning(s), 1 info(s)
 ```
 
 ---

@@ -7,13 +7,15 @@
 # Available subcommands:
 #   convert  - Convert frontmatter between YAML and TOML formats
 #   list     - List content files by status
-#   check    - Check for dead links
+#   deadlink - Check for dead links
+#   doctor   - Diagnose config and content issues
 
 require "option_parser"
 require "../metadata"
 require "./tool/convert_command"
 require "./tool/list_command"
-require "./tool/check_command"
+require "./tool/deadlink_command"
+require "./tool/doctor_command"
 require "../../utils/logger"
 
 module Hwaro
@@ -35,7 +37,8 @@ module Hwaro
           [
             Tool::ConvertCommand.metadata,
             Tool::ListCommand.metadata,
-            Tool::CheckCommand.metadata,
+            Tool::DeadlinkCommand.metadata,
+            Tool::DoctorCommand.metadata,
           ]
         end
 
@@ -63,8 +66,10 @@ module Hwaro
             Tool::ConvertCommand.new.run(args)
           when "list"
             Tool::ListCommand.new.run(args)
-          when "check"
-            Tool::CheckCommand.new.run(args)
+          when "deadlink"
+            Tool::DeadlinkCommand.new.run(args)
+          when "doctor"
+            Tool::DoctorCommand.new.run(args)
           when "-h", "--help", "help"
             print_help
           else

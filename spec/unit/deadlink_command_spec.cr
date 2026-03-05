@@ -1,12 +1,12 @@
 require "../spec_helper"
 
-describe Hwaro::CLI::Commands::Tool::CheckCommand do
+describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
   describe "#find_links" do
     it "extracts standard markdown links" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "[Example](https://example.com)")
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(1)
@@ -19,7 +19,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "![Alt text](https://example.com/image.png)")
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(1)
@@ -38,7 +38,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
         MD
         File.write(File.join(dir, "test.md"), content)
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(3)
@@ -58,7 +58,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
         MD
         File.write(File.join(dir, "test.md"), content)
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(1)
@@ -68,7 +68,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
 
     it "returns empty array for empty directory" do
       Dir.mktmpdir do |dir|
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.should be_empty
@@ -79,7 +79,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "# Just a heading\nSome text without links.")
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.should be_empty
@@ -91,7 +91,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
         File.write(File.join(dir, "test.md"), "[Link](https://example.com)")
         File.write(File.join(dir, "test.txt"), "[Link](https://other.com)")
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(1)
@@ -105,7 +105,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
         FileUtils.mkdir_p(sub)
         File.write(File.join(sub, "nested.md"), "[Nested](https://nested.example.com)")
 
-        cmd = Hwaro::CLI::Commands::Tool::CheckCommand.new
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
         links.size.should eq(1)
@@ -116,7 +116,7 @@ describe Hwaro::CLI::Commands::Tool::CheckCommand do
 end
 
 # Test helper to expose private find_links method
-class Hwaro::CLI::Commands::Tool::CheckCommand
+class Hwaro::CLI::Commands::Tool::DeadlinkCommand
   def find_links_for_test(dir : String) : Array(Link)
     find_links(dir)
   end
