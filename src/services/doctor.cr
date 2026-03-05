@@ -18,7 +18,7 @@ module Hwaro
       YAML_DELIMITER = "---"
       TOML_DELIMITER = "+++"
 
-      VALID_CHANGEFREQS = %w[always hourly daily weekly monthly yearly never]
+      VALID_CHANGEFREQS    = %w[always hourly daily weekly monthly yearly never]
       VALID_SEARCH_FORMATS = %w[fuse_json fuse_javascript elasticlunr_json elasticlunr_javascript]
 
       @content_dir : String
@@ -156,11 +156,11 @@ module Hwaro
             result = {} of String => FrontmatterValue
             toml_data.each do |key, value|
               case raw = value.raw
-              when String then result[key] = raw
-              when Bool   then result[key] = raw
-              when Int64  then result[key] = raw
+              when String  then result[key] = raw
+              when Bool    then result[key] = raw
+              when Int64   then result[key] = raw
               when Float64 then result[key] = raw
-              when Time   then result[key] = raw.to_s
+              when Time    then result[key] = raw.to_s
               end
             end
             return result
