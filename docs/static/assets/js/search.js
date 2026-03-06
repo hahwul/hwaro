@@ -20,8 +20,10 @@ function initSearch() {
       fuse = new Fuse(data, {
         keys: ["title", "content", "description"],
         threshold: 0.3,
+        ignoreLocation: true,
         includeMatches: true,
         includeScore: true,
+        minMatchCharLength: 2,
       });
     })
     .catch((error) => console.error("Error loading search data:", error));
@@ -121,6 +123,17 @@ style.textContent = `
   .search-result-description {
     font-size: 14px;
     color: var(--text-muted);
+  }
+  .search-result-content {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.4;
+    opacity: 0.8;
+  }
+  .search-result-content mark {
+    background: var(--primary-dim);
+    color: var(--text);
   }
   #search-close {
     position: absolute;
@@ -239,24 +252,64 @@ function performSearch() {
   resultsDiv.innerHTML = results
     .map((result) => {
       const item = result.item;
+      const contentMatch = result.matches.find((m) => m.key === "content");
+      const descriptionMatch = result.matches.find(
+        (m) => m.key === "description",
+      );
+
+      let snippet = "";
+      if (item.description) {
+        snippet = `<div class="search-result-description">${highlightMatches(
+          item.description,
+          descriptionMatch,
+        )}</div>`;
+      }
+      if (contentMatch && contentMatch.indices && contentMatch.indices.length > 0) {
+        snippet += `<div class="search-result-content">${getContentSnippet(
+          item.content,
+          contentMatch,
+        )}</div>`;
+      }
+
       return `
       <div class="search-result" onclick="window.location.href='${item.url}'">
         <div class="search-result-title">${highlightMatches(
           item.title,
           result.matches.find((m) => m.key === "title"),
         )}</div>
-        ${
-          item.description
-            ? `<div class="search-result-description">${highlightMatches(
-                item.description,
-                result.matches.find((m) => m.key === "description"),
-              )}</div>`
-            : ""
-        }
+        ${snippet}
       </div>
     `;
     })
     .join("");
+}
+
+function getContentSnippet(text, match) {
+  if (!match || !match.indices || match.indices.length === 0) return "";
+
+  // Pick the longest (most relevant) match index
+  const best = match.indices.reduce((a, b) =>
+    (b[1] - b[0]) > (a[1] - a[0]) ? b : a
+  );
+  const [start, end] = best;
+  const snippetRadius = 60;
+  const snippetStart = Math.max(0, start - snippetRadius);
+  const snippetEnd = Math.min(text.length, end + 1 + snippetRadius);
+
+  let snippet = "";
+  if (snippetStart > 0) snippet += "...";
+  snippet += escapeHtml(text.slice(snippetStart, start));
+  snippet += "<mark>" + escapeHtml(text.slice(start, end + 1)) + "</mark>";
+  snippet += escapeHtml(text.slice(end + 1, snippetEnd));
+  if (snippetEnd < text.length) snippet += "...";
+
+  return snippet;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function highlightMatches(text, match) {
