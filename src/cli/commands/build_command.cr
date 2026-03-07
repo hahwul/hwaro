@@ -29,6 +29,8 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile for each phase"),
           FlagInfo.new(short: nil, long: "--debug", description: "Print debug information after build"),
           FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources"),
+          FlagInfo.new(short: nil, long: "--stream", description: "Enable streaming build to reduce memory usage"),
+          FlagInfo.new(short: nil, long: "--memory-limit", description: "Memory limit for streaming build (e.g. 2G, 512M)", takes_value: true, value_hint: "SIZE"),
           HELP_FLAG,
         ]
 
@@ -91,6 +93,8 @@ module Hwaro
           profile = false
           debug = false
           cache_busting = true
+          stream = false
+          memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -106,6 +110,8 @@ module Hwaro
             parser.on("--profile", "Show build timing profile for each phase") { profile = true }
             parser.on("--debug", "Print debug information after build") { debug = true }
             parser.on("--skip-cache-busting", "Disable cache busting query parameters on CSS/JS resources") { cache_busting = false }
+            parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
+            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -120,7 +126,9 @@ module Hwaro
             verbose: verbose,
             profile: profile,
             debug: debug,
-            cache_busting: cache_busting
+            cache_busting: cache_busting,
+            stream: stream,
+            memory_limit: memory_limit
           ), output_dir_explicit}, input_dir }
         end
       end

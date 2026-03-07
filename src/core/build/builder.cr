@@ -99,6 +99,8 @@ module Hwaro
             profile: options.profile,
             debug: options.debug,
             error_overlay: options.error_overlay,
+            stream: options.stream,
+            memory_limit: options.memory_limit,
           )
         end
 
@@ -301,6 +303,8 @@ module Hwaro
           profile : Bool = false,
           debug : Bool = false,
           error_overlay : Bool = false,
+          stream : Bool = false,
+          memory_limit : String? = nil,
         )
           # Load config once and reuse throughout the build
           config = Models::Config.load
@@ -317,6 +321,10 @@ module Hwaro
           end
 
           Logger.info "Building site..."
+          if stream || !memory_limit.nil?
+            batch = Config::Options::BuildOptions.new(stream: stream, memory_limit: memory_limit).batch_size
+            Logger.info "  Streaming mode enabled (batch size: #{batch})"
+          end
           start_time = Time.instant
 
           # Initialize profiler
@@ -337,6 +345,8 @@ module Hwaro
             profile: profile,
             debug: debug,
             error_overlay: error_overlay,
+            stream: stream,
+            memory_limit: memory_limit,
           )
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
@@ -405,6 +415,11 @@ module Hwaro
           # Phase: Generate
           result = execute_generate_phase(ctx, profiler)
           return result if result != Lifecycle::HookResult::Continue
+
+          if ctx.options.streaming?
+            ctx.all_pages.each { |page| page.raw_content = "" }
+            GC.collect
+          end
 
           # Phase: Write
           result = execute_write_phase(ctx, profiler)
@@ -542,7 +557,9 @@ module Hwaro
           result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
             global_vars = build_global_vars(site, ctx.options.cache_busting)
             @pages_by_path = build_pages_by_path(site)
-            count = if parallel && pages_to_build.size > 1
+            count = if ctx.options.streaming?
+                      render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size)
+                    elsif parallel && pages_to_build.size > 1
                       process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
                     else
                       process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
@@ -551,6 +568,42 @@ module Hwaro
           end
           profiler.end_phase
           result
+        end
+
+        private def render_streaming(
+          pages : Array(Models::Page),
+          site : Models::Site,
+          templates : Hash(String, String),
+          output_dir : String,
+          minify : Bool,
+          build_cache : Cache,
+          use_highlight : Bool,
+          verbose : Bool,
+          global_vars : Hash(String, Crinja::Value),
+          error_overlay : Bool,
+          parallel : Bool,
+          batch_size : Int32,
+        ) : Int32
+          total_count = 0
+          batch_num = 0
+
+          pages.each_slice(batch_size) do |batch|
+            batch_num += 1
+            Logger.debug "  Streaming batch #{batch_num} (#{batch.size} pages)"
+
+            count = if parallel && batch.size > 1
+                      process_files_parallel(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+                    else
+                      process_files_sequential(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+                    end
+            total_count += count
+
+            # Release rendered HTML to free memory
+            batch.each { |page| page.content = "" }
+            GC.collect
+          end
+
+          total_count
         end
 
         private def execute_generate_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult

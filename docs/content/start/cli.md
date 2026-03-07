@@ -103,9 +103,30 @@ hwaro build -i /path/to/my-site -o ./dist
 | --cache | Enable build caching (see below) |
 | --skip-highlighting | Disable syntax highlighting |
 | --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
+| --stream | Enable streaming build to reduce memory usage |
+| --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
 | -v, --verbose | Show detailed output |
 | --profile | Print phase-by-phase and per-template build timing |
 | --debug | Print debug information after build |
+
+**About `--stream` / `--memory-limit` (Streaming Build):**
+
+For sites with thousands of pages, loading all rendered HTML into memory at once can cause high memory usage. Streaming build processes pages in batches during the Render phase, releasing rendered HTML after each batch is written to disk.
+
+- `--stream` enables streaming with a default batch size of 50 pages.
+- `--memory-limit SIZE` enables streaming and calculates the batch size automatically based on the given limit (heuristic: ~50KB per page). Accepts `G`, `M`, `K` suffixes (e.g. `2G`, `512M`, `256K`).
+- You can also set the `HWARO_MEMORYLIMIT` environment variable as a fallback. The CLI flag overrides the env var.
+
+| `--stream` | `--memory-limit` | `HWARO_MEMORYLIMIT` | Result |
+|---|---|---|---|
+| - | - | - | Normal build |
+| yes | - | - | Streaming, batch=50 |
+| - | 2G | - | Streaming, batch≈20000 |
+| - | - | 1G | Streaming, batch≈10000 |
+| yes | 512M | - | Streaming, batch≈5000 |
+| - | 2G | 1G | CLI wins (2G) |
+
+The build output is identical — streaming only affects memory usage during the build.
 
 **About `--minify`:**
 
@@ -281,6 +302,13 @@ hwaro build -i ~/projects/my-blog
 
 # Build a remote project and output to current directory
 hwaro build -i ~/projects/my-blog -o ./output
+
+# Streaming build for large sites
+hwaro build --stream
+hwaro build --memory-limit 512M
+
+# Streaming build with env var
+HWARO_MEMORYLIMIT=1G hwaro build
 
 # Serve a site from another directory
 hwaro serve -i ~/projects/my-blog --open

@@ -16,4 +16,5 @@ Hwaro includes powerful features out of the box.
 - [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
 - [Cache Busting](/features/cache-busting/) — Content-hash based browser cache invalidation for CSS/JS resources
 - [Build Hooks](/features/build-hooks/) — Run custom shell commands before and after builds
+- [Streaming Build](/features/streaming-build/) — Reduce memory usage for large sites with batch rendering
 - [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers

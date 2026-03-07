@@ -20,6 +20,8 @@ describe Hwaro::CLI::Commands::BuildCommand do
       options.verbose.should be_false
       options.profile.should be_false
       options.debug.should be_false
+      options.stream.should be_false
+      options.memory_limit.should be_nil
     end
 
     it "parses output directory" do
@@ -116,6 +118,61 @@ describe Hwaro::CLI::Commands::BuildCommand do
       input_dir.should eq("/tmp/my-site")
       options.output_dir.should eq("dist")
       output_dir_explicit.should be_true
+    end
+
+    it "parses --stream flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--stream"])
+      options, _ = result
+
+      options.stream.should be_true
+      options.streaming?.should be_true
+    end
+
+    it "parses --memory-limit flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--memory-limit", "512M"])
+      options, _ = result
+
+      options.memory_limit.should eq("512M")
+      options.streaming?.should be_true
+    end
+
+    it "parses --stream with --memory-limit" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--stream", "--memory-limit", "2G"])
+      options, _ = result
+
+      options.stream.should be_true
+      options.memory_limit.should eq("2G")
+      options.streaming?.should be_true
+    end
+
+    it "uses HWARO_MEMORYLIMIT env var as fallback" do
+      ENV["HWARO_MEMORYLIMIT"] = "1G"
+      begin
+        cmd = Hwaro::CLI::Commands::BuildCommand.new
+        result, _ = cmd.parse_options([] of String)
+        options, _ = result
+
+        options.memory_limit.should eq("1G")
+        options.streaming?.should be_true
+      ensure
+        ENV.delete("HWARO_MEMORYLIMIT")
+      end
+    end
+
+    it "CLI --memory-limit overrides HWARO_MEMORYLIMIT env var" do
+      ENV["HWARO_MEMORYLIMIT"] = "1G"
+      begin
+        cmd = Hwaro::CLI::Commands::BuildCommand.new
+        result, _ = cmd.parse_options(["--memory-limit", "2G"])
+        options, _ = result
+
+        options.memory_limit.should eq("2G")
+      ensure
+        ENV.delete("HWARO_MEMORYLIMIT")
+      end
     end
   end
 end

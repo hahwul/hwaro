@@ -58,6 +58,8 @@
       url: /features/content-files/
     - title: Build Hooks
       url: /features/build-hooks/
+    - title: Streaming Build
+      url: /features/streaming-build/
     - title: LLMs.txt
       url: /features/llms-txt/
 - title: Deploy

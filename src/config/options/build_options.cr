@@ -14,6 +14,8 @@ module Hwaro
         property debug : Bool
         property error_overlay : Bool
         property cache_busting : Bool
+        property stream : Bool
+        property memory_limit : String?
 
         def initialize(
           @output_dir : String = "public",
@@ -28,7 +30,39 @@ module Hwaro
           @debug : Bool = false,
           @error_overlay : Bool = false,
           @cache_busting : Bool = true,
+          @stream : Bool = false,
+          @memory_limit : String? = nil,
         )
+        end
+
+        def streaming? : Bool
+          @stream || !@memory_limit.nil?
+        end
+
+        def batch_size : Int32
+          if limit = @memory_limit
+            bytes = parse_memory_limit(limit)
+            # Heuristic: ~50KB per page
+            size = (bytes / (50 * 1024)).to_i32
+            size < 1 ? 1 : size
+          else
+            50
+          end
+        end
+
+        private def parse_memory_limit(value : String) : Int64
+          case value.strip
+          when /^(\d+(?:\.\d+)?)\s*[Gg]$/
+            ($1.to_f * 1024 * 1024 * 1024).to_i64
+          when /^(\d+(?:\.\d+)?)\s*[Mm]$/
+            ($1.to_f * 1024 * 1024).to_i64
+          when /^(\d+(?:\.\d+)?)\s*[Kk]$/
+            ($1.to_f * 1024).to_i64
+          when /^(\d+)$/
+            $1.to_i64
+          else
+            raise "Invalid memory limit format: #{value}. Use format like '2G', '512M', or '256K'."
+          end
         end
       end
     end

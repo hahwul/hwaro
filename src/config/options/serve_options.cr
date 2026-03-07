@@ -46,6 +46,8 @@ module Hwaro
             debug: @debug,
             error_overlay: @error_overlay,
             cache_busting: @cache_busting,
+            stream: false,
+            memory_limit: nil,
           )
         end
       end
