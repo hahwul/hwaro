@@ -1,0 +1,299 @@
+/* =============================================================================
+   Content Typography
+   ============================================================================= */
+
+.docs-main > h1:first-child {
+    font-family: var(--font-sans);
+    font-size: 1.85rem;
+    margin: 0 0 0.75rem 0;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    line-height: 1.25;
+}
+
+.docs-main h1 {
+    font-family: var(--font-sans);
+    font-size: 1.6rem;
+    margin: 2.5rem 0 1rem 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+.docs-main h2 {
+    font-family: var(--font-sans);
+    font-size: 1.25rem;
+    margin: 2.5rem 0 0.75rem 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+.docs-main h3 {
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    margin: 2rem 0 0.6rem 0;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.docs-main h4 {
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    margin: 1.5rem 0 0.5rem 0;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.docs-main p {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+    line-height: 1.75;
+}
+
+.docs-main ul,
+.docs-main ol {
+    margin: 0 0 1rem 0;
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
+}
+
+.docs-main li {
+    margin-bottom: 0.35rem;
+    line-height: 1.7;
+}
+
+.docs-main li::marker {
+    color: var(--text-dim);
+}
+
+.docs-main strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.docs-main img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+/* =============================================================================
+   Heading Anchor Links
+   ============================================================================= */
+
+.docs-main h1[id],
+.docs-main h2[id],
+.docs-main h3[id],
+.docs-main h4[id],
+.docs-main h5[id],
+.docs-main h6[id] {
+    position: relative;
+    scroll-margin-top: calc(var(--header-h) + 1.5rem);
+}
+
+.heading-anchor {
+    opacity: 0;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 0.15rem 0.3rem;
+    margin-left: 0.4rem;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+.heading-anchor svg {
+    width: 14px;
+    height: 14px;
+}
+
+.heading-anchor:hover {
+    color: var(--primary);
+    border-color: var(--border);
+    background: var(--bg-hover);
+    border-bottom-color: var(--border);
+}
+
+.docs-main h1:hover .heading-anchor,
+.docs-main h2:hover .heading-anchor,
+.docs-main h3:hover .heading-anchor,
+.docs-main h4:hover .heading-anchor,
+.docs-main h5:hover .heading-anchor,
+.docs-main h6:hover .heading-anchor {
+    opacity: 1;
+}
+
+.heading-anchor.copied {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+/* =============================================================================
+   Code Blocks
+   ============================================================================= */
+
+.code-wrapper {
+    position: relative;
+    margin: 0.75rem 0 1rem 0;
+}
+
+.code-wrapper pre {
+    margin: 0;
+}
+
+.code-copy-btn {
+    font-family: var(--font-mono);
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    opacity: 0;
+    transition: all 0.15s ease;
+    border-radius: 6px;
+}
+
+.code-copy-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.code-wrapper:hover .code-copy-btn {
+    opacity: 1;
+}
+
+.code-copy-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+    border-color: var(--border-light);
+}
+
+.code-copy-btn.copied {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+/* Inline code */
+code {
+    font-family: var(--font-mono);
+    background: var(--bg-subtle);
+    padding: 0.15rem 0.4rem;
+    font-size: 0.85em;
+    color: var(--primary-light);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+}
+
+pre {
+    font-family: var(--font-mono);
+    background: var(--code-bg);
+    padding: 0.8rem 1.25rem;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 0.75rem 0 1rem 0;
+    position: relative;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+    border: none;
+    border-radius: 0;
+    font-size: 0.8rem;
+    line-height: 1.65;
+}
+
+/* =============================================================================
+   Tables
+   ============================================================================= */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem 0;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+th,
+td {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    background: var(--bg-elevated);
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+}
+
+td {
+    color: var(--text-secondary);
+}
+
+td code {
+    font-size: 0.8rem;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover td {
+    background: var(--bg-hover);
+}
+
+/* =============================================================================
+   Blockquote
+   ============================================================================= */
+
+blockquote {
+    margin: 1rem 0 1.5rem 0;
+    padding: 0.75rem 1.25rem;
+    border-left: 3px solid var(--primary);
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    border-radius: 0 8px 8px 0;
+    font-style: normal;
+}
+
+blockquote p {
+    margin: 0;
+}
+
+blockquote p + p {
+    margin-top: 0.5rem;
+}
+
+/* =============================================================================
+   Horizontal Rule
+   ============================================================================= */
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+}

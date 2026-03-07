@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <title>Configuration - Hwaro</title>
+  <meta property="og:title" content="Configuration">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/start/config/">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Configuration">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/02-base.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/03-layout.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/04-content.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/05-components.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/06-responsive.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/07-landing.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css?v=a11e5b22">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/" class="active">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/start/">Overview</a></li>
+      
+      <li><a href="/start/installation/">Installation</a></li>
+      
+      <li><a href="/start/first-site/">First Site</a></li>
+      
+      <li><a href="/start/cli/">CLI</a></li>
+      
+      <li><a href="/start/config/" class="active">Configuration</a></li>
+      
+      <li><a href="/start/tools/">Tools & Completion</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/writing/">Overview</a></li>
+      
+      <li><a href="/writing/pages/">Pages</a></li>
+      
+      <li><a href="/writing/sections/">Sections</a></li>
+      
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/templates/">Overview</a></li>
+      
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      
+      <li><a href="/templates/functions/">Functions</a></li>
+      
+      <li><a href="/templates/filters/">Filters</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/features/">Overview</a></li>
+      
+      <li><a href="/features/seo/">SEO</a></li>
+      
+      <li><a href="/features/search/">Search</a></li>
+      
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      
+      <li><a href="/features/pagination/">Pagination</a></li>
+      
+      <li><a href="/features/multilingual/">Multilingual</a></li>
+      
+      <li><a href="/features/auto-includes/">Auto Includes</a></li>
+      
+      <li><a href="/features/content-files/">Content Files</a></li>
+      
+      <li><a href="/features/build-hooks/">Build Hooks</a></li>
+      
+      <li><a href="/features/streaming-build/">Streaming Build</a></li>
+      
+      <li><a href="/features/llms-txt/">LLMs.txt</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/deploy/">Overview</a></li>
+      
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      <li><a href="/deploy/docker/">Docker</a></li>
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Configuration</h1>
+    <p>All site configuration lives in <code>config.toml</code> at the project root.</p>
+<h2 id="site-settings">Site Settings</h2>
+<pre><code class="language-toml hljs">title = &quot;My Site&quot;
+description = &quot;Site description for SEO&quot;
+base_url = &quot;https://example.com&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>string</td>
+<td>Site title</td>
+</tr>
+<tr>
+<td>description</td>
+<td>string</td>
+<td>Site description</td>
+</tr>
+<tr>
+<td>base_url</td>
+<td>string</td>
+<td>Production URL (no trailing slash)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="build-options">Build Options</h2>
+<pre><code class="language-toml hljs">[build]
+output_dir = &quot;public&quot;
+drafts = false
+parallel = true
+cache = false
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>output_dir</td>
+<td>string</td>
+<td>&quot;public&quot;</td>
+<td>Output directory</td>
+</tr>
+<tr>
+<td>drafts</td>
+<td>bool</td>
+<td>false</td>
+<td>Include draft content</td>
+</tr>
+<tr>
+<td>parallel</td>
+<td>bool</td>
+<td>true</td>
+<td>Parallel processing</td>
+</tr>
+<tr>
+<td>cache</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable build caching</td>
+</tr>
+</tbody>
+</table>
+<h3 id="build-hooks">Build Hooks</h3>
+<p>Run commands before/after build:</p>
+<pre><code class="language-toml hljs">[build]
+hooks.pre = [&quot;npm install&quot;, &quot;npx tsc&quot;]
+hooks.post = [&quot;npm run minify&quot;]
+</code></pre>
+<h2 id="markdown">Markdown</h2>
+<pre><code class="language-toml hljs">[markdown]
+safe = false
+lazy_loading = true
+emoji = true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>safe</td>
+<td>bool</td>
+<td>false</td>
+<td>Strip raw HTML from markdown</td>
+</tr>
+<tr>
+<td>lazy_loading</td>
+<td>bool</td>
+<td>false</td>
+<td>Automatically add <code>loading=&quot;lazy&quot;</code> to images</td>
+</tr>
+<tr>
+<td>emoji</td>
+<td>bool</td>
+<td>false</td>
+<td>Convert emoji shortcodes (e.g. <code>:smile:</code>) to emoji characters</td>
+</tr>
+</tbody>
+</table>
+<h2 id="permalinks">Permalinks</h2>
+<p>Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.</p>
+<pre><code class="language-toml hljs">[permalinks]
+&quot;old/posts&quot; = &quot;posts&quot;
+&quot;2023/drafts&quot; = &quot;archive/2023&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Source (Directory)</th>
+<th>Target (URL Path)</th>
+<th>Example Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content/old/posts/a.md</code></td>
+<td><code>posts/</code></td>
+<td><code>/old/posts/a/</code> -&gt; <code>/posts/a/</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="seo">SEO</h2>
+<h3 id="feeds">Feeds</h3>
+<pre><code class="language-toml hljs">[feeds]
+enabled = true
+type = &quot;rss&quot;
+limit = 20
+truncate = 0
+filename = &quot;feed.xml&quot;
+sections = []
+default_language_only = true   # true: main feed = default language only, false: all languages
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable feed generation</td>
+</tr>
+<tr>
+<td>type</td>
+<td>string</td>
+<td>&quot;rss&quot;</td>
+<td>Feed format (<code>&quot;rss&quot;</code> or <code>&quot;atom&quot;</code>)</td>
+</tr>
+<tr>
+<td>limit</td>
+<td>int</td>
+<td>10</td>
+<td>Maximum number of items in the feed</td>
+</tr>
+<tr>
+<td>truncate</td>
+<td>int</td>
+<td>0</td>
+<td>Truncate content to N characters (0 = no truncation)</td>
+</tr>
+<tr>
+<td>filename</td>
+<td>string</td>
+<td>&quot;&quot;</td>
+<td>Output filename (auto-determined if empty)</td>
+</tr>
+<tr>
+<td>sections</td>
+<td>array</td>
+<td>[]</td>
+<td>Limit feed to specific sections</td>
+</tr>
+<tr>
+<td>default_language_only</td>
+<td>bool</td>
+<td>true</td>
+<td>Only include default language in main feed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sitemap">Sitemap</h3>
+<pre><code class="language-toml hljs">[sitemap]
+enabled = true
+filename = &quot;sitemap.xml&quot;
+changefreq = &quot;weekly&quot;
+priority = 0.5
+exclude = [&quot;/private&quot;, &quot;/drafts&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable sitemap generation</td>
+</tr>
+<tr>
+<td>filename</td>
+<td>string</td>
+<td>&quot;sitemap.xml&quot;</td>
+<td>Output filename</td>
+</tr>
+<tr>
+<td>changefreq</td>
+<td>string</td>
+<td>&quot;weekly&quot;</td>
+<td>Default change frequency (<code>always</code>, <code>hourly</code>, <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>, <code>never</code>)</td>
+</tr>
+<tr>
+<td>priority</td>
+<td>float</td>
+<td>0.5</td>
+<td>Default priority (0.0 to 1.0)</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>array</td>
+<td>[]</td>
+<td>Exclude paths (prefixes) from sitemap</td>
+</tr>
+</tbody>
+</table>
+<h3 id="robotstxt">Robots.txt</h3>
+<pre><code class="language-toml hljs">[robots]
+enabled = true
+
+[[robots.rules]]
+user_agent = &quot;*&quot;
+allow = [&quot;/&quot;]
+disallow = [&quot;/private&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>true</td>
+<td>Enable robots.txt generation</td>
+</tr>
+<tr>
+<td>filename</td>
+<td>string</td>
+<td>&quot;robots.txt&quot;</td>
+<td>Output filename</td>
+</tr>
+<tr>
+<td>rules</td>
+<td>array</td>
+<td>[]</td>
+<td>List of robot rules</td>
+</tr>
+</tbody>
+</table>
+<p>Each rule in <code>rules</code> supports:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>user_agent</td>
+<td>string</td>
+<td>User-agent to match (e.g. <code>&quot;*&quot;</code>, <code>&quot;Googlebot&quot;</code>)</td>
+</tr>
+<tr>
+<td>allow</td>
+<td>array</td>
+<td>Paths to allow</td>
+</tr>
+<tr>
+<td>disallow</td>
+<td>array</td>
+<td>Paths to disallow</td>
+</tr>
+</tbody>
+</table>
+<h3 id="opengraph">OpenGraph</h3>
+<pre><code class="language-toml hljs">[og]
+default_image = &quot;/images/og.png&quot;
+type = &quot;website&quot;
+twitter_card = &quot;summary_large_image&quot;
+twitter_site = &quot;@username&quot;
+twitter_creator = &quot;@authorname&quot;
+fb_app_id = &quot;your_fb_app_id&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default_image</td>
+<td>string</td>
+<td>—</td>
+<td>Fallback image when page has none</td>
+</tr>
+<tr>
+<td>type</td>
+<td>string</td>
+<td>&quot;article&quot;</td>
+<td>OpenGraph type (<code>website</code>, <code>article</code>)</td>
+</tr>
+<tr>
+<td>twitter_card</td>
+<td>string</td>
+<td>&quot;summary_large_image&quot;</td>
+<td>Twitter card type (<code>summary</code>, <code>summary_large_image</code>)</td>
+</tr>
+<tr>
+<td>twitter_site</td>
+<td>string</td>
+<td>—</td>
+<td>Site's Twitter handle</td>
+</tr>
+<tr>
+<td>twitter_creator</td>
+<td>string</td>
+<td>—</td>
+<td>Author's Twitter handle</td>
+</tr>
+<tr>
+<td>fb_app_id</td>
+<td>string</td>
+<td>—</td>
+<td>Facebook App ID</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/seo/">SEO</a> for template usage and output examples.</p>
+<h2 id="llmstxt">LLMs.txt</h2>
+<p>Generate instruction files for AI/LLM crawlers:</p>
+<pre><code class="language-toml hljs">[llms]
+enabled = true
+filename = &quot;llms.txt&quot;
+instructions = &quot;This site's content is provided under the MIT license.&quot;
+full_enabled = true
+full_filename = &quot;llms-full.txt&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate <code>llms.txt</code></td>
+</tr>
+<tr>
+<td>filename</td>
+<td>string</td>
+<td>&quot;llms.txt&quot;</td>
+<td>Output filename</td>
+</tr>
+<tr>
+<td>instructions</td>
+<td>string</td>
+<td>&quot;&quot;</td>
+<td>Instructions text for LLM crawlers</td>
+</tr>
+<tr>
+<td>full_enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate full content version (<code>llms-full.txt</code>)</td>
+</tr>
+<tr>
+<td>full_filename</td>
+<td>string</td>
+<td>&quot;llms-full.txt&quot;</td>
+<td>Full version filename</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/llms-txt/">LLMs.txt</a> for details.</p>
+<h2 id="search">Search</h2>
+<pre><code class="language-toml hljs">[search]
+enabled = true
+format = &quot;fuse_json&quot;
+fields = [&quot;title&quot;, &quot;content&quot;]
+filename = &quot;search.json&quot;
+exclude = [&quot;/private&quot;, &quot;/drafts&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate search index</td>
+</tr>
+<tr>
+<td>format</td>
+<td>string</td>
+<td>&quot;fuse_json&quot;</td>
+<td>Search index format</td>
+</tr>
+<tr>
+<td>fields</td>
+<td>array</td>
+<td>[&quot;title&quot;, &quot;content&quot;]</td>
+<td>Fields to include in index</td>
+</tr>
+<tr>
+<td>filename</td>
+<td>string</td>
+<td>&quot;search.json&quot;</td>
+<td>Output filename</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>array</td>
+<td>[]</td>
+<td>Exclude paths (prefixes) from search index</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pagination">Pagination</h2>
+<p>Site-level pagination defaults. These apply when sections enable pagination via front matter.</p>
+<pre><code class="language-toml hljs">[pagination]
+enabled = false
+per_page = 10
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable pagination globally</td>
+</tr>
+<tr>
+<td>per_page</td>
+<td>int</td>
+<td>10</td>
+<td>Default items per page</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/pagination/">Pagination</a> for section-level configuration and template usage.</p>
+<h2 id="taxonomies">Taxonomies</h2>
+<pre><code class="language-toml hljs">[[taxonomies]]
+name = &quot;tags&quot;
+feed = true
+paginate = 10
+
+[[taxonomies]]
+name = &quot;categories&quot;
+feed = true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>—</td>
+<td>Taxonomy name (used in front matter)</td>
+</tr>
+<tr>
+<td>feed</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate RSS feed for each term</td>
+</tr>
+<tr>
+<td>sitemap</td>
+<td>bool</td>
+<td>true</td>
+<td>Include taxonomy pages in sitemap</td>
+</tr>
+<tr>
+<td>paginate</td>
+<td>int</td>
+<td>—</td>
+<td>Pages per pagination page</td>
+</tr>
+</tbody>
+</table>
+<h2 id="syntax-highlighting">Syntax Highlighting</h2>
+<pre><code class="language-toml hljs">[highlight]
+enabled = true
+theme = &quot;github-dark&quot;
+use_cdn = true
+</code></pre>
+<h2 id="auto-includes">Auto Includes</h2>
+<p>Automatically include CSS/JS from static directories:</p>
+<pre><code class="language-toml hljs">[auto_includes]
+enabled = true
+dirs = [&quot;assets/css&quot;, &quot;assets/js&quot;]
+</code></pre>
+<h2 id="multilingual">Multilingual</h2>
+<pre><code class="language-toml hljs">default_language = &quot;en&quot;
+
+[languages.en]
+language_name = &quot;English&quot;
+weight = 1
+
+[languages.ko]
+language_name = &quot;한국어&quot;
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = [&quot;tags&quot;, &quot;categories&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default_language</td>
+<td>string</td>
+<td>&quot;en&quot;</td>
+<td>Default language code</td>
+</tr>
+<tr>
+<td>language_name</td>
+<td>string</td>
+<td>—</td>
+<td>Human-readable language name</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>int</td>
+<td>0</td>
+<td>Sort order (lower = first)</td>
+</tr>
+<tr>
+<td>generate_feed</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate RSS feed for this language</td>
+</tr>
+<tr>
+<td>build_search_index</td>
+<td>bool</td>
+<td>false</td>
+<td>Include in search index</td>
+</tr>
+<tr>
+<td>taxonomies</td>
+<td>array</td>
+<td>[]</td>
+<td>Taxonomies for this language</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/multilingual/">Multilingual</a> for content structure and template usage.</p>
+<h2 id="deployment">Deployment</h2>
+<p>Configure deployment targets for the <code>hwaro deploy</code> command.</p>
+<pre><code class="language-toml hljs">[deployment]
+confirm = false
+dry_run = false
+force = false
+max_deletes = 256
+source_dir = &quot;public&quot;
+
+[[deployment.targets]]
+name = &quot;prod&quot;
+url = &quot;file:///var/www/mysite&quot;
+
+[[deployment.targets]]
+name = &quot;s3&quot;
+url = &quot;s3://your-bucket&quot;
+command = &quot;aws s3 sync {source}/ {url} --delete&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>confirm</td>
+<td>bool</td>
+<td>false</td>
+<td>Ask for confirmation before deploying</td>
+</tr>
+<tr>
+<td>dry_run</td>
+<td>bool</td>
+<td>false</td>
+<td>Show changes without writing</td>
+</tr>
+<tr>
+<td>force</td>
+<td>bool</td>
+<td>false</td>
+<td>Force upload (ignore file comparisons)</td>
+</tr>
+<tr>
+<td>max_deletes</td>
+<td>int</td>
+<td>256</td>
+<td>Maximum deletions allowed (-1 to disable)</td>
+</tr>
+<tr>
+<td>source_dir</td>
+<td>string</td>
+<td>&quot;public&quot;</td>
+<td>Source directory to deploy</td>
+</tr>
+</tbody>
+</table>
+<h3 id="target-options">Target Options</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>Target identifier</td>
+</tr>
+<tr>
+<td>url</td>
+<td>string</td>
+<td>Destination URL or path</td>
+</tr>
+<tr>
+<td>command</td>
+<td>string</td>
+<td>Custom deploy command (overrides URL-based deployment)</td>
+</tr>
+<tr>
+<td>include</td>
+<td>string</td>
+<td>Glob pattern for files to include</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>string</td>
+<td>Glob pattern for files to exclude</td>
+</tr>
+<tr>
+<td>strip_index_html</td>
+<td>bool</td>
+<td>Remove <code>index.html</code> from paths</td>
+</tr>
+</tbody>
+</table>
+<p>Custom commands support placeholders: <code>{source}</code>, <code>{url}</code>, <code>{target}</code>.</p>
+<h2 id="content-files">Content Files</h2>
+<p>Publish non-Markdown files from <code>content/</code> to the output directory:</p>
+<pre><code class="language-toml hljs">[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;, &quot;webp&quot;, &quot;pdf&quot;]
+disallow_extensions = [&quot;psd&quot;, &quot;ai&quot;]
+disallow_paths = [&quot;drafts/**&quot;, &quot;**/_*&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>allow_extensions</td>
+<td>array</td>
+<td>[]</td>
+<td>File extensions to publish</td>
+</tr>
+<tr>
+<td>disallow_extensions</td>
+<td>array</td>
+<td>[]</td>
+<td>File extensions to exclude</td>
+</tr>
+<tr>
+<td>disallow_paths</td>
+<td>array</td>
+<td>[]</td>
+<td>Glob patterns for paths to exclude</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/content-files/">Content Files</a> for details.</p>
+<h2 id="full-example">Full Example</h2>
+<pre><code class="language-toml hljs">title = &quot;My Blog&quot;
+description = &quot;A blog about programming&quot;
+base_url = &quot;https://myblog.com&quot;
+default_language = &quot;en&quot;
+
+[build]
+output_dir = &quot;public&quot;
+drafts = false
+parallel = true
+hooks.pre = [&quot;npm ci&quot;]
+hooks.post = [&quot;npm run optimize&quot;]
+
+[markdown]
+safe = false
+lazy_loading = true
+emoji = false
+
+[permalinks]
+&quot;old/posts&quot; = &quot;posts&quot;
+
+[feeds]
+enabled = true
+limit = 20
+
+[sitemap]
+enabled = true
+changefreq = &quot;weekly&quot;
+priority = 0.5
+
+[pagination]
+enabled = false
+per_page = 10
+
+[robots]
+enabled = true
+
+[llms]
+enabled = true
+instructions = &quot;Content under MIT license.&quot;
+full_enabled = true
+
+[og]
+default_image = &quot;/images/og-default.png&quot;
+twitter_card = &quot;summary_large_image&quot;
+twitter_site = &quot;@myblog&quot;
+twitter_creator = &quot;@myblog&quot;
+
+[search]
+enabled = true
+format = &quot;fuse_json&quot;
+fields = [&quot;title&quot;, &quot;content&quot;]
+
+[highlight]
+enabled = true
+theme = &quot;github-dark&quot;
+use_cdn = true
+
+[auto_includes]
+enabled = true
+dirs = [&quot;assets/css&quot;, &quot;assets/js&quot;]
+
+[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;, &quot;webp&quot;]
+
+[[taxonomies]]
+name = &quot;tags&quot;
+feed = true
+
+[[taxonomies]]
+name = &quot;categories&quot;
+
+[deployment]
+source_dir = &quot;public&quot;
+
+[[deployment.targets]]
+name = &quot;prod&quot;
+url = &quot;file:///var/www/myblog&quot;
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/">Features</a> — All built-in features</li>
+<li><a href="/start/cli/">CLI</a> — Command-line options that override config</li>
+<li><a href="/features/multilingual/">Multilingual</a> — Multilingual configuration details</li>
+<li><a href="/features/llms-txt/">LLMs.txt</a> — LLM instructions configuration</li>
+<li><a href="/features/build-hooks/">Build Hooks</a> — Pre/post build commands</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#site-settings">Site Settings</a></li><li><a href="#build-options">Build Options</a><ul><li><a href="#build-hooks">Build Hooks</a></li></ul></li><li><a href="#markdown">Markdown</a></li><li><a href="#permalinks">Permalinks</a></li><li><a href="#seo">SEO</a><ul><li><a href="#feeds">Feeds</a></li><li><a href="#sitemap">Sitemap</a></li><li><a href="#robotstxt">Robots.txt</a></li><li><a href="#opengraph">OpenGraph</a></li></ul></li><li><a href="#llmstxt">LLMs.txt</a></li><li><a href="#search">Search</a></li><li><a href="#pagination">Pagination</a></li><li><a href="#taxonomies">Taxonomies</a></li><li><a href="#syntax-highlighting">Syntax Highlighting</a></li><li><a href="#auto-includes">Auto Includes</a></li><li><a href="#multilingual">Multilingual</a></li><li><a href="#deployment">Deployment</a><ul><li><a href="#target-options">Target Options</a></li></ul></li><li><a href="#content-files">Content Files</a></li><li><a href="#full-example">Full Example</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js?v=a11e5b22"></script>
+<script src="/assets/js/02-shortcodes-market.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaid.min.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaidinit.js?v=a11e5b22"></script>
+<script src="/assets/js/search.js?v=a11e5b22"></script>
+</body>
+</html>

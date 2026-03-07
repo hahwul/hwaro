@@ -1,0 +1,6369 @@
+# Hwaro
+Fast and lightweight static site generator built with Crystal
+
+
+This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license.
+
+---
+
+Title: Hwaro Documentation
+URL: /
+Source: content/index.md
+
+Hwaro(화로) is a fast, lightweight static site generator built with Crystal.
+
+## Features
+
+- **Fast builds** — Parallel processing with smart caching
+- **Markdown content** — Write with TOML or YAML front matter
+- **Jinja2 templates** — Flexible templating with Crinja
+- **SEO built-in** — Sitemaps, RSS feeds, OpenGraph, LLMs.txt
+- **Multilingual** — Translation linking, hreflang tags
+- **Extensible** — Lifecycle hooks, build hooks, custom processors
+- **Developer tools** — Shell completion, content lister, link checker
+
+## Quick Start
+
+```bash
+# Install
+git clone https://github.com/hahwul/hwaro
+cd hwaro && shards build --release
+
+# Create site
+./bin/hwaro init my-site --scaffold blog
+cd my-site
+
+# Start server
+hwaro serve
+```
+
+Open `http://localhost:3000` to preview your site.
+
+## Documentation
+
+<div class="doc-grid">
+
+### [Start](/start/)
+Installation, first site, CLI commands, and configuration.
+
+### [Writing](/writing/)
+Pages, sections, taxonomies, and shortcodes.
+
+### [Templates](/templates/)
+Data model, syntax, functions, and filters.
+
+### [Features](/features/)
+SEO, search, syntax highlighting, pagination, multilingual, and more.
+
+### [Deploy](/deploy/)
+Build and deploy to GitHub Pages and other hosts.
+
+</div>
+
+## How It Works
+
+```
+content/           →   public/
+├── index.md            ├── index.html
+├── about.md            ├── about/index.html
+└── blog/               └── blog/
+    ├── _index.md           ├── index.html
+    └── post.md             └── post/index.html
+```
+
+1. Write content in `content/` using Markdown
+2. Design templates in `templates/` using Jinja2
+3. Build with `hwaro build`
+4. Deploy `public/` anywhere
+
+---
+
+Title: Deploy
+URL: /deploy/
+Source: content/deploy/_index.md
+
+Deploy your Hwaro site to any static hosting provider.
+
+## Built-in Deploy Command
+
+Hwaro includes a built-in `hwaro deploy` command for deploying to configured targets:
+
+```bash
+# Deploy to default target
+hwaro deploy
+
+# Deploy to a specific target
+hwaro deploy prod
+
+# Preview changes without deploying
+hwaro deploy --dry-run
+```
+
+Configure deployment targets in `config.toml`:
+
+```toml
+[deployment]
+source_dir = "public"
+
+[[deployment.targets]]
+name = "prod"
+url = "file:///var/www/mysite"
+
+[[deployment.targets]]
+name = "s3"
+url = "s3://my-bucket"
+command = "aws s3 sync {source}/ {url} --delete"
+```
+
+See [CLI Reference](/start/cli/#deploy) for all deploy options and [Configuration](/start/config/#deployment) for target setup.
+
+## Build for Production
+
+```bash
+hwaro build
+```
+
+This generates static files in `public/`.
+
+### Optional: Minification
+
+You can optionally minify output files:
+
+```bash
+hwaro build --minify
+```
+
+This performs conservative optimization:
+- **HTML**: Removes comments and trailing whitespace
+- **JSON/XML**: Compacts whitespace for smaller files
+
+All code blocks and content structure are preserved. See [CLI Reference](/start/cli/#build) for details.
+
+## Hosting Options
+
+Static sites can be deployed anywhere:
+
+- [GitHub Pages](/deploy/github-pages/) — Free hosting from GitHub
+- [Docker](/deploy/docker/) — Containerized deployment
+- [GitLab CI](/deploy/gitlab-ci/) — GitLab Pages via CI/CD
+- **Netlify** — Drag and drop or Git integration
+- **Vercel** — Zero-config deployments
+- **Cloudflare Pages** — Fast global CDN
+- **AWS S3 + CloudFront** — Scalable hosting
+- **Any web server** — Nginx, Apache, etc.
+
+## General Steps
+
+1. Build the site: `hwaro build`
+2. Upload `public/` directory to your host (or use `hwaro deploy`)
+3. Configure your domain
+
+---
+
+Title: Docker
+URL: /deploy/docker/
+Source: content/deploy/docker/index.md
+
+Deploy your Hwaro site using Docker.
+
+## Official Image
+
+The official Docker image is available at `ghcr.io/hahwul/hwaro`.
+
+```bash
+docker pull ghcr.io/hahwul/hwaro:latest
+```
+
+## Multi-stage Build
+
+You can use a multi-stage build to compile your site and serve it with a lightweight web server like Nginx.
+
+Create a `Dockerfile` in your project root:
+
+```dockerfile
+# Stage 1: Build the site
+FROM ghcr.io/hahwul/hwaro:latest AS builder
+
+WORKDIR /site
+COPY . .
+
+# Build the site
+RUN hwaro build
+
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
+
+# Copy built assets from builder stage
+COPY --from=builder /site/public /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Build and Run
+
+```bash
+# Build the image
+docker build -t my-hwaro-site .
+
+# Run the container
+docker run -d -p 8080:80 my-hwaro-site
+```
+
+Visit `http://localhost:8080` to see your site.
+
+## CLI Usage
+
+You can run Hwaro commands directly using the Docker image without installing Crystal or Hwaro locally.
+
+```bash
+# Build the site
+docker run --rm -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro build
+
+# Interactive shell
+docker run --rm -it -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro /bin/sh
+```
+
+---
+
+Title: GitHub Pages
+URL: /deploy/github-pages/
+Source: content/deploy/github-pages/index.md
+
+Deploy your Hwaro site to GitHub Pages for free hosting.
+
+## Prerequisites
+
+- GitHub repository
+- Hwaro site ready to build
+
+## Method 1: GitHub Actions (Recommended)
+
+Use the official [`hahwul/hwaro`](https://github.com/hahwul/hwaro) action to build and deploy without installing Hwaro manually.
+
+### Create Workflow
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Only
+        uses: hahwul/hwaro@main
+        with:
+          build_only: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build and Deploy
+        uses: hahwul/hwaro@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `build_dir` | Directory containing the Hwaro site | `.` (repository root) |
+| `build_only` | Only build without deploying | `false` |
+| `token` | GitHub token for deployment | — |
+
+If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
+
+```yaml
+- name: Build and Deploy
+  uses: hahwul/hwaro@main
+  with:
+    build_dir: "docs"
+    token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Configure GitHub Pages
+
+1. Go to repository **Settings** → **Pages**
+2. Under "Build and deployment", select **Deploy from a branch**
+3. Choose `gh-pages` branch, `/ (root)` folder
+4. Push to `main` branch to trigger deployment
+
+### Set Base URL
+
+Update `config.toml`:
+
+```toml
+# For user/org site (username.github.io)
+base_url = "https://username.github.io"
+
+# For project site (username.github.io/repo)
+base_url = "https://username.github.io/repo"
+```
+
+## Method 2: Deploy from Branch
+
+### Build Locally
+
+```bash
+hwaro build
+```
+
+### Push to gh-pages Branch
+
+```bash
+# Create orphan branch
+git checkout --orphan gh-pages
+
+# Remove all files
+git rm -rf .
+
+# Copy built site
+cp -r public/* .
+
+# Commit and push
+git add .
+git commit -m "Deploy site"
+git push origin gh-pages --force
+
+# Return to main branch
+git checkout main
+```
+
+### Configure GitHub Pages
+
+1. Go to repository **Settings** → **Pages**
+2. Under "Build and deployment", select **Deploy from a branch**
+3. Choose `gh-pages` branch, `/ (root)` folder
+4. Click **Save**
+
+## Custom Domain
+
+### Configure DNS
+
+Add a CNAME record pointing to `username.github.io`:
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | www | username.github.io |
+| A | @ | 185.199.108.153 |
+| A | @ | 185.199.109.153 |
+| A | @ | 185.199.110.153 |
+| A | @ | 185.199.111.153 |
+
+### Add CNAME File
+
+Create `static/CNAME`:
+
+```
+www.yourdomain.com
+```
+
+### Update Config
+
+```toml
+base_url = "https://www.yourdomain.com"
+```
+
+### Enable HTTPS
+
+1. Go to repository **Settings** → **Pages**
+2. Check **Enforce HTTPS**
+
+## Troubleshooting
+
+### 404 Errors
+
+- Check `base_url` matches your GitHub Pages URL
+- Ensure CNAME file is in `static/` directory
+- Wait a few minutes for deployment to complete
+
+### Assets Not Loading
+
+- Verify `base_url` has no trailing slash
+- Check asset paths use `{{ base_url }}` prefix
+
+### Build Failures
+
+- Review Actions logs for error messages
+- Check that `build_dir` points to the correct directory
+
+## Example Repository Structure
+
+```
+my-site/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml
+├── content/
+├── templates/
+├── static/
+│   └── CNAME
+├── config.toml
+└── README.md
+```
+
+---
+
+Title: GitLab CI
+URL: /deploy/gitlab-ci/
+Source: content/deploy/gitlab-ci/index.md
+
+Deploy your Hwaro site using GitLab CI/CD.
+
+## Configuration
+
+Add `.gitlab-ci.yml` to your repository:
+
+```yaml
+image: ghcr.io/hahwul/hwaro:latest
+
+pages:
+  script:
+    - hwaro build
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+```
+
+This configuration uses the official Hwaro Docker image to build your site and deploys the `public` directory to GitLab Pages.
+
+---
+
+Title: Features
+URL: /features/
+Source: content/features/_index.md
+
+Hwaro includes powerful features out of the box.
+
+## Built-in Features
+
+- [SEO](/features/seo/) — Sitemaps, RSS feeds, robots.txt, OpenGraph, and Twitter Cards
+- [Search](/features/search/) — Client-side search index generation (Fuse.js compatible)
+- [Syntax Highlighting](/features/syntax-highlighting/) — Code block highlighting with Highlight.js
+- [Pagination](/features/pagination/) — Split large content lists into multiple pages
+- [Multilingual](/features/multilingual/) — Build multilingual sites with translation linking and hreflang tags
+- [Auto Includes](/features/auto-includes/) — Automatically load CSS and JS files from static directories
+- [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
+- [Cache Busting](/features/cache-busting/) — Content-hash based browser cache invalidation for CSS/JS resources
+- [Build Hooks](/features/build-hooks/) — Run custom shell commands before and after builds
+- [Streaming Build](/features/streaming-build/) — Reduce memory usage for large sites with batch rendering
+- [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers
+
+---
+
+Title: Auto Includes
+URL: /features/auto-includes/
+Source: content/features/auto-includes.md
+
+Auto Includes automatically load CSS and JS files from specified static directories into all pages. This eliminates the need to manually add each asset file to templates.
+
+## Configuration
+
+Enable in `config.toml`:
+
+```toml
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable auto includes |
+| dirs | array | [] | Directories under `static/` to scan |
+
+## Directory Structure
+
+Place CSS and JS files in subdirectories of `static/`:
+
+```
+static/
+├── assets/
+│   ├── css/
+│   │   ├── 01-reset.css
+│   │   ├── 02-typography.css
+│   │   └── 03-layout.css
+│   └── js/
+│       ├── 01-utils.js
+│       └── 02-app.js
+```
+
+Files are scanned recursively from `static/{dir}/**/*.css` and `static/{dir}/**/*.js`.
+
+## File Ordering
+
+Files are included in **alphabetical order**. Use numeric prefixes to control the load order:
+
+```
+assets/css/
+├── 01-reset.css        ← loaded first
+├── 02-typography.css
+├── 03-layout.css
+└── 99-overrides.css    ← loaded last
+```
+
+## Template Variables
+
+### CSS Only
+
+Place in `<head>` to include only CSS files:
+
+```jinja
+<head>
+  {{ auto_includes_css | safe }}
+</head>
+```
+
+### JS Only
+
+Place before `</body>` to include only JS files:
+
+```jinja
+<body>
+  ...
+  {{ auto_includes_js | safe }}
+</body>
+```
+
+### All Assets
+
+Include both CSS and JS together:
+
+```jinja
+{{ auto_includes | safe }}
+```
+
+| Variable | Description |
+|----------|-------------|
+| auto_includes_css | `<link>` tags for CSS files |
+| auto_includes_js | `<script>` tags for JS files |
+| auto_includes | Both CSS and JS tags combined |
+
+## Generated Output
+
+Given the example directory structure above, the template variables produce:
+
+**`auto_includes_css`:**
+
+```html
+<link rel="stylesheet" href="/assets/css/01-reset.css">
+<link rel="stylesheet" href="/assets/css/02-typography.css">
+<link rel="stylesheet" href="/assets/css/03-layout.css">
+```
+
+**`auto_includes_js`:**
+
+```html
+<script src="/assets/js/01-utils.js"></script>
+<script src="/assets/js/02-app.js"></script>
+```
+
+## Full Template Example
+
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }} - {{ site.title }}</title>
+  {{ highlight_css | safe }}
+  {{ auto_includes_css | safe }}
+</head>
+<body>
+  {% block content %}{% endblock %}
+
+  {{ highlight_js | safe }}
+  {{ auto_includes_js | safe }}
+</body>
+</html>
+```
+
+## Tips
+
+- **Separate concerns**: Use `auto_includes_css` in `<head>` and `auto_includes_js` before `</body>` for optimal page loading.
+- **Multiple directories**: You can list multiple directories to scan. Each directory is scanned independently.
+- **No duplicates**: Each file is included only once, even if it appears in multiple scanned directories.
+- **Static files only**: Auto includes scan the `static/` directory. Files in `content/` are not included.
+
+## See Also
+
+- [Configuration](/start/config/) — Full configuration reference
+- [Syntax Highlighting](/features/syntax-highlighting/) — Highlight.js asset inclusion
+- [Data Model](/templates/data-model/) — Asset template variables
+
+---
+
+Title: Build Hooks
+URL: /features/build-hooks/
+Source: content/features/build-hooks.md
+
+Build hooks allow you to run custom shell commands before and after the build process. This is useful for tasks like installing dependencies, preprocessing data, optimizing assets, or triggering deployments.
+
+## Configuration
+
+Define hooks in `config.toml`:
+
+```toml
+[build]
+hooks.pre = ["npm install", "npx tsc"]
+hooks.post = ["npm run minify", "npx pagefind --site public"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| hooks.pre | array | [] | Commands to run **before** building |
+| hooks.post | array | [] | Commands to run **after** building |
+
+## How It Works
+
+### Pre-Build Hooks
+
+Pre-build hooks run **before** any content processing begins. They are ideal for:
+
+- Installing dependencies
+- Compiling assets (TypeScript, Sass, etc.)
+- Running data fetching scripts
+- Preprocessing content
+
+```toml
+[build]
+hooks.pre = [
+  "npm ci",
+  "npx tailwindcss -i src/input.css -o static/assets/css/main.css",
+  "python scripts/fetch-data.py"
+]
+```
+
+If a pre-build hook **fails** (exits with a non-zero status), the build process is **aborted**. This prevents building with missing dependencies or broken assets.
+
+### Post-Build Hooks
+
+Post-build hooks run **after** the site has been generated in the output directory. They are ideal for:
+
+- Optimizing images
+- Minifying assets
+- Generating search indexes (e.g., Pagefind)
+- Deploying the site
+- Running validation checks
+
+```toml
+[build]
+hooks.post = [
+  "npx imagemin public/images/* --out-dir=public/images",
+  "npx pagefind --site public",
+  "./scripts/deploy.sh"
+]
+```
+
+If a post-build hook **fails**, a warning is shown but the build is **not** considered failed. The generated site remains intact.
+
+## Execution Order
+
+Commands are executed **sequentially** in the order they are defined:
+
+```toml
+[build]
+hooks.pre = ["echo Step 1", "echo Step 2", "echo Step 3"]
+```
+
+Output:
+
+```
+Running pre-build hook: echo Step 1
+Step 1
+Running pre-build hook: echo Step 2
+Step 2
+Running pre-build hook: echo Step 3
+Step 3
+```
+
+## Serve Mode
+
+Build hooks also run during `hwaro serve`:
+
+- Hooks execute on the **initial build** when the server starts
+- Hooks **re-execute on each rebuild** triggered by file changes
+- Config changes are picked up automatically — if you modify `hooks.pre` or `hooks.post` in `config.toml`, the new commands take effect on the next rebuild
+
+## Use Cases
+
+### TypeScript Compilation
+
+```toml
+[build]
+hooks.pre = ["npx tsc --outDir static/assets/js"]
+```
+
+### Tailwind CSS
+
+```toml
+[build]
+hooks.pre = [
+  "npx tailwindcss -i src/styles.css -o static/assets/css/styles.css --minify"
+]
+```
+
+### Pagefind Search
+
+Generate a client-side search index after build:
+
+```toml
+[build]
+hooks.post = ["npx pagefind --site public"]
+```
+
+### Image Optimization
+
+```toml
+[build]
+hooks.post = [
+  "npx imagemin public/**/*.{jpg,png} --out-dir=public"
+]
+```
+
+### Custom Deploy Script
+
+```toml
+[build]
+hooks.post = ["./scripts/deploy.sh"]
+```
+
+### Full Pipeline Example
+
+```toml
+[build]
+hooks.pre = [
+  "npm ci",
+  "npx tsc",
+  "npx tailwindcss -i src/input.css -o static/assets/css/main.css --minify"
+]
+hooks.post = [
+  "npx pagefind --site public",
+  "npx imagemin public/images/* --out-dir=public/images",
+  "echo 'Build complete!'"
+]
+```
+
+## Error Handling
+
+| Hook Type | On Failure |
+|-----------|------------|
+| Pre-build | ❌ Build **aborted** — no content is processed |
+| Post-build | ⚠️ Warning shown — generated site is preserved |
+
+This design ensures that critical setup tasks (pre-build) must succeed, while optional optimization tasks (post-build) don't block the build output.
+
+## Tips
+
+- **Keep hooks fast**: Slow hooks run on every rebuild during `hwaro serve`. Consider caching or conditional execution.
+- **Use scripts for complexity**: For multi-step processes, write a shell script and call it from the hook: `hooks.pre = ["./scripts/setup.sh"]`
+- **Check dependencies**: Use `command -v` to check if tools are available before running them:
+  ```bash
+  command -v npx >/dev/null 2>&1 && npx pagefind --site public
+  ```
+- **Combine with Auto Includes**: Use pre-build hooks to compile CSS/JS, then let [Auto Includes](/features/auto-includes/) pick them up automatically.
+
+## See Also
+
+- [Configuration](/start/config/) — Full configuration reference
+- [Auto Includes](/features/auto-includes/) — Automatic CSS/JS loading
+- [Search](/features/search/) — Search index with Pagefind post-build hook
+- [Deploy](/deploy/) — Deployment options
+
+---
+
+Title: Cache Busting
+URL: /features/cache-busting/
+Source: content/features/cache-busting.md
+
+Cache busting automatically appends a `?v=<hash>` query parameter to locally served CSS and JS resource URLs. This forces browsers to fetch the latest version of assets when their content changes, preventing stale cached files from being used.
+
+## How It Works
+
+Hwaro computes an MD5 content hash of your local CSS/JS files and appends the first 8 characters as a query parameter. The hash only changes when file contents actually change, so browsers keep using their cache until a real update occurs.
+
+```html
+<!-- With cache busting (default) -->
+<link rel="stylesheet" href="/assets/css/highlight/github.min.css?v=3a8f1b2c">
+<script src="/assets/js/highlight.min.js?v=3a8f1b2c"></script>
+<link rel="stylesheet" href="/assets/css/style.css?v=3a8f1b2c">
+
+<!-- Without cache busting -->
+<link rel="stylesheet" href="/assets/css/highlight/github.min.css">
+<script src="/assets/js/highlight.min.js"></script>
+<link rel="stylesheet" href="/assets/css/style.css">
+```
+
+## Content Hash vs Timestamp
+
+Hwaro uses a **content-based hash** rather than a build timestamp. This means:
+
+- The hash stays the same across builds if files haven't changed — no unnecessary cache invalidation
+- The hash changes immediately when any CSS/JS file content is modified
+- Different build machines produce the same hash for identical files
+
+## CDN URLs Are Not Modified
+
+Cache busting only applies to **local** resource URLs. CDN URLs (e.g., cdnjs.cloudflare.com) already contain version numbers in their paths and are not modified:
+
+```html
+<!-- CDN URL — unchanged -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+
+<!-- Local URL — cache busted -->
+<link rel="stylesheet" href="/assets/css/highlight/github.min.css?v=3a8f1b2c">
+```
+
+## Affected Template Variables
+
+Cache busting applies to the following template variables:
+
+| Variable | Description |
+|----------|-------------|
+| `highlight_css` | Syntax highlighting CSS (local only) |
+| `highlight_js` | Syntax highlighting JS (local only) |
+| `highlight_tags` | Combined highlighting CSS + JS (local only) |
+| `auto_includes_css` | Auto-included CSS files |
+| `auto_includes_js` | Auto-included JS files |
+| `auto_includes` | Combined auto-included CSS + JS |
+
+## Disabling Cache Busting
+
+Cache busting is enabled by default. To disable it, use the `--skip-cache-busting` flag:
+
+```bash
+# Build without cache busting
+hwaro build --skip-cache-busting
+
+# Serve without cache busting
+hwaro serve --skip-cache-busting
+```
+
+This can be useful when you manage cache invalidation through other means (e.g., filename hashing, CDN purge).
+
+## See Also
+
+- [Syntax Highlighting](/features/syntax-highlighting/) — Highlight.js configuration
+- [Auto Includes](/features/auto-includes/) — Automatic CSS/JS loading
+- [CLI](/start/cli/) — Command-line options
+
+---
+
+Title: Content Files
+URL: /features/content-files/
+Source: content/features/content-files.md
+
+Non-Markdown files placed in the `content/` directory can be automatically published to the output directory. This is useful for images, PDFs, and other assets that live alongside your content.
+
+## Configuration
+
+Enable content file publishing in `config.toml`:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "pdf"]
+disallow_extensions = ["psd", "ai"]
+disallow_paths = ["drafts/**", "**/_*"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| allow_extensions | array | [] | File extensions to publish |
+| disallow_extensions | array | [] | File extensions to exclude |
+| disallow_paths | array | [] | Glob patterns for paths to exclude |
+
+## How It Works
+
+When content file publishing is enabled, Hwaro copies non-Markdown files from `content/` to the output directory, preserving their directory structure.
+
+### Example
+
+```
+content/
+├── about/
+│   ├── index.md          → /about/index.html
+│   ├── team-photo.jpg    → /about/team-photo.jpg
+│   └── resume.pdf        → /about/resume.pdf
+├── blog/
+│   ├── _index.md         → /blog/index.html
+│   └── my-post/
+│       ├── index.md      → /blog/my-post/index.html
+│       ├── diagram.svg   → /blog/my-post/diagram.svg
+│       └── screenshot.png → /blog/my-post/screenshot.png
+└── index.md              → /index.html
+```
+
+Files are copied directly to the matching output path. The `content/` prefix is stripped automatically.
+
+## Extension Matching
+
+### Allow List
+
+Only files with extensions in `allow_extensions` are published:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
+```
+
+Extensions are normalized — both `"jpg"` and `".jpg"` are accepted.
+
+### Deny List
+
+Exclude specific extensions with `disallow_extensions`:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "png", "gif", "svg"]
+disallow_extensions = ["psd", "ai", "sketch"]
+```
+
+The deny list takes priority over the allow list.
+
+### Path Exclusion
+
+Exclude files by path pattern using glob syntax:
+
+```toml
+[content.files]
+disallow_paths = ["drafts/**", "**/_*", "private/**"]
+```
+
+| Pattern | Matches |
+|---------|---------|
+| `drafts/**` | All files under `content/drafts/` |
+| `**/_*` | Any file starting with underscore |
+| `private/**` | All files under `content/private/` |
+
+Paths are matched relative to the `content/` directory.
+
+## Referencing Content Files
+
+### In Markdown
+
+Reference colocated files with relative paths:
+
+```markdown
+![Team Photo](team-photo.jpg)
+
+[Download Resume](resume.pdf)
+
+![Diagram](diagram.svg)
+```
+
+### In Templates
+
+For page bundles, colocated assets are also available via `page.assets`:
+
+```jinja
+{% for asset in page.assets %}
+  {% if asset is matching("[.](jpg|png|gif)$") %}
+    <img src="{{ get_url(path=asset) }}" alt="Asset">
+  {% endif %}
+{% endfor %}
+```
+
+## Content Files vs Static Files
+
+| Feature | Content Files (`content/`) | Static Files (`static/`) |
+|---------|---------------------------|--------------------------|
+| Colocated with content | ✅ Yes | ❌ No |
+| Requires configuration | ✅ Yes | ❌ No (always copied) |
+| Extension filtering | ✅ Yes | ❌ No |
+| Path filtering | ✅ Yes | ❌ No |
+| Best for | Per-page assets | Site-wide assets |
+
+Use **content files** for assets that belong to specific pages (screenshots, diagrams, attachments). Use **static files** for site-wide assets (CSS, JS, logos, favicons).
+
+## Tips
+
+- **Page Bundles**: For the best organization, use [page bundles](/writing/pages/#asset-colocation) — place `index.md` and its assets in a directory together.
+- **Image formats**: Include common web image formats: `["jpg", "jpeg", "png", "gif", "svg", "webp"]`.
+- **Security**: Use `disallow_paths` to prevent publishing source files or drafts.
+- **Keep it lean**: Only allow extensions you actually need. This prevents accidentally publishing large source files.
+
+## See Also
+
+- [Pages — Asset Colocation](/writing/pages/#asset-colocation) — Page bundles
+- [Sections — Asset Colocation](/writing/sections/#asset-colocation) — Section assets
+- [Configuration](/start/config/) — Full configuration reference
+
+---
+
+Title: LLMs.txt
+URL: /features/llms-txt/
+Source: content/features/llms-txt.md
+
+Hwaro can generate `llms.txt` and `llms-full.txt` files that provide instructions and content for AI/LLM crawlers. This is part of the emerging [llms.txt standard](https://llmstxt.org/) for making websites more accessible to large language models.
+
+## Configuration
+
+Enable in `config.toml`:
+
+```toml
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This is my site. Content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `llms.txt` |
+| filename | string | "llms.txt" | Output filename |
+| instructions | string | "" | Instructions text for LLM crawlers |
+| full_enabled | bool | false | Generate full content version |
+| full_filename | string | "llms-full.txt" | Filename for the full version |
+
+## Generated Files
+
+### llms.txt
+
+The basic `llms.txt` file contains only the instructions you define in the configuration. This is a lightweight file that tells AI crawlers about your site's policies.
+
+**Example output (`llms.txt`):**
+
+```
+This is my site. Content is provided under the MIT license.
+```
+
+### llms-full.txt
+
+The full version includes all rendered content from your site, making it easy for LLMs to ingest your entire site in a single file. Each page is separated by `---` delimiters.
+
+**Example output (`llms-full.txt`):**
+
+```
+# My Site
+A great site about programming
+
+Base URL: https://example.com
+
+This is my site. Content is provided under the MIT license.
+
+---
+
+Title: About
+URL: https://example.com/about/
+Source: content/about.md
+
+About page content goes here...
+
+---
+
+Title: Getting Started
+URL: https://example.com/docs/getting-started/
+Source: content/docs/getting-started.md
+
+Getting started guide content...
+```
+
+## Full Document Structure
+
+The `llms-full.txt` file is structured as follows:
+
+1. **Site header** — Site title as an H1 heading
+2. **Site description** — From `config.toml`
+3. **Base URL** — The site's base URL
+4. **Instructions** — The instructions text from configuration
+5. **Page entries** — Each page separated by `---`, containing:
+   - `Title` — Page title
+   - `URL` — Absolute URL to the page
+   - `Source` — Source file path relative to project root
+   - `Language` — Language code (only for multilingual sites)
+   - Raw content of the page
+
+### Page Selection
+
+Only pages that meet these criteria are included in `llms-full.txt`:
+
+- The page has `render = true` (default)
+- The page has non-empty raw content
+- Pages are sorted by URL for consistent output
+
+Draft pages are excluded from production builds (unless `--drafts` is used).
+
+## Multilingual Support
+
+For multilingual sites, each page entry includes a `Language` field indicating the content language:
+
+```
+---
+
+Title: 소개
+URL: https://example.com/ko/about/
+Source: content/about.ko.md
+Language: ko
+
+한국어 콘텐츠...
+```
+
+## Use Cases
+
+### Documentation Sites
+
+Provide your full documentation to LLMs for better AI-assisted answers:
+
+```toml
+[llms]
+enabled = true
+instructions = "This is the official documentation for MyProject. All content is licensed under Apache 2.0. Please cite the source URL when referencing this content."
+full_enabled = true
+```
+
+### Blog Sites
+
+Share your blog content with clear usage guidelines:
+
+```toml
+[llms]
+enabled = true
+instructions = "This is a personal blog. Content is copyrighted. You may summarize but not reproduce full articles."
+full_enabled = false
+```
+
+### Restricting LLM Access
+
+Use `llms.txt` to communicate preferences without providing full content:
+
+```toml
+[llms]
+enabled = true
+instructions = "Please do not use this site's content for training purposes. Summarization and citation are permitted."
+full_enabled = false
+```
+
+## Combining with robots.txt
+
+`llms.txt` works alongside `robots.txt`. While `robots.txt` controls crawler access at the HTTP level, `llms.txt` provides human-readable instructions and context:
+
+```toml
+[robots]
+enabled = true
+rules = [
+  { user_agent = "*", allow = ["/"] },
+  { user_agent = "GPTBot", disallow = ["/private/"] }
+]
+
+[llms]
+enabled = true
+instructions = "Public content may be used for AI responses with attribution."
+full_enabled = true
+```
+
+## Template Integration
+
+You can link to the `llms.txt` file from your HTML templates:
+
+```jinja
+<head>
+  <link rel="alternate" type="text/plain" href="{{ base_url }}/llms.txt" title="LLM Instructions">
+</head>
+```
+
+## See Also
+
+- [SEO](/features/seo/) — Sitemap, RSS feeds, robots.txt, and social tags
+- [Configuration](/start/config/) — Full configuration reference
+- [Search](/features/search/) — Search index generation
+
+---
+
+Title: Multilingual
+URL: /features/multilingual/
+Source: content/features/multilingual.md
+
+Hwaro supports building multilingual sites with automatic translation linking, language-specific URLs, and hreflang tags for SEO.
+
+## Configuration
+
+Enable multilingual support in `config.toml`:
+
+```toml
+default_language = "en"
+
+[languages.en]
+language_name = "English"
+weight = 1
+
+[languages.ko]
+language_name = "한국어"
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = ["tags", "categories"]
+
+[languages.ja]
+language_name = "日本語"
+weight = 3
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| default_language | string | "en" | Default language code |
+| language_name | string | — | Human-readable language name |
+| weight | int | 0 | Sort order (lower = first) |
+| generate_feed | bool | true | Generate RSS/Atom feed for this language |
+| build_search_index | bool | false | Include in search index |
+| taxonomies | array | [] | Taxonomies for this language |
+
+## Content Structure
+
+Create translations by adding a language suffix to filenames:
+
+```
+content/
+├── posts/
+│   ├── hello.md         # Default language (en)
+│   ├── hello.ko.md      # Korean translation
+│   └── hello.ja.md      # Japanese translation
+├── about.md             # Default language (en)
+├── about.ko.md          # Korean translation
+└── index.md             # Homepage (default)
+```
+
+### URL Mapping
+
+| File | URL |
+|------|-----|
+| content/about.md | /about/ |
+| content/about.ko.md | /ko/about/ |
+| content/about.ja.md | /ja/about/ |
+| content/posts/hello.md | /posts/hello/ |
+| content/posts/hello.ko.md | /ko/posts/hello/ |
+
+The default language pages are served at the root path. Non-default language pages are prefixed with the language code.
+
+### Section Translations
+
+Section index files also support language suffixes:
+
+```
+content/
+└── blog/
+    ├── _index.md         # /blog/
+    ├── _index.ko.md      # /ko/blog/
+    └── post.md
+```
+
+## Translation Linking
+
+Hwaro automatically links translated pages based on their filenames. Pages with the same base name (without the language suffix) are considered translations of each other.
+
+For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
+
+### Template Variables
+
+Access translation data in templates:
+
+```jinja
+{% if page.translations %}
+<nav class="language-switcher">
+  {% for t in page.translations %}
+    {% if t.is_current %}
+      <span class="active">{{ t.code | upper }}</span>
+    {% else %}
+      <a href="{{ t.url }}">{{ t.code | upper }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+```
+
+### Translation Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| code | String | Language code (e.g., "en", "ko") |
+| url | String | URL of the translated page |
+| title | String | Title of the translated page |
+| is_current | Bool | Whether this is the current page's language |
+| is_default | Bool | Whether this is the default language |
+
+## SEO Tags
+
+### Canonical URLs
+
+Hwaro generates canonical link tags for multilingual pages:
+
+```jinja
+<head>
+  {{ canonical_tag | safe }}
+</head>
+```
+
+Output:
+
+```html
+<link rel="canonical" href="https://example.com/about/">
+```
+
+### Hreflang Tags
+
+Alternate language link tags are generated automatically for translated pages:
+
+```jinja
+<head>
+  {{ hreflang_tags | safe }}
+</head>
+```
+
+Output:
+
+```html
+<link rel="alternate" hreflang="en" href="https://example.com/about/">
+<link rel="alternate" hreflang="ko" href="https://example.com/ko/about/">
+<link rel="alternate" hreflang="ja" href="https://example.com/ja/about/">
+```
+
+### Combined SEO Tags
+
+Include both canonical and hreflang tags together:
+
+```jinja
+<head>
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+  {{ og_all_tags | safe }}
+</head>
+```
+
+## Page Language
+
+Access the current page's language in templates:
+
+```jinja
+<html lang="{{ page.language }}">
+```
+
+```jinja
+{% if page.language == "ko" %}
+<p>한국어 콘텐츠</p>
+{% endif %}
+```
+
+## Scaffolding with Multilingual
+
+Create a new site with multilingual support:
+
+```bash
+hwaro init mysite --include-multilingual en,ko,ja
+```
+
+This generates the configuration and sample content files for each specified language.
+
+## Template Examples
+
+### Language Switcher (Dropdown)
+
+```jinja
+{% if page.translations %}
+<div class="lang-dropdown">
+  <button>{{ page.language | upper }} ▾</button>
+  <ul>
+    {% for t in page.translations %}
+    <li>
+      <a href="{{ t.url }}"{% if t.is_current %} class="current"{% endif %}>
+        {{ t.code | upper }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+```
+
+### Language-Specific Navigation
+
+```jinja
+<nav>
+  {% if page.language == "ko" %}
+    <a href="/ko/">홈</a>
+    <a href="/ko/blog/">블로그</a>
+  {% elif page.language == "ja" %}
+    <a href="/ja/">ホーム</a>
+    <a href="/ja/blog/">ブログ</a>
+  {% else %}
+    <a href="/">Home</a>
+    <a href="/blog/">Blog</a>
+  {% endif %}
+</nav>
+```
+
+### Base Template with i18n
+
+```jinja
+<!DOCTYPE html>
+<html lang="{{ page.language | default(value='en') }}">
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }} - {{ site.title }}</title>
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+  {{ og_all_tags | safe }}
+</head>
+<body>
+  {% if page.translations %}
+  <nav class="i18n">
+    {% for t in page.translations %}
+      {% if t.is_current %}
+        <strong>{{ t.code }}</strong>
+      {% else %}
+        <a href="{{ t.url }}">{{ t.code }}</a>
+      {% endif %}
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
+```
+
+## Per-Language Feeds
+
+When the site is multilingual, Hwaro automatically generates separate RSS/Atom feeds for each language:
+
+| Language | Feed Path | Contents |
+|----------|-----------|----------|
+| Default (e.g., `en`) | `/rss.xml` | Default language pages only (configurable) |
+| Non-default (e.g., `ko`) | `/ko/rss.xml` | Only Korean pages |
+| Non-default (e.g., `ja`) | `/ja/rss.xml` | Only Japanese pages |
+
+By default, the main site feed (`/rss.xml` or `/atom.xml`) includes **only default language pages**. You can change this behavior with the `default_language_only` option. Each non-default language with `generate_feed = true` gets its own feed under its language prefix regardless of this setting.
+
+### Configuration
+
+#### Main Feed Language Control
+
+```toml
+[feeds]
+enabled = true
+default_language_only = true   # true (default): main feed = default language only
+                               # false: main feed includes all languages
+```
+
+#### Per-Language Feed Control
+
+```toml
+[languages.ko]
+language_name = "한국어"
+generate_feed = true    # Generates /ko/rss.xml (default: true)
+
+[languages.ja]
+language_name = "日本語"
+generate_feed = false   # No /ja/rss.xml will be generated
+```
+
+Language feeds share the same `sections`, `limit`, and `truncate` settings from the global `[feeds]` config:
+
+```toml
+[feeds]
+enabled = true
+type = "rss"       # or "atom"
+limit = 20
+truncate = 0
+sections = []      # empty = all sections
+default_language_only = true
+```
+
+### Feed Details
+
+- **RSS feeds** include a `<language>` tag (e.g., `<language>ko</language>`)
+- **Atom feeds** include an `xml:lang` attribute (e.g., `<feed xmlns="..." xml:lang="ko">`)
+- Feed title includes the language name: `"My Site (한국어)"`
+- Self-referencing links point to the correct language path (e.g., `https://example.com/ko/rss.xml`)
+- Draft pages and section index pages are excluded
+- Language feeds are generated independently of the main feed's `enabled` setting
+
+### Template Links
+
+Add language-specific feed links in your templates:
+
+```jinja
+{# Main feed (default language) #}
+<link rel="alternate" type="application/rss+xml"
+      href="{{ base_url }}/rss.xml"
+      title="{{ site.title }}">
+
+{# Language-specific feed #}
+{% if page.language and page.language != "en" %}
+<link rel="alternate" type="application/rss+xml"
+      href="{{ base_url }}/{{ page.language }}/rss.xml"
+      title="{{ site.title }} ({{ page.language }})">
+{% endif %}
+```
+
+## See Also
+
+- [Configuration](/start/config/) — Full configuration reference
+- [SEO](/features/seo/) — SEO features including feeds, canonical and hreflang
+- [Data Model](/templates/data-model/) — Translation link properties
+
+---
+
+Title: Pagination
+URL: /features/pagination/
+Source: content/features/pagination.md
+
+Split large content lists into multiple pages.
+
+## Configuration
+
+### Site-Level Defaults
+
+Set default pagination behavior in `config.toml`:
+
+```toml
+[pagination]
+enabled = false
+per_page = 10
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable pagination globally |
+| per_page | int | 10 | Default items per page |
+
+### Section Pagination
+
+Enable in section front matter:
+
+```toml
++++
+title = "Blog"
+paginate = 10
+paginate_path = "page"
++++
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| paginate | int | — | Items per page |
+| paginate_path | string | "page" | URL pattern for pages |
+
+### Generated URLs
+
+For a section at `/blog/`:
+
+| Page | URL |
+|------|-----|
+| 1 | /blog/ |
+| 2 | /blog/page/2/ |
+| 3 | /blog/page/3/ |
+
+With `paginate_path = "p"`:
+
+| Page | URL |
+|------|-----|
+| 1 | /blog/ |
+| 2 | /blog/p/2/ |
+| 3 | /blog/p/3/ |
+
+## Template Variables
+
+### pagination
+
+Pre-rendered pagination HTML:
+
+```jinja
+{{ pagination | safe }}
+```
+
+### paginator
+
+Pagination object for custom rendering:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| paginator.paginate_by | Int | Items per page |
+| paginator.base_url | String | Base URL for pagination |
+| paginator.number_pagers | Int | Total number of pagers (pages) |
+| paginator.first | String | URL to first pager |
+| paginator.last | String | URL to last pager |
+| paginator.previous | String? | URL to previous pager |
+| paginator.next | String? | URL to next pager |
+| paginator.pages | Array | Array of pages for the current pager |
+| paginator.current_index | Int | Current pager index (1-indexed) |
+| paginator.total_pages | Int | Total number of items across all pagers |
+
+## Template Examples
+
+### Simple Navigation
+
+Use the pre-rendered `pagination` variable:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ section.title }}</h1>
+
+<ul>
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+
+{{ pagination | safe }}
+{% endblock %}
+```
+
+### Custom Pagination
+
+Build your own pagination UI:
+
+```jinja
+{% if paginator.number_pagers > 1 %}
+<nav class="pagination">
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}" class="prev">← Previous</a>
+  {% endif %}
+  
+  <span class="current">
+    Page {{ paginator.current_index }} of {{ paginator.number_pagers }}
+  </span>
+  
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}" class="next">Next →</a>
+  {% endif %}
+</nav>
+{% endif %}
+```
+
+### Full Pagination with Page Numbers
+
+```jinja
+{% if paginator.number_pagers > 1 %}
+<nav class="pagination">
+  {# First page #}
+  {% if paginator.current_index > 1 %}
+  <a href="{{ paginator.first }}">« First</a>
+  {% endif %}
+  
+  {# Previous #}
+  {% if paginator.previous %}
+  <a href="{{ paginator.previous }}">‹ Prev</a>
+  {% endif %}
+  
+  {# Current #}
+  <span class="current">{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  
+  {# Next #}
+  {% if paginator.next %}
+  <a href="{{ paginator.next }}">Next ›</a>
+  {% endif %}
+  
+  {# Last page #}
+  {% if paginator.current_index < paginator.number_pagers %}
+  <a href="{{ paginator.last }}">Last »</a>
+  {% endif %}
+</nav>
+{% endif %}
+```
+
+## Taxonomy Pagination
+
+Taxonomies also support pagination in `config.toml`:
+
+```toml
+[[taxonomies]]
+name = "tags"
+paginate = 20
+```
+
+## CSS Example
+
+```css
+.pagination {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.pagination a {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  background: #f0f0f0;
+}
+
+.pagination .current {
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+}
+```
+
+## See Also
+
+- [Sections](/writing/sections/) — Section configuration
+- [Taxonomies](/writing/taxonomies/) — Taxonomy pagination
+- [Data Model](/templates/data-model/) — Section variables
+
+---
+
+Title: Search
+URL: /features/search/
+Source: content/features/search.md
+
+Hwaro generates a search index that works with Fuse.js for client-side search.
+
+## Configuration
+
+Enable in `config.toml`:
+
+```toml
+[search]
+enabled = true
+format = "fuse_json"
+fields = ["title", "content", "description", "tags", "url", "section"]
+filename = "search.json"
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate search index |
+| format | string | "fuse_json" | Search index format |
+| fields | array | ["title", "content"] | Fields to include in index |
+| filename | string | "search.json" | Output filename |
+| exclude | array | [] | Paths (prefixes) to exclude from search index |
+
+## Generated Files
+
+When enabled, Hwaro generates `/search.json` (configurable via `filename`):
+
+```json
+[
+  {
+    "title": "My Post",
+    "url": "/blog/my-post/",
+    "content": "Page content...",
+    "description": "Post description",
+    "section": "blog",
+    "tags": ["tutorial"]
+  }
+]
+```
+
+## Fields Indexed
+
+| Field | Description |
+|-------|-------------|
+| title | Page title |
+| url | Page URL |
+| content | Page content (if `"content"` is in `fields`) |
+| description | Page description |
+| section | Section name |
+| tags | Page tags |
+
+## Client-Side Implementation
+
+### Using Fuse.js
+
+Add to your template:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+<script>
+let searchIndex = [];
+
+// Load index
+fetch('/search.json')
+  .then(res => res.json())
+  .then(data => {
+    searchIndex = data;
+  });
+
+// Initialize Fuse.js
+function search(query) {
+  const fuse = new Fuse(searchIndex, {
+    keys: ['title', 'content', 'description', 'tags'],
+    threshold: 0.3
+  });
+  return fuse.search(query);
+}
+</script>
+```
+
+### Search Form
+
+```html
+<form id="search-form">
+  <input type="search" id="search-input" placeholder="Search...">
+</form>
+
+<div id="search-results"></div>
+
+<script>
+const input = document.getElementById('search-input');
+const results = document.getElementById('search-results');
+
+input.addEventListener('input', (e) => {
+  const query = e.target.value;
+  if (query.length < 2) {
+    results.innerHTML = '';
+    return;
+  }
+  
+  const matches = search(query);
+  results.innerHTML = matches
+    .slice(0, 10)
+    .map(m => `
+      <a href="${m.item.url}">
+        <h3>${m.item.title}</h3>
+        <p>${m.item.description || ''}</p>
+      </a>
+    `)
+    .join('');
+});
+</script>
+```
+
+## Excluding Pages
+
+### Front Matter
+
+Exclude individual pages from search with front matter:
+
+```markdown
++++
+title = "Terms of Service"
+in_search_index = false
++++
+```
+
+### Configuration
+
+Exclude entire sections or paths using `config.toml`:
+
+```toml
+[search]
+exclude = ["/private", "/drafts"]
+```
+
+### Field Selection
+
+Control which fields appear in the search index by specifying `fields`:
+
+```toml
+[search]
+enabled = true
+fields = ["title", "description", "tags", "url"]
+```
+
+Available fields: `title`, `content`, `description`, `tags`, `url`, `section`.
+
+Omitting `content` from `fields` significantly reduces the index file size for large sites.
+
+## Performance Tips
+
+### Large Sites
+
+For sites with many pages:
+
+1. Remove `"content"` from `fields` to reduce index size
+2. Use Fuse.js `ignoreLocation` option
+3. Implement debounced search
+
+```javascript
+function debounce(fn, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
+
+input.addEventListener('input', debounce((e) => {
+  // search logic
+}, 200));
+```
+
+### Lazy Loading
+
+Load index only when search is focused:
+
+```javascript
+let indexLoaded = false;
+
+input.addEventListener('focus', async () => {
+  if (indexLoaded) return;
+  const res = await fetch('/search.json');
+  searchIndex = await res.json();
+  indexLoaded = true;
+});
+```
+
+## Alternative: Pagefind
+
+For larger sites, consider [Pagefind](https://pagefind.app/):
+
+```bash
+# After build
+npx pagefind --site public
+```
+
+Add to config as post-build hook:
+
+```toml
+[build]
+hooks.post = ["npx pagefind --site public"]
+```
+
+---
+
+Title: SEO
+URL: /features/seo/
+Source: content/features/seo.md
+
+Hwaro includes built-in SEO features: sitemaps, RSS feeds, robots.txt, and social sharing meta tags.
+
+## Sitemap
+
+Automatically generates `sitemap.xml` for search engines.
+
+### Configuration
+
+```toml
+[sitemap]
+enabled = true
+filename = "sitemap.xml"
+changefreq = "weekly"
+priority = 0.5
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `sitemap.xml` |
+| filename | string | "sitemap.xml" | Output filename |
+| changefreq | string | "weekly" | Default change frequency for all pages |
+| priority | float | 0.5 | Default priority for all pages (0.0 to 1.0) |
+| exclude | array | [] | Path prefixes to exclude (e.g., `["/private"]` excludes `/private`, `/private/page.html`) |
+
+### Output
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://example.com/</loc>
+    <lastmod>2024-01-15</lastmod>
+  </url>
+  <url>
+    <loc>https://example.com/about/</loc>
+  </url>
+</urlset>
+```
+
+### Excluding Pages
+
+Set `in_sitemap = false` in front matter:
+
+```markdown
++++
+title = "Private Page"
+in_sitemap = false
++++
+```
+
+---
+
+## RSS Feeds
+
+Generate RSS feeds for your site and sections.
+
+### Configuration
+
+```toml
+[feeds]
+enabled = true
+limit = 20
+```
+
+### Section Feeds
+
+Enable per-section feeds:
+
+```markdown
++++
+title = "Blog"
+generate_feeds = true
++++
+```
+
+Generates `/blog/rss.xml`.
+
+### Output
+
+- `/rss.xml` — Site-wide feed
+- `/blog/rss.xml` — Section feed (if enabled)
+
+### Multilingual Feeds
+
+When the site is multilingual, feeds are generated per language automatically:
+
+| Language | Feed Path | Contents |
+|----------|-----------|----------|
+| Default (e.g., `en`) | `/rss.xml` | Default language pages only (configurable) |
+| Non-default (e.g., `ko`) | `/ko/rss.xml` | Only Korean pages |
+| Non-default (e.g., `ja`) | `/ja/rss.xml` | Only Japanese pages |
+
+By default, the main site feed includes **only default language pages** (`default_language_only = true`). Set `default_language_only = false` to include all languages in the main feed. Each non-default language with `generate_feed = true` gets its own separate feed regardless of this setting.
+
+```toml
+[feeds]
+enabled = true
+default_language_only = true   # true (default): main feed = default language only
+                               # false: main feed includes all languages
+```
+
+Per-language feed control:
+
+```toml
+[languages.ko]
+language_name = "한국어"
+generate_feed = true    # Generates /ko/rss.xml (default: true)
+
+[languages.ja]
+language_name = "日本語"
+generate_feed = false   # No /ja/rss.xml will be generated
+```
+
+Language feeds share the same `sections`, `limit`, and `truncate` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, and Atom feeds include an `xml:lang` attribute. The feed title includes the language name (e.g., `"My Site (한국어)"`).
+
+### Template Links
+
+```jinja
+<link rel="alternate" type="application/rss+xml" 
+      href="{{ base_url }}/rss.xml" 
+      title="{{ site.title }}">
+
+{% if page.language and page.language != "en" %}
+<link rel="alternate" type="application/rss+xml"
+      href="{{ base_url }}/{{ page.language }}/rss.xml"
+      title="{{ site.title }} ({{ page.language }})">
+{% endif %}
+```
+
+---
+
+## Robots.txt
+
+Control search engine crawling.
+
+### Configuration
+
+```toml
+[robots]
+enabled = true
+```
+
+### Output
+
+```
+User-agent: *
+Allow: /
+Sitemap: https://example.com/sitemap.xml
+```
+
+---
+
+## LLMs.txt
+
+Generate instruction files for AI/LLM crawlers following the [llms.txt standard](https://llmstxt.org/).
+
+### Configuration
+
+```toml
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This site's content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `llms.txt` |
+| filename | string | "llms.txt" | Output filename |
+| instructions | string | "" | Instructions for LLM crawlers |
+| full_enabled | bool | false | Generate full content version |
+| full_filename | string | "llms-full.txt" | Full version filename |
+
+### Output
+
+- `/llms.txt` — Instructions text only
+- `/llms-full.txt` — Full site content with metadata (title, URL, source path per page)
+
+The full version includes all rendered pages sorted by URL, separated by `---` delimiters.
+
+See [LLMs.txt](/features/llms-txt/) for detailed documentation.
+
+---
+
+## OpenGraph Tags
+
+Social sharing meta tags for Facebook, LinkedIn, etc.
+
+### Configuration
+
+```toml
+[og]
+default_image = "/images/og-default.png"
+type = "website"
+fb_app_id = "your_fb_app_id"
+```
+
+| Key | Description |
+|-----|-------------|
+| default_image | Fallback image when page has none |
+| type | OpenGraph type (website, article) |
+| fb_app_id | Facebook App ID (optional) |
+
+### Page-Level Override
+
+```markdown
++++
+title = "My Article"
+description = "Article description"
+image = "/images/article-cover.png"
++++
+```
+
+### Template Usage
+
+```jinja
+<head>
+  {{ og_tags | safe }}
+</head>
+```
+
+### Output
+
+```html
+<meta property="og:title" content="My Article">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://example.com/my-article/">
+<meta property="og:description" content="Article description">
+<meta property="og:image" content="https://example.com/images/article-cover.png">
+```
+
+---
+
+## Twitter Cards
+
+Twitter-specific sharing tags.
+
+### Configuration
+
+```toml
+[og]
+twitter_card = "summary_large_image"
+twitter_site = "@yourusername"
+twitter_creator = "@authorusername"
+```
+
+| Key | Description |
+|-----|-------------|
+| twitter_card | Card type: summary, summary_large_image |
+| twitter_site | Site's Twitter handle |
+| twitter_creator | Author's Twitter handle |
+
+### Template Usage
+
+```jinja
+<head>
+  {{ twitter_tags | safe }}
+</head>
+```
+
+Or include both OG and Twitter:
+
+```jinja
+<head>
+  {{ og_all_tags | safe }}
+</head>
+```
+
+### Output
+
+```html
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="My Article">
+<meta name="twitter:description" content="Article description">
+<meta name="twitter:image" content="https://example.com/images/article-cover.png">
+<meta name="twitter:site" content="@yourusername">
+```
+
+---
+
+## Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
+| page_description | Page description (fallback: site) |
+| page_image | Page image (fallback: og.default_image) |
+
+---
+
+## Complete Example
+
+### config.toml
+
+```toml
+title = "My Site"
+description = "A great site"
+base_url = "https://example.com"
+
+[sitemap]
+enabled = true
+
+[feeds]
+enabled = true
+limit = 20
+
+[robots]
+enabled = true
+
+[og]
+default_image = "/images/og-default.png"
+type = "website"
+twitter_card = "summary_large_image"
+twitter_site = "@mysite"
+```
+
+### templates/base.html
+
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ page.title }} - {{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default(value=site.description) }}">
+  {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+  <link rel="alternate" type="application/rss+xml" href="{{ base_url }}/rss.xml">
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>
+```
+
+## See Also
+
+- [LLMs.txt](/features/llms-txt/) — AI/LLM crawler instructions
+- [Multilingual](/features/multilingual/) — Hreflang and canonical tags for i18n
+- [Configuration](/start/config/) — Full config reference
+
+---
+
+Title: Streaming Build
+URL: /features/streaming-build/
+Source: content/features/streaming-build.md
+
+Streaming build reduces memory usage for large sites by processing pages in batches during the Render phase. Instead of holding all rendered HTML in memory at once, each batch is rendered, written to disk, and then released before the next batch begins.
+
+## When to Use
+
+For most sites, the default build mode works well. Streaming build is useful when:
+
+- Your site has thousands of pages
+- The build process consumes too much memory
+- You're building in a memory-constrained environment (CI, containers, small VMs)
+
+## Usage
+
+### `--stream` flag
+
+Enable streaming with a default batch size of 50 pages:
+
+```bash
+hwaro build --stream
+```
+
+### `--memory-limit` flag
+
+Set a memory limit and let Hwaro calculate the optimal batch size automatically:
+
+```bash
+hwaro build --memory-limit 512M
+hwaro build --memory-limit 2G
+```
+
+Accepts `G` (gigabytes), `M` (megabytes), and `K` (kilobytes) suffixes. The batch size is calculated using a heuristic of ~50KB per page.
+
+### Environment variable
+
+Set `HWARO_MEMORYLIMIT` as a fallback when the CLI flag is not provided:
+
+```bash
+export HWARO_MEMORYLIMIT=1G
+hwaro build
+```
+
+The CLI `--memory-limit` flag always overrides the environment variable.
+
+### Combined flags
+
+You can combine `--stream` with `--memory-limit`. When `--memory-limit` is provided, it determines the batch size regardless of `--stream`:
+
+```bash
+hwaro build --stream --memory-limit 512M
+```
+
+## Flag Interaction
+
+| `--stream` | `--memory-limit` | `HWARO_MEMORYLIMIT` | Result |
+|---|---|---|---|
+| - | - | - | Normal build |
+| yes | - | - | Streaming, batch=50 |
+| - | 2G | - | Streaming, batch≈20000 |
+| - | - | 1G | Streaming, batch≈10000 |
+| yes | 512M | - | Streaming, batch≈5000 |
+| - | 2G | 1G | CLI wins (2G) |
+
+## How It Works
+
+1. During the Render phase, pages are split into batches
+2. Each batch is rendered using the same parallel/sequential logic as a normal build
+3. After each batch is written to disk, `page.content` is cleared to free memory
+4. The garbage collector is invoked to reclaim the released memory
+5. After the Generate phase (feeds, sitemap, search index), `page.raw_content` is also cleared
+
+The Generate phase (feeds, search, sitemap, llms.txt) still works correctly because these generators already fall back to re-rendering from `raw_content` when `page.content` is empty.
+
+## Output
+
+The build output is **identical** whether streaming is enabled or not. Streaming only affects memory usage during the build process.
+
+Use `--verbose` to see batch progress:
+
+```bash
+hwaro build --stream --verbose
+```
+
+```
+Building site...
+  Streaming mode enabled (batch size: 50)
+  ...
+  Streaming batch 1 (50 pages)
+  Streaming batch 2 (50 pages)
+  Streaming batch 3 (23 pages)
+  ...
+```
+
+## See Also
+
+- [CLI Reference](/start/cli/) — Full list of build flags
+- [Build Hooks](/features/build-hooks/) — Run custom commands before/after builds
+
+---
+
+Title: Syntax Highlighting
+URL: /features/syntax-highlighting/
+Source: content/features/syntax-highlighting.md
+
+Code blocks in Markdown are automatically syntax highlighted.
+
+## Usage
+
+Use fenced code blocks with a language identifier:
+
+````markdown
+```javascript
+function greet(name) {
+  console.log(`Hello, ${name}!`);
+}
+```
+````
+
+## Supported Languages
+
+Common languages:
+
+| Language | Identifiers |
+|----------|-------------|
+| JavaScript | javascript, js |
+| TypeScript | typescript, ts |
+| Python | python, py |
+| Ruby | ruby, rb |
+| Go | go, golang |
+| Rust | rust, rs |
+| Crystal | crystal, cr |
+| HTML | html |
+| CSS | css |
+| JSON | json |
+| YAML | yaml, yml |
+| TOML | toml |
+| Markdown | markdown, md |
+| Shell | bash, sh, shell |
+| SQL | sql |
+
+## Configuration
+
+Configure in `config.toml`:
+
+```toml
+[highlight]
+enabled = true
+theme = "github-dark"
+use_cdn = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | true | Enable syntax highlighting |
+| theme | string | "github" | Highlight.js theme name |
+| use_cdn | bool | true | Load assets from CDN (false = local files) |
+
+## Themes
+
+Hwaro uses [Highlight.js](https://highlightjs.org/) themes. Any valid Highlight.js theme name works. Popular choices:
+
+- `github` — Light GitHub style (default)
+- `github-dark` — Dark GitHub style
+- `github-dark-dimmed` — Dimmed dark GitHub style
+- `monokai` — Classic dark theme
+- `dracula` — Dark purple theme
+- `solarized-dark` — Solarized dark
+- `solarized-light` — Solarized light
+- `nord` — Arctic color palette
+- `tokyo-night-dark` — Tokyo Night dark
+
+Browse all available themes at [highlightjs.org/demo](https://highlightjs.org/demo).
+
+## CDN vs Local
+
+When `use_cdn = true` (default), assets are loaded from cdnjs:
+
+```html
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+```
+
+When `use_cdn = false`, assets are loaded from local paths:
+
+```html
+<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css">
+<script src="/assets/js/highlight.min.js"></script>
+```
+
+You must provide the local files yourself when using `use_cdn = false`.
+
+## Template Integration
+
+Include highlighting assets in templates:
+
+```jinja
+<head>
+  {{ highlight_css | safe }}
+</head>
+<body>
+  ...
+  {{ highlight_js | safe }}
+</body>
+```
+
+Or combined:
+
+```jinja
+<head>
+  {{ highlight_tags | safe }}
+</head>
+```
+
+## Build Options
+
+Disable highlighting for faster builds:
+
+```bash
+hwaro build --skip-highlighting
+```
+
+## Plain Text Blocks
+
+For no highlighting, omit the language or use `text`:
+
+````markdown
+```text
+Plain text content
+No highlighting applied
+```
+````
+
+## Inline Code
+
+Inline code uses backticks and is not highlighted:
+
+```markdown
+Use the `console.log()` function.
+```
+
+---
+
+Title: Start
+URL: /start/
+Source: content/start/_index.md
+
+Get Hwaro installed and create your first site in minutes.
+
+## Steps
+
+1. [Installation](/start/installation/) — Install Hwaro on your system
+2. [First Site](/start/first-site/) — Create and run your first site
+3. [CLI](/start/cli/) — Command-line interface reference
+4. [Configuration](/start/config/) — Configure your site with `config.toml`
+5. [Tools & Completion](/start/tools/) — Utility tools and shell completion
+
+---
+
+Title: CLI
+URL: /start/cli/
+Source: content/start/cli.md
+
+Hwaro provides commands for creating, building, and serving your site.
+
+## Commands
+
+### init
+
+Create a new site:
+
+```bash
+hwaro init my-site
+hwaro init my-site --scaffold blog
+hwaro init my-site --scaffold docs
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| --scaffold NAME | Use a scaffold template: simple, blog, docs |
+| -f, --force | Force creation even if directory is not empty |
+| --skip-agents-md | Skip creating AGENTS.md file |
+| --skip-sample-content | Skip creating sample content files |
+| --skip-taxonomies | Skip taxonomies configuration and templates |
+| --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`) |
+
+### new
+
+Create a new content file:
+
+```bash
+hwaro new content/about.md
+hwaro new content/blog/my-post.md
+hwaro new -t "My Post Title"
+hwaro new posts/my-post.md -a posts
+```
+
+Creates a Markdown file with front matter template. Supports **archetypes** for customizable templates.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -t, --title TITLE | Content title |
+| -a, --archetype NAME | Archetype to use |
+
+**Archetypes:**
+
+Archetypes are template files in `archetypes/` directory that define default front matter for new content:
+
+- `archetypes/default.md` - Default template for all content
+- `archetypes/posts.md` - Used for `hwaro new posts/...`
+- `archetypes/tools/develop.md` - Used for `hwaro new tools/develop/...`
+
+Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`
+
+Example archetype (`archetypes/posts.md`):
+```
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+tags: []
+---
+
+# {{ title }}
+```
+
+Archetype matching priority:
+1. Explicit `-a` flag (e.g., `-a posts` uses `archetypes/posts.md`)
+2. Path-based matching (e.g., `posts/hello.md` checks `archetypes/posts.md`)
+3. Nested paths try parent archetypes (e.g., `tools/dev/x.md` tries `tools/dev.md`, then `tools.md`)
+4. Falls back to `archetypes/default.md`
+5. Uses built-in template if no archetype found
+
+### build
+
+Build the site to `public/`:
+
+```bash
+hwaro build
+hwaro build --drafts
+hwaro build --minify
+hwaro build -i /path/to/my-site
+hwaro build -i /path/to/my-site -o ./dist
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -i, --input DIR | Project directory to build (default: current directory) |
+| -o, --output-dir DIR | Output directory (default: public) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| -d, --drafts | Include draft content |
+| --minify | Minify output files (see below) |
+| --no-parallel | Disable parallel processing |
+| --cache | Enable build caching (see below) |
+| --skip-highlighting | Disable syntax highlighting |
+| --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
+| --stream | Enable streaming build to reduce memory usage |
+| --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
+| -v, --verbose | Show detailed output |
+| --profile | Print phase-by-phase and per-template build timing |
+| --debug | Print debug information after build |
+
+**About `--stream` / `--memory-limit` (Streaming Build):**
+
+For sites with thousands of pages, loading all rendered HTML into memory at once can cause high memory usage. Streaming build processes pages in batches during the Render phase, releasing rendered HTML after each batch is written to disk.
+
+- `--stream` enables streaming with a default batch size of 50 pages.
+- `--memory-limit SIZE` enables streaming and calculates the batch size automatically based on the given limit (heuristic: ~50KB per page). Accepts `G`, `M`, `K` suffixes (e.g. `2G`, `512M`, `256K`).
+- You can also set the `HWARO_MEMORYLIMIT` environment variable as a fallback. The CLI flag overrides the env var.
+
+| `--stream` | `--memory-limit` | `HWARO_MEMORYLIMIT` | Result |
+|---|---|---|---|
+| - | - | - | Normal build |
+| yes | - | - | Streaming, batch=50 |
+| - | 2G | - | Streaming, batch≈20000 |
+| - | - | 1G | Streaming, batch≈10000 |
+| yes | 512M | - | Streaming, batch≈5000 |
+| - | 2G | 1G | CLI wins (2G) |
+
+The build output is identical — streaming only affects memory usage during the build.
+
+**About `--minify`:**
+
+The minify flag performs conservative optimization on generated files:
+
+- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, and content structure.
+- **JSON**: Removes whitespace and newlines for compact output.
+- **XML**: Removes whitespace between tags for smaller file sizes.
+
+Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
+
+**About `--cache`:**
+
+When enabled, Hwaro tracks file modification times in a `.hwaro_cache.json` file at the project root. On subsequent builds, only files that have changed since the last build are re-processed. The cache uses millisecond-precision mtime comparison and also verifies that the output file still exists. Use `hwaro build --cache` to enable, or set `cache = true` in `[build]` config.
+
+**About `-i, --input`:**
+
+When specified, Hwaro changes its working directory to the given path before building. This lets you build a site located in another directory without `cd`-ing into it first.
+
+- All site sources (`config.toml`, `content/`, `templates/`, `static/`) are read from the input directory.
+- **Without `-o`:** The default output directory `public/` is created inside the input directory (i.e., the site's own `public/` folder). This is the natural behavior — `hwaro build -i ../my-site` produces `../my-site/public/`.
+- **With `-o`:** The output path is resolved relative to **your current directory** (not the input directory), so `hwaro build -i ../my-site -o ./dist` writes output to `./dist` in your shell's CWD.
+- If `-i` is omitted, behavior is unchanged — the current directory is used.
+
+### serve
+
+Start a development server with live reload:
+
+```bash
+hwaro serve
+hwaro serve --port 8080
+hwaro serve --open
+hwaro serve --access-log
+hwaro serve --live-reload
+hwaro serve -i /path/to/my-site
+hwaro serve -i /path/to/my-site -p 8080
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -i, --input DIR | Project directory to serve (default: current directory) |
+| -b, --bind HOST | Bind address (default: 0.0.0.0) |
+| -p, --port PORT | Port number (default: 3000) |
+| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| --minify | Serve minified output |
+| --open | Open browser after starting |
+| -d, --drafts | Include draft content |
+| -v, --verbose | Show detailed output |
+| --debug | Print debug information after each rebuild |
+| --access-log | Show HTTP access log (e.g. GET requests) |
+| --live-reload | Enable browser live reload on file changes |
+| --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
+| --profile | Print phase-by-phase and per-template build timing |
+
+The server watches for file changes and rebuilds automatically. It uses **smart rebuild strategies** based on what changed:
+
+| Change Type | Strategy | Description |
+|-------------|----------|-------------|
+| `config.toml` | Full rebuild | Rebuilds entire site |
+| `content/` only | Incremental | Rebuilds only affected content pages |
+| `templates/` only | Template re-render | Re-renders all pages with existing content |
+| `static/` only | Static copy | Copies only changed static files |
+| Mixed / new / deleted files | Full rebuild | Rebuilds entire site |
+
+**About `--live-reload`:**
+
+When enabled, the server injects a small WebSocket client script into every HTML response. After each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.
+
+When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
+
+### deploy
+
+Deploy the generated site to configured targets.
+
+```bash
+hwaro deploy [target ...]
+hwaro deploy --dry-run
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -s, --source DIR | Source directory to deploy (default: deployment.source_dir or public) |
+| --dry-run | Show planned changes without writing |
+| --confirm | Ask for confirmation before deploying |
+| --force | Force upload/copy (ignore file comparisons) |
+| --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
+| --list-targets | List configured deployment targets and exit |
+
+### tool
+
+Utility tools for content management:
+
+```bash
+hwaro tool convert toYAML       # Convert frontmatter to YAML
+hwaro tool convert toTOML       # Convert frontmatter to TOML
+hwaro tool list all             # List all content files
+hwaro tool list drafts          # List draft files
+hwaro tool list published       # List published files
+hwaro tool deadlink             # Check for dead external links
+hwaro tool doctor               # Diagnose config and content issues
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| convert | Convert frontmatter between YAML and TOML formats |
+| list | List content files by status (all, drafts, published) |
+| deadlink | Check for dead links in content files |
+| doctor | Diagnose config and content issues |
+
+**Common Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Limit to specific content directory |
+| -h, --help | Show help |
+
+See [Tools & Completion](/start/tools/) for detailed usage.
+
+### completion
+
+Generate shell completion scripts:
+
+```bash
+hwaro completion bash    # Bash completion script
+hwaro completion zsh     # Zsh completion script
+hwaro completion fish    # Fish completion script
+```
+
+**Installation:**
+
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(hwaro completion bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(hwaro completion zsh)"
+
+# Fish (add to ~/.config/fish/config.fish)
+hwaro completion fish | source
+```
+
+See [Tools & Completion](/start/tools/) for detailed installation instructions.
+
+## Examples
+
+```bash
+# Development workflow
+hwaro serve --drafts --verbose
+
+# Development with HTTP access log
+hwaro serve --access-log
+
+# Development with auto browser refresh
+hwaro serve --live-reload
+
+# Production build
+hwaro build
+
+# Custom output directory
+hwaro build -o dist
+
+# Preview on specific port
+hwaro serve -p 8000 --open
+
+# Build a site in another directory
+hwaro build -i ~/projects/my-blog
+
+# Build a remote project and output to current directory
+hwaro build -i ~/projects/my-blog -o ./output
+
+# Streaming build for large sites
+hwaro build --stream
+hwaro build --memory-limit 512M
+
+# Streaming build with env var
+HWARO_MEMORYLIMIT=1G hwaro build
+
+# Serve a site from another directory
+hwaro serve -i ~/projects/my-blog --open
+```
+
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| -h, --help | Show help |
+| -v, --verbose | Verbose output |
+
+---
+
+Title: Configuration
+URL: /start/config/
+Source: content/start/config.md
+
+All site configuration lives in `config.toml` at the project root.
+
+## Site Settings
+
+```toml
+title = "My Site"
+description = "Site description for SEO"
+base_url = "https://example.com"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| title | string | Site title |
+| description | string | Site description |
+| base_url | string | Production URL (no trailing slash) |
+
+## Build Options
+
+```toml
+[build]
+output_dir = "public"
+drafts = false
+parallel = true
+cache = false
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| output_dir | string | "public" | Output directory |
+| drafts | bool | false | Include draft content |
+| parallel | bool | true | Parallel processing |
+| cache | bool | false | Enable build caching |
+
+### Build Hooks
+
+Run commands before/after build:
+
+```toml
+[build]
+hooks.pre = ["npm install", "npx tsc"]
+hooks.post = ["npm run minify"]
+```
+
+## Markdown
+
+```toml
+[markdown]
+safe = false
+lazy_loading = true
+emoji = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| safe | bool | false | Strip raw HTML from markdown |
+| lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
+| emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
+
+## Permalinks
+
+Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.
+
+```toml
+[permalinks]
+"old/posts" = "posts"
+"2023/drafts" = "archive/2023"
+```
+
+| Source (Directory) | Target (URL Path) | Example Effect |
+|-------------------|-------------------|----------------|
+| `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
+
+## SEO
+
+### Feeds
+
+```toml
+[feeds]
+enabled = true
+type = "rss"
+limit = 20
+truncate = 0
+filename = "feed.xml"
+sections = []
+default_language_only = true   # true: main feed = default language only, false: all languages
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable feed generation |
+| type | string | "rss" | Feed format (`"rss"` or `"atom"`) |
+| limit | int | 10 | Maximum number of items in the feed |
+| truncate | int | 0 | Truncate content to N characters (0 = no truncation) |
+| filename | string | "" | Output filename (auto-determined if empty) |
+| sections | array | [] | Limit feed to specific sections |
+| default_language_only | bool | true | Only include default language in main feed |
+
+### Sitemap
+
+```toml
+[sitemap]
+enabled = true
+filename = "sitemap.xml"
+changefreq = "weekly"
+priority = 0.5
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable sitemap generation |
+| filename | string | "sitemap.xml" | Output filename |
+| changefreq | string | "weekly" | Default change frequency (`always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never`) |
+| priority | float | 0.5 | Default priority (0.0 to 1.0) |
+| exclude | array | [] | Exclude paths (prefixes) from sitemap |
+
+### Robots.txt
+
+```toml
+[robots]
+enabled = true
+
+[[robots.rules]]
+user_agent = "*"
+allow = ["/"]
+disallow = ["/private"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | true | Enable robots.txt generation |
+| filename | string | "robots.txt" | Output filename |
+| rules | array | [] | List of robot rules |
+
+Each rule in `rules` supports:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| user_agent | string | User-agent to match (e.g. `"*"`, `"Googlebot"`) |
+| allow | array | Paths to allow |
+| disallow | array | Paths to disallow |
+
+### OpenGraph
+
+```toml
+[og]
+default_image = "/images/og.png"
+type = "website"
+twitter_card = "summary_large_image"
+twitter_site = "@username"
+twitter_creator = "@authorname"
+fb_app_id = "your_fb_app_id"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| default_image | string | — | Fallback image when page has none |
+| type | string | "article" | OpenGraph type (`website`, `article`) |
+| twitter_card | string | "summary_large_image" | Twitter card type (`summary`, `summary_large_image`) |
+| twitter_site | string | — | Site's Twitter handle |
+| twitter_creator | string | — | Author's Twitter handle |
+| fb_app_id | string | — | Facebook App ID |
+
+See [SEO](/features/seo/) for template usage and output examples.
+
+## LLMs.txt
+
+Generate instruction files for AI/LLM crawlers:
+
+```toml
+[llms]
+enabled = true
+filename = "llms.txt"
+instructions = "This site's content is provided under the MIT license."
+full_enabled = true
+full_filename = "llms-full.txt"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate `llms.txt` |
+| filename | string | "llms.txt" | Output filename |
+| instructions | string | "" | Instructions text for LLM crawlers |
+| full_enabled | bool | false | Generate full content version (`llms-full.txt`) |
+| full_filename | string | "llms-full.txt" | Full version filename |
+
+See [LLMs.txt](/features/llms-txt/) for details.
+
+## Search
+
+```toml
+[search]
+enabled = true
+format = "fuse_json"
+fields = ["title", "content"]
+filename = "search.json"
+exclude = ["/private", "/drafts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate search index |
+| format | string | "fuse_json" | Search index format |
+| fields | array | ["title", "content"] | Fields to include in index |
+| filename | string | "search.json" | Output filename |
+| exclude | array | [] | Exclude paths (prefixes) from search index |
+
+## Pagination
+
+Site-level pagination defaults. These apply when sections enable pagination via front matter.
+
+```toml
+[pagination]
+enabled = false
+per_page = 10
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable pagination globally |
+| per_page | int | 10 | Default items per page |
+
+See [Pagination](/features/pagination/) for section-level configuration and template usage.
+
+## Taxonomies
+
+```toml
+[[taxonomies]]
+name = "tags"
+feed = true
+paginate = 10
+
+[[taxonomies]]
+name = "categories"
+feed = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| name | string | — | Taxonomy name (used in front matter) |
+| feed | bool | false | Generate RSS feed for each term |
+| sitemap | bool | true | Include taxonomy pages in sitemap |
+| paginate | int | — | Pages per pagination page |
+
+## Syntax Highlighting
+
+```toml
+[highlight]
+enabled = true
+theme = "github-dark"
+use_cdn = true
+```
+
+## Auto Includes
+
+Automatically include CSS/JS from static directories:
+
+```toml
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]
+```
+
+## Multilingual
+
+```toml
+default_language = "en"
+
+[languages.en]
+language_name = "English"
+weight = 1
+
+[languages.ko]
+language_name = "한국어"
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = ["tags", "categories"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| default_language | string | "en" | Default language code |
+| language_name | string | — | Human-readable language name |
+| weight | int | 0 | Sort order (lower = first) |
+| generate_feed | bool | false | Generate RSS feed for this language |
+| build_search_index | bool | false | Include in search index |
+| taxonomies | array | [] | Taxonomies for this language |
+
+See [Multilingual](/features/multilingual/) for content structure and template usage.
+
+## Deployment
+
+Configure deployment targets for the `hwaro deploy` command.
+
+```toml
+[deployment]
+confirm = false
+dry_run = false
+force = false
+max_deletes = 256
+source_dir = "public"
+
+[[deployment.targets]]
+name = "prod"
+url = "file:///var/www/mysite"
+
+[[deployment.targets]]
+name = "s3"
+url = "s3://your-bucket"
+command = "aws s3 sync {source}/ {url} --delete"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| confirm | bool | false | Ask for confirmation before deploying |
+| dry_run | bool | false | Show changes without writing |
+| force | bool | false | Force upload (ignore file comparisons) |
+| max_deletes | int | 256 | Maximum deletions allowed (-1 to disable) |
+| source_dir | string | "public" | Source directory to deploy |
+
+### Target Options
+
+| Key | Type | Description |
+|-----|------|-------------|
+| name | string | Target identifier |
+| url | string | Destination URL or path |
+| command | string | Custom deploy command (overrides URL-based deployment) |
+| include | string | Glob pattern for files to include |
+| exclude | string | Glob pattern for files to exclude |
+| strip_index_html | bool | Remove `index.html` from paths |
+
+Custom commands support placeholders: `{source}`, `{url}`, `{target}`.
+
+## Content Files
+
+Publish non-Markdown files from `content/` to the output directory:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "pdf"]
+disallow_extensions = ["psd", "ai"]
+disallow_paths = ["drafts/**", "**/_*"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| allow_extensions | array | [] | File extensions to publish |
+| disallow_extensions | array | [] | File extensions to exclude |
+| disallow_paths | array | [] | Glob patterns for paths to exclude |
+
+See [Content Files](/features/content-files/) for details.
+
+## Full Example
+
+```toml
+title = "My Blog"
+description = "A blog about programming"
+base_url = "https://myblog.com"
+default_language = "en"
+
+[build]
+output_dir = "public"
+drafts = false
+parallel = true
+hooks.pre = ["npm ci"]
+hooks.post = ["npm run optimize"]
+
+[markdown]
+safe = false
+lazy_loading = true
+emoji = false
+
+[permalinks]
+"old/posts" = "posts"
+
+[feeds]
+enabled = true
+limit = 20
+
+[sitemap]
+enabled = true
+changefreq = "weekly"
+priority = 0.5
+
+[pagination]
+enabled = false
+per_page = 10
+
+[robots]
+enabled = true
+
+[llms]
+enabled = true
+instructions = "Content under MIT license."
+full_enabled = true
+
+[og]
+default_image = "/images/og-default.png"
+twitter_card = "summary_large_image"
+twitter_site = "@myblog"
+twitter_creator = "@myblog"
+
+[search]
+enabled = true
+format = "fuse_json"
+fields = ["title", "content"]
+
+[highlight]
+enabled = true
+theme = "github-dark"
+use_cdn = true
+
+[auto_includes]
+enabled = true
+dirs = ["assets/css", "assets/js"]
+
+[content.files]
+allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
+
+[[taxonomies]]
+name = "tags"
+feed = true
+
+[[taxonomies]]
+name = "categories"
+
+[deployment]
+source_dir = "public"
+
+[[deployment.targets]]
+name = "prod"
+url = "file:///var/www/myblog"
+```
+
+## See Also
+
+- [Features](/features/) — All built-in features
+- [CLI](/start/cli/) — Command-line options that override config
+- [Multilingual](/features/multilingual/) — Multilingual configuration details
+- [LLMs.txt](/features/llms-txt/) — LLM instructions configuration
+- [Build Hooks](/features/build-hooks/) — Pre/post build commands
+
+---
+
+Title: First Site
+URL: /start/first-site/
+Source: content/start/first-site.md
+
+Create your first Hwaro site in 5 minutes.
+
+## 1. Create Project
+
+```bash
+hwaro init my-site --scaffold blog
+cd my-site
+```
+
+Scaffolds available:
+- `simple` — Landing pages, small sites
+- `blog` — Posts with tags and categories
+- `docs` — Documentation with sidebar
+
+## 2. Start Development Server
+
+```bash
+hwaro serve
+```
+
+Open `http://localhost:3000`. Changes reload automatically.
+
+## 3. Project Structure
+
+```
+my-site/
+├── config.toml      # Site configuration
+├── content/         # Markdown content
+│   ├── index.md     # Homepage
+│   └── blog/        # Blog section
+│       ├── _index.md
+│       └── hello.md
+├── templates/       # Jinja2 templates
+├── static/          # Static files (CSS, JS, images)
+└── public/          # Generated output
+```
+
+## 4. Edit Configuration
+
+Open `config.toml`:
+
+```toml
+title = "My Site"
+description = "A site built with Hwaro"
+base_url = "https://example.com"
+```
+
+## 5. Create a Page
+
+```bash
+hwaro new content/about.md
+```
+
+Edit `content/about.md`:
+
+```markdown
++++
+title = "About"
++++
+
+Welcome to my site!
+```
+
+Visit `http://localhost:3000/about/`.
+
+## 6. Create a Section
+
+Sections group related content. Create a blog section:
+
+```bash
+mkdir -p content/blog
+```
+
+Create `content/blog/_index.md`:
+
+```markdown
++++
+title = "Blog"
+sort_by = "date"
++++
+
+My blog posts.
+```
+
+Create `content/blog/first-post.md`:
+
+```markdown
++++
+title = "My First Post"
+date = "2024-01-15"
+tags = ["hello"]
++++
+
+Hello, world!
+```
+
+Visit `http://localhost:3000/blog/`.
+
+## 7. Build for Production
+
+```bash
+hwaro build
+```
+
+Deploy the `public/` directory to any static host.
+
+## Next Steps
+
+- [CLI Commands](/start/cli/) — All available commands
+- [Configuration](/start/config/) — Full config reference
+- [Writing Content](/writing/) — Pages, sections, taxonomies
+
+---
+
+Title: Installation
+URL: /start/installation/
+Source: content/start/installation.md
+
+Hwaro is written in Crystal. You can install it from source or use a pre-built binary.
+
+## Homebrew
+
+```bash
+brew tap hwaro/hwaro
+brew install hwaro
+```
+
+## From Source
+
+### Prerequisites
+
+- [Crystal](https://crystal-lang.org/install/) 1.19+
+- Git
+
+### Build
+
+```bash
+git clone https://github.com/hahwul/hwaro
+cd hwaro
+shards install
+shards build --release
+```
+
+The binary is created at `./bin/hwaro`.
+
+### Add to PATH (Optional)
+
+```bash
+# Copy to a directory in your PATH
+sudo cp ./bin/hwaro /usr/local/bin/
+
+# Or add the bin directory to PATH
+export PATH="$PATH:$(pwd)/bin"
+```
+
+## Verify Installation
+
+```bash
+hwaro --version
+```
+
+## Next Steps
+
+- [Create your first site →](/start/first-site/)
+
+---
+
+Title: Tools & Completion
+URL: /start/tools/
+Source: content/start/tools.md
+
+Hwaro includes utility tools for content management and shell completion scripts for a better CLI experience.
+
+## Tool Commands
+
+The `hwaro tool` command provides utility subcommands for working with content files.
+
+### convert — Frontmatter Converter
+
+Convert frontmatter between YAML and TOML formats across your content files.
+
+```bash
+# Convert all frontmatter to YAML
+hwaro tool convert toYAML
+
+# Convert all frontmatter to TOML
+hwaro tool convert toTOML
+
+# Convert only in a specific directory
+hwaro tool convert toYAML -c posts
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Limit conversion to a specific content directory |
+| -h, --help | Show help |
+
+**Example — TOML to YAML:**
+
+Before:
+
+```markdown
++++
+title = "My Post"
+date = "2024-01-15"
+tags = ["crystal", "tutorial"]
++++
+
+Content here.
+```
+
+After `hwaro tool convert toYAML`:
+
+```markdown
+---
+title: "My Post"
+date: "2024-01-15"
+tags:
+  - crystal
+  - tutorial
+---
+
+Content here.
+```
+
+### list — Content Lister
+
+List content files filtered by status.
+
+```bash
+# List all content files
+hwaro tool list all
+
+# List only draft files
+hwaro tool list drafts
+
+# List only published files
+hwaro tool list published
+
+# List files in a specific directory
+hwaro tool list all -c posts
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Limit listing to a specific content directory |
+| -h, --help | Show help |
+
+**Filters:**
+
+| Filter | Description |
+|--------|-------------|
+| all | Show all content files |
+| drafts | Show only files with `draft = true` |
+| published | Show only files with `draft = false` or no draft field |
+
+### deadlink — Dead Link Checker
+
+Check for broken external links in your content files.
+
+```bash
+hwaro tool deadlink
+```
+
+This command:
+
+1. Scans all Markdown files in the `content/` directory
+2. Finds external URLs (http/https links)
+3. Sends concurrent HEAD requests to each URL
+4. Reports broken or unreachable links
+
+**Example output:**
+
+```
+Checking links in content/...
+Found 42 external links in 15 files
+
+✓ https://example.com (200)
+✓ https://crystal-lang.org (200)
+✗ https://old-site.com/page (404)
+✗ https://broken-link.invalid (Connection refused)
+
+Results: 40 OK, 2 broken
+```
+
+### doctor — Site Diagnostics
+
+Diagnose configuration and content issues in your Hwaro site.
+
+```bash
+hwaro tool doctor
+
+# Check only a specific content directory
+hwaro tool doctor -c posts
+```
+
+This command checks:
+
+**Config diagnostics:**
+
+- `base_url` is not set
+- `title` is still the default value
+- `feeds.enabled` is true but `feeds.filename` is empty
+- `sitemap.changefreq` has an invalid value
+- `sitemap.priority` is out of range (0.0–1.0)
+- Duplicate taxonomy names
+- Invalid `search.format` value
+
+**Content diagnostics:**
+
+- Missing `title` in frontmatter
+- Missing `description` in frontmatter
+- Missing `date` in frontmatter
+- Images without alt text (`![](url)`)
+- Frontmatter parse errors (TOML/YAML)
+- Draft files (reported as info)
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -c, --content DIR | Content directory to check |
+| -h, --help | Show help |
+
+**Example output:**
+
+```
+Running diagnostics...
+
+Config:
+  ⚠ config.toml: base_url is not set
+  ⚠ config.toml: feeds.enabled is true but feeds.filename is not set
+
+Content:
+  ⚠ content/blog/draft.md: Missing description in frontmatter
+  ℹ content/blog/draft.md: File is marked as draft
+  ⚠ content/about.md: Image missing alt text: ![](photo.jpg)
+
+Found 0 error(s), 3 warning(s), 1 info(s)
+```
+
+---
+
+## Shell Completion
+
+Hwaro can generate completion scripts for your shell, providing tab completion for commands, subcommands, and flags.
+
+### Supported Shells
+
+| Shell | Command |
+|-------|---------|
+| Bash | `hwaro completion bash` |
+| Zsh | `hwaro completion zsh` |
+| Fish | `hwaro completion fish` |
+
+### Installation
+
+#### Bash
+
+Add to your `~/.bashrc`:
+
+```bash
+eval "$(hwaro completion bash)"
+```
+
+Or save to a file:
+
+```bash
+hwaro completion bash > /etc/bash_completion.d/hwaro
+```
+
+#### Zsh
+
+Add to your `~/.zshrc`:
+
+```bash
+eval "$(hwaro completion zsh)"
+```
+
+Or save to your fpath:
+
+```bash
+hwaro completion zsh > ~/.zsh/completions/_hwaro
+```
+
+#### Fish
+
+Add to your `~/.config/fish/config.fish`:
+
+```fish
+hwaro completion fish | source
+```
+
+Or save to the completions directory:
+
+```bash
+hwaro completion fish > ~/.config/fish/completions/hwaro.fish
+```
+
+### What Gets Completed
+
+The completion scripts provide tab completion for:
+
+- **Commands**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `completion`
+- **Subcommands**: `hwaro tool <TAB>` → `convert`, `list`, `check`
+- **Flags**: `hwaro build <TAB>` → `--output-dir`, `--drafts`, `--minify`, etc.
+- **Positional arguments**: `hwaro completion <TAB>` → `bash`, `zsh`, `fish`
+- **Positional choices**: `hwaro tool convert <TAB>` → `toYAML`, `toTOML`
+
+### Automatic Updates
+
+Completion scripts are generated dynamically from command metadata. When you update Hwaro to a new version with new commands or flags, regenerating the completion script will automatically include them.
+
+```bash
+# Regenerate after updating hwaro
+eval "$(hwaro completion bash)"
+```
+
+## See Also
+
+- [CLI](/start/cli/) — Full CLI command reference
+- [Configuration](/start/config/) — Site configuration
+- [Build Hooks](/features/build-hooks/) — Custom build commands
+
+---
+
+Title: Templates
+URL: /templates/
+Source: content/templates/_index.md
+
+Templates define how content becomes HTML. Hwaro uses Crinja, a Jinja2-compatible engine.
+
+## Template Directory
+
+```
+templates/
+├── base.html           # Base layout
+├── page.html           # Regular pages
+├── section.html        # Section index pages
+├── index.html          # Homepage (optional)
+├── taxonomy.html       # Taxonomy listing
+├── taxonomy_term.html  # Taxonomy term page
+├── 404.html            # Error page
+└── shortcodes/         # Shortcode templates
+```
+
+## Template Selection
+
+| Content | Template |
+|---------|----------|
+| content/index.md | index.html or page.html |
+| content/about.md | page.html |
+| content/blog/_index.md | section.html |
+| content/blog/post.md | page.html |
+| Taxonomy index | taxonomy.html |
+| Taxonomy term | taxonomy_term.html |
+
+## Quick Example
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  <time>{{ page.date }}</time>
+  {{ content | safe }}
+</article>
+{% endblock %}
+```
+
+---
+
+Title: Data Model
+URL: /templates/data-model/
+Source: content/templates/data-model.md
+
+Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. Understanding their hierarchy is essential for building templates.
+
+## Hierarchy
+
+```
+Site
+├── Config (title, base_url, ...)
+├── Pages[] (standalone pages)
+├── Sections[]
+│   ├── Pages[] (pages in section)
+│   └── Subsections[]
+│       ├── Pages[]
+│       └── Subsections[] (recursive)
+└── Taxonomies{}
+    └── Terms{}
+        └── Pages[]
+```
+
+### Relationships
+
+- A **Site** contains multiple **Sections** and standalone **Pages**
+- A **Section** contains **Pages** and child **Subsections**
+- **Subsections** can nest indefinitely
+- **Taxonomies** group **Pages** by terms
+
+## Site
+
+The root container. Configured in `config.toml`.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| site.title | String | Site title |
+| site.description | String | Site description |
+| site.base_url | String | Base URL (no trailing slash) |
+| site.pages | Array<Page> | All non-section pages |
+| site.sections | Array<Section> | All section index pages |
+| site.taxonomies | Object | All taxonomy groups and terms |
+| site.data | Object | Data loaded from `data/` directory |
+| site.authors | Object | Aggregated author data |
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| site_title | site.title |
+| site_description | site.description |
+| base_url | site.base_url |
+
+### Data Directory
+
+Hwaro allows you to store auxiliary data in the `data/` directory. Files ending in `.yml`, `.yaml`, `.json`, or `.toml` are automatically loaded and exposed via `site.data`.
+
+#### File Structure
+
+```text
+data/
+├── authors.yml
+├── products.json
+└── config.toml
+```
+
+#### Accessing Data
+
+Data is accessed by the filename (without extension).
+
+For example, `data/products.json`:
+
+```json
+[
+  {"name": "Widget", "price": 10},
+  {"name": "Gadget", "price": 20}
+]
+```
+
+Can be accessed in templates:
+
+```jinja
+{% for product in site.data.products %}
+  <h2>{{ product.name }}</h2>
+  <p>{{ product.price }}</p>
+{% endfor %}
+```
+
+### Site Authors
+
+Hwaro automatically aggregates all authors defined in the `authors` front matter field (`authors = ["id"]`) into `site.authors`.
+
+#### Defining Authors
+
+You can enrich author data by creating a `data/authors.yml` (or `.json`, `.toml`) file. Keys must match the author IDs used in the page front matter.
+
+**content/my-post.md**
+
+```yaml
+---
+title: "My Post"
+authors: ["john-doe"]
+---
+```
+
+**data/authors.yml**
+
+```yaml
+john-doe:
+  name: "John Doe"
+  bio: "Creator of things."
+  avatar: "/images/john.jpg"
+```
+
+#### Usage in Templates
+
+The `site.authors` object contains all authors found on the site. Each author object has:
+- `key`: The author ID (e.g., "john-doe")
+- `name`: The author name (from data or ID fallback)
+- `pages`: List of pages by this author (sorted by date)
+- Any custom fields from `data/authors.yml`
+
+```jinja
+{% for id, author in site.authors %}
+  <div class="author">
+    <img src="{{ author.avatar }}" alt="{{ author.name }}">
+    <h3>{{ author.name }}</h3>
+    <p>{{ author.bio }}</p>
+
+    <h4>Recent Posts</h4>
+    <ul>
+    {% for p in author.pages %}
+      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    {% endfor %}
+    </ul>
+  </div>
+{% endfor %}
+```
+
+### Example
+
+```jinja
+<title>{{ site.title }}</title>
+<link rel="canonical" href="{{ site.base_url }}{{ page.url }}">
+```
+
+---
+
+## Section
+
+A directory with `_index.md` that groups related content.
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| section.title | String | Section title |
+| section.description | String? | Section description |
+| section.pages | Array<Page> | Pages in this section |
+| section.pages_count | Int | Number of pages |
+| section.list | String | Pre-rendered HTML list (`section_list`) |
+| section.subsections | Array<Section> | Child sections |
+| section.assets | Array<String> | Static files in section |
+| section.page_template | String? | Default template for pages |
+| section.paginate_path | String | Pagination URL pattern |
+| section.redirect_to | String? | Redirect URL |
+
+For the current section URL in `section.html`, use `page.url`.
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| section_title | section.title |
+| section_description | section.description |
+| section_list | Pre-rendered HTML list of pages |
+
+### From Front Matter
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| sort_by | String? | "date" | Sort by: date, weight, title |
+| reverse | Bool? | false | Reverse sort order |
+| paginate | Int? | — | Pages per page |
+| transparent | Bool | false | Pass pages to parent |
+| generate_feeds | Bool | false | Generate RSS feed |
+
+### Iterating Pages
+
+```jinja
+{% for p in section.pages %}
+<article>
+  <h2><a href="{{ p.url }}">{{ p.title }}</a></h2>
+  <time>{{ p.date }}</time>
+  {% if p.description %}
+  <p>{{ p.description }}</p>
+  {% endif %}
+</article>
+{% endfor %}
+```
+
+### Iterating Subsections
+
+```jinja
+{% for sub in section.subsections %}
+<div class="category">
+  <a href="{{ sub.url }}">{{ sub.title }}</a>
+  <span>({{ sub.pages_count }} articles)</span>
+</div>
+{% endfor %}
+```
+
+### Using section_list
+
+For simple listings, use the pre-rendered HTML:
+
+```jinja
+<ul>{{ section_list | safe }}</ul>
+```
+
+---
+
+## Page
+
+An individual content file (`.md`).
+
+### Core Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.title | String | Page title |
+| page.description | String? | Page description |
+| page.url | String | Relative URL path |
+| page.permalink | String? | Absolute URL with base_url |
+| page.section | String | Parent section name |
+| page.date | String? | Publication date (YYYY-MM-DD) |
+| page.updated | String? | Last updated date |
+| page.language | String | Effective language code |
+| page.translations | Array<TranslationLink> | Language variants |
+
+Rendered HTML content is available as the top-level `content` variable.
+
+### Metadata Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.draft | Bool | Is draft |
+| page.weight | Int | Sort weight |
+| page.image | String? | Featured image path |
+| page.authors | Array<String> | Author names |
+| page.extra | Object | Custom front matter fields |
+
+### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.word_count | Int | Word count |
+| page.reading_time | Int | Reading time (minutes) |
+| page.summary | String? | Content before <!-- more --> |
+| page.assets | Array<String> | Static files in page bundle |
+
+### Boolean Flags
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| page.toc | Bool | false | Show table of contents |
+| page.render | Bool | true | Should render |
+| page.is_index | Bool | — | Is index file |
+| page.generated | Bool | false | Auto-generated page |
+| page.in_sitemap | Bool | true | Include in sitemap |
+| page.in_search_index | Bool | true | Include in search |
+
+### Navigation Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.lower | Page? | Previous page in section |
+| page.higher | Page? | Next page in section |
+| page.ancestors | Array<Page> | Parent section chain |
+| page.translations | Array<TranslationLink> | Language variants |
+
+### Custom Metadata
+
+| Property | Type | Description |
+|----------|------|-------------|
+| page.extra | Object | Custom front matter fields |
+
+### Flat Aliases
+
+| Variable | Equivalent |
+|----------|------------|
+| page_title | page.title |
+| page_description | page.description |
+| page_url | page.url |
+| page_section | page.section |
+| page_date | page.date |
+| page_image | page.image |
+| page_summary | page.summary |
+| page_word_count | page.word_count |
+| page_reading_time | page.reading_time |
+| page_permalink | page.permalink |
+| page_authors | page.authors |
+| page_weight | page.weight |
+| page_language | page.language |
+| page_translations | page.translations |
+| taxonomy_name | Current taxonomy name (taxonomy pages) |
+| taxonomy_term | Current taxonomy term (taxonomy term pages) |
+| content | Rendered HTML content |
+
+---
+
+## Navigation Objects
+
+### page.lower / page.higher
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .title | String | Page title |
+| .url | String | Page URL |
+| .description | String? | Page description |
+| .date | String? | Page date |
+
+```jinja
+<nav class="post-nav">
+  {% if page.lower %}
+  <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  {% endif %}
+  
+  {% if page.higher %}
+  <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  {% endif %}
+</nav>
+```
+
+### page.ancestors
+
+Parent sections for breadcrumbs:
+
+```jinja
+<nav class="breadcrumbs">
+  <a href="/">Home</a>
+  {% for ancestor in page.ancestors %}
+  / <a href="{{ ancestor.url }}">{{ ancestor.title }}</a>
+  {% endfor %}
+  / <span>{{ page.title }}</span>
+</nav>
+```
+
+### page.translations
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .code | String | Language code (e.g., "en") |
+| .url | String | Translated page URL |
+| .title | String | Title in that language |
+| .is_current | Bool | Current page's language |
+| .is_default | Bool | Default language |
+
+```jinja
+{% if page.translations %}
+<nav class="lang-switcher">
+{% for t in page.translations %}
+  {% if t.is_current %}
+  <span>{{ t.code | upper }}</span>
+  {% else %}
+  <a href="{{ t.url }}">{{ t.code | upper }}</a>
+  {% endif %}
+{% endfor %}
+</nav>
+{% endif %}
+```
+
+---
+
+## Accessing page.extra
+
+Custom metadata from front matter:
+
+```markdown
++++
+title = "Review"
+
+[extra]
+rating = 4.5
+featured = true
+pros = ["Fast", "Reliable"]
++++
+```
+
+```jinja
+{% if page.extra.featured %}
+<span class="badge">Featured</span>
+{% endif %}
+
+<div class="rating">{{ page.extra.rating }} / 5</div>
+
+<ul>
+{% for pro in page.extra.pros %}
+  <li>{{ pro }}</li>
+{% endfor %}
+</ul>
+```
+
+---
+
+### Time Variables
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| current_year | Int | Current year (e.g., 2025) |
+| current_date | String | Current date (YYYY-MM-DD) |
+| current_datetime | String | Current datetime |
+
+```jinja
+<footer>&copy; {{ current_year }} {{ site.title }}</footer>
+```
+
+---
+
+### SEO Variables
+
+| Variable | Description |
+|----------|-------------|
+| og_tags | OpenGraph meta tags |
+| twitter_tags | Twitter Card meta tags |
+| og_all_tags | Both OG and Twitter tags |
+| canonical_tag | Canonical link tag |
+| hreflang_tags | Hreflang alternate link tags (multilingual) |
+
+```jinja
+<head>
+  {{ og_all_tags | safe }}
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+</head>
+```
+
+---
+
+### Asset Variables
+
+| Variable | Description |
+|----------|-------------|
+| highlight_css | Syntax highlighting CSS |
+| highlight_js | Syntax highlighting JS |
+| highlight_tags | Both CSS and JS |
+| auto_includes_css | Auto-included CSS |
+| auto_includes_js | Auto-included JS |
+| auto_includes | All auto-includes |
+
+```jinja
+<head>
+  {{ highlight_css | safe }}
+  {{ auto_includes_css | safe }}
+</head>
+<body>
+  ...
+  {{ highlight_js | safe }}
+  {{ auto_includes_js | safe }}
+</body>
+```
+
+---
+
+### Table of Contents
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| toc | String | Generated TOC HTML |
+| toc_obj.html | String | Same TOC HTML in object form |
+
+Only available when `toc = true` in front matter:
+
+```jinja
+{% if page.toc %}
+<aside class="toc">
+  {{ toc | safe }}
+</aside>
+{% endif %}
+```
+
+---
+
+### Taxonomy Variables
+
+Available in taxonomy templates:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name (e.g., "tags") |
+| taxonomy_term | String | Current term name |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
+| taxonomy_pages | Array<Page> | Pages for term |
+
+---
+
+## Type Reference
+
+### Quick Reference
+
+| Type | Description |
+|------|-------------|
+| String | Text value |
+| String? | Optional text (may be nil) |
+| Int | Integer number |
+| Bool | true/false |
+| Array<T> | List of type T |
+| Object | Key-value map |
+
+### Template Checking
+
+```jinja
+{# Check for nil #}
+{% if page.description %}...{% endif %}
+
+{# Check for empty array #}
+{% if page.authors %}...{% endif %}
+
+{# Check for empty string #}
+{% if page.description is present %}...{% endif %}
+
+{# Default value #}
+{{ page.description | default(value=site.description) }}
+```
+
+---
+
+## Example Templates
+
+### page.html
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  
+  <div class="meta">
+    <time>{{ page.date }}</time>
+    {% if page.authors %}
+    <span>by {{ page.authors | join(", ") }}</span>
+    {% endif %}
+    <span>{{ page.reading_time }} min read</span>
+  </div>
+  
+  {% if page.toc %}
+  <nav class="toc">{{ toc | safe }}</nav>
+  {% endif %}
+  
+  <div class="content">
+    {{ content | safe }}
+  </div>
+  
+  {% if page.lower or page.higher %}
+  <nav class="post-nav">
+    {% if page.lower %}
+    <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+    {% endif %}
+    {% if page.higher %}
+    <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</article>
+{% endblock %}
+```
+
+### section.html
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h1>{{ section.title }}</h1>
+  {% if section.description %}
+  <p class="lead">{{ section.description }}</p>
+  {% endif %}
+  
+  {{ content | safe }}
+  
+  <h2>Articles ({{ section.pages_count }})</h2>
+  <ul class="article-list">
+  {% for p in section.pages %}
+    <li>
+      <a href="{{ p.url }}">{{ p.title }}</a>
+      {% if p.date %}<time>{{ p.date }}</time>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  
+  {% if section.subsections %}
+  <h2>Categories</h2>
+  <ul>
+  {% for sub in section.subsections %}
+    <li>
+      <a href="{{ sub.url }}">{{ sub.title }}</a>
+      ({{ sub.pages_count }})
+    </li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+  
+  {{ pagination | safe }}
+</section>
+{% endblock %}
+```
+
+---
+
+## See Also
+
+- [Template Syntax](/templates/syntax/) — Jinja2 basics
+- [Functions](/templates/functions/) — Data retrieval functions
+- [Filters](/templates/filters/) — Value transformation
+
+---
+
+Title: Filters
+URL: /templates/filters/
+Source: content/templates/filters.md
+
+Filters transform values in templates. Apply with the pipe `|` operator.
+
+## Syntax
+
+```jinja
+{{ value | filter }}
+{{ value | filter(arg="value") }}
+{{ value | filter1 | filter2 }}
+```
+
+## Text Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| upper | Uppercase | {{ "hello" \| upper }} → HELLO |
+| lower | Lowercase | {{ "HELLO" \| lower }} → hello |
+| capitalize | Capitalize first | {{ "hello" \| capitalize }} → Hello |
+| trim | Remove whitespace | {{ "  hi  " \| trim }} → hi |
+| replace | Replace text | {{ "hello" \| replace("l", "x") }} → hexxo |
+| slugify | URL slug | {{ "Hello World" \| slugify }} → hello-world |
+| truncate_words | Limit words | {{ text \| truncate_words(20) }} |
+
+## HTML Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| safe | Don't escape HTML | {{ content \| safe }} |
+| strip_html | Remove HTML tags | {{ html \| strip_html }} |
+| markdownify | Render Markdown | {{ text \| markdownify }} |
+| xml_escape | XML escape | {{ text \| xml_escape }} |
+
+## Array Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| length | Get length | {{ items \| length }} |
+| first | First element | {{ items \| first }} |
+| last | Last element | {{ items \| last }} |
+| reverse | Reverse order | {{ items \| reverse }} |
+| sort | Sort array | {{ items \| sort }} |
+| join | Join elements | {{ tags \| join(", ") }} |
+| split | Split string | {{ "a,b,c" \| split(pat=",") }} |
+| where | Filter objects by field value | {{ posts \| where(attribute="draft", value=false) }} |
+| sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
+| group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
+
+## URL Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| absolute_url | Full URL with base | {{ "/about/" \| absolute_url }} |
+| relative_url | Prefix base_url | {{ "/img.png" \| relative_url }} |
+
+## Data Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| default | Fallback value | {{ value \| default(value="N/A") }} |
+| jsonify | JSON encode | {{ data \| jsonify }} |
+| date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
+
+## Examples
+
+### Safe HTML
+
+Always use `safe` for rendered content:
+
+```jinja
+{{ content | safe }}
+{{ og_tags | safe }}
+{{ toc | safe }}
+```
+
+### Default Values
+
+```jinja
+{{ page.description | default(value=site.description) }}
+{{ page.image | default(value="/images/default.png") }}
+```
+
+### Date Formatting
+
+```jinja
+<time>{{ page.date | date("%B %d, %Y") }}</time>
+```
+
+Format codes:
+- `%Y` — Year (2024)
+- `%m` — Month (01-12)
+- `%d` — Day (01-31)
+- `%B` — Month name (January)
+- `%b` — Month abbr (Jan)
+
+### URL Handling
+
+```jinja
+<a href="{{ page.url | absolute_url }}">Permalink</a>
+<img src="{{ "/logo.png" | relative_url }}">
+```
+
+### String Processing
+
+```jinja
+{{ page.title | upper }}
+{{ page.title | slugify }}
+{{ long_text | truncate_words(50) }}
+```
+
+### Array Operations
+
+```jinja
+{% set tags = "a,b,c" | split(pat=",") %}
+{% for tag in tags %}
+  <span>{{ tag | trim }}</span>
+{% endfor %}
+
+{{ page.authors | join(" & ") }}
+```
+
+### Collection Querying
+
+```jinja
+{% set published = site.pages | where(attribute="draft", value=false) %}
+{% set newest = published | sort_by(attribute="date", reverse=true) %}
+
+{% for group in newest | group_by(attribute="section") %}
+  <h3>{{ group.grouper }}</h3>
+  <ul>
+  {% for p in group.list %}
+    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  {% endfor %}
+  </ul>
+{% endfor %}
+```
+
+### Chaining
+
+```jinja
+{{ page.title | lower | slugify }}
+{{ content | strip_html | truncate_words(100) }}
+{{ description | default(value="No description") | upper }}
+```
+
+---
+
+## Tests
+
+Tests evaluate conditions in `{% if %}` statements.
+
+| Test | Description | Example |
+|------|-------------|---------|
+| startswith | Starts with | {% if page.url is startswith("/blog/") %} |
+| endswith | Ends with | {% if page.url is endswith("/") %} |
+| containing | Contains | {% if page.url is containing("docs") %} |
+| matching | Regex match | {% if asset is matching("[.](jpg|png)$") %} |
+| empty | Is empty | {% if page.description is empty %} |
+| present | Is not empty | {% if page.title is present %} |
+
+### Test Examples
+
+```jinja
+{% if page.url is startswith("/blog/") %}
+<span class="badge">Blog</span>
+{% endif %}
+
+{% if page.description is empty %}
+<meta name="description" content="{{ site.description }}">
+{% endif %}
+
+{% if page.image is present %}
+<meta property="og:image" content="{{ page.image | absolute_url }}">
+{% endif %}
+
+{% if "hero.jpg" is matching("[.](jpg|png)$") %}
+<span>Image file</span>
+{% endif %}
+```
+
+### Built-in Tests
+
+```jinja
+{% if value is defined %}
+{% if value is none %}
+{% if value is number %}
+{% if value is string %}
+{% if value is iterable %}
+{% if value is even %}
+{% if value is odd %}
+```
+
+---
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Available variables
+- [Functions](/templates/functions/) — Template functions
+- [Syntax](/templates/syntax/) — Template basics
+
+---
+
+Title: Functions
+URL: /templates/functions/
+Source: content/templates/functions.md
+
+Built-in functions for retrieving data and generating URLs in templates.
+
+## Data Retrieval
+
+### get_page()
+
+Retrieve any page by path or URL:
+
+```jinja
+{% set about = get_page(path="about.md") %}
+{% if about %}
+<a href="{{ about.url }}">{{ about.title }}</a>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
+
+**Returns:** Page? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| title | String |
+| description | String? |
+| url | String |
+| date | String? |
+| section | String |
+| draft | Bool |
+| weight | Int |
+| summary | String? |
+| word_count | Int |
+| reading_time | Int |
+
+**Examples:**
+
+```jinja
+{# Page in root #}
+{% set contact = get_page(path="contact.md") %}
+
+{# Page in section #}
+{% set intro = get_page(path="docs/introduction.md") %}
+
+{# Match by URL #}
+{% set intro_by_url = get_page(path="/docs/introduction/") %}
+```
+
+---
+
+### get_section()
+
+Retrieve a section by section name, source path, or URL:
+
+```jinja
+{% set blog = get_section(path="blog") %}
+{% if blog %}
+<h2>{{ blog.title }}</h2>
+<ul>
+{% for p in blog.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Section name (`blog`), path (`blog/_index.md`), or URL (`/blog/`) |
+
+**Returns:** Section? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| title | String |
+| description | String? |
+| url | String |
+| path | String |
+| name | String |
+| pages | Array<Page> |
+| pages_count | Int |
+| assets | Array<String> |
+
+**Examples:**
+
+```jinja
+{# Top-level section #}
+{% set docs = get_section(path="docs") %}
+
+{# Nested section #}
+{% set guides = get_section(path="docs/guides") %}
+
+{# Match by URL #}
+{% set blog = get_section(path="/blog/") %}
+
+{# Display count #}
+<p>{{ docs.pages_count }} articles</p>
+```
+
+---
+
+### get_taxonomy()
+
+Access taxonomy terms and their pages:
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+{% if tags %}
+<ul class="tag-cloud">
+{% for term in tags.items %}
+  <li>
+    <a href="/tags/{{ term.slug }}/">
+      {{ term.name }} ({{ term.count }})
+    </a>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| kind | String | Taxonomy name (e.g., "tags", "categories") |
+
+**Returns:** Taxonomy? (nil if not found)
+
+**Returned Properties:**
+
+| Property | Type |
+|----------|------|
+| name | String |
+| items | Array<Term> |
+
+**Term Properties:**
+
+| Property | Type |
+|----------|------|
+| name | String |
+| slug | String |
+| pages | Array<Page> |
+| count | Int |
+
+---
+
+### get_taxonomy_url()
+
+Generate URL for a taxonomy term:
+
+```jinja
+<a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}">
+  Crystal articles
+</a>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| kind | String | Taxonomy name |
+| term | String | Term name |
+
+**Returns:** String (absolute URL)
+
+---
+
+## Data Loading
+
+### load_data()
+
+Load external data files (JSON, TOML, YAML, CSV):
+
+```jinja
+{% set menu = load_data(path="data/menu.json") %}
+{% for item in menu %}
+<a href="{{ item.url }}">{{ item.title }}</a>
+{% endfor %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Path to data file |
+
+**Returns:** Parsed data or nil
+
+**Supported Formats:**
+
+| Extension | Format |
+|-----------|--------|
+| .json | JSON |
+| .toml | TOML |
+| .yaml, .yml | YAML |
+| .csv | CSV (array of arrays) |
+
+**Examples:**
+
+JSON (`data/team.json`):
+```json
+[
+  {"name": "Alice", "role": "Developer"},
+  {"name": "Bob", "role": "Designer"}
+]
+```
+
+```jinja
+{% set team = load_data(path="data/team.json") %}
+<ul>
+{% for member in team %}
+  <li>{{ member.name }} - {{ member.role }}</li>
+{% endfor %}
+</ul>
+```
+
+TOML (`data/social.toml`):
+```toml
+[[links]]
+name = "Twitter"
+url = "https://twitter.com/example"
+```
+
+```jinja
+{% set social = load_data(path="data/social.toml") %}
+{% for link in social.links %}
+<a href="{{ link.url }}">{{ link.name }}</a>
+{% endfor %}
+```
+
+---
+
+## URL Functions
+
+### url_for()
+
+Generate URL with base_url:
+
+```jinja
+<a href="{{ url_for(path='/about/') }}">About</a>
+<img src="{{ url_for(path='/images/logo.png') }}">
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Path to convert |
+
+**Returns:** String (absolute URL)
+
+---
+
+### get_url()
+
+Alias for `url_for()`. You can use either name:
+
+```jinja
+<a href="{{ get_url(path='/about/') }}">About</a>
+```
+
+---
+
+### now()
+
+Get current datetime:
+
+```jinja
+{# Default format #}
+<p>Generated: {{ now() }}</p>
+
+{# Custom format #}
+<p>Year: {{ now(format="%Y") }}</p>
+<p>Date: {{ now(format="%B %d, %Y") }}</p>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| format | String? | Date format string (optional) |
+
+**Returns:** String
+
+**Format Codes:**
+
+| Code | Description | Example |
+|------|-------------|---------|
+| %Y | Year | 2025 |
+| %m | Month (01-12) | 01 |
+| %d | Day (01-31) | 15 |
+| %B | Month name | January |
+| %b | Month abbr | Jan |
+| %H | Hour (00-23) | 14 |
+| %M | Minute | 30 |
+| %S | Second | 45 |
+
+---
+
+## Media Functions
+
+### resize_image()
+
+Returns an image object with a resolved URL and requested dimensions.
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1200, height=630) %}
+<img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}">
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| path | String | Image path |
+| width | Int | Requested width |
+| height | Int | Requested height |
+| op | String | Operation name (default: `"fill"`) |
+
+**Returns:** Object (`url`, `width`, `height`)
+
+**Current behavior:** placeholder implementation. It resolves the URL and echoes requested dimensions, but does not perform actual image processing yet.
+
+---
+
+## Best Practices
+
+### Always Check for nil
+
+```jinja
+{% set page = get_page(path="featured.md") %}
+{% if page %}
+{{ page.title }}
+{% else %}
+<p>Coming soon</p>
+{% endif %}
+```
+
+### Cache Function Results
+
+```jinja
+{# Good: Single lookup #}
+{% set blog = get_section(path="blog") %}
+<h2>{{ blog.title }}</h2>
+<p>{{ blog.pages_count }} posts</p>
+
+{# Avoid: Multiple lookups #}
+<h2>{{ get_section(path="blog").title }}</h2>
+<p>{{ get_section(path="blog").pages_count }} posts</p>
+```
+
+### Organize Data Files
+
+```
+data/
+├── navigation/
+│   ├── main.json
+│   └── footer.json
+├── team.yaml
+└── products.toml
+```
+
+---
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Site, Section, Page types
+- [Filters](/templates/filters/) — Value transformation
+
+---
+
+Title: Syntax
+URL: /templates/syntax/
+Source: content/templates/syntax.md
+
+Hwaro uses Crinja, a Jinja2-compatible template engine. This page covers the essential syntax.
+
+## Variables
+
+Print values with double braces:
+
+```jinja
+{{ page.title }}
+{{ site.description }}
+{{ content }}
+```
+
+## Comments
+
+```jinja
+{# This is a comment #}
+```
+
+## Conditionals
+
+```jinja
+{% if page.description %}
+<meta name="description" content="{{ page.description }}">
+{% endif %}
+```
+
+With else:
+
+```jinja
+{% if page.draft %}
+<span class="badge">Draft</span>
+{% else %}
+<span class="badge">Published</span>
+{% endif %}
+```
+
+With elif:
+
+```jinja
+{% if page.section == "blog" %}
+<article class="post">{{ content | safe }}</article>
+{% elif page.section == "docs" %}
+<div class="documentation">{{ content | safe }}</div>
+{% else %}
+<main>{{ content | safe }}</main>
+{% endif %}
+```
+
+## Loops
+
+```jinja
+{% for p in section.pages %}
+<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+```
+
+With index:
+
+```jinja
+{% for tag in page.tags %}
+{% if not loop.first %}, {% endif %}
+{{ tag }}
+{% endfor %}
+```
+
+Loop variables:
+
+| Variable | Description |
+|----------|-------------|
+| loop.index | Current iteration (1-based) |
+| loop.index0 | Current iteration (0-based) |
+| loop.first | True on first iteration |
+| loop.last | True on last iteration |
+| loop.length | Total items |
+
+## Template Inheritance
+
+### Base Template
+
+`templates/base.html`:
+
+```jinja
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  {{ highlight_css | safe }}
+</head>
+<body>
+  {% block content %}{% endblock %}
+  {{ highlight_js | safe }}
+</body>
+</html>
+```
+
+### Child Template
+
+`templates/page.html`:
+
+```jinja
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  {{ content | safe }}
+</article>
+{% endblock %}
+```
+
+## Includes
+
+Include partial templates:
+
+```jinja
+{% include "partials/header.html" %}
+<main>{{ content | safe }}</main>
+{% include "partials/footer.html" %}
+```
+
+## Variables
+
+Set variables:
+
+```jinja
+{% set author = page.authors | first %}
+<span>By {{ author }}</span>
+```
+
+## Filters
+
+Transform values with the pipe operator:
+
+```jinja
+{{ page.title | upper }}
+{{ content | safe }}
+{{ page.date | date("%B %d, %Y") }}
+{{ page.authors | join(", ") }}
+```
+
+See [Filters](/templates/filters/) for all available filters.
+
+## Tests
+
+Evaluate conditions:
+
+```jinja
+{% if page.url is startswith("/blog/") %}
+<span>Blog post</span>
+{% endif %}
+
+{% if page.description is empty %}
+<meta name="description" content="{{ site.description }}">
+{% endif %}
+```
+
+See [Filters](/templates/filters/) for all available tests.
+
+## Whitespace Control
+
+Trim whitespace with minus signs:
+
+```jinja
+{%- if condition -%}
+trimmed
+{%- endif -%}
+```
+
+## Raw Blocks
+
+Output literal Jinja syntax:
+
+```jinja
+{% raw %}
+{{ this will not be parsed }}
+{% endraw %}
+```
+
+## Operators
+
+### Comparison
+
+| Operator | Description |
+|----------|-------------|
+| `==` | Equal |
+| `!=` | Not equal |
+| `<` | Less than |
+| `>` | Greater than |
+| `<=` | Less or equal |
+| `>=` | Greater or equal |
+
+### Logical
+
+| Operator | Description |
+|----------|-------------|
+| `and` | Both true |
+| `or` | Either true |
+| `not` | Negation |
+
+```jinja
+{% if page.section == "blog" and not page.draft %}
+<article>{{ content | safe }}</article>
+{% endif %}
+```
+
+### Membership
+
+```jinja
+{% if "tutorial" in page.tags %}
+<span class="badge">Tutorial</span>
+{% endif %}
+```
+
+## Common Patterns
+
+### Active Navigation
+
+```jinja
+<nav>
+  <a href="/"{% if page.url == "/" %} class="active"{% endif %}>Home</a>
+  <a href="/blog/"{% if page.section == "blog" %} class="active"{% endif %}>Blog</a>
+</nav>
+```
+
+### Conditional Meta Tags
+
+```jinja
+<head>
+  {% if page.description %}
+  <meta name="description" content="{{ page.description }}">
+  {% endif %}
+  {{ og_all_tags | safe }}
+</head>
+```
+
+### Section-Based Layout
+
+```jinja
+<body data-section="{{ page.section }}">
+  {% if page.section == "docs" %}
+  {% include "partials/sidebar.html" %}
+  {% endif %}
+  
+  <main>{{ content | safe }}</main>
+</body>
+```
+
+### Loop with Empty Check
+
+```jinja
+{% if section.pages %}
+<ul>
+{% for p in section.pages %}
+  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No articles yet.</p>
+{% endif %}
+```
+
+## See Also
+
+- [Data Model](/templates/data-model/) — Available variables
+- [Functions](/templates/functions/) — Built-in functions
+- [Filters](/templates/filters/) — Filters and tests
+
+---
+
+Title: Writing
+URL: /writing/
+Source: content/writing/_index.md
+
+Content lives in the `content/` directory. Write Markdown with TOML front matter.
+
+## Content Types
+
+| Type | File | URL |
+|------|------|-----|
+| Page | about.md | /about/ |
+| Section | blog/_index.md | /blog/ |
+| Section Page | blog/post.md | /blog/post/ |
+
+## Basic Content File
+
+```markdown
++++
+title = "My Page"
+date = "2024-01-15"
++++
+
+Content in **Markdown**.
+```
+
+---
+
+Title: Archetypes
+URL: /writing/archetypes/
+Source: content/writing/archetypes.md
+
+Archetypes are content templates that define default front matter and content structure for new pages. When you create content with `hwaro new`, archetypes provide consistent starting points.
+
+## Overview
+
+Archetypes live in the `archetypes/` directory at your project root:
+
+```
+my-site/
+├── archetypes/
+│   ├── default.md      # Default template
+│   ├── posts.md        # For content/posts/
+│   └── tools/
+│       └── develop.md  # For content/tools/develop/
+├── content/
+├── templates/
+└── config.toml
+```
+
+## Creating Archetypes
+
+An archetype is a Markdown file with front matter and optional content. Use placeholders that get replaced when creating new content.
+
+### Available Placeholders
+
+| Placeholder | Description |
+|-------------|-------------|
+| `{{ title }}` | Content title (from `-t` flag or filename) |
+| `{{ date }}` | Current date and time |
+| `{{ draft }}` | Draft status (`true` for drafts/ directory) |
+
+### Example Archetype
+
+Create `archetypes/posts.md`:
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: "Your Name"
+tags: []
+categories: []
+---
+
+# {{ title }}
+
+Write your introduction here.
+
+## Main Content
+
+Add your content...
+```
+
+## Archetype Matching
+
+When you run `hwaro new`, archetypes are matched in this order:
+
+### 1. Explicit Flag (`-a`)
+
+```bash
+hwaro new -t "My Article" -a posts
+```
+
+Uses `archetypes/posts.md` regardless of the output path.
+
+### 2. Path-Based Matching
+
+```bash
+hwaro new posts/hello-world.md
+```
+
+Checks for `archetypes/posts.md`.
+
+### 3. Nested Path Matching
+
+```bash
+hwaro new tools/develop/mytool.md
+```
+
+Tries in order:
+1. `archetypes/tools/develop.md`
+2. `archetypes/tools.md`
+3. `archetypes/default.md`
+
+### 4. Default Archetype
+
+If no specific archetype matches, uses `archetypes/default.md`.
+
+### 5. Built-in Template
+
+If no archetypes exist, uses the built-in default template.
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+# Uses path-based archetype matching
+hwaro new posts/my-first-post.md
+
+# Specify title explicitly
+hwaro new posts/my-post.md -t "My First Post"
+
+# Use specific archetype
+hwaro new -t "Quick Note" -a posts
+```
+
+### Creating Different Content Types
+
+```bash
+# Blog post (uses archetypes/posts.md)
+hwaro new posts/new-article.md
+
+# Documentation (uses archetypes/docs.md)
+hwaro new docs/getting-started.md
+
+# Tool page (uses archetypes/tools.md or archetypes/tools/develop.md)
+hwaro new tools/develop/my-tool.md
+```
+
+## Recommended Archetypes
+
+### Blog Posts (`archetypes/posts.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: false
+author: ""
+tags: []
+categories: []
+description: ""
+image: ""
+---
+
+# {{ title }}
+
+Introduction paragraph.
+
+## Content
+```
+
+### Documentation (`archetypes/docs.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+weight: 10
+toc: true
+---
+
+Brief description of this documentation page.
+
+## Overview
+
+## Usage
+
+## Examples
+```
+
+### Default (`archetypes/default.md`)
+
+```markdown
+---
+title: "{{ title }}"
+date: {{ date }}
+draft: {{ draft }}
+---
+
+# {{ title }}
+```
+
+## Tips
+
+- **Consistent metadata**: Define all commonly used front matter fields in archetypes
+- **Section-specific**: Create archetypes for each content section with relevant defaults
+- **Nested organization**: Use subdirectories in `archetypes/` to match your content structure
+- **Draft handling**: The `{{ draft }}` placeholder is `true` when creating in `drafts/` directory
+
+---
+
+Title: Pages
+URL: /writing/pages/
+Source: content/writing/pages.md
+
+Pages are Markdown files that become HTML pages on your site.
+
+## Basic Structure
+
+```markdown
++++
+title = "My Page"
+date = "2024-01-15"
++++
+
+Your content in **Markdown**.
+```
+
+The `+++` block is TOML front matter. Content below becomes HTML.
+
+## Front Matter
+
+### Required
+
+| Field | Type | Description |
+|-------|------|-------------|
+| title | string | Page title |
+
+### Common Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| date | string | — | Publication date (YYYY-MM-DD) |
+| description | string | — | SEO description |
+| draft | bool | false | Exclude from production builds |
+| template | string | "page" | Template to use |
+| weight | int | 0 | Sort order (lower = first) |
+| image | string | — | Featured image for social sharing |
+| tags | array | [] | Tag taxonomy terms |
+| categories | array | [] | Category taxonomy terms |
+
+### All Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| updated | string | Last updated date |
+| slug | string | Custom URL slug |
+| path | string | Custom URL path |
+| aliases | array | Redirect URLs to this page |
+| authors | array | Author names |
+| toc | bool | Show table of contents |
+| in_search_index | bool | Include in search |
+| in_sitemap | bool | Include in sitemap |
+| insert_anchor_links | bool | Add heading anchors |
+| redirect_to | string | Redirect page to this URL |
+| render | bool | Render page to output (default: true) |
+| extra | table | Custom metadata |
+
+## Examples
+
+### Blog Post
+
+```markdown
++++
+title = "Getting Started with Crystal"
+date = "2024-01-15"
+description = "Learn Crystal programming basics"
+tags = ["crystal", "tutorial"]
+authors = ["Alice Smith"]
+image = "/images/crystal-guide.png"
++++
+
+Crystal is a fast, compiled language...
+```
+
+### Draft
+
+```markdown
++++
+title = "Work in Progress"
+draft = true
++++
+
+Not visible in production.
+```
+
+Build with drafts: `hwaro build --drafts`
+
+### Custom Template
+
+```markdown
++++
+title = "Landing Page"
+template = "landing"
++++
+
+Uses `templates/landing.html` instead of `page.html`.
+```
+
+### Weighted Order
+
+```markdown
++++
+title = "Introduction"
+weight = 1
++++
+```
+
+```markdown
++++
+title = "Getting Started"
+weight = 2
++++
+```
+
+Lower weight appears first.
+
+### URL Aliases
+
+```markdown
++++
+title = "New Page"
+aliases = ["/old-url/", "/another-old-url/"]
++++
+
+Redirects from old URLs to this page.
+```
+
+### Custom Metadata
+
+```markdown
++++
+title = "Product Review"
+
+[extra]
+rating = 4.5
+featured = true
+pros = ["Fast", "Reliable"]
++++
+```
+
+Access in templates: `{{ page.extra.rating }}`
+
+## Content Summary
+
+Use `<!-- more -->` to define a summary:
+
+```markdown
++++
+title = "Long Article"
++++
+
+This is the summary shown in listings.
+
+<!-- more -->
+
+The full article continues here...
+```
+
+## Markdown Syntax
+
+### Text
+
+```markdown
+**bold** and *italic*
+`inline code`
+[link](https://example.com)
+![image](/img.jpg)
+```
+
+### Lists
+
+```markdown
+- Unordered
+- Items
+
+1. Ordered
+2. Items
+```
+
+### Code Blocks
+
+````markdown
+```javascript
+console.log("Hello");
+```
+````
+
+### Tables
+
+```markdown
+| Header | Header |
+|--------|--------|
+| Cell   | Cell   |
+```
+
+Table cells support inline Markdown: **bold**, *italic*, `code spans`, [links](url), ![images](url), and ~~strikethrough~~.
+
+```markdown
+| Feature        | Example                          |
+|----------------|----------------------------------|
+| Bold           | **important**                    |
+| Italic         | *emphasis*                       |
+| Code           | `config.toml`                    |
+| Link           | [Hwaro](https://example.com)     |
+| Image          | ![logo](/img/logo.png)           |
+| Strikethrough  | ~~deprecated~~                   |
+```
+
+### Internal Links
+
+Use `@/` to link to other content pages by their source path. Hwaro resolves these to the correct output URL at build time.
+
+```markdown
+[Read the post](@/blog/my-post.md)
+[About section](@/about/_index.md)
+[With anchor](@/blog/my-post.md#introduction)
+```
+
+This is useful because you don't need to know the final URL — Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
+
+| Syntax | Resolved URL |
+|--------|-------------|
+| `@/blog/post.md` | `/blog/post/` |
+| `@/blog/_index.md` | `/blog/` |
+| `@/blog/post.md#section` | `/blog/post/#section` |
+
+### Blockquotes
+
+```markdown
+> Quote text
+```
+
+## Asset Colocation
+
+You can keep related assets (images, PDFs, etc.) in the same directory as your content file. This is known as a **Page Bundle**.
+
+To use this feature, rename your markdown file to `index.md` (for regular pages) or `_index.md` (for section pages) and place it in a directory named after your page.
+
+**Example Structure:**
+
+```text
+content/
+└── blog/
+    ├── my-trip/
+    │   ├── index.md        <-- The page content
+    │   ├── photo.jpg       <-- Asset
+    │   └── data.json       <-- Asset
+    └── _index.md
+```
+
+Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path.
+
+In your markdown, you can link to these assets using relative paths:
+
+```markdown
+![My Trip Photo](photo.jpg)
+
+[Download Data](data.json)
+```
+
+### Accessing Assets in Templates
+
+You can access the list of colocated assets in your templates using `page.assets`. This returns an array of relative paths to the files.
+
+```jinja
+{% for asset in page.assets %}
+  {% if asset is matching("[.](jpg|png)$") %}
+    <img src="{{ get_url(path=asset) }}" alt="Gallery Image">
+  {% endif %}
+{% endfor %}
+```
+
+## URL Mapping
+
+| File | URL |
+|------|-----|
+| content/index.md | `/` |
+| content/about.md | `/about/` |
+| content/blog/post.md | `/blog/post/` |
+
+## See Also
+
+- [Sections](/writing/sections/) — Group related pages
+- [Data Model](/templates/data-model/) — Page properties in templates
+
+---
+
+Title: Sections
+URL: /writing/sections/
+Source: content/writing/sections.md
+
+Sections are directories that group related content. They require an `_index.md` file.
+
+## Creating a Section
+
+```
+content/
+└── blog/
+    ├── _index.md     # Section index → /blog/
+    ├── first.md      # Page → /blog/first/
+    └── second.md     # Page → /blog/second/
+```
+
+## Section Index
+
+Every section needs an `_index.md`:
+
+```markdown
++++
+title = "Blog"
+description = "Latest articles"
+sort_by = "date"
++++
+
+Welcome to my blog.
+```
+
+## Front Matter
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| title | string | — | Section title (required) |
+| description | string | — | Section description |
+| template | string | "section" | Template to use |
+| page_template | string | — | Default template for pages |
+| sort_by | string | "date" | Sort by: date, weight, title |
+| reverse | bool | false | Reverse sort order |
+| paginate | int | — | Pages per page |
+| paginate_path | string | "page" | Pagination URL pattern |
+| transparent | bool | false | Pass pages to parent |
+| generate_feeds | bool | false | Generate RSS feed |
+| redirect_to | string | — | Redirect URL |
+| draft | bool | false | Exclude from production |
+| weight | int | 0 | Section sort order |
+
+## Examples
+
+### Blog with Pagination
+
+```toml
++++
+title = "Blog"
+sort_by = "date"
+paginate = 10
+paginate_path = "p"
++++
+```
+
+Generates: `/blog/`, `/blog/p/2/`, `/blog/p/3/`
+
+### Documentation
+
+```toml
++++
+title = "Docs"
+page_template = "doc-page"
+sort_by = "weight"
++++
+```
+
+All pages use `doc-page.html` template and sort by weight.
+
+### Section with Feed
+
+```toml
++++
+title = "News"
+generate_feeds = true
++++
+```
+
+Generates `/news/rss.xml`.
+
+## Nested Sections
+
+Sections can contain other sections:
+
+```
+content/
+└── docs/
+    ├── _index.md           # /docs/
+    ├── getting-started/
+    │   ├── _index.md       # /docs/getting-started/
+    │   └── install.md      # /docs/getting-started/install/
+    └── guides/
+        ├── _index.md       # /docs/guides/
+        └── deploy.md       # /docs/guides/deploy/
+```
+
+Access subsections in templates:
+
+```jinja
+{% for sub in section.subsections %}
+<a href="{{ sub.url }}">{{ sub.title }}</a>
+<small>({{ sub.pages_count }})</small>
+{% endfor %}
+```
+
+## Template Variables
+
+When rendering a section page (`_index.md`), these variables are available:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| section.title | String | Current section title |
+| section.description | String | Current section description |
+| section.pages | Array<Page> | Pages shown in the current section list |
+| section.pages_count | Int | Number of items in `section.pages` |
+| section.list | String | Pre-rendered HTML list (same value as `section_list`) |
+| section.subsections | Array<Section> | Direct child sections (`title`, `description`, `url`, `pages_count`) |
+| section.assets | Array<String> | Colocated section assets |
+| section.page_template | String | Default template name for child pages |
+| section.paginate_path | String | Pagination path segment |
+| section.redirect_to | String | Redirect target if configured |
+| section_list | String | Same as `section.list` |
+| pagination | String | Pre-rendered pagination HTML |
+| paginator | Object | Structured pagination object |
+
+Use `page.url` for the current section URL.
+
+### `section.list` / `section_list`
+
+```jinja
+<ul class="auto-list">
+  {{ section.list | safe }}
+</ul>
+```
+
+### `paginator` (custom pagination UI)
+
+```jinja
+{% if paginator is defined and paginator.number_pagers > 1 %}
+<nav>
+  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+```
+
+## Transparent Sections
+
+Use `transparent = true` to merge pages into parent section:
+
+```toml
++++
+title = "2024 Posts"
+transparent = true
++++
+```
+
+Pages appear in the parent's `section.pages` list.
+
+## Asset Colocation
+
+Just like regular pages, sections can have colocated assets. Place non-markdown files in the same directory as the `_index.md` file.
+
+**Example Structure:**
+
+```text
+content/
+└── gallery/
+    ├── _index.md       <-- The section index
+    ├── banner.jpg      <-- Section asset
+    └── icon.png        <-- Section asset
+```
+
+These assets are copied to the output directory relative to the section.
+
+### Accessing Assets in Templates
+
+You can access the list of section assets in your templates using `section.assets`. This returns an array of relative paths to the files (from the content directory).
+
+```jinja
+<!-- In section.html -->
+<div class="gallery">
+  {% for asset in section.assets %}
+    <img src="{{ get_url(path=asset) }}" alt="Section Asset">
+  {% endfor %}
+</div>
+```
+
+## Section vs Page
+
+| File | Type | URL |
+|------|------|-----|
+| _index.md | Section index | `/blog/` |
+| index.md | Regular page | `/blog/` |
+
+Use `_index.md` when you need to list child pages.
+
+---
+
+Title: Shortcodes
+URL: /writing/shortcodes/
+Source: content/writing/shortcodes.md
+
+Shortcodes are reusable template snippets you can use in Markdown content.
+
+## Using Shortcodes
+
+Two syntax patterns work in content files:
+
+```markdown
+{%raw%}{{ shortcode_name(arg1="value", arg2="value") }}{%endraw%}
+```
+
+Or explicitly:
+
+```markdown
+{%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
+```
+
+## Creating Shortcodes
+
+Shortcode templates live in `templates/shortcodes/`.
+
+### Example: Alert Box
+
+Create `templates/shortcodes/alert.html`:
+
+```jinja
+{% if type and message %}
+<div class="alert alert-{{ type }}">
+  {{ message | safe }}
+</div>
+{% endif %}
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ alert(type="warning", message="This is important!") }}{%endraw%}
+```
+
+Output:
+
+```html
+<div class="alert alert-warning">
+  This is important!
+</div>
+```
+
+### Example: YouTube Embed
+
+Create `templates/shortcodes/youtube.html`:
+
+```jinja
+{% if id %}
+<div class="video-container">
+  <iframe 
+    src="https://www.youtube.com/embed/{{ id }}"
+    frameborder="0"
+    allowfullscreen>
+  </iframe>
+</div>
+{% endif %}
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}{%endraw%}
+```
+
+### Example: Figure with Caption
+
+Create `templates/shortcodes/figure.html`:
+
+```jinja
+<figure>
+  <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+  {% if caption %}
+  <figcaption>{{ caption }}</figcaption>
+  {% endif %}
+</figure>
+```
+
+Use in content:
+
+```markdown
+{%raw%}{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+```
+
+### Example: Image Gallery (Asset Colocation)
+
+You can create a gallery that automatically lists images found in the same directory as the page (Page Bundle).
+
+Create `templates/shortcodes/gallery.html`:
+
+```jinja
+<div class="gallery">
+{% for asset in page.assets -%}
+  {%- if asset is matching("[.](jpg|png)$") -%}
+    {% set image = resize_image(path=asset, width=240, height=180) %}
+    <a href="{{ get_url(path=asset) }}" target="_blank">
+      <img src="{{ image.url }}" alt="{{ asset }}" />
+    </a>
+  {%- endif %}
+{%- endfor %}
+</div>
+```
+
+Use in content (inside a Page Bundle directory):
+
+```markdown
+{%raw%}{{ gallery() }}{%endraw%}
+```
+
+This will render a grid of all JPG and PNG images found alongside the Markdown file.
+
+## Argument Syntax
+
+Arguments support multiple quote styles:
+
+```markdown
+{%raw%}{{ alert(type="warning", message="Double quotes") }}
+{{ alert(type='info', message='Single quotes') }}
+{{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+```
+
+## Built-in Variables
+
+Shortcodes have access to:
+
+- All passed arguments
+- `site` object
+- `page` object
+- Standard filters and functions
+
+```jinja
+{# In shortcode template #}
+<a href="{{ site.base_url }}/{{ url }}">{{ text }}</a>
+```
+
+## Tips
+
+### Validate Arguments
+
+Always check for required arguments:
+
+```jinja
+{% if not url %}
+<p class="error">Missing url parameter</p>
+{% else %}
+<a href="{{ url }}">{{ text | default(value="Link") }}</a>
+{% endif %}
+```
+
+### Use Safe Filter for HTML
+
+When passing HTML content:
+
+```jinja
+{{ content | safe }}
+```
+
+### Organize Shortcodes
+
+Group related shortcodes:
+
+```
+templates/shortcodes/
+├── alert.html
+├── youtube.html
+├── figure.html
+├── code/
+│   ├── tabs.html
+│   └── snippet.html
+└── social/
+    ├── twitter.html
+    └── github.html
+```
+
+---
+
+Title: Taxonomies
+URL: /writing/taxonomies/
+Source: content/writing/taxonomies.md
+
+Taxonomies organize content into groups like tags, categories, or authors.
+
+## Configuration
+
+Define taxonomies in `config.toml`:
+
+```toml
+[[taxonomies]]
+name = "tags"
+feed = true
+paginate = 10
+
+[[taxonomies]]
+name = "categories"
+feed = true
+
+[[taxonomies]]
+name = "authors"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `name` | string | — | Taxonomy name (used in front matter) |
+| `feed` | bool | false | Generate RSS feed for each term |
+| `sitemap` | bool | true | Include taxonomy pages in sitemap |
+| `paginate` | int | — | Pages per pagination page |
+
+## Using Taxonomies
+
+Assign terms in front matter:
+
+```markdown
++++
+title = "My Post"
+tags = ["crystal", "tutorial"]
+categories = ["Programming"]
+authors = ["Alice"]
++++
+```
+
+## Generated URLs
+
+For a taxonomy named `tags` with term `crystal`:
+
+| URL | Content |
+|-----|---------|
+| `/tags/` | List of all tags |
+| `/tags/crystal/` | Pages tagged "crystal" |
+
+## Templates
+
+### Taxonomy Index
+
+`templates/taxonomy.html` — List of all terms:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ taxonomy_name | capitalize }}</h1>
+<ul>
+{% for term in taxonomy_terms %}
+  <li>
+    <a href="/{{ taxonomy_name }}/{{ term.slug }}/">
+      {{ term.name }} ({{ term.count }})
+    </a>
+  </li>
+{% endfor %}
+</ul>
+{% endblock %}
+```
+
+### Taxonomy Term
+
+`templates/taxonomy_term.html` — Pages for a specific term:
+
+```jinja
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ taxonomy_name }}: {{ taxonomy_term }}</h1>
+<ul>
+{% for p in taxonomy_pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    <time>{{ p.date }}</time>
+  </li>
+{% endfor %}
+</ul>
+{% endblock %}
+```
+
+## Template Variables
+
+### In taxonomy.html
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name ("tags") |
+| taxonomy_terms | Array | All terms (in taxonomy.html) |
+
+### In taxonomy_term.html
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| taxonomy_name | String | Taxonomy name |
+| taxonomy_term | String | Current term name |
+| taxonomy_pages | Array<Page> | Pages for term |
+
+### Term Object
+
+| Property | Type | Description |
+|----------|------|-------------|
+| name | String | Term name |
+| slug | String | URL-safe name |
+| count | Int | Number of pages |
+
+## get_taxonomy() Function
+
+Access taxonomy data anywhere:
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+{% if tags %}
+<div class="tag-cloud">
+{% for term in tags.items %}
+  <a href="/tags/{{ term.slug }}/">{{ term.name }}</a>
+{% endfor %}
+</div>
+{% endif %}
+```
+
+## get_taxonomy_url() Function
+
+Generate taxonomy term URL:
+
+```jinja
+<a href="{{ get_taxonomy_url(kind='tags', term='crystal') }}">
+  Crystal articles
+</a>
+```
+
+## Common Patterns
+
+### Tag Cloud
+
+```jinja
+{% set tags = get_taxonomy(kind="tags") %}
+<div class="tags">
+{% for term in tags.items %}
+  <a href="/tags/{{ term.slug }}/" 
+     class="tag count-{{ term.count }}">
+    {{ term.name }}
+  </a>
+{% endfor %}
+</div>
+```
+
+### Display Page Tags
+
+```jinja
+{% if page.tags %}
+<div class="post-tags">
+{% for tag in page.tags %}
+  <a href="/tags/{{ tag | slugify }}/">{{ tag }}</a>
+{% endfor %}
+</div>
+{% endif %}
+```
+
+### Category Navigation
+
+```jinja
+{% set categories = get_taxonomy(kind="categories") %}
+<nav class="categories">
+{% for cat in categories.items %}
+  <a href="/categories/{{ cat.slug }}/">
+    {{ cat.name }} ({{ cat.count }})
+  </a>
+{% endfor %}
+</nav>
+```
