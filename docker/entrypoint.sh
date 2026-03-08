@@ -50,6 +50,12 @@ main() {
     git config --global --add safe.directory "*"
     git config --global init.defaultBranch "gh_action"
 
+    # Clear credential helpers that may have been set by actions/checkout (v6+)
+    # This prevents exit code 128 when $RUNNER_TEMP is not mounted in the container
+    # Safe because we authenticate via token in the remote URL
+    git config --global --unset-all credential.helper 2>/dev/null || true
+    git config --global --unset-all http.extraheader 2>/dev/null || true
+
     # Show hwaro version
     version=$(hwaro --version)
     echo "Using $version"
