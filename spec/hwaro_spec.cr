@@ -4,7 +4,7 @@ describe Hwaro do
   describe "VERSION" do
     it "has a version number" do
       Hwaro::VERSION.should_not be_nil
-      Hwaro::VERSION.should eq("0.3.0")
+      Hwaro::VERSION.should eq("0.4.0")
     end
   end
 
