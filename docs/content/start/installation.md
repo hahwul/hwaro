@@ -13,6 +13,12 @@ brew tap hwaro/hwaro
 brew install hwaro
 ```
 
+## Snapcraft
+
+```bash
+sudo snap install hwaro
+```
+
 ## From Source
 
 ### Prerequisites
