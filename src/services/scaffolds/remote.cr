@@ -161,8 +161,13 @@ module Hwaro
 
           targets.each do |target|
             spawn do
-              body = fetch_file(owner, repo, default_branch, target[:full_path])
-              channel.send({category: target[:category], key: target[:key], display: target[:display], body: body})
+              begin
+                body = fetch_file(owner, repo, default_branch, target[:full_path])
+                channel.send({category: target[:category], key: target[:key], display: target[:display], body: body})
+              rescue ex
+                Logger.warn "Failed to fetch #{target[:display]}: #{ex.message}"
+                channel.send({category: target[:category], key: target[:key], display: target[:display], body: ""})
+              end
             end
           end
 
@@ -248,16 +253,20 @@ module Hwaro
           client.connect_timeout = 10.seconds
           client.read_timeout = 30.seconds
 
-          response = client.get(uri.request_target, headers: HTTP::Headers{
-            "User-Agent" => "Hwaro",
-          })
+          begin
+            response = client.get(uri.request_target, headers: HTTP::Headers{
+              "User-Agent" => "Hwaro",
+            })
 
-          unless response.status_code == 200
-            Logger.warn "Failed to fetch #{path}: HTTP #{response.status_code}"
-            return ""
+            unless response.status_code == 200
+              Logger.warn "Failed to fetch #{path}: HTTP #{response.status_code}"
+              return ""
+            end
+
+            response.body
+          ensure
+            client.close
           end
-
-          response.body
         end
 
         private def github_api_get(path : String) : HTTP::Client::Response
@@ -274,7 +283,11 @@ module Hwaro
             headers["Authorization"] = "Bearer #{token}"
           end
 
-          client.get(path, headers: headers)
+          begin
+            client.get(path, headers: headers)
+          ensure
+            client.close
+          end
         end
       end
     end
