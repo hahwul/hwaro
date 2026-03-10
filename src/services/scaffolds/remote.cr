@@ -112,51 +112,64 @@ module Hwaro
 
           tree = fetch_tree(owner, repo, default_branch)
           prefix = subpath.empty? ? "" : "#{subpath}/"
-          file_count = 0
+
+          # Collect files to download
+          targets = [] of {category: Symbol, key: String, full_path: String, display: String}
 
           tree.each do |entry|
             full_path = entry["path"].as_s
             next unless entry["type"].as_s == "blob"
 
-            # When subpath is set, only consider files under that prefix
             unless prefix.empty?
               next unless full_path.starts_with?(prefix)
             end
 
-            # Strip the subpath prefix to get the scaffold-relative path
             path = prefix.empty? ? full_path : full_path.sub(prefix, "")
-
-            # Skip content directory
             next if path.starts_with?("content/")
 
             if path == "config.toml"
-              @config_data = fetch_file(owner, repo, default_branch, full_path)
-              Logger.action :fetch, path
-              file_count += 1
+              targets << {category: :config, key: "", full_path: full_path, display: path}
             elsif path.starts_with?("templates/shortcodes/")
-              relative = path.sub("templates/", "")
-              @shortcode_data[relative] = fetch_file(owner, repo, default_branch, full_path)
-              Logger.action :fetch, path
-              file_count += 1
+              targets << {category: :shortcode, key: path.sub("templates/", ""), full_path: full_path, display: path}
             elsif path.starts_with?("templates/")
-              relative = path.sub("templates/", "")
-              @template_data[relative] = fetch_file(owner, repo, default_branch, full_path)
-              Logger.action :fetch, path
-              file_count += 1
+              targets << {category: :template, key: path.sub("templates/", ""), full_path: full_path, display: path}
             elsif path.starts_with?("static/")
-              relative = path.sub("static/", "")
-              @static_data[relative] = fetch_file(owner, repo, default_branch, full_path)
-              Logger.action :fetch, path
-              file_count += 1
+              targets << {category: :static, key: path.sub("static/", ""), full_path: full_path, display: path}
             end
           end
 
-          if file_count == 0
+          if targets.empty?
             Logger.warn "No scaffold files found in #{label}."
             Logger.warn "Expected: config.toml, templates/, or static/ directories."
-          else
-            Logger.info "Fetched #{file_count} files from remote scaffold."
+            return
           end
+
+          # Download files in parallel using fibers
+          channel = Channel({category: Symbol, key: String, display: String, body: String}).new(targets.size)
+
+          targets.each do |target|
+            spawn do
+              body = fetch_file(owner, repo, default_branch, target[:full_path])
+              channel.send({category: target[:category], key: target[:key], display: target[:display], body: body})
+            end
+          end
+
+          targets.size.times do
+            result = channel.receive
+            case result[:category]
+            when :config
+              @config_data = result[:body]
+            when :shortcode
+              @shortcode_data[result[:key]] = result[:body]
+            when :template
+              @template_data[result[:key]] = result[:body]
+            when :static
+              @static_data[result[:key]] = result[:body]
+            end
+            Logger.action :fetch, result[:display]
+          end
+
+          Logger.info "Fetched #{targets.size} files from remote scaffold."
         end
 
         private def fetch_default_branch(owner : String, repo : String) : String
