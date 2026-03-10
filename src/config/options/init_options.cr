@@ -38,6 +38,7 @@ module Hwaro
         property skip_taxonomies : Bool
         property multilingual_languages : Array(String)
         property scaffold : ScaffoldType
+        property scaffold_remote : String?
 
         def initialize(
           @path : String = ".",
@@ -47,6 +48,7 @@ module Hwaro
           @skip_taxonomies : Bool = false,
           @multilingual_languages : Array(String) = [] of String,
           @scaffold : ScaffoldType = ScaffoldType::Simple,
+          @scaffold_remote : String? = nil,
         )
         end
 

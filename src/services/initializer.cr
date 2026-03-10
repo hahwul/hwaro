@@ -6,20 +6,27 @@
 require "../config/options/init_options"
 require "../utils/logger"
 require "../services/scaffolds/registry"
+require "../services/scaffolds/remote"
 require "./defaults/agents_md"
 
 module Hwaro
   module Services
     class Initializer
       def run(options : Config::Options::InitOptions)
-        run(
+        scaffold = if remote = options.scaffold_remote
+                     Scaffolds::Remote.new(remote)
+                   else
+                     Scaffolds::Registry.get(options.scaffold)
+                   end
+
+        run_with_scaffold(
           options.path,
           options.force,
           options.skip_agents_md,
           options.skip_sample_content,
           options.skip_taxonomies,
           options.multilingual_languages,
-          options.scaffold
+          scaffold
         )
       end
 
@@ -32,6 +39,19 @@ module Hwaro
         multilingual_languages : Array(String) = [] of String,
         scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
       )
+        scaffold = Scaffolds::Registry.get(scaffold_type)
+        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold)
+      end
+
+      private def run_with_scaffold(
+        target_path : String,
+        force : Bool,
+        skip_agents_md : Bool,
+        skip_sample_content : Bool,
+        skip_taxonomies : Bool,
+        multilingual_languages : Array(String),
+        scaffold : Scaffolds::Base,
+      )
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
         end
@@ -42,9 +62,8 @@ module Hwaro
           exit(1)
         end
 
-        scaffold = Scaffolds::Registry.get(scaffold_type)
         Logger.info "Initializing new Hwaro project in #{target_path}..."
-        Logger.info "Using scaffold: #{scaffold_type} - #{scaffold.description}"
+        Logger.info "Using scaffold: #{scaffold.description}"
 
         is_multilingual = multilingual_languages.size > 1
 

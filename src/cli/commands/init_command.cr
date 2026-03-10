@@ -2,6 +2,7 @@ require "option_parser"
 require "../metadata"
 require "../../config/options/init_options"
 require "../../services/initializer"
+require "../../services/scaffolds/remote"
 require "../../utils/logger"
 
 module Hwaro
@@ -17,7 +18,7 @@ module Hwaro
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
           FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
-          FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type: simple, blog, docs", takes_value: true, value_hint: "TYPE"),
+          FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
           FlagInfo.new(short: nil, long: "--skip-agents-md", description: "Skip creating AGENTS.md file"),
           FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
           FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
@@ -48,20 +49,29 @@ module Hwaro
           skip_taxonomies = false
           multilingual_languages = [] of String
           scaffold = Config::Options::ScaffoldType::Simple
+          scaffold_remote : String? = nil
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
-            parser.on("--scaffold TYPE", "Scaffold type: simple, blog, docs (default: simple)") do |type|
-              begin
-                scaffold = Config::Options::ScaffoldType.from_string(type)
-              rescue ex : ArgumentError
-                Logger.error ex.message.not_nil!
-                Logger.info "Available scaffolds:"
-                Logger.info "  simple  - Basic pages structure with homepage and about page"
-                Logger.info "  blog    - Blog-focused structure with posts, archives, and taxonomies"
-                Logger.info "  docs    - Documentation-focused structure with organized sections and sidebar"
-                exit(1)
+            parser.on("--scaffold TYPE", "Scaffold type or remote source (default: simple)") do |type|
+              if Services::Scaffolds::Remote.remote?(type)
+                scaffold_remote = type
+              else
+                begin
+                  scaffold = Config::Options::ScaffoldType.from_string(type)
+                rescue ex : ArgumentError
+                  Logger.error ex.message.not_nil!
+                  Logger.info "Available scaffolds:"
+                  Logger.info "  simple  - Basic pages structure with homepage and about page"
+                  Logger.info "  blog    - Blog-focused structure with posts, archives, and taxonomies"
+                  Logger.info "  docs    - Documentation-focused structure with organized sections and sidebar"
+                  Logger.info ""
+                  Logger.info "Remote scaffolds:"
+                  Logger.info "  github:owner/repo[/path] - GitHub repository shorthand"
+                  Logger.info "  https://github.com/...   - Full GitHub URL (with optional subpath)"
+                  exit(1)
+                end
               end
             end
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
@@ -77,6 +87,10 @@ module Hwaro
               Logger.info "  simple  - Basic pages structure with homepage and about page (default)"
               Logger.info "  blog    - Blog-focused structure with posts, archives, and taxonomies"
               Logger.info "  docs    - Documentation-focused structure with organized sections and sidebar"
+              Logger.info ""
+              Logger.info "Remote scaffolds:"
+              Logger.info "  github:owner/repo        - GitHub repository shorthand"
+              Logger.info "  https://github.com/...   - Full GitHub URL"
               exit
             end
             parser.unknown_args do |unknown|
@@ -91,7 +105,8 @@ module Hwaro
             skip_sample_content: skip_sample_content,
             skip_taxonomies: skip_taxonomies,
             multilingual_languages: multilingual_languages,
-            scaffold: scaffold
+            scaffold: scaffold,
+            scaffold_remote: scaffold_remote
           )
         end
       end

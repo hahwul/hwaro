@@ -88,6 +88,25 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.multilingual_languages.should eq(["en", "es"])
     end
 
+    it "parses github shorthand scaffold" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options(["--scaffold", "github:hahwul/hwaro-starter-blog"])
+      options.scaffold_remote.should eq("github:hahwul/hwaro-starter-blog")
+    end
+
+    it "parses full github URL scaffold" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options(["--scaffold", "https://github.com/hahwul/hwaro-starter-blog"])
+      options.scaffold_remote.should eq("https://github.com/hahwul/hwaro-starter-blog")
+    end
+
+    it "keeps scaffold_remote nil for built-in types" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options(["--scaffold", "blog"])
+      options.scaffold_remote.should be_nil
+      options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Blog)
+    end
+
     it "raises on unknown flags" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
       expect_raises(OptionParser::InvalidOption) do

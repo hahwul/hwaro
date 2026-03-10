@@ -7,6 +7,7 @@ require "./base"
 require "./simple"
 require "./blog"
 require "./docs"
+require "./remote"
 
 module Hwaro
   module Services
