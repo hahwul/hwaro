@@ -64,6 +64,11 @@ describe Hwaro::CLI::Commands::Tool::ConvertCommand do
       meta.flags.any? { |f| f.long == "--content-dir" }.should be_true
     end
 
+    it "includes json flag" do
+      meta = Hwaro::CLI::Commands::Tool::ConvertCommand.metadata
+      meta.flags.any? { |f| f.long == "--json" }.should be_true
+    end
+
     it "includes help flag" do
       meta = Hwaro::CLI::Commands::Tool::ConvertCommand.metadata
       meta.flags.any? { |f| f.long == "--help" }.should be_true
@@ -104,6 +109,11 @@ describe Hwaro::CLI::Commands::Tool::ListCommand do
     it "includes content-dir flag" do
       meta = Hwaro::CLI::Commands::Tool::ListCommand.metadata
       meta.flags.any? { |f| f.long == "--content-dir" }.should be_true
+    end
+
+    it "includes json flag" do
+      meta = Hwaro::CLI::Commands::Tool::ListCommand.metadata
+      meta.flags.any? { |f| f.long == "--json" }.should be_true
     end
 
     it "includes help flag" do
@@ -148,6 +158,11 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
       meta.flags.any? { |f| f.long == "--content-dir" }.should be_true
     end
 
+    it "includes json flag" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      meta.flags.any? { |f| f.long == "--json" }.should be_true
+    end
+
     it "includes help flag" do
       meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
       meta.flags.any? { |f| f.long == "--help" }.should be_true
@@ -169,6 +184,30 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_true
       flag.not_nil!.value_hint.should eq("DIR")
+    end
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
+  describe ".metadata" do
+    it "returns correct command name" do
+      meta = Hwaro::CLI::Commands::Tool::DeadlinkCommand.metadata
+      meta.name.should eq("deadlink")
+    end
+
+    it "returns a description" do
+      meta = Hwaro::CLI::Commands::Tool::DeadlinkCommand.metadata
+      meta.description.should_not be_empty
+    end
+
+    it "includes json flag" do
+      meta = Hwaro::CLI::Commands::Tool::DeadlinkCommand.metadata
+      meta.flags.any? { |f| f.long == "--json" }.should be_true
+    end
+
+    it "includes help flag" do
+      meta = Hwaro::CLI::Commands::Tool::DeadlinkCommand.metadata
+      meta.flags.any? { |f| f.long == "--help" }.should be_true
     end
   end
 end

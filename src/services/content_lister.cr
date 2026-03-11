@@ -3,6 +3,7 @@
 # This service provides functionality to list content files
 # based on their publication status (all, drafts, published).
 
+require "json"
 require "yaml"
 require "toml"
 require "../utils/logger"
@@ -18,9 +19,13 @@ module Hwaro
 
     # Information about a content file
     struct ContentInfo
+      include JSON::Serializable
+
       property path : String
       property title : String
       property draft : Bool
+
+      @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter)]
       property date : Time?
 
       def initialize(
@@ -29,6 +34,21 @@ module Hwaro
         @draft : Bool = false,
         @date : Time? = nil,
       )
+      end
+
+      module TimeConverter
+        def self.to_json(value : Time?, json : JSON::Builder)
+          if value
+            json.string(value.to_s("%Y-%m-%dT%H:%M:%S%:z"))
+          else
+            json.null
+          end
+        end
+
+        def self.from_json(pull : JSON::PullParser) : Time?
+          str = pull.read_string_or_null
+          str ? Time.parse_rfc3339(str) : nil
+        end
       end
     end
 

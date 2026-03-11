@@ -1,3 +1,4 @@
+require "json"
 require "colorize"
 require "option_parser"
 require "../../metadata"
@@ -24,6 +25,7 @@ module Hwaro
               takes_value: true,
               value_hint: "DIR"
             ),
+            JSON_FLAG,
             HELP_FLAG,
           ]
 
@@ -40,16 +42,35 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             config_path = "config.toml"
+            json_output = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool doctor [options]"
               parser.on("-c DIR", "--content-dir DIR", "Content directory to check") do |dir|
                 content_dir = dir
               end
+              parser.on("-j", "--json", "Output result as JSON") { json_output = true }
               parser.on("-h", "--help", "Show this help") do
                 Logger.info parser.to_s
                 exit
               end
+            end
+
+            doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
+            issues = doctor.run
+
+            if json_output
+              result = {
+                "issues" => issues,
+                "summary" => {
+                  "errors"   => issues.count { |i| i.level == :error },
+                  "warnings" => issues.count { |i| i.level == :warning },
+                  "infos"    => issues.count { |i| i.level == :info },
+                  "total"    => issues.size,
+                },
+              }
+              puts result.to_json
+              return
             end
 
             Logger.info "Running diagnostics..."
@@ -67,9 +88,6 @@ module Hwaro
             Logger.info "    ☐ image alt text"
             Logger.info "    ☐ draft status"
             Logger.info ""
-
-            doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
-            issues = doctor.run
 
             if issues.empty?
               Logger.info "#{"✔".colorize(:green)} No issues found. Your site looks great!"

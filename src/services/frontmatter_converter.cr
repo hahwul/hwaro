@@ -3,6 +3,7 @@
 # This service provides functionality to convert frontmatter between
 # YAML and TOML formats in content files.
 
+require "json"
 require "yaml"
 require "toml"
 require "../utils/logger"
@@ -18,6 +19,8 @@ module Hwaro
 
     # Result of a conversion operation
     struct ConversionResult
+      include JSON::Serializable
+
       property success : Bool
       property message : String
       property converted_count : Int32

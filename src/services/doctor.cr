@@ -4,6 +4,7 @@
 # Checks config.toml for invalid settings and content files
 # for missing metadata, accessibility issues, and parse errors.
 
+require "json"
 require "yaml"
 require "toml"
 require "../models/config"
@@ -12,7 +13,22 @@ require "../utils/logger"
 module Hwaro
   module Services
     # Represents a single diagnostic issue found by the doctor
-    record Issue, level : Symbol, category : String, file : String?, message : String
+    record Issue, level : Symbol, category : String, file : String?, message : String do
+      include JSON::Serializable
+
+      @[JSON::Field(converter: Hwaro::Services::Issue::SymbolConverter)]
+      getter level : Symbol
+
+      module SymbolConverter
+        def self.to_json(value : Symbol, json : JSON::Builder)
+          json.string(value.to_s)
+        end
+
+        def self.from_json(pull : JSON::PullParser) : Symbol
+          pull.read_string.to_s
+        end
+      end
+    end
 
     class Doctor
       YAML_DELIMITER = "---"

@@ -6,6 +6,7 @@
 #   hwaro tool list drafts    - List only draft content files
 #   hwaro tool list published - List only published content files
 
+require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_lister"
@@ -25,6 +26,7 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR"),
+            JSON_FLAG,
             HELP_FLAG,
           ]
 
@@ -41,10 +43,12 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             filter : String? = nil
+            json_output = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool list <all|drafts|published> [options]"
               parser.on("-c DIR", "--content-dir DIR", "Content directory (default: content)") { |dir| content_dir = dir }
+              parser.on("-j", "--json", "Output result as JSON") { json_output = true }
               parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
               parser.unknown_args do |unknown|
                 filter = unknown.first? if unknown.any?
@@ -70,17 +74,24 @@ module Hwaro
 
             lister = Services::ContentLister.new(content_dir)
 
-            case filter.not_nil!.downcase
-            when "all"
-              lister.display(Services::ContentFilter::All)
-            when "drafts", "draft"
-              lister.display(Services::ContentFilter::Drafts)
-            when "published", "pub"
-              lister.display(Services::ContentFilter::Published)
+            content_filter = case filter.not_nil!.downcase
+                             when "all"
+                               Services::ContentFilter::All
+                             when "drafts", "draft"
+                               Services::ContentFilter::Drafts
+                             when "published", "pub"
+                               Services::ContentFilter::Published
+                             else
+                               Logger.error "Unknown filter: #{filter}"
+                               Logger.info "Use 'all', 'drafts', or 'published'"
+                               exit(1)
+                             end
+
+            if json_output
+              contents = lister.list_content(content_filter)
+              puts contents.to_json
             else
-              Logger.error "Unknown filter: #{filter}"
-              Logger.info "Use 'all', 'drafts', or 'published'"
-              exit(1)
+              lister.display(content_filter)
             end
           end
         end

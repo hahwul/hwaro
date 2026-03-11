@@ -37,5 +37,8 @@ module Hwaro
 
     # Common help flag used by all commands
     HELP_FLAG = FlagInfo.new(short: "-h", long: "--help", description: "Show this help")
+
+    # Common JSON output flag
+    JSON_FLAG = FlagInfo.new(short: "-j", long: "--json", description: "Output result as JSON")
   end
 end

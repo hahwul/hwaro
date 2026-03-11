@@ -5,6 +5,7 @@
 #   hwaro tool convert toYAML  - Convert all frontmatter to YAML format
 #   hwaro tool convert toTOML  - Convert all frontmatter to TOML format
 
+require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/frontmatter_converter"
@@ -24,6 +25,7 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR"),
+            JSON_FLAG,
             HELP_FLAG,
           ]
 
@@ -40,10 +42,12 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             format : String? = nil
+            json_output = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool convert <toYAML|toTOML> [options]"
               parser.on("-c DIR", "--content-dir DIR", "Content directory (default: content)") { |dir| content_dir = dir }
+              parser.on("-j", "--json", "Output result as JSON") { json_output = true }
               parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
               parser.unknown_args do |unknown|
                 format = unknown.first? if unknown.any?
@@ -67,9 +71,15 @@ module Hwaro
             case format.not_nil!.downcase
             when "toyaml"
               result = converter.convert_to_yaml
+              if json_output
+                puts result.to_json
+              end
               exit(1) unless result.success
             when "totoml"
               result = converter.convert_to_toml
+              if json_output
+                puts result.to_json
+              end
               exit(1) unless result.success
             else
               Logger.error "Unknown format: #{format}"

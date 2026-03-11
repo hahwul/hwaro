@@ -1,3 +1,4 @@
+require "json"
 require "http/client"
 require "uri"
 require "file"
@@ -18,6 +19,7 @@ module Hwaro
 
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
+            JSON_FLAG,
             HELP_FLAG,
           ]
 
@@ -32,26 +34,63 @@ module Hwaro
           end
 
           # Structure to hold link information
-          record Link, file : String, url : String, kind : Symbol = :external
+          record Link, file : String, url : String, kind : Symbol = :external do
+            include JSON::Serializable
+
+            @[JSON::Field(converter: Hwaro::CLI::Commands::Tool::DeadlinkCommand::SymbolConverter)]
+            getter kind : Symbol
+          end
+
           # Structure to hold check result
-          record Result, link : Link, status : Int32, error : String?
+          record Result, link : Link, status : Int32, error : String? do
+            include JSON::Serializable
+          end
+
+          module SymbolConverter
+            def self.to_json(value : Symbol, json : JSON::Builder)
+              json.string(value.to_s)
+            end
+
+            def self.from_json(pull : JSON::PullParser) : Symbol
+              pull.read_string.to_s
+            end
+          end
 
           def run(args : Array(String))
             target_dir = "content"
-            options = parse_options(args)
+            json_output = false
+
+            OptionParser.parse(args) do |parser|
+              parser.banner = "Usage: hwaro tool deadlink [options]"
+              parser.on("-j", "--json", "Output result as JSON") { json_output = true }
+              parser.on("-h", "--help", "Show this help") do
+                Logger.info parser.to_s
+                exit
+              end
+            end
 
             unless Dir.exists?(target_dir)
               Logger.error "Directory not found: #{target_dir}"
               return
             end
 
-            Logger.info "Starting dead link check in '#{target_dir}'..."
+            Logger.info "Starting dead link check in '#{target_dir}'..." unless json_output
 
             external_links = find_external_links(target_dir)
             internal_links = find_internal_links(target_dir)
 
             if external_links.empty? && internal_links.empty?
-              Logger.info "✔ No links found."
+              if json_output
+                puts({
+                  "dead_links"      => [] of Result,
+                  "total_links"     => 0,
+                  "external_links"  => 0,
+                  "internal_links"  => 0,
+                  "dead_link_count" => 0,
+                }.to_json)
+              else
+                Logger.info "✔ No links found."
+              end
               return
             end
 
@@ -64,6 +103,17 @@ module Hwaro
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
+
+            if json_output
+              puts({
+                "dead_links"      => dead_external + dead_internal,
+                "total_links"     => total,
+                "external_links"  => external_links.size,
+                "internal_links"  => internal_links.size,
+                "dead_link_count" => dead_total,
+              }.to_json)
+              return
+            end
 
             Logger.info "----------------------------------------"
             if dead_total == 0
@@ -178,18 +228,6 @@ module Hwaro
 
             # Collect all results
             links.size.times.map { results_channel.receive }.to_a
-          end
-
-          private def parse_options(args : Array(String))
-            options = {} of String => String
-            OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: hwaro tool deadlink [options]"
-              parser.on("-h", "--help", "Show this help") do
-                Logger.info parser.to_s
-                exit
-              end
-            end
-            options
           end
         end
       end
