@@ -46,8 +46,16 @@ module Hwaro
               str << "    <li class=\"pagination-prev pagination-disabled\"><span>Prev</span></li>\n"
             end
 
-            # Page numbers
-            (1..paginated_page.total_pages).each do |page_num|
+            # Page numbers with ellipsis for large page counts
+            pages = visible_pages(paginated_page.page_number, paginated_page.total_pages)
+            prev_page = 0
+            pages.each do |page_num|
+              # Insert ellipsis if there's a gap
+              if page_num > prev_page + 1
+                str << "    <li class=\"pagination-ellipsis\"><span>\u2026</span></li>\n"
+              end
+              prev_page = page_num
+
               page_url = if page_num == 1
                            HTML.escape("#{@base_url}#{paginated_page.first_url}")
                          else
@@ -72,6 +80,34 @@ module Hwaro
             str << "  </ul>\n"
             str << "</nav>\n"
           end
+        end
+
+        # Render SEO <link rel="prev/next"> tags for <head>
+        def render_seo_links(paginated_page : PaginatedPage) : String
+          return "" unless paginated_page.total_pages > 1
+
+          String.build do |str|
+            if paginated_page.has_prev
+              prev_full_url = HTML.escape("#{@base_url}#{paginated_page.prev_url}")
+              str << "<link rel=\"prev\" href=\"#{prev_full_url}\">\n"
+            end
+            if paginated_page.has_next
+              next_full_url = HTML.escape("#{@base_url}#{paginated_page.next_url}")
+              str << "<link rel=\"next\" href=\"#{next_full_url}\">\n"
+            end
+          end
+        end
+
+        private def visible_pages(current : Int32, total : Int32) : Array(Int32)
+          return (1..total).to_a if total <= 7
+
+          pages = Set(Int32).new
+          pages << 1
+          pages << total
+          ((current - 2)..(current + 2)).each do |p|
+            pages << p if p >= 1 && p <= total
+          end
+          pages.to_a.sort
         end
 
         # Render combined section list with pagination info

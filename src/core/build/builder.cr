@@ -1623,6 +1623,7 @@ module Hwaro
           pagination_result.paginated_pages.each do |paginated_page|
             section_list_html = renderer.render_section_list(paginated_page)
             pagination_nav_html = renderer.render_pagination_nav(paginated_page)
+            pagination_seo_links = renderer.render_seo_links(paginated_page)
 
             # Use the correct URL for each paginated page during rendering (important for SEO tags, nav, etc.)
             base = section.url.rstrip("/")
@@ -1634,7 +1635,7 @@ module Hwaro
 
             final_html = if template_content
                            apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page, global_vars,
-                             crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                             crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links)
                          else
                            msg = "No template found for #{section.path}. Using raw content."
                            Logger.warn "  [WARN] #{msg}"
@@ -1812,13 +1813,14 @@ module Hwaro
           global_vars : Hash(String, Crinja::Value)? = nil,
           crinja_env_override : Crinja? = nil,
           template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
+          pagination_seo_links : String = "",
         ) : String
           # Use per-worker env when provided (parallel path), otherwise shared env
           env = crinja_env_override || crinja_env
           cache = template_cache_override || @compiled_templates_cache
 
           # Build template variables
-          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links)
 
           begin
             # Process shortcodes in template first (convert to Jinja2 include syntax)
@@ -2024,6 +2026,7 @@ module Hwaro
           page_url_override : String? = nil,
           paginator : Content::Pagination::PaginatedPage? = nil,
           global_vars : Hash(String, Crinja::Value)? = nil,
+          pagination_seo_links : String = "",
         ) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
@@ -2279,6 +2282,7 @@ module Hwaro
           vars["toc_obj"] = Crinja::Value.new(toc_obj)
 
           vars["pagination"] = Crinja::Value.new(pagination)
+          vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
 
           if paginator
             paginator_obj = {
