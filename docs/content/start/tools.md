@@ -23,6 +23,9 @@ hwaro tool convert toTOML
 
 # Convert only in a specific directory
 hwaro tool convert toYAML -c posts
+
+# Output result as JSON
+hwaro tool convert toYAML --json
 ```
 
 **Options:**
@@ -30,7 +33,20 @@ hwaro tool convert toYAML -c posts
 | Flag | Description |
 |------|-------------|
 | -c, --content DIR | Limit conversion to a specific content directory |
+| -j, --json | Output result as JSON |
 | -h, --help | Show help |
+
+**JSON output example:**
+
+```json
+{
+  "success": true,
+  "message": "Converted 5 files to YAML",
+  "converted_count": 5,
+  "skipped_count": 2,
+  "error_count": 0
+}
+```
 
 **Example — TOML to YAML:**
 
@@ -76,6 +92,9 @@ hwaro tool list published
 
 # List files in a specific directory
 hwaro tool list all -c posts
+
+# Output result as JSON
+hwaro tool list all --json
 ```
 
 **Options:**
@@ -83,7 +102,27 @@ hwaro tool list all -c posts
 | Flag | Description |
 |------|-------------|
 | -c, --content DIR | Limit listing to a specific content directory |
+| -j, --json | Output result as JSON |
 | -h, --help | Show help |
+
+**JSON output example:**
+
+```json
+[
+  {
+    "path": "content/blog/my-post.md",
+    "title": "My Post",
+    "draft": false,
+    "date": "2024-06-15T00:00:00+00:00"
+  },
+  {
+    "path": "content/blog/draft-post.md",
+    "title": "Draft Post",
+    "draft": true,
+    "date": "2024-06-10T00:00:00+00:00"
+  }
+]
+```
 
 **Filters:**
 
@@ -99,7 +138,17 @@ Check for broken external and internal links in your content files.
 
 ```bash
 hwaro tool deadlink
+
+# Output result as JSON
+hwaro tool deadlink --json
 ```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| -j, --json | Output result as JSON |
+| -h, --help | Show help |
 
 This command:
 
@@ -135,6 +184,37 @@ Starting dead link check in 'content'...
 | Internal | Relative and absolute path links — checked on filesystem |
 | Images | `![alt](path)` image references — checked on filesystem |
 
+**JSON output example:**
+
+```json
+{
+  "dead_links": [
+    {
+      "link": {
+        "file": "content/blog/post.md",
+        "url": "https://old-site.com/page",
+        "kind": "external"
+      },
+      "status": 404,
+      "error": null
+    },
+    {
+      "link": {
+        "file": "content/about.md",
+        "url": "/images/photo.png",
+        "kind": "image"
+      },
+      "status": -1,
+      "error": "Image not found"
+    }
+  ],
+  "total_links": 50,
+  "external_links": 30,
+  "internal_links": 20,
+  "dead_link_count": 2
+}
+```
+
 ### doctor — Site Diagnostics
 
 Diagnose configuration and content issues in your Hwaro site.
@@ -144,6 +224,9 @@ hwaro tool doctor
 
 # Check only a specific content directory
 hwaro tool doctor -c posts
+
+# Output result as JSON
+hwaro tool doctor --json
 ```
 
 This command checks:
@@ -187,6 +270,7 @@ This command checks:
 | Flag | Description |
 |------|-------------|
 | -c, --content DIR | Content directory to check |
+| -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
 **Example output:**
@@ -204,6 +288,39 @@ Content:
   ⚠ content/about.md: Image missing alt text: ![](photo.jpg)
 
 Found 0 error(s), 3 warning(s), 1 info(s)
+```
+
+**JSON output example:**
+
+```json
+{
+  "issues": [
+    {
+      "level": "warning",
+      "category": "config",
+      "file": "config.toml",
+      "message": "base_url is not set"
+    },
+    {
+      "level": "warning",
+      "category": "content",
+      "file": "content/blog/draft.md",
+      "message": "Missing description in frontmatter"
+    },
+    {
+      "level": "info",
+      "category": "content",
+      "file": "content/blog/draft.md",
+      "message": "File is marked as draft"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 2,
+    "infos": 1,
+    "total": 3
+  }
+}
 ```
 
 ---

@@ -245,6 +245,12 @@ hwaro tool list drafts          # List draft files
 hwaro tool list published       # List published files
 hwaro tool deadlink             # Check for dead external links
 hwaro tool doctor               # Diagnose config and content issues
+
+# JSON output
+hwaro tool list all --json
+hwaro tool doctor --json
+hwaro tool deadlink --json
+hwaro tool convert toYAML --json
 ```
 
 **Subcommands:**
@@ -261,6 +267,7 @@ hwaro tool doctor               # Diagnose config and content issues
 | Flag | Description |
 |------|-------------|
 | -c, --content DIR | Limit to specific content directory |
+| -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
 See [Tools & Completion](/start/tools/) for detailed usage.
