@@ -25,6 +25,7 @@ exclude = ["/private", "/drafts"]
 | fields | array | ["title", "content"] | Fields to include in index |
 | filename | string | "search.json" | Output filename |
 | exclude | array | [] | Paths (prefixes) to exclude from search index |
+| tokenize_cjk | bool | false | Enable CJK bigram tokenization |
 
 ## Generated Files
 
@@ -116,6 +117,39 @@ input.addEventListener('input', (e) => {
 });
 </script>
 ```
+
+## CJK Search Support
+
+For sites with Chinese, Japanese, or Korean content, enable CJK tokenization to improve search accuracy. CJK languages often lack spaces between words, making it difficult for search libraries to tokenize text properly.
+
+When enabled, CJK character runs are split into overlapping bigrams (2-character pairs), allowing search terms to match within longer text.
+
+**Example:** `"검색엔진"` → `"검색 색엔 엔진"` (search query `"검색"` now matches)
+
+### Configuration
+
+```toml
+[search]
+enabled = true
+tokenize_cjk = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| tokenize_cjk | bool | false | Enable CJK bigram tokenization for search index |
+
+### How It Works
+
+- Only `title`, `content`, and `description` fields are tokenized
+- `url`, `tags`, and `section` fields are left unchanged (structural fields)
+- Non-CJK text passes through unmodified
+- Works with both Fuse.js and ElasticLunr formats
+
+### Notes
+
+- Enabling this option slightly increases the search index size
+- The bigram approach works well for most CJK search scenarios
+- Korean text with natural spaces (e.g., `"검색 엔진"`) is handled correctly
 
 ## Excluding Pages
 

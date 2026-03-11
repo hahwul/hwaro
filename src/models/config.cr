@@ -66,6 +66,7 @@ module Hwaro
       property fields : Array(String)
       property filename : String
       property exclude : Array(String)
+      property tokenize_cjk : Bool
 
       def initialize
         @enabled = false
@@ -73,6 +74,7 @@ module Hwaro
         @fields = ["title", "content"]
         @filename = "search.json"
         @exclude = [] of String
+        @tokenize_cjk = false
       end
     end
 
@@ -651,6 +653,7 @@ module Hwaro
         if exclude_arr = s["exclude"]?.try(&.as_a?)
           config.search.exclude = exclude_arr.compact_map(&.as_s?)
         end
+        config.search.tokenize_cjk = bool_value(s["tokenize_cjk"]?, config.search.tokenize_cjk)
       end
 
       private def self.load_plugins(config : Config)

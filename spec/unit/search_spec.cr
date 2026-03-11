@@ -318,5 +318,77 @@ describe Hwaro::Models::SearchConfig do
     config.format.should eq("fuse_json")
     config.fields.should eq(["title", "content"])
     config.filename.should eq("search.json")
+    config.tokenize_cjk.should eq(false)
+  end
+end
+
+describe "CJK tokenization in search" do
+  it "tokenizes CJK content when tokenize_cjk is true" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = true
+    config.search.fields = ["title", "content", "description"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "검색엔진"
+    page.url = "/test/"
+    page.description = "搜索引擎"
+    page.draft = false
+    page.raw_content = "테스트내용"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      # Title should be bigram-tokenized
+      content.should contain("검색 색엔 엔진")
+      # Description should be bigram-tokenized
+      content.should contain("搜索 索引 引擎")
+    end
+  end
+
+  it "does not tokenize CJK content when tokenize_cjk is false" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = false
+    config.search.fields = ["title"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "검색엔진"
+    page.url = "/test/"
+    page.draft = false
+    page.raw_content = "Content"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      content.should contain("검색엔진")
+      content.should_not contain("검색 색엔 엔진")
+    end
+  end
+
+  it "does not tokenize tags and url fields" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = true
+    config.search.fields = ["title", "tags", "url"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "테스트"
+    page.url = "/검색엔진/"
+    page.tags = ["검색엔진"]
+    page.draft = false
+    page.raw_content = "Content"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      # URL should not be tokenized
+      content.should contain("/검색엔진/")
+      # Tags should not be tokenized
+      content.should contain("검색엔진")
+    end
   end
 end

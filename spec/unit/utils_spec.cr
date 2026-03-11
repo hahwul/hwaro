@@ -102,6 +102,73 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.strip_html("Hello World").should eq("Hello World")
     end
   end
+
+  describe ".cjk_char?" do
+    it "detects CJK Unified Ideographs (Chinese)" do
+      Hwaro::Utils::TextUtils.cjk_char?('中').should be_true
+      Hwaro::Utils::TextUtils.cjk_char?('文').should be_true
+    end
+
+    it "detects Hiragana (Japanese)" do
+      Hwaro::Utils::TextUtils.cjk_char?('あ').should be_true
+      Hwaro::Utils::TextUtils.cjk_char?('ん').should be_true
+    end
+
+    it "detects Katakana (Japanese)" do
+      Hwaro::Utils::TextUtils.cjk_char?('ア').should be_true
+      Hwaro::Utils::TextUtils.cjk_char?('ン').should be_true
+    end
+
+    it "detects Hangul Syllables (Korean)" do
+      Hwaro::Utils::TextUtils.cjk_char?('가').should be_true
+      Hwaro::Utils::TextUtils.cjk_char?('검').should be_true
+    end
+
+    it "rejects ASCII characters" do
+      Hwaro::Utils::TextUtils.cjk_char?('A').should be_false
+      Hwaro::Utils::TextUtils.cjk_char?('0').should be_false
+      Hwaro::Utils::TextUtils.cjk_char?(' ').should be_false
+    end
+
+    it "rejects other Unicode characters" do
+      Hwaro::Utils::TextUtils.cjk_char?('é').should be_false
+      Hwaro::Utils::TextUtils.cjk_char?('ñ').should be_false
+    end
+  end
+
+  describe ".tokenize_cjk" do
+    it "tokenizes Chinese text into bigrams" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("搜索引擎").should eq("搜索 索引 引擎")
+    end
+
+    it "tokenizes Japanese text into bigrams" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("東京都").should eq("東京 京都")
+    end
+
+    it "tokenizes Korean text into bigrams" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("검색엔진").should eq("검색 색엔 엔진")
+    end
+
+    it "passes single CJK character as-is" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("字").should eq("字")
+    end
+
+    it "handles mixed CJK and ASCII text" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("hello世界测试bye").should eq("hello世界 界测 测试bye")
+    end
+
+    it "handles empty string" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("").should eq("")
+    end
+
+    it "passes pure ASCII text unchanged" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("hello world").should eq("hello world")
+    end
+
+    it "handles Korean text with spaces" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("검색 엔진").should eq("검색 엔진")
+    end
+  end
 end
 
 describe Hwaro::Utils::SortUtils do
