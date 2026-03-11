@@ -57,13 +57,13 @@ module Hwaro
       def cjk_char?(char : Char) : Bool
         code = char.ord
         (code >= 0x4E00 && code <= 0x9FFF) ||   # CJK Unified Ideographs
-        (code >= 0x3040 && code <= 0x309F) ||    # Hiragana
-        (code >= 0x30A0 && code <= 0x30FF) ||    # Katakana
-        (code >= 0xAC00 && code <= 0xD7AF) ||    # Hangul Syllables
-        (code >= 0x1100 && code <= 0x11FF) ||    # Hangul Jamo
-        (code >= 0x3400 && code <= 0x4DBF) ||    # CJK Extension A
-        (code >= 0x3300 && code <= 0x33FF) ||    # CJK Compatibility
-        (code >= 0xFE30 && code <= 0xFE4F)       # CJK Compatibility Forms
+          (code >= 0x3040 && code <= 0x309F) || # Hiragana
+          (code >= 0x30A0 && code <= 0x30FF) || # Katakana
+          (code >= 0xAC00 && code <= 0xD7AF) || # Hangul Syllables
+          (code >= 0x1100 && code <= 0x11FF) || # Hangul Jamo
+          (code >= 0x3400 && code <= 0x4DBF) || # CJK Extension A
+          (code >= 0x3300 && code <= 0x33FF) || # CJK Compatibility
+          (code >= 0xFE30 && code <= 0xFE4F)    # CJK Compatibility Forms
       end
 
       # Tokenize CJK text into overlapping bigrams for search indexing

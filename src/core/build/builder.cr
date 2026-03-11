@@ -37,6 +37,7 @@ require "../../content/processors/markdown"
 require "../../content/processors/content_files"
 require "../../content/processors/template"
 require "../../content/multilingual"
+require "../../content/i18n"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
@@ -65,6 +66,7 @@ module Hwaro
         @crinja_env : Crinja?
         @compiled_templates_cache : Hash(UInt64, Crinja::Template) = {} of UInt64 => Crinja::Template
         @pages_by_path : Hash(String, Models::Page)?
+        @i18n_translations : Content::I18n::TranslationData = Content::I18n::TranslationData.new
 
         # Regex constants for HTML minification
         private REGEX_PRE_OPEN    = /<pre([^>]*)>\s*<code/
@@ -455,6 +457,10 @@ module Hwaro
             end
             @site = Models::Site.new(config)
             load_data_files(@site.not_nil!)
+
+            # Load i18n translations
+            i18n_dir = File.join("i18n")
+            @i18n_translations = Content::I18n.load_translations(i18n_dir, config)
 
             @config = config
             ctx.site = @site
@@ -1504,10 +1510,11 @@ module Hwaro
           emoji = site.config.markdown.emoji
 
           # Use anchor links if enabled
+          md_config = site.config.markdown
           html_content, toc_headers = if page.insert_anchor_links
-                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji)
+                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config)
                                       else
-                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji)
+                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config)
                                       end
 
           # Replace shortcode placeholders with their rendered HTML content
@@ -1982,6 +1989,20 @@ module Hwaro
           vars["current_year"] = Crinja::Value.new(now.year)
           vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
           vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
+
+          # i18n translations (available to {{ "key" | t }} filter)
+          unless @i18n_translations.empty?
+            i18n_hash = {} of Crinja::Value => Crinja::Value
+            @i18n_translations.each do |lang, entries|
+              entries_hash = {} of Crinja::Value => Crinja::Value
+              entries.each do |key, value|
+                entries_hash[Crinja::Value.new(key)] = Crinja::Value.new(value)
+              end
+              i18n_hash[Crinja::Value.new(lang)] = Crinja::Value.new(entries_hash)
+            end
+            vars["_i18n_translations"] = Crinja::Value.new(i18n_hash)
+          end
+          vars["_i18n_default_language"] = Crinja::Value.new(config.default_language)
 
           vars
         end
