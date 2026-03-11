@@ -111,7 +111,6 @@ module Hwaro
           parts << breadcrumb(page, config) unless page.ancestors.empty? && page.is_index
           parts.join("\n")
         end
-
       end
     end
   end

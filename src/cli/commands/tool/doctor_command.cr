@@ -61,7 +61,7 @@ module Hwaro
 
             if json_output
               result = {
-                "issues" => issues,
+                "issues"  => issues,
                 "summary" => {
                   "errors"   => issues.count { |i| i.level == :error },
                   "warnings" => issues.count { |i| i.level == :warning },

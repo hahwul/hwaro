@@ -136,11 +136,74 @@ describe Hwaro::Config::Options::ServeOptions do
   end
 end
 
+describe Hwaro::Config::Options::ScaffoldType do
+  describe ".from_string" do
+    it "parses 'simple'" do
+      Hwaro::Config::Options::ScaffoldType.from_string("simple").should eq(Hwaro::Config::Options::ScaffoldType::Simple)
+    end
+
+    it "parses 'blog'" do
+      Hwaro::Config::Options::ScaffoldType.from_string("blog").should eq(Hwaro::Config::Options::ScaffoldType::Blog)
+    end
+
+    it "parses 'docs'" do
+      Hwaro::Config::Options::ScaffoldType.from_string("docs").should eq(Hwaro::Config::Options::ScaffoldType::Docs)
+    end
+
+    it "is case-insensitive" do
+      Hwaro::Config::Options::ScaffoldType.from_string("BLOG").should eq(Hwaro::Config::Options::ScaffoldType::Blog)
+      Hwaro::Config::Options::ScaffoldType.from_string("Docs").should eq(Hwaro::Config::Options::ScaffoldType::Docs)
+    end
+
+    it "raises for unknown type" do
+      expect_raises(ArgumentError, /Unknown scaffold type/) do
+        Hwaro::Config::Options::ScaffoldType.from_string("unknown")
+      end
+    end
+  end
+
+  describe "#to_s" do
+    it "converts Simple to 'simple'" do
+      Hwaro::Config::Options::ScaffoldType::Simple.to_s.should eq("simple")
+    end
+
+    it "converts Blog to 'blog'" do
+      Hwaro::Config::Options::ScaffoldType::Blog.to_s.should eq("blog")
+    end
+
+    it "converts Docs to 'docs'" do
+      Hwaro::Config::Options::ScaffoldType::Docs.to_s.should eq("docs")
+    end
+  end
+end
+
 describe Hwaro::Config::Options::InitOptions do
   it "has default values" do
     options = Hwaro::Config::Options::InitOptions.new
     options.path.should eq(".")
     options.force.should eq(false)
+    options.skip_agents_md.should eq(false)
+    options.skip_sample_content.should eq(false)
+    options.skip_taxonomies.should eq(false)
+    options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
+    options.scaffold_remote.should be_nil
+  end
+
+  describe "#multilingual?" do
+    it "returns false when no languages are set" do
+      options = Hwaro::Config::Options::InitOptions.new
+      options.multilingual?.should be_false
+    end
+
+    it "returns false when only one language is set" do
+      options = Hwaro::Config::Options::InitOptions.new(multilingual_languages: ["en"])
+      options.multilingual?.should be_false
+    end
+
+    it "returns true when multiple languages are set" do
+      options = Hwaro::Config::Options::InitOptions.new(multilingual_languages: ["en", "ko"])
+      options.multilingual?.should be_true
+    end
   end
 end
 
