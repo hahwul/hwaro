@@ -50,6 +50,36 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 | sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
 
+## Collection Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| unique | Remove duplicates | {{ items \| unique }} |
+| flatten | Flatten nested arrays | {{ nested \| flatten }} |
+| compact | Remove nil/empty values | {{ items \| compact }} |
+
+## Math Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| ceil | Round up to integer | {{ 3.2 \| ceil }} → 4 |
+| floor | Round down to integer | {{ 3.8 \| floor }} → 3 |
+
+## i18n Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| t | Translate a key | {{ "nav.home" \| t }} |
+| pluralize | Select singular/plural form | {{ count \| pluralize(singular="item", plural="items") }} |
+
+The `t` filter looks up translation keys from TOML files in the `i18n/` directory. It uses the current page's language and falls back to the default language, then returns the key itself if no translation is found. See [Multilingual](/features/multilingual/) for i18n file setup.
+
+## Debug Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| inspect | Debug representation | {{ value \| inspect }} |
+
 ## URL Filters
 
 | Filter | Description | Example |
@@ -137,6 +167,43 @@ Format codes:
   {% endfor %}
   </ul>
 {% endfor %}
+```
+
+### Collection Processing
+
+```jinja
+{# Remove duplicates from tags across all pages #}
+{% set all_tags = site.pages | map(attribute="tags") | flatten | unique %}
+
+{# Remove empty entries #}
+{% set valid = items | compact %}
+```
+
+### Math Operations
+
+```jinja
+{# Calculate number of pages #}
+{% set total_pages = total_items / per_page | ceil %}
+```
+
+### Translations
+
+```jinja
+{# Translate UI strings (requires i18n/*.toml files) #}
+<nav>
+  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/blog/">{{ "nav.blog" | t }}</a>
+</nav>
+
+{# Pluralize based on count #}
+<p>{{ post_count }} {{ post_count | pluralize(singular="post", plural="posts") }}</p>
+```
+
+### Debugging
+
+```jinja
+{# Inspect a value for debugging #}
+<!-- {{ page.extra | inspect }} -->
 ```
 
 ### Chaining

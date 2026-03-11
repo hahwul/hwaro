@@ -159,6 +159,33 @@ Build your own pagination UI:
 {% endif %}
 ```
 
+## Ellipsis for Large Page Counts
+
+When there are more than 7 pages, the built-in pagination navigation automatically inserts ellipsis (`...`) to keep the UI compact. A sliding window of 5 page numbers around the current page is shown, with the first and last pages always visible.
+
+For example, on page 5 of 20:
+
+```
+« Prev  1 ... 3  4  [5]  6  7 ... 20  Next »
+```
+
+## SEO Links
+
+Hwaro generates `<link rel="prev">` and `<link rel="next">` tags for paginated pages. Include them in your `<head>`:
+
+```jinja
+<head>
+  {{ pagination_seo_links | safe }}
+</head>
+```
+
+Output:
+
+```html
+<link rel="prev" href="https://example.com/blog/page/2/">
+<link rel="next" href="https://example.com/blog/page/4/">
+```
+
 ## Taxonomy Pagination
 
 Taxonomies also support pagination in `config.toml`:

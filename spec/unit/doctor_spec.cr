@@ -166,6 +166,147 @@ describe Hwaro::Services::Doctor do
         content_issues = issues.select { |i| i.category == "content" }
         content_issues.should be_empty
       end
+
+      it "warns on broken internal link" do
+        files = {
+          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[Link](/nonexistent/)\n",
+        }
+        issues = run_doctor(base_config, files)
+        issues.any? { |i| i.message.includes?("broken internal link") }.should be_true
+      end
+
+      it "does not warn on valid internal link" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "about"))
+          File.write(File.join(content_dir, "about", "_index.md"), "+++\ntitle = \"About\"\ndate = \"2024-01-01\"\ndescription = \"About\"\n+++\n")
+          File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[About](/about/)\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path)
+          issues = doctor.run
+          issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
+        end
+      end
+
+      it "does not flag external links as broken" do
+        files = {
+          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[Google](https://google.com)\n",
+        }
+        issues = run_doctor(base_config, files)
+        issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
+      end
+    end
+
+    describe "config — base_url format" do
+      it "warns when base_url has no protocol" do
+        issues = run_doctor(%(title = "My Site"\nbase_url = "example.com"\n))
+        issues.any? { |i| i.message.includes?("http://") }.should be_true
+      end
+
+      it "warns when base_url has trailing slash" do
+        issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com/"\n))
+        issues.any? { |i| i.message.includes?("trailing slash") }.should be_true
+      end
+
+      it "does not warn on proper base_url" do
+        issues = run_doctor(base_config)
+        issues.any? { |i| i.message.includes?("trailing slash") }.should be_false
+        issues.any? { |i| i.message.includes?("http://") && i.message.includes?("https://") }.should be_false
+      end
+    end
+
+    describe "template diagnostics" do
+      it "warns when templates directory is missing" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.category == "template" && i.message.includes?("not found") }.should be_true
+        end
+      end
+
+      it "warns when required template files are missing" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          # Only create page.html, not section.html
+          File.write(File.join(templates_dir, "page.html"), "<html>{{ content }}</html>")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          issues = doctor.run
+          tpl_issues = issues.select { |i| i.category == "template" }
+          tpl_issues.any? { |i| i.message.includes?("section.html") }.should be_true
+          tpl_issues.any? { |i| i.message.includes?("page.html") }.should be_false
+        end
+      end
+
+      it "warns on unclosed template block tags" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          File.write(File.join(templates_dir, "page.html"), "{% if true %}hello")
+          File.write(File.join(templates_dir, "section.html"), "<html></html>")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          issues = doctor.run
+          issues.any? { |i| i.message.includes?("unclosed template block") }.should be_true
+        end
+      end
+
+      it "no template warnings when all valid" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          File.write(File.join(templates_dir, "page.html"), "{% if true %}hello{% endif %}")
+          File.write(File.join(templates_dir, "section.html"), "{{ content }}")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          issues = doctor.run
+          tpl_issues = issues.select { |i| i.category == "template" }
+          tpl_issues.should be_empty
+        end
+      end
+    end
+
+    describe "directory structure" do
+      it "reports info when section dir missing _index.md" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "blog"))
+          File.write(File.join(content_dir, "blog", "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.category == "structure" && i.message.includes?("_index.md") }.should be_true
+        end
+      end
+
+      it "no structure warning when _index.md exists" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "blog"))
+          File.write(File.join(content_dir, "blog", "_index.md"), "+++\ntitle = \"Blog\"\n+++\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.category == "structure" && i.message.includes?("_index.md") }.should be_false
+        end
+      end
     end
   end
 end

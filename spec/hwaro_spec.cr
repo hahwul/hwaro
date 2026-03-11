@@ -37,7 +37,7 @@ describe Hwaro do
   describe Hwaro::Config::Options::ServeOptions do
     it "has default values" do
       options = Hwaro::Config::Options::ServeOptions.new
-      options.host.should eq("0.0.0.0")
+      options.host.should eq("127.0.0.1")
       options.port.should eq(3000)
       options.drafts.should eq(false)
       options.open_browser.should eq(false)

@@ -84,6 +84,61 @@ module Hwaro
               end
               result
             end
+
+            # Unique filter — removes duplicate values from an array
+            env.filters["unique"] = Crinja.filter do
+              result = begin
+                arr = target.as_a
+                seen = Set(String).new
+                unique_items = arr.select do |item|
+                  key = item.to_s
+                  if seen.includes?(key)
+                    false
+                  else
+                    seen << key
+                    true
+                  end
+                end
+                Crinja::Value.new(unique_items)
+              rescue
+                Crinja::Value.new([] of Crinja::Value)
+              end
+              result
+            end
+
+            # Flatten filter — flattens nested arrays one level
+            env.filters["flatten"] = Crinja.filter do
+              result = begin
+                arr = target.as_a
+                flattened = [] of Crinja::Value
+                arr.each do |item|
+                  begin
+                    sub = item.as_a
+                    sub.each { |v| flattened << v }
+                  rescue
+                    flattened << item
+                  end
+                end
+                Crinja::Value.new(flattened)
+              rescue
+                Crinja::Value.new([] of Crinja::Value)
+              end
+              result
+            end
+
+            # Compact filter — removes nil/empty values from an array
+            env.filters["compact"] = Crinja.filter do
+              result = begin
+                arr = target.as_a
+                compacted = arr.reject do |item|
+                  item.raw.nil? || item.to_s.empty?
+                end
+                Crinja::Value.new(compacted)
+              rescue
+                Crinja::Value.new([] of Crinja::Value)
+              end
+              result
+            end
           end
         end
       end

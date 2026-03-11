@@ -25,6 +25,7 @@ require "../../content/seo/sitemap"
 require "../../content/seo/robots"
 require "../../content/seo/llms"
 require "../../content/seo/tags"
+require "../../content/seo/jsonld"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
@@ -36,6 +37,7 @@ require "../../content/processors/markdown"
 require "../../content/processors/content_files"
 require "../../content/processors/template"
 require "../../content/multilingual"
+require "../../content/i18n"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
@@ -64,6 +66,7 @@ module Hwaro
         @crinja_env : Crinja?
         @compiled_templates_cache : Hash(UInt64, Crinja::Template) = {} of UInt64 => Crinja::Template
         @pages_by_path : Hash(String, Models::Page)?
+        @i18n_translations : Content::I18n::TranslationData = Content::I18n::TranslationData.new
 
         # Regex constants for HTML minification
         private REGEX_PRE_OPEN    = /<pre([^>]*)>\s*<code/
@@ -454,6 +457,10 @@ module Hwaro
             end
             @site = Models::Site.new(config)
             load_data_files(@site.not_nil!)
+
+            # Load i18n translations
+            i18n_dir = File.join("i18n")
+            @i18n_translations = Content::I18n.load_translations(i18n_dir, config)
 
             @config = config
             ctx.site = @site
@@ -1503,10 +1510,11 @@ module Hwaro
           emoji = site.config.markdown.emoji
 
           # Use anchor links if enabled
+          md_config = site.config.markdown
           html_content, toc_headers = if page.insert_anchor_links
-                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji)
+                                        Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config)
                                       else
-                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji)
+                                        Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config)
                                       end
 
           # Replace shortcode placeholders with their rendered HTML content
@@ -1623,6 +1631,7 @@ module Hwaro
           pagination_result.paginated_pages.each do |paginated_page|
             section_list_html = renderer.render_section_list(paginated_page)
             pagination_nav_html = renderer.render_pagination_nav(paginated_page)
+            pagination_seo_links = renderer.render_seo_links(paginated_page)
 
             # Use the correct URL for each paginated page during rendering (important for SEO tags, nav, etc.)
             base = section.url.rstrip("/")
@@ -1634,7 +1643,7 @@ module Hwaro
 
             final_html = if template_content
                            apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page, global_vars,
-                             crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                             crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links)
                          else
                            msg = "No template found for #{section.path}. Using raw content."
                            Logger.warn "  [WARN] #{msg}"
@@ -1812,13 +1821,14 @@ module Hwaro
           global_vars : Hash(String, Crinja::Value)? = nil,
           crinja_env_override : Crinja? = nil,
           template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
+          pagination_seo_links : String = "",
         ) : String
           # Use per-worker env when provided (parallel path), otherwise shared env
           env = crinja_env_override || crinja_env
           cache = template_cache_override || @compiled_templates_cache
 
           # Build template variables
-          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars)
+          vars = build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links)
 
           begin
             # Process shortcodes in template first (convert to Jinja2 include syntax)
@@ -1980,6 +1990,20 @@ module Hwaro
           vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
           vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
 
+          # i18n translations (available to {{ "key" | t }} filter)
+          unless @i18n_translations.empty?
+            i18n_hash = {} of Crinja::Value => Crinja::Value
+            @i18n_translations.each do |lang, entries|
+              entries_hash = {} of Crinja::Value => Crinja::Value
+              entries.each do |key, value|
+                entries_hash[Crinja::Value.new(key)] = Crinja::Value.new(value)
+              end
+              i18n_hash[Crinja::Value.new(lang)] = Crinja::Value.new(entries_hash)
+            end
+            vars["_i18n_translations"] = Crinja::Value.new(i18n_hash)
+          end
+          vars["_i18n_default_language"] = Crinja::Value.new(config.default_language)
+
           vars
         end
 
@@ -2024,6 +2048,7 @@ module Hwaro
           page_url_override : String? = nil,
           paginator : Content::Pagination::PaginatedPage? = nil,
           global_vars : Hash(String, Crinja::Value)? = nil,
+          pagination_seo_links : String = "",
         ) : Hash(String, Crinja::Value)
           config = site.config
           vars = {} of String => Crinja::Value
@@ -2279,6 +2304,7 @@ module Hwaro
           vars["toc_obj"] = Crinja::Value.new(toc_obj)
 
           vars["pagination"] = Crinja::Value.new(pagination)
+          vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
 
           if paginator
             paginator_obj = {
@@ -2333,6 +2359,14 @@ module Hwaro
           hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
           vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
           vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
+
+          # JSON-LD structured data
+          jsonld_article = Content::Seo::JsonLd.article(page, config)
+          jsonld_breadcrumb = Content::Seo::JsonLd.breadcrumb(page, config)
+          jsonld_all = Content::Seo::JsonLd.all_tags(page, config)
+          vars["jsonld_article"] = Crinja::Value.new(jsonld_article)
+          vars["jsonld_breadcrumb"] = Crinja::Value.new(jsonld_breadcrumb)
+          vars["jsonld"] = Crinja::Value.new(jsonld_all)
 
           # NOTE: current_year/current_date/current_datetime are now in
           # global_vars (computed once in build_global_vars).

@@ -12,6 +12,7 @@ Hwaro includes powerful features out of the box.
 - [Syntax Highlighting](/features/syntax-highlighting/) — Code block highlighting with Highlight.js
 - [Pagination](/features/pagination/) — Split large content lists into multiple pages
 - [Multilingual](/features/multilingual/) — Build multilingual sites with translation linking and hreflang tags
+- [Markdown Extensions](/features/markdown-extensions/) — Task lists, footnotes, definition lists, math, and Mermaid diagrams
 - [Auto Includes](/features/auto-includes/) — Automatically load CSS and JS files from static directories
 - [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
 - [Cache Busting](/features/cache-busting/) — Content-hash based browser cache invalidation for CSS/JS resources

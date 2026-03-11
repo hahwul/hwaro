@@ -263,4 +263,73 @@ describe Hwaro::Core::Build::Builder do
       result.should eq("from_args")
     end
   end
+
+  describe "positional arguments" do
+    it "parses positional string arguments as _0, _1, etc" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("warning", "Be careful!"))
+      args["_0"].should eq("warning")
+      args["_1"].should eq("Be careful!")
+    end
+
+    it "parses single positional argument" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("hello"))
+      args["_0"].should eq("hello")
+    end
+
+    it "prefers named args when = is present" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%(type="warning"))
+      args["type"].should eq("warning")
+      args.has_key?("_0").should be_false
+    end
+
+    it "renders shortcode with positional args" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      template = "{{ _0 }}: {{ _1 }}"
+      args = {"_0" => "alert", "_1" => "message"}
+      context = {} of String => Crinja::Value
+
+      result = builder.test_render_shortcode_jinja(template, args, context, crinja_env_override: env)
+      result.should eq("alert: message")
+    end
+  end
+
+  describe "nested shortcodes" do
+    it "processes shortcodes nested inside block body" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+
+      templates = {
+        "shortcodes/outer" => "<div>{{ body }}</div>",
+        "shortcodes/inner" => "<em>{{ text }}</em>",
+      }
+      context = {} of String => Crinja::Value
+      content = "{% outer() %}{{ inner(text=\"nested\") }}{% end %}"
+
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div>")
+      result.should contain("<em>nested</em>")
+    end
+  end
+
+  describe "markdown in shortcode body" do
+    it "passes raw body to shortcode template without automatic markdown conversion" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+
+      templates = {
+        "shortcodes/note" => "<div class=\"note\">{{ body }}</div>",
+      }
+      context = {} of String => Crinja::Value
+      content = "{% note() %}\n**bold** text\n{% end %}"
+
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      # Body is passed as-is; markdown conversion is the template's responsibility
+      result.should contain("**bold** text")
+      result.should contain("note")
+    end
+  end
 end

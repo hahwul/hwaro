@@ -118,7 +118,43 @@ Use in content (inside a Page Bundle directory):
 
 This will render a grid of all JPG and PNG images found alongside the Markdown file.
 
+## Block Shortcodes
+
+Block shortcodes wrap content between opening and closing tags:
+
+```markdown
+{%raw%}{% note() %}
+This is the **body** content of the shortcode.
+{% end %}{%endraw%}
+```
+
+The body is passed to the shortcode template as the `body` variable. Markdown conversion is **not** applied automatically — use the `markdownify` filter in your template if needed:
+
+```jinja
+<div class="note">
+  {{ body | markdownify | safe }}
+</div>
+```
+
+Or use the body as-is for raw content:
+
+```jinja
+<div class="note">{{ body }}</div>
+```
+
+### Nested Shortcodes
+
+Block shortcodes can be nested up to 5 levels deep:
+
+```markdown
+{%raw%}{% outer() %}
+  Some text with {{ inner(type="info") }} inside.
+{% end %}{%endraw%}
+```
+
 ## Argument Syntax
+
+### Named Arguments
 
 Arguments support multiple quote styles:
 
@@ -126,6 +162,20 @@ Arguments support multiple quote styles:
 {%raw%}{{ alert(type="warning", message="Double quotes") }}
 {{ alert(type='info', message='Single quotes') }}
 {{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+```
+
+### Positional Arguments
+
+When no `key=value` syntax is used, arguments are assigned as `_0`, `_1`, etc.:
+
+```markdown
+{%raw%}{{ youtube("dQw4w9WgXcQ") }}{%endraw%}
+```
+
+In the shortcode template, access via `{{ _0 }}`:
+
+```jinja
+<iframe src="https://www.youtube.com/embed/{{ _0 }}"></iframe>
 ```
 
 ## Built-in Variables

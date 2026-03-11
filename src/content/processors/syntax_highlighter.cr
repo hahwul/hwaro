@@ -11,6 +11,7 @@
 
 require "markd"
 require "./table_parser"
+require "./markdown_extensions"
 require "set"
 
 module Hwaro

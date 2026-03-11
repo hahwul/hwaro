@@ -80,6 +80,7 @@ require "./content/seo/feeds"
 require "./content/seo/sitemap"
 require "./content/seo/robots"
 require "./content/seo/llms"
+require "./content/seo/jsonld"
 require "./content/search"
 require "./content/taxonomies"
 

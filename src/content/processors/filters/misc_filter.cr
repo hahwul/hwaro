@@ -21,6 +21,29 @@ module Hwaro
                 val
               end
             end
+
+            # Inspect filter — outputs debug representation of a value
+            env.filters["inspect"] = Crinja.filter do
+              raw = target.raw
+              case raw
+              when Nil
+                "nil"
+              when String
+                raw.inspect
+              when Bool, Int32, Int64, Float64
+                raw.to_s
+              when Array
+                "[#{target.as_a.map(&.to_s).join(", ")}]"
+              when Hash
+                pairs = [] of String
+                target.as_h.each do |k, v|
+                  pairs << "#{k}: #{v}"
+                end
+                "{#{pairs.join(", ")}}"
+              else
+                target.to_s.inspect
+              end
+            end
           end
         end
       end

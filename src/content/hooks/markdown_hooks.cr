@@ -165,17 +165,18 @@ module Hwaro
           # Get markdown config options
           safe = ctx.config.try(&.markdown.safe) || false
           emoji = ctx.config.try(&.markdown.emoji) || false
+          md_config = ctx.config.try(&.markdown)
 
           ctx.all_pages.each do |page|
-            transform_page(page, safe, emoji)
+            transform_page(page, safe, emoji, md_config)
           end
         end
 
-        private def transform_page(page : Models::Page, safe : Bool = false, emoji : Bool = false)
+        private def transform_page(page : Models::Page, safe : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil)
           return unless page.render
           return if page.raw_content.empty?
 
-          html_content, toc_headers = Processor::Markdown.render(page.raw_content, highlight: true, safe: safe, emoji: emoji)
+          html_content, toc_headers = Processor::Markdown.render(page.raw_content, highlight: true, safe: safe, emoji: emoji, markdown_config: markdown_config)
           page.content = html_content
           # Store TOC in metadata if needed
         end

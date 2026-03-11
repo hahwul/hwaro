@@ -705,3 +705,150 @@ describe "Filter Chaining" do
     result.should eq("Alice,Diana,Charlie,")
   end
 end
+
+# =============================================================================
+# Collection Filters — unique, flatten, compact
+# =============================================================================
+describe "CollectionFilters (extended)" do
+  describe "unique" do
+    it "removes duplicate values from an array" do
+      items = Crinja::Value.new([1, 2, 2, 3, 1].map { |n| Crinja::Value.new(n) })
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | unique %}{{ i }},{% endfor %}", vars)
+      result.should eq("1,2,3,")
+    end
+
+    it "removes duplicate strings" do
+      items = Crinja::Value.new(["a", "b", "a", "c"].map { |s| Crinja::Value.new(s) })
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | unique %}{{ i }},{% endfor %}", vars)
+      result.should eq("a,b,c,")
+    end
+
+    it "returns empty array for empty input" do
+      items = Crinja::Value.new([] of Crinja::Value)
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | unique %}{{ i }}{% endfor %}", vars)
+      result.should eq("")
+    end
+  end
+
+  describe "flatten" do
+    it "flattens nested arrays one level" do
+      inner1 = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new(2)])
+      inner2 = Crinja::Value.new([Crinja::Value.new(3)])
+      items = Crinja::Value.new([inner1, inner2])
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | flatten %}{{ i }},{% endfor %}", vars)
+      result.should eq("1,2,3,")
+    end
+
+    it "passes through non-array items" do
+      inner = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new(2)])
+      scalar = Crinja::Value.new("hello")
+      items = Crinja::Value.new([inner, scalar])
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | flatten %}{{ i }},{% endfor %}", vars)
+      result.should eq("1,2,hello,")
+    end
+  end
+
+  describe "compact" do
+    it "removes nil values from an array" do
+      items = Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new(nil), Crinja::Value.new("b")])
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | compact %}{{ i }},{% endfor %}", vars)
+      result.should eq("a,b,")
+    end
+
+    it "removes empty string values" do
+      items = Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new(""), Crinja::Value.new("b")])
+      vars = {"items" => items}
+      result = render_filter("{% for i in items | compact %}{{ i }},{% endfor %}", vars)
+      result.should eq("a,b,")
+    end
+  end
+end
+
+# =============================================================================
+# Math Filters — ceil, floor
+# =============================================================================
+describe "MathFilters" do
+  describe "ceil" do
+    it "rounds up a float" do
+      vars = {"val" => Crinja::Value.new(3.2)}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("4")
+    end
+
+    it "returns same value for integer" do
+      vars = {"val" => Crinja::Value.new(5.0)}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("5")
+    end
+
+    it "rounds up negative float towards zero" do
+      vars = {"val" => Crinja::Value.new(-2.3)}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("-2")
+    end
+  end
+
+  describe "floor" do
+    it "rounds down a float" do
+      vars = {"val" => Crinja::Value.new(3.7)}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("3")
+    end
+
+    it "returns same value for integer" do
+      vars = {"val" => Crinja::Value.new(5.0)}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("5")
+    end
+
+    it "rounds down negative float away from zero" do
+      vars = {"val" => Crinja::Value.new(-2.3)}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("-3")
+    end
+  end
+end
+
+# =============================================================================
+# Misc Filters — inspect
+# =============================================================================
+describe "MiscFilters (extended)" do
+  describe "inspect" do
+    it "inspects a string value" do
+      vars = {"val" => Crinja::Value.new("hello")}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("\"hello\"")
+    end
+
+    it "inspects nil value" do
+      vars = {"val" => Crinja::Value.new(nil)}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("nil")
+    end
+
+    it "inspects a number" do
+      vars = {"val" => Crinja::Value.new(42)}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("42")
+    end
+
+    it "inspects an array" do
+      items = Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new("b")])
+      vars = {"val" => items}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("[a, b]")
+    end
+
+    it "inspects a boolean" do
+      vars = {"val" => Crinja::Value.new(true)}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("true")
+    end
+  end
+end

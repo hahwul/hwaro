@@ -95,7 +95,7 @@ hwaro tool list all -c posts
 
 ### deadlink — Dead Link Checker
 
-Check for broken external links in your content files.
+Check for broken external and internal links in your content files.
 
 ```bash
 hwaro tool deadlink
@@ -104,23 +104,36 @@ hwaro tool deadlink
 This command:
 
 1. Scans all Markdown files in the `content/` directory
-2. Finds external URLs (http/https links)
-3. Sends concurrent HEAD requests to each URL
-4. Reports broken or unreachable links
+2. Finds external URLs (http/https links) and internal links (relative/absolute paths)
+3. Sends concurrent HEAD requests to external URLs
+4. Verifies internal link targets exist on disk (checks `.md`, `_index.md`, `index.md`)
+5. Reports broken or unreachable links
 
 **Example output:**
 
 ```
-Checking links in content/...
-Found 42 external links in 15 files
-
-✓ https://example.com (200)
-✓ https://crystal-lang.org (200)
-✗ https://old-site.com/page (404)
-✗ https://broken-link.invalid (Connection refused)
-
-Results: 40 OK, 2 broken
+Starting dead link check in 'content'...
+----------------------------------------
+✘ Found 3 dead links (out of 50 total):
+[DEAD] content/blog/post.md
+  └─ URL: https://old-site.com/page
+  └─ Status: 404
+[DEAD] content/blog/post.md
+  └─ URL: ../missing-page (internal)
+  └─ Internal link target not found
+[DEAD] content/about.md
+  └─ URL: /images/photo.png (internal)
+  └─ Image not found
+----------------------------------------
 ```
+
+**Link types checked:**
+
+| Type | Description |
+|------|-------------|
+| External | `http://` and `https://` links — checked via HTTP HEAD |
+| Internal | Relative and absolute path links — checked on filesystem |
+| Images | `![alt](path)` image references — checked on filesystem |
 
 ### doctor — Site Diagnostics
 
@@ -138,12 +151,22 @@ This command checks:
 **Config diagnostics:**
 
 - `base_url` is not set
+- `base_url` doesn't start with `http://` or `https://`
+- `base_url` has a trailing slash
 - `title` is still the default value
 - `feeds.enabled` is true but `feeds.filename` is empty
 - `sitemap.changefreq` has an invalid value
 - `sitemap.priority` is out of range (0.0–1.0)
 - Duplicate taxonomy names
+- Duplicate language codes
 - Invalid `search.format` value
+
+**Template diagnostics:**
+
+- Templates directory not found
+- Required templates missing (`page.html`, `section.html`)
+- Unclosed block tags (`if`, `for`, `block`, `macro` without matching `end`)
+- Mismatched `{{ }}` variable tags
 
 **Content diagnostics:**
 
@@ -151,8 +174,13 @@ This command checks:
 - Missing `description` in frontmatter
 - Missing `date` in frontmatter
 - Images without alt text (`![](url)`)
+- Broken internal links (relative/absolute paths that don't resolve)
 - Frontmatter parse errors (TOML/YAML)
 - Draft files (reported as info)
+
+**Structure diagnostics:**
+
+- Section directories missing `_index.md`
 
 **Options:**
 

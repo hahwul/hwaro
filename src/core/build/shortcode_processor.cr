@@ -15,7 +15,10 @@ module Hwaro
   module Core
     module Build
       module ShortcodeProcessor
-        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+        # NOTE: POSITIONAL_ARG_REGEX is reserved for future use
+        # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
+        MAX_SHORTCODE_NESTING = 5
 
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
@@ -54,12 +57,22 @@ module Hwaro
           end
         end
 
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil) : String
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, depth : Int32 = 0) : String
           # 1. Block shortcodes: {% name(args) %}body{% end %}
           processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
             name = $1
             args_str = $2
             body = $3.strip
+
+            # Recursively process nested shortcodes in body (with depth limit)
+            if depth < MAX_SHORTCODE_NESTING && (body.includes?("{{") || body.includes?("{%"))
+              body = process_shortcodes_in_text(body, templates, context, shortcode_results, crinja_env_override: crinja_env_override, depth: depth + 1)
+            end
+
+            # NOTE: Markdown conversion of shortcode body is left to the shortcode
+            # template itself (e.g. via {{ body | safe }} or a markdown filter).
+            # Automatic conversion was removed to avoid unintended transformations
+            # when body contains characters like *, _, or ` in non-markdown context.
 
             extra_args = {"body" => body}
             render_shortcode_result(name, args_str, templates, context, shortcode_results, match, warn_missing: true, extra_args: extra_args, crinja_env_override: crinja_env_override)
@@ -111,17 +124,40 @@ module Hwaro
           end
         end
 
-        # Parse shortcode arguments (key="value" or key='value' or key=value)
+        # Parse shortcode arguments — supports both named and positional
+        # Named:      key="value", key='value', key=value
+        # Positional:  "value", 'value', value (assigned as _0, _1, ...)
         private def parse_shortcode_args_jinja(args_str : String?) : Hash(String, String)
           args = {} of String => String
           return args unless args_str
+          return args if args_str.strip.empty?
 
-          # Match: key="value", key='value', or key=value (unquoted)
-          args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
-            key = match[1]
-            value = match[2]? || match[3]? || match[4]? || ""
-            args[key] = value
+          # First try named arguments
+          has_named = args_str.includes?("=")
+          if has_named
+            args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
+              key = match[1]
+              value = match[2]? || match[3]? || match[4]? || ""
+              args[key] = value
+            end
           end
+
+          # If no named args found, try positional
+          if args.empty?
+            idx = 0
+            args_str.split(",").each do |part|
+              value = part.strip
+              # Strip surrounding quotes
+              if (value.starts_with?('"') && value.ends_with?('"')) ||
+                 (value.starts_with?('\'') && value.ends_with?('\''))
+                value = value[1..-2]
+              end
+              next if value.empty?
+              args["_#{idx}"] = value
+              idx += 1
+            end
+          end
+
           args
         end
 

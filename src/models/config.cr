@@ -66,6 +66,7 @@ module Hwaro
       property fields : Array(String)
       property filename : String
       property exclude : Array(String)
+      property tokenize_cjk : Bool
 
       def initialize
         @enabled = false
@@ -73,6 +74,7 @@ module Hwaro
         @fields = ["title", "content"]
         @filename = "search.json"
         @exclude = [] of String
+        @tokenize_cjk = false
       end
     end
 
@@ -399,14 +401,26 @@ module Hwaro
     # Markdown parser configuration
     # Maps to Markd::Options for controlling markdown parsing behavior
     class MarkdownConfig
-      property safe : Bool         # If true, raw HTML will not be passed through (replaced by comments)
-      property lazy_loading : Bool # If true, adds loading="lazy" to img tags
-      property emoji : Bool        # If true, converts emoji shortcodes (e.g. :smile:) to emoji characters
+      property safe : Bool             # If true, raw HTML will not be passed through (replaced by comments)
+      property lazy_loading : Bool     # If true, adds loading="lazy" to img tags
+      property emoji : Bool            # If true, converts emoji shortcodes (e.g. :smile:) to emoji characters
+      property footnotes : Bool        # If true, enables footnote syntax ([^1])
+      property task_lists : Bool       # If true, enables task list syntax (- [ ] / - [x])
+      property definition_lists : Bool # If true, enables definition list syntax (Term\n: Definition)
+      property mermaid : Bool          # If true, renders ```mermaid blocks as diagrams
+      property math : Bool             # If true, enables math syntax ($...$ and $$...$$)
+      property math_engine : String    # "katex" or "mathjax"
 
       def initialize
         @safe = false
         @lazy_loading = false
         @emoji = false
+        @footnotes = false
+        @task_lists = false
+        @definition_lists = false
+        @mermaid = false
+        @math = false
+        @math_engine = "katex"
       end
     end
 
@@ -651,6 +665,7 @@ module Hwaro
         if exclude_arr = s["exclude"]?.try(&.as_a?)
           config.search.exclude = exclude_arr.compact_map(&.as_s?)
         end
+        config.search.tokenize_cjk = bool_value(s["tokenize_cjk"]?, config.search.tokenize_cjk)
       end
 
       private def self.load_plugins(config : Config)
@@ -774,6 +789,14 @@ module Hwaro
         config.markdown.safe = bool_value(s["safe"]?, config.markdown.safe)
         config.markdown.lazy_loading = bool_value(s["lazy_loading"]?, config.markdown.lazy_loading)
         config.markdown.emoji = bool_value(s["emoji"]?, config.markdown.emoji)
+        config.markdown.footnotes = bool_value(s["footnotes"]?, config.markdown.footnotes)
+        config.markdown.task_lists = bool_value(s["task_lists"]?, config.markdown.task_lists)
+        config.markdown.definition_lists = bool_value(s["definition_lists"]?, config.markdown.definition_lists)
+        config.markdown.mermaid = bool_value(s["mermaid"]?, config.markdown.mermaid)
+        config.markdown.math = bool_value(s["math"]?, config.markdown.math)
+        if engine = s["math_engine"]?.try(&.as_s?)
+          config.markdown.math_engine = engine
+        end
       end
 
       private def self.load_permalinks(config : Config)

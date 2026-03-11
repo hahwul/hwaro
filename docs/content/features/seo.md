@@ -286,6 +286,87 @@ Or include both OG and Twitter:
 
 ---
 
+## JSON-LD Structured Data
+
+Hwaro generates [JSON-LD](https://json-ld.org/) structured data for search engines.
+
+### Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| jsonld | Both Article and BreadcrumbList JSON-LD |
+| jsonld_article | Article JSON-LD only |
+| jsonld_breadcrumb | BreadcrumbList JSON-LD only |
+
+### Template Usage
+
+```jinja
+<head>
+  {{ jsonld | safe }}
+</head>
+```
+
+Or include specific types:
+
+```jinja
+<head>
+  {{ jsonld_article | safe }}
+  {{ jsonld_breadcrumb | safe }}
+</head>
+```
+
+### Article Output
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "My Article",
+  "url": "https://example.com/blog/my-article/",
+  "datePublished": "2024-01-15T00:00:00+00:00",
+  "dateModified": "2024-02-01T00:00:00+00:00",
+  "description": "Article description",
+  "author": {
+    "@type": "Person",
+    "name": "Author Name"
+  }
+}
+</script>
+```
+
+### BreadcrumbList Output
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "My Site", "item": "https://example.com/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://example.com/blog/"},
+    {"@type": "ListItem", "position": 3, "name": "My Article"}
+  ]
+}
+</script>
+```
+
+### Fields Included
+
+The Article JSON-LD includes the following fields when available:
+
+| Field | Source |
+|-------|--------|
+| headline | `page.title` |
+| url | `page.permalink` or computed from `base_url` |
+| datePublished | `page.date` |
+| dateModified | `page.updated` |
+| description | `page.description` |
+| image | `page.image` |
+| author | First entry from `page.authors` |
+
+---
+
 ## Template Variables
 
 | Variable | Description |
@@ -293,6 +374,9 @@ Or include both OG and Twitter:
 | og_tags | OpenGraph meta tags |
 | twitter_tags | Twitter Card meta tags |
 | og_all_tags | Both OG and Twitter tags |
+| jsonld | Article + BreadcrumbList JSON-LD |
+| jsonld_article | Article JSON-LD only |
+| jsonld_breadcrumb | BreadcrumbList JSON-LD only |
 | page_description | Page description (fallback: site) |
 | page_image | Page image (fallback: og.default_image) |
 
@@ -336,6 +420,7 @@ twitter_site = "@mysite"
   {{ og_all_tags | safe }}
   {{ canonical_tag | safe }}
   {{ hreflang_tags | safe }}
+  {{ jsonld | safe }}
   <link rel="alternate" type="application/rss+xml" href="{{ base_url }}/rss.xml">
 </head>
 <body>

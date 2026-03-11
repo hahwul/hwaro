@@ -60,6 +60,7 @@ module Hwaro
 
       private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Hash(String, String | Array(String)))
         fields = config.search.fields
+        cjk = config.search.tokenize_cjk
 
         pages.map do |page|
           data = {} of String => String | Array(String)
@@ -67,7 +68,8 @@ module Hwaro
           fields.each do |field|
             case field.downcase
             when "title"
-              data["title"] = page.title
+              title = page.title
+              data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               # Convert markdown to plain text
               # Optimization: Reuse rendered content if available
@@ -79,7 +81,7 @@ module Hwaro
 
               # Strip HTML tags to get plain text
               text_content = Utils::TextUtils.strip_html(html_content)
-              data["content"] = text_content
+              data["content"] = cjk ? Utils::TextUtils.tokenize_cjk(text_content) : text_content
             when "tags"
               data["tags"] = page.tags
             when "url"
@@ -87,7 +89,8 @@ module Hwaro
             when "section"
               data["section"] = page.section
             when "description"
-              data["description"] = page.description || ""
+              desc = page.description || ""
+              data["description"] = cjk ? Utils::TextUtils.tokenize_cjk(desc) : desc
             end
           end
 

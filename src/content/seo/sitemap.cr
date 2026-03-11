@@ -53,6 +53,15 @@ module Hwaro
                 str << "    <lastmod>#{date.to_s("%Y-%m-%d")}</lastmod>\n"
               end
 
+              # Add changefreq and priority from config
+              changefreq = site.config.sitemap.changefreq
+              unless changefreq.empty?
+                str << "    <changefreq>#{Utils::TextUtils.escape_xml(changefreq)}</changefreq>\n"
+              end
+
+              priority = site.config.sitemap.priority
+              str << "    <priority>#{priority}</priority>\n"
+
               str << "  </url>\n"
             end
 

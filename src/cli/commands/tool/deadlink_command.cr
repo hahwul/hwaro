@@ -32,7 +32,7 @@ module Hwaro
           end
 
           # Structure to hold link information
-          record Link, file : String, url : String
+          record Link, file : String, url : String, kind : Symbol = :external
           # Structure to hold check result
           record Result, link : Link, status : Int32, error : String?
 
@@ -47,42 +47,104 @@ module Hwaro
 
             Logger.info "Starting dead link check in '#{target_dir}'..."
 
-            links = find_links(target_dir)
+            external_links = find_external_links(target_dir)
+            internal_links = find_internal_links(target_dir)
 
-            if links.empty?
-              Logger.info "✔ No external links found."
+            if external_links.empty? && internal_links.empty?
+              Logger.info "✔ No links found."
               return
             end
 
-            results = check_links_concurrently(links)
-            dead_links = results.select { |r| !(200..299).includes?(r.status) }
+            # Check external links
+            external_results = check_links_concurrently(external_links)
+            dead_external = external_results.select { |r| !(200..299).includes?(r.status) }
+
+            # Check internal links
+            dead_internal = check_internal_links(internal_links, target_dir)
+
+            total = external_links.size + internal_links.size
+            dead_total = dead_external.size + dead_internal.size
 
             Logger.info "----------------------------------------"
-            if dead_links.empty?
-              Logger.info "✔ All #{links.size} links are healthy."
+            if dead_total == 0
+              Logger.info "✔ All #{total} links are healthy (#{external_links.size} external, #{internal_links.size} internal)."
             else
-              Logger.warn "✘ Found #{dead_links.size} dead links (out of #{links.size} total):"
-              dead_links.each do |result|
+              Logger.warn "✘ Found #{dead_total} dead links (out of #{total} total):"
+              dead_external.each do |result|
                 Logger.error "[DEAD] #{result.link.file}"
                 Logger.error "  └─ URL: #{result.link.url}"
                 Logger.error "  └─ Status: #{result.status}#{result.error ? " (Error: #{result.error})" : ""}"
+              end
+              dead_internal.each do |result|
+                Logger.error "[DEAD] #{result.link.file}"
+                Logger.error "  └─ URL: #{result.link.url} (internal)"
+                Logger.error "  └─ #{result.error}"
               end
             end
             Logger.info "----------------------------------------"
           end
 
-          private def find_links(dir : String) : Array(Link)
+          private def find_external_links(dir : String) : Array(Link)
             links = [] of Link
-            # Regex to find Markdown links (standard and image) with absolute URLs
             link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/[^\s\)]+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
               content = File.read(file)
               content.scan(link_regex) do |match|
-                links << Link.new(file: file, url: match[1])
+                links << Link.new(file: file, url: match[1], kind: :external)
               end
             end
             links
+          end
+
+          private def find_internal_links(dir : String) : Array(Link)
+            links = [] of Link
+            # Match standard markdown links [text](url) — skip external and mailto
+            link_regex = /\[([^\]]*)\]\(([^\)]+)\)/
+            # Match image links ![alt](url) — skip external
+            img_regex = /!\[([^\]]*)\]\(([^\)]+)\)/
+
+            Dir.glob("#{dir}/**/*.md").each do |file|
+              content = File.read(file)
+
+              # Regular links (exclude images by using negative lookbehind)
+              content.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
+                url = match[2].split("#").first.split("?").first.strip
+                next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://") || url.starts_with?("mailto:") || url.starts_with?("#")
+                links << Link.new(file: file, url: url, kind: :internal)
+              end
+
+              # Image links
+              content.scan(/!\[([^\]]*)\]\(([^\)]+)\)/) do |match|
+                url = match[2].split("#").first.split("?").first.strip
+                next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://")
+                links << Link.new(file: file, url: url, kind: :image)
+              end
+            end
+            links
+          end
+
+          private def check_internal_links(links : Array(Link), content_dir : String) : Array(Result)
+            results = [] of Result
+            links.each do |link|
+              base_dir = File.dirname(link.file)
+              target = if link.url.starts_with?("/")
+                         File.join(content_dir, link.url.lstrip("/"))
+                       else
+                         File.join(base_dir, link.url)
+                       end
+
+              exists = File.exists?(target) ||
+                       File.exists?(target + ".md") ||
+                       File.exists?(File.join(target, "_index.md")) ||
+                       File.exists?(File.join(target, "index.md"))
+
+              unless exists
+                kind_label = link.kind == :image ? "Image not found" : "Internal link target not found"
+                results << Result.new(link: link, status: -1, error: kind_label)
+              end
+            end
+            results
           end
 
           private def check_links_concurrently(links : Array(Link)) : Array(Result)

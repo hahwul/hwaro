@@ -12,6 +12,7 @@ require "toml"
 require "xml"
 require "./base"
 require "./syntax_highlighter"
+require "./markdown_extensions"
 require "../../models/toc"
 require "../../utils/logger"
 require "../../utils/text_utils"
@@ -75,9 +76,21 @@ module Hwaro
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
         # @param lazy_loading - if true, adds loading="lazy" to img tags
         # @param emoji - if true, converts emoji shortcodes to emoji characters
-        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
+        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+          # Pre-process markdown extensions (task lists, footnotes, etc.)
+          processed = if md_cfg = markdown_config
+                        MarkdownExtensions.preprocess(content, md_cfg)
+                      else
+                        content
+                      end
+
           # Use SyntaxHighlighter for rendering with highlighting support
-          html = SyntaxHighlighter.render(content, highlight, safe)
+          html = SyntaxHighlighter.render(processed, highlight, safe)
+
+          # Post-process markdown extensions (footnotes section, mermaid)
+          if md_cfg = markdown_config
+            html = MarkdownExtensions.postprocess(html, md_cfg)
+          end
 
           has_headers = html.includes?("<h")
           has_images = lazy_loading && html.includes?("<img")
@@ -224,8 +237,8 @@ module Hwaro
           end
           toc = toml_fm["toc"]?.try(&.as_bool) || false
 
-          date = parse_time(toml_fm["date"]?.try(&.as_s))
-          updated = parse_time(toml_fm["updated"]?.try(&.as_s))
+          date = parse_toml_time(toml_fm["date"]?)
+          updated = parse_toml_time(toml_fm["updated"]?)
 
           render = true
           if toml_fm.has_key?("render")
@@ -476,8 +489,8 @@ module Hwaro
         end
 
         # Render with anchor links inserted into headings
-        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
-          html, toc = render(content, highlight, safe, lazy_loading, emoji)
+        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+          html, toc = render(content, highlight, safe, lazy_loading, emoji, markdown_config)
           html_with_anchors = insert_anchor_links_to_html(html, anchor_style)
           {html_with_anchors, toc}
         end
@@ -646,6 +659,17 @@ module Hwaro
           result.to_s
         end
 
+        # Parse a TOML value that may be a native Time or a String
+        private def parse_toml_time(val : TOML::Any?) : Time?
+          return nil unless val
+          raw = val.raw
+          if raw.is_a?(Time)
+            raw
+          else
+            parse_time(val.as_s?)
+          end
+        end
+
         private def parse_time(time_str : String?) : Time?
           return nil unless time_str
 
@@ -724,8 +748,8 @@ module Hwaro
       # @param safe - if true, raw HTML will not be passed through (replaced by comments)
       # @param lazy_loading - if true, adds loading="lazy" to img tags
       # @param emoji - if true, converts emoji shortcodes to emoji characters
-      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight, safe, lazy_loading, emoji)
+      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config)
       end
 
       # Returns parsed metadata and content

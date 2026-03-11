@@ -253,6 +253,77 @@ This generates the configuration and sample content files for each specified lan
 </html>
 ```
 
+## i18n Translation Files
+
+Hwaro supports translation files for UI strings (navigation labels, button text, etc.) using TOML files in the `i18n/` directory.
+
+### File Structure
+
+Create one TOML file per language:
+
+```
+i18n/
+├── en.toml
+├── ko.toml
+└── ja.toml
+```
+
+### Translation File Format
+
+```toml
+# i18n/en.toml
+[nav]
+home = "Home"
+blog = "Blog"
+about = "About"
+
+[common]
+read_more = "Read more"
+back = "Back"
+```
+
+```toml
+# i18n/ko.toml
+[nav]
+home = "홈"
+blog = "블로그"
+about = "소개"
+
+[common]
+read_more = "더 읽기"
+back = "뒤로"
+```
+
+Nested TOML sections are flattened to dot-separated keys (e.g., `nav.home`, `common.read_more`).
+
+### Template Usage
+
+Use the `t` filter to translate keys:
+
+```jinja
+<nav>
+  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/blog/">{{ "nav.blog" | t }}</a>
+  <a href="/about/">{{ "nav.about" | t }}</a>
+</nav>
+
+<a href="{{ page.url }}">{{ "common.read_more" | t }}</a>
+```
+
+### Fallback Behavior
+
+1. Look up the key in the current page's language
+2. If not found, fall back to the default language (`default_language`)
+3. If still not found, return the key itself (e.g., `"nav.home"`)
+
+### Pluralization
+
+Use the `pluralize` filter for count-dependent strings:
+
+```jinja
+{{ post_count }} {{ post_count | pluralize(singular="post", plural="posts") }}
+```
+
 ## Per-Language Feeds
 
 When the site is multilingual, Hwaro automatically generates separate RSS/Atom feeds for each language:

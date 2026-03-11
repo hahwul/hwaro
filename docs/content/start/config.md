@@ -54,6 +54,12 @@ hooks.post = ["npm run minify"]
 safe = false
 lazy_loading = true
 emoji = true
+footnotes = false
+task_lists = false
+definition_lists = false
+mermaid = false
+math = false
+math_engine = "katex"
 ```
 
 | Key | Type | Default | Description |
@@ -61,6 +67,14 @@ emoji = true
 | safe | bool | false | Strip raw HTML from markdown |
 | lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
+| footnotes | bool | false | Enable footnote syntax (`[^1]`) |
+| task_lists | bool | false | Enable task list syntax (`- [ ]` / `- [x]`) |
+| definition_lists | bool | false | Enable definition list syntax (`Term\n: Definition`) |
+| mermaid | bool | false | Render ` ```mermaid ` blocks as `<div class="mermaid">` |
+| math | bool | false | Enable math syntax (`$...$` and `$$...$$`) |
+| math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
+
+See [Markdown Extensions](/features/markdown-extensions/) for syntax details and examples.
 
 ## Permalinks
 
@@ -201,6 +215,7 @@ format = "fuse_json"
 fields = ["title", "content"]
 filename = "search.json"
 exclude = ["/private", "/drafts"]
+tokenize_cjk = false
 ```
 
 | Key | Type | Default | Description |
@@ -210,6 +225,7 @@ exclude = ["/private", "/drafts"]
 | fields | array | ["title", "content"] | Fields to include in index |
 | filename | string | "search.json" | Output filename |
 | exclude | array | [] | Exclude paths (prefixes) from search index |
+| tokenize_cjk | bool | false | Enable CJK bigram tokenization for search |
 
 ## Pagination
 
@@ -376,6 +392,8 @@ hooks.post = ["npm run optimize"]
 safe = false
 lazy_loading = true
 emoji = false
+footnotes = true
+task_lists = true
 
 [permalinks]
 "old/posts" = "posts"

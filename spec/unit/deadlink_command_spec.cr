@@ -113,11 +113,105 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
   end
+
+  describe "#find_internal_links" do
+    it "extracts relative links" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "[About](/about/)\n[Sibling](../other/)")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        links.size.should eq(2)
+        links.map(&.kind).uniq.should eq([:internal])
+      end
+    end
+
+    it "extracts internal image paths" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "![Screenshot](images/shot.png)")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        links.size.should eq(1)
+        links[0].kind.should eq(:image)
+        links[0].url.should eq("images/shot.png")
+      end
+    end
+
+    it "skips external links and anchors" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "[External](https://example.com)\n[Anchor](#section)\n[Internal](/page/)")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        links.size.should eq(1)
+        links[0].url.should eq("/page/")
+      end
+    end
+  end
+
+  describe "#check_internal_links" do
+    it "detects broken internal links" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/nonexistent/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("not found")
+      end
+    end
+
+    it "resolves valid internal links" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "about"))
+        File.write(File.join(dir, "about", "_index.md"), "about page")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/about/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.should be_empty
+      end
+    end
+
+    it "detects broken image paths" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "missing.png", kind: :image
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("Image not found")
+      end
+    end
+  end
 end
 
-# Test helper to expose private find_links method
+# Test helper to expose private methods
 class Hwaro::CLI::Commands::Tool::DeadlinkCommand
   def find_links_for_test(dir : String) : Array(Link)
-    find_links(dir)
+    find_external_links(dir)
+  end
+
+  def find_internal_links_for_test(dir : String) : Array(Link)
+    find_internal_links(dir)
+  end
+
+  def check_internal_links_for_test(links : Array(Link), content_dir : String) : Array(Result)
+    check_internal_links(links, content_dir)
   end
 end

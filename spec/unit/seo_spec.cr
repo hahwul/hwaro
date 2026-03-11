@@ -653,3 +653,160 @@ describe Hwaro::Content::Seo::Feeds do
     end
   end
 end
+
+describe Hwaro::Content::Seo::Sitemap do
+  describe "changefreq and priority in XML" do
+    it "includes changefreq and priority from config" do
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.sitemap.changefreq = "daily"
+      config.sitemap.priority = 0.8
+      config.base_url = "https://example.com"
+
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      page.render = true
+      page.in_sitemap = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Sitemap.generate([page], site, output_dir)
+        content = File.read(File.join(output_dir, "sitemap.xml"))
+        content.should contain("<changefreq>daily</changefreq>")
+        content.should contain("<priority>0.8</priority>")
+      end
+    end
+
+    it "uses default changefreq and priority" do
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.base_url = "https://example.com"
+
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      page.render = true
+      page.in_sitemap = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Sitemap.generate([page], site, output_dir)
+        content = File.read(File.join(output_dir, "sitemap.xml"))
+        content.should contain("<changefreq>weekly</changefreq>")
+        content.should contain("<priority>0.5</priority>")
+      end
+    end
+  end
+end
+
+describe Hwaro::Content::Seo::JsonLd do
+  describe ".article" do
+    it "generates Article JSON-LD" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("blog/post.md")
+      page.title = "My Post"
+      page.url = "/blog/post/"
+      page.date = Time.utc(2024, 6, 15)
+      page.description = "A great post"
+
+      result = Hwaro::Content::Seo::JsonLd.article(page, config)
+      result.should contain("application/ld+json")
+      result.should contain("\"Article\"")
+      result.should contain("\"My Post\"")
+      result.should contain("https://example.com/blog/post/")
+      result.should contain("\"A great post\"")
+      result.should contain("2024-06-15")
+    end
+
+    it "includes dateModified when updated is set" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.date = Time.utc(2024, 1, 1)
+      page.updated = Time.utc(2024, 6, 15)
+
+      result = Hwaro::Content::Seo::JsonLd.article(page, config)
+      result.should contain("dateModified")
+      result.should contain("2024-06-15")
+    end
+
+    it "includes image when set" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.image = "/images/cover.jpg"
+
+      result = Hwaro::Content::Seo::JsonLd.article(page, config)
+      result.should contain("https://example.com/images/cover.jpg")
+    end
+  end
+
+  describe ".breadcrumb" do
+    it "generates BreadcrumbList with home and current page" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+
+      page = Hwaro::Models::Page.new("about.md")
+      page.title = "About"
+      page.url = "/about/"
+
+      result = Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)
+      result.should contain("BreadcrumbList")
+      result.should contain("My Site")
+      result.should contain("About")
+      result.should contain("https://example.com/")
+    end
+
+    it "includes ancestors in breadcrumb" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+
+      ancestor = Hwaro::Models::Page.new("blog/_index.md")
+      ancestor.title = "Blog"
+      ancestor.url = "/blog/"
+
+      page = Hwaro::Models::Page.new("blog/post.md")
+      page.title = "My Post"
+      page.url = "/blog/post/"
+      page.ancestors = [ancestor]
+
+      result = Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)
+      result.should contain("Blog")
+      result.should contain("My Post")
+      result.should contain("https://example.com/blog/")
+    end
+  end
+
+  describe ".all_tags" do
+    it "generates both article and breadcrumb" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+
+      ancestor = Hwaro::Models::Page.new("blog/_index.md")
+      ancestor.title = "Blog"
+      ancestor.url = "/blog/"
+
+      page = Hwaro::Models::Page.new("blog/post.md")
+      page.title = "My Post"
+      page.url = "/blog/post/"
+      page.date = Time.utc(2024, 6, 15)
+      page.ancestors = [ancestor]
+
+      result = Hwaro::Content::Seo::JsonLd.all_tags(page, config)
+      result.should contain("\"Article\"")
+      result.should contain("\"BreadcrumbList\"")
+    end
+  end
+end

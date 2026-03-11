@@ -294,6 +294,238 @@ describe Hwaro::Content::Pagination::Renderer do
       html.should contain("https://example.com/wiki/page/2/")
       html.should contain("https://example.com/wiki/page/3/")
     end
+
+    describe "ellipsis pagination" do
+      it "shows all pages when total <= 7" do
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+          pages: [] of Hwaro::Models::Page,
+          page_number: 4,
+          total_pages: 7,
+          per_page: 10,
+          total_items: 70,
+          has_prev: true,
+          has_next: true,
+          prev_url: "/blog/page/3/",
+          next_url: "/blog/page/5/",
+          first_url: "/blog/",
+          last_url: "/blog/page/7/",
+          base_url: "/blog/page/"
+        )
+
+        renderer = Hwaro::Content::Pagination::Renderer.new(config)
+        html = renderer.render_pagination_nav(paginated_page)
+
+        html.should_not contain("pagination-ellipsis")
+        (1..7).each do |n|
+          html.should contain(">#{n}<")
+        end
+      end
+
+      it "on page 1 of 20: shows 1 2 3 ... 20" do
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+          pages: [] of Hwaro::Models::Page,
+          page_number: 1,
+          total_pages: 20,
+          per_page: 10,
+          total_items: 200,
+          has_prev: false,
+          has_next: true,
+          prev_url: nil,
+          next_url: "/blog/page/2/",
+          first_url: "/blog/",
+          last_url: "/blog/page/20/",
+          base_url: "/blog/page/"
+        )
+
+        renderer = Hwaro::Content::Pagination::Renderer.new(config)
+        html = renderer.render_pagination_nav(paginated_page)
+
+        html.should contain("pagination-ellipsis")
+        html.should contain(">1<")
+        html.should contain(">2<")
+        html.should contain(">3<")
+        html.should contain(">20<")
+        html.should_not contain(">4<")
+        html.should_not contain(">19<")
+      end
+
+      it "on page 10 of 20: shows 1 ... 8 9 10 11 12 ... 20" do
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+          pages: [] of Hwaro::Models::Page,
+          page_number: 10,
+          total_pages: 20,
+          per_page: 10,
+          total_items: 200,
+          has_prev: true,
+          has_next: true,
+          prev_url: "/blog/page/9/",
+          next_url: "/blog/page/11/",
+          first_url: "/blog/",
+          last_url: "/blog/page/20/",
+          base_url: "/blog/page/"
+        )
+
+        renderer = Hwaro::Content::Pagination::Renderer.new(config)
+        html = renderer.render_pagination_nav(paginated_page)
+
+        html.should contain(">1<")
+        html.should contain(">8<")
+        html.should contain(">9<")
+        html.should contain(">10<")
+        html.should contain(">11<")
+        html.should contain(">12<")
+        html.should contain(">20<")
+        html.should_not contain(">7<")
+        html.should_not contain(">13<")
+        # Should have two ellipsis
+        html.scan("pagination-ellipsis").size.should eq(2)
+      end
+
+      it "on page 20 of 20: shows 1 ... 18 19 20" do
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+          pages: [] of Hwaro::Models::Page,
+          page_number: 20,
+          total_pages: 20,
+          per_page: 10,
+          total_items: 200,
+          has_prev: true,
+          has_next: false,
+          prev_url: "/blog/page/19/",
+          next_url: nil,
+          first_url: "/blog/",
+          last_url: "/blog/page/20/",
+          base_url: "/blog/page/"
+        )
+
+        renderer = Hwaro::Content::Pagination::Renderer.new(config)
+        html = renderer.render_pagination_nav(paginated_page)
+
+        html.should contain(">1<")
+        html.should contain(">18<")
+        html.should contain(">19<")
+        html.should contain(">20<")
+        html.should_not contain(">17<")
+        # Should have one ellipsis
+        html.scan("pagination-ellipsis").size.should eq(1)
+      end
+    end
+  end
+
+  describe "#render_seo_links" do
+    it "returns empty string for single page" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+        pages: [] of Hwaro::Models::Page,
+        page_number: 1,
+        total_pages: 1,
+        per_page: 10,
+        total_items: 5,
+        has_prev: false,
+        has_next: false,
+        prev_url: nil,
+        next_url: nil,
+        first_url: "/blog/",
+        last_url: "/blog/",
+        base_url: "/blog/page/"
+      )
+
+      renderer = Hwaro::Content::Pagination::Renderer.new(config)
+      html = renderer.render_seo_links(paginated_page)
+
+      html.should eq("")
+    end
+
+    it "first page: only rel=next" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+        pages: [] of Hwaro::Models::Page,
+        page_number: 1,
+        total_pages: 5,
+        per_page: 10,
+        total_items: 50,
+        has_prev: false,
+        has_next: true,
+        prev_url: nil,
+        next_url: "/blog/page/2/",
+        first_url: "/blog/",
+        last_url: "/blog/page/5/",
+        base_url: "/blog/page/"
+      )
+
+      renderer = Hwaro::Content::Pagination::Renderer.new(config)
+      html = renderer.render_seo_links(paginated_page)
+
+      html.should contain("<link rel=\"next\" href=\"https://example.com/blog/page/2/\">")
+      html.should_not contain("rel=\"prev\"")
+    end
+
+    it "middle page: both rel=prev and rel=next" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+        pages: [] of Hwaro::Models::Page,
+        page_number: 3,
+        total_pages: 5,
+        per_page: 10,
+        total_items: 50,
+        has_prev: true,
+        has_next: true,
+        prev_url: "/blog/page/2/",
+        next_url: "/blog/page/4/",
+        first_url: "/blog/",
+        last_url: "/blog/page/5/",
+        base_url: "/blog/page/"
+      )
+
+      renderer = Hwaro::Content::Pagination::Renderer.new(config)
+      html = renderer.render_seo_links(paginated_page)
+
+      html.should contain("<link rel=\"prev\" href=\"https://example.com/blog/page/2/\">")
+      html.should contain("<link rel=\"next\" href=\"https://example.com/blog/page/4/\">")
+    end
+
+    it "last page: only rel=prev" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+        pages: [] of Hwaro::Models::Page,
+        page_number: 5,
+        total_pages: 5,
+        per_page: 10,
+        total_items: 50,
+        has_prev: true,
+        has_next: false,
+        prev_url: "/blog/page/4/",
+        next_url: nil,
+        first_url: "/blog/",
+        last_url: "/blog/page/5/",
+        base_url: "/blog/page/"
+      )
+
+      renderer = Hwaro::Content::Pagination::Renderer.new(config)
+      html = renderer.render_seo_links(paginated_page)
+
+      html.should contain("<link rel=\"prev\" href=\"https://example.com/blog/page/4/\">")
+      html.should_not contain("rel=\"next\"")
+    end
   end
 
   describe "#render_paginated_section" do
