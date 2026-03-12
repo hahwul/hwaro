@@ -18,6 +18,7 @@ module Hwaro
       # Lookup indices for performance
       property pages_by_section : Hash(String, Array(Page))
       property sections_by_parent : Hash(String, Array(Section))
+      property sections_by_name : Hash(String, Section)
       property pages_for_section_cache : Hash(Tuple(String, String?), Array(Page))
       @lookup_index_built : Bool = false
 
@@ -31,6 +32,7 @@ module Hwaro
 
         @pages_by_section = {} of String => Array(Page)
         @sections_by_parent = {} of String => Array(Section)
+        @sections_by_name = {} of String => Section
         @pages_for_section_cache = {} of Tuple(String, String?) => Array(Page)
       end
 
@@ -51,6 +53,7 @@ module Hwaro
       def build_lookup_index
         @pages_by_section.clear
         @sections_by_parent.clear
+        @sections_by_name.clear
         @pages_for_section_cache.clear
 
         @pages.each do |p|
@@ -63,6 +66,9 @@ module Hwaro
         end
 
         @sections.each do |s|
+          # Index by section name for O(1) lookup
+          @sections_by_name[s.section] ||= s
+
           # s.section is the section this object represents (e.g. "blog").
           # We want to index it by its PARENT section (e.g. "").
           current_section = s.section

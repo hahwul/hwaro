@@ -184,7 +184,7 @@ module Hwaro
 
           # Section index pages whose content lists include the changed pages
           affected_sections.each do |section_name|
-            section = site.sections.find { |s| s.section == section_name }
+            section = site.sections_by_name[section_name]?
             pages_to_render << section if section
           end
 
@@ -1883,7 +1883,7 @@ module Hwaro
             pages = site.pages_for_section(section_name, language)
 
             # Use section's sort_by setting if available, otherwise sort by title
-            section = site.sections.find { |s| s.section == section_name }
+            section = site.sections_by_name[section_name]?
             sort_by = section.try(&.sort_by) || "title"
             reverse = section.try(&.reverse) || false
             pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
@@ -2275,8 +2275,8 @@ module Hwaro
             # Use the page's assets as section assets
             section_assets_array = assets_array
           elsif !page.section.empty?
-            # For regular pages, find the parent section
-            section_page = (site.pages + site.sections).find { |p| p.section == page.section && p.is_index }
+            # For regular pages, find the parent section via O(1) lookup
+            section_page = site.sections_by_name[page.section]?
             if section_page
               section_title = section_page.title
               section_description = section_page.description || ""
@@ -2361,7 +2361,7 @@ module Hwaro
           # OG/Twitter tags (page-specific — depend on page title/description/url/image)
           og_tags = config.og.og_tags(page.title, page.description, effective_url, page.image, config.base_url)
           twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
-          og_all_tags = config.og.all_tags(page.title, page.description, effective_url, page.image, config.base_url)
+          og_all_tags = [og_tags, twitter_tags].reject(&.empty?).join("\n")
           vars["og_tags"] = Crinja::Value.new(og_tags)
           vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
           vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
@@ -2372,10 +2372,12 @@ module Hwaro
           vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
           vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
-          # JSON-LD structured data
+          # JSON-LD structured data — reuse individual results instead of calling all_tags again
           jsonld_article = Content::Seo::JsonLd.article(page, config)
           jsonld_breadcrumb = Content::Seo::JsonLd.breadcrumb(page, config)
-          jsonld_all = Content::Seo::JsonLd.all_tags(page, config)
+          jsonld_parts = [jsonld_article]
+          jsonld_parts << jsonld_breadcrumb unless page.ancestors.empty? && page.is_index
+          jsonld_all = jsonld_parts.join("\n")
           vars["jsonld_article"] = Crinja::Value.new(jsonld_article)
           vars["jsonld_breadcrumb"] = Crinja::Value.new(jsonld_breadcrumb)
           vars["jsonld"] = Crinja::Value.new(jsonld_all)

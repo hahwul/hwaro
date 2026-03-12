@@ -2,17 +2,17 @@ require "../spec_helper"
 
 describe Hwaro::Models::Page do
   describe "#calculate_word_count" do
-    it "counts words in raw content excluding front matter (TOML)" do
+    it "counts words in raw content (front matter already stripped)" do
       page = Hwaro::Models::Page.new("test.md")
-      page.raw_content = "+++\ntitle = \"Test\"\n+++\n\nHello world this is a test."
+      page.raw_content = "Hello world this is a test."
       count = page.calculate_word_count
       count.should eq(6)
       page.word_count.should eq(6)
     end
 
-    it "counts words in raw content excluding front matter (YAML)" do
+    it "counts words in raw content without front matter" do
       page = Hwaro::Models::Page.new("test.md")
-      page.raw_content = "---\ntitle: Test\n---\n\nOne two three four five."
+      page.raw_content = "One two three four five."
       count = page.calculate_word_count
       count.should eq(5)
       page.word_count.should eq(5)
@@ -40,9 +40,9 @@ describe Hwaro::Models::Page do
       count.should eq(0)
     end
 
-    it "returns 0 for content with only front matter" do
+    it "returns 0 for empty content after front matter stripping" do
       page = Hwaro::Models::Page.new("test.md")
-      page.raw_content = "+++\ntitle = \"Only FM\"\n+++\n"
+      page.raw_content = ""
       count = page.calculate_word_count
       count.should eq(0)
     end

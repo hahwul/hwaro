@@ -672,24 +672,29 @@ module Hwaro
 
         private def parse_time(time_str : String?) : Time?
           return nil unless time_str
+          str = time_str.strip
+          return nil if str.empty?
 
-          formats = [
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d",
-          ]
+          # Select format based on string pattern to avoid exception-based control flow
+          fmt = if str.includes?('T')
+                  # Could be RFC 3339 (with timezone) or plain ISO
+                  if str.includes?('+') || str.includes?('Z') || str.matches?(/\d{2}-\d{2}$/)
+                    begin
+                      return Time.parse_rfc3339(str)
+                    rescue
+                      "%Y-%m-%dT%H:%M:%S"
+                    end
+                  else
+                    "%Y-%m-%dT%H:%M:%S"
+                  end
+                elsif str.size > 10
+                  "%Y-%m-%d %H:%M:%S"
+                else
+                  "%Y-%m-%d"
+                end
 
-          formats.each do |fmt|
-            begin
-              return Time.parse(time_str, fmt, Time::Location.local)
-            rescue
-              next
-            end
-          end
-
-          # Try ISO 8601 parsing as last resort
           begin
-            return Time.parse_rfc3339(time_str)
+            Time.parse(str, fmt, Time::Location.local)
           rescue
             nil
           end

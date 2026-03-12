@@ -162,17 +162,33 @@ module Hwaro
         @assets
       end
 
-      # Calculate word count from raw content (excluding front matter)
+      # Calculate word count from raw content
+      # Note: @raw_content already has front matter stripped during parsing,
+      # so we only need to remove HTML tags and markdown syntax.
       def calculate_word_count : Int32
-        # Remove front matter
-        content_only = @raw_content.gsub(REGEX_FRONT_MATTER, "")
-        # Remove HTML tags
-        content_only = content_only.gsub(REGEX_HTML_TAGS, " ")
-        # Remove markdown syntax elements
-        content_only = content_only.gsub(REGEX_MARKDOWN_SYNTAX, " ")
-        # Split by whitespace and count non-empty words
-        words = content_only.split(REGEX_WHITESPACE).reject(&.empty?)
-        @word_count = words.size
+        # Single pass: count words while skipping tags and markdown syntax
+        in_tag = false
+        in_word = false
+        count = 0
+
+        @raw_content.each_char do |char|
+          if char == '<'
+            in_tag = true
+            in_word = false
+          elsif char == '>'
+            in_tag = false
+          elsif !in_tag
+            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '|')
+            if is_word_char
+              count += 1 unless in_word
+              in_word = true
+            else
+              in_word = false
+            end
+          end
+        end
+
+        @word_count = count
         @word_count
       end
 
