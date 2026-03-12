@@ -256,8 +256,8 @@ module Hwaro
         tags = [] of String
 
         tags << %(<meta property="og:title" content="#{Utils::TextUtils.escape_xml(title)}">)
-        tags << %(<meta property="og:type" content="#{@og_type}">)
-        tags << %(<meta property="og:url" content="#{base_url}#{url}">)
+        tags << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(@og_type)}">)
+        tags << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(url)}">)
 
         if desc = description
           tags << %(<meta property="og:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
@@ -267,11 +267,11 @@ module Hwaro
         if img = (image || @default_image)
           # Make image URL absolute
           img_url = img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
-          tags << %(<meta property="og:image" content="#{img_url}">)
+          tags << %(<meta property="og:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
         end
 
         if fb_id = @fb_app_id
-          tags << %(<meta property="fb:app_id" content="#{fb_id}">)
+          tags << %(<meta property="fb:app_id" content="#{Utils::TextUtils.escape_xml(fb_id)}">)
         end
 
         tags.join("\n")
@@ -286,7 +286,7 @@ module Hwaro
       ) : String
         tags = [] of String
 
-        tags << %(<meta name="twitter:card" content="#{@twitter_card}">)
+        tags << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(@twitter_card)}">)
         tags << %(<meta name="twitter:title" content="#{Utils::TextUtils.escape_xml(title)}">)
 
         if desc = description
@@ -296,15 +296,15 @@ module Hwaro
         # Use page image or fall back to default
         if img = (image || @default_image)
           img_url = img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
-          tags << %(<meta name="twitter:image" content="#{img_url}">)
+          tags << %(<meta name="twitter:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
         end
 
         if site = @twitter_site
-          tags << %(<meta name="twitter:site" content="#{site}">)
+          tags << %(<meta name="twitter:site" content="#{Utils::TextUtils.escape_xml(site)}">)
         end
 
         if creator = @twitter_creator
-          tags << %(<meta name="twitter:creator" content="#{creator}">)
+          tags << %(<meta name="twitter:creator" content="#{Utils::TextUtils.escape_xml(creator)}">)
         end
 
         tags.join("\n")

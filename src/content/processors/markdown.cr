@@ -232,80 +232,90 @@ module Hwaro
           is_draft = toml_fm["draft"]?.try(&.as_bool) || false
           template = toml_fm["template"]?.try(&.as_s)
           in_sitemap = true
-          if toml_fm.has_key?("in_sitemap")
-            in_sitemap = toml_fm["in_sitemap"].as_bool
+          if (val = toml_fm["in_sitemap"]?)
+            bool_val = val.as_bool?
+            in_sitemap = bool_val unless bool_val.nil?
           end
-          toc = toml_fm["toc"]?.try(&.as_bool) || false
+          toc = toml_fm["toc"]?.try(&.as_bool?) || false
 
           date = parse_toml_time(toml_fm["date"]?)
           updated = parse_toml_time(toml_fm["updated"]?)
 
           render = true
-          if toml_fm.has_key?("render")
-            render = toml_fm["render"].as_bool
+          if (val = toml_fm["render"]?)
+            bool_val = val.as_bool?
+            render = bool_val unless bool_val.nil?
           end
 
           transparent = false
-          if toml_fm.has_key?("transparent")
-            transparent = toml_fm["transparent"].as_bool
+          if (val = toml_fm["transparent"]?)
+            bool_val = val.as_bool?
+            transparent = bool_val unless bool_val.nil?
           end
           generate_feeds = false
-          if toml_fm.has_key?("generate_feeds")
-            generate_feeds = toml_fm["generate_feeds"].as_bool
+          if (val = toml_fm["generate_feeds"]?)
+            bool_val = val.as_bool?
+            generate_feeds = bool_val unless bool_val.nil?
           end
 
           paginate = nil.as(Int32?)
-          if toml_fm.has_key?("paginate")
-            paginate = toml_fm["paginate"].as_i
+          if (val = toml_fm["paginate"]?)
+            int_val = val.as_i?
+            paginate = int_val unless int_val.nil?
           end
           pagination_enabled = nil.as(Bool?)
-          if toml_fm.has_key?("pagination_enabled")
-            pagination_enabled = toml_fm["pagination_enabled"].as_bool
+          if (val = toml_fm["pagination_enabled"]?)
+            bool_val = val.as_bool?
+            pagination_enabled = bool_val unless bool_val.nil?
           end
           sort_by = nil.as(String?)
-          if toml_fm.has_key?("sort_by")
-            sort_by = toml_fm["sort_by"].as_s
+          if (val = toml_fm["sort_by"]?)
+            sort_by = val.as_s?
           end
           reverse = nil.as(Bool?)
-          if toml_fm.has_key?("reverse")
-            reverse = toml_fm["reverse"].as_bool
+          if (val = toml_fm["reverse"]?)
+            bool_val = val.as_bool?
+            reverse = bool_val unless bool_val.nil?
           end
 
-          slug = toml_fm["slug"]?.try(&.as_s)
-          custom_path = toml_fm["path"]?.try(&.as_s)
+          slug = toml_fm["slug"]?.try(&.as_s?)
+          custom_path = toml_fm["path"]?.try(&.as_s?)
 
           aliases = [] of String
-          if toml_fm.has_key?("aliases")
-            aliases = toml_fm["aliases"].as_a.map(&.as_s)
+          if (val = toml_fm["aliases"]?)
+            aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
           end
 
           authors = [] of String
-          if toml_fm.has_key?("authors")
-            authors = toml_fm["authors"].as_a.map(&.as_s)
+          if (val = toml_fm["authors"]?)
+            authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
           end
           in_search_index = true
-          if toml_fm.has_key?("in_search_index")
-            in_search_index = toml_fm["in_search_index"].as_bool
+          if (val = toml_fm["in_search_index"]?)
+            bool_val = val.as_bool?
+            in_search_index = bool_val unless bool_val.nil?
           end
           insert_anchor_links = false
-          if toml_fm.has_key?("insert_anchor_links")
-            insert_anchor_links = toml_fm["insert_anchor_links"].as_bool
+          if (val = toml_fm["insert_anchor_links"]?)
+            bool_val = val.as_bool?
+            insert_anchor_links = bool_val unless bool_val.nil?
           end
           page_template = nil.as(String?)
-          if toml_fm.has_key?("page_template")
-            page_template = toml_fm["page_template"].as_s
+          if (val = toml_fm["page_template"]?)
+            page_template = val.as_s?
           end
           paginate_path = "page"
-          if toml_fm.has_key?("paginate_path")
-            paginate_path = toml_fm["paginate_path"].as_s
+          if (val = toml_fm["paginate_path"]?)
+            paginate_path = val.as_s? || "page"
           end
           redirect_to = nil.as(String?)
-          if toml_fm.has_key?("redirect_to")
-            redirect_to = toml_fm["redirect_to"].as_s
+          if (val = toml_fm["redirect_to"]?)
+            redirect_to = val.as_s?
           end
           weight = 0
-          if toml_fm.has_key?("weight")
-            weight = toml_fm["weight"].as_i
+          if (val = toml_fm["weight"]?)
+            int_val = val.as_i?
+            weight = int_val unless int_val.nil?
           end
 
           extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
@@ -317,8 +327,8 @@ module Hwaro
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
           tags = [] of String
-          if toml_fm.has_key?("tags")
-            tags = toml_fm["tags"].as_a.map(&.as_s)
+          if (val = toml_fm["tags"]?)
+            tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
           end
           taxonomies["tags"] = tags if tags.any?
 
@@ -618,17 +628,17 @@ module Hwaro
           len = html.bytesize
 
           while pos < len
-            # Check for <code or <pre tags
+            # Check for <code or <pre tags (bounded check avoids O(n) substring)
             if html[pos] == '<' && pos + 1 < len
-              rest = html[pos..]
-              if rest.starts_with?("<code") || rest.starts_with?("<pre")
-                # Find the closing tag
-                close_tag = rest.starts_with?("<code") ? "</code>" : "</pre>"
-                end_pos = rest.index(close_tag)
+              is_code = pos + 5 <= len && html[pos, 5] == "<code"
+              is_pre = !is_code && pos + 4 <= len && html[pos, 4] == "<pre"
+              if is_code || is_pre
+                close_tag = is_code ? "</code>" : "</pre>"
+                end_pos = html.index(close_tag, pos)
                 if end_pos
-                  block = rest[0, end_pos + close_tag.bytesize]
-                  result << block
-                  pos += block.bytesize
+                  block_end = end_pos + close_tag.bytesize
+                  result << html[pos, block_end - pos]
+                  pos = block_end
                   next
                 end
               end
@@ -672,24 +682,29 @@ module Hwaro
 
         private def parse_time(time_str : String?) : Time?
           return nil unless time_str
+          str = time_str.strip
+          return nil if str.empty?
 
-          formats = [
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d",
-          ]
+          # Select format based on string pattern to avoid exception-based control flow
+          fmt = if str.includes?('T')
+                  # Could be RFC 3339 (with timezone) or plain ISO
+                  if str.includes?('+') || str.includes?('Z') || str.matches?(/\d{2}-\d{2}$/)
+                    begin
+                      return Time.parse_rfc3339(str)
+                    rescue
+                      "%Y-%m-%dT%H:%M:%S"
+                    end
+                  else
+                    "%Y-%m-%dT%H:%M:%S"
+                  end
+                elsif str.size > 10
+                  "%Y-%m-%d %H:%M:%S"
+                else
+                  "%Y-%m-%d"
+                end
 
-          formats.each do |fmt|
-            begin
-              return Time.parse(time_str, fmt, Time::Location.local)
-            rescue
-              next
-            end
-          end
-
-          # Try ISO 8601 parsing as last resort
           begin
-            return Time.parse_rfc3339(time_str)
+            Time.parse(str, fmt, Time::Location.local)
           rescue
             nil
           end

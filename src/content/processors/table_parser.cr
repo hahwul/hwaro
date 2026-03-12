@@ -20,6 +20,9 @@
 #   - `:---:` = center align
 #   - `---:` = right align
 
+require "html"
+require "uri"
+
 module Hwaro
   module Content
     module Processors
@@ -127,7 +130,7 @@ module Hwaro
               alt = $1
               url = $2
               if safe_url?(url)
-                "<img src=\"#{url}\" alt=\"#{alt}\">"
+                "<img src=\"#{HTML.escape(url)}\" alt=\"#{HTML.escape(alt)}\">"
               else
                 "![#{alt}](#{url})"
               end
@@ -138,7 +141,7 @@ module Hwaro
               link_text = $1
               url = $2
               if safe_url?(url)
-                "<a href=\"#{url}\">#{link_text}</a>"
+                "<a href=\"#{HTML.escape(url)}\">#{link_text}</a>"
               else
                 "[#{link_text}](#{url})"
               end
@@ -165,8 +168,8 @@ module Hwaro
 
           private def safe_url?(url : String) : Bool
             stripped = url.strip.downcase
-            # Decode percent-encoded colons to prevent scheme bypass (e.g. javascript%3A)
-            decoded = stripped.gsub("%3a", ":")
+            # Fully decode percent-encoding to prevent bypass (e.g. java%73cript:)
+            decoded = URI.decode(stripped)
             return true if decoded.starts_with?("http://") || decoded.starts_with?("https://") || decoded.starts_with?("mailto:")
             return true if decoded.starts_with?("/") || decoded.starts_with?("#") || decoded.starts_with?("./") || decoded.starts_with?("../")
             !decoded.includes?(":")

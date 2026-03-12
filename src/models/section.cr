@@ -42,9 +42,10 @@ module Hwaro
         @subsections << section
       end
 
-      # Find subsection by name
+      # Find subsection by name (exact section match first, then case-insensitive title)
       def find_subsection(name : String) : Section?
-        @subsections.find { |s| s.section == name || s.title.downcase == name.downcase }
+        @subsections.find { |s| s.section == name } ||
+          @subsections.find { |s| s.title.downcase == name.downcase }
       end
 
       # Get all pages including from subsections (recursive)

@@ -356,28 +356,36 @@ module Hwaro
           #        {% for page in blog.pages %}
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
-            sections_val = env.resolve("__all_sections__")
 
-            result = Crinja::Value.new(nil)
+            # Optimised O(1) lookup via __sections_by_key__ map
+            sections_map = env.resolve("__sections_by_key__")
+            if !sections_map.raw.nil? && sections_map.raw.is_a?(Hash)
+              raw_map = sections_map.raw.as(Hash)
+              found = raw_map[path_arg]? || raw_map["/#{path_arg}/"]?
+              found || Crinja::Value.new(nil)
+            else
+              # Fallback to linear search O(N) if map is not available
+              sections_val = env.resolve("__all_sections__")
+              result = Crinja::Value.new(nil)
 
-            raw_sections = sections_val.raw
-            if raw_sections.is_a?(Array)
-              raw_sections.each do |section_val|
-                if section_val.is_a?(Hash)
-                  section_path = section_val["path"]?.try(&.to_s) || ""
-                  section_name = section_val["name"]?.try(&.to_s) || ""
-                  section_url = section_val["url"]?.try(&.to_s) || ""
+              raw_sections = sections_val.raw
+              if raw_sections.is_a?(Array)
+                raw_sections.each do |section_val|
+                  if section_val.is_a?(Hash)
+                    section_path = section_val["path"]?.try(&.to_s) || ""
+                    section_name = section_val["name"]?.try(&.to_s) || ""
+                    section_url = section_val["url"]?.try(&.to_s) || ""
 
-                  # Match by path, name, or URL
-                  if section_path == path_arg || section_name == path_arg || section_url == "/#{path_arg}/"
-                    result = Crinja::Value.new(section_val)
-                    break
+                    if section_path == path_arg || section_name == path_arg || section_url == "/#{path_arg}/"
+                      result = Crinja::Value.new(section_val)
+                      break
+                    end
                   end
                 end
               end
-            end
 
-            result
+              result
+            end
           end
 
           # get_taxonomy() function - get taxonomy terms and their pages
@@ -406,11 +414,8 @@ module Hwaro
             term = arguments["term"].to_s
             base_url = env.resolve("base_url").to_s
 
-            # Generate slug from term
-            slug = term.downcase
-              .gsub(/[^\w\s-]/, "")
-              .gsub(/[\s_-]+/, "-")
-              .strip("-")
+            # Generate slug from term (use TextUtils for consistency with taxonomy pages)
+            slug = Utils::TextUtils.slugify(term)
 
             url = "/#{kind}/#{slug}/"
             Crinja::Value.new(base_url.rstrip("/") + url)

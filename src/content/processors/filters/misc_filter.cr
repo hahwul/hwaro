@@ -7,9 +7,9 @@ module Hwaro
       module Filters
         module MiscFilters
           def self.register(env : Crinja)
-            # JSON encode filter
+            # JSON encode filter (escapes </ to prevent script-tag breakout in inline JS)
             env.filters["jsonify"] = Crinja.filter do
-              target.to_s.to_json
+              target.to_s.to_json.gsub("</", "<\\/")
             end
 
             # Default filter

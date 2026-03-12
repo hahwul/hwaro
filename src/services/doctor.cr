@@ -255,7 +255,7 @@ module Hwaro
       # Strip fenced code blocks and inline code from text to avoid false positives
       private def strip_code_blocks(text : String) : String
         text.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
-            .gsub(/`[^`]+`/, "")
+          .gsub(/`[^`]+`/, "")
       end
 
       # Check for broken internal links (@/ prefixed) in markdown body

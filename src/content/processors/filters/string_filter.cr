@@ -9,8 +9,8 @@ module Hwaro
             # Truncate words filter
             env.filters["truncate_words"] = Crinja.filter({length: 50, end: "..."}) do
               text = target.to_s
-              length = arguments["length"].as_number.to_i
-              ending = arguments["end"].as_s
+              length = (arguments["length"].as_number rescue 50).to_i
+              ending = arguments["end"].to_s
 
               words = text.split(/\s+/)
               if words.size > length

@@ -1,3 +1,5 @@
+require "html"
+
 # Internal Link Resolver
 #
 # Resolves Zola-style internal links (`@/path.md`) in rendered HTML.
@@ -30,10 +32,15 @@ module Hwaro
             content_path = $1
             anchor = $2?
 
+            if content_path.empty?
+              Logger.warn "  [WARN] Empty internal link '@/' in '#{source_path}'"
+              next match
+            end
+
             if page = pages_by_path[content_path]?
-              url = page.url
+              url = HTML.escape(page.url)
               if anchor && !anchor.empty?
-                "href=\"#{url}##{anchor}\""
+                "href=\"#{url}##{HTML.escape(anchor)}\""
               else
                 "href=\"#{url}\""
               end

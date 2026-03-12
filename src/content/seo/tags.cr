@@ -1,3 +1,4 @@
+require "html"
 require "../../models/config"
 require "../../models/page"
 
@@ -10,7 +11,7 @@ module Hwaro
         def canonical_tag(page : Models::Page, config : Models::Config) : String
           # Use permalink if available, otherwise construct from base_url + url
           url = page.permalink || "#{config.base_url.rstrip("/")}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
-          %(<link rel="canonical" href="#{url}">)
+          %(<link rel="canonical" href="#{HTML.escape(url)}">)
         end
 
         def hreflang_tags(page : Models::Page, config : Models::Config) : String
@@ -22,7 +23,7 @@ module Hwaro
           # Add current page
           current_url = page.permalink || "#{config.base_url.rstrip("/")}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
           lang_code = page.language || config.default_language
-          tags << %(<link rel="alternate" hreflang="#{lang_code}" href="#{current_url}">)
+          tags << %(<link rel="alternate" hreflang="#{HTML.escape(lang_code)}" href="#{HTML.escape(current_url)}">)
 
           # Add translations
           page.translations.each do |t|
@@ -30,7 +31,7 @@ module Hwaro
 
             # TranslationLink url is relative, so we need to make it absolute
             abs_url = t.url.starts_with?("http") ? t.url : "#{config.base_url.rstrip("/")}#{t.url.starts_with?("/") ? t.url : "/#{t.url}"}"
-            tags << %(<link rel="alternate" hreflang="#{t.code}" href="#{abs_url}">)
+            tags << %(<link rel="alternate" hreflang="#{HTML.escape(t.code)}" href="#{HTML.escape(abs_url)}">)
           end
 
           # Sort tags to ensure deterministic output

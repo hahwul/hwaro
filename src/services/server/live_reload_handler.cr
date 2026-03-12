@@ -26,13 +26,18 @@ module Hwaro
       end
 
       def notify_reload
-        @sockets.each do |socket|
+        # Snapshot to avoid race: on_close can delete from @sockets
+        # while we yield in socket.send during iteration
+        snapshot = @sockets.dup
+        dead = [] of HTTP::WebSocket
+        snapshot.each do |socket|
           begin
             socket.send("reload")
           rescue
-            @sockets.delete(socket)
+            dead << socket
           end
         end
+        dead.each { |s| @sockets.delete(s) }
       end
     end
 
@@ -99,8 +104,13 @@ module Hwaro
       end
 
       def inject_script(html : String) : String
+        # Use rindex to find the LAST </body> tag (the real one, not one in content)
         if idx = html.rindex("</body>")
-          html.insert(idx, LIVE_RELOAD_SCRIPT)
+          String.build(html.bytesize + LIVE_RELOAD_SCRIPT.bytesize) do |io|
+            io << html[0...idx]
+            io << LIVE_RELOAD_SCRIPT
+            io << html[idx..]
+          end
         else
           html + LIVE_RELOAD_SCRIPT
         end

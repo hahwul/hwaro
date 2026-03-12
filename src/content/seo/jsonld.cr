@@ -13,7 +13,7 @@ module Hwaro
           base = config.base_url.rstrip("/")
           url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
 
-          date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z")) || ""
+          date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           updated_str = page.updated.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           desc = page.description
           image_url = if image = page.image
@@ -27,7 +27,9 @@ module Hwaro
               j.field "@type", "Article"
               j.field "headline", page.title
               j.field "url", url
-              j.field "datePublished", date_published
+              if dp = date_published
+                j.field "datePublished", dp
+              end
               if us = updated_str
                 j.field "dateModified", us
               end
@@ -48,7 +50,7 @@ module Hwaro
             end
           end
 
-          %(<script type="application/ld+json">#{json}</script>)
+          %(<script type="application/ld+json">#{json.gsub("</", "<\\/")}</script>)
         end
 
         # Generate BreadcrumbList JSON-LD from page ancestors
@@ -101,7 +103,7 @@ module Hwaro
             end
           end
 
-          %(<script type="application/ld+json">#{json}</script>)
+          %(<script type="application/ld+json">#{json.gsub("</", "<\\/")}</script>)
         end
 
         # Generate both Article + BreadcrumbList JSON-LD

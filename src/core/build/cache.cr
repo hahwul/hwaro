@@ -4,7 +4,6 @@
 # The cache is stored in a JSON file for persistence across builds.
 
 require "json"
-require "digest/md5"
 require "../../utils/logger"
 
 module Hwaro
@@ -143,14 +142,6 @@ module Hwaro
         # Check if caching is enabled
         def enabled? : Bool
           @enabled
-        end
-
-        private def compute_hash(file_path : String) : String
-          content = File.read(file_path)
-          Digest::MD5.hexdigest(content)
-        rescue ex
-          Logger.debug "Cache: failed to compute hash for #{file_path}: #{ex.message}"
-          ""
         end
       end
     end

@@ -72,6 +72,8 @@ module Hwaro
           per_page = per_page_for_section(section)
 
           unless enabled
+            # Still sort even when pagination is disabled
+            pages = sort_section_pages(pages, section)
             # Return single page with all items when pagination is disabled
             single_page = PaginatedPage.new(
               pages: pages,
@@ -162,14 +164,16 @@ module Hwaro
           @config.pagination.enabled
         end
 
-        # Get per_page setting for a section
+        # Get per_page setting for a section (minimum 1 to avoid division by zero)
         private def per_page_for_section(section : Models::Section) : Int32
           # Section-level override takes precedence
-          if section_per_page = section.paginate
-            return section_per_page
-          end
-          # Fall back to global config
-          @config.pagination.per_page
+          per_page = if section_per_page = section.paginate
+                       section_per_page
+                     else
+                       # Fall back to global config
+                       @config.pagination.per_page
+                     end
+          [per_page, 1].max
         end
 
         # Sort pages according to section settings

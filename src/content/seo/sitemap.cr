@@ -38,8 +38,8 @@ module Hwaro
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
 
+            base = site.config.base_url.rstrip('/')
             sitemap_pages.each do |page|
-              base = site.config.base_url.rstrip('/')
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base.empty? ? path : base + path
 

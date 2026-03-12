@@ -106,7 +106,7 @@ module Hwaro
       end
 
       private def self.generate_javascript(search_data : Array(Hash(String, String | Array(String)))) : String
-        json_data = search_data.to_json
+        json_data = search_data.to_json.gsub("</", "<\\/")
         "var searchData = #{json_data};"
       end
     end

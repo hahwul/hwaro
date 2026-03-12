@@ -11,16 +11,33 @@ module Hwaro
 
       # Convert text to a URL-friendly slug
       #
+      # Supports Unicode characters (CJK, Hangul, etc.) in addition to ASCII.
+      #
       # Examples:
       #   slugify("Hello World!")  # => "hello-world"
       #   slugify("My Blog Post")  # => "my-blog-post"
-      #   slugify("한글 제목")      # => "" (non-ASCII removed)
+      #   slugify("한글 제목")      # => "한글-제목"
+      #   slugify("CJK 테스트!")   # => "cjk-테스트"
       #
       def slugify(text : String) : String
-        text.downcase
-          .gsub(/[^a-z0-9\s-]/, "") # Remove non-alphanumeric chars except space and hyphen
-          .gsub(/\s+/, "-")         # Replace spaces with hyphens
-          .strip("-")               # Trim leading/trailing hyphens
+        result = String.build do |io|
+          text.each_char do |char|
+            if char.ascii_letter? || char.ascii_number?
+              io << char.downcase
+            elsif char.ascii_whitespace? || char == '-' || char == '_'
+              io << ' '
+            elsif cjk_char?(char) || unicode_letter?(char)
+              io << char
+            end
+            # All other characters (punctuation, symbols) are dropped
+          end
+        end
+        result.gsub(/\s+/, "-").strip("-")
+      end
+
+      # Check if a character is a Unicode letter (non-ASCII)
+      private def unicode_letter?(char : Char) : Bool
+        !char.ascii? && char.letter?
       end
 
       # Escape XML special characters
@@ -32,25 +49,52 @@ module Hwaro
       #   escape_xml("<script>")     # => "&lt;script&gt;"
       #
       def escape_xml(text : String) : String
-        text.gsub(/[&<>"']/) do |match|
-          case match
-          when "&"  then "&amp;"
-          when "<"  then "&lt;"
-          when ">"  then "&gt;"
-          when "\"" then "&quot;"
-          when "'"  then "&apos;"
-          else           match
+        String.build(text.bytesize) do |io|
+          text.each_char do |char|
+            case char
+            when '&'  then io << "&amp;"
+            when '<'  then io << "&lt;"
+            when '>'  then io << "&gt;"
+            when '"'  then io << "&quot;"
+            when '\'' then io << "&apos;"
+            else           io << char
+            end
           end
         end
       end
 
-      # Strip HTML tags from text
+      # Strip HTML tags from text (single-pass)
       #
       # Example:
       #   strip_html("<p>Hello <b>World</b></p>")  # => "Hello World"
       #
       def strip_html(text : String) : String
-        text.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+        String.build(text.bytesize) do |io|
+          in_tag = false
+          last_was_space = true # suppress leading space
+          text.each_char do |char|
+            if char == '<'
+              in_tag = true
+            elsif char == '>'
+              in_tag = false
+              # Emit a single space in place of the tag
+              unless last_was_space
+                io << ' '
+                last_was_space = true
+              end
+            elsif !in_tag
+              if char.ascii_whitespace?
+                unless last_was_space
+                  io << ' '
+                  last_was_space = true
+                end
+              else
+                io << char
+                last_was_space = false
+              end
+            end
+          end
+        end.strip
       end
 
       # Check if a character is in a CJK Unicode range

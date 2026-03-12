@@ -11,14 +11,14 @@ module Hwaro
           content = String.build do |str|
             # Add rules
             config.robots.rules.each do |rule|
-              str << "User-agent: #{rule.user_agent}\n"
+              str << "User-agent: #{rule.user_agent.gsub('\n', ' ')}\n"
 
               rule.allow.each do |path|
-                str << "Allow: #{path}\n"
+                str << "Allow: #{path.gsub('\n', ' ')}\n"
               end
 
               rule.disallow.each do |path|
-                str << "Disallow: #{path}\n"
+                str << "Disallow: #{path.gsub('\n', ' ')}\n"
               end
 
               str << "\n"

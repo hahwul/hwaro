@@ -128,8 +128,8 @@ module Hwaro
                        feed_type == "atom" ? "atom.xml" : "rss.xml"
                      end
 
-          # Sort pages: updated > date > none (newest first)
-          pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
+          # Sort a copy to avoid mutating the caller's array
+          pages = pages.sort { |a, b| Utils::SortUtils.compare_by_date(a, b) }
 
           # Apply limit
           if config.feeds.limit > 0

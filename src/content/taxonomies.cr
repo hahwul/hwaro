@@ -24,6 +24,9 @@ module Hwaro
 
         build_taxonomy_index(site)
 
+        # Reuse a single Builder instance across all taxonomy renders
+        builder = Core::Build::Builder.new
+
         config.taxonomies.each do |taxonomy|
           next if taxonomy.name.strip.empty?
 
@@ -33,10 +36,10 @@ module Hwaro
           base_path = "/#{taxonomy.name}/"
           index_page = build_taxonomy_index_page(taxonomy, base_path)
 
-          render_taxonomy_index(index_page, terms.keys.sort, templates, site, output_dir, verbose)
+          render_taxonomy_index(index_page, terms.keys.sort, templates, site, output_dir, builder, verbose)
 
           terms.each do |term, pages|
-            render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir, verbose)
+            render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir, builder, verbose)
           end
         end
       end
@@ -87,12 +90,13 @@ module Hwaro
         templates : Hash(String, String),
         site : Models::Site,
         output_dir : String,
+        builder : Core::Build::Builder,
         verbose : Bool = false,
       )
         template_content = templates["taxonomy"]? || templates["page"]?
         html_content = build_term_list(terms, page.url, site.config.base_url)
 
-        final_html = apply_template(template_content, html_content, page, site, templates)
+        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder)
         write_output(page, output_dir, final_html, verbose)
       end
 
@@ -103,6 +107,7 @@ module Hwaro
         templates : Hash(String, String),
         site : Models::Site,
         output_dir : String,
+        builder : Core::Build::Builder,
         verbose : Bool = false,
       )
         slug = Utils::TextUtils.slugify(term)
@@ -130,7 +135,7 @@ module Hwaro
           pagination_html = Content::Pagination::Renderer.new(site.config).render_pagination_nav(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
@@ -238,6 +243,7 @@ module Hwaro
         site : Models::Site,
         templates : Hash(String, String),
         paginator : Content::Pagination::PaginatedPage? = nil,
+        builder : Core::Build::Builder? = nil,
       ) : String
         return html_content unless template_content
 
@@ -252,8 +258,8 @@ module Hwaro
                         page.url
                       end
 
-        builder = Core::Build::Builder.new
-        builder.apply_template(
+        b = builder || Core::Build::Builder.new
+        b.apply_template(
           template: template_content,
           content: html_content,
           page: page,

@@ -42,7 +42,7 @@ module Hwaro
         end
 
         private def self.build_full_document(pages : Array(Models::Page), config : Models::Config) : String
-          eligible_pages = pages.select { |page| page.render && !page.raw_content.empty? }.sort_by(&.url)
+          eligible_pages = pages.select { |page| page.render && !page.draft && !page.raw_content.empty? }.sort_by(&.url)
 
           base_url = config.base_url
           base_url = base_url.rstrip('/') unless base_url.empty?

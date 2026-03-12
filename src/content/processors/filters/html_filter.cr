@@ -1,5 +1,6 @@
 require "crinja"
 require "markd"
+require "../../../../src/utils/text_utils"
 
 module Hwaro
   module Content
@@ -17,14 +18,9 @@ module Hwaro
               Markd.to_html(target.to_s)
             end
 
-            # XML escape filter
+            # XML escape filter (single-pass via TextUtils)
             env.filters["xml_escape"] = Crinja.filter do
-              target.to_s
-                .gsub("&", "&amp;")
-                .gsub("<", "&lt;")
-                .gsub(">", "&gt;")
-                .gsub("\"", "&quot;")
-                .gsub("'", "&apos;")
+              Hwaro::Utils::TextUtils.escape_xml(target.to_s)
             end
 
             # Safe filter

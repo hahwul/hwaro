@@ -7,6 +7,7 @@
 # - sort_pages: Generic page sorting with multiple criteria
 
 require "../models/page"
+require "./logger"
 
 module Hwaro
   module Utils
@@ -77,7 +78,10 @@ module Hwaro
           sort_by_title(pages, reverse)
         when "weight"
           sort_by_weight(pages, reverse)
-        else # "date" is default
+        when "date"
+          sort_by_date(pages, reverse)
+        else
+          Logger.warn "  [WARN] Unknown sort_by '#{sort_by}', defaulting to 'date'"
           sort_by_date(pages, reverse)
         end
       end

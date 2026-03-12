@@ -38,8 +38,16 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.slugify("").should eq("")
     end
 
-    it "removes non-ASCII characters" do
-      Hwaro::Utils::TextUtils.slugify("café").should eq("caf")
+    it "preserves unicode letters" do
+      Hwaro::Utils::TextUtils.slugify("café").should eq("café")
+    end
+
+    it "supports CJK characters" do
+      Hwaro::Utils::TextUtils.slugify("한글 제목").should eq("한글-제목")
+    end
+
+    it "supports mixed ASCII and CJK" do
+      Hwaro::Utils::TextUtils.slugify("Hello 세계!").should eq("hello-세계")
     end
 
     it "preserves numbers" do

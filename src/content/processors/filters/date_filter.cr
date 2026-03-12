@@ -9,7 +9,7 @@ module Hwaro
             # Date formatting filter
             env.filters["date"] = Crinja.filter({format: "%Y-%m-%d"}) do
               value = target.raw
-              format = arguments["format"].as_s
+              format = arguments["format"].to_s
 
               case value
               when Time

@@ -161,13 +161,13 @@ module Hwaro
         def preprocess_math(content : String) : String
           # Display math: $$...$$ (multi-line)
           result = content.gsub(/\$\$(.*?)\$\$/m) do |_|
-            escaped = $~[1].gsub("<", "&lt;").gsub(">", "&gt;")
+            escaped = $~[1].gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
             "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
           end
 
           # Inline math: $...$ (single line, no space after opening or before closing $)
           result = result.gsub(/(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/) do |_|
-            escaped = $~[1].gsub("<", "&lt;").gsub(">", "&gt;")
+            escaped = $~[1].gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
             "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
           end
 
