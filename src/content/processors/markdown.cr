@@ -112,38 +112,6 @@ module Hwaro
         # Returns parsed metadata and content
         def parse(raw_content : String, file_path : String = "")
           markdown_content = raw_content
-          title = "Untitled"
-          description = nil.as(String?)
-          image = nil.as(String?)
-          is_draft = false
-          template = nil
-          in_sitemap = true
-          toc = false
-          date = nil
-          updated = nil
-          render = true
-          slug = nil
-          custom_path = nil
-          aliases = [] of String
-          tags = [] of String
-          taxonomies = {} of String => Array(String)
-          front_matter_keys = [] of String
-          transparent = false
-          generate_feeds = false
-          paginate = nil.as(Int32?)
-          pagination_enabled = nil.as(Bool?)
-          sort_by = nil.as(String?)
-          reverse = nil.as(Bool?)
-
-          # New fields
-          authors = [] of String
-          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
-          in_search_index = true
-          insert_anchor_links = false
-          page_template = nil.as(String?)
-          paginate_path = "page"
-          redirect_to = nil.as(String?)
-          weight = 0
 
           # Try TOML Front Matter (+++) then YAML Front Matter (---)
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
@@ -155,168 +123,83 @@ module Hwaro
           end
 
           if result
-            title = result[:title]
-            description = result[:description]
-            image = result[:image]
-            is_draft = result[:draft]
-            template = result[:template]
-            in_sitemap = result[:in_sitemap]
-            toc = result[:toc]
-            date = result[:date]
-            updated = result[:updated]
-            render = result[:render]
-            slug = result[:slug]
-            custom_path = result[:custom_path]
-            aliases = result[:aliases]
-            transparent = result[:transparent]
-            generate_feeds = result[:generate_feeds]
-            paginate = result[:paginate]
-            pagination_enabled = result[:pagination_enabled]
-            sort_by = result[:sort_by]
-            reverse = result[:reverse]
-            authors = result[:authors]
-            extra = result[:extra]
-            in_search_index = result[:in_search_index]
-            insert_anchor_links = result[:insert_anchor_links]
-            page_template = result[:page_template]
-            paginate_path = result[:paginate_path]
-            redirect_to = result[:redirect_to]
-            weight = result[:weight]
-            front_matter_keys = result[:front_matter_keys]
-            taxonomies = result[:taxonomies]
-            tags = result[:tags]
+            {
+              title:               result[:title],
+              description:         result[:description],
+              image:               result[:image],
+              content:             markdown_content,
+              draft:               result[:draft],
+              template:            result[:template],
+              in_sitemap:          result[:in_sitemap],
+              toc:                 result[:toc],
+              date:                result[:date],
+              updated:             result[:updated],
+              render:              result[:render],
+              slug:                result[:slug],
+              custom_path:         result[:custom_path],
+              aliases:             result[:aliases],
+              tags:                result[:tags],
+              taxonomies:          result[:taxonomies],
+              front_matter_keys:   result[:front_matter_keys],
+              transparent:         result[:transparent],
+              generate_feeds:      result[:generate_feeds],
+              paginate:            result[:paginate],
+              pagination_enabled:  result[:pagination_enabled],
+              sort_by:             result[:sort_by],
+              reverse:             result[:reverse],
+              authors:             result[:authors],
+              extra:               result[:extra],
+              in_search_index:     result[:in_search_index],
+              insert_anchor_links: result[:insert_anchor_links],
+              page_template:       result[:page_template],
+              paginate_path:       result[:paginate_path],
+              redirect_to:         result[:redirect_to],
+              weight:              result[:weight],
+            }
+          else
+            # No front matter found — return defaults
+            {
+              title:               "Untitled",
+              description:         nil.as(String?),
+              image:               nil.as(String?),
+              content:             markdown_content,
+              draft:               false,
+              template:            nil.as(String?),
+              in_sitemap:          true,
+              toc:                 false,
+              date:                nil.as(Time?),
+              updated:             nil.as(Time?),
+              render:              true,
+              slug:                nil.as(String?),
+              custom_path:         nil.as(String?),
+              aliases:             [] of String,
+              tags:                [] of String,
+              taxonomies:          {} of String => Array(String),
+              front_matter_keys:   [] of String,
+              transparent:         false,
+              generate_feeds:      false,
+              paginate:            nil.as(Int32?),
+              pagination_enabled:  nil.as(Bool?),
+              sort_by:             nil.as(String?),
+              reverse:             nil.as(Bool?),
+              authors:             [] of String,
+              extra:               {} of String => String | Bool | Int64 | Float64 | Array(String),
+              in_search_index:     true,
+              insert_anchor_links: false,
+              page_template:       nil.as(String?),
+              paginate_path:       "page",
+              redirect_to:         nil.as(String?),
+              weight:              0,
+            }
           end
-
-          {
-            title:              title,
-            description:        description,
-            image:              image,
-            content:            markdown_content,
-            draft:              is_draft,
-            template:           template,
-            in_sitemap:         in_sitemap,
-            toc:                toc,
-            date:               date,
-            updated:            updated,
-            render:             render,
-            slug:               slug,
-            custom_path:        custom_path,
-            aliases:            aliases,
-            tags:               tags,
-            taxonomies:         taxonomies,
-            front_matter_keys:  front_matter_keys,
-            transparent:        transparent,
-            generate_feeds:     generate_feeds,
-            paginate:           paginate,
-            pagination_enabled: pagination_enabled,
-            sort_by:            sort_by,
-            reverse:            reverse,
-            # New fields
-            authors:             authors,
-            extra:               extra,
-            in_search_index:     in_search_index,
-            insert_anchor_links: insert_anchor_links,
-            page_template:       page_template,
-            paginate_path:       paginate_path,
-            redirect_to:         redirect_to,
-            weight:              weight,
-          }
         end
 
         # Extract front matter fields from TOML content
         private def extract_from_toml(raw : String, file_path : String)
           toml_fm = TOML.parse(raw)
-          title = toml_fm["title"]?.try(&.as_s) || "Untitled"
-          description = toml_fm["description"]?.try(&.as_s)
-          image = toml_fm["image"]?.try(&.as_s)
-          is_draft = toml_fm["draft"]?.try(&.as_bool) || false
-          template = toml_fm["template"]?.try(&.as_s)
-          in_sitemap = true
-          if (val = toml_fm["in_sitemap"]?)
-            bool_val = val.as_bool?
-            in_sitemap = bool_val unless bool_val.nil?
-          end
-          toc = toml_fm["toc"]?.try(&.as_bool?) || false
 
           date = parse_toml_time(toml_fm["date"]?)
           updated = parse_toml_time(toml_fm["updated"]?)
-
-          render = true
-          if (val = toml_fm["render"]?)
-            bool_val = val.as_bool?
-            render = bool_val unless bool_val.nil?
-          end
-
-          transparent = false
-          if (val = toml_fm["transparent"]?)
-            bool_val = val.as_bool?
-            transparent = bool_val unless bool_val.nil?
-          end
-          generate_feeds = false
-          if (val = toml_fm["generate_feeds"]?)
-            bool_val = val.as_bool?
-            generate_feeds = bool_val unless bool_val.nil?
-          end
-
-          paginate = nil.as(Int32?)
-          if (val = toml_fm["paginate"]?)
-            int_val = val.as_i?
-            paginate = int_val unless int_val.nil?
-          end
-          pagination_enabled = nil.as(Bool?)
-          if (val = toml_fm["pagination_enabled"]?)
-            bool_val = val.as_bool?
-            pagination_enabled = bool_val unless bool_val.nil?
-          end
-          sort_by = nil.as(String?)
-          if (val = toml_fm["sort_by"]?)
-            sort_by = val.as_s?
-          end
-          reverse = nil.as(Bool?)
-          if (val = toml_fm["reverse"]?)
-            bool_val = val.as_bool?
-            reverse = bool_val unless bool_val.nil?
-          end
-
-          slug = toml_fm["slug"]?.try(&.as_s?)
-          custom_path = toml_fm["path"]?.try(&.as_s?)
-
-          aliases = [] of String
-          if (val = toml_fm["aliases"]?)
-            aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
-
-          authors = [] of String
-          if (val = toml_fm["authors"]?)
-            authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
-          in_search_index = true
-          if (val = toml_fm["in_search_index"]?)
-            bool_val = val.as_bool?
-            in_search_index = bool_val unless bool_val.nil?
-          end
-          insert_anchor_links = false
-          if (val = toml_fm["insert_anchor_links"]?)
-            bool_val = val.as_bool?
-            insert_anchor_links = bool_val unless bool_val.nil?
-          end
-          page_template = nil.as(String?)
-          if (val = toml_fm["page_template"]?)
-            page_template = val.as_s?
-          end
-          paginate_path = "page"
-          if (val = toml_fm["paginate_path"]?)
-            paginate_path = val.as_s? || "page"
-          end
-          redirect_to = nil.as(String?)
-          if (val = toml_fm["redirect_to"]?)
-            redirect_to = val.as_s?
-          end
-          weight = 0
-          if (val = toml_fm["weight"]?)
-            int_val = val.as_i?
-            weight = int_val unless int_val.nil?
-          end
 
           extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
           toml_fm.each do |key, value|
@@ -326,23 +209,10 @@ module Hwaro
 
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
-          tags = [] of String
-          if (val = toml_fm["tags"]?)
-            tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
+          tags = toml_fm["tags"]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
           taxonomies["tags"] = tags if tags.any?
 
-          {
-            title: title, description: description, image: image, draft: is_draft,
-            template: template, in_sitemap: in_sitemap, toc: toc, date: date,
-            updated: updated, render: render, slug: slug, custom_path: custom_path,
-            aliases: aliases, transparent: transparent, generate_feeds: generate_feeds,
-            paginate: paginate, pagination_enabled: pagination_enabled, sort_by: sort_by,
-            reverse: reverse, authors: authors, extra: extra, in_search_index: in_search_index,
-            insert_anchor_links: insert_anchor_links, page_template: page_template,
-            paginate_path: paginate_path, redirect_to: redirect_to, weight: weight,
-            front_matter_keys: front_matter_keys, taxonomies: taxonomies, tags: tags,
-          }
+          build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
         rescue ex
           Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil
@@ -353,99 +223,8 @@ module Hwaro
           yaml_fm = YAML.parse(raw)
           return nil unless yaml_fm.as_h?
 
-          title = yaml_fm["title"]?.try(&.as_s?) || "Untitled"
-          description = yaml_fm["description"]?.try(&.as_s?)
-          image = yaml_fm["image"]?.try(&.as_s?)
-          is_draft = yaml_fm["draft"]?.try(&.as_bool?) || false
-          template = yaml_fm["template"]?.try(&.as_s?)
-          in_sitemap = true
-          if (val = yaml_fm["in_sitemap"]?)
-            bool_val = val.as_bool?
-            in_sitemap = bool_val unless bool_val.nil?
-          end
-          toc = yaml_fm["toc"]?.try(&.as_bool?) || false
-
           date = parse_time(yaml_fm["date"]?.try(&.as_s?))
           updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
-
-          render = true
-          if (val = yaml_fm["render"]?)
-            bool_val = val.as_bool?
-            render = bool_val unless bool_val.nil?
-          end
-
-          transparent = false
-          if (val = yaml_fm["transparent"]?)
-            bool_val = val.as_bool?
-            transparent = bool_val unless bool_val.nil?
-          end
-
-          generate_feeds = false
-          if (val = yaml_fm["generate_feeds"]?)
-            bool_val = val.as_bool?
-            generate_feeds = bool_val unless bool_val.nil?
-          end
-
-          paginate = nil.as(Int32?)
-          if (val = yaml_fm["paginate"]?)
-            int_val = val.as_i?
-            paginate = int_val unless int_val.nil?
-          end
-
-          pagination_enabled = nil.as(Bool?)
-          if (val = yaml_fm["pagination_enabled"]?)
-            bool_val = val.as_bool?
-            pagination_enabled = bool_val unless bool_val.nil?
-          end
-          sort_by = nil.as(String?)
-          if (val = yaml_fm["sort_by"]?)
-            sort_by = val.as_s?
-          end
-          reverse = nil.as(Bool?)
-          if (val = yaml_fm["reverse"]?)
-            bool_val = val.as_bool?
-            reverse = bool_val unless bool_val.nil?
-          end
-
-          slug = yaml_fm["slug"]?.try(&.as_s?)
-          custom_path = yaml_fm["path"]?.try(&.as_s?)
-
-          aliases = [] of String
-          if (val = yaml_fm["aliases"]?)
-            aliases = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
-
-          authors = [] of String
-          if (val = yaml_fm["authors"]?)
-            authors = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
-          in_search_index = true
-          if (val = yaml_fm["in_search_index"]?)
-            bool_val = val.as_bool?
-            in_search_index = bool_val unless bool_val.nil?
-          end
-          insert_anchor_links = false
-          if (val = yaml_fm["insert_anchor_links"]?)
-            bool_val = val.as_bool?
-            insert_anchor_links = bool_val unless bool_val.nil?
-          end
-          page_template = nil.as(String?)
-          if (val = yaml_fm["page_template"]?)
-            page_template = val.as_s?
-          end
-          paginate_path = "page"
-          if (val = yaml_fm["paginate_path"]?)
-            paginate_path = val.as_s? || "page"
-          end
-          redirect_to = nil.as(String?)
-          if (val = yaml_fm["redirect_to"]?)
-            redirect_to = val.as_s?
-          end
-          weight = 0
-          if (val = yaml_fm["weight"]?)
-            int_val = val.as_i?
-            weight = int_val unless int_val.nil?
-          end
 
           extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
           if fm_hash = yaml_fm.as_h?
@@ -459,34 +238,95 @@ module Hwaro
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
-          tags = [] of String
-          if (val = yaml_fm["tags"]?)
-            tags = val.as_a?.try { |a| a.map(&.as_s) } || [] of String
-          end
+          tags = yaml_fm["tags"]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
           taxonomies["tags"] = tags if tags.any?
 
-          {
-            title: title, description: description, image: image, draft: is_draft,
-            template: template, in_sitemap: in_sitemap, toc: toc, date: date,
-            updated: updated, render: render, slug: slug, custom_path: custom_path,
-            aliases: aliases, transparent: transparent, generate_feeds: generate_feeds,
-            paginate: paginate, pagination_enabled: pagination_enabled, sort_by: sort_by,
-            reverse: reverse, authors: authors, extra: extra, in_search_index: in_search_index,
-            insert_anchor_links: insert_anchor_links, page_template: page_template,
-            paginate_path: paginate_path, redirect_to: redirect_to, weight: weight,
-            front_matter_keys: front_matter_keys, taxonomies: taxonomies, tags: tags,
-          }
+          build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
         rescue ex
           Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil
+        end
+
+        # Shared helper: extract a Bool from a front matter value, returning the
+        # given default when the key is absent or not a boolean.
+        private def fm_bool(fm : TOML::Table | YAML::Any, key : String, default : Bool) : Bool
+          val = fm[key]?
+          return default unless val
+          bool_val = val.as_bool?
+          bool_val.nil? ? default : bool_val
+        end
+
+        # Shared helper: extract a nilable Bool from a front matter value.
+        private def fm_bool?(fm : TOML::Table | YAML::Any, key : String) : Bool?
+          fm[key]?.try(&.as_bool?)
+        end
+
+        # Shared helper: extract a nilable Int32 from a front matter value.
+        private def fm_int?(fm : TOML::Table | YAML::Any, key : String) : Int32?
+          fm[key]?.try(&.as_i?)
+        end
+
+        # Shared helper: extract a String with a default from a front matter value.
+        private def fm_string(fm : TOML::Table | YAML::Any, key : String, default : String) : String
+          fm[key]?.try(&.as_s?) || default
+        end
+
+        # Shared helper: extract a string array from a front matter value.
+        private def fm_string_array(fm : TOML::Table | YAML::Any, key : String) : Array(String)
+          fm[key]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
+        end
+
+        # Build the front matter result NamedTuple from any front matter source.
+        # This eliminates duplication between extract_from_toml and extract_from_yaml.
+        private def build_front_matter_result(
+          fm : TOML::Table | YAML::Any,
+          date : Time?,
+          updated : Time?,
+          extra : Hash(String, String | Bool | Int64 | Float64 | Array(String)),
+          front_matter_keys : Array(String),
+          taxonomies : Hash(String, Array(String)),
+          tags : Array(String),
+        )
+          {
+            title:               fm["title"]?.try(&.as_s?) || "Untitled",
+            description:         fm["description"]?.try(&.as_s?),
+            image:               fm["image"]?.try(&.as_s?),
+            draft:               fm_bool(fm, "draft", false),
+            template:            fm["template"]?.try(&.as_s?),
+            in_sitemap:          fm_bool(fm, "in_sitemap", true),
+            toc:                 fm_bool(fm, "toc", false),
+            date:                date,
+            updated:             updated,
+            render:              fm_bool(fm, "render", true),
+            slug:                fm["slug"]?.try(&.as_s?),
+            custom_path:         fm["path"]?.try(&.as_s?),
+            aliases:             fm_string_array(fm, "aliases"),
+            transparent:         fm_bool(fm, "transparent", false),
+            generate_feeds:      fm_bool(fm, "generate_feeds", false),
+            paginate:            fm_int?(fm, "paginate"),
+            pagination_enabled:  fm_bool?(fm, "pagination_enabled"),
+            sort_by:             fm["sort_by"]?.try(&.as_s?),
+            reverse:             fm_bool?(fm, "reverse"),
+            authors:             fm_string_array(fm, "authors"),
+            extra:               extra,
+            in_search_index:     fm_bool(fm, "in_search_index", true),
+            insert_anchor_links: fm_bool(fm, "insert_anchor_links", false),
+            page_template:       fm["page_template"]?.try(&.as_s?),
+            paginate_path:       fm_string(fm, "paginate_path", "page"),
+            redirect_to:         fm["redirect_to"]?.try(&.as_s?),
+            weight:              fm_int?(fm, "weight") || 0,
+            front_matter_keys:   front_matter_keys,
+            taxonomies:          taxonomies,
+            tags:                tags,
+          }
         end
 
         # Extract extra value from TOML::Any or YAML::Any
         private def extract_extra_value(value : TOML::Any | YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
           if str = value.as_s?
             str
-          elsif !value.as_bool?.nil?
-            value.as_bool?.not_nil!
+          elsif !(bool_val = value.as_bool?).nil?
+            bool_val.not_nil!
           elsif int = value.as_i?
             int.to_i64
           elsif float = value.as_f?

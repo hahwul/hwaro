@@ -2146,20 +2146,7 @@ module Hwaro
           # Convert extra to Crinja hash
           extra_hash = {} of String => Crinja::Value
           page.extra.each do |k, v|
-            extra_hash[k] = case v
-                            when String
-                              Crinja::Value.new(v)
-                            when Bool
-                              Crinja::Value.new(v)
-                            when Int64
-                              Crinja::Value.new(v)
-                            when Float64
-                              Crinja::Value.new(v)
-                            when Array(String)
-                              Crinja::Value.new(v.map { |s| Crinja::Value.new(s) })
-                            else
-                              Crinja::Value.new(v.to_s)
-                            end
+            extra_hash[k] = Utils::CrinjaUtils.from_extra(v)
           end
 
           # Build lower/higher page objects

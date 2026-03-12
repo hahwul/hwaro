@@ -273,14 +273,7 @@ module Hwaro
       end
 
       private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
-        normalized = rel.gsub('\\', '/')
-        if inc = target.include
-          return false unless File.match?(inc, normalized)
-        end
-        if exc = target.exclude
-          return false if File.match?(exc, normalized)
-        end
-        true
+        included_by_target?(rel, target)
       end
 
       private def list_existing_files(dest_dir : String) : Array(String)
@@ -373,12 +366,26 @@ module Hwaro
         true
       end
 
+      # Compare two files for identical content. Uses size check first,
+      # then reads in 8 KiB chunks to avoid loading large files entirely
+      # into memory for the common case where files differ early.
       private def same_file?(a : String, b : String) : Bool
         return false unless File.exists?(a) && File.exists?(b)
-        a_info = File.info(a)
-        b_info = File.info(b)
-        return false unless a_info.size == b_info.size
-        Digest::SHA256.hexdigest(File.read(a)) == Digest::SHA256.hexdigest(File.read(b))
+        return false unless File.info(a).size == File.info(b).size
+
+        File.open(a, "rb") do |fa|
+          File.open(b, "rb") do |fb|
+            buf_a = Bytes.new(8192)
+            buf_b = Bytes.new(8192)
+            loop do
+              read_a = fa.read(buf_a)
+              read_b = fb.read(buf_b)
+              return false unless read_a == read_b
+              return true if read_a == 0
+              return false unless buf_a[0, read_a] == buf_b[0, read_b]
+            end
+          end
+        end
       rescue
         false
       end

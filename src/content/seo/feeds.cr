@@ -150,6 +150,20 @@ module Hwaro
           Logger.action :create, feed_path if verbose
         end
 
+        # Build the self-referencing feed URL from config, base path, and filename.
+        private def self.build_feed_url(config : Models::Config, base_path : String, filename : String) : {String, String}
+          base_url = config.base_url.rstrip('/')
+          feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
+          feed_url = "#{base_url}/#{feed_url_path.sub(/^\//, "")}"
+          {base_url, feed_url}
+        end
+
+        # Build the full absolute URL for a page.
+        private def self.page_full_url(page : Models::Page, base_url : String) : String
+          path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+          base_url.empty? ? path : base_url + path
+        end
+
         def self.generate_rss(
           pages : Array(Models::Page),
           config : Models::Config,
@@ -159,6 +173,8 @@ module Hwaro
           base_path : String,
           language : String? = nil,
         ) : String
+          base_url, feed_url = build_feed_url(config, base_path, filename)
+
           String.build do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
@@ -167,15 +183,9 @@ module Hwaro
             str << "    <link>#{Utils::TextUtils.escape_xml(config.base_url)}</link>\n"
             str << "    <description>#{Utils::TextUtils.escape_xml(config.description)}</description>\n"
 
-            # Include language tag for language-specific feeds
             if language
               str << "    <language>#{Utils::TextUtils.escape_xml(language)}</language>\n"
             end
-
-            # Self-referencing link
-            base_url = config.base_url.rstrip('/')
-            feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
-            feed_url = "#{base_url}/#{feed_url_path.sub(/^\//, "")}"
 
             str << "    <atom:link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" type=\"application/rss+xml\" />\n"
 
@@ -183,17 +193,14 @@ module Hwaro
               str << "    <item>\n"
               str << "      <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
 
-              # Build full URL
-              path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-              full_url = base_url.empty? ? path : base_url + path
-              str << "      <link>#{Utils::TextUtils.escape_xml(full_url)}</link>\n"
-              str << "      <guid>#{Utils::TextUtils.escape_xml(full_url)}</guid>\n"
+              full_url = page_full_url(page, base_url)
+              escaped_url = Utils::TextUtils.escape_xml(full_url)
+              str << "      <link>#{escaped_url}</link>\n"
+              str << "      <guid>#{escaped_url}</guid>\n"
 
-              # Add description/content
               content = get_content_for_feed(page, config.feeds.truncate)
               str << "      <description>#{Utils::TextUtils.escape_xml(content)}</description>\n"
 
-              # Add pubDate (publication date) and separate lastBuildDate if updated
               if pub_date = page.date
                 str << "      <pubDate>#{pub_date.to_rfc2822}</pubDate>\n"
               end
@@ -216,11 +223,11 @@ module Hwaro
           language : String? = nil,
         ) : String
           now = Time.utc
+          base_url, feed_url = build_feed_url(config, base_path, filename)
 
           String.build do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
-            # Include xml:lang attribute for language-specific feeds
             if language
               str << "<feed xmlns=\"http://www.w3.org/2005/Atom\" xml:lang=\"#{Utils::TextUtils.escape_xml(language)}\">\n"
             else
@@ -229,14 +236,7 @@ module Hwaro
 
             str << "  <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
             str << "  <link href=\"#{Utils::TextUtils.escape_xml(config.base_url)}\" />\n"
-
-            # Self-referencing link
-            base_url = config.base_url.rstrip('/')
-            feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
-            feed_url = "#{base_url}/#{feed_url_path.sub(/^\//, "")}"
-
             str << "  <link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" />\n"
-
             str << "  <updated>#{now.to_rfc3339}</updated>\n"
             str << "  <id>#{Utils::TextUtils.escape_xml(config.base_url)}</id>\n"
 
@@ -248,17 +248,14 @@ module Hwaro
               str << "  <entry>\n"
               str << "    <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
 
-              # Build full URL
-              path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-              full_url = base_url.empty? ? path : base_url + path
-              str << "    <link href=\"#{Utils::TextUtils.escape_xml(full_url)}\" />\n"
-              str << "    <id>#{Utils::TextUtils.escape_xml(full_url)}</id>\n"
+              full_url = page_full_url(page, base_url)
+              escaped_url = Utils::TextUtils.escape_xml(full_url)
+              str << "    <link href=\"#{escaped_url}\" />\n"
+              str << "    <id>#{escaped_url}</id>\n"
 
-              # Add date
               entry_date = page.updated || page.date || now
               str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
 
-              # Add content with appropriate type
               content = get_content_for_feed(page, config.feeds.truncate)
               content_type = is_text ? "text" : "html"
               str << "    <content type=\"#{content_type}\">#{Utils::TextUtils.escape_xml(content)}</content>\n"

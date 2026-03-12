@@ -71,6 +71,16 @@ module Hwaro
         end
       end
 
+      # Convert an extra field value (from front matter) to Crinja::Value
+      def from_extra(value : String | Bool | Int64 | Float64 | Array(String)) : Crinja::Value
+        case value
+        when Array(String)
+          Crinja::Value.new(value.map { |s| Crinja::Value.new(s) })
+        else
+          Crinja::Value.new(value)
+        end
+      end
+
       # Convert a JSON::Any value to Crinja::Value
       def from_json(value : JSON::Any) : Crinja::Value
         case value.raw
