@@ -59,9 +59,9 @@ describe Hwaro::Config::Options::BuildOptions do
   end
 
   describe "#batch_size" do
-    it "returns 50 by default (stream without memory_limit)" do
+    it "returns 500 by default (stream without memory_limit)" do
       options = Hwaro::Config::Options::BuildOptions.new(stream: true)
-      options.batch_size.should eq(50)
+      options.batch_size.should eq(500)
     end
 
     it "calculates batch size from gigabytes" do

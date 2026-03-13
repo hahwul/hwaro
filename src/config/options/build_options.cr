@@ -47,7 +47,11 @@ module Hwaro
             size = size.clamp(1, Int32::MAX.to_i64).to_i32
             size
           else
-            50
+            # Default batch size: 500 pages.  The previous default of 50 caused
+            # excessive GC.collect + cache clear cycles on large sites (e.g.
+            # 5000 pages → 100 batches → 100 GC cycles).  500 reduces this to
+            # 10 cycles while still bounding peak memory for very large sites.
+            500
           end
         end
 

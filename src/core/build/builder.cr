@@ -73,6 +73,11 @@ module Hwaro
         @section_pages_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
         # Per-section cache of Crinja::Value arrays for section assets, keyed by section name
         @section_assets_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
+        # Track created directories to avoid redundant mkdir_p syscalls
+        @created_dirs : Set(String) = Set(String).new
+        # Per-page Crinja::Value cache — avoids repeated Page→Crinja::Value conversion
+        # across build_global_vars, section page lists, and page_to_crinja_list_value
+        @page_crinja_value_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -242,6 +247,7 @@ module Hwaro
           @compiled_templates_cache.clear
           @section_pages_crinja_cache.clear
           @section_assets_crinja_cache.clear
+          @page_crinja_value_cache.clear
           templates = load_templates
           @templates = templates
 
@@ -365,6 +371,8 @@ module Hwaro
           @compiled_templates_cache.clear
           @section_pages_crinja_cache.clear
           @section_assets_crinja_cache.clear
+          @created_dirs.clear
+          @page_crinja_value_cache.clear
 
           # Execute build phases through lifecycle
           result = execute_phases(ctx, profiler)
@@ -611,10 +619,11 @@ module Hwaro
                     end
             total_count += count
 
-            # Release rendered HTML and per-section caches to free memory
+            # Release rendered HTML and per-section/page caches to free memory
             batch.each { |page| page.content = "" }
             @section_pages_crinja_cache.clear
             @section_assets_crinja_cache.clear
+            @page_crinja_value_cache.clear
             GC.collect
           end
 
@@ -1534,7 +1543,7 @@ module Hwaro
           return unless redirect_url
 
           output_path = File.join(output_dir, page.url.sub(/^\//, ""), "index.html")
-          FileUtils.mkdir_p(Path[output_path].dirname)
+          ensure_dir(Path[output_path].dirname.to_s)
           File.write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
           Logger.action :create, output_path if verbose
         end
@@ -1608,7 +1617,7 @@ module Hwaro
           output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
           return unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
 
-          FileUtils.mkdir_p(Path[output_path].dirname)
+          ensure_dir(Path[output_path].dirname.to_s)
           File.write(output_path, content)
           Logger.action :create, output_path if verbose
         end
@@ -1638,7 +1647,7 @@ module Hwaro
             dest_path = File.join(output_dir, alias_clean, "index.html")
             next unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
 
-            FileUtils.mkdir_p(File.dirname(dest_path))
+            ensure_dir(File.dirname(dest_path))
 
             redirect_url = page.redirect_to || page.url
             File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
@@ -1771,23 +1780,41 @@ module Hwaro
           vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
         end
 
+        # Unified Page→Crinja::Value conversion with per-page caching.
+        # Avoids repeated conversion of the same Page across build_global_vars,
+        # section page lists, and paginator rendering.  The cached value contains
+        # a superset of fields needed by all consumers.
+        private def cached_page_crinja_value(p : Models::Page, default_language : String) : Crinja::Value
+          @page_crinja_value_cache[p.path]? || begin
+            val = Crinja::Value.new({
+              "path"         => Crinja::Value.new(p.path),
+              "title"        => Crinja::Value.new(p.title),
+              "description"  => Crinja::Value.new(p.description || ""),
+              "url"          => Crinja::Value.new(p.url),
+              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+              "image"        => Crinja::Value.new(p.image || ""),
+              "section"      => Crinja::Value.new(p.section),
+              "draft"        => Crinja::Value.new(p.draft),
+              "toc"          => Crinja::Value.new(p.toc),
+              "render"       => Crinja::Value.new(p.render),
+              "is_index"     => Crinja::Value.new(p.is_index),
+              "generated"    => Crinja::Value.new(p.generated),
+              "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
+              "language"     => Crinja::Value.new(p.language || default_language),
+              "weight"       => Crinja::Value.new(p.weight),
+              "summary"      => Crinja::Value.new(p.effective_summary || ""),
+              "word_count"   => Crinja::Value.new(p.word_count),
+              "reading_time" => Crinja::Value.new(p.reading_time),
+            })
+            @page_crinja_value_cache[p.path] = val
+            val
+          end
+        end
+
         # Convert a Page to a Crinja::Value hash for use in section page lists and paginator.
-        # This is a shared helper to avoid duplicating the same conversion in multiple places.
+        # Delegates to the cached unified conversion to avoid redundant allocations.
         private def page_to_crinja_list_value(p : Models::Page, default_language : String) : Crinja::Value
-          Crinja::Value.new({
-            "title"       => Crinja::Value.new(p.title),
-            "description" => Crinja::Value.new(p.description || ""),
-            "url"         => Crinja::Value.new(p.url),
-            "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-            "image"       => Crinja::Value.new(p.image || ""),
-            "draft"       => Crinja::Value.new(p.draft),
-            "toc"         => Crinja::Value.new(p.toc),
-            "render"      => Crinja::Value.new(p.render),
-            "is_index"    => Crinja::Value.new(p.is_index),
-            "generated"   => Crinja::Value.new(p.generated),
-            "in_sitemap"  => Crinja::Value.new(p.in_sitemap),
-            "language"    => Crinja::Value.new(p.language || default_language),
-          })
+          cached_page_crinja_value(p, default_language)
         end
 
         # Get (or build and cache) the sorted Crinja::Value array for a section's pages.
@@ -1829,23 +1856,14 @@ module Hwaro
 
           # Hidden variables for get_page/get_section/get_taxonomy functions
           # These are prefixed with __ to indicate they're internal
-          all_pages_array = [] of Crinja::Value
-          pages_by_path = {} of String => Crinja::Value
+          default_lang = config.default_language
+          all_pages_array = Array(Crinja::Value).new(site.pages.size)
+          pages_by_path = Hash(String, Crinja::Value).new
 
           site.pages.each do |p|
-            page_val = Crinja::Value.new({
-              "path"         => Crinja::Value.new(p.path),
-              "title"        => Crinja::Value.new(p.title),
-              "description"  => Crinja::Value.new(p.description || ""),
-              "url"          => Crinja::Value.new(p.url),
-              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-              "section"      => Crinja::Value.new(p.section),
-              "draft"        => Crinja::Value.new(p.draft),
-              "weight"       => Crinja::Value.new(p.weight),
-              "summary"      => Crinja::Value.new(p.effective_summary || ""),
-              "word_count"   => Crinja::Value.new(p.word_count),
-              "reading_time" => Crinja::Value.new(p.reading_time),
-            })
+            # Reuse cached per-page Crinja::Value to avoid redundant allocations
+            # (same cache is used by section page lists and paginator)
+            page_val = cached_page_crinja_value(p, default_lang)
             all_pages_array << page_val
 
             # Build O(1) lookup map
@@ -1867,11 +1885,8 @@ module Hwaro
 
           site.sections.each do |s|
             section_pages = s.pages.map do |sp|
-              Crinja::Value.new({
-                "title" => Crinja::Value.new(sp.title),
-                "url"   => Crinja::Value.new(sp.url),
-                "date"  => Crinja::Value.new(sp.date.try(&.to_s("%Y-%m-%d")) || ""),
-              })
+              # Reuse cached page values (contains title/url/date and more)
+              cached_page_crinja_value(sp, default_lang)
             end
             section_val = Crinja::Value.new({
               "path"        => Crinja::Value.new(s.path),
@@ -2017,7 +2032,16 @@ module Hwaro
           pagination_seo_links : String = "",
         ) : Hash(String, Crinja::Value)
           config = site.config
-          vars = {} of String => Crinja::Value
+
+          # Start from a dup of global_vars instead of building an empty hash
+          # and merge!'ing at the end.  This avoids incremental hash growth
+          # (0→8→16→32→64→128 rehashes) since the hash starts pre-sized.
+          # Page-specific vars are written on top, which is the desired behavior.
+          vars = if global_vars
+                   global_vars.dup
+                 else
+                   build_global_vars(site)
+                 end
 
           effective_url = page_url_override || page.url
 
@@ -2296,14 +2320,8 @@ module Hwaro
           vars["jsonld_breadcrumb"] = Crinja::Value.new(jsonld_breadcrumb)
           vars["jsonld"] = Crinja::Value.new(jsonld_all)
 
-          # NOTE: current_year/current_date/current_datetime are now in
-          # global_vars (computed once in build_global_vars).
-
-          if global_vars
-            vars.merge!(global_vars)
-          else
-            vars.merge!(build_global_vars(site))
-          end
+          # NOTE: global_vars are already included — vars was initialized from
+          # global_vars.dup at the top, so no merge! needed here.
 
           vars
         end
@@ -2312,10 +2330,18 @@ module Hwaro
           Utils::HtmlMinifier.minify(html)
         end
 
+        # Create directory only if not already created during this build.
+        # Avoids redundant mkdir_p syscalls (stat+mkdir) for large sites.
+        private def ensure_dir(dir : String)
+          return if @created_dirs.includes?(dir)
+          FileUtils.mkdir_p(dir)
+          @created_dirs << dir
+        end
+
         private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
           output_path = get_output_path(page, output_dir)
 
-          FileUtils.mkdir_p(Path[output_path].dirname)
+          ensure_dir(Path[output_path].dirname.to_s)
           File.write(output_path, content)
           Logger.action :create, output_path if verbose
         end
