@@ -1002,8 +1002,6 @@ module Hwaro
 title = "Documentation"
 +++
 
-# Welcome to the Documentation
-
 This documentation site is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
 
 ## Quick Links
@@ -1029,8 +1027,6 @@ CONTENT
 title = "Getting Started"
 +++
 
-# Getting Started
-
 Welcome to the Getting Started guide. This section will help you set up your first Hwaro documentation site.
 
 ## What You'll Learn
@@ -1047,8 +1043,6 @@ CONTENT
 +++
 title = "Installation"
 +++
-
-# Installation
 
 Learn how to install Hwaro on your system.
 
@@ -1085,8 +1079,6 @@ CONTENT
 +++
 title = "Quick Start"
 +++
-
-# Quick Start
 
 Get up and running with Hwaro in minutes.
 
@@ -1139,8 +1131,6 @@ CONTENT
 title = "Configuration"
 +++
 
-# Configuration
-
 Hwaro is configured through a `config.toml` file in your project root.
 
 ## Basic Configuration
@@ -1182,8 +1172,6 @@ CONTENT
 title = "Guide"
 +++
 
-# Guide
-
 This section contains in-depth guides for using Hwaro effectively.
 
 ## Topics
@@ -1201,8 +1189,6 @@ CONTENT
 +++
 title = "Content Management"
 +++
-
-# Content Management
 
 Learn how to organize and write content in Hwaro.
 
@@ -1263,8 +1249,6 @@ CONTENT
 title = "Templates"
 +++
 
-# Templates
-
 Hwaro uses Jinja2-compatible templates (via Crinja) for rendering pages.
 
 ## Template Directory
@@ -1320,8 +1304,6 @@ CONTENT
 +++
 title = "Shortcodes"
 +++
-
-# Shortcodes
 
 Shortcodes are reusable content snippets you can embed in your Markdown.
 
@@ -1386,8 +1368,6 @@ CONTENT
 title = "Reference"
 +++
 
-# Reference
-
 Technical reference documentation for Hwaro.
 
 ## Contents
@@ -1403,8 +1383,6 @@ CONTENT
 title = "CLI Commands"
 +++
 
-# CLI Commands
-
 Reference for all Hwaro command-line commands.
 
 ## hwaro init
@@ -1419,7 +1397,7 @@ hwaro init [path] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--scaffold TYPE` | Scaffold type: simple, blog, docs (default: simple) |
+| `--scaffold TYPE` | Scaffold type: simple, blog, blog-dark, docs, docs-dark (default: simple) |
 | `--force` | Overwrite existing files |
 | `--skip-sample-content` | Don't create sample content |
 
@@ -1428,7 +1406,9 @@ hwaro init [path] [options]
 ```bash
 hwaro init my-site
 hwaro init my-blog --scaffold blog
+hwaro init my-blog --scaffold blog-dark
 hwaro init my-docs --scaffold docs --force
+hwaro init my-docs --scaffold docs-dark
 ```
 
 ## hwaro build
@@ -1478,8 +1458,6 @@ CONTENT
 +++
 title = "Configuration Reference"
 +++
-
-# Configuration Reference
 
 Complete reference for `config.toml` options.
 

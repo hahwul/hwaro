@@ -3,9 +3,11 @@ module Hwaro
     module Options
       # Available scaffold types for project initialization
       enum ScaffoldType
-        Simple # Basic pages (current default)
-        Blog   # Blog-focused with posts, archives, tags
-        Docs   # Documentation-focused with sidebar, TOC
+        Simple   # Basic pages (current default)
+        Blog     # Blog-focused with posts, archives, tags
+        Docs     # Documentation-focused with sidebar, TOC
+        BlogDark # Blog-focused with dark theme
+        DocsDark # Documentation-focused with dark theme
 
         def self.from_string(value : String) : ScaffoldType
           case value.downcase
@@ -15,17 +17,23 @@ module Hwaro
             Blog
           when "docs"
             Docs
+          when "blog-dark"
+            BlogDark
+          when "docs-dark"
+            DocsDark
           else
-            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, blog, docs")
+            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, blog, blog-dark, docs, docs-dark")
           end
         end
 
         def to_s : String
           case self
-          when Simple then "simple"
-          when Blog   then "blog"
-          when Docs   then "docs"
-          else             "simple"
+          when Simple   then "simple"
+          when Blog     then "blog"
+          when Docs     then "docs"
+          when BlogDark then "blog-dark"
+          when DocsDark then "docs-dark"
+          else               "simple"
           end
         end
       end
