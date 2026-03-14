@@ -273,12 +273,12 @@ hwaro tool convert toYAML --json
 
 | Subcommand | Description |
 |------------|-------------|
-| convert | Convert frontmatter between YAML and TOML formats |
-| list | List content files by status (all, drafts, published) |
-| deadlink | Check for dead links in content files |
-| doctor | Diagnose config and content issues |
-| platform | Generate hosting platform config files (Netlify, Vercel, Cloudflare) |
-| ci | Generate CI/CD workflow files (GitHub Actions) |
+| [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
+| [list](/start/tools/list/) | List content files by status (all, drafts, published) |
+| [deadlink](/start/tools/deadlink/) | Check for dead links in content files |
+| [doctor](/start/tools/doctor/) | Diagnose config and content issues |
+| [platform](/start/tools/platform/) | Generate hosting platform config files (Netlify, Vercel, Cloudflare) |
+| [ci](/start/tools/ci/) | Generate CI/CD workflow files (GitHub Actions) |
 
 **Common Options:**
 

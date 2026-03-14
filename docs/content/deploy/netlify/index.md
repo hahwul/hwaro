@@ -88,6 +88,6 @@ Netlify automatically creates deploy previews for pull requests. Preview builds 
 
 ## See Also
 
-- [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
+- [Platform Config Generator](/start/tools/platform/) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
 - Other platforms: [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) | [GitHub Pages](/deploy/github-pages/)

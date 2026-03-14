@@ -78,6 +78,6 @@ Vercel automatically creates preview deployments for every push to non-productio
 
 ## See Also
 
-- [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
+- [Platform Config Generator](/start/tools/platform/) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
 - Other platforms: [Netlify](/deploy/netlify/) | [Cloudflare Pages](/deploy/cloudflare-pages/) | [GitHub Pages](/deploy/github-pages/)

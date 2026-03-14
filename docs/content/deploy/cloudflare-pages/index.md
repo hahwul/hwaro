@@ -97,6 +97,6 @@ Cloudflare Pages automatically creates preview deployments for every branch push
 
 ## See Also
 
-- [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
+- [Platform Config Generator](/start/tools/platform/) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
 - Other platforms: [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [GitHub Pages](/deploy/github-pages/)
