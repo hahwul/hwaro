@@ -10,6 +10,7 @@
 
 require "crinja"
 require "../../utils/logger"
+require "./builtin_shortcodes"
 
 module Hwaro
   module Core
@@ -104,7 +105,7 @@ module Hwaro
           crinja_env_override : Crinja? = nil,
         ) : String
           template_key = "shortcodes/#{name}"
-          template = templates[template_key]?
+          template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
 
           unless template
             Logger.warn "  [WARN] Shortcode template '#{template_key}' not found." if warn_missing

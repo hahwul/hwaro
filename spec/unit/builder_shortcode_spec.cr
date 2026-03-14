@@ -332,4 +332,124 @@ describe Hwaro::Core::Build::Builder do
       result.should contain("note")
     end
   end
+
+  describe "built-in shortcodes" do
+    it "renders youtube shortcode without user template" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ youtube(id="dQw4w9WgXcQ") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("youtube.com/embed/dQw4w9WgXcQ")
+      result.should contain("iframe")
+    end
+
+    it "renders vimeo shortcode without user template" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ vimeo(id="123456789") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("player.vimeo.com/video/123456789")
+    end
+
+    it "renders gist shortcode without user template" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ gist(user="octocat", id="abc123") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("gist.github.com/octocat/abc123.js")
+    end
+
+    it "renders gist shortcode with file parameter" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ gist(user="octocat", id="abc123", file="hello.rb") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("abc123.js?file=hello.rb")
+    end
+
+    it "renders alert shortcode as block" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({% alert(type="warning", title="Caution") %}Be careful!{% end %})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("sc-alert--warning")
+      result.should contain("Caution")
+      result.should contain("Be careful!")
+    end
+
+    it "renders callout shortcode as alias for alert" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({% callout(type="tip") %}A helpful tip{% end %})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("sc-alert--tip")
+      result.should contain("A helpful tip")
+    end
+
+    it "renders figure shortcode" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("sc-figure")
+      result.should contain(%(/img/photo.jpg))
+      result.should contain("My caption")
+    end
+
+    it "renders tweet shortcode" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ tweet(user="jack", id="20") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("twitter.com/jack/status/20")
+      result.should contain("twitter-tweet")
+    end
+
+    it "renders codepen shortcode" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ codepen(user="chriscoyier", id="gfdDu") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("codepen.io/chriscoyier/embed/gfdDu")
+    end
+
+    it "user template overrides built-in shortcode" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/youtube" => "<custom>{{ id }}</custom>"}
+      context = {} of String => Crinja::Value
+
+      content = %({{ youtube(id="test123") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<custom>test123</custom>")
+      result.should_not contain("iframe")
+    end
+  end
 end

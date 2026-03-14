@@ -21,7 +21,119 @@ Or explicitly:
 {%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
 ```
 
-## Creating Shortcodes
+## Built-in Shortcodes
+
+Hwaro ships with built-in shortcodes that work out of the box — no template files needed.
+
+### youtube
+
+Embed a YouTube video.
+
+```markdown
+{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}
+{{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `id` | (required) | YouTube video ID |
+| `width` | `560` | Player width |
+| `height` | `315` | Player height |
+| `title` | `YouTube Video` | Accessible title |
+
+### vimeo
+
+Embed a Vimeo video.
+
+```markdown
+{%raw%}{{ vimeo(id="123456789") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `id` | (required) | Vimeo video ID |
+| `width` | `560` | Player width |
+| `height` | `315` | Player height |
+| `title` | `Vimeo Video` | Accessible title |
+
+### gist
+
+Embed a GitHub Gist.
+
+```markdown
+{%raw%}{{ gist(user="octocat", id="abc123") }}
+{{ gist(user="octocat", id="abc123", file="hello.rb") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `user` | (required) | GitHub username |
+| `id` | (required) | Gist ID |
+| `file` | (none) | Specific file to show |
+
+### alert / callout
+
+Display an alert box. Use as a block shortcode to wrap content.
+
+```markdown
+{%raw%}{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
+{% callout(type="tip") %}Here is a helpful tip.{% end %}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `type` | `info` | `info`, `warning`, `danger`, `tip`, `success` |
+| `title` | (none) | Optional title |
+
+### figure
+
+Image with optional caption.
+
+```markdown
+{%raw%}{{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `src` | (required) | Image URL |
+| `alt` | `""` | Alt text |
+| `caption` | (none) | Caption below image |
+| `width` | (none) | Image width |
+| `height` | (none) | Image height |
+
+### tweet
+
+Embed a tweet.
+
+```markdown
+{%raw%}{{ tweet(user="jack", id="20") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `user` | (required) | Twitter username |
+| `id` | (required) | Tweet ID |
+
+### codepen
+
+Embed a CodePen.
+
+```markdown
+{%raw%}{{ codepen(user="chriscoyier", id="gfdDu") }}
+{{ codepen(user="chriscoyier", id="gfdDu", tab="css,result", height="400") }}{%endraw%}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `user` | (required) | CodePen username |
+| `id` | (required) | Pen ID |
+| `tab` | `result` | Default tab(s) |
+| `height` | `300` | Embed height |
+| `title` | `CodePen Embed` | Accessible title |
+
+> To override any built-in shortcode, create a file with the same name in `templates/shortcodes/` (e.g., `templates/shortcodes/youtube.html`). User templates always take priority.
+
+## Creating Custom Shortcodes
 
 Shortcode templates live in `templates/shortcodes/`.
 
