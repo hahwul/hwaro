@@ -93,6 +93,7 @@ module Hwaro
         @enabled : Bool
         @cache_path : String
         @metadata : CacheMetadata
+        @mutex : Mutex
 
         # Current build's global checksums — set via set_global_checksums
         @current_template_hash : String = ""
@@ -101,6 +102,7 @@ module Hwaro
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
           @entries = {} of String => CacheEntry
           @metadata = CacheMetadata.new
+          @mutex = Mutex.new
           load if @enabled
         end
 
@@ -168,7 +170,8 @@ module Hwaro
           files.select { |f| changed?(f) }
         end
 
-        # Update cache entry for a file
+        # Update cache entry for a file.
+        # Thread-safe: protected by mutex for concurrent parallel builds.
         def update(file_path : String, output_path : String = "")
           return unless @enabled
           return unless File.exists?(file_path)
@@ -176,7 +179,7 @@ module Hwaro
           begin
             mtime = File.info(file_path).modification_time.to_unix_ms
 
-            # Reuse existing entry if mtime hasn't changed
+            # Compute hash outside the lock to minimize contention
             existing = @entries[file_path]?
             if existing && existing.mtime == mtime && existing.output_path == output_path
               return
@@ -184,7 +187,7 @@ module Hwaro
 
             content_hash = compute_file_hash(file_path)
 
-            @entries[file_path] = CacheEntry.new(
+            entry = CacheEntry.new(
               path: file_path,
               mtime: mtime,
               hash: content_hash,
@@ -192,6 +195,10 @@ module Hwaro
               template_hash: @current_template_hash,
               config_hash: @current_config_hash,
             )
+
+            @mutex.synchronize do
+              @entries[file_path] = entry
+            end
           rescue ex
             Logger.debug "Cache: failed to update entry for #{file_path}: #{ex.message}"
           end
@@ -199,7 +206,9 @@ module Hwaro
 
         # Remove entry from cache
         def invalidate(file_path : String)
-          @entries.delete(file_path)
+          @mutex.synchronize do
+            @entries.delete(file_path)
+          end
         end
 
         # Clear all cache entries
@@ -216,7 +225,7 @@ module Hwaro
             data = CacheData.new(metadata: @metadata, entries: @entries.values)
             File.write(@cache_path, data.to_json)
           rescue ex
-            Logger.debug "Cache: failed to save cache file: #{ex.message}"
+            Logger.warn "Cache: failed to save cache file: #{ex.message}"
           end
         end
 

@@ -8,6 +8,11 @@
 # - Collapse whitespace
 # - Remove whitespace around structural characters
 # - Strip trailing semicolons before }
+# - Preserve url() contents and string literals
+#
+# Processing order is critical: strings and urls are extracted first
+# so that comment removal and whitespace rules cannot damage their
+# contents (e.g. "/* not a comment */" or url(http://example.com)).
 
 module Hwaro
   module Utils
@@ -17,22 +22,49 @@ module Hwaro
       # Perform conservative CSS minification
       def minify(css : String) : String
         result = css
+        preserves = [] of String
+        placeholder_prefix = "\x00PRESERVE_"
 
-        # Remove comments
+        # ── Step 1: Extract url() contents FIRST ─────────────────────────
+        # Must run before string extraction, because url('...') contains
+        # quotes that would otherwise be captured as standalone strings.
+        result = result.gsub(/url\(\s*(['"]?)(.+?)\1\s*\)/m) do |_match|
+          quote = $1
+          inner = $2
+          idx = preserves.size
+          preserves << "url(#{quote}#{inner}#{quote})"
+          "#{placeholder_prefix}#{idx}\x00"
+        end
+
+        # ── Step 2: Extract remaining string literals ─────────────────────
+        # Prevents comment-like patterns inside strings from being stripped.
+        # e.g. content: "/* not a comment */"
+        result = result.gsub(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/m) do |match|
+          idx = preserves.size
+          preserves << match
+          "#{placeholder_prefix}#{idx}\x00"
+        end
+
+        # ── Step 3: Remove comments (safe now — strings/urls are protected) ─
         result = result.gsub(/\/\*.*?\*\//m, "")
 
-        # Collapse whitespace (newlines, tabs, multiple spaces → single space)
+        # ── Step 4: Collapse whitespace ───────────────────────────────────
         result = result.gsub(/\s+/, " ")
 
-        # Remove space around structural characters
+        # ── Step 5: Remove space around structural characters ─────────────
         result = result.gsub(/\s*\{\s*/, "{")
         result = result.gsub(/\s*\}\s*/, "}")
         result = result.gsub(/\s*:\s*/, ":")
         result = result.gsub(/\s*;\s*/, ";")
         result = result.gsub(/\s*,\s*/, ",")
 
-        # Strip trailing semicolons before }
+        # ── Step 6: Strip trailing semicolons before } ────────────────────
         result = result.gsub(/;\}/, "}")
+
+        # ── Step 7: Restore preserved tokens ──────────────────────────────
+        preserves.each_with_index do |original, idx|
+          result = result.gsub("#{placeholder_prefix}#{idx}\x00", original)
+        end
 
         result.strip
       end
