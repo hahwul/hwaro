@@ -28,6 +28,11 @@ module Hwaro
               long: "--stdout",
               description: "Print to stdout instead of writing file"
             ),
+            FlagInfo.new(
+              short: "-f",
+              long: "--force",
+              description: "Overwrite existing file without warning"
+            ),
             HELP_FLAG,
           ]
 
@@ -45,11 +50,13 @@ module Hwaro
             platform : String? = nil
             output_path : String? = nil
             stdout_mode = false
+            force = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool platform <netlify|vercel|cloudflare> [options]"
               parser.on("-o PATH", "--output PATH", "Output file path") { |p| output_path = p }
               parser.on("--stdout", "Print to stdout instead of writing file") { stdout_mode = true }
+              parser.on("-f", "--force", "Overwrite existing file without warning") { force = true }
               parser.on("-h", "--help", "Show this help") do
                 Logger.info parser.to_s
                 Logger.info ""
@@ -77,6 +84,10 @@ module Hwaro
               exit(1)
             end
 
+            unless File.exists?("config.toml")
+              Logger.warn "config.toml not found. Running outside a Hwaro project directory?"
+            end
+
             config = Models::Config.load
             generator = Services::PlatformConfig.new(config)
             content = generator.generate(platform_name)
@@ -85,6 +96,11 @@ module Hwaro
             if stdout_mode
               puts content
             else
+              if File.exists?(filename) && !force
+                Logger.warn "#{filename} already exists. Use --force to overwrite."
+                exit(1)
+              end
+
               File.write(filename, content)
               Logger.success "Generated #{filename}"
             end

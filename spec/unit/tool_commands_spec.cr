@@ -220,6 +220,11 @@ describe Hwaro::CLI::Commands::Tool::PlatformCommand do
       meta.flags.any? { |f| f.long == "--stdout" }.should be_true
     end
 
+    it "includes force flag" do
+      meta = Hwaro::CLI::Commands::Tool::PlatformCommand.metadata
+      meta.flags.any? { |f| f.long == "--force" }.should be_true
+    end
+
     it "includes help flag" do
       meta = Hwaro::CLI::Commands::Tool::PlatformCommand.metadata
       meta.flags.any? { |f| f.long == "--help" }.should be_true

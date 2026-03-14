@@ -26,10 +26,13 @@ hwaro tool ci github-actions
 Or create `.github/workflows/deploy.yml` manually:
 
 ```yaml
-name: Deploy to GitHub Pages
+---
+name: Hwaro CI/CD
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -39,7 +42,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/main'
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -51,7 +54,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -101,12 +104,38 @@ base_url = "https://username.github.io/repo"
 
 ## Method 2: Deploy via `hwaro deploy`
 
-Add a GitHub Pages target to `config.toml`:
+Create a deploy script `scripts/deploy-ghpages.sh`:
+
+```bash
+#!/bin/bash
+set -e
+
+SOURCE_DIR="${1:?Usage: deploy-ghpages.sh <source-dir>}"
+REMOTE_URL=$(git remote get-url origin)
+TMPDIR=$(mktemp -d)
+
+cp -r "$SOURCE_DIR"/. "$TMPDIR"
+touch "$TMPDIR/.nojekyll"
+
+cd "$TMPDIR"
+git init -b gh-pages
+git add -A
+git commit -m "Deploy to GitHub Pages"
+git push --force "$REMOTE_URL" gh-pages
+
+rm -rf "$TMPDIR"
+```
+
+```bash
+chmod +x scripts/deploy-ghpages.sh
+```
+
+Add the target to `config.toml`:
 
 ```toml
 [[deployment.targets]]
 name = "github-pages"
-command = "cd {source} && touch .nojekyll && git init -b gh-pages && git add -A && git commit -m 'Deploy' && git push --force $(git -C $(pwd)/.. remote get-url origin) gh-pages"
+command = "scripts/deploy-ghpages.sh {source}"
 ```
 
 Then build and deploy:
