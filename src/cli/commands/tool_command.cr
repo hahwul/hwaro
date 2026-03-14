@@ -10,6 +10,7 @@
 #   deadlink - Check for dead links
 #   doctor   - Diagnose config and content issues
 #   platform - Generate hosting platform config files
+#   ci       - Generate CI/CD workflow files
 
 require "option_parser"
 require "../metadata"
@@ -18,6 +19,7 @@ require "./tool/list_command"
 require "./tool/deadlink_command"
 require "./tool/doctor_command"
 require "./tool/platform_command"
+require "./tool/ci_command"
 require "../../utils/logger"
 
 module Hwaro
@@ -42,6 +44,7 @@ module Hwaro
             Tool::DeadlinkCommand.metadata,
             Tool::DoctorCommand.metadata,
             Tool::PlatformCommand.metadata,
+            Tool::CICommand.metadata,
           ]
         end
 
@@ -75,6 +78,8 @@ module Hwaro
             Tool::DoctorCommand.new.run(args)
           when "platform"
             Tool::PlatformCommand.new.run(args)
+          when "ci"
+            Tool::CICommand.new.run(args)
           when "-h", "--help", "help"
             print_help
           else

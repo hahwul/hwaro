@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 5 subcommands" do
+    it "returns 6 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(5)
+      subs.size.should eq(6)
     end
 
     it "includes convert subcommand" do
@@ -48,6 +48,11 @@ describe Hwaro::CLI::Commands::ToolCommand do
     it "includes platform subcommand" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
       subs.any? { |s| s.name == "platform" }.should be_true
+    end
+
+    it "includes ci subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "ci" }.should be_true
     end
   end
 end
@@ -236,6 +241,50 @@ describe Hwaro::CLI::Commands::Tool::PlatformCommand do
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_true
       flag.not_nil!.value_hint.should eq("PATH")
+    end
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::CICommand do
+  describe ".metadata" do
+    it "returns correct command name" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.name.should eq("ci")
+    end
+
+    it "returns a description" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.description.should_not be_empty
+    end
+
+    it "includes output flag" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.flags.any? { |f| f.long == "--output" }.should be_true
+    end
+
+    it "includes stdout flag" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.flags.any? { |f| f.long == "--stdout" }.should be_true
+    end
+
+    it "includes force flag" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.flags.any? { |f| f.long == "--force" }.should be_true
+    end
+
+    it "includes help flag" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.flags.any? { |f| f.long == "--help" }.should be_true
+    end
+
+    it "has provider as positional arg" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.positional_args.should eq(["provider"])
+    end
+
+    it "has github-actions as positional choice" do
+      meta = Hwaro::CLI::Commands::Tool::CICommand.metadata
+      meta.positional_choices.should eq(["github-actions"])
     end
   end
 end

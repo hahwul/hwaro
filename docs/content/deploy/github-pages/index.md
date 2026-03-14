@@ -17,7 +17,13 @@ Use the official [`hahwul/hwaro`](https://github.com/hahwul/hwaro) action to bui
 
 ### Create Workflow
 
-Create `.github/workflows/deploy.yml`:
+You can auto-generate the workflow file using:
+
+```bash
+hwaro tool ci github-actions
+```
+
+Or create `.github/workflows/deploy.yml` manually:
 
 ```yaml
 name: Deploy to GitHub Pages

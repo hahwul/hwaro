@@ -260,6 +260,7 @@ hwaro tool doctor               # Diagnose config and content issues
 hwaro tool platform netlify     # Generate Netlify config
 hwaro tool platform vercel      # Generate Vercel config
 hwaro tool platform cloudflare  # Generate Cloudflare Pages config
+hwaro tool ci github-actions    # Generate GitHub Actions workflow
 
 # JSON output
 hwaro tool list all --json
@@ -277,6 +278,7 @@ hwaro tool convert toYAML --json
 | deadlink | Check for dead links in content files |
 | doctor | Diagnose config and content issues |
 | platform | Generate hosting platform config files (Netlify, Vercel, Cloudflare) |
+| ci | Generate CI/CD workflow files (GitHub Actions) |
 
 **Common Options:**
 
