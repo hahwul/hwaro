@@ -1,7 +1,7 @@
 +++
 title = "Netlify"
 description = "Deploy your Hwaro site to Netlify"
-weight = 4
+weight = 5
 +++
 
 Deploy your Hwaro site to Netlify with automatic builds and global CDN.
@@ -77,14 +77,17 @@ base_url = "https://www.yourdomain.com"
 
 ## Deploy Previews
 
-Netlify automatically creates deploy previews for pull requests. Override the base URL for previews using a deploy context:
+Netlify automatically creates deploy previews for pull requests. Preview builds use a temporary URL, so override the base URL using a deploy context:
 
 ```toml
 [context.deploy-preview]
   command = "hwaro build --base-url $DEPLOY_PRIME_URL"
 ```
 
+`$DEPLOY_PRIME_URL` is a Netlify-provided environment variable containing the unique preview URL (e.g., `https://deploy-preview-42--your-site.netlify.app`).
+
 ## See Also
 
 - [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
+- Other platforms: [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) | [GitHub Pages](/deploy/github-pages/)

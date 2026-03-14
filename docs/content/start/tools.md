@@ -358,13 +358,14 @@ hwaro tool platform vercel --stdout
 |------|-------------|
 | -o, --output PATH | Output file path (default: auto-detected) |
 | --stdout | Print to stdout instead of writing file |
+| -f, --force | Overwrite existing file without warning |
 | -h, --help | Show help |
 
 **Generated config includes:**
 
 - **Build command**: `hwaro build`
 - **Output directory**: `public/`
-- **Redirects**: 301 redirects from page `aliases` in frontmatter
+- **Redirects**: 301 redirects from page [`aliases`](/writing/) defined in frontmatter (e.g., `aliases: ["/old-url/"]`)
 - **Cache headers**: Long-lived caching for static assets
 
 **Example — Netlify output:**
@@ -442,6 +443,7 @@ hwaro tool ci github-actions --stdout
 |------|-------------|
 | -o, --output PATH | Output file path (default: auto-detected) |
 | --stdout | Print to stdout instead of writing file |
+| -f, --force | Overwrite existing file without warning |
 | -h, --help | Show help |
 
 **Generated workflow includes:**

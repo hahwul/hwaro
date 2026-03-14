@@ -1,7 +1,7 @@
 +++
 title = "Cloudflare Pages"
 description = "Deploy your Hwaro site to Cloudflare Pages"
-weight = 6
+weight = 7
 +++
 
 Deploy your Hwaro site to Cloudflare Pages for fast global delivery.
@@ -52,7 +52,7 @@ Or create `wrangler.toml`:
 
 ```toml
 name = "my-site"
-compatibility_date = "2026-03-14"
+compatibility_date = "2024-01-01" # Use current date when deploying
 
 [site]
   bucket = "./public"
@@ -60,14 +60,25 @@ compatibility_date = "2026-03-14"
 
 ## Redirects
 
-Cloudflare Pages uses a `_redirects` file in the output directory. After building, create `static/_redirects` with your redirect rules:
+Cloudflare Pages uses a `_redirects` file in the output directory. Create `static/_redirects` with redirect rules for your page aliases:
 
 ```
 /old-url/ /posts/new-post/ 301
 /legacy/post/ /posts/new-post/ 301
 ```
 
-When using `hwaro tool platform cloudflare`, the generated config includes comments listing the redirects from your content aliases for easy reference.
+Aliases are defined in page frontmatter:
+
+```markdown
+---
+title: New Post
+aliases:
+  - /old-url/
+  - /legacy/post/
+---
+```
+
+When using `hwaro tool platform cloudflare`, the generated `wrangler.toml` includes comments listing these redirects so you can copy them into `static/_redirects`.
 
 ## Custom Domain
 
@@ -88,3 +99,4 @@ Cloudflare Pages automatically creates preview deployments for every branch push
 
 - [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
+- Other platforms: [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [GitHub Pages](/deploy/github-pages/)

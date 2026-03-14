@@ -1,7 +1,7 @@
 +++
 title = "Vercel"
 description = "Deploy your Hwaro site to Vercel"
-weight = 5
+weight = 6
 +++
 
 Deploy your Hwaro site to Vercel with zero-config deployments.
@@ -80,3 +80,4 @@ Vercel automatically creates preview deployments for every push to non-productio
 
 - [Tools — Platform Config Generator](/start/tools/#platform--platform-config-generator) — Detailed generator options
 - [CLI Reference](/start/cli/#tool) — All tool commands
+- Other platforms: [Netlify](/deploy/netlify/) | [Cloudflare Pages](/deploy/cloudflare-pages/) | [GitHub Pages](/deploy/github-pages/)
