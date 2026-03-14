@@ -45,6 +45,10 @@ module Hwaro
           sections = []   # Optional: e.g. ["blog"]
           default_language_only = true  # true: main feed = default language only, false: all languages
 
+          # Series
+          [series]
+          enabled = true
+
           # Related Posts
           [related]
           enabled = true
@@ -134,6 +138,10 @@ module Hwaro
           limit = 10
           sections = []   # Optional: e.g. ["blog"]
           default_language_only = true  # true: main feed = default language only, false: all languages
+
+          # Series
+          [series]
+          enabled = true
 
           # Related Posts
           [related]
@@ -236,6 +244,9 @@ module Hwaro
             str << "limit = 10\n"
             str << "sections = []   # Optional: e.g. [\"blog\"]\n"
             str << "default_language_only = true  # true: main feed = default language only, false: all languages\n\n"
+            str << "# Series\n"
+            str << "[series]\n"
+            str << "enabled = true\n\n"
             str << "# Related Posts\n"
             str << "[related]\n"
             str << "enabled = true\n"

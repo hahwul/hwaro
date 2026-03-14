@@ -98,6 +98,15 @@ module Hwaro
       end
     end
 
+    # Series configuration
+    class SeriesConfig
+      property enabled : Bool
+
+      def initialize
+        @enabled = false
+      end
+    end
+
     # Related posts configuration
     class RelatedConfig
       property enabled : Bool
@@ -477,6 +486,7 @@ module Hwaro
       property languages : Hash(String, LanguageConfig)
       property build : BuildConfig
       property markdown : MarkdownConfig
+      property series : SeriesConfig
       property related : RelatedConfig
       property deployment : DeploymentConfig
       property permalinks : Hash(String, String)
@@ -502,6 +512,7 @@ module Hwaro
         @languages = {} of String => LanguageConfig
         @build = BuildConfig.new
         @markdown = MarkdownConfig.new
+        @series = SeriesConfig.new
         @related = RelatedConfig.new
         @deployment = DeploymentConfig.new
         @permalinks = {} of String => String
@@ -550,6 +561,7 @@ module Hwaro
         load_languages(config)
         load_build(config)
         load_markdown(config)
+        load_series(config)
         load_related(config)
         load_permalinks(config)
         load_deployment(config)
@@ -801,6 +813,12 @@ module Hwaro
         if engine = s["math_engine"]?.try(&.as_s?)
           config.markdown.math_engine = engine
         end
+      end
+
+      private def self.load_series(config : Config)
+        return unless s = config.raw["series"]?.try(&.as_h?)
+
+        config.series.enabled = bool_value(s["enabled"]?, config.series.enabled)
       end
 
       private def self.load_related(config : Config)

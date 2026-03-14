@@ -428,6 +428,22 @@ module Hwaro
           TOML
         end
 
+        protected def series_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Series
+          # =============================================================================
+          # Group posts into ordered series for sequential reading.
+          # Use `series = "Series Name"` in front matter to assign posts.
+          # Use `series_weight = 1` to control ordering within a series.
+
+          [series]
+          enabled = true
+
+          TOML
+        end
+
         protected def related_config : String
           <<-TOML
 

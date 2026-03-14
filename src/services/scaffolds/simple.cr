@@ -61,6 +61,7 @@ module Hwaro
             str << og_config
             str << search_config
             str << pagination_config
+            str << series_config
             str << related_config
             str << taxonomies_config unless skip_taxonomies
 

@@ -245,6 +245,50 @@ per_page = 10
 
 See [Pagination](/features/pagination/) for section-level configuration and template usage.
 
+## Series
+
+Group posts into ordered series for sequential reading.
+
+```toml
+[series]
+enabled = true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable series grouping |
+
+In front matter, assign a series name and optional ordering weight:
+
+```toml
++++
+title = "Part 1: Getting Started"
+series = "Crystal Tutorial"
+series_weight = 1
++++
+```
+
+Pages with the same `series` value are grouped together, sorted by `series_weight` (then `date`, then `title`).
+
+Use in templates:
+
+```jinja
+{% if page.series %}
+<nav class="series-nav">
+  <h4>{{ page.series }} (Part {{ page.series_index }} of {{ page.series_pages | length }})</h4>
+  <ol>
+  {% for part in page.series_pages %}
+    <li{% if part.series_index == page.series_index %} class="current"{% endif %}>
+      <a href="{{ part.url }}">{{ part.title }}</a>
+    </li>
+  {% endfor %}
+  </ol>
+</nav>
+{% endif %}
+```
+
+Each series page exposes: `title`, `url`, `description`, `date`, `series_index`.
+
 ## Related Posts
 
 Recommend related content based on shared taxonomy terms.
@@ -438,6 +482,9 @@ priority = 0.5
 [pagination]
 enabled = false
 per_page = 10
+
+[series]
+enabled = true
 
 [related]
 enabled = true

@@ -537,6 +537,9 @@ module Hwaro
 
           aggregate_site_authors(site)
 
+          # Compute series groupings
+          compute_series(site) if site.config.series.enabled
+
           # Compute related posts based on taxonomy similarity
           compute_related_posts(site) if site.config.related.enabled
 
@@ -877,6 +880,30 @@ module Hwaro
           end
         end
 
+        # Group pages by series name and assign series_index, series_pages.
+        # Pages within a series are sorted by series_weight, then date, then title.
+        private def compute_series(site : Models::Site)
+          groups = {} of String => Array(Models::Page)
+
+          site.pages.each do |page|
+            next if page.draft || !page.render
+            if name = page.series
+              (groups[name] ||= [] of Models::Page) << page
+            end
+          end
+
+          groups.each do |_name, pages|
+            sorted = pages.sort_by do |p|
+              {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
+            end
+
+            sorted.each_with_index do |page, idx|
+              page.series_index = idx + 1
+              page.series_pages = sorted
+            end
+          end
+        end
+
         # Compute related posts for each page based on shared taxonomy terms.
         # Pages with more shared terms are ranked higher.
         private def compute_related_posts(site : Models::Site)
@@ -994,6 +1021,10 @@ module Hwaro
           page.in_search_index = data[:in_search_index]
           page.insert_anchor_links = data[:insert_anchor_links]
           page.weight = data[:weight]
+
+          # Series support
+          page.series = data[:series]
+          page.series_weight = data[:series_weight]
 
           # Redirect support — applies to both regular pages and sections
           page.redirect_to = data[:redirect_to]
@@ -2200,6 +2231,17 @@ module Hwaro
             "lower"           => lower_obj ? Crinja::Value.new(lower_obj) : Crinja::Value.new(nil),
             "higher"          => higher_obj ? Crinja::Value.new(higher_obj) : Crinja::Value.new(nil),
             "ancestors"       => Crinja::Value.new(ancestors_array),
+            "series"          => Crinja::Value.new(page.series || ""),
+            "series_index"    => Crinja::Value.new(page.series_index),
+            "series_pages"    => Crinja::Value.new(page.series_pages.map { |sp|
+              Crinja::Value.new({
+                "title"        => Crinja::Value.new(sp.title),
+                "url"          => Crinja::Value.new(sp.url),
+                "description"  => Crinja::Value.new(sp.description || ""),
+                "date"         => Crinja::Value.new(sp.date.try(&.to_s("%Y-%m-%d")) || ""),
+                "series_index" => Crinja::Value.new(sp.series_index),
+              })
+            }),
             "related_posts"   => Crinja::Value.new(page.related_posts.map { |rp|
               Crinja::Value.new({
                 "title"       => Crinja::Value.new(rp.title),

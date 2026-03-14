@@ -49,6 +49,7 @@ module Hwaro
           "transparent", "generate_feeds", "paginate", "pagination_enabled",
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
+          "series", "series_weight",
         }
 
         def name : String
@@ -155,6 +156,8 @@ module Hwaro
               paginate_path:       result[:paginate_path],
               redirect_to:         result[:redirect_to],
               weight:              result[:weight],
+              series:              result[:series],
+              series_weight:       result[:series_weight],
             }
           else
             # No front matter found — return defaults
@@ -190,6 +193,8 @@ module Hwaro
               paginate_path:       "page",
               redirect_to:         nil.as(String?),
               weight:              0,
+              series:              nil.as(String?),
+              series_weight:       0,
             }
           end
         end
@@ -315,6 +320,8 @@ module Hwaro
             paginate_path:       fm_string(fm, "paginate_path", "page"),
             redirect_to:         fm["redirect_to"]?.try(&.as_s?),
             weight:              fm_int?(fm, "weight") || 0,
+            series:              fm["series"]?.try(&.as_s?),
+            series_weight:       fm_int?(fm, "series_weight") || 0,
             front_matter_keys:   front_matter_keys,
             taxonomies:          taxonomies,
             tags:                tags,

@@ -85,6 +85,12 @@ module Hwaro
       # New: Ancestors - parent sections chain
       property ancestors : Array(Page)
 
+      # New: Series support
+      property series : String?
+      property series_weight : Int32
+      property series_index : Int32
+      property series_pages : Array(Page)
+
       # New: Related posts (computed by taxonomy similarity)
       property related_posts : Array(Page)
 
@@ -127,6 +133,10 @@ module Hwaro
         @lower = nil
         @higher = nil
         @ancestors = [] of Page
+        @series = nil
+        @series_weight = 0
+        @series_index = 0
+        @series_pages = [] of Page
         @related_posts = [] of Page
         @redirect_to = nil
         @build_warnings = [] of String
