@@ -495,6 +495,33 @@ module Hwaro
       end
     end
 
+    # PWA (Progressive Web App) configuration
+    class PwaConfig
+      property enabled : Bool
+      property name : String?
+      property short_name : String?
+      property theme_color : String
+      property background_color : String
+      property display : String
+      property start_url : String
+      property icons : Array(String)
+      property offline_page : String?
+      property precache_urls : Array(String)
+
+      def initialize
+        @enabled = false
+        @name = nil
+        @short_name = nil
+        @theme_color = "#ffffff"
+        @background_color = "#ffffff"
+        @display = "standalone"
+        @start_url = "/"
+        @icons = [] of String
+        @offline_page = nil
+        @precache_urls = [] of String
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -519,6 +546,7 @@ module Hwaro
       property related : RelatedConfig
       property deployment : DeploymentConfig
       property assets : AssetsConfig
+      property pwa : PwaConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
 
@@ -546,6 +574,7 @@ module Hwaro
         @related = RelatedConfig.new
         @deployment = DeploymentConfig.new
         @assets = AssetsConfig.new
+        @pwa = PwaConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -614,6 +643,7 @@ module Hwaro
         load_related(config)
         load_permalinks(config)
         load_assets(config)
+        load_pwa(config)
         load_deployment(config)
 
         config
@@ -937,6 +967,25 @@ module Hwaro
 
             config.assets.bundles << AssetBundleConfig.new(name: name, files: files)
           end
+        end
+      end
+
+      private def self.load_pwa(config : Config)
+        return unless s = config.raw["pwa"]?.try(&.as_h?)
+
+        config.pwa.enabled = bool_value(s["enabled"]?, config.pwa.enabled)
+        config.pwa.name = s["name"]?.try(&.as_s?)
+        config.pwa.short_name = s["short_name"]?.try(&.as_s?)
+        config.pwa.theme_color = s["theme_color"]?.try(&.as_s?) || config.pwa.theme_color
+        config.pwa.background_color = s["background_color"]?.try(&.as_s?) || config.pwa.background_color
+        config.pwa.display = s["display"]?.try(&.as_s?) || config.pwa.display
+        config.pwa.start_url = s["start_url"]?.try(&.as_s?) || config.pwa.start_url
+        config.pwa.offline_page = s["offline_page"]?.try(&.as_s?)
+        if icons = s["icons"]?.try(&.as_a?)
+          config.pwa.icons = icons.compact_map(&.as_s?)
+        end
+        if precache = s["precache_urls"]?.try(&.as_a?)
+          config.pwa.precache_urls = precache.compact_map(&.as_s?)
         end
       end
 

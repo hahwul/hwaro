@@ -23,3 +23,4 @@ Hwaro includes powerful features out of the box.
 - [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers
 - [Environment Variables](/features/env-variables/) — Reference environment variables in config and templates
 - [Environment-Specific Config](/features/env-config/) — Override config settings per deployment environment
+- [PWA](/features/pwa/) — Progressive Web App support with manifest.json and service worker

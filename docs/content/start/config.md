@@ -204,6 +204,37 @@ fb_app_id = "your_fb_app_id"
 
 See [SEO](/features/seo/) for template usage and output examples.
 
+## PWA
+
+Generate Progressive Web App files for offline access and installability:
+
+```toml
+[pwa]
+enabled = true
+name = "My Site"
+short_name = "Site"
+theme_color = "#ffffff"
+background_color = "#ffffff"
+display = "standalone"
+start_url = "/"
+icons = ["static/icon-192.png", "static/icon-512.png"]
+offline_page = "/offline.html"
+precache_urls = ["/", "/about/", "/css/main.css"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate PWA files (manifest.json, sw.js) |
+| name | string | site title | Full app name |
+| short_name | string | name or site title | Short app name (shown on home screen) |
+| theme_color | string | "#ffffff" | Browser toolbar color |
+| background_color | string | "#ffffff" | Splash screen background |
+| display | string | "standalone" | Display mode (`standalone`, `fullscreen`, `minimal-ui`, `browser`) |
+| start_url | string | "/" | Start URL when app launches |
+| icons | array | [] | Icon file paths (sizes extracted from filenames, e.g. `icon-192.png`) |
+| offline_page | string | — | Page to show when offline |
+| precache_urls | array | [] | URLs to cache on install |
+
 ## LLMs.txt
 
 Generate instruction files for AI/LLM crawlers:
