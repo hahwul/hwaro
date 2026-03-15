@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Optional markdown extensions beyond standard CommonMark">
+  <title>Markdown Extensions - Hwaro</title>
+  <meta property="og:title" content="Markdown Extensions">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/features/markdown-extensions/">
+<meta property="og:description" content="Optional markdown extensions beyond standard CommonMark">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Markdown Extensions">
+<meta name="twitter:description" content="Optional markdown extensions beyond standard CommonMark">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/02-base.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/03-layout.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/04-content.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/05-components.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/06-responsive.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/07-landing.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css?v=a11e5b22">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/" class="active">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/start/">Overview</a></li>
+      
+      <li><a href="/start/installation/">Installation</a></li>
+      
+      <li><a href="/start/first-site/">First Site</a></li>
+      
+      <li><a href="/start/cli/">CLI</a></li>
+      
+      <li><a href="/start/config/">Configuration</a></li>
+      
+      <li><a href="/start/tools/">Tools & Completion</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/writing/">Overview</a></li>
+      
+      <li><a href="/writing/pages/">Pages</a></li>
+      
+      <li><a href="/writing/sections/">Sections</a></li>
+      
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/templates/">Overview</a></li>
+      
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      
+      <li><a href="/templates/functions/">Functions</a></li>
+      
+      <li><a href="/templates/filters/">Filters</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/features/">Overview</a></li>
+      
+      <li><a href="/features/seo/">SEO</a></li>
+      
+      <li><a href="/features/search/">Search</a></li>
+      
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      
+      <li><a href="/features/pagination/">Pagination</a></li>
+      
+      <li><a href="/features/multilingual/">Multilingual</a></li>
+      
+      <li><a href="/features/auto-includes/">Auto Includes</a></li>
+      
+      <li><a href="/features/content-files/">Content Files</a></li>
+      
+      <li><a href="/features/build-hooks/">Build Hooks</a></li>
+      
+      <li><a href="/features/incremental-build/">Incremental Build</a></li>
+      
+      <li><a href="/features/streaming-build/">Streaming Build</a></li>
+      
+      <li><a href="/features/asset-pipeline/">Asset Pipeline</a></li>
+      
+      <li><a href="/features/llms-txt/">LLMs.txt</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/deploy/">Overview</a></li>
+      
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      <li><a href="/deploy/docker/">Docker</a></li>
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Markdown Extensions</h1>
+    <p>Hwaro supports optional markdown extensions beyond standard CommonMark. Each extension is disabled by default and can be enabled in <code>config.toml</code>.</p>
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml hljs">[markdown]
+task_lists = true
+definition_lists = true
+footnotes = true
+math = true
+math_engine = &quot;katex&quot;
+mermaid = true
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>task_lists</td>
+<td>bool</td>
+<td>false</td>
+<td>Checkbox lists (<code>- [ ]</code> / <code>- [x]</code>)</td>
+</tr>
+<tr>
+<td>definition_lists</td>
+<td>bool</td>
+<td>false</td>
+<td>Definition lists (<code>Term\n: Definition</code>)</td>
+</tr>
+<tr>
+<td>footnotes</td>
+<td>bool</td>
+<td>false</td>
+<td>Footnotes (<code>[^1]</code>)</td>
+</tr>
+<tr>
+<td>math</td>
+<td>bool</td>
+<td>false</td>
+<td>Math expressions (<code>$...$</code> and <code>$$...$$</code>)</td>
+</tr>
+<tr>
+<td>math_engine</td>
+<td>string</td>
+<td>&quot;katex&quot;</td>
+<td>Math rendering engine (<code>&quot;katex&quot;</code> or <code>&quot;mathjax&quot;</code>)</td>
+</tr>
+<tr>
+<td>mermaid</td>
+<td>bool</td>
+<td>false</td>
+<td>Mermaid diagram blocks</td>
+</tr>
+</tbody>
+</table>
+<h2 id="task-lists">Task Lists</h2>
+<p>Render checkboxes in lists.</p>
+<h3 id="syntax">Syntax</h3>
+<pre><code class="language-markdown hljs">- [x] Completed task
+- [ ] Incomplete task
+- [X] Also completed (case-insensitive)
+</code></pre>
+<h3 id="output">Output</h3>
+<pre><code class="language-html hljs">&lt;ul&gt;
+  &lt;li&gt;&lt;input type=&quot;checkbox&quot; checked disabled&gt; Completed task&lt;/li&gt;
+  &lt;li&gt;&lt;input type=&quot;checkbox&quot; disabled&gt; Incomplete task&lt;/li&gt;
+  &lt;li&gt;&lt;input type=&quot;checkbox&quot; checked disabled&gt; Also completed&lt;/li&gt;
+&lt;/ul&gt;
+</code></pre>
+<h2 id="definition-lists">Definition Lists</h2>
+<p>Render terms with their definitions using <code>&lt;dl&gt;</code>, <code>&lt;dt&gt;</code>, and <code>&lt;dd&gt;</code> elements.</p>
+<h3 id="syntax-1">Syntax</h3>
+<pre><code class="language-markdown hljs">Crystal
+: A compiled language with Ruby-like syntax
+
+Go
+: A statically typed, compiled language by Google
+</code></pre>
+<h3 id="output-1">Output</h3>
+<pre><code class="language-html hljs">&lt;dl&gt;
+  &lt;dt&gt;Crystal&lt;/dt&gt;
+  &lt;dd&gt;A compiled language with Ruby-like syntax&lt;/dd&gt;
+  &lt;dt&gt;Go&lt;/dt&gt;
+  &lt;dd&gt;A statically typed, compiled language by Google&lt;/dd&gt;
+&lt;/dl&gt;
+</code></pre>
+<h2 id="footnotes">Footnotes</h2>
+<p>Add footnote references and definitions.</p>
+<h3 id="syntax-2">Syntax</h3>
+<pre><code class="language-markdown hljs">This is a statement[^1] with multiple references[^note].
+
+[^1]: First footnote content.
+[^note]: Named footnote content.
+</code></pre>
+<h3 id="output-2">Output</h3>
+<p>References become superscript links:</p>
+<pre><code class="language-html hljs">&lt;p&gt;This is a statement&lt;sup class=&quot;footnote-ref&quot;&gt;&lt;a href=&quot;#fn-1&quot; id=&quot;fnref-1&quot;&gt;[1]&lt;/a&gt;&lt;/sup&gt;
+with multiple references&lt;sup class=&quot;footnote-ref&quot;&gt;&lt;a href=&quot;#fn-note&quot; id=&quot;fnref-note&quot;&gt;[2]&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+</code></pre>
+<p>A footnotes section is appended at the end:</p>
+<pre><code class="language-html hljs">&lt;section class=&quot;footnotes&quot;&gt;
+  &lt;hr&gt;
+  &lt;ol&gt;
+    &lt;li id=&quot;fn-1&quot;&gt;&lt;p&gt;First footnote content. &lt;a href=&quot;#fnref-1&quot; class=&quot;footnote-backref&quot;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+    &lt;li id=&quot;fn-note&quot;&gt;&lt;p&gt;Named footnote content. &lt;a href=&quot;#fnref-note&quot; class=&quot;footnote-backref&quot;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/section&gt;
+</code></pre>
+<h2 id="math">Math</h2>
+<p>Render mathematical expressions. Requires a client-side math library (KaTeX or MathJax).</p>
+<h3 id="syntax-3">Syntax</h3>
+<p>Inline math with single <code>$</code>:</p>
+<pre><code class="language-markdown hljs">The equation $E = mc^2$ is well known.
+</code></pre>
+<p>Display math with double <code>$$</code>:</p>
+<pre><code class="language-markdown hljs">$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+</code></pre>
+<h3 id="output-3">Output</h3>
+<pre><code class="language-html hljs">&lt;p&gt;The equation &lt;span class=&quot;math math-inline&quot;&gt;\(E = mc^2\)&lt;/span&gt; is well known.&lt;/p&gt;
+
+&lt;div class=&quot;math math-display&quot;&gt;\[\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}\]&lt;/div&gt;
+</code></pre>
+<h3 id="client-side-setup">Client-Side Setup</h3>
+<h4 id="katex">KaTeX</h4>
+<pre><code class="language-html hljs">&lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css&quot;&gt;
+&lt;script src=&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+  document.addEventListener(&quot;DOMContentLoaded&quot;, function() {
+    renderMathInElement(document.body);
+  });
+&lt;/script&gt;
+</code></pre>
+<h4 id="mathjax">MathJax</h4>
+<pre><code class="language-html hljs">&lt;script&gt;
+  MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+&lt;/script&gt;
+&lt;script src=&quot;https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js&quot;&gt;&lt;/script&gt;
+</code></pre>
+<h2 id="mermaid-diagrams">Mermaid Diagrams</h2>
+<p>Render Mermaid diagram blocks as <code>&lt;div class=&quot;mermaid&quot;&gt;</code> elements.</p>
+<h3 id="syntax-4">Syntax</h3>
+<pre><code class="language-markdown hljs">```mermaid
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+```
+</code></pre>
+<h3 id="output-4">Output</h3>
+<pre><code class="language-html hljs">&lt;div class=&quot;mermaid&quot;&gt;
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+&lt;/div&gt;
+</code></pre>
+<h3 id="client-side-setup-1">Client-Side Setup</h3>
+<pre><code class="language-html hljs">&lt;script src=&quot;https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;mermaid.initialize({ startOnLoad: true });&lt;/script&gt;
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/config/">Configuration</a> — Markdown configuration options</li>
+<li><a href="/features/syntax-highlighting/">Syntax Highlighting</a> — Code block highlighting</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#configuration">Configuration</a></li><li><a href="#task-lists">Task Lists</a><ul><li><a href="#syntax">Syntax</a></li><li><a href="#output">Output</a></li></ul></li><li><a href="#definition-lists">Definition Lists</a><ul><li><a href="#syntax-1">Syntax</a></li><li><a href="#output-1">Output</a></li></ul></li><li><a href="#footnotes">Footnotes</a><ul><li><a href="#syntax-2">Syntax</a></li><li><a href="#output-2">Output</a></li></ul></li><li><a href="#math">Math</a><ul><li><a href="#syntax-3">Syntax</a></li><li><a href="#output-3">Output</a></li><li><a href="#client-side-setup">Client-Side Setup</a><ul><li><a href="#katex">KaTeX</a></li><li><a href="#mathjax">MathJax</a></li></ul></li></ul></li><li><a href="#mermaid-diagrams">Mermaid Diagrams</a><ul><li><a href="#syntax-4">Syntax</a></li><li><a href="#output-4">Output</a></li><li><a href="#client-side-setup-1">Client-Side Setup</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js?v=a11e5b22"></script>
+<script src="/assets/js/02-shortcodes-market.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaid.min.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaidinit.js?v=a11e5b22"></script>
+<script src="/assets/js/search.js?v=a11e5b22"></script>
+</body>
+</html>

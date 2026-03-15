@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Publish non-Markdown files from the content directory">
+  <title>Content Files - Hwaro</title>
+  <meta property="og:title" content="Content Files">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/features/content-files/">
+<meta property="og:description" content="Publish non-Markdown files from the content directory">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Content Files">
+<meta name="twitter:description" content="Publish non-Markdown files from the content directory">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/02-base.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/03-layout.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/04-content.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/05-components.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/06-responsive.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/07-landing.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css?v=a11e5b22">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/" class="active">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/start/">Overview</a></li>
+      
+      <li><a href="/start/installation/">Installation</a></li>
+      
+      <li><a href="/start/first-site/">First Site</a></li>
+      
+      <li><a href="/start/cli/">CLI</a></li>
+      
+      <li><a href="/start/config/">Configuration</a></li>
+      
+      <li><a href="/start/tools/">Tools & Completion</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/writing/">Overview</a></li>
+      
+      <li><a href="/writing/pages/">Pages</a></li>
+      
+      <li><a href="/writing/sections/">Sections</a></li>
+      
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/templates/">Overview</a></li>
+      
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      
+      <li><a href="/templates/functions/">Functions</a></li>
+      
+      <li><a href="/templates/filters/">Filters</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/features/">Overview</a></li>
+      
+      <li><a href="/features/seo/">SEO</a></li>
+      
+      <li><a href="/features/search/">Search</a></li>
+      
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      
+      <li><a href="/features/pagination/">Pagination</a></li>
+      
+      <li><a href="/features/multilingual/">Multilingual</a></li>
+      
+      <li><a href="/features/auto-includes/">Auto Includes</a></li>
+      
+      <li><a href="/features/content-files/" class="active">Content Files</a></li>
+      
+      <li><a href="/features/build-hooks/">Build Hooks</a></li>
+      
+      <li><a href="/features/incremental-build/">Incremental Build</a></li>
+      
+      <li><a href="/features/streaming-build/">Streaming Build</a></li>
+      
+      <li><a href="/features/asset-pipeline/">Asset Pipeline</a></li>
+      
+      <li><a href="/features/llms-txt/">LLMs.txt</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/deploy/">Overview</a></li>
+      
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      <li><a href="/deploy/docker/">Docker</a></li>
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Content Files</h1>
+    <p>Non-Markdown files placed in the <code>content/</code> directory can be automatically published to the output directory. This is useful for images, PDFs, and other assets that live alongside your content.</p>
+<h2 id="configuration">Configuration</h2>
+<p>Enable content file publishing in <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs">[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;, &quot;webp&quot;, &quot;pdf&quot;]
+disallow_extensions = [&quot;psd&quot;, &quot;ai&quot;]
+disallow_paths = [&quot;drafts/**&quot;, &quot;**/_*&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>allow_extensions</td>
+<td>array</td>
+<td>[]</td>
+<td>File extensions to publish</td>
+</tr>
+<tr>
+<td>disallow_extensions</td>
+<td>array</td>
+<td>[]</td>
+<td>File extensions to exclude</td>
+</tr>
+<tr>
+<td>disallow_paths</td>
+<td>array</td>
+<td>[]</td>
+<td>Glob patterns for paths to exclude</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-it-works">How It Works</h2>
+<p>When content file publishing is enabled, Hwaro copies non-Markdown files from <code>content/</code> to the output directory, preserving their directory structure.</p>
+<h3 id="example">Example</h3>
+<pre><code>content/
+├── about/
+│   ├── index.md          → /about/index.html
+│   ├── team-photo.jpg    → /about/team-photo.jpg
+│   └── resume.pdf        → /about/resume.pdf
+├── blog/
+│   ├── _index.md         → /blog/index.html
+│   └── my-post/
+│       ├── index.md      → /blog/my-post/index.html
+│       ├── diagram.svg   → /blog/my-post/diagram.svg
+│       └── screenshot.png → /blog/my-post/screenshot.png
+└── index.md              → /index.html
+</code></pre>
+<p>Files are copied directly to the matching output path. The <code>content/</code> prefix is stripped automatically.</p>
+<h2 id="extension-matching">Extension Matching</h2>
+<h3 id="allow-list">Allow List</h3>
+<p>Only files with extensions in <code>allow_extensions</code> are published:</p>
+<pre><code class="language-toml hljs">[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;, &quot;webp&quot;]
+</code></pre>
+<p>Extensions are normalized — both <code>&quot;jpg&quot;</code> and <code>&quot;.jpg&quot;</code> are accepted.</p>
+<h3 id="deny-list">Deny List</h3>
+<p>Exclude specific extensions with <code>disallow_extensions</code>:</p>
+<pre><code class="language-toml hljs">[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;]
+disallow_extensions = [&quot;psd&quot;, &quot;ai&quot;, &quot;sketch&quot;]
+</code></pre>
+<p>The deny list takes priority over the allow list.</p>
+<h3 id="path-exclusion">Path Exclusion</h3>
+<p>Exclude files by path pattern using glob syntax:</p>
+<pre><code class="language-toml hljs">[content.files]
+disallow_paths = [&quot;drafts/**&quot;, &quot;**/_*&quot;, &quot;private/**&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Matches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>drafts/**</code></td>
+<td>All files under <code>content/drafts/</code></td>
+</tr>
+<tr>
+<td><code>**/_*</code></td>
+<td>Any file starting with underscore</td>
+</tr>
+<tr>
+<td><code>private/**</code></td>
+<td>All files under <code>content/private/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Paths are matched relative to the <code>content/</code> directory.</p>
+<h2 id="referencing-content-files">Referencing Content Files</h2>
+<h3 id="in-markdown">In Markdown</h3>
+<p>Reference colocated files with relative paths:</p>
+<pre><code class="language-markdown hljs">![Team Photo](team-photo.jpg)
+
+[Download Resume](resume.pdf)
+
+![Diagram](diagram.svg)
+</code></pre>
+<h3 id="in-templates">In Templates</h3>
+<p>For page bundles, colocated assets are also available via <code>page.assets</code>:</p>
+<pre><code class="language-jinja hljs">{% for asset in page.assets %}
+  {% if asset is matching(&quot;[.](jpg|png|gif)$&quot;) %}
+    &lt;img src=&quot;{{ get_url(path=asset) }}&quot; alt=&quot;Asset&quot;&gt;
+  {% endif %}
+{% endfor %}
+</code></pre>
+<h2 id="content-files-vs-static-files">Content Files vs Static Files</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Content Files (<code>content/</code>)</th>
+<th>Static Files (<code>static/</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Colocated with content</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td>Requires configuration</td>
+<td>✅ Yes</td>
+<td>❌ No (always copied)</td>
+</tr>
+<tr>
+<td>Extension filtering</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td>Path filtering</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Per-page assets</td>
+<td>Site-wide assets</td>
+</tr>
+</tbody>
+</table>
+<p>Use <strong>content files</strong> for assets that belong to specific pages (screenshots, diagrams, attachments). Use <strong>static files</strong> for site-wide assets (CSS, JS, logos, favicons).</p>
+<h2 id="tips">Tips</h2>
+<ul>
+<li><strong>Page Bundles</strong>: For the best organization, use <a href="/writing/pages/#asset-colocation">page bundles</a> — place <code>index.md</code> and its assets in a directory together.</li>
+<li><strong>Image formats</strong>: Include common web image formats: <code>[&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;gif&quot;, &quot;svg&quot;, &quot;webp&quot;]</code>.</li>
+<li><strong>Security</strong>: Use <code>disallow_paths</code> to prevent publishing source files or drafts.</li>
+<li><strong>Keep it lean</strong>: Only allow extensions you actually need. This prevents accidentally publishing large source files.</li>
+</ul>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/writing/pages/#asset-colocation">Pages — Asset Colocation</a> — Page bundles</li>
+<li><a href="/writing/sections/#asset-colocation">Sections — Asset Colocation</a> — Section assets</li>
+<li><a href="/start/config/">Configuration</a> — Full configuration reference</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#configuration">Configuration</a></li><li><a href="#how-it-works">How It Works</a><ul><li><a href="#example">Example</a></li></ul></li><li><a href="#extension-matching">Extension Matching</a><ul><li><a href="#allow-list">Allow List</a></li><li><a href="#deny-list">Deny List</a></li><li><a href="#path-exclusion">Path Exclusion</a></li></ul></li><li><a href="#referencing-content-files">Referencing Content Files</a><ul><li><a href="#in-markdown">In Markdown</a></li><li><a href="#in-templates">In Templates</a></li></ul></li><li><a href="#content-files-vs-static-files">Content Files vs Static Files</a></li><li><a href="#tips">Tips</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js?v=a11e5b22"></script>
+<script src="/assets/js/02-shortcodes-market.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaid.min.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaidinit.js?v=a11e5b22"></script>
+<script src="/assets/js/search.js?v=a11e5b22"></script>
+</body>
+</html>

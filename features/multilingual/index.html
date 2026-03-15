@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Build multilingual sites with translation linking and hreflang tags">
+  <title>Multilingual - Hwaro</title>
+  <meta property="og:title" content="Multilingual">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/features/multilingual/">
+<meta property="og:description" content="Build multilingual sites with translation linking and hreflang tags">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Multilingual">
+<meta name="twitter:description" content="Build multilingual sites with translation linking and hreflang tags">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/02-base.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/03-layout.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/04-content.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/05-components.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/06-responsive.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/07-landing.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css?v=a11e5b22">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/" class="active">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/start/">Overview</a></li>
+      
+      <li><a href="/start/installation/">Installation</a></li>
+      
+      <li><a href="/start/first-site/">First Site</a></li>
+      
+      <li><a href="/start/cli/">CLI</a></li>
+      
+      <li><a href="/start/config/">Configuration</a></li>
+      
+      <li><a href="/start/tools/">Tools & Completion</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/writing/">Overview</a></li>
+      
+      <li><a href="/writing/pages/">Pages</a></li>
+      
+      <li><a href="/writing/sections/">Sections</a></li>
+      
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/templates/">Overview</a></li>
+      
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      
+      <li><a href="/templates/functions/">Functions</a></li>
+      
+      <li><a href="/templates/filters/">Filters</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/features/">Overview</a></li>
+      
+      <li><a href="/features/seo/">SEO</a></li>
+      
+      <li><a href="/features/search/">Search</a></li>
+      
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      
+      <li><a href="/features/pagination/">Pagination</a></li>
+      
+      <li><a href="/features/multilingual/" class="active">Multilingual</a></li>
+      
+      <li><a href="/features/auto-includes/">Auto Includes</a></li>
+      
+      <li><a href="/features/content-files/">Content Files</a></li>
+      
+      <li><a href="/features/build-hooks/">Build Hooks</a></li>
+      
+      <li><a href="/features/incremental-build/">Incremental Build</a></li>
+      
+      <li><a href="/features/streaming-build/">Streaming Build</a></li>
+      
+      <li><a href="/features/asset-pipeline/">Asset Pipeline</a></li>
+      
+      <li><a href="/features/llms-txt/">LLMs.txt</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/deploy/">Overview</a></li>
+      
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      <li><a href="/deploy/docker/">Docker</a></li>
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Multilingual</h1>
+    <p>Hwaro supports building multilingual sites with automatic translation linking, language-specific URLs, and hreflang tags for SEO.</p>
+<h2 id="configuration">Configuration</h2>
+<p>Enable multilingual support in <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs">default_language = &quot;en&quot;
+
+[languages.en]
+language_name = &quot;English&quot;
+weight = 1
+
+[languages.ko]
+language_name = &quot;한국어&quot;
+weight = 2
+generate_feed = true
+build_search_index = true
+taxonomies = [&quot;tags&quot;, &quot;categories&quot;]
+
+[languages.ja]
+language_name = &quot;日本語&quot;
+weight = 3
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default_language</td>
+<td>string</td>
+<td>&quot;en&quot;</td>
+<td>Default language code</td>
+</tr>
+<tr>
+<td>language_name</td>
+<td>string</td>
+<td>—</td>
+<td>Human-readable language name</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>int</td>
+<td>0</td>
+<td>Sort order (lower = first)</td>
+</tr>
+<tr>
+<td>generate_feed</td>
+<td>bool</td>
+<td>true</td>
+<td>Generate RSS/Atom feed for this language</td>
+</tr>
+<tr>
+<td>build_search_index</td>
+<td>bool</td>
+<td>false</td>
+<td>Include in search index</td>
+</tr>
+<tr>
+<td>taxonomies</td>
+<td>array</td>
+<td>[]</td>
+<td>Taxonomies for this language</td>
+</tr>
+</tbody>
+</table>
+<h2 id="content-structure">Content Structure</h2>
+<p>Create translations by adding a language suffix to filenames:</p>
+<pre><code>content/
+├── posts/
+│   ├── hello.md         # Default language (en)
+│   ├── hello.ko.md      # Korean translation
+│   └── hello.ja.md      # Japanese translation
+├── about.md             # Default language (en)
+├── about.ko.md          # Korean translation
+└── index.md             # Homepage (default)
+</code></pre>
+<h3 id="url-mapping">URL Mapping</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>content/about.md</td>
+<td>/about/</td>
+</tr>
+<tr>
+<td>content/about.ko.md</td>
+<td>/ko/about/</td>
+</tr>
+<tr>
+<td>content/about.ja.md</td>
+<td>/ja/about/</td>
+</tr>
+<tr>
+<td>content/posts/hello.md</td>
+<td>/posts/hello/</td>
+</tr>
+<tr>
+<td>content/posts/hello.ko.md</td>
+<td>/ko/posts/hello/</td>
+</tr>
+</tbody>
+</table>
+<p>The default language pages are served at the root path. Non-default language pages are prefixed with the language code.</p>
+<h3 id="section-translations">Section Translations</h3>
+<p>Section index files also support language suffixes:</p>
+<pre><code>content/
+└── blog/
+    ├── _index.md         # /blog/
+    ├── _index.ko.md      # /ko/blog/
+    └── post.md
+</code></pre>
+<h2 id="translation-linking">Translation Linking</h2>
+<p>Hwaro automatically links translated pages based on their filenames. Pages with the same base name (without the language suffix) are considered translations of each other.</p>
+<p>For example, <code>hello.md</code>, <code>hello.ko.md</code>, and <code>hello.ja.md</code> are all linked as translations.</p>
+<h3 id="template-variables">Template Variables</h3>
+<p>Access translation data in templates:</p>
+<pre><code class="language-jinja hljs">{% if page.translations %}
+&lt;nav class=&quot;language-switcher&quot;&gt;
+  {% for t in page.translations %}
+    {% if t.is_current %}
+      &lt;span class=&quot;active&quot;&gt;{{ t.code | upper }}&lt;/span&gt;
+    {% else %}
+      &lt;a href=&quot;{{ t.url }}&quot;&gt;{{ t.code | upper }}&lt;/a&gt;
+    {% endif %}
+  {% endfor %}
+&lt;/nav&gt;
+{% endif %}
+</code></pre>
+<h3 id="translation-properties">Translation Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>code</td>
+<td>String</td>
+<td>Language code (e.g., &quot;en&quot;, &quot;ko&quot;)</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+<td>URL of the translated page</td>
+</tr>
+<tr>
+<td>title</td>
+<td>String</td>
+<td>Title of the translated page</td>
+</tr>
+<tr>
+<td>is_current</td>
+<td>Bool</td>
+<td>Whether this is the current page's language</td>
+</tr>
+<tr>
+<td>is_default</td>
+<td>Bool</td>
+<td>Whether this is the default language</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seo-tags">SEO Tags</h2>
+<h3 id="canonical-urls">Canonical URLs</h3>
+<p>Hwaro generates canonical link tags for multilingual pages:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  {{ canonical_tag | safe }}
+&lt;/head&gt;
+</code></pre>
+<p>Output:</p>
+<pre><code class="language-html hljs">&lt;link rel=&quot;canonical&quot; href=&quot;https://example.com/about/&quot;&gt;
+</code></pre>
+<h3 id="hreflang-tags">Hreflang Tags</h3>
+<p>Alternate language link tags are generated automatically for translated pages:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  {{ hreflang_tags | safe }}
+&lt;/head&gt;
+</code></pre>
+<p>Output:</p>
+<pre><code class="language-html hljs">&lt;link rel=&quot;alternate&quot; hreflang=&quot;en&quot; href=&quot;https://example.com/about/&quot;&gt;
+&lt;link rel=&quot;alternate&quot; hreflang=&quot;ko&quot; href=&quot;https://example.com/ko/about/&quot;&gt;
+&lt;link rel=&quot;alternate&quot; hreflang=&quot;ja&quot; href=&quot;https://example.com/ja/about/&quot;&gt;
+</code></pre>
+<h3 id="combined-seo-tags">Combined SEO Tags</h3>
+<p>Include both canonical and hreflang tags together:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+  {{ og_all_tags | safe }}
+&lt;/head&gt;
+</code></pre>
+<h2 id="page-language">Page Language</h2>
+<p>Access the current page's language in templates:</p>
+<pre><code class="language-jinja hljs">&lt;html lang=&quot;{{ page.language }}&quot;&gt;
+</code></pre>
+<pre><code class="language-jinja hljs">{% if page.language == &quot;ko&quot; %}
+&lt;p&gt;한국어 콘텐츠&lt;/p&gt;
+{% endif %}
+</code></pre>
+<h2 id="scaffolding-with-multilingual">Scaffolding with Multilingual</h2>
+<p>Create a new site with multilingual support:</p>
+<pre><code class="language-bash hljs">hwaro init mysite --include-multilingual en,ko,ja
+</code></pre>
+<p>This generates the configuration and sample content files for each specified language.</p>
+<h2 id="template-examples">Template Examples</h2>
+<h3 id="language-switcher-dropdown">Language Switcher (Dropdown)</h3>
+<pre><code class="language-jinja hljs">{% if page.translations %}
+&lt;div class=&quot;lang-dropdown&quot;&gt;
+  &lt;button&gt;{{ page.language | upper }} ▾&lt;/button&gt;
+  &lt;ul&gt;
+    {% for t in page.translations %}
+    &lt;li&gt;
+      &lt;a href=&quot;{{ t.url }}&quot;{% if t.is_current %} class=&quot;current&quot;{% endif %}&gt;
+        {{ t.code | upper }}
+      &lt;/a&gt;
+    &lt;/li&gt;
+    {% endfor %}
+  &lt;/ul&gt;
+&lt;/div&gt;
+{% endif %}
+</code></pre>
+<h3 id="language-specific-navigation">Language-Specific Navigation</h3>
+<pre><code class="language-jinja hljs">&lt;nav&gt;
+  {% if page.language == &quot;ko&quot; %}
+    &lt;a href=&quot;/ko/&quot;&gt;홈&lt;/a&gt;
+    &lt;a href=&quot;/ko/blog/&quot;&gt;블로그&lt;/a&gt;
+  {% elif page.language == &quot;ja&quot; %}
+    &lt;a href=&quot;/ja/&quot;&gt;ホーム&lt;/a&gt;
+    &lt;a href=&quot;/ja/blog/&quot;&gt;ブログ&lt;/a&gt;
+  {% else %}
+    &lt;a href=&quot;/&quot;&gt;Home&lt;/a&gt;
+    &lt;a href=&quot;/blog/&quot;&gt;Blog&lt;/a&gt;
+  {% endif %}
+&lt;/nav&gt;
+</code></pre>
+<h3 id="base-template-with-i18n">Base Template with i18n</h3>
+<pre><code class="language-jinja hljs">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;{{ page.language | default(value='en') }}&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;title&gt;{{ page.title }} - {{ site.title }}&lt;/title&gt;
+  {{ canonical_tag | safe }}
+  {{ hreflang_tags | safe }}
+  {{ og_all_tags | safe }}
+&lt;/head&gt;
+&lt;body&gt;
+  {% if page.translations %}
+  &lt;nav class=&quot;i18n&quot;&gt;
+    {% for t in page.translations %}
+      {% if t.is_current %}
+        &lt;strong&gt;{{ t.code }}&lt;/strong&gt;
+      {% else %}
+        &lt;a href=&quot;{{ t.url }}&quot;&gt;{{ t.code }}&lt;/a&gt;
+      {% endif %}
+    {% endfor %}
+  &lt;/nav&gt;
+  {% endif %}
+
+  &lt;main&gt;
+    {% block content %}{% endblock %}
+  &lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<h2 id="i18n-translation-files">i18n Translation Files</h2>
+<p>Hwaro supports translation files for UI strings (navigation labels, button text, etc.) using TOML files in the <code>i18n/</code> directory.</p>
+<h3 id="file-structure">File Structure</h3>
+<p>Create one TOML file per language:</p>
+<pre><code>i18n/
+├── en.toml
+├── ko.toml
+└── ja.toml
+</code></pre>
+<h3 id="translation-file-format">Translation File Format</h3>
+<pre><code class="language-toml hljs"># i18n/en.toml
+[nav]
+home = &quot;Home&quot;
+blog = &quot;Blog&quot;
+about = &quot;About&quot;
+
+[common]
+read_more = &quot;Read more&quot;
+back = &quot;Back&quot;
+</code></pre>
+<pre><code class="language-toml hljs"># i18n/ko.toml
+[nav]
+home = &quot;홈&quot;
+blog = &quot;블로그&quot;
+about = &quot;소개&quot;
+
+[common]
+read_more = &quot;더 읽기&quot;
+back = &quot;뒤로&quot;
+</code></pre>
+<p>Nested TOML sections are flattened to dot-separated keys (e.g., <code>nav.home</code>, <code>common.read_more</code>).</p>
+<h3 id="template-usage">Template Usage</h3>
+<p>Use the <code>t</code> filter to translate keys:</p>
+<pre><code class="language-jinja hljs">&lt;nav&gt;
+  &lt;a href=&quot;/&quot;&gt;{{ &quot;nav.home&quot; | t }}&lt;/a&gt;
+  &lt;a href=&quot;/blog/&quot;&gt;{{ &quot;nav.blog&quot; | t }}&lt;/a&gt;
+  &lt;a href=&quot;/about/&quot;&gt;{{ &quot;nav.about&quot; | t }}&lt;/a&gt;
+&lt;/nav&gt;
+
+&lt;a href=&quot;{{ page.url }}&quot;&gt;{{ &quot;common.read_more&quot; | t }}&lt;/a&gt;
+</code></pre>
+<h3 id="fallback-behavior">Fallback Behavior</h3>
+<ol>
+<li>Look up the key in the current page's language</li>
+<li>If not found, fall back to the default language (<code>default_language</code>)</li>
+<li>If still not found, return the key itself (e.g., <code>&quot;nav.home&quot;</code>)</li>
+</ol>
+<h3 id="pluralization">Pluralization</h3>
+<p>Use the <code>pluralize</code> filter for count-dependent strings:</p>
+<pre><code class="language-jinja hljs">{{ post_count }} {{ post_count | pluralize(singular=&quot;post&quot;, plural=&quot;posts&quot;) }}
+</code></pre>
+<h2 id="per-language-feeds">Per-Language Feeds</h2>
+<p>When the site is multilingual, Hwaro automatically generates separate RSS/Atom feeds for each language:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Feed Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default (e.g., <code>en</code>)</td>
+<td><code>/rss.xml</code></td>
+<td>Default language pages only (configurable)</td>
+</tr>
+<tr>
+<td>Non-default (e.g., <code>ko</code>)</td>
+<td><code>/ko/rss.xml</code></td>
+<td>Only Korean pages</td>
+</tr>
+<tr>
+<td>Non-default (e.g., <code>ja</code>)</td>
+<td><code>/ja/rss.xml</code></td>
+<td>Only Japanese pages</td>
+</tr>
+</tbody>
+</table>
+<p>By default, the main site feed (<code>/rss.xml</code> or <code>/atom.xml</code>) includes <strong>only default language pages</strong>. You can change this behavior with the <code>default_language_only</code> option. Each non-default language with <code>generate_feed = true</code> gets its own feed under its language prefix regardless of this setting.</p>
+<h3 id="configuration-1">Configuration</h3>
+<h4 id="main-feed-language-control">Main Feed Language Control</h4>
+<pre><code class="language-toml hljs">[feeds]
+enabled = true
+default_language_only = true   # true (default): main feed = default language only
+                               # false: main feed includes all languages
+</code></pre>
+<h4 id="per-language-feed-control">Per-Language Feed Control</h4>
+<pre><code class="language-toml hljs">[languages.ko]
+language_name = &quot;한국어&quot;
+generate_feed = true    # Generates /ko/rss.xml (default: true)
+
+[languages.ja]
+language_name = &quot;日本語&quot;
+generate_feed = false   # No /ja/rss.xml will be generated
+</code></pre>
+<p>Language feeds share the same <code>sections</code>, <code>limit</code>, and <code>truncate</code> settings from the global <code>[feeds]</code> config:</p>
+<pre><code class="language-toml hljs">[feeds]
+enabled = true
+type = &quot;rss&quot;       # or &quot;atom&quot;
+limit = 20
+truncate = 0
+sections = []      # empty = all sections
+default_language_only = true
+</code></pre>
+<h3 id="feed-details">Feed Details</h3>
+<ul>
+<li><strong>RSS feeds</strong> include a <code>&lt;language&gt;</code> tag (e.g., <code>&lt;language&gt;ko&lt;/language&gt;</code>)</li>
+<li><strong>Atom feeds</strong> include an <code>xml:lang</code> attribute (e.g., <code>&lt;feed xmlns=&quot;...&quot; xml:lang=&quot;ko&quot;&gt;</code>)</li>
+<li>Feed title includes the language name: <code>&quot;My Site (한국어)&quot;</code></li>
+<li>Self-referencing links point to the correct language path (e.g., <code>https://example.com/ko/rss.xml</code>)</li>
+<li>Draft pages and section index pages are excluded</li>
+<li>Language feeds are generated independently of the main feed's <code>enabled</code> setting</li>
+</ul>
+<h3 id="template-links">Template Links</h3>
+<p>Add language-specific feed links in your templates:</p>
+<pre><code class="language-jinja hljs">{# Main feed (default language) #}
+&lt;link rel=&quot;alternate&quot; type=&quot;application/rss+xml&quot;
+      href=&quot;{{ base_url }}/rss.xml&quot;
+      title=&quot;{{ site.title }}&quot;&gt;
+
+{# Language-specific feed #}
+{% if page.language and page.language != &quot;en&quot; %}
+&lt;link rel=&quot;alternate&quot; type=&quot;application/rss+xml&quot;
+      href=&quot;{{ base_url }}/{{ page.language }}/rss.xml&quot;
+      title=&quot;{{ site.title }} ({{ page.language }})&quot;&gt;
+{% endif %}
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/config/">Configuration</a> — Full configuration reference</li>
+<li><a href="/features/seo/">SEO</a> — SEO features including feeds, canonical and hreflang</li>
+<li><a href="/templates/data-model/">Data Model</a> — Translation link properties</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#configuration">Configuration</a></li><li><a href="#content-structure">Content Structure</a><ul><li><a href="#url-mapping">URL Mapping</a></li><li><a href="#section-translations">Section Translations</a></li></ul></li><li><a href="#translation-linking">Translation Linking</a><ul><li><a href="#template-variables">Template Variables</a></li><li><a href="#translation-properties">Translation Properties</a></li></ul></li><li><a href="#seo-tags">SEO Tags</a><ul><li><a href="#canonical-urls">Canonical URLs</a></li><li><a href="#hreflang-tags">Hreflang Tags</a></li><li><a href="#combined-seo-tags">Combined SEO Tags</a></li></ul></li><li><a href="#page-language">Page Language</a></li><li><a href="#scaffolding-with-multilingual">Scaffolding with Multilingual</a></li><li><a href="#template-examples">Template Examples</a><ul><li><a href="#language-switcher-dropdown">Language Switcher (Dropdown)</a></li><li><a href="#language-specific-navigation">Language-Specific Navigation</a></li><li><a href="#base-template-with-i18n">Base Template with i18n</a></li></ul></li><li><a href="#i18n-translation-files">i18n Translation Files</a><ul><li><a href="#file-structure">File Structure</a></li><li><a href="#translation-file-format">Translation File Format</a></li><li><a href="#template-usage">Template Usage</a></li><li><a href="#fallback-behavior">Fallback Behavior</a></li><li><a href="#pluralization">Pluralization</a></li></ul></li><li><a href="#per-language-feeds">Per-Language Feeds</a><ul><li><a href="#configuration-1">Configuration</a><ul><li><a href="#main-feed-language-control">Main Feed Language Control</a></li><li><a href="#per-language-feed-control">Per-Language Feed Control</a></li></ul></li><li><a href="#feed-details">Feed Details</a></li><li><a href="#template-links">Template Links</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js?v=a11e5b22"></script>
+<script src="/assets/js/02-shortcodes-market.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaid.min.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaidinit.js?v=a11e5b22"></script>
+<script src="/assets/js/search.js?v=a11e5b22"></script>
+</body>
+</html>

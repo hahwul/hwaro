@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Override config settings per deployment environment">
+  <title>Environment-Specific Configuration - Hwaro</title>
+  <meta property="og:title" content="Environment-Specific Configuration">
+<meta property="og:type" content="article">
+<meta property="og:url" content="/features/env-config/">
+<meta property="og:description" content="Override config settings per deployment environment">
+<meta property="og:image" content="/images/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Environment-Specific Configuration">
+<meta name="twitter:description" content="Override config settings per deployment environment">
+<meta name="twitter:image" content="/images/og-default.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="/assets/css/01-variables.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/02-base.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/03-layout.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/04-content.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/05-components.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/06-responsive.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/07-landing.css?v=a11e5b22">
+<link rel="stylesheet" href="/assets/css/08-shortcodes.css?v=a11e5b22">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 50px;">
+  </a>
+  <nav>
+    <a href="/start/">Start</a>
+    <a href="/writing/">Writing</a>
+    <a href="/templates/">Templates</a>
+    <a href="/features/" class="active">Features</a>
+    <a href="/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/start/">Overview</a></li>
+      
+      <li><a href="/start/installation/">Installation</a></li>
+      
+      <li><a href="/start/first-site/">First Site</a></li>
+      
+      <li><a href="/start/cli/">CLI</a></li>
+      
+      <li><a href="/start/config/">Configuration</a></li>
+      
+      <li><a href="/start/tools/">Tools & Completion</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/writing/">Overview</a></li>
+      
+      <li><a href="/writing/pages/">Pages</a></li>
+      
+      <li><a href="/writing/sections/">Sections</a></li>
+      
+      <li><a href="/writing/taxonomies/">Taxonomies</a></li>
+      
+      <li><a href="/writing/shortcodes/">Shortcodes</a></li>
+      
+      <li><a href="/writing/archetypes/">Archetypes</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/templates/">Overview</a></li>
+      
+      <li><a href="/templates/data-model/">Data Model</a></li>
+      
+      <li><a href="/templates/syntax/">Syntax</a></li>
+      
+      <li><a href="/templates/functions/">Functions</a></li>
+      
+      <li><a href="/templates/filters/">Filters</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/features/">Overview</a></li>
+      
+      <li><a href="/features/seo/">SEO</a></li>
+      
+      <li><a href="/features/search/">Search</a></li>
+      
+      <li><a href="/features/syntax-highlighting/">Syntax Highlighting</a></li>
+      
+      <li><a href="/features/pagination/">Pagination</a></li>
+      
+      <li><a href="/features/multilingual/">Multilingual</a></li>
+      
+      <li><a href="/features/auto-includes/">Auto Includes</a></li>
+      
+      <li><a href="/features/content-files/">Content Files</a></li>
+      
+      <li><a href="/features/build-hooks/">Build Hooks</a></li>
+      
+      <li><a href="/features/incremental-build/">Incremental Build</a></li>
+      
+      <li><a href="/features/streaming-build/">Streaming Build</a></li>
+      
+      <li><a href="/features/asset-pipeline/">Asset Pipeline</a></li>
+      
+      <li><a href="/features/llms-txt/">LLMs.txt</a></li>
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      <li><a href="/deploy/">Overview</a></li>
+      
+      <li><a href="/deploy/github-pages/">GitHub Pages</a></li>
+      
+      <li><a href="/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      <li><a href="/deploy/docker/">Docker</a></li>
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Environment-Specific Configuration</h1>
+    <p>Hwaro supports environment-specific config overrides, allowing different settings for development, staging, and production.</p>
+<h2 id="how-it-works">How It Works</h2>
+<ol>
+<li>Base config is loaded from <code>config.toml</code></li>
+<li>If an environment is specified, <code>config.&lt;env&gt;.toml</code> is loaded and merged on top</li>
+<li>Nested sections (tables) are deep-merged; top-level and leaf values are replaced</li>
+</ol>
+<h2 id="setting-the-environment">Setting the Environment</h2>
+<p>Use the <code>--env</code> flag or the <code>HWARO_ENV</code> environment variable:</p>
+<pre><code class="language-bash hljs"># Via CLI flag
+hwaro build --env production
+hwaro serve --env development
+
+# Via environment variable
+HWARO_ENV=staging hwaro build
+
+# CLI flag takes precedence over HWARO_ENV
+</code></pre>
+<h2 id="file-structure">File Structure</h2>
+<pre><code>mysite/
+├── config.toml                  # Base configuration (always loaded)
+├── config.development.toml      # Development overrides
+├── config.staging.toml          # Staging overrides
+└── config.production.toml       # Production overrides
+</code></pre>
+<h2 id="example">Example</h2>
+<p><strong>config.toml</strong> (base):</p>
+<pre><code class="language-toml hljs">title = &quot;My Blog&quot;
+base_url = &quot;http://localhost:3000&quot;
+
+[sitemap]
+enabled = true
+changefreq = &quot;weekly&quot;
+
+[search]
+enabled = true
+</code></pre>
+<p><strong>config.production.toml</strong> (override):</p>
+<pre><code class="language-toml hljs">base_url = &quot;https://myblog.com&quot;
+
+[sitemap]
+changefreq = &quot;daily&quot;
+</code></pre>
+<p>Running <code>hwaro build --env production</code> produces a config equivalent to:</p>
+<pre><code class="language-toml hljs">title = &quot;My Blog&quot;                     # from base
+base_url = &quot;https://myblog.com&quot;       # overridden by production
+
+[sitemap]
+enabled = true                        # from base (deep-merged)
+changefreq = &quot;daily&quot;                  # overridden by production
+
+[search]
+enabled = true                        # from base (untouched)
+</code></pre>
+<h2 id="deep-merge-behavior">Deep Merge Behavior</h2>
+<p>Sub-tables are merged recursively, not replaced entirely. This means you only need to specify the values you want to change:</p>
+<table>
+<thead>
+<tr>
+<th>Base</th>
+<th>Override</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[sitemap] enabled = true, changefreq = &quot;weekly&quot;</code></td>
+<td><code>[sitemap] changefreq = &quot;daily&quot;</code></td>
+<td><code>[sitemap] enabled = true, changefreq = &quot;daily&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Top-level scalars and arrays are replaced, not merged:</p>
+<table>
+<thead>
+<tr>
+<th>Base</th>
+<th>Override</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title = &quot;Base&quot;</code></td>
+<td><code>title = &quot;Prod&quot;</code></td>
+<td><code>title = &quot;Prod&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="environment-variables">Environment Variables</h2>
+<p>Environment-specific config files also support <a href="/features/env-variables/">environment variable substitution</a>:</p>
+<pre><code class="language-toml hljs"># config.production.toml
+base_url = &quot;${PRODUCTION_URL}&quot;
+
+[og]
+fb_app_id = &quot;${FB_APP_ID}&quot;
+</code></pre>
+<h2 id="use-cases">Use Cases</h2>
+<h3 id="different-base-urls-per-environment">Different base URLs per environment</h3>
+<pre><code class="language-toml hljs"># config.development.toml
+base_url = &quot;http://localhost:3000&quot;
+
+# config.staging.toml
+base_url = &quot;https://staging.myblog.com&quot;
+
+# config.production.toml
+base_url = &quot;https://myblog.com&quot;
+</code></pre>
+<h3 id="enable-features-only-in-production">Enable features only in production</h3>
+<pre><code class="language-toml hljs"># config.production.toml
+[search]
+enabled = true
+
+[feeds]
+enabled = true
+</code></pre>
+<h3 id="different-analytics-per-environment">Different analytics per environment</h3>
+<pre><code class="language-toml hljs"># config.staging.toml
+[og]
+fb_app_id = &quot;staging-app-id&quot;
+
+# config.production.toml
+[og]
+fb_app_id = &quot;prod-app-id&quot;
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/config/">Configuration</a> — Full config reference</li>
+<li><a href="/features/env-variables/">Environment Variables</a> — Env var substitution in config and templates</li>
+<li><a href="/start/cli/">CLI</a> — Command-line options</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#how-it-works">How It Works</a></li><li><a href="#setting-the-environment">Setting the Environment</a></li><li><a href="#file-structure">File Structure</a></li><li><a href="#example">Example</a></li><li><a href="#deep-merge-behavior">Deep Merge Behavior</a></li><li><a href="#environment-variables">Environment Variables</a></li><li><a href="#use-cases">Use Cases</a><ul><li><a href="#different-base-urls-per-environment">Different base URLs per environment</a></li><li><a href="#enable-features-only-in-production">Enable features only in production</a></li><li><a href="#different-analytics-per-environment">Different analytics per environment</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="/assets/js/01-docs.js?v=a11e5b22"></script>
+<script src="/assets/js/02-shortcodes-market.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaid.min.js?v=a11e5b22"></script>
+<script src="/assets/js/mermaidinit.js?v=a11e5b22"></script>
+<script src="/assets/js/search.js?v=a11e5b22"></script>
+</body>
+</html>
