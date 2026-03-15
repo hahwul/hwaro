@@ -495,6 +495,24 @@ module Hwaro
       end
     end
 
+    # AMP (Accelerated Mobile Pages) configuration
+    class AmpConfig
+      property enabled : Bool
+      property path_prefix : String
+      property sections : Array(String)
+
+      def initialize
+        @enabled = false
+        @path_prefix = "amp"
+        @sections = [] of String
+      end
+
+      # Check if a page section should get an AMP version
+      def section_enabled?(section : String) : Bool
+        @sections.empty? || @sections.includes?(section)
+      end
+    end
+
     # PWA (Progressive Web App) configuration
     class PwaConfig
       property enabled : Bool
@@ -547,6 +565,7 @@ module Hwaro
       property deployment : DeploymentConfig
       property assets : AssetsConfig
       property pwa : PwaConfig
+      property amp : AmpConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
 
@@ -575,6 +594,7 @@ module Hwaro
         @deployment = DeploymentConfig.new
         @assets = AssetsConfig.new
         @pwa = PwaConfig.new
+        @amp = AmpConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -644,6 +664,7 @@ module Hwaro
         load_permalinks(config)
         load_assets(config)
         load_pwa(config)
+        load_amp(config)
         load_deployment(config)
 
         config
@@ -967,6 +988,16 @@ module Hwaro
 
             config.assets.bundles << AssetBundleConfig.new(name: name, files: files)
           end
+        end
+      end
+
+      private def self.load_amp(config : Config)
+        return unless s = config.raw["amp"]?.try(&.as_h?)
+
+        config.amp.enabled = bool_value(s["enabled"]?, config.amp.enabled)
+        config.amp.path_prefix = s["path_prefix"]?.try(&.as_s?) || config.amp.path_prefix
+        if sections = s["sections"]?.try(&.as_a?)
+          config.amp.sections = sections.compact_map(&.as_s?)
         end
       end
 

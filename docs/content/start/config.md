@@ -204,6 +204,29 @@ fb_app_id = "your_fb_app_id"
 
 See [SEO](/features/seo/) for template usage and output examples.
 
+## AMP
+
+Generate AMP (Accelerated Mobile Pages) versions of content pages:
+
+```toml
+[amp]
+enabled = true
+path_prefix = "amp"
+sections = ["posts"]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate AMP versions of pages |
+| path_prefix | string | "amp" | URL prefix for AMP pages (e.g., `/amp/posts/hello/`) |
+| sections | array | [] | Sections to generate AMP for (empty = all sections) |
+
+AMP pages are automatically:
+- Stripped of disallowed tags (inline `<script>`, `style` attributes)
+- Converted (`<img>` to `<amp-img>`, `<iframe>` to `<amp-iframe>`)
+- Injected with AMP boilerplate CSS and runtime
+- Linked from canonical pages via `<link rel="amphtml">`
+
 ## PWA
 
 Generate Progressive Web App files for offline access and installability:

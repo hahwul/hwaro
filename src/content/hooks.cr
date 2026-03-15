@@ -7,6 +7,7 @@ require "./hooks/seo_hooks"
 require "./hooks/taxonomy_hooks"
 require "./hooks/asset_hooks"
 require "./hooks/pwa_hooks"
+require "./hooks/amp_hooks"
 
 module Hwaro
   module Content
@@ -19,6 +20,7 @@ module Hwaro
           TaxonomyHooks.new,
           AssetHooks.new,
           PwaHooks.new,
+          AmpHooks.new,
         ] of Core::Lifecycle::Hookable
       end
     end
