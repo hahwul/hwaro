@@ -762,6 +762,54 @@ describe Hwaro::Content::Processors::Template do
       result.should match(/\d{4}-\d{2}-\d{2}/)
     end
 
+    it "processes env function with set variable" do
+      ENV["HWARO_TPL_TEST"] = "analytics-123"
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = %({{ env("HWARO_TPL_TEST") }})
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("analytics-123")
+    ensure
+      ENV.delete("HWARO_TPL_TEST")
+    end
+
+    it "processes env function with default when unset" do
+      ENV.delete("HWARO_TPL_MISS")
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = %({{ env("HWARO_TPL_MISS", default="fallback") }})
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("fallback")
+    end
+
+    it "processes env function with default when empty" do
+      ENV["HWARO_TPL_EMPTY"] = ""
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = %({{ env("HWARO_TPL_EMPTY", default="fallback") }})
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("fallback")
+    ensure
+      ENV.delete("HWARO_TPL_EMPTY")
+    end
+
+    it "processes env function returns empty string when unset without default" do
+      ENV.delete("HWARO_TPL_NODEF")
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = %([{{ env("HWARO_TPL_NODEF") }}])
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("[]")
+    end
+
     it "processes url_for function" do
       page = Hwaro::Models::Page.new("test.md")
       config = Hwaro::Models::Config.new

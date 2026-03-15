@@ -7,6 +7,26 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
+## Environment Variables
+
+You can reference environment variables in `config.toml`. Values are substituted before TOML parsing.
+
+```toml
+base_url = "${SITE_URL}"
+title = "$SITE_TITLE"
+description = "${SITE_DESC:-My awesome site}"
+```
+
+| Syntax | Description |
+|--------|-------------|
+| `${VAR}` | Substitute with env var value |
+| `$VAR` | Same as above (bare form) |
+| `${VAR:-default}` | Use `default` if `VAR` is unset or empty |
+
+Missing variables without defaults are left as-is and produce a build warning.
+
+See [Environment Variables](/features/env-variables/) for template usage and more examples.
+
 ## Site Settings
 
 ```toml

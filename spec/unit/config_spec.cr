@@ -52,6 +52,40 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
+  # Environment variable substitution
+  # ---------------------------------------------------------------------------
+
+  describe "environment variable substitution" do
+    it "substitutes ${VAR} in config values" do
+      ENV["HWARO_CFG_URL"] = "https://mysite.com"
+      config = load_config(%(base_url = "${HWARO_CFG_URL}"))
+      config.base_url.should eq("https://mysite.com")
+    ensure
+      ENV.delete("HWARO_CFG_URL")
+    end
+
+    it "substitutes bare $VAR in config values" do
+      ENV["HWARO_CFG_TITLE"] = "Env Title"
+      config = load_config(%(title = "$HWARO_CFG_TITLE"))
+      config.title.should eq("Env Title")
+    ensure
+      ENV.delete("HWARO_CFG_TITLE")
+    end
+
+    it "uses default value when env var is unset" do
+      ENV.delete("HWARO_CFG_MISS")
+      config = load_config(%(base_url = "${HWARO_CFG_MISS:-https://fallback.com}"))
+      config.base_url.should eq("https://fallback.com")
+    end
+
+    it "keeps original text for missing vars without defaults" do
+      ENV.delete("HWARO_CFG_MISS2")
+      config = load_config(%(title = "${HWARO_CFG_MISS2}"))
+      config.title.should eq("${HWARO_CFG_MISS2}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Sitemap
   # ---------------------------------------------------------------------------
 

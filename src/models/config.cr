@@ -1,6 +1,7 @@
 require "toml"
 require "./deployment"
 require "../utils/text_utils"
+require "../utils/env_substitutor"
 
 module Hwaro
   module Models
@@ -570,7 +571,10 @@ module Hwaro
         config = new
         return config unless File.exists?(config_path)
 
-        config.raw = TOML.parse_file(config_path)
+        # Read file content and substitute environment variables before TOML parsing
+        raw_content = File.read(config_path)
+        substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, "config.toml")
+        config.raw = TOML.parse(substituted_content)
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
         config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url

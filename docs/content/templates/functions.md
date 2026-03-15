@@ -244,6 +244,44 @@ url = "https://twitter.com/example"
 
 ---
 
+## Environment
+
+### env()
+
+Read environment variables in templates:
+
+```jinja
+{{ env("ANALYTICS_ID") }}
+{{ env("API_KEY", default="none") }}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| name | String | Environment variable name |
+| default | String? | Fallback value if variable is unset (optional) |
+
+**Returns:** String (env var value, default, or empty string)
+
+If the variable is not set and no default is provided, an empty string is returned and a build warning is logged.
+
+**Examples:**
+
+```jinja
+{# Google Analytics #}
+{% if env("GA_ID") %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") }}"></script>
+{% endif %}
+
+{# API endpoint with fallback #}
+<script>
+  const API = "{{ env("API_URL", default="https://api.example.com") }}";
+</script>
+```
+
+---
+
 ## URL Functions
 
 ### url_for()

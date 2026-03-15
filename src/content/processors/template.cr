@@ -499,6 +499,33 @@ module Hwaro
 
           # asset_url is an alias for asset
           @env.functions["asset_url"] = @env.functions["asset"]
+
+          # env() function - read environment variables in templates
+          # Usage: {{ env("ANALYTICS_ID") }}
+          #        {{ env("API_KEY", default="none") }}
+          @env.functions["env"] = Crinja.function({name: "", default: nil}) do
+            var_name = arguments["name"].to_s
+            default_val = arguments["default"]
+            has_default = !default_val.none?
+
+            env_value = ENV[var_name]?
+
+            if has_default
+              # env("VAR", default="x") — use default when unset or empty
+              # (aligned with ${VAR:-x} config semantics)
+              if env_value && !env_value.empty?
+                Crinja::Value.new(env_value)
+              else
+                default_val
+              end
+            elsif !env_value.nil?
+              # env("VAR") — substitute if set (even empty)
+              Crinja::Value.new(env_value)
+            else
+              Logger.warn "Environment variable '#{var_name}' is not set (referenced in template)"
+              Crinja::Value.new("")
+            end
+          end
         end
 
         private def json_to_crinja(json : JSON::Any) : Crinja::Value
