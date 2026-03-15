@@ -89,6 +89,9 @@ module Hwaro
             str << assets_config
             str << markdown_config
             str << build_hooks_config
+            str << pwa_config
+            str << amp_config
+            str << og_auto_image_config
             str << deployment_config
           end
           config

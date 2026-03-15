@@ -595,6 +595,66 @@ module Hwaro
           TOML
         end
 
+        protected def pwa_config : String
+          <<-TOML
+
+          # =============================================================================
+          # PWA (Progressive Web App) (Optional)
+          # =============================================================================
+          # Generate manifest.json and service worker for offline access and installability
+
+          # [pwa]
+          # enabled = true
+          # name = "My Site"
+          # short_name = "Site"
+          # theme_color = "#ffffff"
+          # background_color = "#ffffff"
+          # display = "standalone"
+          # start_url = "/"
+          # icons = ["static/icon-192.png", "static/icon-512.png"]
+          # offline_page = "/offline.html"
+          # precache_urls = ["/", "/about/"]
+
+          TOML
+        end
+
+        protected def amp_config : String
+          <<-TOML
+
+          # =============================================================================
+          # AMP (Accelerated Mobile Pages) (Optional)
+          # =============================================================================
+          # Generate AMP-compliant versions of content pages
+
+          # [amp]
+          # enabled = true
+          # path_prefix = "amp"        # Output under /amp/ prefix
+          # sections = ["posts"]       # Limit to specific sections (empty = all)
+
+          TOML
+        end
+
+        protected def og_auto_image_config : String
+          <<-TOML
+
+          # =============================================================================
+          # Auto OG Images (Optional)
+          # =============================================================================
+          # Auto-generate Open Graph preview images (SVG) for social sharing
+          # Images are created for pages without a custom `image` in front matter
+
+          # [og.auto_image]
+          # enabled = true
+          # background = "#1a1a2e"
+          # text_color = "#ffffff"
+          # accent_color = "#e94560"
+          # font_size = 48
+          # logo = "static/logo.png"
+          # output_dir = "og-images"
+
+          TOML
+        end
+
         protected def deployment_config : String
           <<-TOML
 
