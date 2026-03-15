@@ -561,6 +561,8 @@ url = "file:///var/www/myblog"
 
 - [Features](/features/) — All built-in features
 - [CLI](/start/cli/) — Command-line options that override config
+- [Environment-Specific Config](/features/env-config/) — Per-environment overrides (`config.production.toml`)
+- [Environment Variables](/features/env-variables/) — Env var substitution in config and templates
 - [Multilingual](/features/multilingual/) — Multilingual configuration details
 - [LLMs.txt](/features/llms-txt/) — LLM instructions configuration
 - [Build Hooks](/features/build-hooks/) — Pre/post build commands

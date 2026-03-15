@@ -8,6 +8,7 @@ module Hwaro
         property confirm : Bool?
         property force : Bool?
         property max_deletes : Int32?
+        property env : String?
 
         def initialize(
           @source_dir : String? = nil,
@@ -16,6 +17,7 @@ module Hwaro
           @confirm : Bool? = nil,
           @force : Bool? = nil,
           @max_deletes : Int32? = nil,
+          @env : String? = nil,
         )
         end
       end

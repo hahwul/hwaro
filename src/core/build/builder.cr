@@ -109,6 +109,7 @@ module Hwaro
             error_overlay: options.error_overlay,
             stream: options.stream,
             memory_limit: options.memory_limit,
+            env: options.env,
           )
         end
 
@@ -322,9 +323,10 @@ module Hwaro
           error_overlay : Bool = false,
           stream : Bool = false,
           memory_limit : String? = nil,
+          env : String? = nil,
         )
           # Load config once and reuse throughout the build
-          config = Models::Config.load
+          config = Models::Config.load(env: env)
           @config = config
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
@@ -361,6 +363,7 @@ module Hwaro
             error_overlay: error_overlay,
             stream: stream,
             memory_limit: memory_limit,
+            env: env,
           )
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"

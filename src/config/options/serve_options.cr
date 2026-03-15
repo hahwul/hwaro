@@ -16,6 +16,7 @@ module Hwaro
         property live_reload : Bool
         property profile : Bool
         property cache_busting : Bool
+        property env : String?
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -32,6 +33,7 @@ module Hwaro
           @live_reload : Bool = false,
           @profile : Bool = false,
           @cache_busting : Bool = true,
+          @env : String? = nil,
         )
         end
 
@@ -51,6 +53,7 @@ module Hwaro
             cache_busting: @cache_busting,
             stream: false,
             memory_limit: nil,
+            env: @env,
           )
         end
       end

@@ -52,6 +52,80 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
+  # Environment-specific configuration override
+  # ---------------------------------------------------------------------------
+
+  describe "environment-specific config override" do
+    it "merges env config on top of base config" do
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", <<-TOML)
+        title = "My Site"
+        base_url = "http://localhost"
+        description = "Base desc"
+        TOML
+
+        File.write("config.production.toml", <<-TOML)
+        base_url = "https://example.com"
+        TOML
+
+        config = Hwaro::Models::Config.load("config.toml", env: "production")
+        config.title.should eq("My Site")
+        config.base_url.should eq("https://example.com")
+        config.description.should eq("Base desc")
+      end
+    end
+
+    it "deep-merges nested sections" do
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", <<-TOML)
+        title = "My Site"
+        [sitemap]
+        enabled = true
+        changefreq = "weekly"
+        TOML
+
+        File.write("config.staging.toml", <<-TOML)
+        [sitemap]
+        changefreq = "daily"
+        TOML
+
+        config = Hwaro::Models::Config.load("config.toml", env: "staging")
+        config.sitemap.enabled.should eq(true)
+        config.sitemap.changefreq.should eq("daily")
+      end
+    end
+
+    it "loads without error when env config file does not exist" do
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", %(title = "Test"))
+        config = Hwaro::Models::Config.load("config.toml", env: "nonexistent")
+        config.title.should eq("Test")
+      end
+    end
+
+    it "loads normally when env is nil" do
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", %(title = "No Env"))
+        config = Hwaro::Models::Config.load("config.toml", env: nil)
+        config.title.should eq("No Env")
+      end
+    end
+
+    it "supports env var substitution in env config file" do
+      ENV["HWARO_PROD_URL"] = "https://prod.example.com"
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", %(base_url = "http://localhost"))
+        File.write("config.production.toml", %(base_url = "${HWARO_PROD_URL}"))
+
+        config = Hwaro::Models::Config.load("config.toml", env: "production")
+        config.base_url.should eq("https://prod.example.com")
+      end
+    ensure
+      ENV.delete("HWARO_PROD_URL")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Environment variable substitution
   # ---------------------------------------------------------------------------
 

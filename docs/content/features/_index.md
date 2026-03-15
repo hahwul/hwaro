@@ -22,3 +22,4 @@ Hwaro includes powerful features out of the box.
 - [Asset Pipeline](/features/asset-pipeline/) — Built-in CSS/JS bundling, minification, and fingerprinting
 - [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers
 - [Environment Variables](/features/env-variables/) — Reference environment variables in config and templates
+- [Environment-Specific Config](/features/env-config/) — Override config settings per deployment environment

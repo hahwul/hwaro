@@ -567,14 +567,29 @@ module Hwaro
         @languages.values.sort_by(&.weight)
       end
 
-      def self.load(config_path : String = "config.toml") : Config
+      def self.load(config_path : String = "config.toml", env : String? = nil) : Config
         config = new
         return config unless File.exists?(config_path)
 
         # Read file content and substitute environment variables before TOML parsing
         raw_content = File.read(config_path)
-        substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, "config.toml")
+        substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
         config.raw = TOML.parse(substituted_content)
+
+        # Merge environment-specific override (e.g. config.production.toml)
+        if env_name = env
+          env_path = config_path.sub(/\.toml$/, ".#{env_name}.toml")
+          if File.exists?(env_path)
+            env_content = File.read(env_path)
+            env_substituted = Utils::EnvSubstitutor.substitute_with_warnings(env_content, env_path)
+            env_raw = TOML.parse(env_substituted)
+            config.raw = deep_merge(config.raw, env_raw)
+            Logger.info "Loaded environment config: #{env_path}"
+          else
+            Logger.warn "Environment config not found: #{env_path}"
+          end
+        end
+
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
         config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url
@@ -605,6 +620,29 @@ module Hwaro
       end
 
       # --- Private helpers -----------------------------------------------------------
+
+      # Deep-merge two TOML hashes.  Values in `override` take precedence.
+      # Sub-tables (hashes) are merged recursively; all other types are replaced.
+      private def self.deep_merge(
+        base : Hash(String, TOML::Any),
+        override : Hash(String, TOML::Any),
+      ) : Hash(String, TOML::Any)
+        merged = base.dup
+        override.each do |key, value|
+          if base_val = merged[key]?
+            base_hash = base_val.as_h?
+            over_hash = value.as_h?
+            if base_hash && over_hash
+              merged[key] = TOML::Any.new(deep_merge(base_hash, over_hash))
+            else
+              merged[key] = value
+            end
+          else
+            merged[key] = value
+          end
+        end
+        merged
+      end
 
       # Safe boolean loader: returns the parsed Bool if present, otherwise the default.
       # This avoids the `||` pitfall where `false || default` silently ignores `false`.

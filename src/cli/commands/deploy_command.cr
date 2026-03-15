@@ -23,6 +23,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
           FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
           FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
+          FlagInfo.new(short: "-e", long: "--env", description: "Environment name (loads config.<env>.toml override)", takes_value: true, value_hint: "ENV"),
           HELP_FLAG,
         ]
 
@@ -39,7 +40,7 @@ module Hwaro
         def run(args : Array(String))
           options, list_targets = parse_options(args)
           if list_targets
-            print_targets
+            print_targets(options.env)
             return
           end
 
@@ -54,6 +55,7 @@ module Hwaro
           force = nil.as(Bool?)
           max_deletes = nil.as(Int32?)
           list_targets = false
+          env_name = ENV["HWARO_ENV"]? || nil
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro deploy [options] [target ...]"
@@ -63,6 +65,7 @@ module Hwaro
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
             parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") { |n| max_deletes = n.to_i }
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
+            parser.on("-e ENV", "--env ENV", "Environment name (loads config.<env>.toml override)") { |e| env_name = e }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
           end
 
@@ -76,13 +79,14 @@ module Hwaro
               confirm: confirm,
               force: force,
               max_deletes: max_deletes,
+              env: env_name,
             ),
             list_targets,
           }
         end
 
-        private def print_targets
-          config = Models::Config.load
+        private def print_targets(env : String? = nil)
+          config = Models::Config.load(env: env)
           deployment = config.deployment
           if deployment.targets.empty?
             Logger.info "No deployment targets configured."

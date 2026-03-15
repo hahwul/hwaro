@@ -18,6 +18,7 @@ module Hwaro
         property cache_busting : Bool
         property stream : Bool
         property memory_limit : String?
+        property env : String?
 
         def initialize(
           @output_dir : String = "public",
@@ -36,6 +37,7 @@ module Hwaro
           @cache_busting : Bool = true,
           @stream : Bool = false,
           @memory_limit : String? = nil,
+          @env : String? = nil,
         )
         end
 
