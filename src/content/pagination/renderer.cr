@@ -104,8 +104,8 @@ module Hwaro
           # Build pre-sorted array directly (no Set/sort needed for ≤7 elements)
           pages = Array(Int32).new(7)
           pages << 1
-          lo = {current - 2, 2}.max          # start from 2 since 1 is already added
-          hi = {current + 2, total - 1}.min  # stop before total since it's added separately
+          lo = {current - 2, 2}.max         # start from 2 since 1 is already added
+          hi = {current + 2, total - 1}.min # stop before total since it's added separately
           (lo..hi).each { |p| pages << p }
           pages << total unless pages.last == total
           pages
