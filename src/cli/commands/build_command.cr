@@ -18,7 +18,7 @@ module Hwaro
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
           FlagInfo.new(short: "-i", long: "--input", description: "Project directory to build (default: current directory)", takes_value: true, value_hint: "DIR"),
-          FlagInfo.new(short: "-o", long: "--output-dir", description: "Output directory (default: public)", takes_value: true, value_hint: "DIR"),
+          FlagInfo.new(short: "-o", long: "--output", description: "Output directory (default: public)", takes_value: true, value_hint: "DIR"),
           FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL"),
           FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content"),
           FlagInfo.new(short: nil, long: "--include-expired", description: "Include expired content"),
@@ -105,7 +105,7 @@ module Hwaro
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
             parser.on("-i DIR", "--input DIR", "Project directory to build (default: current directory)") { |dir| input_dir = dir }
-            parser.on("-o DIR", "--output-dir DIR", "Output directory (default: public)") { |dir| output_dir = dir; output_dir_explicit = true }
+            parser.on("-o DIR", "--output DIR", "Output directory (default: public)") { |dir| output_dir = dir; output_dir_explicit = true }
             parser.on("--base-url URL", "Override base_url from config.toml") { |url| base_url = url }
             parser.on("-d", "--drafts", "Include draft content") { drafts = true }
             parser.on("--include-expired", "Include expired content") { include_expired = true }

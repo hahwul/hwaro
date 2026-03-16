@@ -12,7 +12,7 @@ module Hwaro
         # Single source of truth for command metadata
         NAME               = "deploy"
         DESCRIPTION        = "Deploy the built site using config.toml"
-        POSITIONAL_ARGS    = ["target"]
+        POSITIONAL_ARGS    = ["target ..."]
         POSITIONAL_CHOICES = [] of String
 
         # Flags defined here are used both for OptionParser and completion generation

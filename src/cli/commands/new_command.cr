@@ -42,9 +42,9 @@ module Hwaro
           archetype = nil
 
           OptionParser.parse(args) do |parser|
-            parser.banner = "Usage: hwaro new [path]"
-            parser.on("-t TITLE", "--title=TITLE", "Content title") { |t| title = t }
-            parser.on("-a NAME", "--archetype=NAME", "Archetype to use") { |a| archetype = a }
+            parser.banner = "Usage: hwaro new <path> [options]"
+            parser.on("-t TITLE", "--title TITLE", "Content title") { |t| title = t }
+            parser.on("-a NAME", "--archetype NAME", "Archetype to use") { |a| archetype = a }
             parser.on("-h", "--help", "Show this help") { Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?

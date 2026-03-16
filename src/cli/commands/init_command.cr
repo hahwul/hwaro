@@ -54,7 +54,7 @@ module Hwaro
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
-            parser.on("--scaffold TYPE", "Scaffold type or remote source (default: simple)") do |type|
+            parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
               if Services::Scaffolds::Remote.remote?(type)
                 scaffold_remote = type
               else

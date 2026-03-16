@@ -74,7 +74,7 @@ module Hwaro
         args = ARGV.dup
 
         case command
-        when "version", "-v", "--version"
+        when "version"
           Logger.info "#{Hwaro::VERSION}"
         when "help", "-h", "--help"
           print_help

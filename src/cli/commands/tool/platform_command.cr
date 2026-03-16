@@ -54,7 +54,7 @@ module Hwaro
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool platform <netlify|vercel|cloudflare> [options]"
-              parser.on("-o PATH", "--output PATH", "Output file path") { |p| output_path = p }
+              parser.on("-o PATH", "--output PATH", "Output file path (default: auto-detected)") { |p| output_path = p }
               parser.on("--stdout", "Print to stdout instead of writing file") { stdout_mode = true }
               parser.on("-f", "--force", "Overwrite existing file without warning") { force = true }
               parser.on("-h", "--help", "Show this help") do

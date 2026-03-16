@@ -29,7 +29,7 @@ module Hwaro
       class ToolCommand
         # Single source of truth for command metadata
         NAME               = "tool"
-        DESCRIPTION        = "Utility tools (convert, etc.)"
+        DESCRIPTION        = "Utility tools (convert, list, deadlink, doctor, ...)"
         POSITIONAL_ARGS    = [] of String
         POSITIONAL_CHOICES = [] of String
 

@@ -110,7 +110,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | Flag | Description |
 |------|-------------|
 | -i, --input DIR | Project directory to build (default: current directory) |
-| -o, --output-dir DIR | Output directory (default: public) |
+| -o, --output DIR | Output directory (default: public) |
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |

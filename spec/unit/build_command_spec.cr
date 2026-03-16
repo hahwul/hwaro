@@ -26,7 +26,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses output directory" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--output-dir", "dist"])
+      result, _ = cmd.parse_options(["--output", "dist"])
       options, output_dir_explicit = result
       options.output_dir.should eq("dist")
       output_dir_explicit.should be_true

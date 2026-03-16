@@ -84,7 +84,7 @@ The completion scripts provide tab completion for:
 
 - **Commands**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `completion`
 - **Subcommands**: `hwaro tool <TAB>` → `convert`, `list`, `check`
-- **Flags**: `hwaro build <TAB>` → `--output-dir`, `--drafts`, `--minify`, etc.
+- **Flags**: `hwaro build <TAB>` → `--output`, `--drafts`, `--minify`, etc.
 - **Positional arguments**: `hwaro completion <TAB>` → `bash`, `zsh`, `fish`
 - **Positional choices**: `hwaro tool convert <TAB>` → `toYAML`, `toTOML`
 

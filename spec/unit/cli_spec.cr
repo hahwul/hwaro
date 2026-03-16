@@ -111,7 +111,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
     meta.name.should eq("build")
 
     flag_names = meta.flags.map(&.long)
-    flag_names.should contain("--output-dir")
+    flag_names.should contain("--output")
     flag_names.should contain("--drafts")
     flag_names.should contain("--minify")
     flag_names.should contain("--verbose")
