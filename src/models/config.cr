@@ -508,6 +508,28 @@ module Hwaro
       end
     end
 
+    # Image processing configuration
+    #
+    # Enables automatic image resizing during build using stb (statically linked).
+    # Supports JPG, PNG, BMP. No external tools required.
+    #
+    # Config example (config.toml):
+    #   [image_processing]
+    #   enabled = true
+    #   widths = [320, 640, 1024, 1280]
+    #   quality = 85
+    class ImageProcessingConfig
+      property enabled : Bool
+      property widths : Array(Int32)
+      property quality : Int32
+
+      def initialize
+        @enabled = false
+        @widths = [] of Int32
+        @quality = 85
+      end
+    end
+
     # AMP (Accelerated Mobile Pages) configuration
     class AmpConfig
       property enabled : Bool
@@ -579,6 +601,7 @@ module Hwaro
       property assets : AssetsConfig
       property pwa : PwaConfig
       property amp : AmpConfig
+      property image_processing : ImageProcessingConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -609,6 +632,7 @@ module Hwaro
         @assets = AssetsConfig.new
         @pwa = PwaConfig.new
         @amp = AmpConfig.new
+        @image_processing = ImageProcessingConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -684,6 +708,7 @@ module Hwaro
         load_assets(config)
         load_pwa(config)
         load_amp(config)
+        load_image_processing(config)
         load_deployment(config)
 
         config
@@ -1046,6 +1071,19 @@ module Hwaro
         end
         if precache = s["precache_urls"]?.try(&.as_a?)
           config.pwa.precache_urls = precache.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_image_processing(config : Config)
+        return unless s = config.raw["image_processing"]?.try(&.as_h?)
+
+        config.image_processing.enabled = bool_value(s["enabled"]?, config.image_processing.enabled)
+        config.image_processing.quality = int_value(s["quality"]?, config.image_processing.quality).clamp(1, 100)
+        if widths = s["widths"]?.try(&.as_a?)
+          config.image_processing.widths = widths.compact_map { |w|
+            val = w.as_i? || w.as_f?.try(&.to_i)
+            val && val > 0 ? val : nil
+          }
         end
       end
 

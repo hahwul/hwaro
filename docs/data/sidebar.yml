@@ -56,6 +56,8 @@
       url: /features/auto-includes/
     - title: Content Files
       url: /features/content-files/
+    - title: Image Processing
+      url: /features/image-processing/
     - title: Build Hooks
       url: /features/build-hooks/
     - title: Incremental Build

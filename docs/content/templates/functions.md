@@ -353,25 +353,56 @@ Get current datetime:
 
 ### resize_image()
 
-Returns an image object with a resolved URL and requested dimensions.
+Returns a resized image variant. When [image processing](/features/image-processing/) is enabled, this returns the URL to an automatically generated resized image. Otherwise, it returns the original URL.
 
 ```jinja
-{% set img = resize_image(path="/images/hero.jpg", width=1200, height=630) %}
-<img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}">
+{% set img = resize_image(path="/images/hero.jpg", width=640) %}
+<img src="{{ img.url }}" width="{{ img.width }}">
 ```
 
 **Parameters:**
 
 | Name | Type | Description |
 |------|------|-------------|
-| path | String | Image path |
+| path | String | Image path (e.g., `/images/photo.jpg`) |
+| width | Int | Requested width in pixels (0 = original) |
+| height | Int | Requested height in pixels (0 = original) |
+
+**Returns:** Object with properties:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| url | String | URL to the resized variant (or original if unavailable) |
 | width | Int | Requested width |
 | height | Int | Requested height |
-| op | String | Operation name (default: `"fill"`) |
 
-**Returns:** Object (`url`, `width`, `height`)
+The function selects the closest available width from the configured `widths`. If you request `width=500` and the configured widths are `[320, 640, 1024]`, it returns the 640px variant (smallest width >= requested). If nothing is large enough, it falls back to the largest available.
 
-**Current behavior:** placeholder implementation. It resolves the URL and echoes requested dimensions, but does not perform actual image processing yet.
+**Examples:**
+
+```jinja
+{# Single resized image #}
+{% set img = resize_image(path="/images/hero.jpg", width=800) %}
+<img src="{{ img.url }}" alt="Hero">
+
+{# Responsive srcset #}
+{% set sm = resize_image(path="/images/hero.jpg", width=320) %}
+{% set md = resize_image(path="/images/hero.jpg", width=640) %}
+{% set lg = resize_image(path="/images/hero.jpg", width=1024) %}
+<img
+  src="{{ md.url }}"
+  srcset="{{ sm.url }} 320w, {{ md.url }} 640w, {{ lg.url }} 1024w"
+  sizes="(max-width: 640px) 320px, (max-width: 1024px) 640px, 1024px"
+>
+
+{# With page image from front matter #}
+{% if page.image %}
+  {% set thumb = resize_image(path=page.image, width=320) %}
+  <img src="{{ thumb.url }}" alt="{{ page_title }}">
+{% endif %}
+```
+
+Requires `[image_processing]` to be enabled in `config.toml`. See [Image Processing](/features/image-processing/) for setup details.
 
 ---
 

@@ -9,6 +9,7 @@ require "./hooks/asset_hooks"
 require "./hooks/pwa_hooks"
 require "./hooks/amp_hooks"
 require "./hooks/og_image_hooks"
+require "./hooks/image_hooks"
 
 module Hwaro
   module Content
@@ -23,6 +24,7 @@ module Hwaro
           PwaHooks.new,
           AmpHooks.new,
           OgImageHooks.new,
+          ImageHooks.new,
         ] of Core::Lifecycle::Hookable
       end
     end

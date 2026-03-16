@@ -146,6 +146,16 @@ full_filename = "llms-full.txt"
 enabled = false
 
 # =============================================================================
+# Image Processing
+# =============================================================================
+# Automatically generate resized image variants during build
+
+[image_processing]
+enabled = true
+widths = [128, 256, 512]
+quality = 90
+
+# =============================================================================
 # Markdown Configuration
 # =============================================================================
 # Configure markdown parser behavior

@@ -56,6 +56,7 @@ require "./content/processors/xml"
 require "./content/processors/table_parser"
 require "./content/processors/internal_link_resolver"
 require "./content/processors/syntax_highlighter"
+require "./content/processors/image_processor"
 require "./content/processors/template"
 require "./content/multilingual"
 

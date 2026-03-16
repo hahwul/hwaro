@@ -16,5 +16,8 @@ docs/public
 # Hwaro benchmark
 benchmark
 
+# stb compiled object
+src/ext/stb_impl.o
+
 # macOS
 .DS_Store

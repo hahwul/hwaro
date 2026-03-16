@@ -412,25 +412,34 @@ module Hwaro
             Crinja::Value.new(base_url.rstrip("/") + url)
           end
 
-          # resize_image() function - placeholder for image resizing
-          # Usage: {{ resize_image(path="/images/photo.jpg", width=800, height=600) }}
-          # Note: This is a placeholder - actual image processing would need additional libraries
-          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0, op: "fill"}) do
+          # resize_image() function - returns URL to a resized image variant
+          # Usage: {{ resize_image(path="/images/photo.jpg", width=800).url }}
+          # Returns object with:
+          #   - url: URL to the resized variant (or original if not available)
+          #   - width: requested width (0 if not specified)
+          #   - height: requested height (0 if not specified)
+          # Note: actual output dimensions depend on aspect ratio preservation.
+          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0}) do
             path = arguments["path"].to_s
-            width = arguments["width"].as_number.to_i
-            height = arguments["height"].as_number.to_i
-            op = arguments["op"].to_s
+            width = Math.max(0, arguments["width"].as_number.to_i)
+            height = Math.max(0, arguments["height"].as_number.to_i)
 
-            # Resolve URL
             base_url = env.resolve("base_url").to_s
-            final_url = if path.starts_with?("/")
-                          base_url.rstrip("/") + path
+
+            # Normalize path to start with /
+            normalized = path.starts_with?("/") ? path : "/#{path}"
+
+            # Try to find a resized variant from the image hooks map
+            resized_url = if width > 0
+                            Content::Hooks::ImageHooks.find_closest(normalized, width)
+                          end
+
+            final_url = if resized = resized_url
+                          base_url.rstrip("/") + resized
                         else
-                          base_url.rstrip("/") + "/" + path
+                          base_url.rstrip("/") + normalized
                         end
 
-            # For now, just return the original path (resolved)
-            # TODO: Implement actual image resizing with an image processing library
             Crinja::Value.new({
               "url"    => Crinja::Value.new(final_url),
               "width"  => Crinja::Value.new(width),
