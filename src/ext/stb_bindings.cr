@@ -5,7 +5,7 @@
 # - stb_image_write.h (encode JPG/PNG/BMP/TGA)
 # - stb_image_resize2.h (high-quality resize)
 
-@[Link(ldflags: "#{__DIR__}/stb_impl.o")]
+@[Link(ldflags: "`sh -c 'OBJ=#{__DIR__}/stb_impl.o; SRC=#{__DIR__}/stb_impl.c; if [ ! -f \"$OBJ\" ] || [ \"$SRC\" -nt \"$OBJ\" ]; then cc -c -O2 -o \"$OBJ\" \"$SRC\"; fi; echo \"$OBJ\"'`")]
 lib LibStb
   # --- stb_image ---
   fun stbi_load(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, channels_in_file : LibC::Int*, desired_channels : LibC::Int) : UInt8*
