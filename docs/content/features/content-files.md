@@ -136,6 +136,7 @@ Use **content files** for assets that belong to specific pages (screenshots, dia
 
 ## See Also
 
+- [Image Processing](/features/image-processing/) — Automatic image resizing
 - [Pages — Asset Colocation](/writing/pages/#asset-colocation) — Page bundles
 - [Sections — Asset Colocation](/writing/sections/#asset-colocation) — Section assets
 - [Configuration](/start/config/) — Full configuration reference
