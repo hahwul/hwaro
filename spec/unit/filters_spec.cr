@@ -423,7 +423,8 @@ describe "HtmlFilters" do
     it "removes self-closing tags" do
       vars = {"html" => Crinja::Value.new("Hello<br/>World")}
       result = render_filter("{{ html | strip_html }}", vars)
-      result.strip.should eq("HelloWorld")
+      # TextUtils.strip_html inserts space at tag boundaries for word separation
+      result.strip.should eq("Hello World")
     end
 
     it "handles text without HTML" do
@@ -617,7 +618,7 @@ describe "UrlFilters" do
   end
 
   describe "relative_url" do
-    it "prepends base_url to path starting with /" do
+    it "returns path-only URL (strips protocol and host)" do
       page = Hwaro::Models::Page.new("test.md")
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"
@@ -626,7 +627,7 @@ describe "UrlFilters" do
       context.add("my_url", "/blog/post/")
 
       result = Hwaro::Content::Processors::Template.process("{{ my_url | relative_url }}", context)
-      result.strip.should eq("https://example.com/blog/post/")
+      result.strip.should eq("/blog/post/")
     end
 
     it "returns path without leading / unchanged" do
@@ -641,16 +642,16 @@ describe "UrlFilters" do
       result.strip.should eq("blog/post/")
     end
 
-    it "strips trailing slash from base_url" do
+    it "includes base_url path component" do
       page = Hwaro::Models::Page.new("test.md")
       config = Hwaro::Models::Config.new
-      config.base_url = "https://example.com/"
+      config.base_url = "https://example.com/subdir/"
 
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
       context.add("my_url", "/about/")
 
       result = Hwaro::Content::Processors::Template.process("{{ my_url | relative_url }}", context)
-      result.strip.should eq("https://example.com/about/")
+      result.strip.should eq("/subdir/about/")
     end
   end
 end

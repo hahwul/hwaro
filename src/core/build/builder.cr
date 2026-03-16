@@ -2127,9 +2127,9 @@ module Hwaro
 
           if has_local_highlight
             css_path = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
-            digest.update(File.read(css_path)) if File.exists?(css_path)
+            digest_file(digest, css_path) if File.exists?(css_path)
             js_path = File.join("static", "assets", "js", "highlight.min.js")
-            digest.update(File.read(js_path)) if File.exists?(js_path)
+            digest_file(digest, js_path) if File.exists?(js_path)
           end
 
           if has_auto_includes
@@ -2137,12 +2137,22 @@ module Hwaro
               static_dir = File.join("static", dir)
               next unless Dir.exists?(static_dir)
               Dir.glob(File.join(static_dir, "**", "*.{css,js}")).sort.each do |file|
-                digest.update(File.read(file))
+                digest_file(digest, file)
               end
             end
           end
 
           digest.hexfinal[0, 8]
+        end
+
+        # Stream file contents into digest to avoid loading entire file into memory
+        private def digest_file(digest : Digest::MD5, path : String)
+          File.open(path, "r") do |io|
+            buffer = Bytes.new(8192)
+            while (n = io.read(buffer)) > 0
+              digest.update(buffer[0, n])
+            end
+          end
         end
 
         # Build template variables hash for Crinja
@@ -2381,20 +2391,10 @@ module Hwaro
               # instead of O(n) reject with per-element Hash access.
               all_section = cached_section_pages_crinja(current_section, page.language, site)
               page_url_str = page.url
-              exclude_idx = -1
-              all_section.each_with_index do |v, i|
+              section_pages_array = all_section.reject do |v|
                 raw = v.raw
-                if raw.is_a?(Hash) && raw["url"]?.try(&.to_s) == page_url_str
-                  exclude_idx = i
-                  break
-                end
+                raw.is_a?(Hash) && raw["url"]?.try(&.to_s) == page_url_str
               end
-              section_pages_array = if exclude_idx >= 0
-                                      # Build array without the excluded element (avoids full reject scan)
-                                      all_section[0...exclude_idx] + all_section[(exclude_idx + 1)..]
-                                    else
-                                      all_section
-                                    end
             end
           end
           vars["section_title"] = Crinja::Value.new(section_title)
@@ -2543,6 +2543,12 @@ module Hwaro
 
           raw_files.each do |raw_file|
             output_path = File.join(output_dir, raw_file.relative_path)
+
+            # Validate output path stays within output directory
+            unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
+              Logger.warn "  [WARN] Skipping raw file outside output directory: #{raw_file.relative_path}"
+              next
+            end
 
             # Get appropriate processor
             processor = Content::Processors::Registry.for_file(raw_file.source_path).first?

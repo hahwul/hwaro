@@ -22,7 +22,7 @@ module Hwaro
 
           search_pages.reject! do |page|
             page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-            excluded_paths.any? { |excluded| page_url.starts_with?(excluded) }
+            excluded_paths.any? { |excluded| page_url == excluded || page_url.starts_with?(excluded.ends_with?("/") ? excluded : excluded + "/") }
           end
         end
 
@@ -51,7 +51,7 @@ module Hwaro
                   end
 
         # Write search file
-        filename = config.search.filename
+        filename = File.basename(config.search.filename)
         search_path = File.join(output_dir, filename)
         File.write(search_path, content)
         Logger.action :create, search_path if verbose

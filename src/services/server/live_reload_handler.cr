@@ -86,7 +86,7 @@ module Hwaro
         # Verify resolved path is within public_dir
         resolved = File.realpath(file_path) rescue nil
         public_real = File.realpath(@public_dir) rescue @public_dir
-        unless resolved && resolved.starts_with?(public_real + "/")
+        unless resolved && (resolved == public_real || resolved.starts_with?(public_real + "/"))
           call_next(context)
           return
         end

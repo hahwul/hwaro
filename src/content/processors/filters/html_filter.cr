@@ -8,9 +8,9 @@ module Hwaro
       module Filters
         module HtmlFilters
           def self.register(env : Crinja)
-            # Strip HTML tags filter
+            # Strip HTML tags filter (delegates to TextUtils for robust tag handling)
             env.filters["strip_html"] = Crinja.filter do
-              target.to_s.gsub(/<[^>]*>/, "")
+              Hwaro::Utils::TextUtils.strip_html(target.to_s)
             end
 
             # Markdownify filter

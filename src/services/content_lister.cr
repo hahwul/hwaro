@@ -248,7 +248,7 @@ module Hwaro
 
         formats.each do |fmt|
           begin
-            return Time.parse(time_str, fmt, Time::Location.local)
+            return Time.parse(time_str, fmt, Time::Location::UTC)
           rescue
             next
           end

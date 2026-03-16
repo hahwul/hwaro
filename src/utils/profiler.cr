@@ -94,7 +94,7 @@ module Hwaro
       io.puts "─" * 50
 
       total = @phases.sum(&.duration_ms)
-      max_name_len = @phases.map(&.phase.size).max
+      max_name_len = @phases.map(&.phase.size).max? || 0
 
       @phases.each do |phase|
         percent = if total > 0

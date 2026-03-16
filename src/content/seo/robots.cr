@@ -40,7 +40,7 @@ module Hwaro
             end
           end
 
-          filename = config.robots.filename
+          filename = File.basename(config.robots.filename)
           file_path = File.join(output_dir, filename)
           File.write(file_path, content)
           Logger.action :create, file_path if verbose

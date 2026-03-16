@@ -88,8 +88,10 @@ module Hwaro
 
         # --- Footnotes ---
         # Pre-processing: extract footnote definitions and replace references with placeholders
-        FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.+?)$/m
-        FOOTNOTE_REF_RE = /\[\^([^\]]+)\]/
+        FOOTNOTE_DEF_RE     = /^\[\^([^\]]+)\]:\s*(.+?)$/m
+        FOOTNOTE_REF_RE     = /\[\^([^\]]+)\]/
+        FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+):(.+?)-->/
+        FOOTNOTE_BLOCK_RE   = /\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m
 
         def preprocess_footnotes(content : String) : String
           # Extract and remove footnote definitions
@@ -113,7 +115,8 @@ module Hwaro
               ref_order[key] = counter
             end
             num = ref_order[key]
-            "<sup class=\"footnote-ref\"><a href=\"#fn-#{key}\" id=\"fnref-#{key}\">[#{num}]</a></sup>"
+            escaped_key = HTML.escape(key)
+            "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
@@ -121,7 +124,10 @@ module Hwaro
             result += "\n<!--HWARO-FOOTNOTES-START-->\n"
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
-              result += "<!--HWARO-FN:#{key}:#{num}:#{text}-->\n"
+              # Escape --> in text to prevent premature comment close, and : to prevent parsing issues
+              safe_key = key.gsub("-->", "—&gt;").gsub(":", "&#58;")
+              safe_text = text.gsub("-->", "—&gt;").gsub(":", "&#58;")
+              result += "<!--HWARO-FN:#{safe_key}:#{num}:#{safe_text}-->\n"
             end
             result += "<!--HWARO-FOOTNOTES-END-->\n"
           end
@@ -135,8 +141,13 @@ module Hwaro
 
           # Extract footnote data from comments
           footnotes = [] of {key: String, num: Int32, text: String}
-          html.scan(/<!--HWARO-FN:([^:]+):(\d+):(.+?)-->/) do |match|
-            footnotes << {key: match[1], num: match[2].to_i, text: match[3]}
+          html.scan(FOOTNOTE_COMMENT_RE) do |match|
+            # Unescape the comment-safe encoding
+            key = match[1].gsub("&#58;", ":").gsub("—&gt;", "-->")
+            text = match[3].gsub("&#58;", ":").gsub("—&gt;", "-->")
+            num = match[2].to_i? || 0
+            next if num <= 0
+            footnotes << {key: key, num: num, text: text}
           end
 
           return html if footnotes.empty?
@@ -145,15 +156,17 @@ module Hwaro
           section = String.build do |str|
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
-              str << "<li id=\"fn-#{fn[:key]}\">\n"
-              str << "<p>#{fn[:text]} <a href=\"#fnref-#{fn[:key]}\" class=\"footnote-backref\">\u21A9</a></p>\n"
+              escaped_key = HTML.escape(fn[:key])
+              escaped_text = HTML.escape(fn[:text])
+              str << "<li id=\"fn-#{escaped_key}\">\n"
+              str << "<p>#{escaped_text} <a href=\"#fnref-#{escaped_key}\" class=\"footnote-backref\">\u21A9</a></p>\n"
               str << "</li>\n"
             end
             str << "</ol>\n</section>\n"
           end
 
           # Replace the comment block with the rendered section
-          html.sub(/\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m, section)
+          html.sub(FOOTNOTE_BLOCK_RE, section)
         end
 
         # --- Math ---
@@ -178,11 +191,10 @@ module Hwaro
         # Post-processing: convert mermaid code blocks to div elements
         def postprocess_mermaid(html : String) : String
           html.gsub(/<pre><code class="language-mermaid[^"]*">(.*?)<\/code><\/pre>/m) do |_|
-            code = $~[1]
-              .gsub("&amp;", "&")
-              .gsub("&lt;", "<")
-              .gsub("&gt;", ">")
-              .gsub("&quot;", "\"")
+            # Keep HTML entities as-is; the browser decodes them automatically
+            # when Mermaid.js reads the element's textContent.
+            # Only decode &amp; which Mermaid syntax may require in labels.
+            code = $~[1].gsub("&amp;", "&")
             "<div class=\"mermaid\">#{code}</div>"
           end
         end

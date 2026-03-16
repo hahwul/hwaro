@@ -217,7 +217,7 @@ module Hwaro
         return "" unless @enabled
         return "" if @dirs.empty?
 
-        suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
+        suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
         tags = [] of String
         @dirs.each do |dir|
           static_dir = File.join("static", dir)
@@ -225,7 +225,7 @@ module Hwaro
 
           Dir.glob(File.join(static_dir, "**", "*.#{extension}")).sort.each do |file|
             relative_path = file.sub(/^static\/?/, "/")
-            tags << yield("#{base_url}#{relative_path}#{suffix}")
+            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"))
           end
         end
         tags.join("\n")
@@ -387,11 +387,12 @@ module Hwaro
       # Generate the CSS link tag for highlighting
       def css_tag(cache_bust : String = "") : String
         return "" unless @enabled
+        safe_theme = HTML.escape(@theme)
         if @use_cdn
-          %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{@theme}.min.css">)
+          %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{safe_theme}.min.css">)
         else
-          suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
-          %(<link rel="stylesheet" href="/assets/css/highlight/#{@theme}.min.css#{suffix}">)
+          suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
+          %(<link rel="stylesheet" href="/assets/css/highlight/#{safe_theme}.min.css#{suffix}">)
         end
       end
 
@@ -401,7 +402,7 @@ module Hwaro
         if @use_cdn
           %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
         else
-          suffix = cache_bust.empty? ? "" : "?v=#{cache_bust}"
+          suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
           %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
         end
       end

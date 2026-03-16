@@ -21,7 +21,7 @@ module Hwaro
 
             sitemap_pages.reject! do |page|
               page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-              excluded_paths.any? { |excluded| page_url.starts_with?(excluded) }
+              excluded_paths.any? { |excluded| page_url == excluded || page_url.starts_with?(excluded.ends_with?("/") ? excluded : excluded + "/") }
             end
           end
 
@@ -72,7 +72,7 @@ module Hwaro
             str << "</urlset>\n"
           end
 
-          filename = site.config.sitemap.filename
+          filename = File.basename(site.config.sitemap.filename)
           sitemap_path = Path[output_dir, filename].to_s
           File.write(sitemap_path, xml_content)
           Logger.action :create, sitemap_path if verbose

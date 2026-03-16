@@ -40,7 +40,7 @@ module Hwaro
           # Verify resolved path is within public_dir
           resolved = File.realpath(fs_path) rescue nil
           public_real = File.realpath(@public_dir) rescue @public_dir
-          if resolved && resolved.starts_with?(public_real + "/") && Dir.exists?(resolved)
+          if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
             context.response.status_code = 301
             context.response.headers["Location"] = path + "/"
             return

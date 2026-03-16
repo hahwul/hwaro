@@ -21,7 +21,7 @@ module Hwaro
 
         # Render section list HTML for a paginated page
         def render_section_list(paginated_page : PaginatedPage) : String
-          String.build do |str|
+          String.build(paginated_page.pages.size * 100) do |str|
             paginated_page.pages.each do |page|
               escaped_url = HTML.escape("#{@base_url}#{page.url}")
               escaped_title = HTML.escape(page.title)
@@ -34,7 +34,7 @@ module Hwaro
         def render_pagination_nav(paginated_page : PaginatedPage) : String
           return "" unless paginated_page.total_pages > 1
 
-          String.build do |str|
+          String.build(paginated_page.total_pages * 100 + 200) do |str|
             str << "<nav class=\"pagination\" aria-label=\"Pagination\">\n"
             str << "  <ul class=\"pagination-list\">\n"
 

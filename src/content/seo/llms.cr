@@ -13,7 +13,7 @@ module Hwaro
           # Add a newline at the end if not present and content is not empty
           content += "\n" if !content.empty? && !content.ends_with?("\n")
 
-          filename = config.llms.filename
+          filename = File.basename(config.llms.filename)
           file_path = File.join(output_dir, filename)
           File.write(file_path, content)
           Logger.action :create, file_path if verbose
@@ -31,6 +31,7 @@ module Hwaro
 
           filename = config.llms.full_filename
           filename = "llms-full.txt" if filename.empty?
+          filename = File.basename(filename)
 
           file_path = File.join(output_dir, filename)
           content = build_full_document(pages, config)

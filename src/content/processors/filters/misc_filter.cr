@@ -12,13 +12,13 @@ module Hwaro
               target.to_s.to_json.gsub("</", "<\\/")
             end
 
-            # Default filter
+            # Default filter — returns fallback when target is nil/undefined or empty string
             env.filters["default"] = Crinja.filter({value: ""}) do
-              val = target.to_s
-              if val.empty?
+              if target.raw.nil? || target.undefined?
                 arguments["value"].to_s
               else
-                val
+                val = target.to_s
+                val.empty? ? arguments["value"].to_s : val
               end
             end
 

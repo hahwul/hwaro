@@ -74,6 +74,26 @@ module Hwaro
             if table = value.as_h?
               flatten_toml(table, full_key, result)
             end
+          when Array
+            # Store array items as indexed keys (e.g., "nav.items.0", "nav.items.1")
+            raw.each_with_index do |item, i|
+              toml_item = item.as?(TOML::Any)
+              if toml_item
+                item_raw = toml_item.raw
+                case item_raw
+                when String
+                  result["#{full_key}.#{i}"] = item_raw
+                when Hash
+                  if table = toml_item.as_h?
+                    flatten_toml(table, "#{full_key}.#{i}", result)
+                  end
+                else
+                  result["#{full_key}.#{i}"] = item_raw.to_s
+                end
+              else
+                result["#{full_key}.#{i}"] = item.to_s
+              end
+            end
           else
             result[full_key] = raw.to_s
           end

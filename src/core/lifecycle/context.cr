@@ -31,9 +31,9 @@ module Hwaro
         property site : Models::Site?
         property config : Models::Config?
 
-        # Content
-        property pages : Array(Models::Page)
-        property sections : Array(Models::Section)
+        # Content (use setter to auto-invalidate all_pages cache)
+        getter pages : Array(Models::Page)
+        getter sections : Array(Models::Section)
 
         # Raw files (JSON, XML, etc.)
         property raw_files : Array(RawFile)
@@ -63,6 +63,17 @@ module Hwaro
           @output_dir = options.output_dir
           @metadata = {} of String => String | Bool | Int32 | Float64
           @stats = BuildStats.new
+        end
+
+        # Setters that auto-invalidate cache
+        def pages=(value : Array(Models::Page))
+          @pages = value
+          @all_pages_cache = nil
+        end
+
+        def sections=(value : Array(Models::Section))
+          @sections = value
+          @all_pages_cache = nil
         end
 
         # Convenience: all pages including sections (cached after first call)

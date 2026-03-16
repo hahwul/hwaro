@@ -142,7 +142,8 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html = "<pre><code class=\"language-mermaid hljs\">graph LR\n  A --&gt; B</code></pre>"
       result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_mermaid(html)
       result.should contain("<div class=\"mermaid\">")
-      result.should contain("A --> B")
+      # Browser decodes &gt; to > when Mermaid.js reads textContent
+      result.should contain("A --&gt; B")
       result.should_not contain("<pre>")
     end
 

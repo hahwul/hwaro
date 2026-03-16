@@ -15,12 +15,22 @@ module Hwaro
               when Time
                 value.to_s(format)
               when String
-                # Try to parse the string as a date
-                begin
-                  Time.parse(value, "%Y-%m-%d", Time::Location::UTC).to_s(format)
-                rescue
-                  value
+                # Try to parse the string as a date using multiple common formats
+                parsed = nil
+                ["%Y-%m-%dT%H:%M:%S%:z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"].each do |fmt|
+                  begin
+                    parsed = Time.parse(value, fmt, Time::Location::UTC)
+                    break
+                  rescue
+                  end
                 end
+                if parsed.nil?
+                  begin
+                    parsed = Time.parse_rfc3339(value)
+                  rescue
+                  end
+                end
+                parsed ? parsed.to_s(format) : value
               else
                 value.to_s
               end

@@ -18,8 +18,8 @@ module Hwaro
       def safe_output_path(output_path : String, output_dir : String) : String?
         canonical_output = File.expand_path(output_path)
         canonical_output_dir = File.expand_path(output_dir)
-        if canonical_output.starts_with?(canonical_output_dir)
-          output_path
+        if canonical_output == canonical_output_dir || canonical_output.starts_with?(canonical_output_dir + "/")
+          canonical_output
         else
           Logger.warn "  [WARN] Skipping output outside output directory: #{output_path}"
           nil
@@ -31,7 +31,7 @@ module Hwaro
       def within_output_dir?(output_path : String, output_dir : String) : Bool
         canonical_output = File.expand_path(output_path)
         canonical_output_dir = File.expand_path(output_dir)
-        canonical_output.starts_with?(canonical_output_dir)
+        canonical_output == canonical_output_dir || canonical_output.starts_with?(canonical_output_dir + "/")
       end
     end
   end

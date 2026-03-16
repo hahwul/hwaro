@@ -231,6 +231,8 @@ module Hwaro
             TOML::Any.new(raw)
           when Int64
             TOML::Any.new(raw)
+          when Int32
+            TOML::Any.new(raw.to_i64)
           when Float64
             TOML::Any.new(raw)
           when Bool

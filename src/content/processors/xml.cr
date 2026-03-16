@@ -39,13 +39,10 @@ module Hwaro
         end
 
         # Simple XML minification - removes excess whitespace
-        # Preserves whitespace within text content where significant
+        # Only removes whitespace-only text nodes between tags (preserves mixed content)
         private def minify_xml(xml : String) : String
           xml
-            .gsub(/>\s+</, "><")           # Remove whitespace between tags
-            .gsub(/^\s+/, "")              # Remove leading whitespace
-            .gsub(/\s+$/, "")              # Remove trailing whitespace
-            .gsub(/\n\s*/, "")             # Remove newlines and following spaces
+            .gsub(/>\s*\n\s*</, "><")      # Remove whitespace-only text between tags (cross-line only)
             .gsub(/\s{2,}(?=[^<]*>)/, " ") # Collapse multiple spaces in attributes
             .strip
         end

@@ -132,9 +132,10 @@ module Hwaro
       end
 
       private def generate_default_content(title : String, date : String, is_draft : Bool) : String
+        safe_title = title.gsub("\"", "\\\"").gsub("\n", " ")
         String.build do |str|
           str << "---\n"
-          str << "title: #{title}\n"
+          str << "title: \"#{safe_title}\"\n"
           str << "date: #{date}\n"
           str << "draft: true\n" if is_draft
           str << "---\n\n"

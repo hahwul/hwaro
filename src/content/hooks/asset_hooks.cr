@@ -15,6 +15,7 @@ module Hwaro
 
         # Class-level manifest shared with template functions
         @@manifest = {} of String => String
+        @@manifest_mutex = Mutex.new
 
         def register_hooks(manager : Core::Lifecycle::Manager)
           manager.on(Core::Lifecycle::HookPoint::AfterInitialize, priority: 40, name: "assets:process") do |ctx|
@@ -24,7 +25,7 @@ module Hwaro
         end
 
         def self.manifest : Hash(String, String)
-          @@manifest
+          @@manifest_mutex.synchronize { @@manifest }
         end
 
         private def process_assets(ctx : Core::Lifecycle::BuildContext)
@@ -34,7 +35,7 @@ module Hwaro
           pipeline = Assets::Pipeline.new(config.assets, config.base_url)
           pipeline.process(ctx.output_dir)
 
-          @@manifest = pipeline.manifest
+          @@manifest_mutex.synchronize { @@manifest = pipeline.manifest }
 
           if pipeline.manifest.size > 0
             Logger.info "  Assets: #{pipeline.manifest.size} bundle(s) processed."

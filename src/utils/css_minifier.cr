@@ -61,9 +61,10 @@ module Hwaro
         # ── Step 6: Strip trailing semicolons before } ────────────────────
         result = result.gsub(/;\}/, "}")
 
-        # ── Step 7: Restore preserved tokens ──────────────────────────────
-        preserves.each_with_index do |original, idx|
-          result = result.gsub("#{placeholder_prefix}#{idx}\x00", original)
+        # ── Step 7: Restore preserved tokens (single-pass) ─────────────────
+        result = result.gsub(/\x00PRESERVE_(\d+)\x00/) do
+          idx = $1.to_i
+          idx < preserves.size ? preserves[idx] : $0
         end
 
         result.strip

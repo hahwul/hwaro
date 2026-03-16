@@ -27,10 +27,16 @@ module Hwaro
         dir = Path[relative_path].dirname.to_s
         basename = Path[relative_path].basename
 
+        # Only strip the first matching language suffix to avoid over-stripping
+        # e.g., "post.en.ko.md" should strip ".ko" (if ko matches) but not both
         codes = (config.languages.keys + [config.default_language]).uniq
-        cleaned = codes.reduce(basename) do |acc, code|
+        cleaned = basename
+        codes.each do |code|
           escaped = Regex.escape(code)
-          acc.sub(/\.#{escaped}\.md$/, ".md")
+          if cleaned.matches?(/\.#{escaped}\.md$/)
+            cleaned = cleaned.sub(/\.#{escaped}\.md$/, ".md")
+            break
+          end
         end
 
         dir == "." ? cleaned : "#{dir}/#{cleaned}"

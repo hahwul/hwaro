@@ -18,7 +18,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: My First Post")
+          content.should contain("title: \"My First Post\"")
           content.should contain("draft: true")
         end
       end
@@ -38,7 +38,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: My Custom Title")
+          content.should contain("title: \"My Custom Title\"")
         end
       end
     end
@@ -74,7 +74,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: My Blog Post")
+          content.should contain("title: \"My Blog Post\"")
         end
       end
     end
@@ -163,7 +163,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: Fallback Test")
+          content.should contain("title: \"Fallback Test\"")
           content.should contain("date: ")
         end
       end
@@ -199,7 +199,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: My Draft Post")
+          content.should contain("title: \"My Draft Post\"")
         end
       end
     end
@@ -252,7 +252,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: Breaking News! (2024)")
+          content.should contain("title: \"Breaking News! (2024)\"")
         end
       end
     end

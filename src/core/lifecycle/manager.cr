@@ -55,8 +55,8 @@ module Hwaro
         # Register handler directly
         def register_hook(point : HookPoint, handler : HookHandler, priority : Int32 = 0, name : String = "anonymous")
           @hooks[point] << RegisteredHook.new(handler, priority, name)
-          # Sort by priority descending (higher priority first)
-          @hooks[point].sort_by!(&.priority).reverse!
+          # Sort by priority descending (higher priority first) — single sort, no reverse
+          @hooks[point].sort! { |a, b| b.priority <=> a.priority }
         end
 
         # ========================================

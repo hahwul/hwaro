@@ -386,7 +386,11 @@ module Hwaro
             end
           end
         end
-      rescue
+      rescue ex : IO::Error | File::Error
+        Logger.debug "File comparison failed for #{a} vs #{b}: #{ex.message}"
+        false
+      rescue ex
+        Logger.debug "File comparison failed: #{ex.message}"
         false
       end
 
@@ -469,8 +473,10 @@ module Hwaro
 
       # Escape a string for safe interpolation into a shell command.
       # Wraps the value in single quotes and escapes any embedded single quotes.
+      # Strips null bytes which can bypass shell escaping.
       private def shell_escape(value : String) : String
-        "'" + value.gsub("'", "'\\''") + "'"
+        sanitized = value.gsub("\0", "")
+        "'" + sanitized.gsub("'", "'\\''") + "'"
       end
 
       private def local_directory_destination(url : String) : String?
@@ -490,7 +496,8 @@ module Hwaro
 
         # No scheme: treat as local path
         url
-      rescue
+      rescue ex
+        Logger.debug "Failed to parse deploy URL '#{url}': #{ex.message}"
         nil
       end
     end

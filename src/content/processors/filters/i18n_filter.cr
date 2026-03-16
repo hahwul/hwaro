@@ -24,9 +24,12 @@ module Hwaro
 
               begin
                 lang_hash = i18n_data.as_h
+                key_val = Crinja::Value.new(key)
+
                 # Try current language
-                if lang_entries = lang_hash[Crinja::Value.new(lang)]?
-                  if val = lang_entries.as_h[Crinja::Value.new(key)]?
+                lang_val = Crinja::Value.new(lang)
+                if lang_entries = lang_hash[lang_val]?
+                  if val = lang_entries.as_h[key_val]?
                     result = val.to_s
                     found = true
                   end
@@ -34,8 +37,9 @@ module Hwaro
 
                 # Fallback to default language
                 if !found && lang != default_lang
-                  if default_entries = lang_hash[Crinja::Value.new(default_lang)]?
-                    if val = default_entries.as_h[Crinja::Value.new(key)]?
+                  default_val = Crinja::Value.new(default_lang)
+                  if default_entries = lang_hash[default_val]?
+                    if val = default_entries.as_h[key_val]?
                       result = val.to_s
                       found = true
                     end

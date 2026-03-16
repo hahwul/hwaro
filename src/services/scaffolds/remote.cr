@@ -84,7 +84,7 @@ module Hwaro
             {parts[0], parts[1], subpath}
           else
             uri = URI.parse(source)
-            unless uri.host.try(&.includes?("github.com"))
+            unless uri.host.try { |h| h == "github.com" || h.ends_with?(".github.com") }
               raise ArgumentError.new("Only GitHub URLs are supported. Got: #{source}")
             end
             path_parts = (uri.path || "/").strip("/").split("/")

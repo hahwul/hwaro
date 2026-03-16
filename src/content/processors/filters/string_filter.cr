@@ -20,13 +20,9 @@ module Hwaro
               end
             end
 
-            # Slugify filter
+            # Slugify filter (delegates to TextUtils for CJK support)
             env.filters["slugify"] = Crinja.filter do
-              text = target.to_s
-              text.downcase
-                .gsub(/[^\w\s-]/, "")
-                .gsub(/[\s_-]+/, "-")
-                .strip("-")
+              Utils::TextUtils.slugify(target.to_s)
             end
 
             # Split filter

@@ -101,7 +101,7 @@ describe "Filters: URL filters" do
       },
     ) do
       html = File.read("public/page/index.html")
-      html.should contain("REL=http://localhost/about/")
+      html.should contain("REL=/about/")
     end
   end
 end
@@ -390,7 +390,8 @@ describe "Filters: strip_html with nested tags" do
       },
     ) do
       html = File.read("public/page/index.html")
-      html.should contain("STRIPPED=HelloWorld")
+      # TextUtils.strip_html inserts space at tag boundaries for word separation
+      html.should contain("STRIPPED=Hello World")
     end
   end
 end

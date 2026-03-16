@@ -25,8 +25,9 @@ module Hwaro
       def compare_by_date(a : Models::Page, b : Models::Page) : Int32
         a_date = a.updated || a.date || FALLBACK_DATE
         b_date = b.updated || b.date || FALLBACK_DATE
-        # Default: newest first (descending)
-        b_date <=> a_date
+        # Default: newest first (descending); tiebreak by path for deterministic ordering
+        result = b_date <=> a_date
+        result == 0 ? (a.path <=> b.path) : result
       end
 
       # Compare two pages by title alphabetically (A-Z)

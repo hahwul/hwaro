@@ -203,7 +203,8 @@ module Hwaro
       # Calculate reading time in minutes (assuming ~200 words per minute)
       def calculate_reading_time(words_per_minute : Int32 = 200) : Int32
         calculate_word_count if @word_count == 0
-        @reading_time = (@word_count.to_f / words_per_minute).ceil.to_i
+        wpm = words_per_minute < 1 ? 200 : words_per_minute
+        @reading_time = (@word_count.to_f / wpm).ceil.to_i
         @reading_time = 1 if @reading_time < 1 && @word_count > 0
         @reading_time
       end

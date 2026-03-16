@@ -193,11 +193,13 @@ describe Hwaro::Utils::SortUtils do
       Hwaro::Utils::SortUtils.compare_by_date(older, newer).should be > 0
     end
 
-    it "returns zero when dates are equal" do
+    it "uses path tiebreaker when dates are equal" do
       date = Time.utc(2024, 6, 1)
       page1 = create_test_page("Page1", date)
       page2 = create_test_page("Page2", date)
-      Hwaro::Utils::SortUtils.compare_by_date(page1, page2).should eq(0)
+      # Same date, different path — tiebreak by path for deterministic ordering
+      result = Hwaro::Utils::SortUtils.compare_by_date(page1, page2)
+      result.should eq(page1.path <=> page2.path)
     end
 
     it "handles nil dates using fallback" do

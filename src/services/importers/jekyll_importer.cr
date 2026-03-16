@@ -101,7 +101,7 @@ module Hwaro
 
             # Title
             if title = yaml["title"]?
-              fields["title"] = title.as_s
+              fields["title"] = title.as_s? || title.raw.to_s
             end
 
             # Date: prefer frontmatter, fall back to filename
@@ -119,7 +119,7 @@ module Hwaro
 
             # Layout -> template
             if layout = yaml["layout"]?
-              fields["template"] = layout.as_s
+              fields["template"] = layout.as_s? || layout.raw.to_s
             end
 
             # Tags: merge categories and tags
@@ -128,7 +128,7 @@ module Hwaro
             if cats = yaml["categories"]?
               case cats.raw
               when Array
-                cats.as_a.each { |c| tags << c.as_s }
+                cats.as_a.each { |c| tags << (c.as_s? || c.raw.to_s) }
               when String
                 cats.as_s.split(/[\s,]+/).each { |c| tags << c.strip unless c.strip.empty? }
               end
@@ -143,7 +143,7 @@ module Hwaro
             if tag_val = yaml["tags"]?
               case tag_val.raw
               when Array
-                tag_val.as_a.each { |t| tags << t.as_s }
+                tag_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
               when String
                 tag_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
               end
@@ -161,16 +161,16 @@ module Hwaro
 
             # Description
             if excerpt = yaml["excerpt"]?
-              fields["description"] = excerpt.as_s
+              fields["description"] = excerpt.as_s? || excerpt.raw.to_s
             elsif description = yaml["description"]?
-              fields["description"] = description.as_s
+              fields["description"] = description.as_s? || description.raw.to_s
             end
 
             # Image
             if image = yaml["image"]?
               case image.raw
               when String
-                fields["image"] = image.as_s
+                fields["image"] = image.as_s? || image.raw.to_s
               when Hash
                 # Handle nested image object (e.g., image.path or similar)
               end
@@ -178,7 +178,7 @@ module Hwaro
 
             if header = yaml["header"]?
               if header_image = header["image"]?
-                fields["image"] = header_image.as_s unless fields.has_key?("image")
+                fields["image"] = (header_image.as_s? || header_image.raw.to_s) unless fields.has_key?("image")
               end
             end
           else

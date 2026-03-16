@@ -10,13 +10,13 @@ module Hwaro
             env.filters["where"] = Crinja.filter({attribute: nil, value: nil}) do
               result = begin
                 arr = target.as_a
-                attr = arguments["attribute"].to_s
+                attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 val = arguments["value"]
 
                 filtered = arr.select do |item|
                   begin
                     item_hash = item.as_h
-                    item_val = item_hash[Crinja::Value.new(attr)]?
+                    item_val = item_hash[attr_key]?
                     item_val == val
                   rescue
                     false
@@ -33,13 +33,13 @@ module Hwaro
             env.filters["sort_by"] = Crinja.filter({attribute: nil, reverse: false}) do
               result = begin
                 arr = target.as_a
-                attr = arguments["attribute"].to_s
+                attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 reverse = arguments["reverse"].truthy?
 
                 sorted = arr.sort_by do |item|
                   begin
                     item_hash = item.as_h
-                    item_hash[Crinja::Value.new(attr)]?.try(&.to_s) || ""
+                    item_hash[attr_key]?.try(&.to_s) || ""
                   rescue
                     ""
                   end
@@ -57,13 +57,13 @@ module Hwaro
             env.filters["group_by"] = Crinja.filter({attribute: nil}) do
               result = begin
                 arr = target.as_a
-                attr = arguments["attribute"].to_s
+                attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 groups = {} of String => Array(Crinja::Value)
 
                 arr.each do |item|
                   begin
                     item_hash = item.as_h
-                    key = item_hash[Crinja::Value.new(attr)]?.try(&.to_s) || ""
+                    key = item_hash[attr_key]?.try(&.to_s) || ""
                     groups[key] ||= [] of Crinja::Value
                     groups[key] << item
                   rescue

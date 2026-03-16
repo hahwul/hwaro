@@ -566,7 +566,7 @@ describe Hwaro::Content::Processors::Template do
 
       template = "{{ path | relative_url }}"
       result = Hwaro::Content::Processors::Template.process(template, tpl_context)
-      result.should eq("https://example.com/blog/post/1/")
+      result.should eq("/blog/post/1/")
     end
 
     it "processes markdownify filter" do

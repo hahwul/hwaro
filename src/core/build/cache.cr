@@ -128,7 +128,7 @@ module Hwaro
           end
 
           if invalidated
-            @entries.clear
+            @mutex.synchronize { @entries.clear }
           end
 
           @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash)
@@ -139,7 +139,7 @@ module Hwaro
           return true unless @enabled
           return true unless File.exists?(file_path)
 
-          entry = @entries[file_path]?
+          entry = @mutex.synchronize { @entries[file_path]? }
           return true unless entry
 
           # Check if output exists

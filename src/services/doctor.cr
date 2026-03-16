@@ -559,17 +559,21 @@ module Hwaro
       private def check_template_syntax(file_path : String, issues : Array(Issue))
         content = File.read(file_path)
 
+        # Strip Jinja comments {# ... #} and HTML comments before counting,
+        # to avoid false positives from commented-out template code
+        stripped = content.gsub(/\{#.*?#\}/m, "").gsub(/<!--.*?-->/m, "")
+
         # Check for unclosed block tags
-        opens = content.scan(/\{%[-\s]*\b(if|for|block|macro)\b/).size
-        closes = content.scan(/\{%[-\s]*\bend(if|for|block|macro)\b/).size
+        opens = stripped.scan(/\{%[-\s]*\b(if|for|block|macro)\b/).size
+        closes = stripped.scan(/\{%[-\s]*\bend(if|for|block|macro)\b/).size
         if opens != closes
           issues << Issue.new(level: :warning, category: "template", file: file_path,
             message: "Possible unclosed template block tag (#{opens} opened, #{closes} closed)")
         end
 
         # Check for unclosed variable tags
-        open_vars = content.scan(/\{\{/).size
-        close_vars = content.scan(/\}\}/).size
+        open_vars = stripped.scan(/\{\{/).size
+        close_vars = stripped.scan(/\}\}/).size
         if open_vars != close_vars
           issues << Issue.new(level: :warning, category: "template", file: file_path,
             message: "Mismatched {{ }} variable tags (#{open_vars} opened, #{close_vars} closed)")

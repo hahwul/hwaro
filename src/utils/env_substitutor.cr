@@ -14,6 +14,9 @@ module Hwaro
       # Group 1: braced var name          (from ${VAR} or ${VAR:-default})
       # Group 2: default value            (from ${VAR:-default}, nil when absent)
       # Group 3: bare var name            (from $VAR)
+      #
+      # NOTE: Nested ${...} in default values is not supported.
+      # Use a flat default value: ${VAR:-fallback}
       PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}|\$([A-Za-z_][A-Za-z0-9_]*)\b/
 
       # Substitute environment variables in the given string.

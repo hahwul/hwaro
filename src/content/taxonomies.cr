@@ -351,10 +351,7 @@ module Hwaro
         url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, ""))
         output_path = File.join(output_dir, url_path, "index.html")
 
-        # Ensure output path is within output directory
-        canonical_output = File.expand_path(output_path)
-        canonical_output_dir = File.expand_path(output_dir)
-        unless canonical_output.starts_with?(canonical_output_dir)
+        unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
           Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
           return
         end
@@ -368,10 +365,7 @@ module Hwaro
         url_path = Utils::PathUtils.sanitize_path(page.url.sub(/^\//, ""))
         output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
 
-        # Ensure output path is within output directory
-        canonical_output = File.expand_path(output_path)
-        canonical_output_dir = File.expand_path(output_dir)
-        unless canonical_output.starts_with?(canonical_output_dir)
+        unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
           Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
           return
         end

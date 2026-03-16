@@ -18,7 +18,7 @@ module Hwaro
 
             # Filter by section if configured for main feed
             if !config.feeds.sections.empty?
-              site_pages.select! { |p|
+              site_pages = site_pages.select { |p|
                 config.feeds.sections.any? { |s| p.section == s || p.section.starts_with?("#{s}/") }
               }
             end
@@ -28,7 +28,7 @@ module Hwaro
             # When false, the main feed includes all languages (original behavior).
             if config.multilingual? && config.feeds.default_language_only
               default_lang = config.default_language
-              site_pages.select! { |p|
+              site_pages = site_pages.select { |p|
                 lang = p.language || default_lang
                 lang == default_lang
               }
@@ -144,8 +144,8 @@ module Hwaro
                            generate_rss(pages, config, filename, config.feeds.truncate > 0, feed_title, base_path, language)
                          end
 
-          # Write feed file
-          feed_path = File.join(output_dir, filename)
+          # Write feed file (basename prevents path traversal via config filename)
+          feed_path = File.join(output_dir, File.basename(filename))
           File.write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
         end
@@ -175,7 +175,7 @@ module Hwaro
         ) : String
           base_url, feed_url = build_feed_url(config, base_path, filename)
 
-          String.build do |str|
+          String.build(500 + pages.size * 300) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
             str << "  <channel>\n"
@@ -225,7 +225,7 @@ module Hwaro
           now = Time.utc
           base_url, feed_url = build_feed_url(config, base_path, filename)
 
-          String.build do |str|
+          String.build(500 + pages.size * 350) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 
             if language
@@ -253,7 +253,7 @@ module Hwaro
               str << "    <link href=\"#{escaped_url}\" />\n"
               str << "    <id>#{escaped_url}</id>\n"
 
-              entry_date = page.updated || page.date || now
+              entry_date = (page.updated || page.date || now).to_utc
               str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
 
               content = get_content_for_feed(page, config.feeds.truncate)

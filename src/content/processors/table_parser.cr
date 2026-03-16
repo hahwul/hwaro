@@ -108,11 +108,7 @@ module Hwaro
           end
 
           private def escape_html(text : String) : String
-            text
-              .gsub("&", "&amp;")
-              .gsub("<", "&lt;")
-              .gsub(">", "&gt;")
-              .gsub("\"", "&quot;")
+            HTML.escape(text)
           end
 
           private def render_inline_markdown(text : String) : String

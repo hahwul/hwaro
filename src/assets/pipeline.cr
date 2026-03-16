@@ -36,7 +36,14 @@ module Hwaro
         # Read and concatenate source files
         contents = String.build do |io|
           bundle.files.each_with_index do |file, i|
+            # Validate source path stays within source_dir
             source = File.join(@config.source_dir, file)
+            source_real = File.expand_path(source)
+            source_dir_real = File.expand_path(@config.source_dir)
+            unless source_real == source_dir_real || source_real.starts_with?(source_dir_real + "/")
+              Logger.warn "Asset pipeline: source file outside source directory: #{file}"
+              next
+            end
             unless File.exists?(source)
               Logger.warn "Asset pipeline: source file not found: #{source}"
               next

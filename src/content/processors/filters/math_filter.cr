@@ -9,7 +9,16 @@ module Hwaro
             # Ceil filter — rounds up to the nearest integer
             env.filters["ceil"] = Crinja.filter do
               begin
-                Crinja::Value.new(target.as_number.ceil.to_i64)
+                num = target.as_number
+                if num.is_a?(Float64)
+                  if num.nan? || num.infinite? || num > Int64::MAX.to_f || num < Int64::MIN.to_f
+                    target
+                  else
+                    Crinja::Value.new(num.ceil.to_i64)
+                  end
+                else
+                  Crinja::Value.new(num.to_i64)
+                end
               rescue
                 target
               end
@@ -18,7 +27,16 @@ module Hwaro
             # Floor filter — rounds down to the nearest integer
             env.filters["floor"] = Crinja.filter do
               begin
-                Crinja::Value.new(target.as_number.floor.to_i64)
+                num = target.as_number
+                if num.is_a?(Float64)
+                  if num.nan? || num.infinite? || num > Int64::MAX.to_f || num < Int64::MIN.to_f
+                    target
+                  else
+                    Crinja::Value.new(num.floor.to_i64)
+                  end
+                else
+                  Crinja::Value.new(num.to_i64)
+                end
               rescue
                 target
               end

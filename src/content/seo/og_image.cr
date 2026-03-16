@@ -65,8 +65,8 @@ module Hwaro
           bg = escape_attr(ai.background)
           text_color = escape_attr(ai.text_color)
           accent = escape_attr(ai.accent_color)
-          font_size = ai.font_size
-          desc_size = (font_size * 0.45).to_i
+          font_size = Math.max(ai.font_size, 1)
+          desc_size = Math.max((font_size * 0.45).to_i, 1)
           site_name = escape_xml(config.title)
           title = escape_xml(page.title)
           description = escape_xml(page.description || "")
@@ -173,8 +173,7 @@ module Hwaro
         end
 
         private def self.escape_attr(text : String) : String
-          # & must be replaced first to avoid double-encoding (&quot; → &amp;quot;)
-          text.gsub("&", "&amp;").gsub("\"", "&quot;").gsub("<", "&lt;").gsub(">", "&gt;")
+          Utils::TextUtils.escape_xml(text)
         end
       end
     end

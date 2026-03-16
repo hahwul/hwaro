@@ -248,6 +248,7 @@ module Hwaro
 
           regex_cache = {} of String => Regex
           regex_mutex = Mutex.new
+          max_regex_cache_size = 256
 
           # Test if a string matches a regex
           # Usage: {% if asset is matching("[.](jpg|png)$") %}
@@ -255,6 +256,10 @@ module Hwaro
             regex_str = arguments.varargs.first?.try(&.to_s) || ""
             begin
               regex = regex_mutex.synchronize do
+                # Evict oldest entry when cache is full
+                if regex_cache.size >= max_regex_cache_size && !regex_cache.has_key?(regex_str)
+                  regex_cache.delete(regex_cache.first_key)
+                end
                 regex_cache[regex_str] ||= Regex.new(regex_str)
               end
               target.to_s.matches?(regex)
@@ -442,12 +447,14 @@ module Hwaro
 
             begin
               # Restrict file access to the project directory (cwd)
-              # to prevent reading arbitrary files via malicious templates
+              # to prevent reading arbitrary files via malicious templates.
+              # Resolve symlinks BEFORE boundary check to prevent TOCTOU attacks.
               project_root = File.realpath(Dir.current)
               resolved = File.expand_path(path, project_root)
-              resolved = File.realpath(resolved) if File.exists?(resolved)
+              resolved = File.realpath(resolved) rescue nil
 
-              if (resolved.starts_with?(project_root + "/") || resolved == project_root) &&
+              if resolved &&
+                 (resolved == project_root || resolved.starts_with?(project_root + "/")) &&
                  File.exists?(resolved) && File.file?(resolved)
                 content = File.read(resolved)
 
@@ -469,6 +476,9 @@ module Hwaro
                     Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
                   end
                   result = Crinja::Value.new(csv_data)
+                else
+                  ext = File.extname(path)
+                  Logger.debug "load_data('#{path}'): unsupported file type '#{ext}' (supported: .json, .toml, .yaml, .yml, .csv)"
                 end
               end
             rescue ex

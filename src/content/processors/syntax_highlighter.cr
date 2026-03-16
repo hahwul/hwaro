@@ -54,11 +54,7 @@ module Hwaro
 
         # Escape special HTML characters in language name
         private def escape_lang(text : String) : String
-          text
-            .gsub("&", "&amp;")
-            .gsub("<", "&lt;")
-            .gsub(">", "&gt;")
-            .gsub("\"", "&quot;")
+          HTML.escape(text)
         end
       end
 

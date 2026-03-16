@@ -151,8 +151,8 @@ module Hwaro
         # Check if pagination is enabled for a section
         private def pagination_enabled_for_section?(section : Models::Section) : Bool
           # Section-level override takes precedence
-          if !section.pagination_enabled.nil?
-            return section.pagination_enabled.not_nil!
+          if enabled = section.pagination_enabled
+            return enabled
           end
 
           # If paginate (per_page) is explicitly set, enable pagination
