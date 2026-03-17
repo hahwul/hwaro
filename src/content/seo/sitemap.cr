@@ -31,7 +31,7 @@ module Hwaro
           end
 
           if site.config.base_url.empty?
-            Logger.warn "  [WARN] base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
+            Logger.warn "base_url is empty. Sitemap will contain relative URLs instead of absolute URLs."
           end
 
           # Pre-compute config values once outside the loop

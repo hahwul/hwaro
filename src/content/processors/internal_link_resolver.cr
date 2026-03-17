@@ -33,7 +33,7 @@ module Hwaro
             anchor = $2?
 
             if content_path.empty?
-              Logger.warn "  [WARN] Empty internal link '@/' in '#{source_path}'"
+              Logger.warn "Empty internal link '@/' in '#{source_path}'"
               next match
             end
 
@@ -45,7 +45,7 @@ module Hwaro
                 "href=\"#{url}\""
               end
             else
-              Logger.warn "  [WARN] Internal link '@/#{content_path}' in '#{source_path}' could not be resolved: page not found."
+              Logger.warn "Internal link '@/#{content_path}' in '#{source_path}' could not be resolved: page not found."
               match
             end
           end

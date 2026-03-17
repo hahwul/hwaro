@@ -71,7 +71,7 @@ module Hwaro
                      when "weight" then ->compare_by_weight(Models::Page, Models::Page)
                      when "date"   then ->compare_by_date(Models::Page, Models::Page)
                      else
-                       Logger.warn "  [WARN] Unknown sort_by '#{sort_by}', defaulting to 'date'"
+                       Logger.warn "Unknown sort_by '#{sort_by}', defaulting to 'date'"
                        ->compare_by_date(Models::Page, Models::Page)
                      end
 

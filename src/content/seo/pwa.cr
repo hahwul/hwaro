@@ -72,7 +72,11 @@ module Hwaro
           end
 
           precache_json = precache_urls.map(&.inspect).join(",\n  ")
-          offline_url = pwa.offline_page ? pwa.offline_page.not_nil!.inspect : pwa.start_url.inspect
+          offline_url = if op = pwa.offline_page
+                          op.inspect
+                        else
+                          pwa.start_url.inspect
+                        end
           cache_version = Time.utc.to_unix
 
           sw_content = <<-JS

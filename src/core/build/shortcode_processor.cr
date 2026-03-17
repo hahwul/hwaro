@@ -112,7 +112,7 @@ module Hwaro
           template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
 
           unless template
-            Logger.warn "  [WARN] Shortcode template '#{template_key}' not found." if warn_missing
+            Logger.warn "Shortcode template '#{template_key}' not found." if warn_missing
             return fallback
           end
 
@@ -186,7 +186,7 @@ module Hwaro
             end
             crinja_template.render(context)
           rescue ex : Crinja::TemplateError
-            Logger.warn "  [WARN] Shortcode template error: #{ex.message}"
+            Logger.warn "Shortcode template error: #{ex.message}"
             ""
           ensure
             args.each_key { |key| context.delete(key) }

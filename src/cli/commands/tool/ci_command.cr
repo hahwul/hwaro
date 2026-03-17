@@ -70,12 +70,10 @@ module Hwaro
               end
             end
 
-            unless provider
+            unless provider_name = provider
               Logger.error "CI provider name required. Use: github-actions"
               exit(1)
             end
-
-            provider_name = provider.not_nil!
 
             unless Services::CIConfig::SUPPORTED_PROVIDERS.includes?(provider_name)
               Logger.error "Unsupported CI provider: #{provider_name}"
@@ -85,7 +83,11 @@ module Hwaro
 
             generator = Services::CIConfig.new
             content = generator.generate(provider_name)
-            filename = (output_file || generator.output_path(provider_name)).not_nil!
+            filename = if of = output_file
+                         of
+                       else
+                         generator.output_path(provider_name)
+                       end
 
             if stdout_mode
               puts content

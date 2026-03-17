@@ -271,7 +271,8 @@ module Hwaro
         private def fetch_file(owner : String, repo : String, branch : String, path : String) : String
           uri = URI.parse("https://raw.githubusercontent.com/#{owner}/#{repo}/#{branch}/#{path}")
           tls = OpenSSL::SSL::Context::Client.new
-          client = HTTP::Client.new(uri.host.not_nil!, uri.port || 443, tls: tls)
+          host = uri.host || raise "Invalid URI: missing host"
+          client = HTTP::Client.new(host, uri.port || 443, tls: tls)
           client.connect_timeout = 10.seconds
           client.read_timeout = 30.seconds
 

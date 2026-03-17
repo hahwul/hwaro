@@ -124,10 +124,10 @@ module Hwaro
               end
               ok ? dest : nil
             ensure
-              LibC.free(out_pixels.as(Void*))
+              LibC.free(out_pixels.as(Void*)) unless out_pixels.null?
             end
           ensure
-            LibStb.stbi_image_free(pixels.as(Void*))
+            LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
           end
         end
 
@@ -205,7 +205,10 @@ module Hwaro
               next if buf_size > MAX_PIXELS * 4
 
               out_pixels = LibC.malloc(buf_size).as(UInt8*)
-              next if out_pixels.null?
+              if out_pixels.null?
+                Logger.debug "Failed to allocate #{buf_size} bytes for resize of '#{source}' at width #{width}"
+                next
+              end
 
               begin
                 resized = LibStb.stbir_resize_uint8_linear(
@@ -219,11 +222,11 @@ module Hwaro
                   result_map[width] = dest
                 end
               ensure
-                LibC.free(out_pixels.as(Void*))
+                LibC.free(out_pixels.as(Void*)) unless out_pixels.null?
               end
             end
           ensure
-            LibStb.stbi_image_free(pixels.as(Void*))
+            LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
           end
 
           result_map

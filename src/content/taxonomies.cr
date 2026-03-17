@@ -351,7 +351,7 @@ module Hwaro
         output_path = File.join(output_dir, url_path, "index.html")
 
         unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-          Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
+          Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
           return
         end
 
@@ -365,7 +365,7 @@ module Hwaro
         output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
 
         unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-          Logger.warn "  [WARN] Skipping taxonomy output outside output directory: #{output_path}"
+          Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
           return
         end
 

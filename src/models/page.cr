@@ -62,6 +62,9 @@ module Hwaro
       # Build warnings collected during rendering (used for error overlay in serve mode)
       property build_warnings : Array(String)
 
+      # Whether parsing (front-matter / markdown) failed for this page
+      property parse_failed : Bool
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
@@ -141,6 +144,7 @@ module Hwaro
         @related_posts = [] of Page
         @redirect_to = nil
         @build_warnings = [] of String
+        @parse_failed = false
       end
 
       # Check if page has redirect
@@ -226,8 +230,9 @@ module Hwaro
       def generate_permalink(base_url : String) : String
         base = base_url.rstrip("/")
         path = @url.starts_with?("/") ? @url : "/#{@url}"
-        @permalink = "#{base}#{path}"
-        @permalink.not_nil!
+        permalink = "#{base}#{path}"
+        @permalink = permalink
+        permalink
       end
 
       # Check if page has summary (either from <!-- more --> or description)

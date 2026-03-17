@@ -61,7 +61,7 @@ module Hwaro
             exit(1)
           end
 
-          case shell.not_nil!.downcase
+          case shell.as(String).downcase
           when "bash"
             puts generate_bash
           when "zsh"

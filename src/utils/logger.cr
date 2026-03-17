@@ -47,7 +47,7 @@ module Hwaro
 
     def self.warn(message : String)
       return if @@level > Level::Warn
-      @@io.puts message.colorize(:yellow)
+      @@io.puts "[WARN] #{message}".colorize(:yellow)
     end
 
     def self.success(message : String)

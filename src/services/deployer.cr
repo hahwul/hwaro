@@ -35,8 +35,8 @@ module Hwaro
         target_names =
           if options.targets.any?
             options.targets
-          elsif deployment.target
-            [deployment.target.not_nil!]
+          elsif target = deployment.target
+            [target]
           elsif deployment.targets.size > 0
             [deployment.targets.first.name]
           else
@@ -78,9 +78,9 @@ module Hwaro
         getter max_deletes : Int32
 
         def initialize(deployment : Models::DeploymentConfig, options : Config::Options::DeployOptions)
-          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.not_nil!
-          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.not_nil!
-          @force = options.force.nil? ? deployment.force : options.force.not_nil!
+          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.as(Bool)
+          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.as(Bool)
+          @force = options.force.nil? ? deployment.force : options.force.as(Bool)
           @max_deletes = options.max_deletes || deployment.max_deletes
         end
       end
@@ -117,6 +117,11 @@ module Hwaro
         false
       end
 
+      # Shell metacharacters that indicate potentially dangerous commands.
+      # These are not inherently bad but warrant user attention when present
+      # in deploy commands, especially from remote scaffolds.
+      DANGEROUS_SHELL_PATTERNS = /[|;&`$]|\bsudo\b|\brm\s+-rf\b/
+
       private def deploy_via_command(
         target : Models::DeploymentTarget,
         source_dir : String,
@@ -136,7 +141,17 @@ module Hwaro
           return true
         end
 
-        if effective.confirm && !confirm?("Run deploy command for '#{target.name}'?")
+        # Always show the command that will be executed
+        Logger.info "  Command: #{expanded}"
+
+        # Warn and require confirmation for commands with shell metacharacters
+        needs_confirm = effective.confirm
+        if !effective.force && DANGEROUS_SHELL_PATTERNS.matches?(expanded)
+          Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
+          needs_confirm = true
+        end
+
+        if needs_confirm && !confirm?("Run deploy command for '#{target.name}'?")
           Logger.warn "Cancelled."
           return true
         end

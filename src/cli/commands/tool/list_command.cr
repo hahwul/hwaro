@@ -74,7 +74,7 @@ module Hwaro
 
             lister = Services::ContentLister.new(content_dir)
 
-            content_filter = case filter.not_nil!.downcase
+            content_filter = case filter.as(String).downcase
                              when "all"
                                Services::ContentFilter::All
                              when "drafts", "draft"

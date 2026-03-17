@@ -71,12 +71,10 @@ module Hwaro
               end
             end
 
-            unless platform
+            unless platform_name = platform
               Logger.error "Platform name required. Use: netlify, vercel, or cloudflare"
               exit(1)
             end
-
-            platform_name = platform.not_nil!
 
             unless Services::PlatformConfig::SUPPORTED_PLATFORMS.includes?(platform_name)
               Logger.error "Unsupported platform: #{platform_name}"
@@ -91,7 +89,11 @@ module Hwaro
             config = Models::Config.load
             generator = Services::PlatformConfig.new(config)
             content = generator.generate(platform_name)
-            filename = (output_path || generator.output_filename(platform_name)).not_nil!
+            filename = if op = output_path
+                         op
+                       else
+                         generator.output_filename(platform_name)
+                       end
 
             if stdout_mode
               puts content

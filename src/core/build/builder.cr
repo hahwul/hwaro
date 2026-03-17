@@ -83,6 +83,10 @@ module Hwaro
         @ancestors_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
         # Per-page related_posts Crinja::Value cache (avoids rebuilding the array on each build_template_variables call)
         @related_posts_crinja_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
+        # Mutex to protect shared Crinja value caches during parallel rendering.
+        # Crystal fibers are single-threaded by default, but this guards against
+        # future multi-threaded mode (-Dpreview_mt) and ensures correctness.
+        @crinja_cache_mutex : Mutex = Mutex.new(:reentrant)
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -350,8 +354,8 @@ module Hwaro
           start_time = Time.instant
 
           # Initialize profiler
-          @profiler = Profiler.new(enabled: profile)
-          profiler = @profiler.not_nil!
+          profiler = Profiler.new(enabled: profile)
+          @profiler = profiler
           profiler.start
 
           # Create build context for lifecycle
@@ -417,7 +421,9 @@ module Hwaro
           end
 
           if options.debug
-            Utils::DebugPrinter.print(@site.not_nil!)
+            if debug_site = @site
+              Utils::DebugPrinter.print(debug_site)
+            end
           end
         end
 
@@ -470,15 +476,16 @@ module Hwaro
             verbose = ctx.options.verbose
             cache_enabled = ctx.options.cache
 
-            @cache = Cache.new(enabled: cache_enabled)
-            ctx.cache = @cache
+            build_cache = Cache.new(enabled: cache_enabled)
+            @cache = build_cache
+            ctx.cache = build_cache
 
             if cache_enabled
               if ctx.options.full
-                @cache.not_nil!.clear
+                build_cache.clear
                 Logger.info "  Cache: full rebuild requested — cleared all entries."
               else
-                stats = @cache.not_nil!.stats
+                stats = build_cache.stats
                 Logger.info "  Cache enabled (#{stats[:valid]} valid entries)"
               end
             end
@@ -486,13 +493,14 @@ module Hwaro
             setup_output_dir(output_dir, cache_enabled)
             copy_static_files(output_dir, verbose, cache_enabled)
 
-            config = @config.not_nil!
+            config = @config || raise "Config not loaded"
             if url = ctx.options.base_url
               override = url.strip
               config.base_url = override unless override.empty?
             end
-            @site = Models::Site.new(config)
-            load_data_files(@site.not_nil!)
+            site = Models::Site.new(config)
+            @site = site
+            load_data_files(site)
 
             # Load i18n translations
             i18n_dir = File.join("i18n")
@@ -509,7 +517,7 @@ module Hwaro
             if cache_enabled
               template_hash = Cache.compute_templates_hash(ctx.templates)
               config_hash = Cache.compute_config_hash
-              @cache.not_nil!.set_global_checksums(template_hash, config_hash)
+              build_cache.set_global_checksums(template_hash, config_hash)
             end
           end
           profiler.end_phase
@@ -559,7 +567,7 @@ module Hwaro
           profiler.end_phase
           return result if result != Lifecycle::HookResult::Continue
 
-          site = @site.not_nil!
+          site = @site || raise "Site not initialized"
           # Populate site with pages and sections from context
           site.pages = ctx.pages
           site.sections = ctx.sections
@@ -579,9 +587,9 @@ module Hwaro
         end
 
         private def execute_render_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
-          site = @site.not_nil!
-          templates = @templates.not_nil!
-          build_cache = @cache.not_nil!
+          site = @site || raise "Site not initialized"
+          templates = @templates || raise "Templates not loaded"
+          build_cache = @cache || raise "Cache not initialized"
           output_dir = ctx.options.output_dir
           cache_enabled = ctx.options.cache
           parallel = ctx.options.parallel
@@ -672,7 +680,7 @@ module Hwaro
           result = @lifecycle.run_phase(Lifecycle::Phase::Generate, ctx) do
             # Default generation if no SEO hooks registered
             unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeGenerate)
-              site = @site.not_nil!
+              site = @site || raise "Site not initialized"
               output_dir = ctx.options.output_dir
               all_pages = ctx.all_pages
 
@@ -694,8 +702,8 @@ module Hwaro
         private def execute_write_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
           profiler.start_phase("Write")
           result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
-            site = @site.not_nil!
-            templates = @templates.not_nil!
+            site = @site || raise "Site not initialized"
+            templates = @templates || raise "Templates not loaded"
             output_dir = ctx.options.output_dir
             minify = ctx.options.minify
             verbose = ctx.options.verbose
@@ -716,7 +724,7 @@ module Hwaro
         private def execute_finalize_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
           profiler.start_phase("Finalize")
           result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
-            build_cache = @cache.not_nil!
+            build_cache = @cache || raise "Cache not initialized"
             build_cache.save if ctx.options.cache
           end
           profiler.end_phase
@@ -1018,33 +1026,54 @@ module Hwaro
             parse_content_sequential(pages)
           end
 
-          # Filter drafts (must be sequential — mutates shared arrays)
-          unless ctx.options.drafts
-            ctx.pages.reject! { |p| p.draft }
-            ctx.sections.reject! { |s| s.draft }
-            ctx.invalidate_all_pages_cache
-          end
+          # Single-pass filtering: remove parse-failed, draft, and expired pages.
+          # Combines multiple reject! calls into one pass per array to avoid
+          # repeated traversals, and calls invalidate_all_pages_cache at most once.
+          include_drafts = ctx.options.drafts
+          filter_expired = !ctx.options.include_expired
+          now = filter_expired ? Time.utc : Time.utc # evaluated once
+          soon = now + 7.days
 
-          # Filter expired content and warn about pages expiring soon
-          unless ctx.options.include_expired
-            now = Time.utc
-            soon = now + 7.days
+          # Warn about pages expiring soon (before filtering)
+          if filter_expired
             ctx.pages.each do |p|
               if exp = p.expires
                 if exp > now && exp <= soon
-                  Logger.warn "  [WARN] Page '#{p.path}' expires on #{exp.to_s("%Y-%m-%d")} (within 7 days)"
+                  Logger.warn "Page '#{p.path}' expires on #{exp.to_s("%Y-%m-%d")} (within 7 days)"
                 end
               end
             end
-            before = ctx.pages.size
-            ctx.pages.reject! { |p| p.expires.try { |e| e <= now } || false }
-            ctx.sections.reject! { |s| s.expires.try { |e| e <= now } || false }
-            removed = before - ctx.pages.size
-            if removed > 0
-              Logger.info "  Excluded #{removed} expired page#{"s" if removed > 1}"
-              ctx.invalidate_all_pages_cache
+          end
+
+          pages_before = ctx.pages.size
+          sections_before = ctx.sections.size
+          failed_count = 0
+          expired_count = 0
+
+          filter = ->(p : Models::Page) do
+            if p.parse_failed
+              failed_count += 1
+              true
+            elsif !include_drafts && p.draft
+              true
+            elsif filter_expired && (p.expires.try { |e| e <= now } || false)
+              expired_count += 1
+              true
+            else
+              false
             end
           end
+
+          ctx.pages.reject!(&filter)
+          ctx.sections.reject!(&filter)
+
+          total_removed = (pages_before - ctx.pages.size) + (sections_before - ctx.sections.size)
+          if total_removed > 0
+            ctx.invalidate_all_pages_cache
+          end
+
+          Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
+          Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
         end
 
         # Parse a single page: read file, parse frontmatter, assign properties
@@ -1115,7 +1144,14 @@ module Hwaro
         end
 
         private def parse_content_sequential(pages : Array(Models::Page))
-          pages.each { |page| parse_single_page(page) }
+          pages.each do |page|
+            begin
+              parse_single_page(page)
+            rescue ex
+              page.parse_failed = true
+              Logger.warn "Failed to parse #{page.path}: #{ex.message}"
+            end
+          end
         end
 
         # Parallel file reading + frontmatter parsing using fibers.
@@ -1141,7 +1177,8 @@ module Hwaro
                 begin
                   parse_single_page(page)
                 rescue ex
-                  Logger.warn "  [WARN] Failed to parse #{page.path}: #{ex.message}"
+                  page.parse_failed = true
+                  Logger.warn "Failed to parse #{page.path}: #{ex.message}"
                 end
                 done.send(nil)
               end
@@ -1235,7 +1272,9 @@ module Hwaro
 
         # Populate site.taxonomies from all pages (lifecycle context variant)
         private def populate_taxonomies(ctx : Lifecycle::BuildContext)
-          rebuild_taxonomies(ctx.site.not_nil!, ctx.all_pages)
+          if site = ctx.site
+            rebuild_taxonomies(site, ctx.all_pages)
+          end
         end
 
         # Rebuild site.taxonomies from the given set of pages.
@@ -1288,8 +1327,8 @@ module Hwaro
                           ""
                         end
 
-          if page.custom_path
-            custom = page.custom_path.not_nil!.lchop("/")
+          if custom_path = page.custom_path
+            custom = custom_path.lchop("/")
             page.url = "#{lang_prefix}/#{custom}"
             page.url += "/" unless page.url.ends_with?("/")
           elsif page.is_index
@@ -1411,7 +1450,9 @@ module Hwaro
         end
 
         private def load_templates : Hash(String, String)
-          return @templates.not_nil! if @templates
+          if cached = @templates
+            return cached
+          end
 
           templates = {} of String => String
           if Dir.exists?("templates")
@@ -1659,7 +1700,7 @@ module Hwaro
                              prebuilt_vars: shortcode_context)
                          else
                            msg = "No template found for #{page.path}. Using raw content."
-                           Logger.warn "  [WARN] #{msg}"
+                           Logger.warn "#{msg}"
                            page.build_warnings << msg unless page.build_warnings.includes?(msg)
                            html_content
                          end
@@ -1734,7 +1775,7 @@ module Hwaro
                              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links)
                          else
                            msg = "No template found for #{section.path}. Using raw content."
-                           Logger.warn "  [WARN] #{msg}"
+                           Logger.warn "#{msg}"
                            section.build_warnings << msg unless section.build_warnings.includes?(msg)
                            html_content
                          end
@@ -1768,7 +1809,7 @@ module Hwaro
           if custom = page.template
             return custom if templates.has_key?(custom)
             msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
-            Logger.warn "  [WARN] #{msg}"
+            Logger.warn "#{msg}"
             page.build_warnings << msg unless page.build_warnings.includes?(msg)
           end
 
@@ -1893,12 +1934,12 @@ module Hwaro
             crinja_template.render(vars)
           rescue ex : Crinja::TemplateNotFoundError
             msg = "Template error for #{page.path}: #{ex.message}"
-            Logger.warn "  [WARN] #{msg}"
+            Logger.warn "#{msg}"
             page.build_warnings << msg unless page.build_warnings.includes?(msg)
             content
           rescue ex : Crinja::Error
             msg = "Template error for #{page.path}: #{ex.message}"
-            Logger.warn "  [WARN] #{msg}"
+            Logger.warn "#{msg}"
             page.build_warnings << msg unless page.build_warnings.includes?(msg)
             content
           end
@@ -1928,32 +1969,34 @@ module Hwaro
         # section page lists, and paginator rendering.  The cached value contains
         # a superset of fields needed by all consumers.
         private def cached_page_crinja_value(p : Models::Page, default_language : String) : Crinja::Value
-          @page_crinja_value_cache[p.path]? || begin
-            val = Crinja::Value.new({
-              "path"         => Crinja::Value.new(p.path),
-              "title"        => Crinja::Value.new(p.title),
-              "description"  => Crinja::Value.new(p.description || ""),
-              "url"          => Crinja::Value.new(p.url),
-              "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-              "image"        => Crinja::Value.new(p.image || ""),
-              "section"      => Crinja::Value.new(p.section),
-              "draft"        => Crinja::Value.new(p.draft),
-              "toc"          => Crinja::Value.new(p.toc),
-              "render"       => Crinja::Value.new(p.render),
-              "is_index"     => Crinja::Value.new(p.is_index),
-              "generated"    => Crinja::Value.new(p.generated),
-              "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
-              "language"     => Crinja::Value.new(p.language || default_language),
-              "weight"       => Crinja::Value.new(p.weight),
-              "summary"      => Crinja::Value.new(p.effective_summary || ""),
-              "word_count"   => Crinja::Value.new(p.word_count),
-              "reading_time" => Crinja::Value.new(p.reading_time),
-              "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
-              "authors"      => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
-              "assets"       => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
-            })
-            @page_crinja_value_cache[p.path] = val
-            val
+          @crinja_cache_mutex.synchronize do
+            @page_crinja_value_cache[p.path]? || begin
+              val = Crinja::Value.new({
+                "path"         => Crinja::Value.new(p.path),
+                "title"        => Crinja::Value.new(p.title),
+                "description"  => Crinja::Value.new(p.description || ""),
+                "url"          => Crinja::Value.new(p.url),
+                "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+                "image"        => Crinja::Value.new(p.image || ""),
+                "section"      => Crinja::Value.new(p.section),
+                "draft"        => Crinja::Value.new(p.draft),
+                "toc"          => Crinja::Value.new(p.toc),
+                "render"       => Crinja::Value.new(p.render),
+                "is_index"     => Crinja::Value.new(p.is_index),
+                "generated"    => Crinja::Value.new(p.generated),
+                "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
+                "language"     => Crinja::Value.new(p.language || default_language),
+                "weight"       => Crinja::Value.new(p.weight),
+                "summary"      => Crinja::Value.new(p.effective_summary || ""),
+                "word_count"   => Crinja::Value.new(p.word_count),
+                "reading_time" => Crinja::Value.new(p.reading_time),
+                "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
+                "authors"      => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+                "assets"       => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
+              })
+              @page_crinja_value_cache[p.path] = val
+              val
+            end
           end
         end
 
@@ -1971,19 +2014,21 @@ module Hwaro
           site : Models::Site,
         ) : Array(Crinja::Value)
           cache_key = "#{section_name}:#{language}"
-          @section_pages_crinja_cache[cache_key]? || begin
-            pages = site.pages_for_section(section_name, language)
+          @crinja_cache_mutex.synchronize do
+            @section_pages_crinja_cache[cache_key]? || begin
+              pages = site.pages_for_section(section_name, language)
 
-            # Use section's sort_by setting if available, otherwise sort by title
-            section = site.sections_by_name[section_name]?
-            sort_by = section.try(&.sort_by) || "title"
-            reverse = section.try(&.reverse) || false
-            pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+              # Use section's sort_by setting if available, otherwise sort by title
+              section = site.sections_by_name[section_name]?
+              sort_by = section.try(&.sort_by) || "title"
+              reverse = section.try(&.reverse) || false
+              pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
 
-            default_lang = site.config.default_language
-            arr = pages.map { |p| page_to_crinja_list_value(p, default_lang) }
-            @section_pages_crinja_cache[cache_key] = arr
-            arr
+              default_lang = site.config.default_language
+              arr = pages.map { |p| page_to_crinja_list_value(p, default_lang) }
+              @section_pages_crinja_cache[cache_key] = arr
+              arr
+            end
           end
         end
 
@@ -2251,15 +2296,17 @@ module Hwaro
 
           # Build ancestors array (cached per section — pages in the same section share ancestors)
           ancestors_cache_key = page.section
-          ancestors_array = @ancestors_crinja_cache[ancestors_cache_key]? || begin
-            arr = page.ancestors.map do |ancestor|
-              Crinja::Value.new({
-                "title" => Crinja::Value.new(ancestor.title),
-                "url"   => Crinja::Value.new(ancestor.url),
-              })
+          ancestors_array = @crinja_cache_mutex.synchronize do
+            @ancestors_crinja_cache[ancestors_cache_key]? || begin
+              arr = page.ancestors.map do |ancestor|
+                Crinja::Value.new({
+                  "title" => Crinja::Value.new(ancestor.title),
+                  "url"   => Crinja::Value.new(ancestor.url),
+                })
+              end
+              @ancestors_crinja_cache[ancestors_cache_key] = arr
+              arr
             end
-            @ancestors_crinja_cache[ancestors_cache_key] = arr
-            arr
           end
 
           # Page object with all properties
@@ -2295,20 +2342,24 @@ module Hwaro
             "ancestors"       => Crinja::Value.new(ancestors_array),
             "series"          => Crinja::Value.new(page.series || ""),
             "series_index"    => Crinja::Value.new(page.series_index),
-            "series_pages"    => (page.series.try { |s| @series_crinja_cache[s]? } || begin
-              val = Crinja::Value.new(page.series_pages.map { |sp|
-                cached_page_crinja_value(sp, default_lang)
-              })
-              page.series.try { |s| @series_crinja_cache[s] = val }
-              val
-            end),
-            "related_posts" => (@related_posts_crinja_cache[page.path]? || begin
-              val = Crinja::Value.new(page.related_posts.map { |rp|
-                cached_page_crinja_value(rp, default_lang)
-              })
-              @related_posts_crinja_cache[page.path] = val
-              val
-            end),
+            "series_pages"    => @crinja_cache_mutex.synchronize {
+              page.series.try { |s| @series_crinja_cache[s]? } || begin
+                val = Crinja::Value.new(page.series_pages.map { |sp|
+                  cached_page_crinja_value(sp, default_lang)
+                })
+                page.series.try { |s| @series_crinja_cache[s] = val }
+                val
+              end
+            },
+            "related_posts" => @crinja_cache_mutex.synchronize {
+              @related_posts_crinja_cache[page.path]? || begin
+                val = Crinja::Value.new(page.related_posts.map { |rp|
+                  cached_page_crinja_value(rp, default_lang)
+                })
+                @related_posts_crinja_cache[page.path] = val
+                val
+              end
+            },
           }
           vars["page"] = Crinja::Value.new(page_obj)
 
@@ -2370,10 +2421,12 @@ module Hwaro
               section_description = section_page.description || ""
               current_section = page.section
               # Use cached section assets to avoid re-allocating per page
-              section_assets_val = @section_assets_crinja_cache[page.section]?.try { |arr| Crinja::Value.new(arr) } || begin
-                arr = section_page.assets.map { |a| Crinja::Value.new(a) }
-                @section_assets_crinja_cache[page.section] = arr
-                Crinja::Value.new(arr)
+              section_assets_val = @crinja_cache_mutex.synchronize do
+                @section_assets_crinja_cache[page.section]?.try { |arr| Crinja::Value.new(arr) } || begin
+                  arr = section_page.assets.map { |a| Crinja::Value.new(a) }
+                  @section_assets_crinja_cache[page.section] = arr
+                  Crinja::Value.new(arr)
+                end
               end
             end
           end
@@ -2523,10 +2576,20 @@ module Hwaro
 
         # Create directory only if not already created during this build.
         # Avoids redundant mkdir_p syscalls (stat+mkdir) for large sites.
+        # Mutex protects the Set during parallel rendering; mkdir_p is
+        # itself idempotent, so the worst case without it is duplicate syscalls.
+        @created_dirs_mutex : Mutex = Mutex.new
+
         private def ensure_dir(dir : String)
-          return if @created_dirs.includes?(dir)
-          FileUtils.mkdir_p(dir)
-          @created_dirs << dir
+          needs_create = @created_dirs_mutex.synchronize do
+            if @created_dirs.includes?(dir)
+              false
+            else
+              @created_dirs << dir
+              true
+            end
+          end
+          FileUtils.mkdir_p(dir) if needs_create
         end
 
         private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
@@ -2567,7 +2630,7 @@ module Hwaro
 
             # Validate output path stays within output directory
             unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-              Logger.warn "  [WARN] Skipping raw file outside output directory: #{raw_file.relative_path}"
+              Logger.warn "Skipping raw file outside output directory: #{raw_file.relative_path}"
               next
             end
 

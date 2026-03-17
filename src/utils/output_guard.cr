@@ -21,7 +21,7 @@ module Hwaro
         if canonical_output == canonical_output_dir || canonical_output.starts_with?(canonical_output_dir + "/")
           canonical_output
         else
-          Logger.warn "  [WARN] Skipping output outside output directory: #{output_path}"
+          Logger.warn "Skipping output outside output directory: #{output_path}"
           nil
         end
       end

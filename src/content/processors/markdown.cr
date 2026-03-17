@@ -52,6 +52,41 @@ module Hwaro
           "series", "series_weight", "expires",
         }
 
+        # Warn about unknown front-matter keys that look like typos of known keys.
+        # Uses Levenshtein distance ≤ 2 to detect likely misspellings while ignoring
+        # intentional custom fields (which tend to differ significantly from known keys).
+        private def warn_typo_keys(unknown_keys : Array(String), file_path : String)
+          return if file_path.empty?
+          unknown_keys.each do |key|
+            KNOWN_FRONT_MATTER_KEYS.each do |known|
+              dist = levenshtein(key, known)
+              if dist > 0 && dist <= 2
+                Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{known}'?"
+                break
+              end
+            end
+          end
+        end
+
+        # Minimal Levenshtein distance (edit distance) for short strings.
+        private def levenshtein(a : String, b : String) : Int32
+          return b.size if a.empty?
+          return a.size if b.empty?
+          m = a.size
+          n = b.size
+          prev = Array(Int32).new(n + 1) { |i| i }
+          curr = Array(Int32).new(n + 1, 0)
+          m.times do |i|
+            curr[0] = i + 1
+            n.times do |j|
+              cost = a[i] == b[j] ? 0 : 1
+              curr[j + 1] = {curr[j] + 1, prev[j + 1] + 1, prev[j] + cost}.min
+            end
+            prev, curr = curr, prev
+          end
+          prev[n]
+        end
+
         def name : String
           "markdown"
         end
@@ -210,10 +245,13 @@ module Hwaro
           expires = parse_toml_time(toml_fm["expires"]?)
 
           extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          unknown_keys = [] of String
           toml_fm.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+            unknown_keys << key
             extra[key] = extract_extra_value(value)
           end
+          warn_typo_keys(unknown_keys, file_path)
 
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
@@ -223,7 +261,7 @@ module Hwaro
           result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
         rescue ex
-          Logger.warn "  [WARN] Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
+          Logger.warn "Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil
         end
 
@@ -237,14 +275,17 @@ module Hwaro
           expires = parse_time(yaml_fm["expires"]?.try(&.as_s?))
 
           extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          unknown_keys = [] of String
           if fm_hash = yaml_fm.as_h?
             fm_hash.each do |key_any, value|
               key = key_any.as_s?
               next unless key
               next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+              unknown_keys << key
               extra[key] = extract_extra_value(value)
             end
           end
+          warn_typo_keys(unknown_keys, file_path)
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
@@ -254,7 +295,7 @@ module Hwaro
           result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
         rescue ex
-          Logger.warn "  [WARN] Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
+          Logger.warn "Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil
         end
 
@@ -339,8 +380,8 @@ module Hwaro
         private def extract_extra_value(value : TOML::Any | YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
           if str = value.as_s?
             str
-          elsif !(bool_val = value.as_bool?).nil?
-            bool_val.not_nil!
+          elsif (bool_val = value.as_bool?) != nil
+            bool_val.as(Bool)
           elsif int = value.as_i?
             int.to_i64
           elsif float = value.as_f?

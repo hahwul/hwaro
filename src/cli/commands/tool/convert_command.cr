@@ -68,7 +68,7 @@ module Hwaro
 
             converter = Services::FrontmatterConverter.new(content_dir)
 
-            case format.not_nil!.downcase
+            case format.as(String).downcase
             when "to-yaml"
               result = converter.convert_to_yaml
               if json_output

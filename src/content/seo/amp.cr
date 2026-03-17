@@ -38,7 +38,7 @@ module Hwaro
             # Write AMP version
             amp_output = amp_output_path(page, output_dir, prefix)
             unless Utils::OutputGuard.within_output_dir?(amp_output, output_dir)
-              Logger.warn "  [WARN] Skipping AMP output outside output directory: #{amp_output}"
+              Logger.warn "Skipping AMP output outside output directory: #{amp_output}"
               next
             end
             dir = File.dirname(amp_output)

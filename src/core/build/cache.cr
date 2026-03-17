@@ -218,14 +218,19 @@ module Hwaro
           File.delete(@cache_path) if File.exists?(@cache_path)
         end
 
-        # Save cache to disk
+        # Save cache to disk using atomic write (temp file + rename)
+        # to prevent corruption from partial writes (e.g. disk full, crash).
         def save
           return unless @enabled
+          tmp_path = "#{@cache_path}.tmp"
           begin
             data = CacheData.new(metadata: @metadata, entries: @entries.values)
-            File.write(@cache_path, data.to_json)
+            File.write(tmp_path, data.to_json)
+            File.rename(tmp_path, @cache_path)
           rescue ex
             Logger.warn "Cache: failed to save cache file: #{ex.message}"
+            # Clean up temp file if rename failed
+            File.delete(tmp_path) if File.exists?(tmp_path)
           end
         end
 
@@ -238,8 +243,12 @@ module Hwaro
             content = File.read(@cache_path)
           rescue ex
             Logger.warn "Cache: failed to read cache file: #{ex.message}"
+            delete_corrupt_cache
             return
           end
+
+          return if content.empty?
+
           begin
             # Try loading new format with metadata
             data = CacheData.from_json(content)
@@ -252,11 +261,19 @@ module Hwaro
               entries.each { |e| @entries[e.path] = e }
               @metadata = CacheMetadata.new
             rescue ex
-              Logger.debug "Cache: failed to load cache file, starting fresh: #{ex.message}"
+              Logger.warn "Cache: corrupt cache file, rebuilding from scratch: #{ex.message}"
               @entries.clear
               @metadata = CacheMetadata.new
+              delete_corrupt_cache
             end
           end
+        end
+
+        # Remove corrupt cache file so the next build starts clean
+        private def delete_corrupt_cache
+          File.delete(@cache_path) if File.exists?(@cache_path)
+        rescue
+          # Ignore deletion failure — the cache will be overwritten on save
         end
 
         # Get cache statistics

@@ -28,7 +28,7 @@ module Hwaro
             flatten_toml(data, "", flat)
             translations[code] = flat
           rescue ex
-            Logger.warn "  [WARN] Failed to parse i18n file #{path}: #{ex.message}"
+            Logger.warn "Failed to parse i18n file #{path}: #{ex.message}"
           end
         end
 

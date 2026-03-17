@@ -46,7 +46,7 @@ module Hwaro
                   when "elasticlunr_javascript"
                     generate_javascript(search_data)
                   else
-                    Logger.warn "  [WARN] Unknown search format '#{config.search.format}'. Defaulting to 'fuse_json'."
+                    Logger.warn "Unknown search format '#{config.search.format}'. Defaulting to 'fuse_json'."
                     generate_json(search_data)
                   end
 

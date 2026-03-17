@@ -61,7 +61,7 @@ module Hwaro
                 begin
                   scaffold = Config::Options::ScaffoldType.from_string(type)
                 rescue ex : ArgumentError
-                  Logger.error ex.message.not_nil!
+                  Logger.error(ex.message || "Unknown error")
                   Logger.info "Available scaffolds:"
                   Logger.info "  simple    - Basic pages structure with homepage and about page"
                   Logger.info "  blog      - Blog-focused structure with posts, archives, and taxonomies"
