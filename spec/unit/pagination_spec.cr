@@ -78,6 +78,135 @@ describe Hwaro::Content::Pagination::Paginator do
     result.per_page.should eq(1)
     result.paginated_pages.size.should eq(2)
   end
+
+  it "generates correct page URLs" do
+    config = Hwaro::Models::Config.new
+    config.pagination.enabled = true
+    config.pagination.per_page = 1
+
+    section = Hwaro::Models::Section.new("blog/index.md")
+    section.section = "blog"
+    section.url = "/blog/"
+
+    pages = [
+      Hwaro::Models::Page.new("blog/1.md"),
+      Hwaro::Models::Page.new("blog/2.md"),
+      Hwaro::Models::Page.new("blog/3.md"),
+    ]
+    pages.each { |p| p.section = "blog"; p.title = p.path }
+
+    paginator = Hwaro::Content::Pagination::Paginator.new(config)
+    result = paginator.paginate(section, pages)
+
+    # First page URL should be base URL (no /page/1/)
+    result.paginated_pages[0].first_url.should eq("/blog/")
+    # Second page should have /page/2/
+    result.paginated_pages[1].prev_url.should eq("/blog/")
+    result.paginated_pages[1].next_url.should eq("/blog/page/3/")
+    # Last page
+    result.paginated_pages[2].has_next.should be_false
+    result.paginated_pages[2].next_url.should be_nil
+  end
+
+  it "uses custom paginate_path from section" do
+    config = Hwaro::Models::Config.new
+    config.pagination.enabled = true
+    config.pagination.per_page = 1
+
+    section = Hwaro::Models::Section.new("blog/index.md")
+    section.section = "blog"
+    section.url = "/blog/"
+    section.paginate_path = "p"
+
+    pages = [
+      Hwaro::Models::Page.new("blog/1.md"),
+      Hwaro::Models::Page.new("blog/2.md"),
+    ]
+    pages.each { |p| p.section = "blog"; p.title = p.path }
+
+    paginator = Hwaro::Content::Pagination::Paginator.new(config)
+    result = paginator.paginate(section, pages)
+
+    result.paginated_pages[1].prev_url.should eq("/blog/")
+    result.paginated_pages[0].last_url.should eq("/blog/p/2/")
+    result.paginated_pages[0].base_url.should contain("/p/")
+  end
+
+  it "handles empty page list" do
+    config = Hwaro::Models::Config.new
+    config.pagination.enabled = true
+    config.pagination.per_page = 10
+
+    section = Hwaro::Models::Section.new("empty/index.md")
+    section.section = "empty"
+    section.url = "/empty/"
+
+    paginator = Hwaro::Content::Pagination::Paginator.new(config)
+    result = paginator.paginate(section, [] of Hwaro::Models::Page)
+
+    result.enabled.should be_true
+    result.paginated_pages.size.should eq(1) # At least 1 page even if empty
+    result.paginated_pages[0].pages.should be_empty
+    result.paginated_pages[0].total_items.should eq(0)
+  end
+
+  it "sets correct has_prev/has_next on boundary pages" do
+    config = Hwaro::Models::Config.new
+    config.pagination.enabled = true
+    config.pagination.per_page = 2
+
+    section = Hwaro::Models::Section.new("blog/index.md")
+    section.section = "blog"
+    section.url = "/blog/"
+
+    pages = (1..5).map do |i|
+      p = Hwaro::Models::Page.new("blog/#{i}.md")
+      p.section = "blog"
+      p.title = "Page #{i}"
+      p
+    end
+
+    paginator = Hwaro::Content::Pagination::Paginator.new(config)
+    result = paginator.paginate(section, pages)
+
+    # First page
+    result.paginated_pages[0].has_prev.should be_false
+    result.paginated_pages[0].has_next.should be_true
+    result.paginated_pages[0].prev_url.should be_nil
+
+    # Middle page
+    result.paginated_pages[1].has_prev.should be_true
+    result.paginated_pages[1].has_next.should be_true
+
+    # Last page
+    result.paginated_pages[2].has_prev.should be_true
+    result.paginated_pages[2].has_next.should be_false
+    result.paginated_pages[2].next_url.should be_nil
+    result.paginated_pages[2].pages.size.should eq(1) # 5 items, 2 per page = last page has 1
+  end
+
+  it "enables pagination when section has paginate set even if global disabled" do
+    config = Hwaro::Models::Config.new
+    config.pagination.enabled = false
+
+    section = Hwaro::Models::Section.new("wiki/index.md")
+    section.section = "wiki"
+    section.paginate = 5 # Implicitly enables pagination
+
+    pages = (1..6).map do |i|
+      p = Hwaro::Models::Page.new("wiki/#{i}.md")
+      p.section = "wiki"
+      p.title = "Page #{i}"
+      p
+    end
+
+    paginator = Hwaro::Content::Pagination::Paginator.new(config)
+    result = paginator.paginate(section, pages)
+
+    result.enabled.should be_true
+    result.per_page.should eq(5)
+    result.paginated_pages.size.should eq(2)
+  end
 end
 
 describe Hwaro::Content::Pagination::Renderer do
