@@ -31,29 +31,46 @@ Hwaro processes Markdown content with TOML front matter and Jinja2-compatible te
 - Markdown with TOML/YAML front matter
 - Jinja2 templates (inheritance, includes, macros)
 - Markdown extensions: task lists, footnotes, definition lists, math (KaTeX/MathJax), Mermaid diagrams, emoji, etc
+- Built-in shortcodes (YouTube, Vimeo, Gist, Alert, Figure, Tweet, CodePen) and custom shortcode support
 - Syntax highlighting via Highlight.js
+- Table of contents (TOC) generation
+- Reading time and word count
+- Content summaries via `<!-- more -->` marker
 - Non-markdown content file publishing
+
+### Content Management
+- Draft, scheduled, and expiring post support
+- URL aliases and redirects
+- Archetypes for content scaffolding templates
+- Data files (YAML, JSON, TOML) accessible in templates
+- Author data aggregation and management
+- Page weight and custom sorting (by date, weight, title)
 
 ### Build & Performance
 - Parallel processing and incremental build caching
 - Streaming build mode with memory limits
 - Pre/post build hooks
 - CSS/JS bundling, minification, and content-hash fingerprinting
+- Lazy loading images
+- Environment-specific config (`config.production.toml`, `config.staging.toml`, etc.)
 
 ### SEO & Discovery
 - Auto-generated sitemap, robots.txt, RSS/Atom feeds
 - OpenGraph meta tags and auto-generated OG images (PNG)
-- Twitter Cards and JSON-LD structured data
+- Twitter Cards and JSON-LD structured data (Article, FAQ, HowTo, Organization, Person)
+- Canonical URLs and hreflang tags
 - `llms.txt` and `AGENTS.md` generation
 - Client-side search index (Fuse.js, ElasticLunr) with CJK tokenization
 
 ### Site Features
 - Pagination, taxonomies (tags, categories, custom)
 - Content series and related posts
+- Breadcrumb navigation and previous/next page links
 - Multilingual (i18n) with per-language feeds and search
-- Image processing (resize, responsive images) and Auto generated OG Image
+- Image processing (resize, responsive images) and auto-generated OG images
 - PWA support (manifest, service worker)
 - AMP page generation
+- Transparent sections for flexible content organization
 
 ### Development & Deployment
 - Dev server with live reload and error overlay
@@ -62,7 +79,7 @@ Hwaro processes Markdown content with TOML front matter and Jinja2-compatible te
 - Platform config generation (Netlify, Vercel, Cloudflare Pages)
 - GitHub Actions CI/CD generation
 - Import from WordPress, Jekyll, Hugo
-- Link checker and config doctor
+- Link checker, config doctor, and front matter format conversion
 
 </details>
 
@@ -88,6 +105,8 @@ shards install
 # Build
 shards build --release --no-debug --production
 ```
+
+> For more installation options including Docker and pre-built binaries, see the [Installation Guide](https://hwaro.hahwul.com/start/installation/).
 
 ## Contributing
 

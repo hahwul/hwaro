@@ -20,6 +20,19 @@ brew install hwaro
 sudo snap install hwaro
 ```
 
+## Pre-built Binary
+
+Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
+
+1. Download the archive for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
+2. Extract the archive and move the binary to a directory in your PATH.
+
+```bash
+# Example for Linux (amd64)
+tar -xzf hwaro-linux-amd64.tar.gz
+sudo mv hwaro /usr/local/bin/
+```
+
 ## From Source
 
 ### Prerequisites
