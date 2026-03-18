@@ -11,7 +11,7 @@ describe "Build Integration: page.assets in templates" do
     build_site(
       BASIC_CONFIG,
       content_files: {
-        "drawings/index.md"    => "---\ntitle: Drawings\n---\nGallery content",
+        "drawings/index.md"     => "---\ntitle: Drawings\n---\nGallery content",
         "drawings/images/1.jpg" => "fake-jpg-1",
         "drawings/images/2.jpg" => "fake-jpg-2",
       },
