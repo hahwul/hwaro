@@ -68,6 +68,28 @@
       url: /features/asset-pipeline/
     - title: LLMs.txt
       url: /features/llms-txt/
+    - title: Markdown Extensions
+      url: /features/markdown-extensions/
+    - title: Cache Busting
+      url: /features/cache-busting/
+    - title: Environment Variables
+      url: /features/env-variables/
+    - title: Environment-Specific Config
+      url: /features/env-config/
+    - title: PWA
+      url: /features/pwa/
+    - title: AMP
+      url: /features/amp/
+    - title: Structured Data
+      url: /features/structured-data/
+    - title: Auto OG Images
+      url: /features/og-images/
+    - title: Series
+      url: /features/series/
+    - title: Related Posts
+      url: /features/related-posts/
+    - title: Deployment
+      url: /features/deployment/
 - title: Deploy
   items:
     - title: Overview
