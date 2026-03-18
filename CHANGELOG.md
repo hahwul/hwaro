@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.0
+
+### Added
+- LQIP (Low Quality Image Placeholder) support for image processing
+- OG image enhancements: base64 logo embedding, style presets (dots, grid, diagonal, gradient, waves, minimal), background image support
+- Native PNG rendering for OG images via stb_truetype + stb_image_write (no external tools required)
+- System font auto-detection for OG images (macOS: Helvetica/Arial, Linux: DejaVu/Noto)
+- `show_title` option to toggle site name display on OG images
+- Image processing and LQIP config to init scaffolds and `doctor` command
+
+### Changed
+- Unify config TOML snippets between scaffold and doctor via shared `ConfigSnippets` module
+- Cache fonts, logo, and background image data URIs across all pages for OG image generation
+- Clamp opacity and `pattern_scale` values to valid ranges in SVG output
+- Code refactoring and test improvements
+
 ## v0.6.0
 
 ### Added
