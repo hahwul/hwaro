@@ -182,3 +182,77 @@ dirs = ["assets/css", "assets/js"]
 enabled = true
 minify = true
 fingerprint = true
+
+# =============================================================================
+# PWA (Progressive Web App) (Optional)
+# =============================================================================
+# Generate manifest.json and service worker for offline access
+
+# [pwa]
+# enabled = true
+# name = "My Site"
+# short_name = "Site"
+# theme_color = "#ffffff"
+# background_color = "#ffffff"
+# display = "standalone"
+# icons = ["static/icon-192.png", "static/icon-512.png"]
+
+# =============================================================================
+# AMP (Accelerated Mobile Pages) (Optional)
+# =============================================================================
+# Generate AMP-compliant versions of content pages
+
+# [amp]
+# enabled = true
+# path_prefix = "amp"
+# sections = ["posts"]
+
+# =============================================================================
+# Series (Optional)
+# =============================================================================
+# Group posts into ordered series
+
+# [series]
+# enabled = true
+
+# =============================================================================
+# Related Posts (Optional)
+# =============================================================================
+# Recommend related content based on shared taxonomy terms
+
+# [related]
+# enabled = true
+# limit = 5
+# taxonomies = ["tags"]
+
+# =============================================================================
+# Deployment (Optional)
+# =============================================================================
+
+# [deployment]
+# target = "prod"
+# source_dir = "public"
+#
+# [[deployment.targets]]
+# name = "prod"
+# url = "file://./out"
+
+# =============================================================================
+# Auto OG Images (Optional)
+# =============================================================================
+# Auto-generate Open Graph preview images for social sharing
+# Images are created for pages without a custom `image` in front matter
+
+[og.auto_image]
+enabled = true
+background = "#101012"
+text_color = "#ffffff"
+accent_color = "#e94560"
+font_size = 48
+logo = "static/hwaro.png"
+output_dir = "og-images"
+show_title = true
+style = "default"
+pattern_opacity = 0.15
+pattern_scale = 1.0
+format = "png"
