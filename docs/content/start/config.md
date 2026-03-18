@@ -215,19 +215,33 @@ accent_color = "#e94560"
 font_size = 48
 logo = "static/logo.png"
 output_dir = "og-images"
+show_title = true
+style = "default"
+pattern_opacity = 0.15
+pattern_scale = 1.0
+background_image = "static/og-bg.jpg"
+overlay_opacity = 0.5
+format = "svg"
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| enabled | bool | false | Auto-generate OG images for pages without a custom image |
-| background | string | "#1a1a2e" | Background color |
-| text_color | string | "#ffffff" | Title and description text color |
-| accent_color | string | "#e94560" | Accent color (top/bottom bars, site name) |
-| font_size | int | 48 | Title font size in pixels |
-| logo | string | — | Path to logo file (e.g., `static/logo.png`) |
-| output_dir | string | "og-images" | Output directory for generated images |
+| enabled | bool | `false` | Auto-generate OG images for pages without a custom image |
+| background | string | `"#1a1a2e"` | Background color |
+| text_color | string | `"#ffffff"` | Title and description text color |
+| accent_color | string | `"#e94560"` | Accent color (top/bottom bars, site name) |
+| font_size | int | `48` | Title font size in pixels |
+| logo | string | — | Path to logo file, embedded as base64 |
+| output_dir | string | `"og-images"` | Output directory for generated images |
+| show_title | bool | `true` | Show site name at the bottom |
+| style | string | `"default"` | Style preset: `default`, `dots`, `grid`, `diagonal`, `gradient`, `waves`, `minimal` |
+| pattern_opacity | float | `0.15` | Pattern opacity (0.0–1.0) |
+| pattern_scale | float | `1.0` | Pattern scale multiplier |
+| background_image | string | — | Background image file path, embedded as base64 |
+| overlay_opacity | float | `0.5` | Overlay opacity on background images (0.0–1.0) |
+| format | string | `"svg"` | Output format: `svg` or `png` |
 
-See [SEO](/features/seo/) for template usage and output examples.
+See [Auto OG Images](/features/og-images/) for full details on styles, PNG rendering, and layout options.
 
 ## AMP
 
