@@ -16,7 +16,8 @@
   <a href="https://hwaro.hahwul.com/start/">Documentation</a> •
   <a href="https://hwaro.hahwul.com/start/installation/">Installation</a> •
   <a href="https://hwaro.hahwul.com/deploy/github-pages/">Github Action</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#contributing">Contributing</a> •
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 ---
