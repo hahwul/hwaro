@@ -1,0 +1,22 @@
+{% set demo = resize_image(path=src, width=256) %}
+<div class="lqip-demo">
+  <div class="lqip-demo__section">
+    <strong>Dominant color:</strong>
+    <span style="display:inline-block;width:1.2em;height:1.2em;vertical-align:middle;border-radius:3px;background:{{ demo.dominant_color }};border:1px solid var(--border)"></span>
+    <code>{{ demo.dominant_color }}</code>
+  </div>
+  {% if demo.lqip %}
+  <div class="lqip-demo__section">
+    <strong>LQIP placeholder</strong> (the tiny base64 image, shown at 256px):
+    <div style="margin-top:0.5rem">
+      <img src="{{ demo.lqip }}" alt="LQIP placeholder" style="width:256px;border-radius:8px;border:1px solid var(--border);image-rendering:pixelated">
+    </div>
+  </div>
+  <div class="lqip-demo__section">
+    <strong>Blur-up effect</strong> (LQIP as background, full image on top):
+    <div style="margin-top:0.5rem">
+      <img src="{{ demo.url }}" alt="Full image with LQIP background" style="max-width:256px;border-radius:8px;border:1px solid var(--border);background-image:url({{ demo.lqip }});background-size:cover" loading="lazy">
+    </div>
+  </div>
+  {% endif %}
+</div>

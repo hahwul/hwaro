@@ -67,7 +67,7 @@ Hwaro processes Markdown content with TOML front matter and Jinja2-compatible te
 - Content series and related posts
 - Breadcrumb navigation and previous/next page links
 - Multilingual (i18n) with per-language feeds and search
-- Image processing (resize, responsive images) and auto-generated OG images
+- Image processing (resize, responsive images, LQIP blur-up placeholders, dominant color extraction) and auto-generated OG images
 - PWA support (manifest, service worker)
 - AMP page generation
 - Transparent sections for flexible content organization

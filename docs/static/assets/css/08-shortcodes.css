@@ -495,6 +495,13 @@
     background: var(--bg);
 }
 
+/* LQIP blur-up transition */
+.lqip-blur {
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: auto;
+}
+
 .sc-figure figcaption {
     margin-top: 0.5rem;
     color: var(--text-dim);

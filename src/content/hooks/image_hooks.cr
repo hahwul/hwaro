@@ -21,6 +21,10 @@ module Hwaro
         @@resize_map = {} of String => Hash(Int32, String)
         @@resize_map_mutex = Mutex.new
 
+        # Class-level map: original_url => { "lqip" => data_uri, "dominant_color" => hex }
+        @@lqip_map = {} of String => Hash(String, String)
+        @@lqip_map_mutex = Mutex.new
+
         # Max number of concurrent image processing fibers
         CONCURRENCY = 8
 
@@ -48,6 +52,18 @@ module Hwaro
           @@resize_map_mutex.synchronize do
             @@resize_map[url]?.try { |m| m[width]? }
           end
+        end
+
+        def self.lqip_map : Hash(String, Hash(String, String))
+          @@lqip_map_mutex.synchronize { @@lqip_map.dup }
+        end
+
+        def self.set_lqip_map(map : Hash(String, Hash(String, String)))
+          @@lqip_map_mutex.synchronize { @@lqip_map = map }
+        end
+
+        def self.find_lqip(url : String) : Hash(String, String)?
+          @@lqip_map_mutex.synchronize { @@lqip_map[url]?.try(&.dup) }
         end
 
         def self.find_closest(url : String, width : Int32) : String?
@@ -86,6 +102,9 @@ module Hwaro
 
           widths = config.image_processing.widths
           quality = config.image_processing.quality
+          lqip_enabled = config.image_processing.lqip_enabled
+          lqip_width = lqip_enabled ? config.image_processing.lqip_width : 0
+          lqip_quality = config.image_processing.lqip_quality
           output_dir = ctx.output_dir
           resolved_output = File.expand_path(output_dir)
 
@@ -100,6 +119,7 @@ module Hwaro
 
           # Phase 2: Process in parallel with bounded concurrency
           new_map = {} of String => Hash(Int32, String)
+          new_lqip_map = {} of String => Hash(String, String)
           map_mutex = Mutex.new
           work_channel = Channel(ImageJob?).new(CONCURRENCY)
           done_channel = Channel(Nil).new
@@ -108,11 +128,10 @@ module Hwaro
           CONCURRENCY.times do
             spawn do
               while job = work_channel.receive?
-                width_map = resize_one(job, widths, quality)
-                unless width_map.empty?
-                  map_mutex.synchronize do
-                    new_map[job.original_url] = width_map
-                  end
+                width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality)
+                map_mutex.synchronize do
+                  new_map[job.original_url] = width_map unless width_map.empty?
+                  new_lqip_map[job.original_url] = lqip_data if lqip_data
                 end
               end
               done_channel.send(nil)
@@ -127,14 +146,17 @@ module Hwaro
           CONCURRENCY.times { done_channel.receive }
 
           @@resize_map_mutex.synchronize { @@resize_map = new_map }
+          @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
           resized_count = new_map.values.sum(&.size)
           Logger.success "  Generated #{resized_count} resized image(s)." if resized_count > 0
+          Logger.success "  Generated #{new_lqip_map.size} LQIP placeholder(s)." if new_lqip_map.size > 0
         end
 
-        # Resize a single image to all widths (one decode, N encodes)
-        private def resize_one(job : ImageJob, widths : Array(Int32), quality : Int32) : Hash(Int32, String)
-          path_map = Processors::ImageProcessor.resize_multi_widths(
-            job.source_path, job.dest_dir, widths, quality
+        # Resize a single image to all widths + generate LQIP (one decode pass)
+        private def resize_one(job : ImageJob, widths : Array(Int32), quality : Int32,
+                               lqip_width : Int32, lqip_quality : Int32) : {Hash(Int32, String), Hash(String, String)?}
+          path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
+            job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality
           )
 
           width_url_map = {} of Int32 => String
@@ -142,7 +164,14 @@ module Hwaro
             resized_name = File.basename(dest_path)
             width_url_map[width] = job.url_prefix + resized_name
           end
-          width_url_map
+
+          lqip_data = if lqip_uri
+                        {"lqip" => lqip_uri, "dominant_color" => dom_color}
+                      else
+                        nil
+                      end
+
+          {width_url_map, lqip_data}
         end
 
         # --- Job collection helpers ---

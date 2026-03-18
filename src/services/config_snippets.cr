@@ -105,7 +105,7 @@ module Hwaro
       end
 
       def self.og_auto_image : String
-          <<-TOML
+        <<-TOML
 
           # =============================================================================
           # Auto OG Images (Optional)

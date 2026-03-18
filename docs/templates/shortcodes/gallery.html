@@ -3,7 +3,7 @@
   {%- if asset is matching("[.](jpg|png)$") -%}
     {% set image = resize_image(path=asset, width=240, height=180) %}
     <a href="{{ get_url(path=asset) }}" target="_blank">
-      <img src="{{ image.url }}" alt="{{ asset }}" />
+      <img src="{{ image.url }}" alt="{{ asset }}"{% if image.lqip %} class="lqip-blur" style="background-image: url({{ image.lqip }}); background-size: cover;"{% endif %} loading="lazy" />
     </a>
   {%- endif %}
 {%- endfor %}

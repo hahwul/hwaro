@@ -536,11 +536,17 @@ module Hwaro
       property enabled : Bool
       property widths : Array(Int32)
       property quality : Int32
+      property lqip_enabled : Bool
+      property lqip_width : Int32
+      property lqip_quality : Int32
 
       def initialize
         @enabled = false
         @widths = [] of Int32
         @quality = 85
+        @lqip_enabled = false
+        @lqip_width = 32
+        @lqip_quality = 20
       end
     end
 
@@ -1105,6 +1111,13 @@ module Hwaro
             val = w.as_i? || w.as_f?.try(&.to_i)
             val && val > 0 ? val : nil
           }
+        end
+
+        # LQIP sub-config: [image_processing.lqip]
+        if lqip = s["lqip"]?.try(&.as_h?)
+          config.image_processing.lqip_enabled = bool_value(lqip["enabled"]?, config.image_processing.lqip_enabled)
+          config.image_processing.lqip_width = int_value(lqip["width"]?, config.image_processing.lqip_width).clamp(8, 128)
+          config.image_processing.lqip_quality = int_value(lqip["quality"]?, config.image_processing.lqip_quality).clamp(1, 100)
         end
       end
 

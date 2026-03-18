@@ -18,6 +18,7 @@
 #   widths = [320, 640, 1024, 1280]
 #   quality = 85
 
+require "base64"
 require "../../ext/stb_bindings"
 require "../../models/config"
 
@@ -163,38 +164,144 @@ module Hwaro
           widths : Array(Int32),
           quality : Int32 = 85,
         ) : Hash(Int32, String)
-          result_map = {} of Int32 => String
-          return result_map unless File.exists?(source)
+          result_map, _, _ = resize_and_lqip(source, dest_dir, widths, quality, 0, 20)
+          result_map
+        end
 
+        # Generate a low-quality image placeholder as a base64 data URI.
+        # Operates on already-decoded pixel data (avoids a second stbi_load).
+        def generate_lqip(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
+                          lqip_width : Int32 = 32, quality : Int32 = 20) : String?
+          result = generate_lqip_with_color(pixels, src_w, src_h, channels, lqip_width, quality)
+          result.try(&.[0])
+        end
+
+        # Generate LQIP data URI and dominant color from the thumbnail in one pass.
+        # Returns {data_uri, dominant_color_hex} or nil on failure.
+        def generate_lqip_with_color(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
+                                     lqip_width : Int32 = 32, quality : Int32 = 20) : {String, String}?
+          return nil if lqip_width <= 0
+          return nil if src_w <= 0 || src_h <= 0 || channels <= 0
+
+          # Don't upscale — cap thumbnail width to source width
+          effective_width = Math.min(lqip_width, src_w)
+          out_w, out_h = calculate_dimensions(src_w, src_h, effective_width, 0)
+          return nil if out_w <= 0 || out_h <= 0
+
+          buf_size = out_w.to_i64 * out_h.to_i64 * channels.to_i64
+          return nil if buf_size > MAX_PIXELS
+
+          thumb_pixels = LibC.malloc(buf_size).as(UInt8*)
+          return nil if thumb_pixels.null?
+
+          begin
+            resized = LibStb.stbir_resize_uint8_linear(
+              pixels, src_w, src_h, 0,
+              thumb_pixels, out_w, out_h, 0,
+              channels
+            )
+            return nil if resized.null?
+
+            # Compute dominant color from the tiny thumbnail (cheap)
+            dom_color = dominant_color(thumb_pixels, out_w, out_h, channels)
+
+            jpg_buf = Pointer(UInt8).null
+            jpg_len = 0_i32
+            ok = LibStb.hwaro_write_jpg_to_mem(
+              thumb_pixels, out_w, out_h, channels,
+              quality, pointerof(jpg_buf), pointerof(jpg_len)
+            )
+            return nil if ok == 0 || jpg_buf.null? || jpg_len <= 0
+
+            begin
+              bytes = Bytes.new(jpg_buf, jpg_len)
+              b64 = Base64.strict_encode(bytes)
+              {"data:image/jpeg;base64,#{b64}", dom_color}
+            ensure
+              LibC.free(jpg_buf.as(Void*))
+            end
+          ensure
+            LibC.free(thumb_pixels.as(Void*))
+          end
+        end
+
+        # Compute dominant color as a hex string (e.g., "#a3b2c1").
+        # Channels: 1=gray, 2=gray+alpha, 3=RGB, 4=RGBA
+        def dominant_color(pixels : UInt8*, w : Int32, h : Int32, channels : Int32) : String
+          return "#000000" if w <= 0 || h <= 0 || channels <= 0
+
+          total = w.to_i64 * h.to_i64
+          return "#000000" if total == 0
+
+          sum_r = 0_i64
+          sum_g = 0_i64
+          sum_b = 0_i64
+
+          is_rgb = channels >= 3 # 3=RGB, 4=RGBA
+
+          total.times do |i|
+            offset = i * channels
+            sum_r += pixels[offset]
+            if is_rgb
+              sum_g += pixels[offset + 1]
+              sum_b += pixels[offset + 2]
+            end
+          end
+
+          r = (sum_r // total).clamp(0, 255)
+          g = is_rgb ? (sum_g // total).clamp(0, 255) : r
+          b = is_rgb ? (sum_b // total).clamp(0, 255) : r
+
+          "#%02x%02x%02x" % {r, g, b}
+        end
+
+        # Combined resize + LQIP in a single decode pass.
+        # Returns {width_map, lqip_data_uri_or_nil, dominant_color_hex}
+        def resize_and_lqip(
+          source : String,
+          dest_dir : String,
+          widths : Array(Int32),
+          quality : Int32 = 85,
+          lqip_width : Int32 = 32,
+          lqip_quality : Int32 = 20,
+        ) : {Hash(Int32, String), String?, String}
+          result_map = {} of Int32 => String
+          lqip_uri = nil
+          dom_color = "#000000"
+
+          return {result_map, lqip_uri, dom_color} unless File.exists?(source)
           quality = quality.clamp(1, 100)
 
-          # Single decode
           src_w = uninitialized LibC::Int
           src_h = uninitialized LibC::Int
           channels = uninitialized LibC::Int
           pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
 
           if pixels.null?
-            # Note: stbi_failure_reason() is not thread-safe, so we skip it
-            # in this method which may be called from concurrent fibers.
             Logger.debug "Image load failed '#{source}'"
-            return result_map
+            return {result_map, lqip_uri, dom_color}
           end
 
           begin
-            return result_map if src_w <= 0 || src_h <= 0 || channels <= 0
+            return {result_map, lqip_uri, dom_color} if src_w <= 0 || src_h <= 0 || channels <= 0
 
             ext = File.extname(source).downcase
             basename = File.basename(source, File.extname(source))
             FileUtils.mkdir_p(dest_dir)
 
-            widths.each do |width|
+            # Track smallest resized variant for LQIP source optimization
+            smallest_pixels : UInt8* = Pointer(UInt8).null
+            smallest_w = 0_i32
+            smallest_h = 0_i32
+
+            # Resize variants (sorted ascending so smallest is processed first)
+            sorted_widths = widths.sort
+            sorted_widths.each do |width|
               out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width, 0)
               next if out_w <= 0 || out_h <= 0
 
               dest = File.join(dest_dir, "#{basename}_#{width}w#{ext}")
 
-              # Skip resize if output would be larger than source
               if out_w >= src_w && out_h >= src_h
                 FileUtils.cp(source, dest)
                 result_map[width] = dest
@@ -205,31 +312,53 @@ module Hwaro
               next if buf_size > MAX_PIXELS * 4
 
               out_pixels = LibC.malloc(buf_size).as(UInt8*)
-              if out_pixels.null?
-                Logger.debug "Failed to allocate #{buf_size} bytes for resize of '#{source}' at width #{width}"
+              next if out_pixels.null?
+
+              resized = LibStb.stbir_resize_uint8_linear(
+                pixels, src_w, src_h, 0,
+                out_pixels, out_w, out_h, 0,
+                channels
+              )
+              if resized.null?
+                LibC.free(out_pixels.as(Void*))
                 next
               end
 
-              begin
-                resized = LibStb.stbir_resize_uint8_linear(
-                  pixels, src_w, src_h, 0,
-                  out_pixels, out_w, out_h, 0,
-                  channels
-                )
-                next if resized.null?
+              if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
+                result_map[width] = dest
+              end
 
-                if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
-                  result_map[width] = dest
-                end
-              ensure
-                LibC.free(out_pixels.as(Void*)) unless out_pixels.null?
+              # Keep the smallest variant alive as LQIP source (free previous if any)
+              if lqip_width > 0 && smallest_pixels.null?
+                smallest_pixels = out_pixels
+                smallest_w = out_w
+                smallest_h = out_h
+              else
+                LibC.free(out_pixels.as(Void*))
               end
             end
+
+            # LQIP generation — use smallest resize variant as source when available
+            # (e.g. 320px → 32px is ~155× cheaper than 4000px → 32px)
+            if lqip_width > 0
+              lqip_src = smallest_pixels.null? ? pixels : smallest_pixels
+              lqip_src_w = smallest_pixels.null? ? src_w.to_i32 : smallest_w
+              lqip_src_h = smallest_pixels.null? ? src_h.to_i32 : smallest_h
+
+              lqip_result = generate_lqip_with_color(lqip_src, lqip_src_w, lqip_src_h, channels.to_i32, lqip_width, lqip_quality)
+              if lqip_result
+                lqip_uri = lqip_result[0]
+                dom_color = lqip_result[1]
+              end
+            end
+
+            # Free the kept smallest variant
+            LibC.free(smallest_pixels.as(Void*)) unless smallest_pixels.null?
           ensure
             LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
           end
 
-          result_map
+          {result_map, lqip_uri, dom_color}
         end
 
         # --- Private helpers ---
