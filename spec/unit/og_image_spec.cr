@@ -161,10 +161,11 @@ describe Hwaro::Content::Seo::OgImage do
         page.title = "Test"
 
         config = Hwaro::Models::Config.new
-        config.og.auto_image.logo = File.join(dir, "logo.png")
+        config.og.auto_image.logo = logo_path
 
-        # Use absolute path so file_to_data_uri works
-        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+        # Pre-compute data URI as generate() would
+        logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
 
         svg.should contain("<image")
         svg.should contain("data:image/png;base64,")
@@ -305,7 +306,8 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.og.auto_image.background_image = bg_path
 
-        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+        bg_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(bg_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, bg_data_uri)
         svg.should contain("data:image/jpeg;base64,")
         svg.should contain("preserveAspectRatio=\"xMidYMid slice\"")
         svg.should contain("opacity=\"0.5\"")
@@ -324,7 +326,8 @@ describe Hwaro::Content::Seo::OgImage do
         config.og.auto_image.background_image = bg_path
         config.og.auto_image.overlay_opacity = 0.8
 
-        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+        bg_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(bg_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, bg_data_uri)
         svg.should contain("opacity=\"0.8\"")
       end
     end

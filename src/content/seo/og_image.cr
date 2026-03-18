@@ -52,6 +52,19 @@ module Hwaro
             end
           end
 
+          # Pre-compute base64 data URIs once for logo and background image
+          logo_data_uri = nil
+          if logo_path = ai.logo
+            abs_path = logo_path.starts_with?("/") ? logo_path : File.join(Dir.current, logo_path)
+            logo_data_uri = file_to_data_uri(abs_path) if File.exists?(abs_path)
+          end
+
+          bg_data_uri = nil
+          if bg_image_path = ai.background_image
+            abs_bg_path = bg_image_path.starts_with?("/") ? bg_image_path : File.join(Dir.current, bg_image_path)
+            bg_data_uri = file_to_data_uri(abs_bg_path) if File.exists?(abs_bg_path)
+          end
+
           img_dir = File.join(output_dir, ai.output_dir)
           FileUtils.mkdir_p(img_dir) unless Dir.exists?(img_dir)
 
@@ -72,7 +85,7 @@ module Hwaro
             svg_filename = "#{slug}.svg"
             svg_path = File.join(img_dir, svg_filename)
 
-            svg = render_svg(page, config)
+            svg = render_svg(page, config, logo_data_uri, bg_data_uri)
             File.write(svg_path, svg)
 
             if format == "png" && png_tool
@@ -97,7 +110,7 @@ module Hwaro
         end
 
         # Render an SVG image for a page
-        def self.render_svg(page : Models::Page, config : Models::Config) : String
+        def self.render_svg(page : Models::Page, config : Models::Config, logo_data_uri : String? = nil, bg_data_uri : String? = nil) : String
           ai = config.og.auto_image
           bg = escape_attr(ai.background)
           text_color = escape_attr(ai.text_color)
@@ -120,14 +133,12 @@ module Hwaro
 
           # Build logo element
           logo_svg = ""
-          if logo_path = ai.logo
-            abs_path = logo_path.starts_with?("/") ? logo_path : File.join(Dir.current, logo_path)
-            if File.exists?(abs_path)
-              data_uri = file_to_data_uri(abs_path)
-              logo_svg = %(<image href="#{data_uri}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
+          if ai.logo
+            if logo_data_uri
+              logo_svg = %(<image href="#{logo_data_uri}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
             else
-              # Fallback: reference logo as URL
-              logo_url = logo_path.lchop("static/")
+              # Fallback: reference logo as URL (file not found or not pre-computed)
+              logo_url = ai.logo.not_nil!.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
               logo_svg = %(<image href="#{escape_attr(logo_url)}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
             end
@@ -141,14 +152,10 @@ module Hwaro
             # Background
             svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" />\n)
 
-            # Background image (if configured)
-            if bg_image_path = ai.background_image
-              abs_bg_path = bg_image_path.starts_with?("/") ? bg_image_path : File.join(Dir.current, bg_image_path)
-              if File.exists?(abs_bg_path)
-                bg_data_uri = file_to_data_uri(abs_bg_path)
-                svg << %(<image href="#{bg_data_uri}" x="0" y="0" width="#{WIDTH}" height="#{HEIGHT}" preserveAspectRatio="xMidYMid slice" />\n)
-                svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity}" />\n)
-              end
+            # Background image (if configured, using pre-computed data URI)
+            if bg_data_uri
+              svg << %(<image href="#{bg_data_uri}" x="0" y="0" width="#{WIDTH}" height="#{HEIGHT}" preserveAspectRatio="xMidYMid slice" />\n)
+              svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity}" />\n)
             end
 
             # Style pattern
@@ -257,7 +264,7 @@ module Hwaro
         end
 
         # Convert a file to a data URI with base64 encoding
-        private def self.file_to_data_uri(file_path : String) : String
+        def self.file_to_data_uri(file_path : String) : String
           ext = File.extname(file_path).downcase
           mime = MIME_TYPES[ext]? || "application/octet-stream"
           data = File.open(file_path, "rb") { |f| f.getb_to_end }
