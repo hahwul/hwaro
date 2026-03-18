@@ -172,7 +172,7 @@ module Hwaro
             # Background image (if configured, using pre-computed data URI)
             if bg_data_uri
               svg << %(<image href="#{bg_data_uri}" x="0" y="0" width="#{WIDTH}" height="#{HEIGHT}" preserveAspectRatio="xMidYMid slice" />\n)
-              svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity}" />\n)
+              svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity.clamp(0.0, 1.0)}" />\n)
             end
 
             # Style pattern
@@ -230,9 +230,12 @@ module Hwaro
 
         # Render a style/pattern SVG snippet based on the configured style
         def self.render_style_pattern(style : String, accent : String, bg : String, opacity : Float64, scale : Float64) : String
+          opacity = opacity.clamp(0.0, 1.0)
+          scale = Math.max(scale, 0.1)
+
           case style
           when "dots"
-            spacing = (20 * scale).to_i
+            spacing = Math.max((20 * scale).to_i, 1)
             radius = Math.max((3 * scale).to_i, 1)
             String.build do |s|
               s << %(<defs><pattern id="dots" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse">)
@@ -241,7 +244,7 @@ module Hwaro
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#dots)" opacity="#{opacity}" />\n)
             end
           when "grid"
-            spacing = (40 * scale).to_i
+            spacing = Math.max((40 * scale).to_i, 1)
             String.build do |s|
               s << %(<defs><pattern id="grid" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse">)
               s << %(<path d="M #{spacing} 0 L 0 0 0 #{spacing}" fill="none" stroke="#{accent}" stroke-width="1" />)
@@ -249,7 +252,7 @@ module Hwaro
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#grid)" opacity="#{opacity}" />\n)
             end
           when "diagonal"
-            spacing = (20 * scale).to_i
+            spacing = Math.max((20 * scale).to_i, 1)
             String.build do |s|
               s << %(<defs><pattern id="diagonal" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">)
               s << %(<line x1="0" y1="0" x2="0" y2="#{spacing}" stroke="#{accent}" stroke-width="1" />)
