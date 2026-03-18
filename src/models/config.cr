@@ -266,6 +266,7 @@ module Hwaro
       property background_image : String?
       property overlay_opacity : Float64
       property format : String
+      property font_path : String?
 
       def initialize
         @enabled = false
@@ -282,6 +283,7 @@ module Hwaro
         @background_image = nil
         @overlay_opacity = 0.5
         @format = "svg"
+        @font_path = nil
       end
     end
 
@@ -950,6 +952,7 @@ module Hwaro
           config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?)
           config.og.auto_image.overlay_opacity = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
+          config.og.auto_image.font_path = ai["font_path"]?.try(&.as_s?)
         end
       end
 

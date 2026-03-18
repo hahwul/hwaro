@@ -15,6 +15,9 @@ module Hwaro
         HEIGHT   =  630
         CHANNELS =    4 # RGBA
 
+        # Bundled DejaVu Sans Bold font (compiled into the binary as fallback)
+        BUNDLED_FONT_BOLD = {{ read_file("#{__DIR__}/../../ext/fonts/DejaVuSans-Bold.ttf") }}
+
         # System font search paths (platform-dependent)
         FONT_SEARCH_PATHS = [
           # macOS
@@ -63,9 +66,9 @@ module Hwaro
           nil
         end
 
-        # Check if PNG rendering is available (font found)
+        # Check if PNG rendering is available (always true thanks to bundled fonts)
         def self.available? : Bool
-          !find_system_font.nil?
+          true
         end
 
         # Pre-decoded and resized RGBA image for reuse across render calls.
@@ -136,38 +139,66 @@ module Hwaro
           end
         end
 
+        # Initialize a single font from raw bytes. Returns {info, data} or nil.
+        private def self.init_font(data : Bytes) : {LibStb::HwaroFontInfo, Bytes}?
+          info = LibStb.hwaro_font_alloc
+          return nil if info.null?
+          if LibStb.hwaro_font_init(info, data, 0) != 0
+            {info, data}
+          else
+            LibStb.hwaro_font_free(info)
+            nil
+          end
+        end
+
+        # Read a font file and initialize it. Returns {info, data} or nil.
+        private def self.load_font_file(path : String) : {LibStb::HwaroFontInfo, Bytes}?
+          return nil unless File.exists?(path)
+          data = File.open(path, "rb") { |f| f.getb_to_end }
+          init_font(data)
+        end
+
         # Load fonts once, return a reusable context. Returns nil if no font found.
-        def self.load_fonts : FontContext?
-          bold_path = find_system_font(bold: true)
-          regular_path = find_system_font(bold: false)
-
-          font_path = bold_path || regular_path
-          return nil unless font_path
-
-          bold_data = File.open(font_path, "rb") { |f| f.getb_to_end }
-          bold_info = LibStb.hwaro_font_alloc
-          return nil if bold_info.null?
-
-          if LibStb.hwaro_font_init(bold_info, bold_data, 0) == 0
-            LibStb.hwaro_font_free(bold_info)
-            return nil
+        # Priority: custom font_path > system fonts > bundled DejaVu Sans Bold.
+        def self.load_fonts(custom_font_path : String? = nil) : FontContext?
+          # 1) Custom font path (user-specified via config)
+          if cfp = custom_font_path
+            abs = cfp.starts_with?("/") ? cfp : File.join(Dir.current, cfp)
+            if result = load_font_file(abs)
+              bold_info, bold_data = result
+              return FontContext.new(bold_data, bold_info)
+            end
+            Logger.warn "  Custom font '#{cfp}' not found or failed to load. Trying system fonts."
           end
 
-          regular_data = nil
-          regular_info = nil
-          r_path = regular_path
-          if r_path && r_path != font_path
-            regular_data = File.open(r_path, "rb") { |f| f.getb_to_end }
-            ri = LibStb.hwaro_font_alloc
-            if ri && !ri.null? && LibStb.hwaro_font_init(ri, regular_data, 0) != 0
-              regular_info = ri
-            else
-              LibStb.hwaro_font_free(ri) if ri && !ri.null?
+          # 2) System fonts
+          bold_path = find_system_font(bold: true)
+          regular_path = find_system_font(bold: false)
+          font_path = bold_path || regular_path
+
+          if font_path
+            if result = load_font_file(font_path)
+              bold_info, bold_data = result
+              # Try loading a separate regular font
+              regular_info = nil
               regular_data = nil
+              r_path = regular_path
+              if r_path && r_path != font_path
+                if r_result = load_font_file(r_path)
+                  regular_info, regular_data = r_result
+                end
+              end
+              return FontContext.new(bold_data, bold_info, regular_data, regular_info)
             end
           end
 
-          FontContext.new(bold_data, bold_info, regular_data, regular_info)
+          # 3) Bundled fallback (DejaVu Sans Bold)
+          if result = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
+            bold_info, bold_data = result
+            return FontContext.new(bold_data, bold_info)
+          end
+
+          nil
         end
 
         # Render OG image directly to PNG file. Returns true on success.

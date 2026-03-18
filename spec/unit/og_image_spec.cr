@@ -37,6 +37,7 @@ describe Hwaro::Models::AutoImageConfig do
       ai.background_image.should be_nil
       ai.overlay_opacity.should eq(0.5)
       ai.format.should eq("svg")
+      ai.font_path.should be_nil
     end
   end
 
@@ -84,6 +85,16 @@ describe Hwaro::Models::AutoImageConfig do
       ai.background_image.should eq("static/bg.jpg")
       ai.overlay_opacity.should eq(0.7)
       ai.format.should eq("png")
+    end
+
+    it "loads font_path from TOML" do
+      config = make_og_config(<<-TOML)
+      [og.auto_image]
+      enabled = true
+      font_path = "fonts/Pretendard-Bold.ttf"
+      TOML
+
+      config.og.auto_image.font_path.should eq("fonts/Pretendard-Bold.ttf")
     end
   end
 end

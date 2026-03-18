@@ -27,9 +27,25 @@ describe Hwaro::Content::Seo::OgPngRenderer do
   end
 
   describe ".available?" do
-    it "returns a boolean" do
-      result = Hwaro::Content::Seo::OgPngRenderer.available?
-      (result == true || result == false).should be_true
+    it "always returns true (bundled font fallback)" do
+      Hwaro::Content::Seo::OgPngRenderer.available?.should be_true
+    end
+  end
+
+  describe ".load_fonts" do
+    it "returns FontContext without arguments (bundled fallback)" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      ctx.should_not be_nil
+    end
+
+    it "returns FontContext with nil custom path" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts(nil)
+      ctx.should_not be_nil
+    end
+
+    it "falls back when custom font path does not exist" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts("/nonexistent/font.ttf")
+      ctx.should_not be_nil
     end
   end
 

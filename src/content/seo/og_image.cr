@@ -50,10 +50,10 @@ module Hwaro
           cached_logo = nil
           cached_bg = nil
           if format == "png"
-            font_ctx = OgPngRenderer.load_fonts
+            font_ctx = OgPngRenderer.load_fonts(ai.font_path)
             png_available = !font_ctx.nil?
             unless png_available
-              Logger.warn "  PNG format requested but no system font found for rendering. Falling back to SVG."
+              Logger.warn "  PNG format requested but font initialization failed. Falling back to SVG."
             end
           end
 
