@@ -12,6 +12,7 @@
 # - {{ value | filter }} - filters
 
 require "../../config/options/init_options"
+require "../config_snippets"
 
 module Hwaro
   module Services
@@ -282,23 +283,7 @@ module Hwaro
         end
 
         protected def pagination_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Pagination
-          # =============================================================================
-          # Enable pagination for section listing pages (e.g., /posts/, /blog/).
-          # You can override per section in `_index.md` with:
-          # - paginate = 10
-          # - pagination_enabled = true
-          # - sort_by = "date" | "title" | "weight"
-          # - reverse = false
-
-          [pagination]
-          enabled = false
-          per_page = 10
-
-          TOML
+          ConfigSnippets.pagination
         end
 
         protected def content_files_config : String
@@ -355,21 +340,7 @@ module Hwaro
         end
 
         protected def search_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Search Configuration
-          # =============================================================================
-          # Generates a search index for client-side search (e.g., Fuse.js)
-
-          [search]
-          enabled = true
-          format = "fuse_json"
-          fields = ["title", "content"]
-          filename = "search.json"
-          exclude = []              # Exclude paths or patterns from search index
-
-          TOML
+          ConfigSnippets.search
         end
 
         protected def sitemap_config : String
@@ -429,35 +400,11 @@ module Hwaro
         end
 
         protected def series_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Series
-          # =============================================================================
-          # Group posts into ordered series for sequential reading.
-          # Use `series = "Series Name"` in front matter to assign posts.
-          # Use `series_weight = 1` to control ordering within a series.
-
-          [series]
-          enabled = true
-
-          TOML
+          ConfigSnippets.series
         end
 
         protected def related_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Related Posts
-          # =============================================================================
-          # Recommend related content based on shared taxonomy terms
-
-          [related]
-          enabled = true
-          limit = 5
-          taxonomies = ["tags"]
-
-          TOML
+          ConfigSnippets.related
         end
 
         protected def taxonomies_config : String
@@ -539,46 +486,11 @@ module Hwaro
         end
 
         protected def assets_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Asset Pipeline (Optional)
-          # =============================================================================
-          # Bundle, minify, and fingerprint CSS/JS files for production.
-          # Use {{ asset(name="main.css") }} in templates to resolve paths.
-
-          # [assets]
-          # enabled = true
-          # minify = true
-          # fingerprint = true
-          # source_dir = "static"
-          # output_dir = "assets"
-
-          # [[assets.bundles]]
-          # name = "main.css"
-          # files = ["css/reset.css", "css/style.css"]
-
-          # [[assets.bundles]]
-          # name = "app.js"
-          # files = ["js/util.js", "js/app.js"]
-
-          TOML
+          ConfigSnippets.assets
         end
 
         protected def markdown_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Markdown Configuration (Optional)
-          # =============================================================================
-          # Configure markdown parser behavior
-
-          [markdown]
-          safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
-          lazy_loading = false  # If true, automatically add loading="lazy" to img tags
-          emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
-
-          TOML
+          ConfigSnippets.markdown
         end
 
         protected def build_hooks_config : String
@@ -596,103 +508,19 @@ module Hwaro
         end
 
         protected def pwa_config : String
-          <<-TOML
-
-          # =============================================================================
-          # PWA (Progressive Web App) (Optional)
-          # =============================================================================
-          # Generate manifest.json and service worker for offline access and installability
-
-          # [pwa]
-          # enabled = true
-          # name = "My Site"
-          # short_name = "Site"
-          # theme_color = "#ffffff"
-          # background_color = "#ffffff"
-          # display = "standalone"
-          # start_url = "/"
-          # icons = ["static/icon-192.png", "static/icon-512.png"]
-          # offline_page = "/offline.html"
-          # precache_urls = ["/", "/about/"]
-
-          TOML
+          ConfigSnippets.pwa
         end
 
         protected def amp_config : String
-          <<-TOML
-
-          # =============================================================================
-          # AMP (Accelerated Mobile Pages) (Optional)
-          # =============================================================================
-          # Generate AMP-compliant versions of content pages
-
-          # [amp]
-          # enabled = true
-          # path_prefix = "amp"        # Output under /amp/ prefix
-          # sections = ["posts"]       # Limit to specific sections (empty = all)
-
-          TOML
+          ConfigSnippets.amp
         end
 
         protected def og_auto_image_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Auto OG Images (Optional)
-          # =============================================================================
-          # Auto-generate Open Graph preview images (SVG) for social sharing
-          # Images are created for pages without a custom `image` in front matter
-
-          # [og.auto_image]
-          # enabled = true
-          # background = "#1a1a2e"
-          # text_color = "#ffffff"
-          # accent_color = "#e94560"
-          # font_size = 48
-          # logo = "static/logo.png"
-          # output_dir = "og-images"
-
-          TOML
+          ConfigSnippets.og_auto_image
         end
 
         protected def deployment_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Deployment (Optional)
-          # =============================================================================
-          # Configure deploy targets for `hwaro deploy`
-          #
-          # - Local filesystem sync: url = "file://./out"
-          # - Remote/object stores: set `command` and use external tools (aws/gsutil/rsync/etc)
-          #
-          # Placeholders for `command`:
-          #   {source} => source directory (default: public)
-          #   {url}    => target url
-          #   {target} => target name
-
-          # [deployment]
-          # target = "prod"
-          # source_dir = "public"
-          # confirm = false
-          # dryRun = false
-          # maxDeletes = 256      # safety limit (-1 disables)
-
-          # [[deployment.targets]]
-          # name = "prod"
-          # url = "file://./out"
-
-          # [[deployment.targets]]
-          # name = "s3"
-          # url = "s3://my-bucket"
-          # command = "aws s3 sync {source}/ {url} --delete"
-
-          # [[deployment.matchers]]
-          # pattern = "^.+\\.css$"
-          # cacheControl = "max-age=31536000"
-          # gzip = true
-
-          TOML
+          ConfigSnippets.deployment
         end
       end
     end

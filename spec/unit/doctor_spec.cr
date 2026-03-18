@@ -463,4 +463,21 @@ describe Hwaro::Services::Doctor do
       end
     end
   end
+
+  describe "ConfigSnippets drift guard" do
+    it "doctor_snippet_for returns non-nil for every KNOWN_SECTIONS key" do
+      Hwaro::Services::ConfigSnippets::KNOWN_SECTIONS.each_key do |key|
+        Hwaro::Services::ConfigSnippets.doctor_snippet_for(key).should_not be_nil,
+          "ConfigSnippets.doctor_snippet_for(#{key.inspect}) returned nil — add a case branch"
+      end
+    end
+
+    it "doctor_snippet_for returns non-nil for every KNOWN_SUB_SECTIONS key" do
+      Hwaro::Services::ConfigSnippets::KNOWN_SUB_SECTIONS.each_key do |parent, child|
+        key = "#{parent}.#{child}"
+        Hwaro::Services::ConfigSnippets.doctor_snippet_for(key).should_not be_nil,
+          "ConfigSnippets.doctor_snippet_for(#{key.inspect}) returned nil — add a case branch"
+      end
+    end
+  end
 end
