@@ -21,6 +21,10 @@ lib LibStb
   fun stbi_write_jpg(filename : LibC::Char*, w : LibC::Int, h : LibC::Int, comp : LibC::Int, data : Void*, quality : LibC::Int) : LibC::Int
   fun stbi_write_bmp(filename : LibC::Char*, w : LibC::Int, h : LibC::Int, comp : LibC::Int, data : Void*) : LibC::Int
 
+  # --- stb_image_write (in-memory JPEG for LQIP) ---
+  fun hwaro_write_jpg_to_mem(pixels : UInt8*, w : LibC::Int, h : LibC::Int, comp : LibC::Int,
+                             quality : LibC::Int, out_buf : UInt8**, out_len : LibC::Int*) : LibC::Int
+
   # --- stb_image_resize2 ---
   fun stbir_resize_uint8_linear(input_pixels : UInt8*, input_w : LibC::Int, input_h : LibC::Int, input_stride_in_bytes : LibC::Int, output_pixels : UInt8*, output_w : LibC::Int, output_h : LibC::Int, output_stride_in_bytes : LibC::Int, num_channels : LibC::Int) : UInt8*
 

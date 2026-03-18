@@ -455,12 +455,220 @@ describe Hwaro::Content::Hooks::ImageHooks do
   end
 end
 
+describe Hwaro::Content::Processors::ImageProcessor do
+  describe ".generate_lqip" do
+    it "generates a base64 data URI from pixel data" do
+      # Create a 20x20 RGB image in memory
+      w = 20_i32
+      h = 20_i32
+      channels = 3_i32
+      pixel_data = Bytes.new(w * h * channels, 128_u8)
+
+      result = Hwaro::Content::Processors::ImageProcessor.generate_lqip(
+        pixel_data.to_unsafe, w, h, channels, 8, 20
+      )
+      result.should_not be_nil
+      result.not_nil!.starts_with?("data:image/jpeg;base64,").should be_true
+    end
+
+    it "returns nil for invalid dimensions" do
+      pixels = Bytes.new(1, 0_u8)
+      result = Hwaro::Content::Processors::ImageProcessor.generate_lqip(
+        pixels.to_unsafe, 0, 0, 3, 8, 20
+      )
+      result.should be_nil
+    end
+
+    it "handles RGBA images" do
+      w = 16_i32
+      h = 16_i32
+      channels = 4_i32
+      pixel_data = Bytes.new(w * h * channels, 200_u8)
+
+      result = Hwaro::Content::Processors::ImageProcessor.generate_lqip(
+        pixel_data.to_unsafe, w, h, channels, 8, 20
+      )
+      result.should_not be_nil
+      result.not_nil!.starts_with?("data:image/jpeg;base64,").should be_true
+    end
+  end
+
+  describe ".dominant_color" do
+    it "computes average color as hex string" do
+      w = 2_i32
+      h = 2_i32
+      channels = 3_i32
+      # All pixels are (100, 150, 200)
+      pixel_data = Bytes.new(w * h * channels)
+      (w * h).times do |i|
+        pixel_data[i * 3] = 100_u8
+        pixel_data[i * 3 + 1] = 150_u8
+        pixel_data[i * 3 + 2] = 200_u8
+      end
+
+      result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
+        pixel_data.to_unsafe, w, h, channels
+      )
+      result.should eq("#6496c8")
+    end
+
+    it "returns #000000 for invalid dimensions" do
+      pixels = Bytes.new(1, 0_u8)
+      result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
+        pixels.to_unsafe, 0, 0, 3
+      )
+      result.should eq("#000000")
+    end
+
+    it "handles grayscale images" do
+      w = 2_i32
+      h = 2_i32
+      channels = 1_i32
+      pixel_data = Bytes.new(w * h * channels, 128_u8)
+
+      result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
+        pixel_data.to_unsafe, w, h, channels
+      )
+      result.should eq("#808080")
+    end
+  end
+
+  describe ".resize_and_lqip" do
+    it "resizes and generates LQIP in one pass" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "photo.png")
+        pixels = Bytes.new(100 * 80 * 3, 150_u8)
+        LibStb.stbi_write_png(src, 100, 80, 3, pixels.to_unsafe.as(Void*), 100 * 3)
+
+        out_dir = File.join(dir, "out")
+        result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+          src, out_dir, [20, 50], 85, 16, 20
+        )
+
+        result_map.size.should eq(2)
+        result_map.has_key?(20).should be_true
+        result_map.has_key?(50).should be_true
+
+        lqip_uri.should_not be_nil
+        lqip_uri.not_nil!.starts_with?("data:image/jpeg;base64,").should be_true
+
+        dom_color.should eq("#969696") # 150 = 0x96
+      end
+    end
+
+    it "skips LQIP when lqip_width is 0" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "photo.png")
+        pixels = Bytes.new(20 * 20 * 3, 150_u8)
+        LibStb.stbi_write_png(src, 20, 20, 3, pixels.to_unsafe.as(Void*), 20 * 3)
+
+        out_dir = File.join(dir, "out")
+        result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+          src, out_dir, [10], 85, 0, 20
+        )
+
+        result_map.size.should eq(1)
+        lqip_uri.should be_nil
+        dom_color.should eq("#000000")
+      end
+    end
+
+    it "returns empty results for non-existent source" do
+      result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+        "/nonexistent.png", "/tmp", [100], 85, 16, 20
+      )
+      result_map.should be_empty
+      lqip_uri.should be_nil
+    end
+
+    it "handles RGBA (4-channel) images with LQIP" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "rgba.png")
+        pixels = Bytes.new(40 * 40 * 4, 180_u8)
+        LibStb.stbi_write_png(src, 40, 40, 4, pixels.to_unsafe.as(Void*), 40 * 4)
+
+        out_dir = File.join(dir, "out")
+        result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+          src, out_dir, [20], 85, 16, 20
+        )
+
+        result_map.size.should eq(1)
+        lqip_uri.should_not be_nil
+        lqip_uri.not_nil!.starts_with?("data:image/jpeg;base64,").should be_true
+        dom_color.should_not eq("#000000")
+      end
+    end
+
+    it "handles grayscale (1-channel) images with LQIP" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "gray.png")
+        pixels = Bytes.new(40 * 40 * 1, 100_u8)
+        LibStb.stbi_write_png(src, 40, 40, 1, pixels.to_unsafe.as(Void*), 40 * 1)
+
+        out_dir = File.join(dir, "out")
+        result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+          src, out_dir, [20], 85, 16, 20
+        )
+
+        result_map.size.should eq(1)
+        lqip_uri.should_not be_nil
+        lqip_uri.not_nil!.starts_with?("data:image/jpeg;base64,").should be_true
+        dom_color.should eq("#646464") # 100 = 0x64
+      end
+    end
+
+    it "does not upscale when source is smaller than lqip_width" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "tiny.png")
+        pixels = Bytes.new(8 * 8 * 3, 200_u8)
+        LibStb.stbi_write_png(src, 8, 8, 3, pixels.to_unsafe.as(Void*), 8 * 3)
+
+        out_dir = File.join(dir, "out")
+        _result_map, lqip_uri, _dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+          src, out_dir, [4], 85, 32, 20  # lqip_width=32 > src=8
+        )
+
+        # Should still produce LQIP (at src width, not upscaled to 32)
+        lqip_uri.should_not be_nil
+      end
+    end
+  end
+end
+
+describe Hwaro::Content::Hooks::ImageHooks do
+  describe ".find_lqip" do
+    it "returns LQIP data when set" do
+      Hwaro::Content::Hooks::ImageHooks.set_lqip_map({
+        "/images/photo.jpg" => {
+          "lqip"           => "data:image/jpeg;base64,abc",
+          "dominant_color" => "#ff0000",
+        },
+      })
+
+      result = Hwaro::Content::Hooks::ImageHooks.find_lqip("/images/photo.jpg")
+      result.should_not be_nil
+      result.not_nil!["lqip"].should eq("data:image/jpeg;base64,abc")
+      result.not_nil!["dominant_color"].should eq("#ff0000")
+
+      Hwaro::Content::Hooks::ImageHooks.set_lqip_map({} of String => Hash(String, String))
+    end
+
+    it "returns nil for unknown URL" do
+      Hwaro::Content::Hooks::ImageHooks.set_lqip_map({} of String => Hash(String, String))
+      Hwaro::Content::Hooks::ImageHooks.find_lqip("/nonexistent.jpg").should be_nil
+    end
+  end
+end
+
 describe Hwaro::Models::ImageProcessingConfig do
   it "has sensible defaults" do
     config = Hwaro::Models::ImageProcessingConfig.new
     config.enabled.should be_false
     config.widths.should eq([] of Int32)
     config.quality.should eq(85)
+    config.lqip_enabled.should be_false
+    config.lqip_width.should eq(32)
+    config.lqip_quality.should eq(20)
   end
 end
 
@@ -529,6 +737,55 @@ describe "Config.load image_processing" do
       )
       config = Hwaro::Models::Config.load
       config.image_processing.quality.should eq(100)
+    end
+  end
+
+  it "loads LQIP config from TOML" do
+    Dir.cd(Dir.tempdir) do
+      File.write("config.toml", <<-TOML
+        title = "Test"
+        [image_processing]
+        enabled = true
+        widths = [320]
+        [image_processing.lqip]
+        enabled = true
+        width = 48
+        quality = 30
+        TOML
+      )
+      config = Hwaro::Models::Config.load
+      config.image_processing.lqip_enabled.should be_true
+      config.image_processing.lqip_width.should eq(48)
+      config.image_processing.lqip_quality.should eq(30)
+    end
+  end
+
+  it "clamps LQIP width to 8-128" do
+    Dir.cd(Dir.tempdir) do
+      File.write("config.toml", <<-TOML
+        title = "Test"
+        [image_processing.lqip]
+        enabled = true
+        width = 2
+        TOML
+      )
+      config = Hwaro::Models::Config.load
+      config.image_processing.lqip_width.should eq(8)
+    end
+  end
+
+  it "uses LQIP defaults when not specified" do
+    Dir.cd(Dir.tempdir) do
+      File.write("config.toml", <<-TOML
+        title = "Test"
+        [image_processing]
+        enabled = true
+        TOML
+      )
+      config = Hwaro::Models::Config.load
+      config.image_processing.lqip_enabled.should be_false
+      config.image_processing.lqip_width.should eq(32)
+      config.image_processing.lqip_quality.should eq(20)
     end
   end
 end

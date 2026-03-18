@@ -440,10 +440,17 @@ module Hwaro
                           base_url.rstrip("/") + normalized
                         end
 
+            # Look up LQIP data
+            lqip_data = Content::Hooks::ImageHooks.find_lqip(normalized)
+            lqip_value = lqip_data.try { |d| d["lqip"]? } || ""
+            dominant_color_value = lqip_data.try { |d| d["dominant_color"]? } || ""
+
             Crinja::Value.new({
-              "url"    => Crinja::Value.new(final_url),
-              "width"  => Crinja::Value.new(width),
-              "height" => Crinja::Value.new(height),
+              "url"            => Crinja::Value.new(final_url),
+              "width"          => Crinja::Value.new(width),
+              "height"         => Crinja::Value.new(height),
+              "lqip"           => Crinja::Value.new(lqip_value),
+              "dominant_color" => Crinja::Value.new(dominant_color_value),
             })
           end
 

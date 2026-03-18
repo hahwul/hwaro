@@ -161,3 +161,64 @@ float hwaro_font_render_text(const stbtt_fontinfo *info, unsigned char *pixels, 
     }
     return x;
 }
+
+/* ---- In-memory JPEG writer for LQIP ---- */
+
+typedef struct {
+    unsigned char *buf;
+    int            len;
+    int            cap;
+    int            failed;
+} hwaro_membuf;
+
+static void hwaro_membuf_write(void *context, void *data, int size) {
+    hwaro_membuf *mb = (hwaro_membuf *)context;
+    if (mb->failed) return;
+    if (mb->len + size > mb->cap) {
+        int new_cap = mb->cap * 2;
+        if (new_cap < mb->len + size) new_cap = mb->len + size;
+        unsigned char *new_buf = (unsigned char *)realloc(mb->buf, new_cap);
+        if (!new_buf) {
+            free(mb->buf);
+            mb->buf = NULL;
+            mb->len = 0;
+            mb->cap = 0;
+            mb->failed = 1;
+            return;
+        }
+        mb->buf = new_buf;
+        mb->cap = new_cap;
+    }
+    memcpy(mb->buf + mb->len, data, size);
+    mb->len += size;
+}
+
+/*
+ * Encode pixel data as JPEG into a malloc'd buffer.
+ * Caller must free(*out_buf) when done.
+ * Returns 1 on success, 0 on failure.
+ */
+int hwaro_write_jpg_to_mem(const unsigned char *pixels, int w, int h, int comp,
+                           int quality, unsigned char **out_buf, int *out_len) {
+    hwaro_membuf mb;
+    mb.cap = w * h * comp;
+    if (mb.cap < 1024) mb.cap = 1024;
+    mb.buf = (unsigned char *)malloc(mb.cap);
+    mb.len = 0;
+    mb.failed = 0;
+    if (!mb.buf) {
+        *out_buf = NULL;
+        *out_len = 0;
+        return 0;
+    }
+    int ok = stbi_write_jpg_to_func(hwaro_membuf_write, &mb, w, h, comp, pixels, quality);
+    if (!ok || mb.failed || !mb.buf) {
+        free(mb.buf);
+        *out_buf = NULL;
+        *out_len = 0;
+        return 0;
+    }
+    *out_buf = mb.buf;
+    *out_len = mb.len;
+    return 1;
+}
