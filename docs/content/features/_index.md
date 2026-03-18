@@ -4,29 +4,3 @@ description = "Built-in features for SEO, search, and more"
 +++
 
 Hwaro includes powerful features out of the box.
-
-## Built-in Features
-
-- [SEO](/features/seo/) — Sitemaps, RSS feeds, robots.txt, OpenGraph, and Twitter Cards
-- [Search](/features/search/) — Client-side search index generation (Fuse.js compatible)
-- [Syntax Highlighting](/features/syntax-highlighting/) — Code block highlighting with Highlight.js
-- [Pagination](/features/pagination/) — Split large content lists into multiple pages
-- [Multilingual](/features/multilingual/) — Build multilingual sites with translation linking and hreflang tags
-- [Markdown Extensions](/features/markdown-extensions/) — Task lists, footnotes, definition lists, math, and Mermaid diagrams
-- [Auto Includes](/features/auto-includes/) — Automatically load CSS and JS files from static directories
-- [Content Files](/features/content-files/) — Publish non-Markdown files from content directories
-- [Cache Busting](/features/cache-busting/) — Content-hash based browser cache invalidation for CSS/JS resources
-- [Build Hooks](/features/build-hooks/) — Run custom shell commands before and after builds
-- [Incremental Build](/features/incremental-build/) — Only rebuild changed files for faster builds on large sites
-- [Streaming Build](/features/streaming-build/) — Reduce memory usage for large sites with batch rendering
-- [Asset Pipeline](/features/asset-pipeline/) — Built-in CSS/JS bundling, minification, and fingerprinting
-- [LLMs.txt](/features/llms-txt/) — Generate instruction files for AI/LLM crawlers
-- [Environment Variables](/features/env-variables/) — Reference environment variables in config and templates
-- [Environment-Specific Config](/features/env-config/) — Override config settings per deployment environment
-- [PWA](/features/pwa/) — Progressive Web App support with manifest.json and service worker
-- [AMP](/features/amp/) — Generate AMP-compliant versions of content pages
-- [Structured Data](/features/structured-data/) — Extended Schema.org JSON-LD (FAQ, HowTo, WebSite, Organization)
-- [Auto OG Images](/features/og-images/) — Auto-generate Open Graph preview images from page titles
-- [Series](/features/series/) — Group posts into ordered series for sequential reading
-- [Related Posts](/features/related-posts/) — Recommend related content based on shared taxonomy terms
-- [Deployment](/features/deployment/) — Configure deploy targets for `hwaro deploy`

@@ -65,19 +65,6 @@ This performs conservative optimization:
 
 All code blocks and content structure are preserved. See [CLI Reference](/start/cli/#build) for details.
 
-## Hosting Options
-
-Static sites can be deployed anywhere:
-
-- [GitHub Pages](/deploy/github-pages/) — Free hosting from GitHub
-- [Docker](/deploy/docker/) — Containerized deployment
-- [GitLab CI](/deploy/gitlab-ci/) — GitLab Pages via CI/CD
-- [Netlify](/deploy/netlify/) — Drag and drop or Git integration
-- [Vercel](/deploy/vercel/) — Zero-config deployments
-- [Cloudflare Pages](/deploy/cloudflare-pages/) — Fast global CDN
-- **AWS S3 + CloudFront** — Scalable hosting
-- **Any web server** — Nginx, Apache, etc.
-
 ## General Steps
 
 1. Build the site: `hwaro build`
