@@ -259,6 +259,13 @@ module Hwaro
       property font_size : Int32
       property logo : String?
       property output_dir : String
+      property show_title : Bool
+      property style : String
+      property pattern_opacity : Float64
+      property pattern_scale : Float64
+      property background_image : String?
+      property overlay_opacity : Float64
+      property format : String
 
       def initialize
         @enabled = false
@@ -268,6 +275,13 @@ module Hwaro
         @font_size = 48
         @logo = nil
         @output_dir = "og-images"
+        @show_title = true
+        @style = "default"
+        @pattern_opacity = 0.15
+        @pattern_scale = 1.0
+        @background_image = nil
+        @overlay_opacity = 0.5
+        @format = "svg"
       end
     end
 
@@ -923,6 +937,13 @@ module Hwaro
           config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size)
           config.og.auto_image.logo = ai["logo"]?.try(&.as_s?)
           config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?) || config.og.auto_image.output_dir
+          config.og.auto_image.show_title = bool_value(ai["show_title"]?, config.og.auto_image.show_title)
+          config.og.auto_image.style = ai["style"]?.try(&.as_s?) || config.og.auto_image.style
+          config.og.auto_image.pattern_opacity = float_value(ai["pattern_opacity"]?, config.og.auto_image.pattern_opacity)
+          config.og.auto_image.pattern_scale = float_value(ai["pattern_scale"]?, config.og.auto_image.pattern_scale)
+          config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?)
+          config.og.auto_image.overlay_opacity = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
+          config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
         end
       end
 
