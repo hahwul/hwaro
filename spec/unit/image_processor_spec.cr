@@ -479,6 +479,14 @@ describe Hwaro::Content::Processors::ImageProcessor do
       result.should be_nil
     end
 
+    it "returns nil when lqip_width is zero" do
+      pixel_data = Bytes.new(20 * 20 * 3, 128_u8)
+      result = Hwaro::Content::Processors::ImageProcessor.generate_lqip(
+        pixel_data.to_unsafe, 20, 20, 3, 0, 20
+      )
+      result.should be_nil
+    end
+
     it "handles RGBA images" do
       w = 16_i32
       h = 16_i32
@@ -530,6 +538,40 @@ describe Hwaro::Content::Processors::ImageProcessor do
         pixel_data.to_unsafe, w, h, channels
       )
       result.should eq("#808080")
+    end
+
+    it "treats 2-channel (gray+alpha) as grayscale, ignoring alpha" do
+      w = 2_i32
+      h = 2_i32
+      channels = 2_i32
+      pixel_data = Bytes.new(w * h * channels)
+      (w * h).times do |i|
+        pixel_data[i * 2] = 100_u8     # gray
+        pixel_data[i * 2 + 1] = 255_u8 # alpha (should be ignored)
+      end
+
+      result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
+        pixel_data.to_unsafe, w, h, channels
+      )
+      result.should eq("#646464") # 100 = 0x64, all RGB channels same
+    end
+
+    it "handles RGBA by ignoring alpha channel" do
+      w = 2_i32
+      h = 2_i32
+      channels = 4_i32
+      pixel_data = Bytes.new(w * h * channels)
+      (w * h).times do |i|
+        pixel_data[i * 4] = 100_u8     # R
+        pixel_data[i * 4 + 1] = 150_u8 # G
+        pixel_data[i * 4 + 2] = 200_u8 # B
+        pixel_data[i * 4 + 3] = 50_u8  # A (should be ignored)
+      end
+
+      result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
+        pixel_data.to_unsafe, w, h, channels
+      )
+      result.should eq("#6496c8")
     end
   end
 
@@ -625,7 +667,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
 
         out_dir = File.join(dir, "out")
         _result_map, lqip_uri, _dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
-          src, out_dir, [4], 85, 32, 20  # lqip_width=32 > src=8
+          src, out_dir, [4], 85, 32, 20 # lqip_width=32 > src=8
         )
 
         # Should still produce LQIP (at src width, not upscaled to 32)

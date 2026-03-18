@@ -43,7 +43,7 @@ module Hwaro
 
       # Delegate to ConfigSnippets for the single source of truth
       KNOWN_CONFIG_SECTIONS = ConfigSnippets::KNOWN_SECTIONS
-      KNOWN_SUB_SECTIONS   = ConfigSnippets::KNOWN_SUB_SECTIONS
+      KNOWN_SUB_SECTIONS    = ConfigSnippets::KNOWN_SUB_SECTIONS
 
       @content_dir : String
       @config_path : String

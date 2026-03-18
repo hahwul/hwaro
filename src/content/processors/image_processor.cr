@@ -180,6 +180,7 @@ module Hwaro
         # Returns {data_uri, dominant_color_hex} or nil on failure.
         def generate_lqip_with_color(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
                                      lqip_width : Int32 = 32, quality : Int32 = 20) : {String, String}?
+          return nil if lqip_width <= 0
           return nil if src_w <= 0 || src_h <= 0 || channels <= 0
 
           # Don't upscale — cap thumbnail width to source width
@@ -225,6 +226,7 @@ module Hwaro
         end
 
         # Compute dominant color as a hex string (e.g., "#a3b2c1").
+        # Channels: 1=gray, 2=gray+alpha, 3=RGB, 4=RGBA
         def dominant_color(pixels : UInt8*, w : Int32, h : Int32, channels : Int32) : String
           return "#000000" if w <= 0 || h <= 0 || channels <= 0
 
@@ -235,16 +237,20 @@ module Hwaro
           sum_g = 0_i64
           sum_b = 0_i64
 
+          is_rgb = channels >= 3 # 3=RGB, 4=RGBA
+
           total.times do |i|
             offset = i * channels
             sum_r += pixels[offset]
-            sum_g += pixels[offset + 1] if channels >= 2
-            sum_b += pixels[offset + 2] if channels >= 3
+            if is_rgb
+              sum_g += pixels[offset + 1]
+              sum_b += pixels[offset + 2]
+            end
           end
 
           r = (sum_r // total).clamp(0, 255)
-          g = channels >= 2 ? (sum_g // total).clamp(0, 255) : r
-          b = channels >= 3 ? (sum_b // total).clamp(0, 255) : r
+          g = is_rgb ? (sum_g // total).clamp(0, 255) : r
+          b = is_rgb ? (sum_b // total).clamp(0, 255) : r
 
           "#%02x%02x%02x" % {r, g, b}
         end
