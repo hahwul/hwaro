@@ -4,6 +4,7 @@ require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
 require "../../utils/text_utils"
+require "./og_png_renderer"
 
 module Hwaro
   module Content
@@ -43,26 +44,42 @@ module Hwaro
             format = "svg"
           end
 
-          # Check PNG tool availability once if format is png
-          png_tool = nil
+          # Check PNG rendering availability and pre-load resources once
+          png_available = false
+          font_ctx = nil
+          cached_logo = nil
+          cached_bg = nil
           if format == "png"
-            png_tool = find_png_tool
-            if png_tool.nil?
-              Logger.warn "  PNG format requested but no conversion tool found (resvg, rsvg-convert, or convert). Falling back to SVG."
+            font_ctx = OgPngRenderer.load_fonts
+            png_available = !font_ctx.nil?
+            unless png_available
+              Logger.warn "  PNG format requested but no system font found for rendering. Falling back to SVG."
             end
           end
 
-          # Pre-compute base64 data URIs once for logo and background image
-          logo_data_uri = nil
+          # Resolve absolute paths for logo and background image
+          logo_abs_path = nil
           if logo_path = ai.logo
-            abs_path = logo_path.starts_with?("/") ? logo_path : File.join(Dir.current, logo_path)
-            logo_data_uri = file_to_data_uri(abs_path) if File.exists?(abs_path)
+            abs = logo_path.starts_with?("/") ? logo_path : File.join(Dir.current, logo_path)
+            logo_abs_path = abs if File.exists?(abs)
           end
 
-          bg_data_uri = nil
+          bg_abs_path = nil
           if bg_image_path = ai.background_image
-            abs_bg_path = bg_image_path.starts_with?("/") ? bg_image_path : File.join(Dir.current, bg_image_path)
-            bg_data_uri = file_to_data_uri(abs_bg_path) if File.exists?(abs_bg_path)
+            abs = bg_image_path.starts_with?("/") ? bg_image_path : File.join(Dir.current, bg_image_path)
+            bg_abs_path = abs if File.exists?(abs)
+          end
+
+          # Pre-compute base64 data URIs once for SVG rendering.
+          # Always compute them even in PNG mode because individual pages
+          # may fall back to SVG if PNG rendering fails.
+          logo_data_uri = logo_abs_path ? file_to_data_uri(logo_abs_path) : nil
+          bg_data_uri = bg_abs_path ? file_to_data_uri(bg_abs_path) : nil
+
+          # Pre-decode and resize images once for PNG rendering
+          if png_available
+            cached_logo = OgPngRenderer.load_image(logo_abs_path, 48, 48) if logo_abs_path
+            cached_bg = OgPngRenderer.load_image(bg_abs_path, WIDTH, HEIGHT) if bg_abs_path
           end
 
           img_dir = File.join(output_dir, ai.output_dir)
@@ -82,23 +99,23 @@ module Hwaro
             slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
             slug = "page" if slug.empty?
 
-            svg_filename = "#{slug}.svg"
-            svg_path = File.join(img_dir, svg_filename)
-
-            svg = render_svg(page, config, logo_data_uri, bg_data_uri)
-            File.write(svg_path, svg)
-
-            if format == "png" && png_tool
+            if format == "png" && png_available
               png_filename = "#{slug}.png"
               png_path = File.join(img_dir, png_filename)
-              if convert_svg_to_png(svg_path, png_path, png_tool)
-                File.delete(svg_path) if File.exists?(svg_path)
+              if OgPngRenderer.render_png(page, config, png_path, logo_abs_path, bg_abs_path, font_ctx, cached_logo, cached_bg)
                 page.image = "/#{ai.output_dir}/#{png_filename}"
               else
-                Logger.warn "  PNG conversion failed for #{svg_filename}, keeping SVG"
+                # Fallback to SVG on render failure
+                svg_filename = "#{slug}.svg"
+                svg = render_svg(page, config, logo_data_uri, bg_data_uri)
+                File.write(File.join(img_dir, svg_filename), svg)
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
+                Logger.warn "  PNG render failed for #{slug}, falling back to SVG"
               end
             else
+              svg_filename = "#{slug}.svg"
+              svg = render_svg(page, config, logo_data_uri, bg_data_uri)
+              File.write(File.join(img_dir, svg_filename), svg)
               page.image = "/#{ai.output_dir}/#{svg_filename}"
             end
 
@@ -270,33 +287,6 @@ module Hwaro
           data = File.open(file_path, "rb") { |f| f.getb_to_end }
           encoded = Base64.strict_encode(data)
           "data:#{mime};base64,#{encoded}"
-        end
-
-        # Find an available PNG conversion tool
-        private def self.find_png_tool : String?
-          {"resvg", "rsvg-convert", "convert"}.each do |tool|
-            result = Process.run("which", [tool], output: Process::Redirect::Pipe, error: Process::Redirect::Close)
-            return tool if result.success?
-          end
-          nil
-        end
-
-        # Convert SVG to PNG using an external tool
-        private def self.convert_svg_to_png(svg_path : String, png_path : String, tool : String) : Bool
-          args = case tool
-                 when "resvg"
-                   [svg_path, png_path]
-                 when "rsvg-convert"
-                   ["-o", png_path, svg_path]
-                 when "convert"
-                   [svg_path, png_path]
-                 else
-                   return false
-                 end
-          result = Process.run(tool, args, output: Process::Redirect::Close, error: Process::Redirect::Close)
-          result.success?
-        rescue
-          false
         end
 
         # Word-wrap text to fit within a character limit per line

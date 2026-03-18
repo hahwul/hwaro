@@ -473,7 +473,7 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
-    it "falls back to SVG when png format is set but no tool is available" do
+    it "generates an image when png format is set" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         config.og.auto_image.enabled = true
@@ -486,7 +486,7 @@ describe Hwaro::Content::Seo::OgImage do
 
         Hwaro::Content::Seo::OgImage.generate([page], config, dir)
 
-        # Should still generate something (SVG fallback if no tool)
+        # Should generate either PNG (if font available) or SVG (fallback)
         page.image.should_not be_nil
       end
     end
