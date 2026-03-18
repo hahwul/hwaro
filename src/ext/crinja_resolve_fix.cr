@@ -10,6 +10,8 @@
 # back to the global function registry.
 #
 # See: https://github.com/hahwul/hwaro/issues/224
+# TODO: Remove this file when Crinja releases a version that includes
+#       https://github.com/straight-shoota/crinja/pull/102
 class Crinja
   def resolve(name : String) : Value
     value = context[name]
