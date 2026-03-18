@@ -27,3 +27,6 @@ Hwaro includes powerful features out of the box.
 - [AMP](/features/amp/) — Generate AMP-compliant versions of content pages
 - [Structured Data](/features/structured-data/) — Extended Schema.org JSON-LD (FAQ, HowTo, WebSite, Organization)
 - [Auto OG Images](/features/og-images/) — Auto-generate Open Graph preview images from page titles
+- [Series](/features/series/) — Group posts into ordered series for sequential reading
+- [Related Posts](/features/related-posts/) — Recommend related content based on shared taxonomy terms
+- [Deployment](/features/deployment/) — Configure deploy targets for `hwaro deploy`
