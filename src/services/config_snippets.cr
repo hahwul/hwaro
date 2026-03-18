@@ -13,20 +13,22 @@ module Hwaro
       # Each key maps to a human-readable description.
       # doctor_snippet_for(key) must return non-nil for every key listed here.
       KNOWN_SECTIONS = {
-        "pwa"        => "Progressive Web App (manifest.json, service worker)",
-        "amp"        => "AMP page generation",
-        "series"     => "Series grouping",
-        "related"    => "Related posts",
-        "search"     => "Client-side search index",
-        "pagination" => "Pagination settings",
-        "markdown"   => "Markdown parser options",
-        "assets"     => "Asset pipeline (bundling, minification)",
-        "deployment" => "Deployment targets",
+        "pwa"              => "Progressive Web App (manifest.json, service worker)",
+        "amp"              => "AMP page generation",
+        "series"           => "Series grouping",
+        "related"          => "Related posts",
+        "search"           => "Client-side search index",
+        "pagination"       => "Pagination settings",
+        "markdown"         => "Markdown parser options",
+        "assets"           => "Asset pipeline (bundling, minification)",
+        "deployment"       => "Deployment targets",
+        "image_processing" => "Image resizing and LQIP placeholder generation",
       }
 
       # Sub-sections that doctor checks when the parent section exists
       KNOWN_SUB_SECTIONS = {
-        {"og", "auto_image"} => "Auto-generated OG images",
+        {"og", "auto_image"}         => "Auto-generated OG images",
+        {"image_processing", "lqip"} => "Low-Quality Image Placeholder (LQIP) generation",
       }
 
       def self.pwa(commented : Bool = false) : String
@@ -335,6 +337,74 @@ module Hwaro
         end
       end
 
+      def self.image_processing(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+          # =============================================================================
+          # Image Processing (Optional)
+          # =============================================================================
+          # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation
+          # Uses vendored stb libraries — no external tools required.
+          # Use resize_image() in templates to generate responsive variants.
+
+          # [image_processing]
+          # enabled = true
+          # widths = [320, 640, 1024, 1280]
+          # quality = 85
+          #
+          # [image_processing.lqip]
+          # enabled = true
+          # width = 32             # Placeholder width in pixels (8-128)
+          # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
+
+          TOML
+        else
+          <<-TOML
+
+          # =============================================================================
+          # Image Processing (Optional)
+          # =============================================================================
+          # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation.
+          # Uses vendored stb libraries — no external tools required.
+          #
+          # Use resize_image() in templates:
+          #   {% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+          #   <img src="{{ img.url }}"
+          #        style="background-image: url({{ img.lqip }}); background-size: cover;"
+          #        loading="lazy">
+
+          # [image_processing]
+          # enabled = true
+          # widths = [320, 640, 1024, 1280]
+          # quality = 85
+          #
+          # [image_processing.lqip]
+          # enabled = true
+          # width = 32             # Placeholder width in pixels (8-128)
+          # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
+
+          TOML
+        end
+      end
+
+      def self.image_processing_lqip : String
+        <<-TOML
+
+          # =============================================================================
+          # LQIP — Low-Quality Image Placeholder (Optional)
+          # =============================================================================
+          # Generate tiny base64-encoded placeholder images and dominant colors
+          # Requires [image_processing] to be enabled
+
+          # [image_processing.lqip]
+          # enabled = true
+          # width = 32             # Placeholder width in pixels (8-128)
+          # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
+
+          TOML
+      end
+
       def self.deployment(commented : Bool = false) : String
         if commented
           <<-TOML
@@ -396,17 +466,19 @@ module Hwaro
       # Convenience method for doctor --fix (all commented)
       def self.doctor_snippet_for(key : String) : String?
         case key
-        when "pwa"           then pwa(commented: true)
-        when "amp"           then amp(commented: true)
-        when "og.auto_image" then og_auto_image
-        when "series"        then series(commented: true)
-        when "related"       then related(commented: true)
-        when "search"        then search(commented: true)
-        when "pagination"    then pagination(commented: true)
-        when "markdown"      then markdown(commented: true)
-        when "assets"        then assets(commented: true)
-        when "deployment"    then deployment(commented: true)
-        else                      nil
+        when "pwa"                   then pwa(commented: true)
+        when "amp"                   then amp(commented: true)
+        when "og.auto_image"         then og_auto_image
+        when "series"                then series(commented: true)
+        when "related"               then related(commented: true)
+        when "search"                then search(commented: true)
+        when "pagination"            then pagination(commented: true)
+        when "markdown"              then markdown(commented: true)
+        when "assets"                then assets(commented: true)
+        when "deployment"            then deployment(commented: true)
+        when "image_processing"      then image_processing(commented: true)
+        when "image_processing.lqip" then image_processing_lqip
+        else                              nil
         end
       end
     end

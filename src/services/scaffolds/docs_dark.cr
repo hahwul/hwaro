@@ -45,6 +45,7 @@ module Hwaro
             str << auto_includes_config
             str << assets_config
             str << markdown_config
+            str << image_processing_config
             str << build_hooks_config
             str << pwa_config
             str << amp_config

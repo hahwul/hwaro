@@ -519,6 +519,10 @@ module Hwaro
           ConfigSnippets.og_auto_image
         end
 
+        protected def image_processing_config : String
+          ConfigSnippets.image_processing
+        end
+
         protected def deployment_config : String
           ConfigSnippets.deployment
         end

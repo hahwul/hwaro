@@ -424,7 +424,7 @@ describe Hwaro::Services::Doctor do
           sections = Hwaro::Services::Doctor::KNOWN_CONFIG_SECTIONS.keys.map { |k|
             "[#{k}]"
           }.join("\n")
-          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n#{sections}\n[og]\ndefault_image = "/img.png"\n[og.auto_image]\nenabled = false\n))
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n#{sections}\n[og]\ndefault_image = "/img.png"\n[og.auto_image]\nenabled = false\n[image_processing.lqip]\nenabled = false\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
           added = doctor.fix_config
