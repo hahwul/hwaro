@@ -539,6 +539,38 @@ command = "aws s3 sync {source}/ {url} --delete"
 
 Custom commands support placeholders: `{source}`, `{url}`, `{target}`.
 
+## Image Processing
+
+Automatic image resizing and LQIP placeholder generation:
+
+```toml
+[image_processing]
+enabled = true
+widths = [320, 640, 1024, 1280]
+quality = 85
+
+[image_processing.lqip]
+enabled = true
+width = 32
+quality = 20
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable image resizing |
+| widths | array | [] | Target widths to generate (in pixels) |
+| quality | int | 85 | JPEG output quality (1-100) |
+
+### LQIP
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Generate base64 blur-up placeholders and dominant colors |
+| width | int | 32 | Placeholder image width (8-128) |
+| quality | int | 20 | Placeholder JPEG quality (1-100) |
+
+See [Image Processing](/features/image-processing/) for template usage and details.
+
 ## Content Files
 
 Publish non-Markdown files from `content/` to the output directory:
@@ -631,6 +663,14 @@ use_cdn = true
 [auto_includes]
 enabled = true
 dirs = ["assets/css", "assets/js"]
+
+[image_processing]
+enabled = true
+widths = [320, 640, 1024]
+quality = 85
+
+[image_processing.lqip]
+enabled = true
 
 [content.files]
 allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]

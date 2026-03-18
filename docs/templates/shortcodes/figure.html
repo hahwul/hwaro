@@ -1,5 +1,6 @@
+{% set fig_image = resize_image(path=src, width=1024) %}
 <figure class="sc-figure">
-  <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+  <img src="{{ fig_image.url }}" alt="{{ alt | default(value='') }}"{% if fig_image.lqip %} class="lqip-blur" style="background-image: url({{ fig_image.lqip }}); background-size: cover;"{% endif %} loading="lazy">
   {% if caption %}<figcaption>{{ caption }}</figcaption>{% endif %}
 </figure>
 

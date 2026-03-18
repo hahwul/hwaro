@@ -1,6 +1,6 @@
 +++
 title = "Image Processing"
-description = "Automatic image resizing during build with zero external dependencies"
+description = "Automatic image resizing, LQIP placeholders, and dominant color extraction during build"
 weight = 21
 toc = true
 +++
@@ -31,6 +31,25 @@ quality = 85
 | enabled | bool | false | Enable image resizing |
 | widths | array | [] | Target widths to generate (in pixels) |
 | quality | int | 85 | JPEG output quality (1-100) |
+
+### LQIP (Low-Quality Image Placeholders)
+
+Enable LQIP to generate tiny base64-encoded placeholder images and extract dominant colors at build time. This eliminates CLS (Cumulative Layout Shift) and provides instant visual feedback while full images load.
+
+```toml
+[image_processing.lqip]
+enabled = true
+width = 32
+quality = 20
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | false | Enable LQIP generation |
+| width | int | 32 | Placeholder image width in pixels (8-128) |
+| quality | int | 20 | JPEG quality for placeholder (1-100, lower = smaller) |
+
+A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image — small enough to inline directly in HTML.
 
 ## How It Works
 
@@ -80,9 +99,55 @@ For responsive images with `srcset`:
 
 The function selects the closest available width. If you request `width=500` and the configured widths are `[320, 640, 1024]`, it returns the 640px variant (smallest width >= requested). If no variant is large enough, it falls back to the largest available.
 
+### Using LQIP Placeholders
+
+When LQIP is enabled, `resize_image()` returns two additional properties: `lqip` (a base64 data URI) and `dominant_color` (a hex color string). Use them for blur-up effects or solid color placeholders:
+
+**Blur-up effect:**
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+<img
+  src="{{ img.url }}"
+  style="background-image: url({{ img.lqip }}); background-size: cover;"
+  loading="lazy"
+  alt="Hero image"
+>
+```
+
+**Dominant color placeholder:**
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+<img
+  src="{{ img.url }}"
+  style="background-color: {{ img.dominant_color }}"
+  loading="lazy"
+  alt="Hero image"
+>
+```
+
+**Combined approach (color first, then blur, then full image):**
+
+```jinja
+{% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+<div style="background-color: {{ img.dominant_color }}">
+  <img
+    src="{{ img.url }}"
+    style="background-image: url({{ img.lqip }}); background-size: cover;"
+    loading="lazy"
+    alt="Hero image"
+  >
+</div>
+```
+
+When LQIP is disabled, `lqip` and `dominant_color` return empty strings, so templates work without changes.
+
 ## Live Demo
 
-This docs site has image processing enabled with `widths = [128, 256, 512]`. The images below are automatically generated resized variants of `static/hwaro.png`:
+### Resize Demo
+
+This docs site has image processing enabled with `widths = [128, 256, 512]` and LQIP enabled. The images below are automatically generated resized variants of `static/hwaro.png`:
 
 **Original** (`hwaro.png`):
 
@@ -108,11 +173,18 @@ These files are generated at build time — no runtime resizing or external serv
 {# renders as: <img src="/hwaro_256w.png"> #}
 ```
 
+### LQIP Demo
+
+The `resize_image()` function also provides LQIP data. Here is the live output for `hwaro.png`:
+
+{{ lqip_demo(src="/hwaro.png") }}
+
 ## Performance
 
 - **Single decode**: Each source image is decoded once and resized to all target widths in memory
 - **Parallel processing**: Multiple images are processed concurrently using a worker pool
 - **No upscaling**: Images smaller than the target width are simply copied
+- **Efficient LQIP**: LQIP thumbnails are generated from the smallest resize variant (not the full-resolution original), and dominant color is computed from the thumbnail
 
 ## Quick Example
 
@@ -125,6 +197,11 @@ Suppose your site has `static/hwaro.png` (the Hwaro logo) and you want to displa
 enabled = true
 widths = [128, 256, 512]
 quality = 90
+
+[image_processing.lqip]
+enabled = true
+width = 32
+quality = 20
 ```
 
 **Template:**
@@ -137,6 +214,8 @@ quality = 90
   src="{{ logo_md.url }}"
   srcset="{{ logo_sm.url }} 128w, {{ logo_md.url }} 256w, {{ logo_lg.url }} 512w"
   sizes="(max-width: 480px) 128px, (max-width: 768px) 256px, 512px"
+  style="background-color: {{ logo_md.dominant_color }}"
+  loading="lazy"
   alt="Hwaro"
 >
 ```
@@ -161,6 +240,9 @@ enabled = true
 widths = [320, 640, 1024]
 quality = 85
 
+[image_processing.lqip]
+enabled = true
+
 [content.files]
 allow_extensions = ["jpg", "jpeg", "png"]
 ```
@@ -171,7 +253,12 @@ allow_extensions = ["jpg", "jpeg", "png"]
   {% set thumb = resize_image(path=page.image, width=320) %}
   <picture>
     <source media="(min-width: 768px)" srcset="{{ hero.url }}">
-    <img src="{{ thumb.url }}" alt="{{ page.title }}">
+    <img
+      src="{{ thumb.url }}"
+      style="background-color: {{ thumb.dominant_color }}"
+      loading="lazy"
+      alt="{{ page.title }}"
+    >
   </picture>
 {% endif %}
 ```

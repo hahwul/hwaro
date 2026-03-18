@@ -375,8 +375,12 @@ Returns a resized image variant. When [image processing](/features/image-process
 | url | String | URL to the resized variant (or original if unavailable) |
 | width | Int | Requested width |
 | height | Int | Requested height |
+| lqip | String | Base64 data URI of a tiny JPEG placeholder (empty if LQIP disabled) |
+| dominant_color | String | Hex color string of the image's dominant color, e.g. `#a3b2c1` (empty if LQIP disabled) |
 
 The function selects the closest available width from the configured `widths`. If you request `width=500` and the configured widths are `[320, 640, 1024]`, it returns the 640px variant (smallest width >= requested). If nothing is large enough, it falls back to the largest available.
+
+The `lqip` and `dominant_color` properties require `[image_processing.lqip]` to be enabled. When disabled, they return empty strings.
 
 **Examples:**
 
@@ -400,6 +404,24 @@ The function selects the closest available width from the configured `widths`. I
   {% set thumb = resize_image(path=page.image, width=320) %}
   <img src="{{ thumb.url }}" alt="{{ page_title }}">
 {% endif %}
+
+{# LQIP blur-up placeholder #}
+{% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+<img
+  src="{{ img.url }}"
+  style="background-image: url({{ img.lqip }}); background-size: cover;"
+  loading="lazy"
+  alt="Hero"
+>
+
+{# Dominant color placeholder #}
+{% set img = resize_image(path="/images/photo.jpg", width=640) %}
+<img
+  src="{{ img.url }}"
+  style="background-color: {{ img.dominant_color }}"
+  loading="lazy"
+  alt="Photo"
+>
 ```
 
 Requires `[image_processing]` to be enabled in `config.toml`. See [Image Processing](/features/image-processing/) for setup details.
