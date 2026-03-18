@@ -1,6 +1,6 @@
 <div align="center">
   <img alt="Hwaro Logo" src="docs/static/hwaro-wide.webp" width="500px;">
-  <p>Hwaro (화로) is a lightweight and fast static site generator written in Crystal.</p>
+  <p>A lightweight and fast static site generator written in Crystal.</p>
 </div>
 
 <p align="center">
@@ -21,18 +21,49 @@
 
 ---
 
-Hwaro is a lightweight static site generator written in [Crystal](https://crystal-lang.org/), focused on speed and simplicity. It provides a straightforward workflow for building high-performance websites using Markdown and Jinja2 templates.
+Hwaro processes Markdown content with TOML front matter and Jinja2-compatible templates (Crinja) to build high-performance static sites. It features parallel builds, incremental caching, and a built-in dev server with live reload.
 
-The tool processes Markdown content with TOML front matter and utilizes the Crinja engine (a Jinja2 implementation for Crystal) to offer flexible template management, including template inheritance and includes. To optimize build times, Hwaro incorporates parallel processing and a caching mechanism.
+<details>
+<summary><strong>Features</strong></summary>
 
-Core Features:
-* Content & Templating: Supports Markdown-based content creation with Jinja2-compatible templating for full design control.
-* Build Hooks: Supports custom commands before and after the site build process, allowing users to integrate asset minification, deployment scripts, or other pipeline tasks.
-* Modern Standards: Automatically generates essential files for modern web discovery, including Sitemaps, RSS feeds, llms.txt, and AGENTS.md.
-* Built-in SEO: Includes native support for OpenGraph tags and other metadata to improve search engine and social media visibility.
-* Performance: Built with Crystal to ensure fast build cycles through concurrent execution.
+### Content & Templating
+- Markdown with TOML/YAML front matter
+- Jinja2 templates (inheritance, includes, macros)
+- Markdown extensions: task lists, footnotes, definition lists, math (KaTeX/MathJax), Mermaid diagrams, emoji, etc
+- Syntax highlighting via Highlight.js
+- Non-markdown content file publishing
 
-Hwaro is designed for developers who need a reliable and efficient tool for managing blogs, documentation, or personal project sites without unnecessary complexity.
+### Build & Performance
+- Parallel processing and incremental build caching
+- Streaming build mode with memory limits
+- Pre/post build hooks
+- CSS/JS bundling, minification, and content-hash fingerprinting
+
+### SEO & Discovery
+- Auto-generated sitemap, robots.txt, RSS/Atom feeds
+- OpenGraph meta tags and auto-generated OG images (PNG)
+- Twitter Cards and JSON-LD structured data
+- `llms.txt` and `AGENTS.md` generation
+- Client-side search index (Fuse.js, ElasticLunr) with CJK tokenization
+
+### Site Features
+- Pagination, taxonomies (tags, categories, custom)
+- Content series and related posts
+- Multilingual (i18n) with per-language feeds and search
+- Image processing (resize, responsive images) and Auto generated OG Image
+- PWA support (manifest, service worker)
+- AMP page generation
+
+### Development & Deployment
+- Dev server with live reload and error overlay
+- Scaffolding with built-in themes (`blog`, `docs`, `blog-dark`, `docs-dark`)
+- Deploy to multiple targets with dry-run support
+- Platform config generation (Netlify, Vercel, Cloudflare Pages)
+- GitHub Actions CI/CD generation
+- Import from WordPress, Jekyll, Hugo
+- Link checker and config doctor
+
+</details>
 
 ## Installation
 
@@ -50,7 +81,7 @@ brew install hwaro
 git clone https://github.com/hahwul/hwaro.git
 cd hwaro
 
-# Install dependencies 
+# Install dependencies
 shards install
 
 # Build
@@ -62,3 +93,7 @@ shards build --release --no-debug --production
 Hwaro is an open-source project made with ❤️. If you would like to contribute, please check [CONTRIBUTING.md](CONTRIBUTING.md) and submit a Pull Request.
 
 ![](docs/static/CONTRIBUTORS.svg)
+
+## Why "Hwaro"?
+
+Hwaro (화로) is the Korean word for **Furnace** — the same name used in Minecraft's Korean localization. In the game, the Furnace is an essential tool that transforms raw materials into useful items. Hwaro aims to serve the same role for static sites: feed in your content, and it crafts a complete website.
