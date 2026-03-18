@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.2
+
+### Fixed
+- Resolve loop variables over global functions in Crinja templates (#224)
+
 ## v0.7.1
 
 ### Added
