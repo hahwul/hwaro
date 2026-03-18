@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.1
+
+### Added
+- Bundled DejaVu Sans Bold font as fallback for OG image PNG rendering (no system font required)
+- `font_path` config option for custom font in OG image generation
+- Image processing and LQIP config snippets to init scaffolds and `doctor` command
+
+### Changed
+- OG PNG rendering always available thanks to bundled font fallback (custom font > system font > bundled font priority)
+- Refactored font loading logic in `OgPngRenderer` for cleaner initialization
+
 ## v0.7.0
 
 ### Added
