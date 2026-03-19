@@ -255,7 +255,7 @@ module Hwaro
 
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
-          tags = toml_fm["tags"]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
+          tags = fm_string_array(toml_fm, "tags")
           taxonomies["tags"] = tags if tags.any?
 
           result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
@@ -289,7 +289,7 @@ module Hwaro
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
-          tags = yaml_fm["tags"]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
+          tags = fm_string_array(yaml_fm, "tags")
           taxonomies["tags"] = tags if tags.any?
 
           result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
@@ -324,8 +324,10 @@ module Hwaro
         end
 
         # Shared helper: extract a string array from a front matter value.
+        # Uses compact_map(&.as_s?) instead of map(&.as_s) to safely skip
+        # non-string elements rather than raising at runtime.
         private def fm_string_array(fm : TOML::Table | YAML::Any, key : String) : Array(String)
-          fm[key]?.try(&.as_a?.try { |a| a.map(&.as_s) }) || [] of String
+          fm[key]?.try(&.as_a?.try { |a| a.compact_map(&.as_s?) }) || [] of String
         end
 
         # Build the front matter result NamedTuple from any front matter source.
@@ -628,25 +630,13 @@ module Hwaro
         private def extract_taxonomies(front_matter : TOML::Table | YAML::Any, keys : Array(String)) : Hash(String, Array(String))
           taxonomies = {} of String => Array(String)
 
-          if front_matter.is_a?(TOML::Table)
-            front_matter.each do |key, value|
-              next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
-              if arr = value.as_a?
-                values = arr.compact_map { |v| v.as_s? }
-                taxonomies[key] = values
-              end
-            end
-          else
-            if fm_hash = front_matter.as_h?
-              fm_hash.each do |key_any, value|
-                key = key_any.as_s?
-                next unless key
-                next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
-                if arr = value.as_a?
-                  values = arr.compact_map(&.as_s?)
-                  taxonomies[key] = values
-                end
-              end
+          # Iterate all keys: TOML::Table yields {String, TOML::Any},
+          # YAML::Any#as_h yields {YAML::Any, YAML::Any}. Unify via keys list.
+          keys.each do |key|
+            next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
+            if arr = front_matter[key]?.try(&.as_a?)
+              values = arr.compact_map(&.as_s?)
+              taxonomies[key] = values
             end
           end
 
