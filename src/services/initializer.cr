@@ -8,6 +8,7 @@ require "../utils/logger"
 require "../services/scaffolds/registry"
 require "../services/scaffolds/remote"
 require "./defaults/agents_md"
+require "./doctor"
 
 module Hwaro
   module Services
@@ -98,6 +99,17 @@ module Hwaro
         # Create AGENTS.md unless skipped
         unless skip_agents_md
           create_file(File.join(target_path, "AGENTS.md"), Defaults::AgentsMd.content)
+        end
+
+        # Auto-add missing optional config sections (commented out)
+        config_path = File.join(target_path, "config.toml")
+        doctor = Services::Doctor.new(
+          content_dir: File.join(target_path, "content"),
+          config_path: config_path
+        )
+        added = doctor.fix_config(minimal: true)
+        unless added.empty?
+          Logger.info "Added #{added.size} optional config section(s) (commented out)."
         end
 
         Logger.success "Done! Run `hwaro build` to generate the site."

@@ -20,6 +20,7 @@ module Hwaro
           FLAGS = [
             CONTENT_DIR_FLAG,
             FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing config sections)"),
+            FlagInfo.new(short: nil, long: "--minimal", description: "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)"),
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -39,19 +40,25 @@ module Hwaro
             config_path = "config.toml"
             json_output = false
             fix_mode = false
+            minimal_mode = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro doctor [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               parser.on("--fix", "Auto-fix issues (add missing config sections)") { fix_mode = true }
+              parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
             doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
 
+            if minimal_mode && !fix_mode
+              Logger.warn "--minimal has no effect without --fix"
+            end
+
             if fix_mode
-              run_fix(doctor)
+              run_fix(doctor, minimal_mode)
               return
             end
 
@@ -137,8 +144,8 @@ module Hwaro
             Logger.info "Found #{errors} error(s), #{warnings} warning(s), #{infos} info(s)"
           end
 
-          private def run_fix(doctor : Services::Doctor)
-            added = doctor.fix_config
+          private def run_fix(doctor : Services::Doctor, minimal : Bool = false)
+            added = doctor.fix_config(minimal: minimal)
 
             if added.empty?
               Logger.info "#{"✔".colorize(:green)} Config is up to date — no missing sections."
