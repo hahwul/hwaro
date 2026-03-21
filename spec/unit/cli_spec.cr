@@ -271,6 +271,21 @@ describe Hwaro::CLI::CommandRegistry do
     names = all.map(&.name)
     names.should contain("init")
     names.should contain("build")
+    names.should contain("doctor")
     names.should contain("completion")
+  end
+end
+
+describe Hwaro::CLI::Commands::DoctorCommand do
+  it "has correct metadata as top-level command" do
+    meta = Hwaro::CLI::Commands::DoctorCommand.metadata
+    meta.name.should eq("doctor")
+    meta.description.should_not be_empty
+  end
+
+  it "shares flags with Tool::DoctorCommand" do
+    top_flags = Hwaro::CLI::Commands::DoctorCommand.metadata.flags.map(&.long)
+    tool_flags = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata.flags.map(&.long)
+    top_flags.should eq(tool_flags)
   end
 end
