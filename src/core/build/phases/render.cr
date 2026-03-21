@@ -560,6 +560,11 @@ module Hwaro::Core::Build::Phases::Render
     vars["toc_obj"] = Crinja::Value.new({"html" => Crinja::Value.new(toc)})
     vars["pagination"] = Crinja::Value.new(pagination)
     vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
+
+    # NOTE: pagination_obj is not updated here because its fields (URLs, page
+    # numbers, booleans) are stable across the shortcode pre-render and final
+    # render passes. The html field is set from the same pagination string
+    # that was used when build_template_variables originally created it.
   end
 
   # Unified Page→Crinja::Value conversion with per-page caching.
@@ -1102,9 +1107,26 @@ module Hwaro::Core::Build::Phases::Render
         "next"          => Crinja::Value.new(paginator.next_url),
         "pages"         => Crinja::Value.new(section_pages_array),
         "current_index" => Crinja::Value.new(paginator.page_number),
-        "total_pages"   => Crinja::Value.new(paginator.total_items),
+        "total_pages"   => Crinja::Value.new(paginator.total_pages),
       }
       vars["paginator"] = Crinja::Value.new(paginator_obj)
+
+      # Structured pagination object for custom markup in themes
+      # Allows: {{ pagination_obj.previous_url }}, {{ pagination_obj.current_page }}, etc.
+      pagination_obj_hash = {
+        "html"         => Crinja::Value.new(pagination),
+        "previous_url" => Crinja::Value.new(paginator.has_prev ? (paginator.prev_url || "") : ""),
+        "next_url"     => Crinja::Value.new(paginator.has_next ? (paginator.next_url || "") : ""),
+        "first_url"    => Crinja::Value.new(paginator.first_url),
+        "last_url"     => Crinja::Value.new(paginator.last_url),
+        "current_page" => Crinja::Value.new(paginator.page_number),
+        "total_pages"  => Crinja::Value.new(paginator.total_pages),
+        "total_items"  => Crinja::Value.new(paginator.total_items),
+        "per_page"     => Crinja::Value.new(paginator.per_page),
+        "has_previous" => Crinja::Value.new(paginator.has_prev),
+        "has_next"     => Crinja::Value.new(paginator.has_next),
+      }
+      vars["pagination_obj"] = Crinja::Value.new(pagination_obj_hash)
     end
 
     # NOTE: highlight_css/js/tags and auto_includes_css/js are now in
