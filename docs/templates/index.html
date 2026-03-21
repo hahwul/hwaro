@@ -48,17 +48,6 @@
                  HERO — SVG as full background, text overlaid
                  ============================================================ -->
             <section class="hero">
-                <!-- Heat haze overlay — SVG filter applied to entire hero -->
-                <svg class="hero-haze-filter" aria-hidden="true">
-                    <defs>
-                        <filter id="heat-haze">
-                            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.04" numOctaves="2" result="noise">
-                                <animate attributeName="baseFrequency" values="0.015 0.04; 0.02 0.06; 0.015 0.04" dur="6s" repeatCount="indefinite" />
-                            </feTurbulence>
-                            <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
-                        </filter>
-                    </defs>
-                </svg>
                 <div class="hero-bg">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
                         <defs>
