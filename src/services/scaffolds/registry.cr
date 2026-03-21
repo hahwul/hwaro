@@ -5,6 +5,7 @@
 
 require "./base"
 require "./simple"
+require "./bare"
 require "./blog"
 require "./blog_dark"
 require "./docs"
@@ -53,6 +54,7 @@ module Hwaro
 
       # Register built-in scaffolds
       Registry.register(Simple.new)
+      Registry.register(Bare.new)
       Registry.register(Blog.new)
       Registry.register(BlogDark.new)
       Registry.register(Docs.new)
