@@ -185,6 +185,134 @@ describe "Pagination: Large per_page value" do
   end
 end
 
+describe "Pagination: pagination_obj exposes individual variables" do
+  it "exposes current_page, total_pages, has_previous, has_next on each page" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "CP={{ pagination_obj.current_page }}|TP={{ pagination_obj.total_pages }}|HP={{ pagination_obj.has_previous }}|HN={{ pagination_obj.has_next }}",
+      },
+    ) do
+      page1 = File.read("public/blog/index.html")
+      page1.should contain("CP=1")
+      page1.should contain("TP=2")
+      page1.should contain("HP=false")
+      page1.should contain("HN=true")
+
+      page2 = File.read("public/blog/page/2/index.html")
+      page2.should contain("CP=2")
+      page2.should contain("TP=2")
+      page2.should contain("HP=true")
+      page2.should contain("HN=false")
+    end
+  end
+
+  it "exposes previous_url and next_url" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+        "blog/p4.md"     => "---\ntitle: P4\n---\nP4",
+        "blog/p5.md"     => "---\ntitle: P5\n---\nP5",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "PREV={{ pagination_obj.previous_url }}|NEXT={{ pagination_obj.next_url }}",
+      },
+    ) do
+      # Page 1: no previous, next is page 2
+      page1 = File.read("public/blog/index.html")
+      page1.should contain("PREV=|NEXT=/blog/page/2/")
+
+      # Page 2: previous is page 1, next is page 3
+      page2 = File.read("public/blog/page/2/index.html")
+      page2.should contain("PREV=/blog/|NEXT=/blog/page/3/")
+
+      # Page 3: previous is page 2, no next
+      page3 = File.read("public/blog/page/3/index.html")
+      page3.should contain("PREV=/blog/page/2/|NEXT=")
+    end
+  end
+
+  it "exposes per_page and total_items" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "PP={{ pagination_obj.per_page }}|TI={{ pagination_obj.total_items }}",
+      },
+    ) do
+      page1 = File.read("public/blog/index.html")
+      page1.should contain("PP=2")
+      page1.should contain("TI=3")
+    end
+  end
+
+  it "renders empty when pagination is disabled" do
+    config = <<-TOML
+    title = "Test"
+    base_url = "http://localhost"
+
+    [pagination]
+    enabled = false
+    per_page = 1
+    TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "CP={{ pagination_obj.current_page }}|TP={{ pagination_obj.total_pages }}",
+      },
+    ) do
+      # pagination_obj still available with single-page defaults when disabled
+      html = File.read("public/blog/index.html")
+      html.should contain("CP=1|TP=1")
+    end
+  end
+
+  it "exposes pagination_obj.html with pre-rendered HTML" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "{{ pagination_obj.html }}",
+      },
+    ) do
+      page1 = File.read("public/blog/index.html")
+      page1.should contain("pagination")
+      page1.should contain("pagination-prev")
+    end
+  end
+end
+
 describe "Pagination: Disabled pagination" do
   it "does not paginate when pagination is disabled" do
     config = <<-TOML
