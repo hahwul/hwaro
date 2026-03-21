@@ -65,25 +65,36 @@ module Hwaro
       def missing_config_sections : Array(String)
         return [] of String unless File.exists?(@config_path)
 
+        raw_text = File.read(@config_path)
+
         begin
-          raw = TOML.parse_file(@config_path)
+          raw = TOML.parse(raw_text)
         rescue
           return [] of String
+        end
+
+        # Collect commented section headers (e.g. "# [pwa]", "# [og.auto_image]")
+        commented_sections = Set(String).new
+        raw_text.each_line do |line|
+          if match = line.match(/^\s*#\s*\[(?!\[)([^\]]+)\]/)
+            commented_sections << match[1]
+          end
         end
 
         missing = [] of String
 
         KNOWN_CONFIG_SECTIONS.each_key do |key|
-          unless raw.has_key?(key)
+          unless raw.has_key?(key) || commented_sections.includes?(key)
             missing << key
           end
         end
 
         # Check sub-sections (only when parent section exists)
         KNOWN_SUB_SECTIONS.each_key do |parent, child|
+          sub_key = "#{parent}.#{child}"
           if parent_hash = raw[parent]?.try(&.as_h?)
-            unless parent_hash.has_key?(child)
-              missing << "#{parent}.#{child}"
+            unless parent_hash.has_key?(child) || commented_sections.includes?(sub_key)
+              missing << sub_key
             end
           end
           # If parent doesn't exist at all, don't report sub-section
@@ -92,9 +103,13 @@ module Hwaro
         missing
       end
 
+      # Sections that are advanced/niche — skipped when minimal: true
+      OPTIONAL_SECTIONS = Set{"pwa", "amp", "assets", "deployment", "image_processing", "og.auto_image", "image_processing.lqip"}
+
       # Append missing config sections to config.toml.
+      # When minimal is true, skip advanced optional sections (pwa, amp, assets, etc.)
       # Returns the list of sections that were added.
-      def fix_config : Array(String)
+      def fix_config(minimal : Bool = false) : Array(String)
         return [] of String unless File.exists?(@config_path)
 
         missing = missing_config_sections
@@ -104,6 +119,7 @@ module Hwaro
         added = [] of String
 
         missing.each do |key|
+          next if minimal && OPTIONAL_SECTIONS.includes?(key)
           if snippet = config_snippet_for(key)
             snippets << snippet
             added << key

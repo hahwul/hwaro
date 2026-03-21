@@ -350,6 +350,36 @@ describe Hwaro::Services::Doctor do
         missing_issues.none? { |i| i.message.includes?("[amp]") }.should be_true
       end
 
+      it "does not report commented-out sections as missing" do
+        config = <<-TOML
+        title = "My Site"
+        base_url = "https://example.com"
+        # [pwa]
+        # enabled = true
+        # [amp]
+        # enabled = true
+        TOML
+        issues = run_doctor(config)
+        missing_issues = issues.select { |i| i.category == "config_missing" }
+
+        missing_issues.none? { |i| i.message.includes?("[pwa]") }.should be_true
+        missing_issues.none? { |i| i.message.includes?("[amp]") }.should be_true
+      end
+
+      it "does not report commented-out sub-sections as missing" do
+        config = <<-TOML
+        title = "My Site"
+        base_url = "https://example.com"
+        [og]
+        default_image = "/img.png"
+        # [og.auto_image]
+        # enabled = true
+        TOML
+        issues = run_doctor(config)
+        missing_issues = issues.select { |i| i.category == "config_missing" }
+        missing_issues.none? { |i| i.message.includes?("[og.auto_image]") }.should be_true
+      end
+
       it "does not report og.auto_image when it exists" do
         config = <<-TOML
         title = "My Site"
@@ -414,6 +444,42 @@ describe Hwaro::Services::Doctor do
           added = doctor.fix_config
 
           added.should_not contain("pwa")
+        end
+      end
+
+      it "skips optional sections with minimal flag" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          added = doctor.fix_config(minimal: true)
+
+          # Should add common sections (search, pagination, etc.)
+          added.should contain("search")
+          added.should contain("pagination")
+
+          # Should skip advanced optional sections
+          added.should_not contain("pwa")
+          added.should_not contain("amp")
+          added.should_not contain("assets")
+          added.should_not contain("deployment")
+          added.should_not contain("image_processing")
+        end
+      end
+
+      it "adds all sections without minimal flag" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          added = doctor.fix_config(minimal: false)
+
+          added.should contain("pwa")
+          added.should contain("amp")
+          added.should contain("assets")
+          added.should contain("deployment")
         end
       end
 
