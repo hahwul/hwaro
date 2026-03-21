@@ -78,9 +78,9 @@ module Hwaro
         getter max_deletes : Int32
 
         def initialize(deployment : Models::DeploymentConfig, options : Config::Options::DeployOptions)
-          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.as(Bool)
-          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.as(Bool)
-          @force = options.force.nil? ? deployment.force : options.force.as(Bool)
+          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.not_nil!
+          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.not_nil!
+          @force = options.force.nil? ? deployment.force : options.force.not_nil!
           @max_deletes = options.max_deletes || deployment.max_deletes
         end
       end
@@ -449,12 +449,12 @@ module Hwaro
           else
             normalized_path
           end
-        rel.starts_with?("/") ? rel[1..] : rel
+        rel.starts_with?("/") ? rel.lchop('/') : rel
       end
 
       private def nested_path?(a : String, b : String) : Bool
-        a = a.gsub(/\/+\z/, "")
-        b = b.gsub(/\/+\z/, "")
+        a = a.rstrip('/')
+        b = b.rstrip('/')
         return false if a.empty? || b.empty?
         b.starts_with?(a + "/")
       end
