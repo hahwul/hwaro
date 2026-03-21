@@ -107,9 +107,9 @@ module Hwaro
         # Use rindex to find the LAST </body> tag (the real one, not one in content)
         if idx = html.rindex("</body>")
           String.build(html.bytesize + LIVE_RELOAD_SCRIPT.bytesize) do |io|
-            io << html[0...idx]
+            io << html[0, idx]
             io << LIVE_RELOAD_SCRIPT
-            io << html[idx..]
+            io << html[idx, html.size - idx]
           end
         else
           html + LIVE_RELOAD_SCRIPT

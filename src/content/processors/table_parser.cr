@@ -206,7 +206,7 @@ module Hwaro
         # markdown table (e.g. `|---|---|` or `---|---`).  This avoids false
         # positives from random `|` in code blocks, URLs, or inline code while
         # still catching tables with or without leading/trailing pipes.
-        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-{2,}:?\s*\|/m
+        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-{3,}:?\s*\|/m
 
         def has_table?(content : String) : Bool
           TABLE_SEPARATOR_CHECK.matches?(content)
@@ -235,7 +235,7 @@ module Hwaro
           cells.all? do |cell|
             cell = cell.strip
             # Must be at least 3 dashes (with optional colons)
-            cell.matches?(/^:?-{1,}:?$/)
+            cell.matches?(/^:?-{3,}:?$/)
           end
         end
 
@@ -244,14 +244,10 @@ module Hwaro
           stripped = line.strip
 
           # Remove leading pipe if present
-          if stripped.starts_with?("|")
-            stripped = stripped[1..]
-          end
+          stripped = stripped.lchop('|') if stripped.starts_with?('|')
 
           # Remove trailing pipe if present
-          if stripped.ends_with?("|")
-            stripped = stripped[0..-2]
-          end
+          stripped = stripped.rchop('|') if stripped.ends_with?('|')
 
           # Split by pipe, handling escaped pipes
           cells = [] of String
