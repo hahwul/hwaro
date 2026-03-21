@@ -97,6 +97,32 @@
     overflow: hidden;
 }
 
+/* Hidden SVG that only provides the filter definition */
+.hero-haze-filter {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+/* Heat haze — distortion layer over the entire hero */
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    filter: url(#heat-haze);
+    backdrop-filter: blur(0.3px);
+    -webkit-backdrop-filter: blur(0.3px);
+    animation: haze-breathe 8s ease-in-out infinite;
+}
+
+@keyframes haze-breathe {
+    0%, 100% { opacity: 0; }
+    30%, 70% { opacity: 1; }
+}
+
 .hero-bg {
     position: absolute;
     inset: 0;
@@ -117,7 +143,7 @@
 
 .hero-content {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     text-align: center;
     padding: 0 2rem;
     max-width: 960px;

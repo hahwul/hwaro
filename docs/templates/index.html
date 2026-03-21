@@ -48,61 +48,39 @@
                  HERO — SVG as full background, text overlaid
                  ============================================================ -->
             <section class="hero">
+                <!-- Heat haze overlay — SVG filter applied to entire hero -->
+                <svg class="hero-haze-filter" aria-hidden="true">
+                    <defs>
+                        <filter id="heat-haze">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.04" numOctaves="2" result="noise">
+                                <animate attributeName="baseFrequency" values="0.015 0.04; 0.02 0.06; 0.015 0.04" dur="6s" repeatCount="indefinite" />
+                            </feTurbulence>
+                            <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+                        </filter>
+                    </defs>
+                </svg>
                 <div class="hero-bg">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -30 240 260">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
                         <defs>
-                            <!-- Heavy wobble for the fire body -->
-                            <filter id="fire-wobble-hero" x="-30%" y="-30%" width="160%" height="160%">
-                                <feTurbulence type="fractalNoise" baseFrequency="0.03 0.06" numOctaves="3" result="noise">
-                                    <animate attributeName="baseFrequency" values="0.03 0.06; 0.06 0.14; 0.03 0.06" dur="2s" repeatCount="indefinite" />
+                            <filter id="fire-wobble-hero" x="-20%" y="-20%" width="140%" height="140%">
+                                <feTurbulence type="fractalNoise" baseFrequency="0.04 0.08" numOctaves="2" result="noise">
+                                    <animate attributeName="baseFrequency" values="0.04 0.08; 0.05 0.12; 0.04 0.08" dur="2.5s" repeatCount="indefinite" />
                                 </feTurbulence>
-                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="6" xChannelSelector="R" yChannelSelector="G" />
-                            </filter>
-                            <!-- Glow filter for the fire -->
-                            <filter id="fire-glow" x="-50%" y="-50%" width="200%" height="200%">
-                                <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
-                                <feColorMatrix in="blur" type="matrix"
-                                    values="1 0 0 0 0
-                                            0 0.2 0 0 0
-                                            0 0 0.1 0 0
-                                            0 0 0 0.6 0" result="glow" />
-                                <feMerge>
-                                    <feMergeNode in="glow" />
-                                    <feMergeNode in="SourceGraphic" />
-                                </feMerge>
+                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G" />
                             </filter>
                         </defs>
-
-                        <!-- Furnace body (stone) -->
                         <rect x="48" y="34" width="104" height="10" fill="#7A7B7E" />
                         <path d="M 28 150 L 28 54 L 172 54 L 172 150 L 154 150 L 154 72 L 46 72 L 46 150 Z" fill="#7A7B7E" />
                         <rect x="28" y="160" width="144" height="10" fill="#7A7B7E" />
-
-                        <!-- Fire glow halo behind the fire -->
-                        <rect x="40" y="66" width="120" height="88" fill="#ED1C24" opacity="0.3" filter="url(#fire-glow)" class="fire-pulse" />
-
-                        <!-- Main fire body — strong wobble -->
                         <g class="fire-pulse" filter="url(#fire-wobble-hero)">
                             <rect x="50" y="76" width="100" height="68" fill="#ED1C24" />
                             <path d="M 50 76 L 150 76 L 150 84 L 58 84 L 58 144 L 50 144 Z" fill="#BE1622" />
-                            <!-- Fire tongues rising above -->
-                            <ellipse cx="80" cy="74" rx="12" ry="8" fill="#ED1C24" opacity="0.7" />
-                            <ellipse cx="110" cy="72" rx="10" ry="10" fill="#BE1622" opacity="0.6" />
-                            <ellipse cx="95" cy="68" rx="8" ry="6" fill="#FF4444" opacity="0.5" />
                         </g>
-
-                        <!-- Sparks — more particles, varied sizes -->
                         <g>
-                            <circle cx="65" cy="128" r="1.5" fill="#FFD54F" class="spark spark-1" opacity="0" />
-                            <circle cx="80" cy="120" r="2.5" fill="#FF6B35" class="spark spark-2" opacity="0" />
-                            <circle cx="100" cy="132" r="2" fill="#FFA000" class="spark spark-2" opacity="0" />
-                            <circle cx="115" cy="118" r="1.8" fill="#FFD54F" class="spark spark-3" opacity="0" />
-                            <circle cx="135" cy="126" r="1.5" fill="#FF6B35" class="spark spark-1" opacity="0" />
-                            <circle cx="90" cy="110" r="1.2" fill="#FFA000" class="spark spark-3" opacity="0" />
-                            <circle cx="120" cy="108" r="1" fill="#FFD54F" class="spark spark-1" opacity="0" />
+                            <circle cx="70" cy="130" r="1.5" fill="#FFD54F" class="spark spark-1" opacity="0" />
+                            <circle cx="100" cy="135" r="2" fill="#FFA000" class="spark spark-2" opacity="0" />
+                            <circle cx="130" cy="125" r="1.5" fill="#FFD54F" class="spark spark-3" opacity="0" />
                         </g>
-
-                        <!-- Coal bed -->
                         <rect x="50" y="124" width="100" height="8" fill="#FFFFFF" />
                         <path d="M50 124 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12" fill="#FFFFFF" />
                         <path d="M56 132 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12" fill="#FFFFFF" />
