@@ -69,18 +69,21 @@
     border-bottom: none;
 }
 
-.landing-header .github-link {
+.landing-header .github-link,
+.landing-header .header-link {
     display: flex;
     align-items: center;
     gap: 0.45rem;
     border-bottom: none;
 }
 
-.landing-header .github-link:hover {
+.landing-header .github-link:hover,
+.landing-header .header-link:hover {
     border-bottom: none;
 }
 
-.landing-header .github-link svg {
+.landing-header .github-link svg,
+.landing-header .header-link svg {
     width: 18px;
     height: 18px;
     fill: currentColor;

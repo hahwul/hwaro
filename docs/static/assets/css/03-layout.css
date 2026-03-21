@@ -91,27 +91,34 @@
     gap: 0.5rem;
 }
 
-.github-link {
+.github-link,
+.header-link {
     color: var(--text-muted);
     text-decoration: none;
-    padding: 0.45rem;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.45rem 0.75rem;
     border-radius: 6px;
     border: none;
     border-bottom: none;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
+    gap: 0.4rem;
 }
 
-.github-link:hover {
+.github-link:hover,
+.header-link:hover {
     color: var(--text);
     background: var(--bg-hover);
     border-bottom: none;
 }
 
-.github-link svg {
-    width: 20px;
-    height: 20px;
+.github-link svg,
+.header-link svg {
+    width: 18px;
+    height: 18px;
 }
 
 /* =============================================================================
