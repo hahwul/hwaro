@@ -9,24 +9,24 @@ describe Hwaro::Services::Defaults::AgentsMd do
       content.should contain "AGENTS.md"
     end
 
-    it "includes Hwaro Usage section" do
+    it "includes Essential Commands section" do
       content = Hwaro::Services::Defaults::AgentsMd.content
-      content.should contain "Hwaro Usage"
-      content.should contain "Installation"
-      content.should contain "brew install hwaro"
-      content.should contain "shards build"
+      content.should contain "Essential Commands"
+      content.should contain "hwaro build"
+      content.should contain "hwaro serve"
+      content.should contain "hwaro new"
     end
 
-    it "includes Content Management section" do
+    it "includes Content section" do
       content = Hwaro::Services::Defaults::AgentsMd.content
-      content.should contain "Content Management"
-      content.should contain "Creating New Pages"
-      content.should contain "Front Matter Fields"
+      content.should contain "## Content"
+      content.should contain "Pages"
+      content.should contain "Front matter uses TOML"
     end
 
-    it "includes Template Development section" do
+    it "includes Templates section" do
       content = Hwaro::Services::Defaults::AgentsMd.content
-      content.should contain "Template Development"
+      content.should contain "## Templates"
       content.should contain "Jinja2"
       content.should contain "Key Variables"
     end
