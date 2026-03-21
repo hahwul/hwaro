@@ -50,3 +50,53 @@ When adding or modifying `config.toml` options, update **all** of the following:
 - **Unit**: `spec/unit/` for logic and models.
 - **Functional**: `spec/functional/` for CLI and integration tests.
 - **Content**: `spec/content/` for SEO and processor output validation.
+
+## Documentation Site
+
+The `docs/` directory is a self-contained Hwaro site that builds the project documentation.
+
+### Build & Verify
+
+```bash
+bin/hwaro build -i docs    # Build docs site
+# Output: docs/public/
+```
+
+Always build after changes to verify rendering.
+
+### Directory Structure
+
+- `docs/content/`: Markdown documentation pages.
+- `docs/data/sidebar.yml`: Sidebar navigation structure (supports nested groups).
+- `docs/templates/`: Jinja2 templates for the docs site.
+- `docs/static/assets/css/`: Stylesheets, numbered by load order (`01-variables` → `08-shortcodes`).
+- `docs/config.toml`: Docs site configuration.
+
+### Landing Page
+
+The landing page (`/`) uses a **separate template** (`docs/templates/index.html`) with dedicated CSS (`07-landing.css`). The markdown content in `docs/content/index.md` is **not rendered** — all landing content is in the template directly.
+
+### Sidebar
+
+`docs/data/sidebar.yml` supports two item types:
+- **Link**: `{ title, url }` — a navigation link.
+- **Nested group**: `{ title, items: [...] }` — a collapsible group header with child links (used in Features section).
+
+### Content Conventions
+
+- **Front matter**: Always TOML (`+++`), not YAML (`---`).
+- **`weight` field**: Controls page ordering within a section. No duplicates.
+- **`toc = true`**: Add to pages longer than ~40 lines for table of contents.
+- **Features docs**: Place a config example (`config.toml` snippet) near the top.
+- **See Also**: End pages with `## See Also` linking to 2-4 related pages.
+- **Full Reference blocks**: Key pages (Pages, Sections, Config) include a "Full Front Matter Reference" or "Full Example" section with a copy-pasteable block of all available fields.
+
+### Docs Site Sections
+
+| Section | Path | Purpose |
+|---------|------|---------|
+| Start | `content/start/` | Installation, first site, CLI, config |
+| Writing | `content/writing/` | Pages, sections, taxonomies, shortcodes, archetypes |
+| Templates | `content/templates/` | Syntax, data model, functions, filters |
+| Features | `content/features/` | All built-in features (grouped in sidebar) |
+| Deploy | `content/deploy/` | Platform-specific deployment guides |
