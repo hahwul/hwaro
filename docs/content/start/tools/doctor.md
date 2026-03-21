@@ -12,6 +12,12 @@ hwaro doctor
 # Check only a specific content directory
 hwaro doctor -c posts
 
+# Auto-fix: add missing config sections
+hwaro doctor --fix
+
+# Auto-fix with minimal sections (skip pwa, amp, assets, etc.)
+hwaro doctor --fix --minimal
+
 # Output result as JSON
 hwaro doctor --json
 ```
@@ -23,6 +29,8 @@ hwaro doctor --json
 | Flag | Description |
 |------|-------------|
 | -c, --content DIR | Content directory to check |
+| --fix | Auto-fix issues (add missing config sections) |
+| --minimal | With `--fix`, skip advanced optional sections (pwa, amp, assets, deployment, image_processing, etc.) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
