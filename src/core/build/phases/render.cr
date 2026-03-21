@@ -591,6 +591,10 @@ module Hwaro::Core::Build::Phases::Render
           "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
           "authors"      => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
           "assets"       => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
+          "extra"        => Crinja::Value.new(
+            p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
+              h[k] = Utils::CrinjaUtils.from_extra(v)
+            }),
         })
         @page_crinja_value_cache[p.path] = val
         val
@@ -874,18 +878,13 @@ module Hwaro::Core::Build::Phases::Render
     # Generate permalink only if not already set
     page.generate_permalink(config.base_url) unless page.permalink
 
-    # Reuse cached Crinja arrays for tags/authors/assets (avoids per-page .map allocation)
+    # Reuse cached Crinja arrays for tags/authors/assets/extra (avoids per-page .map allocation)
     cached_page_val = cached_page_crinja_value(page, default_lang)
     cached_raw = cached_page_val.raw.as(Hash)
     tags_crinja = cached_raw["tags"].as(Crinja::Value)
     authors_crinja = cached_raw["authors"].as(Crinja::Value)
     assets_crinja = cached_raw["assets"].as(Crinja::Value)
-
-    # Convert extra to Crinja hash
-    extra_hash = {} of String => Crinja::Value
-    page.extra.each do |k, v|
-      extra_hash[k] = Utils::CrinjaUtils.from_extra(v)
-    end
+    extra_crinja = cached_raw["extra"].as(Crinja::Value)
 
     # Reuse cached Crinja::Value for lower/higher pages
     lower_obj = page.lower.try { |l| cached_page_crinja_value(l, default_lang) }
@@ -927,7 +926,7 @@ module Hwaro::Core::Build::Phases::Render
       "authors"         => authors_crinja,
       "tags"            => tags_crinja,
       "assets"          => assets_crinja,
-      "extra"           => Crinja::Value.new(extra_hash),
+      "extra"           => extra_crinja,
       "summary"         => Crinja::Value.new(page.effective_summary || ""),
       "word_count"      => Crinja::Value.new(page.word_count),
       "reading_time"    => Crinja::Value.new(page.reading_time),
