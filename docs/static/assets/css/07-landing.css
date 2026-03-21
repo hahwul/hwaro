@@ -1,45 +1,47 @@
 /* =============================================================================
-   Landing Page Styles – Clean Dark Theme
+   Landing Page — x.ai-inspired minimal dark
    ============================================================================= */
 
-/* Landing Header */
+.landing-body {
+    background: #000;
+    color: #e8e8e8;
+}
+
+/* =============================================================================
+   Header — transparent, ultra-minimal
+   ============================================================================= */
+
 .landing-header {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     height: 64px;
-    background: rgba(17, 17, 20, 0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 2rem;
+    padding: 0 3rem;
     z-index: 100;
 }
 
 .landing-header .logo {
-    font-family: var(--font-sans);
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--text);
     text-decoration: none;
+    border-bottom: none;
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    letter-spacing: -0.01em;
-    border-bottom: none;
 }
 
 .landing-header .logo:hover {
-    color: var(--primary);
     border-bottom: none;
+    opacity: 0.8;
 }
 
 .landing-header .logo img {
-    border-radius: 6px;
+    border-radius: 0;
+    border: none;
 }
 
 .landing-header nav {
@@ -50,135 +52,84 @@
 
 .landing-header nav a {
     font-family: var(--font-sans);
-    color: var(--text-muted);
+    color: #888;
     text-decoration: none;
     font-size: 0.85rem;
-    font-weight: 500;
-    padding: 0.45rem 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
     border-radius: 6px;
     border: none;
     border-bottom: none;
-    transition:
-        color 0.15s ease,
-        background 0.15s ease;
+    transition: color 0.2s ease;
 }
 
 .landing-header nav a:hover {
-    color: var(--text);
-    background: var(--bg-hover);
+    color: #fff;
     border-bottom: none;
 }
 
-.landing-header .github-link,
-.landing-header .header-link {
+.landing-header .github-link {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
     border-bottom: none;
 }
 
-.landing-header .github-link:hover,
-.landing-header .header-link:hover {
+.landing-header .github-link:hover {
     border-bottom: none;
 }
 
-.landing-header .github-link svg,
-.landing-header .header-link svg {
+.landing-header .github-link svg {
     width: 18px;
     height: 18px;
     fill: currentColor;
 }
 
 /* =============================================================================
-   Hero Section
+   Hero — SVG logo integrated, massive type
    ============================================================================= */
 
 .hero {
-    padding: 11rem 2rem 5rem;
+    padding: 12rem 2rem 3rem;
     text-align: center;
-    max-width: 860px;
+    max-width: 960px;
     margin: 0 auto;
-    position: relative;
 }
 
-.hero::before {
-    content: "";
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 560px;
-    height: 560px;
-    background: radial-gradient(
-        circle,
-        var(--primary-glow) 0%,
-        transparent 70%
-    );
-    opacity: 0.1;
-    pointer-events: none;
-}
-
-.hero-badge {
-    font-family: var(--font-mono);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 1rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-bottom: 2rem;
-    letter-spacing: 0.02em;
-}
-
-.hero-badge::before {
-    display: none;
-}
-
-.hero-badge span {
-    color: var(--primary);
-    font-weight: 600;
+.hero-logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4rem;
 }
 
 .hero h1 {
     font-family: var(--font-sans);
-    font-size: 3.2rem;
+    font-size: 4.5rem;
     font-weight: 800;
     margin: 0 0 1.5rem 0;
-    line-height: 1.12;
-    letter-spacing: -0.035em;
-    color: var(--text);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    color: #fff;
 }
 
 .hero h1 .highlight {
-    background: linear-gradient(
-        135deg,
-        var(--primary) 0%,
-        var(--primary-hover) 100%
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--primary);
+    -webkit-text-fill-color: var(--primary);
+    background: none;
 }
 
-.hero p {
+.hero-sub {
     font-family: var(--font-sans);
-    font-size: 1.1rem;
-    color: var(--text-muted);
-    margin: 0 0 2.5rem 0;
-    max-width: 520px;
-    margin-left: auto;
-    margin-right: auto;
-    line-height: 1.75;
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: #999;
+    margin: 0 0 3rem 0;
+    line-height: 1.8;
 }
 
 .hero-buttons {
     display: flex;
-    gap: 0.75rem;
+    gap: 1rem;
     justify-content: center;
-    flex-wrap: wrap;
 }
 
 /* =============================================================================
@@ -190,155 +141,108 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    font-size: 0.875rem;
-    font-weight: 600;
+    padding: 0.8rem 2rem;
+    font-size: 0.9rem;
+    font-weight: 500;
     text-decoration: none;
     transition: all 0.2s ease;
     border-radius: 8px;
-    border: 1px solid;
-    border-bottom: 1px solid;
+    border: none;
+    border-bottom: none;
 }
 
 .btn:hover {
-    border-bottom: 1px solid;
+    border-bottom: none;
 }
 
 .btn-primary {
-    background: var(--primary);
-    color: #fff;
-    border-color: var(--primary);
+    background: #fff;
+    color: #000;
 }
 
 .btn-primary:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
-    box-shadow: 0 4px 24px var(--primary-glow);
+    background: #e0e0e0;
+    color: #000;
     transform: translateY(-1px);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #888;
+    border: 1px solid #333;
+}
+
+.btn-ghost:hover {
     color: #fff;
-}
-
-.btn-secondary {
-    background: var(--bg-card);
-    color: var(--text);
-    border-color: var(--border);
-}
-
-.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-light);
-    color: var(--text);
-}
-
-.btn svg {
-    width: 16px;
-    height: 16px;
-    fill: currentColor;
+    border-color: #555;
 }
 
 /* =============================================================================
-   Features Section
+   Features — horizontal rows
    ============================================================================= */
 
 .features {
-    padding: 3rem 2rem 5rem;
-    max-width: 1080px;
+    max-width: 800px;
     margin: 0 auto;
+    padding: 6rem 2rem;
+    border-top: 1px solid #181818;
 }
 
-.features-header {
-    text-align: center;
-    margin-bottom: 2.5rem;
-}
-
-.features-header h2 {
-    font-family: var(--font-sans);
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--primary);
-    margin: 0;
-}
-
-.features-header h2::before {
-    display: none;
-}
-
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.feature-card {
-    background: var(--bg-card);
-    padding: 1.75rem;
-    transition: background 0.2s ease;
-    position: relative;
-}
-
-.feature-card::before {
-    display: none;
-}
-
-.feature-card:hover {
-    background: var(--bg-hover);
-}
-
-.feature-icon {
-    font-family: var(--font-mono);
-    width: 40px;
-    height: 40px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+.features-list {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
+    flex-direction: column;
 }
 
-.feature-card h3 {
+.feature-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2rem;
+    align-items: baseline;
+    padding: 1.4rem 0;
+    border-bottom: 1px solid #141414;
+}
+
+.feature-row:last-child {
+    border-bottom: none;
+}
+
+.feature-row h3 {
     font-family: var(--font-mono);
-    margin: 0 0 0.5rem 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.01em;
 }
 
-.feature-card h3::before {
+.feature-row h3::before {
     display: none;
 }
 
-.feature-card p {
+.feature-row p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: #999;
     margin: 0;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    line-height: 1.65;
+    line-height: 1.7;
 }
 
 /* =============================================================================
-   Code Preview Section
+   Code Section
    ============================================================================= */
 
 .code-section {
-    padding: 1rem 2rem 5rem;
-    max-width: 700px;
+    padding: 3rem 2rem 6rem;
+    max-width: 680px;
     margin: 0 auto;
 }
 
 .code-block {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: #050506;
+    border: 1px solid #1a1a1e;
     border-radius: 12px;
     overflow: hidden;
-    position: relative;
 }
 
 .code-block::before {
@@ -347,15 +251,14 @@
 
 .code-header {
     font-family: var(--font-mono);
-    background: var(--bg-elevated);
+    background: #0a0a0c;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #1a1a1e;
     display: flex;
     align-items: center;
     justify-content: space-between;
     font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.03em;
+    color: #444;
 }
 
 .code-dots {
@@ -367,21 +270,11 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--bg-hover);
-    border: none;
 }
 
-.code-dot.red {
-    background: #ec6a5e;
-}
-
-.code-dot.yellow {
-    background: #f5bf4f;
-}
-
-.code-dot.green {
-    background: #61c554;
-}
+.code-dot.red { background: #ec6a5e; }
+.code-dot.yellow { background: #f5bf4f; }
+.code-dot.green { background: #61c554; }
 
 .code-content {
     padding: 1.5rem;
@@ -402,93 +295,107 @@
     display: none;
 }
 
-.code-content .comment {
-    color: var(--text-dim);
-}
-
-.code-content .command {
-    color: var(--accent);
-}
-
-.code-content .prompt {
-    color: var(--primary);
-}
+.code-content .comment { color: #555; }
+.code-content .command { color: var(--primary); }
+.code-content .prompt { color: #666; }
 
 /* =============================================================================
-   ASCII Art Decoration
+   CTA — before footer
    ============================================================================= */
 
-.ascii-decoration {
-    font-family: var(--font-mono);
-    color: var(--border-light);
-    font-size: 0.55rem;
-    line-height: 1.2;
-    white-space: pre;
+.landing-cta {
     text-align: center;
-    margin: 1.5rem 0;
-    opacity: 0.25;
-    user-select: none;
+    padding: 5rem 2rem 6rem;
+    border-top: 1px solid #181818;
+}
+
+.landing-cta p {
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 0 0 2rem 0;
+    letter-spacing: -0.02em;
 }
 
 /* =============================================================================
-   Landing Footer
+   Footer — minimal, hahwul signature
    ============================================================================= */
 
 .landing-footer {
-    padding: 2.5rem 2rem;
+    padding: 3rem 2rem;
     text-align: center;
-    border-top: 1px solid var(--border);
-    color: var(--text-dim);
+    border-top: 1px solid #111;
     font-family: var(--font-sans);
     font-size: 0.8rem;
+    color: #444;
 }
 
 .landing-footer::before {
     display: none;
 }
 
+.landing-footer p {
+    margin: 0;
+}
+
 .landing-footer a {
-    color: var(--text-muted);
+    color: #666;
     text-decoration: none;
-    transition: color 0.15s ease;
     border-bottom: none;
+    transition: color 0.2s ease;
 }
 
 .landing-footer a:hover {
-    color: var(--primary);
+    color: #fff;
     border-bottom: none;
 }
 
+.hahwul-img {
+    width: 80px;
+    filter: grayscale(100%) brightness(0.4);
+    transition: filter 0.3s ease;
+}
+
+.hahwul-img:hover {
+    filter: grayscale(0%) brightness(1.2);
+}
+
 /* =============================================================================
-   Landing Page Responsive
+   Responsive
    ============================================================================= */
 
 @media (max-width: 768px) {
+    .landing-header {
+        padding: 0 1.5rem;
+    }
+
     .hero {
-        padding: 9rem 1.5rem 3.5rem;
+        padding: 10rem 1.5rem 2rem;
     }
 
     .hero h1 {
-        font-size: 2.2rem;
+        font-size: 2.8rem;
     }
 
-    .hero p {
+    .hero-sub {
         font-size: 1rem;
     }
 
-    .landing-header {
-        padding: 0 1rem;
+    .hero-logo svg {
+        width: 200px;
     }
 
-    .landing-header nav {
-        gap: 0.25rem;
+    .feature-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
     }
 
     .code-content pre {
         font-size: 0.75rem;
     }
 
-    .features-grid {
-        grid-template-columns: 1fr;
+    .landing-cta p {
+        font-size: 1.2rem;
     }
 }

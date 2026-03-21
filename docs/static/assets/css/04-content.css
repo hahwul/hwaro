@@ -221,6 +221,12 @@ pre code {
     line-height: 1.65;
 }
 
+/* Override highlight.js theme background to match our theme */
+pre code.hljs {
+    background: var(--code-bg);
+    padding: 0;
+}
+
 /* =============================================================================
    Tables
    ============================================================================= */

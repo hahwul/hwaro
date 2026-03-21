@@ -22,16 +22,16 @@
     --text-dim: #64646e;
 
     /* Background Colors */
-    --bg: #101012;
-    --bg-elevated: #16161a;
-    --bg-subtle: #1c1c21;
-    --bg-hover: #222228;
-    --bg-card: #18181c;
-    --code-bg: #22272e;
+    --bg: #08080a;
+    --bg-elevated: #101014;
+    --bg-subtle: #161619;
+    --bg-hover: #1c1c20;
+    --bg-card: #111114;
+    --code-bg: #131318;
 
     /* Border Colors */
-    --border: #26262c;
-    --border-light: #37373f;
+    --border: #1e1e24;
+    --border-light: #2e2e36;
 
     /* Semantic Colors */
     --primary-light: #c87a7a;
