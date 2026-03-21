@@ -97,3 +97,9 @@ taxonomies = ["tags", "categories"]
 ```
 
 Posts sharing terms in multiple taxonomies will rank higher. For example, a post sharing 2 tags and 1 category with another post scores 3, while a post sharing only 1 tag scores 1.
+
+## See Also
+
+- [Taxonomies](/writing/taxonomies/) — Tags and categories used for scoring
+- [Series](/features/series/) — Ordered content grouping
+- [Configuration](/start/config/) — Related posts config reference

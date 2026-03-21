@@ -226,3 +226,9 @@ You can access the list of section assets in your templates using `section.asset
 | index.md | Regular page | `/blog/` |
 
 Use `_index.md` when you need to list child pages.
+
+## See Also
+
+- [Pages](/writing/pages/) — Individual content files and front matter
+- [Taxonomies](/writing/taxonomies/) — Classify content by tags and categories
+- [Data Model](/templates/data-model/) — Section properties in templates

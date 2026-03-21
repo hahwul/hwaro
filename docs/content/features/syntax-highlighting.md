@@ -139,3 +139,8 @@ Inline code uses backticks and is not highlighted:
 ```markdown
 Use the `console.log()` function.
 ```
+
+## See Also
+
+- [Markdown Extensions](/features/markdown-extensions/) — Code blocks and language support
+- [Configuration](/start/config/) — Highlight config reference

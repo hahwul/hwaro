@@ -379,3 +379,9 @@ hwaro serve -i ~/projects/my-blog --open
 |------|-------------|
 | -h, --help | Show help |
 | -v, --verbose | Verbose output |
+
+## See Also
+
+- [Configuration](/start/config/) — Config options that CLI flags override
+- [Build Hooks](/features/build-hooks/) — Pre/post build commands
+- [Tools & Completion](/start/tools/) — Utility subcommands

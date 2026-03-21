@@ -242,3 +242,8 @@ Add to config as post-build hook:
 [build]
 hooks.post = ["npx pagefind --site public"]
 ```
+
+## See Also
+
+- [Configuration](/start/config/) — Search config reference
+- [Multilingual](/features/multilingual/) — CJK tokenization and i18n search

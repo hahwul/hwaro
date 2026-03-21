@@ -343,3 +343,8 @@ templates/shortcodes/
     ├── twitter.html
     └── github.html
 ```
+
+## See Also
+
+- [Template Syntax](/templates/syntax/) — Jinja2 reference for custom shortcodes
+- [Functions](/templates/functions/) — Built-in template functions

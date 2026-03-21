@@ -40,14 +40,14 @@ An archetype is a Markdown file with front matter and optional content. Use plac
 Create `archetypes/posts.md`:
 
 ```markdown
----
-title: "{{ title }}"
-date: {{ date }}
-draft: false
-author: "Your Name"
-tags: []
-categories: []
----
++++
+title = "{{ title }}"
+date = {{ date }}
+draft = false
+authors = ["Your Name"]
+tags = []
+categories = []
++++
 
 # {{ title }}
 
@@ -130,16 +130,16 @@ hwaro new tools/develop/my-tool.md
 ### Blog Posts (`archetypes/posts.md`)
 
 ```markdown
----
-title: "{{ title }}"
-date: {{ date }}
-draft: false
-author: ""
-tags: []
-categories: []
-description: ""
-image: ""
----
++++
+title = "{{ title }}"
+date = {{ date }}
+draft = false
+authors = []
+tags = []
+categories = []
+description = ""
+image = ""
++++
 
 # {{ title }}
 
@@ -151,12 +151,12 @@ Introduction paragraph.
 ### Documentation (`archetypes/docs.md`)
 
 ```markdown
----
-title: "{{ title }}"
-date: {{ date }}
-weight: 10
-toc: true
----
++++
+title = "{{ title }}"
+date = {{ date }}
+weight = 10
+toc = true
++++
 
 Brief description of this documentation page.
 
@@ -170,11 +170,11 @@ Brief description of this documentation page.
 ### Default (`archetypes/default.md`)
 
 ```markdown
----
-title: "{{ title }}"
-date: {{ date }}
-draft: {{ draft }}
----
++++
+title = "{{ title }}"
+date = {{ date }}
+draft = {{ draft }}
++++
 
 # {{ title }}
 ```
@@ -185,3 +185,8 @@ draft: {{ draft }}
 - **Section-specific**: Create archetypes for each content section with relevant defaults
 - **Nested organization**: Use subdirectories in `archetypes/` to match your content structure
 - **Draft handling**: The `{{ draft }}` placeholder is `true` when creating in `drafts/` directory
+
+## See Also
+
+- [Pages](/writing/pages/) — Front matter fields reference
+- [CLI](/start/cli/) — The `hwaro new` command

@@ -1,7 +1,7 @@
 +++
 title = "Taxonomies"
 description = "Organize content with tags, categories, and custom groups"
-weight = 4
+weight = 3
 toc = true
 +++
 
@@ -187,3 +187,9 @@ Generate taxonomy term URL:
 {% endfor %}
 </nav>
 ```
+
+## See Also
+
+- [Sections](/writing/sections/) — Group content with directories
+- [Configuration](/start/config/) — Taxonomy config reference
+- [Data Model](/templates/data-model/) — Taxonomy variables in templates

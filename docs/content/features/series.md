@@ -96,3 +96,9 @@ content/
 ```
 
 Each post will have `series_pages` containing all three posts in order, and `series_index` set to 1, 2, or 3 respectively.
+
+## See Also
+
+- [Pages](/writing/pages/) — Front matter fields for series
+- [Related Posts](/features/related-posts/) — Content recommendations
+- [Data Model](/templates/data-model/) — Series template variables
