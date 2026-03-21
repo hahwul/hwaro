@@ -83,7 +83,35 @@ Pagination object for custom rendering:
 | paginator.next | String? | URL to next pager |
 | paginator.pages | Array | Array of pages for the current pager |
 | paginator.current_index | Int | Current pager index (1-indexed) |
-| paginator.total_pages | Int | Total number of items across all pagers |
+| paginator.total_pages | Int | Total number of pages |
+
+### pagination_obj
+
+Structured pagination object with individual fields for building fully custom pagination markup:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| pagination_obj.html | String | Pre-rendered pagination HTML (same as `pagination`) |
+| pagination_obj.current_page | Int | Current page number (1-indexed) |
+| pagination_obj.total_pages | Int | Total number of pages |
+| pagination_obj.per_page | Int | Items per page |
+| pagination_obj.total_items | Int | Total number of items across all pages |
+| pagination_obj.has_previous | Bool | Whether a previous page exists |
+| pagination_obj.has_next | Bool | Whether a next page exists |
+| pagination_obj.previous_url | String | URL to previous page (empty if none) |
+| pagination_obj.next_url | String | URL to next page (empty if none) |
+| pagination_obj.first_url | String | URL to first page |
+| pagination_obj.last_url | String | URL to last page |
+
+```jinja
+{% if pagination_obj.has_previous %}
+  <a href="{{ pagination_obj.previous_url }}">← Newer</a>
+{% endif %}
+<span>Page {{ pagination_obj.current_page }} of {{ pagination_obj.total_pages }}</span>
+{% if pagination_obj.has_next %}
+  <a href="{{ pagination_obj.next_url }}">Older →</a>
+{% endif %}
+```
 
 ## Template Examples
 
