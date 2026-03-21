@@ -85,23 +85,45 @@
 }
 
 /* =============================================================================
-   Hero — SVG logo integrated, massive type
+   Hero — SVG as immersive background, text overlaid
    ============================================================================= */
 
 .hero {
-    padding: 12rem 2rem 3rem;
-    text-align: center;
-    max-width: 960px;
-    margin: 0 auto;
-}
-
-.hero-logo {
+    position: relative;
+    min-height: 100vh;
     display: flex;
+    align-items: center;
     justify-content: center;
-    margin-bottom: 4rem;
+    overflow: hidden;
 }
 
-.hero h1 {
+.hero-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.hero-bg svg {
+    width: 70vw;
+    max-width: 700px;
+    height: auto;
+    opacity: 0.12;
+    filter: blur(2px);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 0 2rem;
+    max-width: 960px;
+}
+
+.hero-content h1 {
     font-family: var(--font-sans);
     font-size: 4.5rem;
     font-weight: 800;
@@ -111,7 +133,7 @@
     color: #fff;
 }
 
-.hero h1 .highlight {
+.hero-content h1 .highlight {
     color: var(--primary);
     -webkit-text-fill-color: var(--primary);
     background: none;
@@ -300,12 +322,12 @@
 .code-content .prompt { color: #666; }
 
 /* =============================================================================
-   CTA — before footer
+   CTA — decorative furnaces flanking the text
    ============================================================================= */
 
 .landing-cta {
     text-align: center;
-    padding: 5rem 2rem 6rem;
+    padding: 8rem 2rem;
     border-top: 1px solid #181818;
 }
 
@@ -319,7 +341,7 @@
 }
 
 /* =============================================================================
-   Footer — minimal, hahwul signature
+   Footer
    ============================================================================= */
 
 .landing-footer {
@@ -370,11 +392,7 @@
         padding: 0 1.5rem;
     }
 
-    .hero {
-        padding: 10rem 1.5rem 2rem;
-    }
-
-    .hero h1 {
+    .hero-content h1 {
         font-size: 2.8rem;
     }
 
@@ -382,8 +400,9 @@
         font-size: 1rem;
     }
 
-    .hero-logo svg {
-        width: 200px;
+    .hero-bg svg {
+        width: 90vw;
+        opacity: 0.08;
     }
 
     .feature-row {
@@ -395,7 +414,12 @@
         font-size: 0.75rem;
     }
 
-    .landing-cta p {
+    .cta-furnace {
+        width: 150px;
+        opacity: 0.05;
+    }
+
+    .cta-content p {
         font-size: 1.2rem;
     }
 }
