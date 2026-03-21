@@ -245,6 +245,17 @@ hwaro deploy --dry-run
 | --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
 
+### doctor
+
+Diagnose config and content issues (top-level shortcut):
+
+```bash
+hwaro doctor               # Diagnose config and content issues
+hwaro doctor --fix         # Add missing config sections to config.toml
+```
+
+See [doctor](/start/tools/doctor/) for details. `hwaro tool doctor` also works as an alias.
+
 ### tool
 
 Utility tools for content management:
@@ -256,8 +267,6 @@ hwaro tool list all             # List all content files
 hwaro tool list drafts          # List draft files
 hwaro tool list published       # List published files
 hwaro tool check-links          # Check for dead external links
-hwaro tool doctor               # Diagnose config and content issues
-hwaro tool doctor --fix         # Add missing config sections to config.toml
 hwaro tool platform netlify     # Generate Netlify config
 hwaro tool platform vercel      # Generate Vercel config
 hwaro tool platform cloudflare  # Generate Cloudflare Pages config

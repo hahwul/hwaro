@@ -7,14 +7,16 @@ weight = 4
 Diagnose configuration and content issues in your Hwaro site.
 
 ```bash
-hwaro tool doctor
+hwaro doctor
 
 # Check only a specific content directory
-hwaro tool doctor -c posts
+hwaro doctor -c posts
 
 # Output result as JSON
-hwaro tool doctor --json
+hwaro doctor --json
 ```
+
+> `hwaro tool doctor` also works as a backward-compatible alias.
 
 ## Options
 
