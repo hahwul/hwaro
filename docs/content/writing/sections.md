@@ -87,6 +87,28 @@ generate_feeds = true
 
 Generates `/news/rss.xml`.
 
+## Full Front Matter Reference
+
+All available fields in one block. Copy and remove what you don't need.
+
+```toml
++++
+title = "Section Title"
+description = "Section description"
+template = "section"
+page_template = "custom-page"
+sort_by = "date"
+reverse = false
+paginate = 10
+paginate_path = "page"
+transparent = false
+generate_feeds = true
+redirect_to = ""
+draft = false
+weight = 0
++++
+```
+
 ## Nested Sections
 
 Sections can contain other sections:

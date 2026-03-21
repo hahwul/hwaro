@@ -5,7 +5,7 @@ weight = 2
 toc = true
 +++
 
-Pages are Markdown files that become HTML pages on your site.
+Pages are Markdown files that become HTML pages on your site. This page covers **how to write content** — front matter fields, Markdown syntax, and file organization. For how these fields are accessed in templates, see the [Data Model](/templates/data-model/#page).
 
 ## Basic Structure
 
@@ -174,6 +174,41 @@ pros = ["Fast", "Reliable"]
 ```
 
 Access in templates: `{{ page.extra.rating }}`
+
+## Full Front Matter Reference
+
+All available fields in one block. Copy and remove what you don't need.
+
+```toml
++++
+title = "Page Title"
+date = "2024-01-15"
+updated = "2024-02-01"
+description = "SEO description"
+draft = false
+template = "page"
+weight = 0
+slug = "custom-slug"
+path = "custom/path"
+aliases = ["/old-url/"]
+image = "/images/cover.png"
+tags = ["tag1", "tag2"]
+categories = ["category1"]
+authors = ["Author Name"]
+toc = true
+in_search_index = true
+in_sitemap = true
+insert_anchor_links = true
+render = true
+redirect_to = ""
+expires = 2025-12-31
+series = "Series Name"
+series_weight = 1
+
+[extra]
+custom_field = "value"
++++
+```
 
 ## Content Summary
 

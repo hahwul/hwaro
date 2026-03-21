@@ -152,3 +152,108 @@ ul.page-list li a:hover {
 .hahwul-img:hover {
     filter: grayscale(0%) brightness(1.2); /* 원래 색상 + 조금 더 밝게 */
 }
+
+/* =============================================================================
+   Landing — Feature Grid
+   ============================================================================= */
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 1.25rem 0 1.5rem 0;
+}
+
+.feature-card {
+    background: var(--bg-card);
+    padding: 1.25rem;
+    transition: all 0.15s ease;
+}
+
+.feature-card:hover {
+    border-color: var(--border-light);
+    background: var(--bg-hover);
+}
+
+.feature-icon {
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.feature-card h3 {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 0.4rem 0;
+}
+
+.feature-card p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* =============================================================================
+   Landing — Documentation Grid
+   ============================================================================= */
+
+.doc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 1.25rem 0 1.5rem 0;
+}
+
+.doc-card {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    border-bottom: none;
+}
+
+.doc-card:hover {
+    border-color: var(--primary-dark);
+    background: var(--bg-hover);
+    border-bottom: none;
+}
+
+.doc-card h3 {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 0.35rem 0;
+}
+
+.doc-card:hover h3 {
+    color: var(--primary);
+}
+
+.doc-card p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* Responsive: 2 columns on narrower screens */
+@media (max-width: 900px) {
+    .feature-grid,
+    .doc-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .feature-grid,
+    .doc-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -7,6 +7,10 @@ toc = true
 
 Incremental build tracks file checksums and dependency changes to skip unchanged pages, significantly reducing rebuild times for large sites.
 
+```bash
+hwaro build --cache
+```
+
 ## When to Use
 
 Incremental builds are most effective when:

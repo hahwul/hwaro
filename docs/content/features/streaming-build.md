@@ -7,6 +7,10 @@ toc = true
 
 Streaming build reduces memory usage for large sites by processing pages in batches during the Render phase. Instead of holding all rendered HTML in memory at once, each batch is rendered, written to disk, and then released before the next batch begins.
 
+```bash
+hwaro build --stream
+```
+
 ## When to Use
 
 For most sites, the default build mode works well. Streaming build is useful when:

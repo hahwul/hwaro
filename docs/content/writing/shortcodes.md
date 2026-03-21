@@ -5,7 +5,7 @@ weight = 4
 toc = true
 +++
 
-Shortcodes are reusable template snippets you can use in Markdown content.
+Shortcodes are reusable template snippets you can use in Markdown content. Custom shortcodes are Jinja2 templates placed in `templates/shortcodes/` — see [Template Syntax](/templates/syntax/) for the templating language reference.
 
 ## Using Shortcodes
 

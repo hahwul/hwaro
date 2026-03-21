@@ -7,6 +7,20 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
+## Site Settings
+
+```toml
+title = "My Site"
+description = "Site description for SEO"
+base_url = "https://example.com"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| title | string | Site title |
+| description | string | Site description |
+| base_url | string | Production URL (no trailing slash) |
+
 ## Environment Variables
 
 You can reference environment variables in `config.toml`. Values are substituted before TOML parsing.
@@ -23,23 +37,7 @@ description = "${SITE_DESC:-My awesome site}"
 | `$VAR` | Same as above (bare form) |
 | `${VAR:-default}` | Use `default` if `VAR` is unset or empty |
 
-Missing variables without defaults are left as-is and produce a build warning.
-
-See [Environment Variables](/features/env-variables/) for template usage and more examples.
-
-## Site Settings
-
-```toml
-title = "My Site"
-description = "Site description for SEO"
-base_url = "https://example.com"
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| title | string | Site title |
-| description | string | Site description |
-| base_url | string | Production URL (no trailing slash) |
+Missing variables without defaults are left as-is and produce a build warning. See [Environment Variables](/features/env-variables/) for template usage.
 
 ## Build Options
 
@@ -49,6 +47,8 @@ output_dir = "public"
 drafts = false
 parallel = true
 cache = false
+hooks.pre = ["npm install", "npx tsc"]
+hooks.post = ["npm run minify"]
 ```
 
 | Key | Type | Default | Description |
@@ -57,16 +57,10 @@ cache = false
 | drafts | bool | false | Include draft content |
 | parallel | bool | true | Parallel processing |
 | cache | bool | false | Enable build caching |
+| hooks.pre | array | [] | Commands to run before build |
+| hooks.post | array | [] | Commands to run after build |
 
-### Build Hooks
-
-Run commands before/after build:
-
-```toml
-[build]
-hooks.pre = ["npm install", "npx tsc"]
-hooks.post = ["npm run minify"]
-```
+See [Build Hooks](/features/build-hooks/) for error handling and use cases.
 
 ## Markdown
 
@@ -111,324 +105,6 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
-## SEO
-
-### Feeds
-
-```toml
-[feeds]
-enabled = true
-type = "rss"
-limit = 20
-truncate = 0
-filename = "feed.xml"
-sections = []
-default_language_only = true   # true: main feed = default language only, false: all languages
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable feed generation |
-| type | string | "rss" | Feed format (`"rss"` or `"atom"`) |
-| limit | int | 10 | Maximum number of items in the feed |
-| truncate | int | 0 | Truncate content to N characters (0 = no truncation) |
-| filename | string | "" | Output filename (auto-determined if empty) |
-| sections | array | [] | Limit feed to specific sections |
-| default_language_only | bool | true | Only include default language in main feed |
-
-### Sitemap
-
-```toml
-[sitemap]
-enabled = true
-filename = "sitemap.xml"
-changefreq = "weekly"
-priority = 0.5
-exclude = ["/private", "/drafts"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable sitemap generation |
-| filename | string | "sitemap.xml" | Output filename |
-| changefreq | string | "weekly" | Default change frequency (`always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never`) |
-| priority | float | 0.5 | Default priority (0.0 to 1.0) |
-| exclude | array | [] | Exclude paths (prefixes) from sitemap |
-
-### Robots.txt
-
-```toml
-[robots]
-enabled = true
-
-[[robots.rules]]
-user_agent = "*"
-allow = ["/"]
-disallow = ["/private"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | true | Enable robots.txt generation |
-| filename | string | "robots.txt" | Output filename |
-| rules | array | [] | List of robot rules |
-
-Each rule in `rules` supports:
-
-| Key | Type | Description |
-|-----|------|-------------|
-| user_agent | string | User-agent to match (e.g. `"*"`, `"Googlebot"`) |
-| allow | array | Paths to allow |
-| disallow | array | Paths to disallow |
-
-### OpenGraph
-
-```toml
-[og]
-default_image = "/images/og.png"
-type = "website"
-twitter_card = "summary_large_image"
-twitter_site = "@username"
-twitter_creator = "@authorname"
-fb_app_id = "your_fb_app_id"
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| default_image | string | — | Fallback image when page has none |
-| type | string | "article" | OpenGraph type (`website`, `article`) |
-| twitter_card | string | "summary_large_image" | Twitter card type (`summary`, `summary_large_image`) |
-| twitter_site | string | — | Site's Twitter handle |
-| twitter_creator | string | — | Author's Twitter handle |
-| fb_app_id | string | — | Facebook App ID |
-
-### Auto OG Images
-
-Automatically generate Open Graph preview images from page titles:
-
-```toml
-[og.auto_image]
-enabled = true
-background = "#1a1a2e"
-text_color = "#ffffff"
-accent_color = "#e94560"
-font_size = 48
-logo = "static/logo.png"
-output_dir = "og-images"
-show_title = true
-style = "default"
-pattern_opacity = 0.15
-pattern_scale = 1.0
-background_image = "static/og-bg.jpg"
-overlay_opacity = 0.5
-format = "svg"
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | `false` | Auto-generate OG images for pages without a custom image |
-| background | string | `"#1a1a2e"` | Background color |
-| text_color | string | `"#ffffff"` | Title and description text color |
-| accent_color | string | `"#e94560"` | Accent color (top/bottom bars, site name) |
-| font_size | int | `48` | Title font size in pixels |
-| logo | string | — | Path to logo file, embedded as base64 |
-| output_dir | string | `"og-images"` | Output directory for generated images |
-| show_title | bool | `true` | Show site name at the bottom |
-| style | string | `"default"` | Style preset: `default`, `dots`, `grid`, `diagonal`, `gradient`, `waves`, `minimal` |
-| pattern_opacity | float | `0.15` | Pattern opacity (0.0–1.0) |
-| pattern_scale | float | `1.0` | Pattern scale multiplier |
-| background_image | string | — | Background image file path, embedded as base64 |
-| overlay_opacity | float | `0.5` | Overlay opacity on background images (0.0–1.0) |
-| format | string | `"svg"` | Output format: `svg` or `png` |
-
-See [Auto OG Images](/features/og-images/) for full details on styles, PNG rendering, and layout options.
-
-## AMP
-
-Generate AMP (Accelerated Mobile Pages) versions of content pages:
-
-```toml
-[amp]
-enabled = true
-path_prefix = "amp"
-sections = ["posts"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate AMP versions of pages |
-| path_prefix | string | "amp" | URL prefix for AMP pages (e.g., `/amp/posts/hello/`) |
-| sections | array | [] | Sections to generate AMP for (empty = all sections) |
-
-AMP pages are automatically:
-- Stripped of disallowed tags (inline `<script>`, `style` attributes)
-- Converted (`<img>` to `<amp-img>`, `<iframe>` to `<amp-iframe>`)
-- Injected with AMP boilerplate CSS and runtime
-- Linked from canonical pages via `<link rel="amphtml">`
-
-## PWA
-
-Generate Progressive Web App files for offline access and installability:
-
-```toml
-[pwa]
-enabled = true
-name = "My Site"
-short_name = "Site"
-theme_color = "#ffffff"
-background_color = "#ffffff"
-display = "standalone"
-start_url = "/"
-icons = ["static/icon-192.png", "static/icon-512.png"]
-offline_page = "/offline.html"
-precache_urls = ["/", "/about/", "/css/main.css"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate PWA files (manifest.json, sw.js) |
-| name | string | site title | Full app name |
-| short_name | string | name or site title | Short app name (shown on home screen) |
-| theme_color | string | "#ffffff" | Browser toolbar color |
-| background_color | string | "#ffffff" | Splash screen background |
-| display | string | "standalone" | Display mode (`standalone`, `fullscreen`, `minimal-ui`, `browser`) |
-| start_url | string | "/" | Start URL when app launches |
-| icons | array | [] | Icon file paths (sizes extracted from filenames, e.g. `icon-192.png`) |
-| offline_page | string | — | Page to show when offline |
-| precache_urls | array | [] | URLs to cache on install |
-
-## LLMs.txt
-
-Generate instruction files for AI/LLM crawlers:
-
-```toml
-[llms]
-enabled = true
-filename = "llms.txt"
-instructions = "This site's content is provided under the MIT license."
-full_enabled = true
-full_filename = "llms-full.txt"
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate `llms.txt` |
-| filename | string | "llms.txt" | Output filename |
-| instructions | string | "" | Instructions text for LLM crawlers |
-| full_enabled | bool | false | Generate full content version (`llms-full.txt`) |
-| full_filename | string | "llms-full.txt" | Full version filename |
-
-See [LLMs.txt](/features/llms-txt/) for details.
-
-## Search
-
-```toml
-[search]
-enabled = true
-format = "fuse_json"
-fields = ["title", "content"]
-filename = "search.json"
-exclude = ["/private", "/drafts"]
-tokenize_cjk = false
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate search index |
-| format | string | "fuse_json" | Search index format |
-| fields | array | ["title", "content"] | Fields to include in index |
-| filename | string | "search.json" | Output filename |
-| exclude | array | [] | Exclude paths (prefixes) from search index |
-| tokenize_cjk | bool | false | Enable CJK bigram tokenization for search |
-
-## Pagination
-
-Site-level pagination defaults. These apply when sections enable pagination via front matter.
-
-```toml
-[pagination]
-enabled = false
-per_page = 10
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable pagination globally |
-| per_page | int | 10 | Default items per page |
-
-See [Pagination](/features/pagination/) for section-level configuration and template usage.
-
-## Series
-
-Group posts into ordered series for sequential reading.
-
-```toml
-[series]
-enabled = true
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable series grouping |
-
-In front matter, assign a series name and optional ordering weight:
-
-```toml
-+++
-title = "Part 1: Getting Started"
-series = "Crystal Tutorial"
-series_weight = 1
-+++
-```
-
-Pages with the same `series` value are grouped together, sorted by `series_weight` (then `date`, then `title`).
-
-Use in templates:
-
-```jinja
-{% if page.series %}
-<nav class="series-nav">
-  <h4>{{ page.series }} (Part {{ page.series_index }} of {{ page.series_pages | length }})</h4>
-  <ol>
-  {% for part in page.series_pages %}
-    <li{% if part.series_index == page.series_index %} class="current"{% endif %}>
-      <a href="{{ part.url }}">{{ part.title }}</a>
-    </li>
-  {% endfor %}
-  </ol>
-</nav>
-{% endif %}
-```
-
-Each series page exposes: `title`, `url`, `description`, `date`, `series_index`.
-
-## Related Posts
-
-Recommend related content based on shared taxonomy terms.
-
-```toml
-[related]
-enabled = true
-limit = 5
-taxonomies = ["tags", "categories"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable related posts |
-| limit | int | 5 | Maximum related posts per page |
-| taxonomies | array | ["tags"] | Taxonomies to use for similarity scoring |
-
-Use in templates:
-
-```jinja
-{% for post in page.related_posts %}
-  <a href="{{ post.url }}">{{ post.title }}</a>
-{% endfor %}
-```
-
-Each related post exposes: `title`, `url`, `description`, `date`, `image`, `section`.
-
 ## Taxonomies
 
 ```toml
@@ -449,148 +125,43 @@ feed = true
 | sitemap | bool | true | Include taxonomy pages in sitemap |
 | paginate | int | — | Pages per pagination page |
 
-## Syntax Highlighting
+## Feature Configuration Reference
+
+Each feature has its own documentation with full configuration details. Below is a quick reference of all `config.toml` sections.
+
+| Config Section | Documentation | Description |
+|----------------|---------------|-------------|
+| `[feeds]` | [SEO](/features/seo/) | RSS/Atom feed generation |
+| `[sitemap]` | [SEO](/features/seo/) | Sitemap XML generation |
+| `[robots]` | [SEO](/features/seo/) | Robots.txt generation |
+| `[og]` | [SEO](/features/seo/) | OpenGraph & Twitter Card meta tags |
+| `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images |
+| `[search]` | [Search](/features/search/) | Client-side search index |
+| `[highlight]` | [Syntax Highlighting](/features/syntax-highlighting/) | Code syntax highlighting |
+| `[pagination]` | [Pagination](/features/pagination/) | Section pagination |
+| `[auto_includes]` | [Auto Includes](/features/auto-includes/) | Auto-include CSS/JS files |
+| `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting |
+| `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
+| `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
+| `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
+| `[series]` | [Series](/features/series/) | Group posts into ordered series |
+| `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
+| `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |
+| `[pwa]` | [PWA](/features/pwa/) | Progressive Web App support |
+| `[amp]` | [AMP](/features/amp/) | Accelerated Mobile Pages |
+| `[deployment]` | [Deploy](/deploy/) | Deploy targets configuration |
+| `languages.*` | [Multilingual](/features/multilingual/) | Multi-language support |
+
+## Plugins
 
 ```toml
-[highlight]
-enabled = true
-theme = "github-dark"
-use_cdn = true
+[plugins]
+processors = ["markdown"]
 ```
-
-## Auto Includes
-
-Automatically include CSS/JS from static directories:
-
-```toml
-[auto_includes]
-enabled = true
-dirs = ["assets/css", "assets/js"]
-```
-
-## Multilingual
-
-```toml
-default_language = "en"
-
-[languages.en]
-language_name = "English"
-weight = 1
-
-[languages.ko]
-language_name = "한국어"
-weight = 2
-generate_feed = true
-build_search_index = true
-taxonomies = ["tags", "categories"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| default_language | string | "en" | Default language code |
-| language_name | string | — | Human-readable language name |
-| weight | int | 0 | Sort order (lower = first) |
-| generate_feed | bool | false | Generate RSS feed for this language |
-| build_search_index | bool | false | Include in search index |
-| taxonomies | array | [] | Taxonomies for this language |
-
-See [Multilingual](/features/multilingual/) for content structure and template usage.
-
-## Deployment
-
-Configure deployment targets for the `hwaro deploy` command.
-
-```toml
-[deployment]
-confirm = false
-dry_run = false
-force = false
-max_deletes = 256
-source_dir = "public"
-
-[[deployment.targets]]
-name = "prod"
-url = "file:///var/www/mysite"
-
-[[deployment.targets]]
-name = "s3"
-url = "s3://your-bucket"
-command = "aws s3 sync {source}/ {url} --delete"
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| confirm | bool | false | Ask for confirmation before deploying |
-| dry_run | bool | false | Show changes without writing |
-| force | bool | false | Force upload (ignore file comparisons) |
-| max_deletes | int | 256 | Maximum deletions allowed (-1 to disable) |
-| source_dir | string | "public" | Source directory to deploy |
-
-### Target Options
-
-| Key | Type | Description |
-|-----|------|-------------|
-| name | string | Target identifier |
-| url | string | Destination URL or path |
-| command | string | Custom deploy command (overrides URL-based deployment) |
-| include | string | Glob pattern for files to include |
-| exclude | string | Glob pattern for files to exclude |
-| strip_index_html | bool | Remove `index.html` from paths |
-
-Custom commands support placeholders: `{source}`, `{url}`, `{target}`.
-
-## Image Processing
-
-Automatic image resizing and LQIP placeholder generation:
-
-```toml
-[image_processing]
-enabled = true
-widths = [320, 640, 1024, 1280]
-quality = 85
-
-[image_processing.lqip]
-enabled = true
-width = 32
-quality = 20
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Enable image resizing |
-| widths | array | [] | Target widths to generate (in pixels) |
-| quality | int | 85 | JPEG output quality (1-100) |
-
-### LQIP
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate base64 blur-up placeholders and dominant colors |
-| width | int | 32 | Placeholder image width (8-128) |
-| quality | int | 20 | Placeholder JPEG quality (1-100) |
-
-See [Image Processing](/features/image-processing/) for template usage and details.
-
-## Content Files
-
-Publish non-Markdown files from `content/` to the output directory:
-
-```toml
-[content.files]
-allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "pdf"]
-disallow_extensions = ["psd", "ai"]
-disallow_paths = ["drafts/**", "**/_*"]
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| allow_extensions | array | [] | File extensions to publish |
-| disallow_extensions | array | [] | File extensions to exclude |
-| disallow_paths | array | [] | Glob patterns for paths to exclude |
-
-See [Content Files](/features/content-files/) for details.
 
 ## Full Example
+
+A complete `config.toml` with all core sections. Copy and adjust to your needs.
 
 ```toml
 title = "My Blog"
@@ -602,6 +173,7 @@ default_language = "en"
 output_dir = "public"
 drafts = false
 parallel = true
+cache = false
 hooks.pre = ["npm ci"]
 hooks.post = ["npm run optimize"]
 
@@ -615,65 +187,8 @@ task_lists = true
 [permalinks]
 "old/posts" = "posts"
 
-[feeds]
-enabled = true
-limit = 20
-
-[sitemap]
-enabled = true
-changefreq = "weekly"
-priority = 0.5
-
-[pagination]
-enabled = false
-per_page = 10
-
-[series]
-enabled = true
-
-[related]
-enabled = true
-limit = 5
-taxonomies = ["tags", "categories"]
-
-[robots]
-enabled = true
-
-[llms]
-enabled = true
-instructions = "Content under MIT license."
-full_enabled = true
-
-[og]
-default_image = "/images/og-default.png"
-twitter_card = "summary_large_image"
-twitter_site = "@myblog"
-twitter_creator = "@myblog"
-
-[search]
-enabled = true
-format = "fuse_json"
-fields = ["title", "content"]
-
-[highlight]
-enabled = true
-theme = "github-dark"
-use_cdn = true
-
-[auto_includes]
-enabled = true
-dirs = ["assets/css", "assets/js"]
-
-[image_processing]
-enabled = true
-widths = [320, 640, 1024]
-quality = 85
-
-[image_processing.lqip]
-enabled = true
-
-[content.files]
-allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
+[plugins]
+processors = ["markdown"]
 
 [[taxonomies]]
 name = "tags"
@@ -682,20 +197,13 @@ feed = true
 [[taxonomies]]
 name = "categories"
 
-[deployment]
-source_dir = "public"
-
-[[deployment.targets]]
-name = "prod"
-url = "file:///var/www/myblog"
+# Feature sections — see Feature Configuration Reference above
+# [feeds], [sitemap], [robots], [og], [search], [highlight],
+# [pagination], [auto_includes], [assets], [image_processing],
+# [series], [related], [llms], [pwa], [amp], [deployment], etc.
 ```
 
 ## See Also
 
-- [Features](/features/) — All built-in features
 - [CLI](/start/cli/) — Command-line options that override config
 - [Environment-Specific Config](/features/env-config/) — Per-environment overrides (`config.production.toml`)
-- [Environment Variables](/features/env-variables/) — Env var substitution in config and templates
-- [Multilingual](/features/multilingual/) — Multilingual configuration details
-- [LLMs.txt](/features/llms-txt/) — LLM instructions configuration
-- [Build Hooks](/features/build-hooks/) — Pre/post build commands

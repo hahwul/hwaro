@@ -4,7 +4,18 @@
     <div class="sidebar-title">{{ section.title }}</div>
     <ul class="sidebar-links">
       {% for item in section.items %}
+      {% if item.items %}
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">{{ item.title }}</div>
+        <ul class="sidebar-sublinks">
+          {% for sub in item.items %}
+          <li><a href="{{ base_url }}{{ sub.url }}"{% if page.url == sub.url %} class="active"{% endif %}>{{ sub.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </li>
+      {% else %}
       <li><a href="{{ base_url }}{{ item.url }}"{% if page.url == item.url %} class="active"{% endif %}>{{ item.title }}</a></li>
+      {% endif %}
       {% endfor %}
     </ul>
   </div>

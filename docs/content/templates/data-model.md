@@ -1,11 +1,11 @@
 +++
 title = "Data Model"
 description = "Site, Section, and Page data types available in templates"
-weight = 1
+weight = 2
 toc = true
 +++
 
-Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. Understanding their hierarchy is essential for building templates.
+Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. This page is a **template-side reference** — all properties and variables you can use when building templates. For how to write content and set front matter fields, see [Writing](/writing/).
 
 ## Hierarchy
 
@@ -612,90 +612,6 @@ Available in taxonomy templates:
 
 {# Default value #}
 {{ page.description | default(value=site.description) }}
-```
-
----
-
-## Example Templates
-
-### page.html
-
-```jinja
-{% extends "base.html" %}
-
-{% block content %}
-<article>
-  <h1>{{ page.title }}</h1>
-  
-  <div class="meta">
-    <time>{{ page.date }}</time>
-    {% if page.authors %}
-    <span>by {{ page.authors | join(", ") }}</span>
-    {% endif %}
-    <span>{{ page.reading_time }} min read</span>
-  </div>
-  
-  {% if page.toc %}
-  <nav class="toc">{{ toc | safe }}</nav>
-  {% endif %}
-  
-  <div class="content">
-    {{ content | safe }}
-  </div>
-  
-  {% if page.lower or page.higher %}
-  <nav class="post-nav">
-    {% if page.lower %}
-    <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
-    {% endif %}
-    {% if page.higher %}
-    <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
-    {% endif %}
-  </nav>
-  {% endif %}
-</article>
-{% endblock %}
-```
-
-### section.html
-
-```jinja
-{% extends "base.html" %}
-
-{% block content %}
-<section>
-  <h1>{{ section.title }}</h1>
-  {% if section.description %}
-  <p class="lead">{{ section.description }}</p>
-  {% endif %}
-  
-  {{ content | safe }}
-  
-  <h2>Articles ({{ section.pages_count }})</h2>
-  <ul class="article-list">
-  {% for p in section.pages %}
-    <li>
-      <a href="{{ p.url }}">{{ p.title }}</a>
-      {% if p.date %}<time>{{ p.date }}</time>{% endif %}
-    </li>
-  {% endfor %}
-  </ul>
-  
-  {% if section.subsections %}
-  <h2>Categories</h2>
-  <ul>
-  {% for sub in section.subsections %}
-    <li>
-      <a href="{{ sub.url }}">{{ sub.title }}</a>
-      ({{ sub.pages_count }})
-    </li>
-  {% endfor %}
-  </ul>
-  {% endif %}
-  
-  {{ pagination | safe }}
-</section>
-{% endblock %}
 ```
 
 ---

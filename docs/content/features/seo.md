@@ -161,33 +161,14 @@ Sitemap: https://example.com/sitemap.xml
 
 Generate instruction files for AI/LLM crawlers following the [llms.txt standard](https://llmstxt.org/).
 
-### Configuration
-
 ```toml
 [llms]
 enabled = true
-filename = "llms.txt"
 instructions = "This site's content is provided under the MIT license."
 full_enabled = true
-full_filename = "llms-full.txt"
 ```
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| enabled | bool | false | Generate `llms.txt` |
-| filename | string | "llms.txt" | Output filename |
-| instructions | string | "" | Instructions for LLM crawlers |
-| full_enabled | bool | false | Generate full content version |
-| full_filename | string | "llms-full.txt" | Full version filename |
-
-### Output
-
-- `/llms.txt` — Instructions text only
-- `/llms-full.txt` — Full site content with metadata (title, URL, source path per page)
-
-The full version includes all rendered pages sorted by URL, separated by `---` delimiters.
-
-See [LLMs.txt](/features/llms-txt/) for detailed documentation.
+See [LLMs.txt](/features/llms-txt/) for full configuration and output details.
 
 ---
 
@@ -289,17 +270,7 @@ Or include both OG and Twitter:
 
 ## JSON-LD Structured Data
 
-Hwaro generates [JSON-LD](https://json-ld.org/) structured data for search engines.
-
-### Template Variables
-
-| Variable | Description |
-|----------|-------------|
-| jsonld | Both Article and BreadcrumbList JSON-LD |
-| jsonld_article | Article JSON-LD only |
-| jsonld_breadcrumb | BreadcrumbList JSON-LD only |
-
-### Template Usage
+Hwaro automatically generates Article and BreadcrumbList JSON-LD for every page.
 
 ```jinja
 <head>
@@ -307,64 +278,7 @@ Hwaro generates [JSON-LD](https://json-ld.org/) structured data for search engin
 </head>
 ```
 
-Or include specific types:
-
-```jinja
-<head>
-  {{ jsonld_article | safe }}
-  {{ jsonld_breadcrumb | safe }}
-</head>
-```
-
-### Article Output
-
-```html
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "My Article",
-  "url": "https://example.com/blog/my-article/",
-  "datePublished": "2024-01-15T00:00:00+00:00",
-  "dateModified": "2024-02-01T00:00:00+00:00",
-  "description": "Article description",
-  "author": {
-    "@type": "Person",
-    "name": "Author Name"
-  }
-}
-</script>
-```
-
-### BreadcrumbList Output
-
-```html
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {"@type": "ListItem", "position": 1, "name": "My Site", "item": "https://example.com/"},
-    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://example.com/blog/"},
-    {"@type": "ListItem", "position": 3, "name": "My Article"}
-  ]
-}
-</script>
-```
-
-### Fields Included
-
-The Article JSON-LD includes the following fields when available:
-
-| Field | Source |
-|-------|--------|
-| headline | `page.title` |
-| url | `page.permalink` or computed from `base_url` |
-| datePublished | `page.date` |
-| dateModified | `page.updated` |
-| description | `page.description` |
-| image | `page.image` |
-| author | First entry from `page.authors` |
+Additional schema types (FAQ, HowTo, WebSite, Organization) are also available. See [Structured Data](/features/structured-data/) for all types, configuration, and output examples.
 
 ---
 

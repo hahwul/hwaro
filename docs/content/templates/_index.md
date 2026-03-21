@@ -19,6 +19,8 @@ templates/
 └── shortcodes/         # Shortcode templates
 ```
 
+The `shortcodes/` directory contains reusable components you can embed in Markdown. See [Writing: Shortcodes](/writing/shortcodes/) for usage and how to create custom shortcodes.
+
 ## Template Selection
 
 | Content | Template |

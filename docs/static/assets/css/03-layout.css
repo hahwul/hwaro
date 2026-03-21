@@ -219,6 +219,56 @@
     border-bottom: none;
 }
 
+/* Nested groups (e.g., Features sub-categories) */
+.sidebar-group {
+    margin-top: 0.5rem;
+}
+
+.sidebar-group-title {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 0.35rem 0.75rem 0.15rem;
+    letter-spacing: 0.03em;
+}
+
+.sidebar-sublinks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-sublinks li {
+    margin-bottom: 1px;
+}
+
+.sidebar-sublinks a {
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.3rem 0.75rem 0.3rem 1.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 400;
+    transition: all 0.12s ease;
+    border-radius: 6px;
+    border-bottom: none;
+}
+
+.sidebar-sublinks a:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+    border-bottom: none;
+}
+
+.sidebar-sublinks a.active {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 500;
+    border-bottom: none;
+}
+
 /* =============================================================================
    TOC Sidebar - fixed right
    ============================================================================= */
