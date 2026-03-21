@@ -13,7 +13,7 @@ Hwaro is designed to help you **build your own website without relying on pre-ma
 
 Hwaro (화로) is the Korean word for **Furnace** — the same name used in Minecraft's Korean localization. In the game, the Furnace is an essential tool that transforms raw materials into useful items. Hwaro aims to serve the same role for static sites: feed in your content, and it crafts a complete website.
 
-![Hwaro in Minecraft](/static/images/hwaro-minecraft.webp)
+![Hwaro in Minecraft](/images/hwaro-minecraft.webp)
 
 ## Getting Started
 
