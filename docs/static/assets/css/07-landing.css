@@ -211,6 +211,31 @@
     border-top: 1px solid #181818;
 }
 
+.features-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.features-header h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.features-header h2::before {
+    display: none;
+}
+
+.features-header p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0;
+}
+
 .features-list {
     display: flex;
     flex-direction: column;
@@ -365,9 +390,28 @@
    ============================================================================= */
 
 .code-section {
-    padding: 3rem 2rem 6rem;
+    padding: 6rem 2rem;
     max-width: 680px;
     margin: 0 auto;
+    border-top: 1px solid #181818;
+}
+
+.code-header-text {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.code-header-text h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.03em;
+}
+
+.code-header-text h2::before {
+    display: none;
 }
 
 .code-block {
@@ -573,13 +617,43 @@
     border-top: 1px solid #181818;
 }
 
-.landing-cta p {
+.cta-heading {
     font-family: var(--font-sans);
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: 2.5rem;
+    font-weight: 700;
     color: #fff;
-    margin: 0 0 2rem 0;
-    letter-spacing: -0.02em;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.cta-sub {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 300;
+    color: #666;
+    margin: 0 0 2.5rem 0;
+}
+
+.cta-install {
+    margin-bottom: 2.5rem;
+}
+
+.cta-install code {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: #999;
+    background: #0a0a0c;
+    border: 1px solid #1a1a1e;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
 }
 
 /* =============================================================================

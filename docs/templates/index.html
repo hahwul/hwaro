@@ -92,6 +92,10 @@
                  FEATURES
                  ============================================================ -->
             <section class="features">
+                <div class="features-header">
+                    <h2>Everything built in.</h2>
+                    <p>No plugins needed. Enable in config.toml and go.</p>
+                </div>
                 <div class="features-list">
                     <div class="feature-row">
                         <h3>blazing_fast</h3>
@@ -171,32 +175,6 @@
             </section>
 
             <!-- ============================================================
-                 CODE
-                 ============================================================ -->
-            <section class="code-section">
-                <div class="code-block">
-                    <div class="code-header">
-                        <div class="code-dots">
-                            <span class="code-dot red"></span>
-                            <span class="code-dot yellow"></span>
-                            <span class="code-dot green"></span>
-                        </div>
-                        <span>terminal</span>
-                    </div>
-                    <div class="code-content">
-                        <pre><span class="comment"># Create a new project</span>
-<span class="prompt">$</span> <span class="command">hwaro init my-site --scaffold docs</span>
-
-<span class="comment"># Start development server</span>
-<span class="prompt">$</span> <span class="command">cd my-site && hwaro serve</span>
-
-<span class="comment"># Build for production</span>
-<span class="prompt">$</span> <span class="command">hwaro build --minify</span></pre>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ============================================================
                  SHOWCASE
                  ============================================================ -->
             <section class="showcase">
@@ -251,8 +229,15 @@
                  CTA
                  ============================================================ -->
             <section class="landing-cta">
-                <p>Start building.</p>
-                <a href="{{ base_url }}/start/" class="btn btn-primary">Read the Docs</a>
+                <p class="cta-heading">Start building.</p>
+                <p class="cta-sub">One command to install. Three lines to deploy.</p>
+                <div class="cta-install">
+                    <code>brew install hwaro/hwaro/hwaro</code>
+                </div>
+                <div class="cta-buttons">
+                    <a href="{{ base_url }}/start/" class="btn btn-primary">Read the Docs</a>
+                    <a href="{{ base_url }}/start/installation/" class="btn btn-ghost">Installation Guide</a>
+                </div>
             </section>
         </main>
 
