@@ -206,7 +206,7 @@ module Hwaro
         # markdown table (e.g. `|---|---|` or `---|---`).  This avoids false
         # positives from random `|` in code blocks, URLs, or inline code while
         # still catching tables with or without leading/trailing pipes.
-        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-{2,}:?\s*\|/m
+        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-{3,}:?\s*\|/m
 
         def has_table?(content : String) : Bool
           TABLE_SEPARATOR_CHECK.matches?(content)
