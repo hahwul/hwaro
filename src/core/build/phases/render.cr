@@ -245,7 +245,7 @@ module Hwaro::Core::Build::Phases::Render
     shortcode_context : Hash(String, Crinja::Value)? = nil
 
     processed_content = if has_shortcodes
-                          shortcode_context = build_template_variables(page, site, "", "", "", "", nil, nil, global_vars)
+                          shortcode_context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
                           process_shortcodes_jinja(raw, templates, shortcode_context, shortcode_results,
                             crinja_env_override: crinja_env_override)
                         else
@@ -275,11 +275,13 @@ module Hwaro::Core::Build::Phases::Render
     # (avoids expensive re-rendering of Markdown in Generate phase)
     page.content = html_content
 
-    toc_html = if page.toc && !toc_headers.empty?
-                 generate_toc_html(toc_headers)
-               else
-                 ""
-               end
+    # Only expose TOC data when page.toc is enabled
+    if page.toc && !toc_headers.empty?
+      toc_html = generate_toc_html(toc_headers)
+    else
+      toc_html = ""
+      toc_headers = [] of Models::TocHeader
+    end
 
     template_name = determine_template(page, templates)
     template_content = templates[template_name]? || templates["page"]?
@@ -287,13 +289,13 @@ module Hwaro::Core::Build::Phases::Render
 
     # Handle section pages with pagination
     if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
-      render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, verbose, global_vars,
+      render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, toc_headers, verbose, global_vars,
         crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, error_overlay: error_overlay)
     else
       section_list_html = ""
 
       final_html = if template_content
-                     apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates, global_vars: global_vars,
+                     apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates, toc_headers, global_vars: global_vars,
                        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
                        prebuilt_vars: shortcode_context)
                    else
@@ -338,6 +340,7 @@ module Hwaro::Core::Build::Phases::Render
     minify : Bool,
     html_content : String,
     toc_html : String,
+    toc_headers : Array(Models::TocHeader) = [] of Models::TocHeader,
     verbose : Bool = false,
     global_vars : Hash(String, Crinja::Value)? = nil,
     crinja_env_override : Crinja? = nil,
@@ -369,7 +372,7 @@ module Hwaro::Core::Build::Phases::Render
                     end
 
       final_html = if template_content
-                     apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, pagination_nav_html, current_url, paginated_page, global_vars,
+                     apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, toc_headers, pagination_nav_html, current_url, paginated_page, global_vars,
                        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links)
                    else
                      msg = "No template found for #{section.path}. Using raw content."
@@ -452,6 +455,19 @@ module Hwaro::Core::Build::Phases::Render
     end
   end
 
+  # Convert TocHeader tree to Crinja-compatible array for toc_obj.headers.
+  private def toc_headers_to_crinja(headers : Array(Models::TocHeader)) : Array(Crinja::Value)
+    headers.map do |h|
+      Crinja::Value.new({
+        "level"     => Crinja::Value.new(h.level),
+        "id"        => Crinja::Value.new(h.id),
+        "title"     => Crinja::Value.new(h.title),
+        "permalink" => Crinja::Value.new(h.permalink),
+        "children"  => Crinja::Value.new(toc_headers_to_crinja(h.children)),
+      })
+    end
+  end
+
   # Inject a dismissible error overlay into the HTML page for development feedback.
   # The overlay shows build warnings collected during rendering so developers
   # can spot template issues directly in the browser.
@@ -493,6 +509,7 @@ module Hwaro::Core::Build::Phases::Render
     section_list : String,
     toc : String,
     templates : Hash(String, String),
+    toc_headers : Array(Models::TocHeader) = [] of Models::TocHeader,
     pagination : String = "",
     page_url_override : String? = nil,
     paginator : Content::Pagination::PaginatedPage? = nil,
@@ -508,10 +525,10 @@ module Hwaro::Core::Build::Phases::Render
 
     # Build template variables — reuse prebuilt_vars if available (shortcode path)
     vars = if pv = prebuilt_vars
-             update_content_vars(pv, content, section_list, toc, pagination, pagination_seo_links)
+             update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links)
              pv
            else
-             build_template_variables(page, site, content, section_list, toc, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links)
+             build_template_variables(page, site, content, section_list, toc, toc_headers, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links)
            end
 
     begin
@@ -551,13 +568,17 @@ module Hwaro::Core::Build::Phases::Render
     content : String,
     section_list : String,
     toc : String,
+    toc_headers : Array(Models::TocHeader),
     pagination : String,
     pagination_seo_links : String,
   )
     vars["content"] = Crinja::Value.new(content)
     vars["section_list"] = Crinja::Value.new(section_list)
     vars["toc"] = Crinja::Value.new(toc)
-    vars["toc_obj"] = Crinja::Value.new({"html" => Crinja::Value.new(toc)})
+    vars["toc_obj"] = Crinja::Value.new({
+      "html"    => Crinja::Value.new(toc),
+      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers)),
+    })
     vars["pagination"] = Crinja::Value.new(pagination)
     vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
 
@@ -832,6 +853,7 @@ module Hwaro::Core::Build::Phases::Render
     content : String,
     section_list : String,
     toc : String,
+    toc_headers : Array(Models::TocHeader) = [] of Models::TocHeader,
     pagination : String = "",
     page_url_override : String? = nil,
     paginator : Content::Pagination::PaginatedPage? = nil,
@@ -1085,10 +1107,12 @@ module Hwaro::Core::Build::Phases::Render
 
     # TOC variables - both flat and structured access
     # - toc (HTML string for backward compatibility)
-    # - toc.html (structured access to the same HTML)
+    # - toc_obj.html (same HTML in structured form)
+    # - toc_obj.headers (array of structured header objects for custom rendering)
     vars["toc"] = Crinja::Value.new(toc)
     toc_obj = {
-      "html" => Crinja::Value.new(toc),
+      "html"    => Crinja::Value.new(toc),
+      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers)),
     }
     vars["toc_obj"] = Crinja::Value.new(toc_obj)
 
@@ -1151,6 +1175,26 @@ module Hwaro::Core::Build::Phases::Render
     hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
     vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
     vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
+
+    # Structured SEO object for custom meta tag markup
+    canonical_url = page.permalink || "#{config.base_url_stripped}#{effective_url.starts_with?("/") ? effective_url : "/#{effective_url}"}"
+    seo_image_raw = page.image || config.og.default_image
+    seo_image = if seo_image_raw
+                  seo_image_raw.starts_with?("http") ? seo_image_raw : "#{config.base_url}#{seo_image_raw.starts_with?("/") ? seo_image_raw : "/#{seo_image_raw}"}"
+                else
+                  ""
+                end
+    seo_obj = {
+      "canonical_url"   => Crinja::Value.new(canonical_url),
+      "og_type"         => Crinja::Value.new(config.og.og_type),
+      "og_image"        => Crinja::Value.new(seo_image),
+      "twitter_card"    => Crinja::Value.new(config.og.twitter_card),
+      "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),
+      "twitter_creator" => Crinja::Value.new(config.og.twitter_creator || ""),
+      "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),
+      "hreflang"        => Crinja::Value.new(translations),
+    }
+    vars["seo"] = Crinja::Value.new(seo_obj)
 
     # JSON-LD structured data — generate breadcrumb only when needed
     jsonld_article = Content::Seo::JsonLd.article(page, config)

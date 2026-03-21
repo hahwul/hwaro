@@ -370,16 +370,60 @@ The Article JSON-LD includes the following fields when available:
 
 ## Template Variables
 
+### Pre-rendered HTML
+
+These variables output ready-to-use HTML tags:
+
 | Variable | Description |
 |----------|-------------|
 | og_tags | OpenGraph meta tags |
 | twitter_tags | Twitter Card meta tags |
 | og_all_tags | Both OG and Twitter tags |
+| canonical_tag | Canonical link tag |
+| hreflang_tags | Hreflang alternate link tags |
 | jsonld | Article + BreadcrumbList JSON-LD |
 | jsonld_article | Article JSON-LD only |
 | jsonld_breadcrumb | BreadcrumbList JSON-LD only |
 | page_description | Page description (fallback: site) |
 | page_image | Page image (fallback: og.default_image) |
+
+### Structured SEO Object
+
+The `seo` object provides individual field access for building custom meta tags:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| seo.canonical_url | String | Full canonical URL |
+| seo.og_type | String | OpenGraph type (default: "article") |
+| seo.og_image | String | Resolved absolute image URL |
+| seo.twitter_card | String | Twitter card type |
+| seo.twitter_site | String | Twitter site handle |
+| seo.twitter_creator | String | Twitter creator handle |
+| seo.fb_app_id | String | Facebook App ID |
+| seo.hreflang | Array | Language translation links |
+
+```jinja
+<head>
+  <link rel="canonical" href="{{ seo.canonical_url }}">
+  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:type" content="{{ seo.og_type }}">
+  <meta property="og:url" content="{{ seo.canonical_url }}">
+  {% if page.description %}
+  <meta property="og:description" content="{{ page.description }}">
+  {% endif %}
+  {% if seo.og_image %}
+  <meta property="og:image" content="{{ seo.og_image }}">
+  {% endif %}
+  {% if seo.fb_app_id %}
+  <meta property="fb:app_id" content="{{ seo.fb_app_id }}">
+  {% endif %}
+  <meta name="twitter:card" content="{{ seo.twitter_card }}">
+  <meta name="twitter:title" content="{{ page.title }}">
+  {% if seo.twitter_site %}
+  <meta name="twitter:site" content="{{ seo.twitter_site }}">
+  {% endif %}
+</head>
+```
 
 ---
 

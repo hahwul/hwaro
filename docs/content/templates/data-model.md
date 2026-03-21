@@ -222,6 +222,19 @@ For simple listings, use the pre-rendered HTML:
 <ul>{{ section_list | safe }}</ul>
 ```
 
+For custom markup, iterate `section.pages` directly:
+
+```jinja
+<ul>
+{% for p in section.pages %}
+  <li>
+    <a href="{{ p.url }}">{{ p.title }}</a>
+    {% if p.date %}<time>{{ p.date }}</time>{% endif %}
+  </li>
+{% endfor %}
+</ul>
+```
+
 ---
 
 ## Page
@@ -423,6 +436,8 @@ pros = ["Fast", "Reliable"]
 
 ### SEO Variables
 
+**Pre-rendered HTML** (backward compatible):
+
 | Variable | Description |
 |----------|-------------|
 | og_tags | OpenGraph meta tags |
@@ -430,12 +445,48 @@ pros = ["Fast", "Reliable"]
 | og_all_tags | Both OG and Twitter tags |
 | canonical_tag | Canonical link tag |
 | hreflang_tags | Hreflang alternate link tags (multilingual) |
+| pagination_seo_links | `<link rel="prev/next">` tags |
 
 ```jinja
 <head>
   {{ og_all_tags | safe }}
   {{ canonical_tag | safe }}
   {{ hreflang_tags | safe }}
+  {{ pagination_seo_links | safe }}
+</head>
+```
+
+**Structured data** for custom meta tag markup:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| seo.canonical_url | String | Full canonical URL (base_url + page URL) |
+| seo.og_type | String | OpenGraph type (default: "article") |
+| seo.og_image | String | Resolved absolute image URL |
+| seo.twitter_card | String | Twitter card type (default: "summary_large_image") |
+| seo.twitter_site | String | Twitter site handle |
+| seo.twitter_creator | String | Twitter creator handle |
+| seo.fb_app_id | String | Facebook App ID |
+| seo.hreflang | Array | Same as `page.translations` |
+
+Page title, description, URL, and image are available as `page.title`, `page.description`, `page.url`, `page.image`. The `seo` object provides computed values specific to SEO (resolved URLs, config values).
+
+```jinja
+<head>
+  <link rel="canonical" href="{{ seo.canonical_url }}">
+  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:type" content="{{ seo.og_type }}">
+  <meta property="og:url" content="{{ seo.canonical_url }}">
+  {% if page.description %}
+  <meta property="og:description" content="{{ page.description }}">
+  {% endif %}
+  {% if seo.og_image %}
+  <meta property="og:image" content="{{ seo.og_image }}">
+  {% endif %}
+  <meta name="twitter:card" content="{{ seo.twitter_card }}">
+  {% if seo.twitter_site %}
+  <meta name="twitter:site" content="{{ seo.twitter_site }}">
+  {% endif %}
 </head>
 ```
 
@@ -443,14 +494,16 @@ pros = ["Fast", "Reliable"]
 
 ### Asset Variables
 
+Pre-rendered `<link>` and `<script>` tags for convenience. These are generated from your `config.toml` settings.
+
 | Variable | Description |
 |----------|-------------|
-| highlight_css | Syntax highlighting CSS |
-| highlight_js | Syntax highlighting JS |
-| highlight_tags | Both CSS and JS |
-| auto_includes_css | Auto-included CSS |
-| auto_includes_js | Auto-included JS |
-| auto_includes | All auto-includes |
+| highlight_css | Syntax highlighting CSS `<link>` tag |
+| highlight_js | Syntax highlighting JS `<script>` tag |
+| highlight_tags | Both CSS and JS tags |
+| auto_includes_css | Auto-included CSS `<link>` tags |
+| auto_includes_js | Auto-included JS `<script>` tags |
+| auto_includes | All auto-include tags |
 
 ```jinja
 <head>
@@ -468,18 +521,52 @@ pros = ["Fast", "Reliable"]
 
 ### Table of Contents
 
+Only available when `toc = true` in front matter.
+
+**Pre-rendered HTML** (backward compatible):
+
 | Variable | Type | Description |
 |----------|------|-------------|
 | toc | String | Generated TOC HTML |
 | toc_obj.html | String | Same TOC HTML in object form |
-
-Only available when `toc = true` in front matter:
 
 ```jinja
 {% if page.toc %}
 <aside class="toc">
   {{ toc | safe }}
 </aside>
+{% endif %}
+```
+
+**Structured data** for custom TOC markup:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| toc_obj.headers | Array | Structured TOC header objects |
+| toc_obj.headers[].level | Int | Heading level (2-6) |
+| toc_obj.headers[].id | String | Anchor ID |
+| toc_obj.headers[].title | String | Heading text |
+| toc_obj.headers[].permalink | String | Full anchor permalink |
+| toc_obj.headers[].children | Array | Nested child headers (same structure) |
+
+```jinja
+{% if page.toc %}
+<nav class="toc">
+  <ul>
+  {% for h in toc_obj.headers %}
+    <li>
+      <a href="{{ h.permalink }}">{{ h.title }}</a>
+      {% if h.children %}
+      <ul>
+        {% for child in h.children %}
+        <li><a href="{{ child.permalink }}">{{ child.title }}</a></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</nav>
 {% endif %}
 ```
 

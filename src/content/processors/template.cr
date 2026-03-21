@@ -114,9 +114,23 @@ module Hwaro
           # TOC variables (basic, will be enriched by builder with actual TOC data)
           vars["toc"] = Crinja::Value.new("")
           toc_obj = {
-            "html" => Crinja::Value.new(""),
+            "html"    => Crinja::Value.new(""),
+            "headers" => Crinja::Value.new([] of Crinja::Value),
           }
           vars["toc_obj"] = Crinja::Value.new(toc_obj)
+
+          # SEO variables (basic defaults, enriched by builder with page-specific data)
+          seo_obj = {
+            "canonical_url"   => Crinja::Value.new(""),
+            "og_type"         => Crinja::Value.new(""),
+            "og_image"        => Crinja::Value.new(""),
+            "twitter_card"    => Crinja::Value.new(""),
+            "twitter_site"    => Crinja::Value.new(""),
+            "twitter_creator" => Crinja::Value.new(""),
+            "fb_app_id"       => Crinja::Value.new(""),
+            "hreflang"        => Crinja::Value.new([] of Crinja::Value),
+          }
+          vars["seo"] = Crinja::Value.new(seo_obj)
 
           # Time-related variables
           now = Time.local

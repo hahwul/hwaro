@@ -420,11 +420,26 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <div>{{ toc_obj.html }}</div>
+      <div>{{ toc_obj.html }}</div><span>{% for h in toc_obj.headers %}H{% endfor %}</span>
       TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<div></div>")
+      result.should contain("<span></span>")
+    end
+
+    it "provides seo object with empty defaults" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = <<-TPL
+      {{ seo.canonical_url }}|{{ seo.og_type }}|{{ seo.twitter_card }}
+      TPL
+
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should contain("||")
     end
 
     it "adds custom variables to context" do
