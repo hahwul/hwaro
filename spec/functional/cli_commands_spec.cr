@@ -87,7 +87,7 @@ describe "CLI Tool Commands" do
     end
   end
 
-  describe "hwaro tool doctor" do
+  describe "hwaro doctor (top-level)" do
     it "runs diagnostics on a valid project" do
       temp_dir = File.tempname("hwaro_test")
       Dir.mkdir(temp_dir)
@@ -95,7 +95,27 @@ describe "CLI Tool Commands" do
         project_dir = File.join(temp_dir, "test_site")
         Dir.mkdir(project_dir)
 
-        # Initialize project
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        output_io = IO::Memory.new
+        error_io = IO::Memory.new
+        status = Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["doctor"], chdir: project_dir, output: output_io, error: error_io)
+
+        status.success?.should be_true
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
+  end
+
+  describe "hwaro tool doctor (alias)" do
+    it "still works via tool subcommand" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
         Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
 
         output_io = IO::Memory.new

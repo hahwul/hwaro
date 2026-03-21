@@ -41,7 +41,7 @@ module Hwaro
             fix_mode = false
 
             OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: hwaro tool doctor [options]"
+              parser.banner = "Usage: hwaro doctor [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               parser.on("--fix", "Auto-fix issues (add missing config sections)") { fix_mode = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
@@ -106,7 +106,7 @@ module Hwaro
             end
 
             unless config_missing.empty?
-              Logger.info "Missing Config Sections (run 'hwaro tool doctor --fix' to add):"
+              Logger.info "Missing Config Sections (run 'hwaro doctor --fix' to add):"
               config_missing.each { |issue| print_issue(issue) }
               Logger.info ""
             end

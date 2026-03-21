@@ -5,6 +5,7 @@ require "./commands/serve_command"
 require "./commands/new_command"
 require "./commands/deploy_command"
 require "./commands/tool_command"
+require "./commands/doctor_command"
 require "./commands/completion_command"
 require "../utils/logger"
 
@@ -127,6 +128,11 @@ module Hwaro
           Commands::ToolCommand.new.run(args)
         end
 
+        # Register doctor command (top-level alias for `tool doctor`)
+        CommandRegistry.register(Commands::DoctorCommand.metadata) do |args|
+          Commands::DoctorCommand.new.run(args)
+        end
+
         # Register completion command
         CommandRegistry.register(Commands::CompletionCommand.metadata) do |args|
           Commands::CompletionCommand.new.run(args)
@@ -180,7 +186,7 @@ module Hwaro
         Logger.info "Commands:"
 
         # Define display order
-        priority = ["init", "build", "serve", "new", "deploy", "tool", "completion", "version", "help"]
+        priority = ["init", "build", "serve", "new", "deploy", "doctor", "tool", "completion", "version", "help"]
 
         # Print registered commands in priority order
         CommandRegistry.all.sort_by { |cmd|

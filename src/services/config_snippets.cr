@@ -1,5 +1,5 @@
 # Shared TOML config snippets used by both scaffold (hwaro init)
-# and doctor (hwaro tool doctor --fix).
+# and doctor (hwaro doctor --fix).
 #
 # Scaffold uses the full version (commented: false) with real values
 # and detailed documentation. Doctor uses the commented version

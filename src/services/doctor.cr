@@ -209,7 +209,7 @@ module Hwaro
         missing.each do |key|
           desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
           issues << Issue.new(level: :info, category: "config_missing", file: @config_path,
-            message: "Missing config section [#{key}] (#{desc}) — run 'hwaro tool doctor --fix' to add it")
+            message: "Missing config section [#{key}] (#{desc}) — run 'hwaro doctor --fix' to add it")
         end
       end
 
