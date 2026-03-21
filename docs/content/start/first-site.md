@@ -19,6 +19,7 @@ Built-in scaffolds:
 | Scaffold | Description |
 |----------|-------------|
 | `simple` | Landing pages, small sites (default) |
+| `bare` | Minimal structure with semantic HTML only |
 | `blog` | Posts with tags and categories |
 | `blog-dark` | Blog with dark theme |
 | `docs` | Documentation with sidebar |

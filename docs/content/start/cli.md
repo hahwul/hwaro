@@ -37,7 +37,7 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 
 | Flag | Description |
 |------|-------------|
-| --scaffold TYPE | Built-in (`simple`, `blog`, `docs`) or remote source (`github:user/repo[/path]`, URL) |
+| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `blog-dark`, `docs`, `docs-dark`) or remote source (`github:user/repo[/path]`, URL) |
 | -f, --force | Force creation even if directory is not empty |
 | --skip-agents-md | Skip creating AGENTS.md file |
 | --skip-sample-content | Skip creating sample content files |
