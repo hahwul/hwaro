@@ -357,7 +357,7 @@ module Hwaro
       end
 
       # Resolve an image path to an absolute URL, falling back to default_image
-      private def resolve_image_url(image : String?, base_url : String) : String?
+      def resolve_image_url(image : String?, base_url : String) : String?
         img = image || @default_image
         return nil unless img
         img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"

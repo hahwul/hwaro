@@ -8,9 +8,13 @@ module Hwaro
       module Tags
         extend self
 
+        # Compute the canonical URL for a page (absolute URL with base_url).
+        def canonical_url(page : Models::Page, config : Models::Config) : String
+          page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+        end
+
         def canonical_tag(page : Models::Page, config : Models::Config) : String
-          # Use permalink if available, otherwise construct from base_url + url
-          url = page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+          url = canonical_url(page, config)
           # Fast path: skip HTML.escape when URL has no escapable chars (common case for URLs)
           escaped = url.includes?('&') || url.includes?('"') || url.includes?('<') || url.includes?('>') ? HTML.escape(url) : url
           %(<link rel="canonical" href="#{escaped}">)

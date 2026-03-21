@@ -1177,13 +1177,8 @@ module Hwaro::Core::Build::Phases::Render
     vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
     # Structured SEO object for custom meta tag markup
-    canonical_url = page.permalink || "#{config.base_url_stripped}#{effective_url.starts_with?("/") ? effective_url : "/#{effective_url}"}"
-    seo_image_raw = page.image || config.og.default_image
-    seo_image = if seo_image_raw
-                  seo_image_raw.starts_with?("http") ? seo_image_raw : "#{config.base_url}#{seo_image_raw.starts_with?("/") ? seo_image_raw : "/#{seo_image_raw}"}"
-                else
-                  ""
-                end
+    canonical_url = Content::Seo::Tags.canonical_url(page, config)
+    seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
     seo_obj = {
       "canonical_url"   => Crinja::Value.new(canonical_url),
       "og_type"         => Crinja::Value.new(config.og.og_type),
