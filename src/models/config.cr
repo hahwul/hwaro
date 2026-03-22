@@ -582,6 +582,9 @@ module Hwaro
       property icons : Array(String)
       property offline_page : String?
       property precache_urls : Array(String)
+      property cache_strategy : String
+
+      VALID_STRATEGIES = %w[cache-first network-first stale-while-revalidate]
 
       def initialize
         @enabled = false
@@ -594,6 +597,7 @@ module Hwaro
         @icons = [] of String
         @offline_page = nil
         @precache_urls = [] of String
+        @cache_strategy = "cache-first"
       end
     end
 
@@ -1101,6 +1105,9 @@ module Hwaro
         end
         if precache = s["precache_urls"]?.try(&.as_a?)
           config.pwa.precache_urls = precache.compact_map(&.as_s?)
+        end
+        if strategy = s["cache_strategy"]?.try(&.as_s?)
+          config.pwa.cache_strategy = strategy
         end
       end
 
