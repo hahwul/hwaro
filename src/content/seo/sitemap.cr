@@ -7,9 +7,14 @@ module Hwaro
   module Content
     module Seo
       class Sitemap
-        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false)
+        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
           # Check if sitemap is enabled
           return unless site.config.sitemap.enabled
+
+          if skip_if_unchanged && File.exists?(File.join(output_dir, site.config.sitemap.filename))
+            Logger.debug "  Sitemap unchanged (cache hit), skipping."
+            return
+          end
 
           sitemap_pages = pages.select { |p| p.in_sitemap && p.render }
 

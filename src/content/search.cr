@@ -8,8 +8,16 @@ require "json"
 module Hwaro
   module Content
     class Search
-      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
+      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
         return unless config.search.enabled
+
+        if skip_if_unchanged
+          search_path = File.join(output_dir, File.basename(config.search.filename))
+          if File.exists?(search_path)
+            Logger.debug "  Search index unchanged (cache hit), skipping."
+            return
+          end
+        end
 
         # Filter out draft pages and pages with in_search_index = false
         search_pages = pages.reject { |p| p.draft || !p.in_search_index }

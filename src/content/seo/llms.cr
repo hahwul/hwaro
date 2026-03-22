@@ -20,7 +20,14 @@ module Hwaro
           Logger.info "  Generated #{filename}"
         end
 
-        def self.generate(config : Models::Config, pages : Array(Models::Page), output_dir : String, verbose : Bool = false)
+        def self.generate(config : Models::Config, pages : Array(Models::Page), output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
+          if skip_if_unchanged && config.llms.enabled
+            filename = File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
+            if File.exists?(File.join(output_dir, filename))
+              Logger.debug "  LLMs.txt unchanged (cache hit), skipping."
+              return
+            end
+          end
           generate(config, output_dir, verbose)
           generate_full(pages, config, output_dir, verbose)
         end

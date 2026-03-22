@@ -11,7 +11,15 @@ module Hwaro
   module Content
     module Seo
       class Feeds
-        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
+        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
+          if skip_if_unchanged && config.feeds.enabled
+            feed_file = config.feeds.filename.empty? ? (config.feeds.type == "atom" ? "atom.xml" : "rss.xml") : config.feeds.filename
+            if File.exists?(File.join(output_dir, feed_file))
+              Logger.debug "  Feeds unchanged (cache hit), skipping."
+              return
+            end
+          end
+
           # 1. Generate Main Site Feed
           if config.feeds.enabled
             site_pages = pages.reject { |p| p.draft || !p.render || p.is_a?(Models::Section) }
