@@ -266,6 +266,43 @@ module Hwaro
           Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
         end
 
+        # Incremental parse of changed content + full re-render with reloaded templates.
+        # Used when both content and templates changed simultaneously.
+        def run_incremental_then_rerender(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+          config = @config
+          site = @site
+
+          unless config && site
+            return run(options)
+          end
+
+          Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
+
+          pages_map = @pages_by_path || build_pages_by_path(site)
+
+          changed_content_files.each do |file|
+            relative_path = begin
+              Path[file].relative_to("content").to_s
+            rescue
+              file.lchop("content/")
+            end
+
+            page = pages_map[relative_path]?
+            next unless page
+
+            parse_single_page(page)
+            page.generate_permalink(config.base_url)
+          end
+
+          # Rebuild taxonomies and lookup after content re-parse
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          rebuild_taxonomies(site, all_pages)
+          site.build_lookup_index
+
+          # Now do a full re-render with reloaded templates
+          run_rerender(options)
+        end
+
         # Re-render all pages using reloaded templates without re-parsing
         # content.  Useful when only template files have been modified.
         def run_rerender(options : Config::Options::BuildOptions)

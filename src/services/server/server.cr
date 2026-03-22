@@ -142,6 +142,15 @@ module Hwaro
           !@config_changed
       end
 
+      # True when content and templates changed together (no structural changes)
+      def content_and_template_only? : Bool
+        !@modified_content.empty? &&
+          !@modified_templates.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
+      end
+
       # True when content was modified (possibly alongside static changes)
       # but no structural / config / template changes occurred.
       def content_incremental? : Bool
@@ -342,10 +351,18 @@ module Hwaro
           Logger.info "\n[Watch] Static file change detected (#{changeset.modified_static.size} file(s)). Copying..."
           output_dir = sanitize_output_dir(build_options.output_dir)
           @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        elsif changeset.content_and_template_only?
+          # Content + template changes: re-parse changed content then re-render all
+          Logger.info "\n[Watch] Content + template changes detected. Incremental parse + full re-render..."
+          @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
+
+          unless changeset.modified_static.empty?
+            output_dir = sanitize_output_dir(build_options.output_dir)
+            @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+          end
         else
-          # Mixed changes that don't fit neatly into one category
-          # (e.g. content + template changes simultaneously) → full rebuild
-          Logger.info "\n[Watch] Multiple change types detected. Full rebuild..."
+          # Structural changes (added/deleted files, config) → full rebuild
+          Logger.info "\n[Watch] Structural change detected. Full rebuild..."
           @builder.run(build_options)
         end
 
