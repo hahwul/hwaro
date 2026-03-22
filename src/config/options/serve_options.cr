@@ -19,6 +19,9 @@ module Hwaro
         property env : String?
         property skip_og_image : Bool
         property skip_image_processing : Bool
+        property cache : Bool
+        property stream : Bool
+        property memory_limit : String?
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -38,6 +41,9 @@ module Hwaro
           @env : String? = nil,
           @skip_og_image : Bool = false,
           @skip_image_processing : Bool = false,
+          @cache : Bool = false,
+          @stream : Bool = false,
+          @memory_limit : String? = nil,
         )
         end
 
@@ -55,8 +61,9 @@ module Hwaro
             debug: @debug,
             error_overlay: @error_overlay,
             cache_busting: @cache_busting,
-            stream: false,
-            memory_limit: nil,
+            cache: @cache,
+            stream: @stream,
+            memory_limit: @memory_limit,
             env: @env,
             skip_og_image: @skip_og_image,
             skip_image_processing: @skip_image_processing,

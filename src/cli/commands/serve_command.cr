@@ -27,6 +27,9 @@ module Hwaro
 
           # Build behavior
           MINIFY_FLAG,
+          FlagInfo.new(short: nil, long: "--cache", description: "Enable build caching (skip unchanged files)"),
+          FlagInfo.new(short: nil, long: "--stream", description: "Enable streaming build to reduce memory usage"),
+          FlagInfo.new(short: nil, long: "--memory-limit", description: "Memory limit for streaming build (e.g. 2G, 512M)", takes_value: true, value_hint: "SIZE"),
 
           # Server
           FlagInfo.new(short: "-b", long: "--bind", description: "Bind address (default: 127.0.0.1)", takes_value: true, value_hint: "HOST"),
@@ -85,6 +88,9 @@ module Hwaro
 
           # Build behavior
           minify = false
+          cache = false
+          stream = false
+          memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
 
           # Server
           host = "127.0.0.1"
@@ -118,6 +124,9 @@ module Hwaro
 
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
+            parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
+            parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
+            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }
 
             # Server
             parser.on("-b HOST", "--bind HOST", "Bind address (default: 127.0.0.1)") { |h| host = h }
@@ -157,6 +166,9 @@ module Hwaro
             env: env_name,
             skip_og_image: skip_og_image,
             skip_image_processing: skip_image_processing,
+            cache: cache,
+            stream: stream,
+            memory_limit: memory_limit,
           )}
         end
       end

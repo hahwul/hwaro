@@ -207,7 +207,12 @@ hwaro serve -i /path/to/my-site -p 8080
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests) |
 | --live-reload | Enable browser live reload on file changes |
+| --cache | Enable build caching (skip unchanged files) |
+| --stream | Enable streaming build to reduce memory usage |
+| --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
 | --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
+| --skip-og-image | Skip auto OG image generation |
+| --skip-image-processing | Skip image resizing and LQIP generation |
 | --profile | Print phase-by-phase and per-template build timing |
 
 The server watches for file changes and rebuilds automatically. It uses **smart rebuild strategies** based on what changed:

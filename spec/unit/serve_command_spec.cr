@@ -111,6 +111,52 @@ describe Hwaro::CLI::Commands::ServeCommand do
       build_options.skip_og_image.should be_true
       build_options.skip_image_processing.should be_true
     end
+
+    it "defaults cache to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.cache.should be_false
+    end
+
+    it "parses --cache flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--cache"])
+      options.cache.should be_true
+    end
+
+    it "defaults stream to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.stream.should be_false
+    end
+
+    it "parses --stream flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--stream"])
+      options.stream.should be_true
+    end
+
+    it "defaults memory_limit to nil" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.memory_limit.should be_nil
+    end
+
+    it "parses --memory-limit flag" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--memory-limit", "512M"])
+      options.memory_limit.should eq("512M")
+    end
+
+    it "propagates cache/stream/memory-limit to build options" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--cache", "--stream", "--memory-limit", "2G"])
+      build_options = options.to_build_options
+      build_options.cache.should be_true
+      build_options.stream.should be_true
+      build_options.memory_limit.should eq("2G")
+      build_options.streaming?.should be_true
+    end
   end
 
   describe "metadata" do
