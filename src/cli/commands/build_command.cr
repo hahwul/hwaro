@@ -27,6 +27,8 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--cache", description: "Enable build caching (skip unchanged files)"),
           FlagInfo.new(short: nil, long: "--full", description: "Force a complete rebuild (ignore cache)"),
           FlagInfo.new(short: nil, long: "--skip-highlighting", description: "Disable syntax highlighting"),
+          SKIP_OG_IMAGE_FLAG,
+          SKIP_IMAGE_PROCESSING_FLAG,
           VERBOSE_FLAG,
           PROFILE_FLAG,
           DEBUG_FLAG,
@@ -99,6 +101,8 @@ module Hwaro
           debug = false
           cache_busting = true
           stream = false
+          skip_og_image = false
+          skip_image_processing = false
           memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
           env_name = ENV["HWARO_ENV"]? || nil
 
@@ -114,6 +118,8 @@ module Hwaro
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--full", "Force a complete rebuild (ignore cache)") { full = true }
             parser.on("--skip-highlighting", "Disable syntax highlighting") { highlight = false }
+            CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
+            CLI.register_flag(parser, SKIP_IMAGE_PROCESSING_FLAG) { |_| skip_image_processing = true }
             CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
@@ -141,6 +147,8 @@ module Hwaro
             stream: stream,
             memory_limit: memory_limit,
             env: env_name,
+            skip_og_image: skip_og_image,
+            skip_image_processing: skip_image_processing,
           ), output_dir_explicit}, input_dir }
         end
       end

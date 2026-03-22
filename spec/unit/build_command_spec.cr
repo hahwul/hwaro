@@ -82,6 +82,34 @@ describe Hwaro::CLI::Commands::BuildCommand do
       options.highlight.should be_false
     end
 
+    it "defaults skip_og_image to false" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options([] of String)
+      options, _ = result
+      options.skip_og_image.should be_false
+    end
+
+    it "parses --skip-og-image flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--skip-og-image"])
+      options, _ = result
+      options.skip_og_image.should be_true
+    end
+
+    it "defaults skip_image_processing to false" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options([] of String)
+      options, _ = result
+      options.skip_image_processing.should be_false
+    end
+
+    it "parses --skip-image-processing flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--skip-image-processing"])
+      options, _ = result
+      options.skip_image_processing.should be_true
+    end
+
     it "parses mixed flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
       result, _ = cmd.parse_options(["-o", "build", "--drafts", "--base-url", "http://localhost:3000"])

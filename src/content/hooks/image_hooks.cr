@@ -97,6 +97,10 @@ module Hwaro
         private def process_images(ctx : Core::Lifecycle::BuildContext)
           config = ctx.config
           return unless config
+          if ctx.options.skip_image_processing
+            Logger.debug "  Skipping image processing (--skip-image-processing)"
+            return
+          end
           return unless config.image_processing.enabled
           return if config.image_processing.widths.empty?
 

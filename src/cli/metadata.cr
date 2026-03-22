@@ -50,7 +50,9 @@ module Hwaro
     INCLUDE_EXPIRED_FLAG    = FlagInfo.new(short: nil, long: "--include-expired", description: "Include expired content")
     MINIFY_FLAG             = FlagInfo.new(short: nil, long: "--minify", description: "Minify HTML output (and minified json, xml)")
     BASE_URL_FLAG           = FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL")
-    SKIP_CACHE_BUSTING_FLAG = FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources")
+    SKIP_CACHE_BUSTING_FLAG    = FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources")
+    SKIP_OG_IMAGE_FLAG         = FlagInfo.new(short: nil, long: "--skip-og-image", description: "Skip auto OG image generation")
+    SKIP_IMAGE_PROCESSING_FLAG = FlagInfo.new(short: nil, long: "--skip-image-processing", description: "Skip image resizing and LQIP generation")
     INPUT_DIR_FLAG          = FlagInfo.new(short: "-i", long: "--input", description: "Input directory (default: current directory)", takes_value: true, value_hint: "DIR")
     CONTENT_DIR_FLAG        = FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR")
 

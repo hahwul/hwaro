@@ -79,6 +79,38 @@ describe Hwaro::CLI::Commands::ServeCommand do
       _, options = cmd.test_parse_options(["--live-reload"])
       options.live_reload.should be_true
     end
+
+    it "defaults skip_og_image to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.skip_og_image.should be_false
+    end
+
+    it "sets skip_og_image to true when --skip-og-image is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--skip-og-image"])
+      options.skip_og_image.should be_true
+    end
+
+    it "defaults skip_image_processing to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.skip_image_processing.should be_false
+    end
+
+    it "sets skip_image_processing to true when --skip-image-processing is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--skip-image-processing"])
+      options.skip_image_processing.should be_true
+    end
+
+    it "propagates skip flags to build options" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--skip-og-image", "--skip-image-processing"])
+      build_options = options.to_build_options
+      build_options.skip_og_image.should be_true
+      build_options.skip_image_processing.should be_true
+    end
   end
 
   describe "metadata" do
@@ -162,6 +194,18 @@ describe Hwaro::CLI::Commands::ServeCommand do
       flag = meta.flags.find { |f| f.long == "--no-error-overlay" }
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_false
+    end
+
+    it "has skip-og-image flag" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag_longs = meta.flags.map(&.long)
+      flag_longs.should contain("--skip-og-image")
+    end
+
+    it "has skip-image-processing flag" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag_longs = meta.flags.map(&.long)
+      flag_longs.should contain("--skip-image-processing")
     end
 
     it "has live-reload flag" do

@@ -31,6 +31,8 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes"),
           PROFILE_FLAG,
           SKIP_CACHE_BUSTING_FLAG,
+          SKIP_OG_IMAGE_FLAG,
+          SKIP_IMAGE_PROCESSING_FLAG,
           ENV_FLAG,
           HELP_FLAG,
         ]
@@ -76,6 +78,8 @@ module Hwaro
           live_reload = false
           profile = false
           cache_busting = true
+          skip_og_image = false
+          skip_image_processing = false
           env_name = ENV["HWARO_ENV"]? || nil
 
           OptionParser.parse(args) do |parser|
@@ -95,6 +99,8 @@ module Hwaro
             parser.on("--live-reload", "Enable live reload on file changes") { live_reload = true }
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, SKIP_CACHE_BUSTING_FLAG) { |_| cache_busting = false }
+            CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
+            CLI.register_flag(parser, SKIP_IMAGE_PROCESSING_FLAG) { |_| skip_image_processing = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
           end
@@ -115,6 +121,8 @@ module Hwaro
             profile: profile,
             cache_busting: cache_busting,
             env: env_name,
+            skip_og_image: skip_og_image,
+            skip_image_processing: skip_image_processing,
           )}
         end
       end

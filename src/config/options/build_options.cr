@@ -19,6 +19,8 @@ module Hwaro
         property stream : Bool
         property memory_limit : String?
         property env : String?
+        property skip_og_image : Bool
+        property skip_image_processing : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -38,6 +40,8 @@ module Hwaro
           @stream : Bool = false,
           @memory_limit : String? = nil,
           @env : String? = nil,
+          @skip_og_image : Bool = false,
+          @skip_image_processing : Bool = false,
         )
         end
 

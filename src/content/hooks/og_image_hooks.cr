@@ -20,6 +20,10 @@ module Hwaro
         private def generate_og_images(ctx : Core::Lifecycle::BuildContext)
           site = ctx.site
           return unless site
+          if ctx.options.skip_og_image
+            Logger.debug "  Skipping OG image generation (--skip-og-image)"
+            return
+          end
           return unless site.config.og.auto_image.enabled
 
           Content::Seo::OgImage.generate(
