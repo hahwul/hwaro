@@ -46,6 +46,48 @@ module Hwaro
         # Returns the config.toml content
         abstract def config_content(skip_taxonomies : Bool = false) : String
 
+        # Returns the site title used in config (overridable per scaffold)
+        protected def config_title : String
+          "My Hwaro Site"
+        end
+
+        # Returns the site description used in config (overridable per scaffold)
+        protected def config_description : String
+          "Welcome to my new Hwaro site."
+        end
+
+        # Returns a minimal config.toml without comments and optional sections
+        def minimal_config_content(skip_taxonomies : Bool = false) : String
+          String.build do |str|
+            str << "title = \"#{config_title}\"\n"
+            str << "description = \"#{config_description}\"\n"
+            str << "base_url = \"http://localhost:3000\"\n"
+            str << "\n[plugins]\n"
+            str << "processors = [\"markdown\"]\n"
+            str << "\n[content.files]\n"
+            str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
+            str << "\n[highlight]\n"
+            str << "enabled = true\n"
+            str << "theme = \"github\"\n"
+            str << "use_cdn = true\n"
+            unless skip_taxonomies
+              str << "\n[[taxonomies]]\n"
+              str << "name = \"tags\"\n"
+              str << "feed = true\n"
+              str << "\n[[taxonomies]]\n"
+              str << "name = \"categories\"\n"
+              str << "\n[[taxonomies]]\n"
+              str << "name = \"authors\"\n"
+            end
+            str << "\n[sitemap]\n"
+            str << "enabled = true\n"
+            str << "\n[feeds]\n"
+            str << "enabled = true\n"
+            str << "type = \"rss\"\n"
+            str << "limit = 10\n"
+          end
+        end
+
         # Common shortcode: alert (Jinja2 syntax)
         protected def alert_shortcode : String
           <<-HTML

@@ -28,7 +28,8 @@ module Hwaro
           options.skip_taxonomies,
           options.multilingual_languages,
           scaffold,
-          options.agents_mode
+          options.agents_mode,
+          options.minimal_config
         )
       end
 
@@ -55,6 +56,7 @@ module Hwaro
         multilingual_languages : Array(String),
         scaffold : Scaffolds::Base,
         agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
+        minimal_config : Bool = false,
       )
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
@@ -92,7 +94,9 @@ module Hwaro
         create_scaffold_static_files(target_path, scaffold)
 
         # Create config.toml
-        config_content = if is_multilingual
+        config_content = if minimal_config
+                           scaffold.minimal_config_content(skip_taxonomies)
+                         elsif is_multilingual
                            create_multilingual_config(multilingual_languages, skip_taxonomies, scaffold)
                          else
                            scaffold.config_content(skip_taxonomies)
@@ -113,14 +117,16 @@ module Hwaro
         end
 
         # Auto-add missing optional config sections (commented out)
-        config_path = File.join(target_path, "config.toml")
-        doctor = Services::Doctor.new(
-          content_dir: File.join(target_path, "content"),
-          config_path: config_path
-        )
-        added = doctor.fix_config(minimal: true)
-        unless added.empty?
-          Logger.info "Added #{added.size} optional config section(s) (commented out)."
+        unless minimal_config
+          config_path = File.join(target_path, "config.toml")
+          doctor = Services::Doctor.new(
+            content_dir: File.join(target_path, "content"),
+            config_path: config_path
+          )
+          added = doctor.fix_config(minimal: true)
+          unless added.empty?
+            Logger.info "Added #{added.size} optional config section(s) (commented out)."
+          end
         end
 
         Logger.success "Done! Run `hwaro build` to generate the site."

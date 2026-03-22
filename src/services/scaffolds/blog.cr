@@ -19,6 +19,14 @@ module Hwaro
           "Blog-focused structure with posts, archives, and taxonomies"
         end
 
+        protected def config_title : String
+          "My Blog"
+        end
+
+        protected def config_description : String
+          "Welcome to my personal blog powered by Hwaro."
+        end
+
         def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {} of String => String
 

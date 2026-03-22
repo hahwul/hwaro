@@ -24,6 +24,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
           FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
           FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
+          FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
           HELP_FLAG,
         ]
 
@@ -52,6 +53,7 @@ module Hwaro
           scaffold = Config::Options::ScaffoldType::Simple
           scaffold_remote : String? = nil
           agents_mode = Config::Options::AgentsMode::Remote
+          minimal_config = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
@@ -92,6 +94,7 @@ module Hwaro
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
+            parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
             parser.on("--include-multilingual LANGS", "Enable multilingual support (e.g., en,ko)") do |langs|
               multilingual_languages = langs.split(",").map(&.strip).reject(&.empty?)
             end
@@ -124,7 +127,8 @@ module Hwaro
             multilingual_languages: multilingual_languages,
             scaffold: scaffold,
             scaffold_remote: scaffold_remote,
-            agents_mode: agents_mode
+            agents_mode: agents_mode,
+            minimal_config: minimal_config
           )
         end
       end

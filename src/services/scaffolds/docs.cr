@@ -17,6 +17,14 @@ module Hwaro
           "Documentation-focused structure with organized sections and sidebar"
         end
 
+        protected def config_title : String
+          "Documentation"
+        end
+
+        protected def config_description : String
+          "Project documentation powered by Hwaro."
+        end
+
         def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {} of String => String
 

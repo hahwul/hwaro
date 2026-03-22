@@ -12,6 +12,7 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.skip_agents_md.should be_false
       options.skip_sample_content.should be_false
       options.skip_taxonomies.should be_false
+      options.minimal_config.should be_false
       options.multilingual_languages.should be_empty
       options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
     end
@@ -123,11 +124,50 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Blog)
     end
 
+    it "parses minimal-config flag" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options(["--minimal-config"])
+      options.minimal_config.should be_true
+    end
+
     it "raises on unknown flags" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
       expect_raises(OptionParser::InvalidOption) do
         cmd.parse_options(["--unknown-flag"])
       end
+    end
+  end
+
+  describe "minimal_config_content" do
+    it "generates minimal config for simple scaffold" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Simple)
+      config = scaffold.minimal_config_content
+      config.should contain("title = \"My Hwaro Site\"")
+      config.should contain("[plugins]")
+      config.should contain("[sitemap]")
+      config.should contain("[feeds]")
+      config.should contain("[[taxonomies]]")
+      config.should_not contain("# ====")
+    end
+
+    it "generates minimal config for blog scaffold" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Blog)
+      config = scaffold.minimal_config_content
+      config.should contain("title = \"My Blog\"")
+      config.should_not contain("# ====")
+    end
+
+    it "generates minimal config for docs scaffold" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Docs)
+      config = scaffold.minimal_config_content
+      config.should contain("title = \"Documentation\"")
+      config.should_not contain("# ====")
+    end
+
+    it "skips taxonomies when requested" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Simple)
+      config = scaffold.minimal_config_content(skip_taxonomies: true)
+      config.should_not contain("[[taxonomies]]")
     end
   end
 end

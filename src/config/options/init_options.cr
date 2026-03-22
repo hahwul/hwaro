@@ -77,6 +77,7 @@ module Hwaro
         property scaffold : ScaffoldType
         property scaffold_remote : String?
         property agents_mode : AgentsMode
+        property minimal_config : Bool
 
         def initialize(
           @path : String = ".",
@@ -88,6 +89,7 @@ module Hwaro
           @scaffold : ScaffoldType = ScaffoldType::Simple,
           @scaffold_remote : String? = nil,
           @agents_mode : AgentsMode = AgentsMode::Remote,
+          @minimal_config : Bool = false,
         )
         end
 
