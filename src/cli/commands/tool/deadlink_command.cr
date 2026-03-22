@@ -20,6 +20,10 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
+            FlagInfo.new(short: nil, long: "--timeout", description: "HTTP request timeout in seconds (default: 10)", takes_value: true, value_hint: "SECONDS"),
+            FlagInfo.new(short: nil, long: "--concurrency", description: "Max concurrent requests (default: 8)", takes_value: true, value_hint: "N"),
+            FlagInfo.new(short: nil, long: "--external-only", description: "Check external links only"),
+            FlagInfo.new(short: nil, long: "--internal-only", description: "Check internal links only"),
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -57,13 +61,24 @@ module Hwaro
             end
           end
 
+          DEFAULT_TIMEOUT     = 10
+          DEFAULT_CONCURRENCY =  8
+
           def run(args : Array(String))
             target_dir = "content"
             json_output = false
+            timeout = DEFAULT_TIMEOUT
+            concurrency = DEFAULT_CONCURRENCY
+            external_only = false
+            internal_only = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool check-links [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| target_dir = v }
+              parser.on("--timeout SECONDS", "HTTP request timeout in seconds (default: #{DEFAULT_TIMEOUT})") { |v| timeout = v.to_i }
+              parser.on("--concurrency N", "Max concurrent requests (default: #{DEFAULT_CONCURRENCY})") { |v| concurrency = v.to_i.clamp(1, 128) }
+              parser.on("--external-only", "Check external links only") { external_only = true }
+              parser.on("--internal-only", "Check internal links only") { internal_only = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
@@ -75,8 +90,8 @@ module Hwaro
 
             Logger.info "Starting dead link check in '#{target_dir}'..." unless json_output
 
-            external_links = find_external_links(target_dir)
-            internal_links = find_internal_links(target_dir)
+            external_links = internal_only ? [] of Link : find_external_links(target_dir)
+            internal_links = external_only ? [] of Link : find_internal_links(target_dir)
 
             if external_links.empty? && internal_links.empty?
               if json_output
@@ -94,7 +109,7 @@ module Hwaro
             end
 
             # Check external links
-            external_results = check_links_concurrently(external_links)
+            external_results = check_links_concurrently(external_links, timeout, concurrency)
             dead_external = external_results.select { |r| !(200..299).includes?(r.status) }
 
             # Check internal links
@@ -196,34 +211,44 @@ module Hwaro
             results
           end
 
-          private def check_links_concurrently(links : Array(Link)) : Array(Result)
+          private def check_links_concurrently(links : Array(Link), timeout_seconds : Int32, max_concurrency : Int32) : Array(Result)
             results_channel = Channel(Result).new(links.size)
+            work_channel = Channel(Link?).new(max_concurrency)
 
-            links.each do |link|
+            # Spawn bounded worker pool
+            max_concurrency.times do
               spawn do
-                status = 0
-                error_message = nil
-                begin
-                  uri = URI.parse(link.url)
-                  # Use HEAD request for efficiency
-                  response = HTTP::Client.head(uri)
-                  status = response.status_code
-                rescue ex : Socket::ConnectError
-                  status = -1
-                  error_message = "Connection failed: #{ex.message}"
-                rescue ex : IO::TimeoutError
-                  status = -1
-                  error_message = "Request timed out: #{ex.message}"
-                rescue ex : Socket::Addrinfo::Error
-                  status = -1
-                  error_message = "DNS resolution failed: #{ex.message}"
-                rescue ex
-                  status = -1
-                  error_message = ex.message
+                while link = work_channel.receive?
+                  status = 0
+                  error_message = nil
+                  begin
+                    uri = URI.parse(link.url)
+                    client = HTTP::Client.new(uri)
+                    client.connect_timeout = timeout_seconds.seconds
+                    client.read_timeout = timeout_seconds.seconds
+                    response = client.head(uri.request_target)
+                    status = response.status_code
+                  rescue ex : Socket::ConnectError
+                    status = -1
+                    error_message = "Connection failed: #{ex.message}"
+                  rescue ex : IO::TimeoutError
+                    status = -1
+                    error_message = "Request timed out (#{timeout_seconds}s)"
+                  rescue ex : Socket::Addrinfo::Error
+                    status = -1
+                    error_message = "DNS resolution failed: #{ex.message}"
+                  rescue ex
+                    status = -1
+                    error_message = ex.message
+                  end
+                  results_channel.send(Result.new(link: link, status: status, error: error_message))
                 end
-                results_channel.send(Result.new(link: link, status: status, error: error_message))
               end
             end
+
+            # Feed links to workers
+            links.each { |link| work_channel.send(link) }
+            max_concurrency.times { work_channel.send(nil) }
 
             # Collect all results
             links.size.times.map { results_channel.receive }.to_a

@@ -11,12 +11,24 @@ hwaro tool check-links
 
 # Output result as JSON
 hwaro tool check-links --json
+
+# Custom timeout and concurrency
+hwaro tool check-links --timeout 30 --concurrency 4
+
+# Check only external or internal links
+hwaro tool check-links --external-only
+hwaro tool check-links --internal-only
 ```
 
 ## Options
 
 | Flag | Description |
 |------|-------------|
+| -c, --content-dir DIR | Content directory (default: `content`) |
+| --timeout SECONDS | HTTP request timeout in seconds (default: 10) |
+| --concurrency N | Max concurrent requests (default: 8) |
+| --external-only | Check external links only |
+| --internal-only | Check internal links only |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
