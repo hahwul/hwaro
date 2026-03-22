@@ -12,57 +12,90 @@ module Hwaro
         path = options.path
         title = options.title || ""
 
-        # Determine if path is a file path or directory
-        is_file_path = path && path.ends_with?(".md")
-
-        if is_file_path && path
-          # Extract directory and filename from path
-          base_dir = File.dirname(path)
-          base_dir = "content/drafts" if base_dir == "."
-
-          # Extract title from filename if not provided
-          if title.empty?
-            filename_without_ext = File.basename(path, ".md")
-            # Convert slug to title (capitalize words, replace dashes with spaces)
-            title = filename_without_ext.split("-").map(&.capitalize).join(" ")
-          end
-
-          filename = File.basename(path)
-          if base_dir == "content/drafts"
-            full_path = File.join(base_dir, filename)
+        # --section overrides the base directory
+        if section = options.section
+          if path && path.ends_with?(".md")
+            filename = File.basename(path)
+            full_path = File.join("content", section, filename)
+          elsif path
+            full_path = File.join("content", section, path)
+            full_path += ".md" unless full_path.ends_with?(".md")
           else
-            full_path = path.starts_with?("content/") ? path : File.join("content", path)
+            # No path given, will prompt for title below
+            full_path = nil
           end
-          base_dir = File.dirname(full_path)
+
+          if full_path
+            base_dir = File.dirname(full_path)
+            if title.empty?
+              filename_without_ext = File.basename(full_path, ".md")
+              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+            end
+          else
+            base_dir = File.join("content", section)
+          end
         else
-          base_dir = path || "content/drafts"
-          base_dir = "content/#{base_dir}" unless base_dir.starts_with?("content/")
+          # Determine if path is a file path or directory
+          is_file_path = path && path.ends_with?(".md")
 
-          if title.empty?
-            print "Enter title: "
-            title = gets.try(&.chomp) || ""
+          if is_file_path && path
+            # Extract directory and filename from path
+            base_dir = File.dirname(path)
+            base_dir = "content/drafts" if base_dir == "."
+
+            # Extract title from filename if not provided
+            if title.empty?
+              filename_without_ext = File.basename(path, ".md")
+              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+            end
+
+            filename = File.basename(path)
+            if base_dir == "content/drafts"
+              full_path = File.join(base_dir, filename)
+            else
+              full_path = path.starts_with?("content/") ? path : File.join("content", path)
+            end
+            base_dir = File.dirname(full_path)
+          else
+            base_dir = path || "content/drafts"
+            base_dir = "content/#{base_dir}" unless base_dir.starts_with?("content/")
+            full_path = nil
           end
+        end
 
+        # Prompt for title if still empty and no file path
+        if !full_path && title.empty?
+          print "Enter title: "
+          title = gets.try(&.chomp) || ""
+        end
+
+        if !full_path
           if title.empty?
             raise "Title cannot be empty."
           end
-
           filename = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-") + ".md"
           full_path = File.join(base_dir, filename)
         end
 
         FileUtils.mkdir_p(base_dir) unless Dir.exists?(base_dir)
 
-        is_draft = base_dir.includes?("drafts")
-        date = Time.local.to_s("%Y-%m-%d %H:%M:%S")
+        # Draft: CLI flag > path-based detection
+        is_draft = if options.draft.nil?
+                     base_dir.includes?("drafts")
+                   else
+                     options.draft == true
+                   end
+
+        date = options.date || Time.local.to_s("%Y-%m-%d %H:%M:%S")
+        tags = options.tags
 
         # Find archetype
         archetype_content = find_archetype(options.archetype, full_path)
 
         content = if archetype_content
-                    process_archetype(archetype_content, title, date, is_draft)
+                    process_archetype(archetype_content, title, date, is_draft, tags)
                   else
-                    generate_default_content(title, date, is_draft)
+                    generate_default_content(title, date, is_draft, tags)
                   end
 
         if File.exists?(full_path)
@@ -118,8 +151,8 @@ module Hwaro
         nil
       end
 
-      private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool) : String
-        # Replace placeholders in archetype
+      private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String)) : String
+        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{t}\"" }.join(", ")}]"
         content = archetype_content
           .gsub("{{ title }}", title)
           .gsub("{{title}}", title)
@@ -127,17 +160,23 @@ module Hwaro
           .gsub("{{date}}", date)
           .gsub("{{ draft }}", is_draft.to_s)
           .gsub("{{draft}}", is_draft.to_s)
+          .gsub("{{ tags }}", tags_str)
+          .gsub("{{tags}}", tags_str)
 
         content
       end
 
-      private def generate_default_content(title : String, date : String, is_draft : Bool) : String
+      private def generate_default_content(title : String, date : String, is_draft : Bool, tags : Array(String)) : String
         safe_title = title.gsub("\"", "\\\"").gsub("\n", " ")
         String.build do |str|
           str << "---\n"
           str << "title: \"#{safe_title}\"\n"
           str << "date: #{date}\n"
           str << "draft: true\n" if is_draft
+          unless tags.empty?
+            str << "tags:\n"
+            tags.each { |tag| str << "  - \"#{tag}\"\n" }
+          end
           str << "---\n\n"
           str << "# #{title}\n"
         end

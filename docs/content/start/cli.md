@@ -54,6 +54,7 @@ hwaro new content/about.md
 hwaro new content/blog/my-post.md
 hwaro new -t "My Post Title"
 hwaro new posts/my-post.md -a posts
+hwaro new my-post.md --section blog --draft --tags "go,web" --date 2026-03-22
 ```
 
 Creates a Markdown file with front matter template. Supports **archetypes** for customizable templates.
@@ -63,6 +64,10 @@ Creates a Markdown file with front matter template. Supports **archetypes** for 
 | Flag | Description |
 |------|-------------|
 | -t, --title TITLE | Content title |
+| --date DATE | Content date (default: now, e.g. `2026-03-22`) |
+| --draft | Mark as draft |
+| --tags TAGS | Comma-separated tags |
+| -s, --section NAME | Section directory (e.g. `blog`, `docs`) |
 | -a, --archetype NAME | Archetype to use |
 
 **Archetypes:**
@@ -73,7 +78,7 @@ Archetypes are template files in `archetypes/` directory that define default fro
 - `archetypes/posts.md` - Used for `hwaro new posts/...`
 - `archetypes/tools/develop.md` - Used for `hwaro new tools/develop/...`
 
-Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`
+Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`, `{{ tags }}`
 
 Example archetype (`archetypes/posts.md`):
 ```
