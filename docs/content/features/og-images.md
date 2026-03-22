@@ -68,7 +68,163 @@ The `style` option controls the background pattern rendered on the image:
 | `waves` | Horizontal wave curves |
 | `minimal` | Clean layout without accent bars |
 
-Example:
+### Preview
+
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-default.svg" alt="default style" loading="lazy" />
+    <span class="og-style-label"><code>default</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-default.svg" alt="default style" />
+        <p><code>default</code> — No pattern (solid background)</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-dots.svg" alt="dots style" loading="lazy" />
+    <span class="og-style-label"><code>dots</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-dots.svg" alt="dots style" />
+        <p><code>dots</code> — Repeating dot grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-grid.svg" alt="grid style" loading="lazy" />
+    <span class="og-style-label"><code>grid</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-grid.svg" alt="grid style" />
+        <p><code>grid</code> — Repeating line grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" loading="lazy" />
+    <span class="og-style-label"><code>diagonal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" />
+        <p><code>diagonal</code> — Diagonal stripe pattern</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" loading="lazy" />
+    <span class="og-style-label"><code>gradient</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" />
+        <p><code>gradient</code> — Diagonal gradient using the accent color</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-waves.svg" alt="waves style" loading="lazy" />
+    <span class="og-style-label"><code>waves</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-waves.svg" alt="waves style" />
+        <p><code>waves</code> — Horizontal wave curves</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" loading="lazy" />
+    <span class="og-style-label"><code>minimal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" />
+        <p><code>minimal</code> — Clean layout without accent bars</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+
+<style>
+.og-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.og-style-card {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #1e1e24);
+  background: var(--bg-card, #111114);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.og-style-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--border-light, #2e2e36);
+}
+.og-style-card > img {
+  width: 100%;
+  display: block;
+}
+.og-style-label {
+  display: block;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.og-style-card dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+.og-style-card dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.og-style-dialog {
+  position: relative;
+  background: var(--bg-elevated, #101014);
+  border: 1px solid var(--border, #1e1e24);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.og-style-dialog > img {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.og-style-dialog > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.og-style-dialog > p {
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+</style>
+
+### Example Configuration
 
 ```toml
 [og.auto_image]
