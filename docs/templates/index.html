@@ -18,15 +18,77 @@
 
         <style>
             /* Shared SVG animation keyframes */
-            .fire-pulse { transform-origin: center 144px; animation: pulse 1.5s infinite alternate ease-in-out; }
-            @keyframes pulse { 0% { transform: scaleY(1); opacity: 0.92; } 100% { transform: scaleY(1.03); opacity: 1; } }
-            .spark { animation-timing-function: ease-in; animation-iteration-count: infinite; }
-            .spark-1 { animation-name: flyUp1; animation-duration: 2s; }
-            .spark-2 { animation-name: flyUp2; animation-duration: 2.5s; animation-delay: 0.5s; }
-            .spark-3 { animation-name: flyUp3; animation-duration: 1.8s; animation-delay: 1.2s; }
-            @keyframes flyUp1 { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 0.8; } 100% { transform: translateY(-40px); opacity: 0; } }
-            @keyframes flyUp2 { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
-            @keyframes flyUp3 { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 0.9; } 100% { transform: translateY(-45px); opacity: 0; } }
+            .fire-pulse {
+                transform-origin: center 144px;
+                animation: pulse 1.5s infinite alternate ease-in-out;
+            }
+            @keyframes pulse {
+                0% {
+                    transform: scaleY(1);
+                    opacity: 0.92;
+                }
+                100% {
+                    transform: scaleY(1.03);
+                    opacity: 1;
+                }
+            }
+            .spark {
+                animation-timing-function: ease-in;
+                animation-iteration-count: infinite;
+            }
+            .spark-1 {
+                animation-name: flyUp1;
+                animation-duration: 2s;
+            }
+            .spark-2 {
+                animation-name: flyUp2;
+                animation-duration: 2.5s;
+                animation-delay: 0.5s;
+            }
+            .spark-3 {
+                animation-name: flyUp3;
+                animation-duration: 1.8s;
+                animation-delay: 1.2s;
+            }
+            @keyframes flyUp1 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 0.8;
+                }
+                100% {
+                    transform: translateY(-40px);
+                    opacity: 0;
+                }
+            }
+            @keyframes flyUp2 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(-50px);
+                    opacity: 0;
+                }
+            }
+            @keyframes flyUp3 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 0.9;
+                }
+                100% {
+                    transform: translateY(-45px);
+                    opacity: 0;
+                }
+            }
         </style>
     </head>
     <body class="landing-body">
@@ -36,9 +98,28 @@
             </a>
             <nav>
                 <a href="{{ base_url }}/start/">Docs</a>
-                <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a>
-                <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                <a
+                    href="https://examples.hwaro.hahwul.com"
+                    target="_blank"
+                    rel="noopener"
+                    >Examples</a
+                >
+                <a
+                    href="https://github.com/hahwul/hwaro"
+                    class="github-link"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="18"
+                        height="18"
+                    >
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                        />
+                    </svg>
                 </a>
             </nav>
         </header>
@@ -49,41 +130,136 @@
                  ============================================================ -->
             <section class="hero">
                 <div class="hero-bg">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 200 200"
+                    >
                         <defs>
-                            <filter id="fire-wobble-hero" x="-20%" y="-20%" width="140%" height="140%">
-                                <feTurbulence type="fractalNoise" baseFrequency="0.04 0.08" numOctaves="2" result="noise">
-                                    <animate attributeName="baseFrequency" values="0.04 0.08; 0.05 0.12; 0.04 0.08" dur="2.5s" repeatCount="indefinite" />
+                            <filter
+                                id="fire-wobble-hero"
+                                x="-20%"
+                                y="-20%"
+                                width="140%"
+                                height="140%"
+                            >
+                                <feTurbulence
+                                    type="fractalNoise"
+                                    baseFrequency="0.04 0.08"
+                                    numOctaves="2"
+                                    result="noise"
+                                >
+                                    <animate
+                                        attributeName="baseFrequency"
+                                        values="0.04 0.08; 0.05 0.12; 0.04 0.08"
+                                        dur="2.5s"
+                                        repeatCount="indefinite"
+                                    />
                                 </feTurbulence>
-                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G" />
+                                <feDisplacementMap
+                                    in="SourceGraphic"
+                                    in2="noise"
+                                    scale="2.5"
+                                    xChannelSelector="R"
+                                    yChannelSelector="G"
+                                />
                             </filter>
                         </defs>
-                        <rect x="48" y="34" width="104" height="10" fill="#7A7B7E" />
-                        <path d="M 28 150 L 28 54 L 172 54 L 172 150 L 154 150 L 154 72 L 46 72 L 46 150 Z" fill="#7A7B7E" />
-                        <rect x="28" y="160" width="144" height="10" fill="#7A7B7E" />
+                        <rect
+                            x="48"
+                            y="34"
+                            width="104"
+                            height="10"
+                            fill="#7A7B7E"
+                        />
+                        <path
+                            d="M 28 150 L 28 54 L 172 54 L 172 150 L 154 150 L 154 72 L 46 72 L 46 150 Z"
+                            fill="#7A7B7E"
+                        />
+                        <rect
+                            x="28"
+                            y="160"
+                            width="144"
+                            height="10"
+                            fill="#7A7B7E"
+                        />
                         <g class="fire-pulse" filter="url(#fire-wobble-hero)">
-                            <rect x="50" y="76" width="100" height="68" fill="#ED1C24" />
-                            <path d="M 50 76 L 150 76 L 150 84 L 58 84 L 58 144 L 50 144 Z" fill="#BE1622" />
+                            <rect
+                                x="50"
+                                y="76"
+                                width="100"
+                                height="68"
+                                fill="#ED1C24"
+                            />
+                            <path
+                                d="M 50 76 L 150 76 L 150 84 L 58 84 L 58 144 L 50 144 Z"
+                                fill="#BE1622"
+                            />
                         </g>
                         <g>
-                            <circle cx="70" cy="130" r="1.5" fill="#FFD54F" class="spark spark-1" opacity="0" />
-                            <circle cx="100" cy="135" r="2" fill="#FFA000" class="spark spark-2" opacity="0" />
-                            <circle cx="130" cy="125" r="1.5" fill="#FFD54F" class="spark spark-3" opacity="0" />
+                            <circle
+                                cx="70"
+                                cy="130"
+                                r="1.5"
+                                fill="#FFD54F"
+                                class="spark spark-1"
+                                opacity="0"
+                            />
+                            <circle
+                                cx="100"
+                                cy="135"
+                                r="2"
+                                fill="#FFA000"
+                                class="spark spark-2"
+                                opacity="0"
+                            />
+                            <circle
+                                cx="130"
+                                cy="125"
+                                r="1.5"
+                                fill="#FFD54F"
+                                class="spark spark-3"
+                                opacity="0"
+                            />
                         </g>
-                        <rect x="50" y="124" width="100" height="8" fill="#FFFFFF" />
-                        <path d="M50 124 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12" fill="#FFFFFF" />
-                        <path d="M56 132 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12" fill="#FFFFFF" />
+                        <rect
+                            x="50"
+                            y="124"
+                            width="100"
+                            height="8"
+                            fill="#FFFFFF"
+                        />
+                        <path
+                            d="M50 124 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12"
+                            fill="#FFFFFF"
+                        />
+                        <path
+                            d="M56 132 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12 h6 v12 h5.75 v-12"
+                            fill="#FFFFFF"
+                        />
                     </svg>
                 </div>
                 <div class="hero-content">
-                    <h1>Fast by default.<br /><span class="highlight">Yours by design.</span></h1>
+                    <h1>
+                        Fast by default.<br /><span class="highlight"
+                            >Yours by design.</span
+                        >
+                    </h1>
                     <p class="hero-sub">
                         A static site generator built with Crystal.<br />
-                        No themes, no lock-in. Your content, your structure, your speed.
+                        No themes, no lock-in. Your content, your structure,
+                        your speed.
                     </p>
                     <div class="hero-buttons">
-                        <a href="{{ base_url }}/start/" class="btn btn-primary">Get Started</a>
-                        <a href="https://github.com/hahwul/hwaro" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+                        <a href="{{ base_url }}/start/" class="btn btn-primary"
+                            >Get Started</a
+                        >
+                        <a
+                            href="https://github.com/hahwul/hwaro"
+                            class="btn btn-ghost"
+                            target="_blank"
+                            rel="noopener"
+                            >GitHub</a
+                        >
                     </div>
                 </div>
             </section>
@@ -99,27 +275,47 @@
                 <div class="features-list">
                     <div class="feature-row">
                         <h3>blazing_fast</h3>
-                        <p>Parallel processing, incremental builds, and streaming mode. Build thousands of pages in seconds.</p>
+                        <p>
+                            Parallel processing, incremental builds, and
+                            streaming mode. Build thousands of pages in seconds.
+                        </p>
                     </div>
                     <div class="feature-row">
                         <h3>markdown_first</h3>
-                        <p>Write in Markdown with TOML front matter. Footnotes, task lists, math, and Mermaid diagrams built in.</p>
+                        <p>
+                            Write in Markdown with TOML front matter. Footnotes,
+                            task lists, math, and Mermaid diagrams built in.
+                        </p>
                     </div>
                     <div class="feature-row">
                         <h3>flexible_templates</h3>
-                        <p>Jinja2 templating with inheritance, filters, functions, and shortcodes. No theme lock-in — build your own.</p>
+                        <p>
+                            Jinja2 templating with inheritance, filters,
+                            functions, and shortcodes. No theme lock-in — build
+                            your own.
+                        </p>
                     </div>
                     <div class="feature-row">
                         <h3>built_in_seo</h3>
-                        <p>Sitemaps, RSS/Atom feeds, OpenGraph, Twitter Cards, JSON-LD structured data, auto OG images, and LLMs.txt.</p>
+                        <p>
+                            Sitemaps, RSS/Atom feeds, OpenGraph, Twitter Cards,
+                            JSON-LD structured data, auto OG images, and
+                            LLMs.txt.
+                        </p>
                     </div>
                     <div class="feature-row">
                         <h3>taxonomies</h3>
-                        <p>Tags, categories, and custom taxonomies with automatic index pages, feeds, and pagination.</p>
+                        <p>
+                            Tags, categories, and custom taxonomies with
+                            automatic index pages, feeds, and pagination.
+                        </p>
                     </div>
                     <div class="feature-row">
                         <h3>extensible</h3>
-                        <p>Build hooks, asset pipeline, image processing, multilingual support, PWA, and AMP — all built in.</p>
+                        <p>
+                            Build hooks, asset pipeline, image processing,
+                            multilingual support, PWA, and AMP — all built in.
+                        </p>
                     </div>
                 </div>
             </section>
@@ -170,7 +366,12 @@
                     </div>
                 </div>
                 <p class="benchmark-link">
-                    <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Full benchmark results →</a>
+                    <a
+                        href="https://hahwul.github.io/ssg-benchmark/"
+                        target="_blank"
+                        rel="noopener"
+                        >Full benchmark results →</a
+                    >
                 </p>
             </section>
 
@@ -180,48 +381,92 @@
             <section class="showcase">
                 <div class="showcase-header">
                     <h2>Built with Hwaro</h2>
-                    <p>From docs to blogs to landing pages — all from <code>hwaro init</code>.</p>
+                    <p>
+                        From docs to blogs to landing pages — all from
+                        <code>hwaro init</code>.
+                    </p>
                 </div>
                 <div class="showcase-grid">
-                    <a href="https://hahwul.github.io/hwaro-examples/acme-docs/" class="showcase-card" target="_blank" rel="noopener">
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/blueprint/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
                         <div class="showcase-preview">
-                            <img src="https://examples.hwaro.hahwul.com/screenshots/acme-docs.png" alt="acme-docs" loading="lazy" />
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/blueprint.png"
+                                alt="blueprint"
+                                loading="lazy"
+                            />
                         </div>
                         <div class="showcase-info">
-                            <span class="showcase-name">acme-docs</span>
+                            <span class="showcase-name">blueprint</span>
                             <span class="showcase-tag">docs</span>
                         </div>
                     </a>
-                    <a href="https://hahwul.github.io/hwaro-examples/modern-blog/" class="showcase-card" target="_blank" rel="noopener">
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/monolith/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
                         <div class="showcase-preview">
-                            <img src="https://examples.hwaro.hahwul.com/screenshots/modern-blog.png" alt="modern-blog" loading="lazy" />
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/monolith.png"
+                                alt="monolith"
+                                loading="lazy"
+                            />
                         </div>
                         <div class="showcase-info">
-                            <span class="showcase-name">modern-blog</span>
-                            <span class="showcase-tag">blog</span>
-                        </div>
-                    </a>
-                    <a href="https://hahwul.github.io/hwaro-examples/devconf/" class="showcase-card" target="_blank" rel="noopener">
-                        <div class="showcase-preview">
-                            <img src="https://examples.hwaro.hahwul.com/screenshots/devconf.png" alt="devconf" loading="lazy" />
-                        </div>
-                        <div class="showcase-info">
-                            <span class="showcase-name">devconf</span>
+                            <span class="showcase-name">monolith</span>
                             <span class="showcase-tag">landing</span>
                         </div>
                     </a>
-                    <a href="https://hahwul.github.io/hwaro-examples/resume/" class="showcase-card" target="_blank" rel="noopener">
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/statuspage/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
                         <div class="showcase-preview">
-                            <img src="https://examples.hwaro.hahwul.com/screenshots/resume.png" alt="resume" loading="lazy" />
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/statuspage.png"
+                                alt="statuspage"
+                                loading="lazy"
+                            />
                         </div>
                         <div class="showcase-info">
-                            <span class="showcase-name">resume</span>
-                            <span class="showcase-tag">portfolio</span>
+                            <span class="showcase-name">statuspage</span>
+                            <span class="showcase-tag">status</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/zen/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/zen.png"
+                                alt="zen"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">zen</span>
+                            <span class="showcase-tag">blog</span>
                         </div>
                     </a>
                 </div>
                 <p class="showcase-link">
-                    <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">View all examples →</a>
+                    <a
+                        href="https://examples.hwaro.hahwul.com"
+                        target="_blank"
+                        rel="noopener"
+                        >View all examples →</a
+                    >
                 </p>
             </section>
 
@@ -230,22 +475,32 @@
                  ============================================================ -->
             <section class="landing-cta">
                 <p class="cta-heading">Start building.</p>
-                <p class="cta-sub">One command to install. Three lines to deploy.</p>
+                <p class="cta-sub">
+                    One command to install. Three lines to deploy.
+                </p>
                 <div class="cta-install">
                     <code>brew install hwaro/hwaro/hwaro</code>
                 </div>
                 <div class="cta-buttons">
-                    <a href="{{ base_url }}/start/" class="btn btn-primary">Read the Docs</a>
-                    <a href="{{ base_url }}/start/installation/" class="btn btn-ghost">Installation Guide</a>
+                    <a href="{{ base_url }}/start/" class="btn btn-primary"
+                        >Read the Docs</a
+                    >
+                    <a
+                        href="{{ base_url }}/start/installation/"
+                        class="btn btn-ghost"
+                        >Installation Guide</a
+                    >
                 </div>
             </section>
         </main>
 
         <footer class="landing-footer">
             <p>
-                <a href="https://www.hahwul.com" target="_blank" rel="noopener"><img src="/images/hahwul.webp" class="hahwul-img" /></a>
+                <a href="https://www.hahwul.com" target="_blank" rel="noopener"
+                    ><img src="/images/hahwul.webp" class="hahwul-img"
+                /></a>
             </p>
-            <p style="margin-top: 1rem;">Built with Love</p>
+            <p style="margin-top: 1rem">Built with Love</p>
         </footer>
         {{ auto_includes_js }}
     </body>
