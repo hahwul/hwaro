@@ -193,6 +193,32 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    describe "agents mode" do
+      it "creates remote AGENTS.md by default" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          initializer = Hwaro::Services::Initializer.new
+          initializer.run(target)
+
+          agents_content = File.read(File.join(target, "AGENTS.md"))
+          agents_content.should contain "hwaro.hahwul.com"
+          agents_content.should contain "llms-full.txt"
+        end
+      end
+
+      it "creates local AGENTS.md when agents_mode is local" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          initializer = Hwaro::Services::Initializer.new
+          initializer.run(target, agents_mode: Hwaro::Config::Options::AgentsMode::Local)
+
+          agents_content = File.read(File.join(target, "AGENTS.md"))
+          agents_content.should contain "## Content"
+          agents_content.should contain "## Templates"
+        end
+      end
+    end
+
     describe "InitOptions struct" do
       it "accepts InitOptions for run" do
         Dir.mktmpdir do |dir|
@@ -210,6 +236,22 @@ describe Hwaro::Services::Initializer do
 
           File.exists?(File.join(target, "config.toml")).should be_true
           File.exists?(File.join(target, "AGENTS.md")).should be_false
+        end
+      end
+
+      it "respects agents_mode in InitOptions" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          options = Hwaro::Config::Options::InitOptions.new(
+            path: target,
+            agents_mode: Hwaro::Config::Options::AgentsMode::Local,
+          )
+
+          initializer = Hwaro::Services::Initializer.new
+          initializer.run(options)
+
+          agents_content = File.read(File.join(target, "AGENTS.md"))
+          agents_content.should contain "## Templates"
         end
       end
     end

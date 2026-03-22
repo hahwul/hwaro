@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 7 subcommands" do
+    it "returns 8 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(7)
+      subs.size.should eq(8)
     end
 
     it "includes convert subcommand" do
@@ -53,6 +53,11 @@ describe Hwaro::CLI::Commands::ToolCommand do
     it "includes ci subcommand" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
       subs.any? { |s| s.name == "ci" }.should be_true
+    end
+
+    it "includes agents-md subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "agents-md" }.should be_true
     end
   end
 end
@@ -327,6 +332,55 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     it "includes help flag" do
       meta = Hwaro::CLI::Commands::Tool::DeadlinkCommand.metadata
       meta.flags.any? { |f| f.long == "--help" }.should be_true
+    end
+  end
+end
+
+describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
+  describe ".metadata" do
+    it "returns correct command name" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.name.should eq("agents-md")
+    end
+
+    it "returns a description" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.description.should_not be_empty
+    end
+
+    it "includes remote flag" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.flags.any? { |f| f.long == "--remote" }.should be_true
+    end
+
+    it "includes local flag" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.flags.any? { |f| f.long == "--local" }.should be_true
+    end
+
+    it "includes write flag" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.flags.any? { |f| f.long == "--write" }.should be_true
+    end
+
+    it "includes force flag" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.flags.any? { |f| f.long == "--force" }.should be_true
+    end
+
+    it "includes help flag" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.flags.any? { |f| f.long == "--help" }.should be_true
+    end
+
+    it "has no positional args" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.positional_args.should be_empty
+    end
+
+    it "has no positional choices" do
+      meta = Hwaro::CLI::Commands::Tool::AgentsMdCommand.metadata
+      meta.positional_choices.should be_empty
     end
   end
 end

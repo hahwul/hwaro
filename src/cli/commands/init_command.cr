@@ -19,6 +19,7 @@ module Hwaro
         FLAGS = [
           FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
+          FlagInfo.new(short: nil, long: "--agents", description: "AGENTS.md content mode: remote (lightweight, default) or local (full embedded)", takes_value: true, value_hint: "MODE"),
           FlagInfo.new(short: nil, long: "--skip-agents-md", description: "Skip creating AGENTS.md file"),
           FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
           FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
@@ -50,6 +51,7 @@ module Hwaro
           multilingual_languages = [] of String
           scaffold = Config::Options::ScaffoldType::Simple
           scaffold_remote : String? = nil
+          agents_mode = Config::Options::AgentsMode::Remote
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
@@ -74,6 +76,17 @@ module Hwaro
                   Logger.info "  https://github.com/...   - Full GitHub URL (with optional subpath)"
                   exit(1)
                 end
+              end
+            end
+            parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|
+              begin
+                agents_mode = Config::Options::AgentsMode.from_string(mode)
+              rescue ex : ArgumentError
+                Logger.error(ex.message || "Unknown error")
+                Logger.info "Available modes:"
+                Logger.info "  remote - Lightweight with links to online docs (default)"
+                Logger.info "  local  - Full embedded reference for offline use"
+                exit(1)
               end
             end
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
@@ -110,7 +123,8 @@ module Hwaro
             skip_taxonomies: skip_taxonomies,
             multilingual_languages: multilingual_languages,
             scaffold: scaffold,
-            scaffold_remote: scaffold_remote
+            scaffold_remote: scaffold_remote,
+            agents_mode: agents_mode
           )
         end
       end

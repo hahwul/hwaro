@@ -42,6 +42,31 @@ module Hwaro
         end
       end
 
+      # AGENTS.md content mode
+      enum AgentsMode
+        Remote # Lightweight with links to online docs (default)
+        Local  # Full embedded reference for offline use
+
+        def self.from_string(value : String) : AgentsMode
+          case value.downcase
+          when "remote"
+            Remote
+          when "local"
+            Local
+          else
+            raise ArgumentError.new("Unknown agents mode: #{value}. Available modes: remote, local")
+          end
+        end
+
+        def to_s : String
+          case self
+          when Remote then "remote"
+          when Local  then "local"
+          else             "remote"
+          end
+        end
+      end
+
       struct InitOptions
         property path : String
         property force : Bool
@@ -51,6 +76,7 @@ module Hwaro
         property multilingual_languages : Array(String)
         property scaffold : ScaffoldType
         property scaffold_remote : String?
+        property agents_mode : AgentsMode
 
         def initialize(
           @path : String = ".",
@@ -61,6 +87,7 @@ module Hwaro
           @multilingual_languages : Array(String) = [] of String,
           @scaffold : ScaffoldType = ScaffoldType::Simple,
           @scaffold_remote : String? = nil,
+          @agents_mode : AgentsMode = AgentsMode::Remote,
         )
         end
 
