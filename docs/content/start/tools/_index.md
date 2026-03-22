@@ -19,6 +19,7 @@ The `hwaro tool` command provides utility subcommands for working with content f
 | [doctor](/start/tools/doctor/) | Diagnose config and content issues |
 | [platform](/start/tools/platform/) | Generate hosting platform config files |
 | [ci](/start/tools/ci/) | Generate CI/CD workflow files |
+| [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
 ---
 
@@ -83,7 +84,7 @@ hwaro completion fish > ~/.config/fish/completions/hwaro.fish
 The completion scripts provide tab completion for:
 
 - **Commands**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `completion`
-- **Subcommands**: `hwaro tool <TAB>` → `convert`, `list`, `check-links`
+- **Subcommands**: `hwaro tool <TAB>` → `convert`, `list`, `check-links`, `agents-md`
 - **Flags**: `hwaro build <TAB>` → `--output`, `--drafts`, `--minify`, etc.
 - **Positional arguments**: `hwaro completion <TAB>` → `bash`, `zsh`, `fish`
 - **Positional choices**: `hwaro tool convert <TAB>` → `to-yaml`, `to-toml`
