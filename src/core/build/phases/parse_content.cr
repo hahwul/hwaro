@@ -93,6 +93,19 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
     Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
+
+    # Show included draft content paths when --drafts flag is used
+    if include_drafts
+      draft_pages = ctx.all_pages.select(&.draft)
+      if draft_pages.size > 0
+        max_url_len = draft_pages.max_of { |p| p.url.size }
+        pad = {max_url_len, 24}.max
+        Logger.info "Including #{draft_pages.size} draft(s):"
+        draft_pages.each do |p|
+          Logger.info "  #{p.url.ljust(pad)} <- content/#{p.path}"
+        end
+      end
+    end
   end
 
   # Parse a single page: read file, parse frontmatter, assign properties
