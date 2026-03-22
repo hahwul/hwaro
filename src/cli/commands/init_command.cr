@@ -17,14 +17,19 @@ module Hwaro
 
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
+          # Project setup
           FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
+          FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
+          FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
           FlagInfo.new(short: nil, long: "--agents", description: "AGENTS.md content mode: remote (lightweight, default) or local (full embedded)", takes_value: true, value_hint: "MODE"),
+
+          # Skip options
           FlagInfo.new(short: nil, long: "--skip-agents-md", description: "Skip creating AGENTS.md file"),
           FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
           FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
-          FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
-          FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
+
+          # Debug & output
           HELP_FLAG,
         ]
 
@@ -44,19 +49,24 @@ module Hwaro
         end
 
         def parse_options(args : Array(String)) : Config::Options::InitOptions
+          # Project setup
           path = "."
           force = false
+          scaffold = Config::Options::ScaffoldType::Simple
+          scaffold_remote : String? = nil
+          multilingual_languages = [] of String
+          minimal_config = false
+          agents_mode = Config::Options::AgentsMode::Remote
+
+          # Skip options
           skip_agents_md = false
           skip_sample_content = false
           skip_taxonomies = false
-          multilingual_languages = [] of String
-          scaffold = Config::Options::ScaffoldType::Simple
-          scaffold_remote : String? = nil
-          agents_mode = Config::Options::AgentsMode::Remote
-          minimal_config = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro init [path] [options]"
+
+            # Project setup
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
             parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
               if Services::Scaffolds::Remote.remote?(type)
@@ -80,6 +90,10 @@ module Hwaro
                 end
               end
             end
+            parser.on("--include-multilingual LANGS", "Enable multilingual support (e.g., en,ko)") do |langs|
+              multilingual_languages = langs.split(",").map(&.strip).reject(&.empty?)
+            end
+            parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
             parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|
               begin
                 agents_mode = Config::Options::AgentsMode.from_string(mode)
@@ -91,13 +105,13 @@ module Hwaro
                 exit(1)
               end
             end
+
+            # Skip options
             parser.on("--skip-agents-md", "Skip creating AGENTS.md file") { skip_agents_md = true }
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
-            parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
-            parser.on("--include-multilingual LANGS", "Enable multilingual support (e.g., en,ko)") do |langs|
-              multilingual_languages = langs.split(",").map(&.strip).reject(&.empty?)
-            end
+
+            # Debug & output
             parser.on("-h", "--help", "Show this help") do
               Logger.info parser.to_s
               Logger.info ""

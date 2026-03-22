@@ -16,24 +16,35 @@ module Hwaro
 
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
+          # Path & URL
           INPUT_DIR_FLAG,
-          FlagInfo.new(short: "-b", long: "--bind", description: "Bind address (default: 127.0.0.1)", takes_value: true, value_hint: "HOST"),
-          FlagInfo.new(short: "-p", long: "--port", description: "Port to listen on (default: 3000)", takes_value: true, value_hint: "PORT"),
           BASE_URL_FLAG,
+          ENV_FLAG,
+
+          # Content filtering
           DRAFTS_FLAG,
           INCLUDE_EXPIRED_FLAG,
+
+          # Build behavior
           MINIFY_FLAG,
+
+          # Server
+          FlagInfo.new(short: "-b", long: "--bind", description: "Bind address (default: 127.0.0.1)", takes_value: true, value_hint: "HOST"),
+          FlagInfo.new(short: "-p", long: "--port", description: "Port to listen on (default: 3000)", takes_value: true, value_hint: "PORT"),
           FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server"),
-          VERBOSE_FLAG,
-          DEBUG_FLAG,
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
           FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes"),
-          PROFILE_FLAG,
-          SKIP_CACHE_BUSTING_FLAG,
+
+          # Skip options
           SKIP_OG_IMAGE_FLAG,
           SKIP_IMAGE_PROCESSING_FLAG,
-          ENV_FLAG,
+          SKIP_CACHE_BUSTING_FLAG,
+
+          # Debug & output
+          VERBOSE_FLAG,
+          PROFILE_FLAG,
+          DEBUG_FLAG,
           HELP_FLAG,
         ]
 
@@ -63,45 +74,68 @@ module Hwaro
         end
 
         private def parse_options(args : Array(String)) : {String?, Config::Options::ServeOptions}
+          # Path & URL
           input_dir = nil.as(String?)
-          host = "127.0.0.1"
-          port = 3000
           base_url = nil.as(String?)
+          env_name = ENV["HWARO_ENV"]? || nil
+
+          # Content filtering
           drafts = false
           include_expired = false
+
+          # Build behavior
           minify = false
+
+          # Server
+          host = "127.0.0.1"
+          port = 3000
           open_browser = false
-          verbose = false
-          debug = false
           access_log = false
           error_overlay = true
           live_reload = false
-          profile = false
-          cache_busting = true
+
+          # Skip options
           skip_og_image = false
           skip_image_processing = false
-          env_name = ENV["HWARO_ENV"]? || nil
+          cache_busting = true
+
+          # Debug & output
+          verbose = false
+          profile = false
+          debug = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
+
+            # Path & URL
             CLI.register_flag(parser, INPUT_DIR_FLAG) { |v| input_dir = v }
-            parser.on("-b HOST", "--bind HOST", "Bind address (default: 127.0.0.1)") { |h| host = h }
-            parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             CLI.register_flag(parser, BASE_URL_FLAG) { |v| base_url = v }
+            CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
+
+            # Content filtering
             CLI.register_flag(parser, DRAFTS_FLAG) { |_| drafts = true }
             CLI.register_flag(parser, INCLUDE_EXPIRED_FLAG) { |_| include_expired = true }
+
+            # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
+
+            # Server
+            parser.on("-b HOST", "--bind HOST", "Bind address (default: 127.0.0.1)") { |h| host = h }
+            parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
             parser.on("--open", "Open browser after starting server") { open_browser = true }
-            CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
-            CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--live-reload", "Enable live reload on file changes") { live_reload = true }
-            CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
-            CLI.register_flag(parser, SKIP_CACHE_BUSTING_FLAG) { |_| cache_busting = false }
+
+            # Skip options
             CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
             CLI.register_flag(parser, SKIP_IMAGE_PROCESSING_FLAG) { |_| skip_image_processing = true }
-            CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
+            CLI.register_flag(parser, SKIP_CACHE_BUSTING_FLAG) { |_| cache_busting = false }
+
+            # Debug & output
+            CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
+            CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
+            CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
           end
 
