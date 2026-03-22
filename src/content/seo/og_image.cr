@@ -329,23 +329,27 @@ module Hwaro
         # Public so OgPngRenderer can reuse it.
         def self.split_into_segments(text : String) : Array(String)
           segments = [] of String
-          current = ""
+          buf = IO::Memory.new
 
           text.each_char do |char|
             if cjk_char?(char)
-              segments << current unless current.empty?
-              current = ""
+              if buf.size > 0
+                segments << buf.to_s
+                buf = IO::Memory.new
+              end
               segments << char.to_s
             elsif char.whitespace?
-              segments << current unless current.empty?
-              current = ""
+              if buf.size > 0
+                segments << buf.to_s
+                buf = IO::Memory.new
+              end
               segments << char.to_s
             else
-              current += char
+              buf << char
             end
           end
 
-          segments << current unless current.empty?
+          segments << buf.to_s if buf.size > 0
           segments
         end
 

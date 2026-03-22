@@ -152,7 +152,7 @@ module Hwaro
       end
 
       private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String)) : String
-        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{t}\"" }.join(", ")}]"
+        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{t.gsub("\"", "\\\"")}\"" }.join(", ")}]"
         content = archetype_content
           .gsub("{{ title }}", title)
           .gsub("{{title}}", title)
@@ -175,7 +175,7 @@ module Hwaro
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"
-            tags.each { |tag| str << "  - \"#{tag}\"\n" }
+            tags.each { |tag| str << "  - \"#{tag.gsub("\"", "\\\"")}\"\n" }
           end
           str << "---\n\n"
           str << "# #{title}\n"

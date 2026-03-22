@@ -1107,7 +1107,11 @@ module Hwaro
           config.pwa.precache_urls = precache.compact_map(&.as_s?)
         end
         if strategy = s["cache_strategy"]?.try(&.as_s?)
-          config.pwa.cache_strategy = strategy
+          if PwaConfig::VALID_STRATEGIES.includes?(strategy)
+            config.pwa.cache_strategy = strategy
+          else
+            Logger.warn "Unknown pwa.cache_strategy '#{strategy}', using 'cache-first'"
+          end
         end
       end
 

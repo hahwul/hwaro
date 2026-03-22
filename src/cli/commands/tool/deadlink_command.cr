@@ -83,6 +83,12 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            if external_only && internal_only
+              Logger.warn "--external-only and --internal-only cancel each other out; checking all links"
+              external_only = false
+              internal_only = false
+            end
+
             unless Dir.exists?(target_dir)
               Logger.error "Directory not found: #{target_dir}"
               return
