@@ -502,4 +502,44 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
   end
+
+  describe ".split_into_segments" do
+    it "splits Latin text by whitespace" do
+      segments = Hwaro::Content::Seo::OgImage.split_into_segments("Hello World")
+      segments.should eq(["Hello", " ", "World"])
+    end
+
+    it "splits CJK text into individual characters" do
+      segments = Hwaro::Content::Seo::OgImage.split_into_segments("안녕하세요")
+      segments.should eq(["안", "녕", "하", "세", "요"])
+    end
+
+    it "handles mixed Latin and CJK" do
+      segments = Hwaro::Content::Seo::OgImage.split_into_segments("Hello 세계")
+      segments.should eq(["Hello", " ", "세", "계"])
+    end
+
+    it "handles Japanese text" do
+      segments = Hwaro::Content::Seo::OgImage.split_into_segments("こんにちは")
+      segments.size.should eq(5)
+    end
+
+    it "returns empty for empty string" do
+      segments = Hwaro::Content::Seo::OgImage.split_into_segments("")
+      segments.should be_empty
+    end
+  end
+
+  describe "word_wrap with CJK" do
+    it "wraps CJK text into multiple lines in SVG" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "이것은 매우 긴 한국어 제목입니다 테스트를 위한 문장"
+
+      config = Hwaro::Models::Config.new
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      # Each line becomes a separate <text> element
+      text_elements = svg.scan(/<text x="80"/)
+      text_elements.size.should be > 1
+    end
+  end
 end

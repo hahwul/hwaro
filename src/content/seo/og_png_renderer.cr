@@ -338,31 +338,29 @@ module Hwaro
         end
 
         # Word-wrap using incremental measured text width.
-        # Measures each word once and accumulates widths with space,
-        # avoiding O(n²) re-measurement of the growing line.
+        # Handles CJK characters by allowing breaks between any CJK characters.
         private def self.word_wrap_measured(font_info : LibStb::HwaroFontInfo, scale : Float32, text : String, max_width : Int32) : Array(String)
           return [] of String if text.empty?
-          words = text.split(/\s+/)
+          segments = Content::Seo::OgImage.split_into_segments(text)
           lines = [] of String
           current_line = ""
           current_width = 0_f32
-          space_width = LibStb.hwaro_font_measure_text(font_info, " ", scale)
 
-          words.each do |word|
-            word_width = LibStb.hwaro_font_measure_text(font_info, word, scale)
+          segments.each do |seg|
+            seg_width = LibStb.hwaro_font_measure_text(font_info, seg, scale)
             if current_line.empty?
-              current_line = word
-              current_width = word_width
-            elsif current_width + space_width + word_width <= max_width
-              current_line = "#{current_line} #{word}"
-              current_width += space_width + word_width
+              current_line = seg
+              current_width = seg_width
+            elsif current_width + seg_width <= max_width
+              current_line += seg
+              current_width += seg_width
             else
-              lines << current_line
-              current_line = word
-              current_width = word_width
+              lines << current_line.strip
+              current_line = seg.lstrip
+              current_width = LibStb.hwaro_font_measure_text(font_info, current_line, scale)
             end
           end
-          lines << current_line unless current_line.empty?
+          lines << current_line.strip unless current_line.strip.empty?
           lines.first(4)
         end
 

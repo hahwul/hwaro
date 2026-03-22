@@ -292,30 +292,73 @@ module Hwaro
           "data:#{mime};base64,#{encoded}"
         end
 
-        # Word-wrap text to fit within a character limit per line
+        # Word-wrap text to fit within a character limit per line.
+        # Handles CJK characters (which have no spaces) by allowing
+        # breaks between any CJK characters.
         private def self.word_wrap(text : String, max_chars : Int32) : Array(String)
           return [] of String if text.empty?
           max_chars = 10 if max_chars < 10 # safety minimum
 
-          words = text.split(/\s+/)
+          segments = split_into_segments(text)
           lines = [] of String
           current_line = ""
 
-          words.each do |word|
+          segments.each do |seg|
             if current_line.empty?
-              current_line = word
-            elsif (current_line.size + 1 + word.size) <= max_chars
-              current_line += " #{word}"
+              current_line = seg
+            elsif (current_line.size + seg.size) <= max_chars
+              current_line += seg
             else
-              lines << current_line
-              current_line = word
+              lines << current_line.strip
+              current_line = seg.lstrip
+            end
+
+            # Break long segments (e.g., very long words) at max_chars
+            while current_line.size > max_chars
+              lines << current_line[0, max_chars].strip
+              current_line = current_line[max_chars..]
             end
           end
 
-          lines << current_line unless current_line.empty?
-
-          # Limit to reasonable number of lines
+          lines << current_line.strip unless current_line.strip.empty?
           lines.first(4)
+        end
+
+        # Split text into wrappable segments: whitespace-separated words
+        # for Latin text, individual characters for CJK ranges.
+        # Public so OgPngRenderer can reuse it.
+        def self.split_into_segments(text : String) : Array(String)
+          segments = [] of String
+          current = ""
+
+          text.each_char do |char|
+            if cjk_char?(char)
+              segments << current unless current.empty?
+              current = ""
+              segments << char.to_s
+            elsif char.whitespace?
+              segments << current unless current.empty?
+              current = ""
+              segments << char.to_s
+            else
+              current += char
+            end
+          end
+
+          segments << current unless current.empty?
+          segments
+        end
+
+        # Check if a character is in CJK Unicode ranges
+        private def self.cjk_char?(char : Char) : Bool
+          code = char.ord
+          (code >= 0x4E00 && code <= 0x9FFF) ||   # CJK Unified Ideographs
+            (code >= 0x3400 && code <= 0x4DBF) ||  # CJK Extension A
+            (code >= 0x3000 && code <= 0x303F) ||  # CJK Symbols and Punctuation
+            (code >= 0x3040 && code <= 0x309F) ||  # Hiragana
+            (code >= 0x30A0 && code <= 0x30FF) ||  # Katakana
+            (code >= 0xAC00 && code <= 0xD7AF) ||  # Hangul Syllables
+            (code >= 0xFF00 && code <= 0xFFEF)     # Fullwidth Forms
         end
 
         private def self.escape_xml(text : String) : String
