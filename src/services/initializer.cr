@@ -27,7 +27,8 @@ module Hwaro
           options.skip_sample_content,
           options.skip_taxonomies,
           options.multilingual_languages,
-          scaffold
+          scaffold,
+          options.agents_mode
         )
       end
 
@@ -39,9 +40,10 @@ module Hwaro
         skip_taxonomies : Bool = false,
         multilingual_languages : Array(String) = [] of String,
         scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
+        agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
       )
         scaffold = Scaffolds::Registry.get(scaffold_type)
-        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold)
+        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode)
       end
 
       private def run_with_scaffold(
@@ -52,6 +54,7 @@ module Hwaro
         skip_taxonomies : Bool,
         multilingual_languages : Array(String),
         scaffold : Scaffolds::Base,
+        agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
       )
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
@@ -98,7 +101,15 @@ module Hwaro
 
         # Create AGENTS.md unless skipped
         unless skip_agents_md
-          create_file(File.join(target_path, "AGENTS.md"), Defaults::AgentsMd.content)
+          agents_content = case agents_mode
+                           when Config::Options::AgentsMode::Local
+                             Defaults::AgentsMd.content
+                           when Config::Options::AgentsMode::Remote
+                             Defaults::AgentsMd.remote_content
+                           else
+                             Defaults::AgentsMd.remote_content
+                           end
+          create_file(File.join(target_path, "AGENTS.md"), agents_content)
         end
 
         # Auto-add missing optional config sections (commented out)

@@ -12,6 +12,7 @@
 #   platform - Generate hosting platform config files
 #   ci       - Generate CI/CD workflow files
 #   import   - Import content from other systems
+#   agents-md - Generate or update AGENTS.md file
 
 require "option_parser"
 require "../metadata"
@@ -22,6 +23,7 @@ require "./tool/doctor_command"
 require "./tool/platform_command"
 require "./tool/ci_command"
 require "./tool/import_command"
+require "./tool/agents_md_command"
 require "../../utils/logger"
 
 module Hwaro
@@ -55,6 +57,7 @@ module Hwaro
         register_sub(Tool::PlatformCommand.metadata) { |args| Tool::PlatformCommand.new.run(args) }
         register_sub(Tool::CICommand.metadata) { |args| Tool::CICommand.new.run(args) }
         register_sub(Tool::ImportCommand.metadata) { |args| Tool::ImportCommand.new.run(args) }
+        register_sub(Tool::AgentsMdCommand.metadata) { |args| Tool::AgentsMdCommand.new.run(args) }
 
         def self.subcommands : Array(CommandInfo)
           @@sub_metadata

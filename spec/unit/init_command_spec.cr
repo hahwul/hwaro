@@ -57,6 +57,22 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.skip_taxonomies.should be_true
     end
 
+    it "parses agents mode flag" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+
+      options = cmd.parse_options(["--agents", "remote"])
+      options.agents_mode.should eq(Hwaro::Config::Options::AgentsMode::Remote)
+
+      options = cmd.parse_options(["--agents", "local"])
+      options.agents_mode.should eq(Hwaro::Config::Options::AgentsMode::Local)
+    end
+
+    it "defaults agents mode to remote" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options([] of String)
+      options.agents_mode.should eq(Hwaro::Config::Options::AgentsMode::Remote)
+    end
+
     it "parses multilingual flag" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
 

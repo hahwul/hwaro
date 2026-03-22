@@ -38,6 +38,7 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | Flag | Description |
 |------|-------------|
 | --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `blog-dark`, `docs`, `docs-dark`) or remote source (`github:user/repo[/path]`, URL) |
+| --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
 | -f, --force | Force creation even if directory is not empty |
 | --skip-agents-md | Skip creating AGENTS.md file |
 | --skip-sample-content | Skip creating sample content files |
@@ -274,6 +275,10 @@ hwaro tool ci github-actions    # Generate GitHub Actions workflow
 hwaro tool import wordpress export.xml   # Import from WordPress
 hwaro tool import jekyll /path/to/site   # Import from Jekyll
 hwaro tool import hugo /path/to/site     # Import from Hugo
+hwaro tool agents-md                    # Print local AGENTS.md to stdout
+hwaro tool agents-md --remote           # Print remote (lightweight) version
+hwaro tool agents-md --write            # Write AGENTS.md to file
+hwaro tool agents-md --remote --write   # Write remote version to file
 
 # JSON output
 hwaro tool list all --json
@@ -293,6 +298,7 @@ hwaro tool convert to-yaml --json
 | [platform](/start/tools/platform/) | Generate hosting platform config files (Netlify, Vercel, Cloudflare) |
 | [ci](/start/tools/ci/) | Generate CI/CD workflow files (GitHub Actions) |
 | import | Import content from WordPress, Jekyll, or Hugo |
+| [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
 **Common Options:**
 

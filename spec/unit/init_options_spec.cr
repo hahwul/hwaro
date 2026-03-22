@@ -64,6 +64,45 @@ describe Hwaro::Config::Options::ScaffoldType do
   end
 end
 
+describe Hwaro::Config::Options::AgentsMode do
+  describe ".from_string" do
+    it "parses 'remote'" do
+      Hwaro::Config::Options::AgentsMode.from_string("remote").should eq(Hwaro::Config::Options::AgentsMode::Remote)
+    end
+
+    it "parses 'local'" do
+      Hwaro::Config::Options::AgentsMode.from_string("local").should eq(Hwaro::Config::Options::AgentsMode::Local)
+    end
+
+    it "is case insensitive" do
+      Hwaro::Config::Options::AgentsMode.from_string("REMOTE").should eq(Hwaro::Config::Options::AgentsMode::Remote)
+      Hwaro::Config::Options::AgentsMode.from_string("Local").should eq(Hwaro::Config::Options::AgentsMode::Local)
+    end
+
+    it "raises on unknown mode" do
+      expect_raises(ArgumentError, /Unknown agents mode/) do
+        Hwaro::Config::Options::AgentsMode.from_string("unknown")
+      end
+    end
+  end
+
+  describe "#to_s" do
+    it "converts Remote to 'remote'" do
+      Hwaro::Config::Options::AgentsMode::Remote.to_s.should eq("remote")
+    end
+
+    it "converts Local to 'local'" do
+      Hwaro::Config::Options::AgentsMode::Local.to_s.should eq("local")
+    end
+
+    it "round-trips through from_string and to_s" do
+      ["remote", "local"].each do |name|
+        Hwaro::Config::Options::AgentsMode.from_string(name).to_s.should eq(name)
+      end
+    end
+  end
+end
+
 describe Hwaro::Config::Options::InitOptions do
   describe "#initialize" do
     it "has sensible defaults" do
@@ -76,6 +115,7 @@ describe Hwaro::Config::Options::InitOptions do
       opts.multilingual_languages.should be_empty
       opts.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
       opts.scaffold_remote.should be_nil
+      opts.agents_mode.should eq(Hwaro::Config::Options::AgentsMode::Remote)
     end
   end
 
