@@ -191,5 +191,50 @@ describe Hwaro::Services::Deployer do
         File.read(dest_file).should eq("Foo Content")
       end
     end
+    it "auto-generates command for s3:// URL in dry_run" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "s3"
+        target.url = "s3://my-bucket"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["s3"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+      end
+    end
+
+    it "auto-generates command for gs:// URL in dry_run" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "gcs"
+        target.url = "gs://my-bucket"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["gcs"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+      end
+    end
   end
 end

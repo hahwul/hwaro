@@ -107,6 +107,11 @@ module Hwaro
           return deploy_to_directory(target, source_dir, directory_destination, effective)
         end
 
+        if auto_command = auto_command_for_url(url, source_dir)
+          Logger.debug "  Auto-generated command for #{url}"
+          return deploy_via_command(target, source_dir, auto_command, effective)
+        end
+
         Logger.error "Unsupported deploy target URL scheme for '#{target.name}': #{url}"
         Logger.info "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc)."
         Logger.info "Example:"
@@ -492,6 +497,23 @@ module Hwaro
       private def shell_escape(value : String) : String
         sanitized = value.gsub("\0", "")
         "'" + sanitized.gsub("'", "'\\''") + "'"
+      end
+
+      # Auto-generate a deploy command for known cloud URL schemes.
+      # Returns nil if the scheme is not recognized.
+      private def auto_command_for_url(url : String, source_dir : String) : String?
+        uri = URI.parse(url) rescue return nil
+        case uri.scheme
+        when "s3"
+          "aws s3 sync {source}/ {url} --delete"
+        when "gs"
+          "gsutil -m rsync -r -d {source}/ {url}"
+        when "az"
+          # az://container → Azure Blob Storage
+          "az storage blob sync --source {source} --container {url}"
+        else
+          nil
+        end
       end
 
       private def local_directory_destination(url : String) : String?

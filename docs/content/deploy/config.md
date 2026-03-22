@@ -41,17 +41,34 @@ url = "file:///var/www/mysite"
 [[deployment.targets]]
 name = "s3"
 url = "s3://my-bucket"
-command = "aws s3 sync {source}/ {url} --delete"
+# Auto-generates: aws s3 sync {source}/ s3://my-bucket --delete
+
+[[deployment.targets]]
+name = "custom"
+url = "s3://my-bucket"
+command = "aws s3 sync {source}/ {url} --delete --exclude '.git/*'"
+# Custom command overrides auto-generation
 ```
+
+**Auto-generated commands by URL scheme:**
+
+| Scheme | Command | Requires |
+|--------|---------|----------|
+| `file://` | Built-in directory sync | — |
+| `s3://` | `aws s3 sync {source}/ {url} --delete` | AWS CLI |
+| `gs://` | `gsutil -m rsync -r -d {source}/ {url}` | Google Cloud SDK |
+| `az://` | `az storage blob sync --source {source} --container {url}` | Azure CLI |
+
+If a `command` field is set, it always takes priority over auto-generation.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | name | string | — | Target identifier |
-| url | string | — | Destination URL |
+| url | string | — | Destination URL (`file://`, `s3://`, `gs://`, `az://`) |
 | include | string | — | Glob pattern for files to include |
 | exclude | string | — | Glob pattern for files to exclude |
 | strip_index_html | bool | false | Remove `index.html` from URLs |
-| command | string | — | Custom command to execute for deployment |
+| command | string | — | Custom command (overrides auto-generation) |
 
 Custom commands support placeholders:
 
