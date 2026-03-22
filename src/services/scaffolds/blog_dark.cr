@@ -18,10 +18,14 @@ module Hwaro
           "Blog-focused structure with dark theme"
         end
 
+        protected def config_highlight_theme : String
+          "github-dark"
+        end
+
         def config_content(skip_taxonomies : Bool = false) : String
           config = String.build do |str|
             # Site basics
-            str << base_config("My Blog", "Welcome to my personal blog powered by Hwaro.")
+            str << base_config(config_title, config_description)
 
             # Content & Processing
             str << multilingual_config

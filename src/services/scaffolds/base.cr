@@ -56,6 +56,11 @@ module Hwaro
           "Welcome to my new Hwaro site."
         end
 
+        # Returns the highlight.js theme name (overridable for dark scaffolds)
+        protected def config_highlight_theme : String
+          "github"
+        end
+
         # Returns a minimal config.toml without comments and optional sections
         def minimal_config_content(skip_taxonomies : Bool = false) : String
           String.build do |str|
@@ -68,7 +73,7 @@ module Hwaro
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
             str << "\n[highlight]\n"
             str << "enabled = true\n"
-            str << "theme = \"github\"\n"
+            str << "theme = \"#{config_highlight_theme}\"\n"
             str << "use_cdn = true\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"

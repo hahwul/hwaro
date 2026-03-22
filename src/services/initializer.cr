@@ -73,6 +73,10 @@ module Hwaro
 
         is_multilingual = multilingual_languages.size > 1
 
+        if minimal_config && is_multilingual
+          Logger.warn "  --minimal-config does not include multilingual settings; ignoring --include-multilingual"
+        end
+
         # Create content structure
         create_directory(File.join(target_path, "content"))
 

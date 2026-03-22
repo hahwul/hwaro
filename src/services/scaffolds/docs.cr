@@ -71,7 +71,7 @@ module Hwaro
         def config_content(skip_taxonomies : Bool = false) : String
           config = String.build do |str|
             # Site basics
-            str << base_config("Documentation", "Project documentation powered by Hwaro.")
+            str << base_config(config_title, config_description)
 
             # Content & Processing
             str << multilingual_config

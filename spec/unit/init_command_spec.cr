@@ -169,5 +169,21 @@ describe Hwaro::CLI::Commands::InitCommand do
       config = scaffold.minimal_config_content(skip_taxonomies: true)
       config.should_not contain("[[taxonomies]]")
     end
+
+    it "uses github theme for light scaffolds" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Simple)
+      config = scaffold.minimal_config_content
+      config.should contain("theme = \"github\"")
+    end
+
+    it "uses github-dark theme for dark scaffolds" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::BlogDark)
+      config = scaffold.minimal_config_content
+      config.should contain("theme = \"github-dark\"")
+
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::DocsDark)
+      config = scaffold.minimal_config_content
+      config.should contain("theme = \"github-dark\"")
+    end
   end
 end
