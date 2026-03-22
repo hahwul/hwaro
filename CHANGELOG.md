@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.8.0
+
+### Added
+- AGENTS.md remote/local content modes and `hwaro tool agents-md` command
+- `bare` scaffold type for minimal project initialization
+- `pagination_obj` template variable for custom pagination markup
+- Structured template variables for TOC and SEO
+- `cache_strategy` config option to PWA service worker
+- Auto-generated deploy commands for `s3://`, `gs://`, `az://` URL schemes
+- `--timeout`, `--concurrency`, `--external-only`, `--internal-only` flags to `check-links` command
+- `--date`, `--draft`, `--tags`, `--section` flags to `new` command
+- `--cache`, `--stream`, `--memory-limit` flags to `serve` command
+- `--skip-og-image` and `--skip-image-processing` flags to `build`/`serve` commands
+- `--minimal-config` flag to `init` command with dark theme support
+- Show draft content paths when using `--drafts` flag
+
+### Changed
+- Promote `doctor` to top-level command (`hwaro doctor`)
+- Merge `tool ci` into `tool platform`, add `github-pages` and `gitlab-ci` targets
+- Organize CLI flags by logical groups in `init`, `build`, `serve` commands
+- Deduplicate SEO URL and image resolution logic
+- Optimize serve rebuild for mixed content+template changes
+- Skip SEO/search index regeneration when cache has no content changes
+- Redesign landing page and restructure docs for readability
+
+### Fixed
+- OG image text wrapping for CJK and long words
+- Table separator regex and string operations
+- Undefined warning for `page.extra` in list contexts
+- Doctor `missing_config_sections` for commented sections
+- Validate `cache_strategy`, sanitize tags, optimize segments
+
 ## v0.7.2
 
 ### Fixed
