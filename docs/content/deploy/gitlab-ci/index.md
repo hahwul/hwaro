@@ -6,9 +6,17 @@ weight = 3
 
 Deploy your Hwaro site using GitLab CI/CD.
 
+## Quick Start
+
+Auto-generate the config file:
+
+```bash
+hwaro tool platform gitlab-ci
+```
+
 ## Configuration
 
-Add `.gitlab-ci.yml` to your repository:
+Or add `.gitlab-ci.yml` to your repository manually:
 
 ```yaml
 image: ghcr.io/hahwul/hwaro:latest

@@ -1,20 +1,20 @@
 +++
 title = "platform"
-description = "Generate hosting platform config files"
+description = "Generate platform config and CI/CD workflow files"
 weight = 5
 +++
 
-Generate hosting platform configuration files for popular providers. Reads your `config.toml` and content aliases to produce ready-to-use deploy configs.
+Generate platform configuration and CI/CD workflow files for popular providers. Reads your `config.toml` and content aliases to produce ready-to-use deploy configs.
 
 ```bash
-# Generate Netlify config
+# Hosting platforms
 hwaro tool platform netlify
-
-# Generate Vercel config
 hwaro tool platform vercel
-
-# Generate Cloudflare Pages config
 hwaro tool platform cloudflare
+
+# CI/CD workflows
+hwaro tool platform github-pages
+hwaro tool platform gitlab-ci
 
 # Output to custom path
 hwaro tool platform netlify -o deploy/netlify.toml
@@ -23,6 +23,8 @@ hwaro tool platform netlify -o deploy/netlify.toml
 hwaro tool platform vercel --stdout
 ```
 
+> **Note:** `hwaro tool ci` is deprecated. Use `hwaro tool platform github-pages` instead.
+
 ## Supported Platforms
 
 | Platform | Output File | Description |
@@ -30,6 +32,8 @@ hwaro tool platform vercel --stdout
 | netlify | `netlify.toml` | Build settings, redirects, headers |
 | vercel | `vercel.json` | Build command, routing, cache headers |
 | cloudflare | `wrangler.toml` | Workers/Pages site config |
+| github-pages | `.github/workflows/deploy.yml` | GitHub Actions build + deploy workflow |
+| gitlab-ci | `.gitlab-ci.yml` | GitLab CI/CD pipeline |
 
 ## Options
 
@@ -101,5 +105,5 @@ Each config includes:
 
 ## See Also
 
-- [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) — Platform deploy guides
+- [GitHub Pages](/deploy/github-pages/) | [GitLab CI](/deploy/gitlab-ci/) | [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) — Platform deploy guides
 - [CLI Reference](/start/cli/#tool) — All tool commands

@@ -76,8 +76,7 @@ Hwaro processes Markdown content with TOML front matter and Jinja2-compatible te
 - Dev server with live reload and error overlay
 - Scaffolding with built-in themes (`blog`, `docs`, `blog-dark`, `docs-dark`)
 - Deploy to multiple targets with dry-run support
-- Platform config generation (Netlify, Vercel, Cloudflare Pages)
-- GitHub Actions CI/CD generation
+- Platform config generation (Netlify, Vercel, Cloudflare Pages, GitHub Pages, GitLab CI)
 - Import from WordPress, Jekyll, Hugo
 - Link checker, config doctor, and front matter format conversion
 

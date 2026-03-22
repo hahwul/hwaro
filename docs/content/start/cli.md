@@ -278,10 +278,11 @@ hwaro tool list all             # List all content files
 hwaro tool list drafts          # List draft files
 hwaro tool list published       # List published files
 hwaro tool check-links          # Check for dead external links
-hwaro tool platform netlify     # Generate Netlify config
-hwaro tool platform vercel      # Generate Vercel config
-hwaro tool platform cloudflare  # Generate Cloudflare Pages config
-hwaro tool ci github-actions    # Generate GitHub Actions workflow
+hwaro tool platform netlify       # Generate Netlify config
+hwaro tool platform vercel        # Generate Vercel config
+hwaro tool platform cloudflare    # Generate Cloudflare Pages config
+hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
+hwaro tool platform gitlab-ci     # Generate GitLab CI config
 hwaro tool import wordpress export.xml   # Import from WordPress
 hwaro tool import jekyll /path/to/site   # Import from Jekyll
 hwaro tool import hugo /path/to/site     # Import from Hugo
@@ -305,8 +306,8 @@ hwaro tool convert to-yaml --json
 | [list](/start/tools/list/) | List content files by status (all, drafts, published) |
 | [check-links](/start/tools/deadlink/) | Check for dead links in content files |
 | [doctor](/start/tools/doctor/) | Diagnose config and content issues |
-| [platform](/start/tools/platform/) | Generate hosting platform config files (Netlify, Vercel, Cloudflare) |
-| [ci](/start/tools/ci/) | Generate CI/CD workflow files (GitHub Actions) |
+| [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
+| ci *(deprecated)* | Use `tool platform github-pages` instead |
 | import | Import content from WordPress, Jekyll, or Hugo |
 | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 

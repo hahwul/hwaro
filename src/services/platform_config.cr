@@ -7,7 +7,7 @@ require "../utils/logger"
 module Hwaro
   module Services
     class PlatformConfig
-      SUPPORTED_PLATFORMS = ["netlify", "vercel", "cloudflare"]
+      SUPPORTED_PLATFORMS = ["netlify", "vercel", "cloudflare", "github-pages", "gitlab-ci"]
 
       @config : Models::Config
 
@@ -22,6 +22,10 @@ module Hwaro
           generate_vercel
         when "cloudflare"
           generate_cloudflare
+        when "github-pages"
+          generate_github_pages
+        when "gitlab-ci"
+          generate_gitlab_ci
         else
           raise "Unsupported platform: #{platform}. Supported: #{SUPPORTED_PLATFORMS.join(", ")}"
         end
@@ -29,10 +33,12 @@ module Hwaro
 
       def output_filename(platform : String) : String
         case platform
-        when "netlify"    then "netlify.toml"
-        when "vercel"     then "vercel.json"
-        when "cloudflare" then "wrangler.toml"
-        else                   raise "Unsupported platform: #{platform}"
+        when "netlify"      then "netlify.toml"
+        when "vercel"       then "vercel.json"
+        when "cloudflare"   then "wrangler.toml"
+        when "github-pages" then ".github/workflows/deploy.yml"
+        when "gitlab-ci"    then ".gitlab-ci.yml"
+        else                     raise "Unsupported platform: #{platform}"
         end
       end
 
@@ -142,6 +148,68 @@ module Hwaro
         end
 
         lines.join("\n") + "\n"
+      end
+
+      private def generate_github_pages : String
+        lines = [] of String
+        lines << "---"
+        lines << "name: Hwaro CI/CD"
+        lines << ""
+        lines << "on:"
+        lines << "  push:"
+        lines << "    branches: [main]"
+        lines << "  pull_request:"
+        lines << "    branches: [main]"
+        lines << "  workflow_dispatch:"
+        lines << ""
+        lines << "permissions:"
+        lines << "  contents: write"
+        lines << ""
+        lines << "jobs:"
+        lines << "  build:"
+        lines << "    runs-on: ubuntu-latest"
+        lines << "    if: github.event_name == 'pull_request'"
+        lines << "    steps:"
+        lines << "      - name: Checkout"
+        lines << "        uses: actions/checkout@v6"
+        lines << ""
+        lines << "      - name: Build Only"
+        lines << "        uses: hahwul/hwaro@main"
+        lines << "        with:"
+        lines << "          build_only: true"
+        lines << ""
+        lines << "  deploy:"
+        lines << "    runs-on: ubuntu-latest"
+        lines << "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        lines << "    steps:"
+        lines << "      - name: Checkout"
+        lines << "        uses: actions/checkout@v6"
+        lines << ""
+        lines << "      - name: Build and Deploy"
+        lines << "        uses: hahwul/hwaro@main"
+        lines << "        with:"
+        lines << "          token: ${{ secrets.GITHUB_TOKEN }}"
+        lines << ""
+
+        lines.join("\n")
+      end
+
+      private def generate_gitlab_ci : String
+        lines = [] of String
+        lines << "image: ghcr.io/hahwul/hwaro:latest"
+        lines << ""
+        lines << "pages:"
+        lines << "  stage: deploy"
+        lines << "  script:"
+        lines << "    - hwaro build"
+        lines << "  artifacts:"
+        lines << "    paths:"
+        lines << "      - public"
+        lines << "  only:"
+        lines << "    - main"
+        lines << ""
+
+        lines.join("\n")
       end
 
       # Collect alias -> target URL pairs by parsing content files using

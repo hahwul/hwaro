@@ -46,6 +46,8 @@ module Hwaro
           end
 
           def run(args : Array(String))
+            Logger.warn "DEPRECATED: 'tool ci' is deprecated. Use 'tool platform github-pages' instead."
+            Logger.warn ""
             provider : String? = nil
             output_file : String? = nil
             stdout_mode = false

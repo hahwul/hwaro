@@ -20,7 +20,7 @@ Use the official [`hahwul/hwaro`](https://github.com/hahwul/hwaro) action to bui
 You can auto-generate the workflow file using:
 
 ```bash
-hwaro tool ci github-actions
+hwaro tool platform github-pages
 ```
 
 Or create `.github/workflows/deploy.yml` manually:
