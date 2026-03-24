@@ -143,6 +143,196 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Incremental taxonomy update: only remove/add entries for changed pages.
+  # Returns the set of affected "taxonomy_name:term" keys for cache invalidation.
+  private def update_taxonomies_incremental(
+    site : Models::Site,
+    changed_pages : Array(Models::Page),
+    old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
+  ) : Set(String)
+    affected_tax_keys = Set(String).new
+
+    changed_pages.each do |page|
+      page_path = page.path
+
+      # 1. Remove old assignments from snapshot
+      if old_tax = old_taxonomies_snapshot[page_path]?
+        old_tax.each do |name, terms|
+          tax_terms = site.taxonomies[name]?
+          next unless tax_terms
+          terms.each do |term|
+            if term_pages = tax_terms[term]?
+              term_pages.reject! { |p| p.path == page_path }
+              affected_tax_keys << "#{name}:#{term}"
+              # Clean up empty term
+              tax_terms.delete(term) if term_pages.empty?
+            end
+          end
+        end
+      end
+
+      # 2. Add new assignments from re-parsed page
+      page.taxonomies.each do |name, terms|
+        site.taxonomies[name] ||= {} of String => Array(Models::Page)
+        terms.each do |term|
+          site.taxonomies[name][term] ||= [] of Models::Page
+          site.taxonomies[name][term] << page
+          affected_tax_keys << "#{name}:#{term}"
+        end
+      end
+    end
+
+    # 3. Re-sort only affected terms
+    affected_tax_keys.each do |key|
+      parts = key.split(":", 2)
+      name = parts[0]
+      term = parts[1]
+      if pages_list = site.taxonomies[name]?.try(&.[term]?)
+        site.taxonomies[name][term] = Utils::SortUtils.sort_pages(pages_list, "date", false)
+      end
+    end
+
+    affected_tax_keys
+  end
+
+  # Re-link lower/higher navigation only for sections that contain changed pages.
+  private def relink_navigation_for_sections(
+    site : Models::Site,
+    affected_sections : Set(String),
+  )
+    affected_sections.each do |section_name|
+      section_pages = site.pages_by_section[section_name]?
+      next unless section_pages
+
+      non_index_pages = section_pages.reject(&.is_index)
+      next if non_index_pages.empty?
+
+      section = site.sections_by_name[section_name]?
+      sort_by = section.try(&.sort_by) || "date"
+      reverse = section.try(&.reverse) || false
+
+      sorted = Utils::SortUtils.sort_pages(non_index_pages, sort_by, reverse)
+
+      sorted.each_with_index do |page, idx|
+        page.lower = idx > 0 ? sorted[idx - 1] : nil
+        page.higher = idx < sorted.size - 1 ? sorted[idx + 1] : nil
+      end
+    end
+  end
+
+  # Recompute series only for series that contain changed pages.
+  # Returns the set of affected series names.
+  private def recompute_series_for_pages(
+    site : Models::Site,
+    changed_pages : Array(Models::Page),
+  ) : Set(String)
+    affected_series = Set(String).new
+    changed_pages.each do |page|
+      if name = page.series
+        affected_series << name
+      end
+    end
+
+    return affected_series if affected_series.empty?
+
+    # Rebuild groups only for affected series
+    groups = {} of String => Array(Models::Page)
+    site.pages.each do |page|
+      next if page.draft || !page.render
+      if name = page.series
+        next unless affected_series.includes?(name)
+        (groups[name] ||= [] of Models::Page) << page
+      end
+    end
+
+    groups.each do |_name, pages|
+      sorted = pages.sort_by do |p|
+        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
+      end
+
+      sorted.each_with_index do |page, idx|
+        page.series_index = idx + 1
+        page.series_pages = sorted
+      end
+    end
+
+    affected_series
+  end
+
+  # Recompute related posts only for changed pages and pages that previously
+  # referenced them. Returns the set of page paths that were updated.
+  private def recompute_related_posts_for_pages(
+    site : Models::Site,
+    changed_pages : Array(Models::Page),
+  ) : Set(String)
+    config = site.config.related
+    return Set(String).new unless config.enabled
+
+    taxonomy_names = config.taxonomies
+    limit = config.limit
+    all_pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
+
+    # Collect paths of pages that need related_posts recomputed
+    changed_paths = changed_pages.map(&.path).to_set
+    pages_to_update = Set(String).new(changed_paths)
+
+    all_pages.each do |page|
+      if page.related_posts.any? { |rp| changed_paths.includes?(rp.path) }
+        pages_to_update << page.path
+      end
+    end
+
+    # Build inverted index (same structure as compute_related_posts)
+    inverted = {} of String => Hash(String, Array(String))
+    page_lookup = {} of String => Models::Page
+
+    all_pages.each do |page|
+      page_lookup[page.path] = page
+      taxonomy_names.each do |tax_name|
+        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values.each do |term|
+          inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
+          arr = inv_tax[term]? || (inv_tax[term] = [] of String)
+          arr << page.path
+        end
+      end
+    end
+
+    # Recompute only for affected pages
+    pages_to_update.each do |page_path|
+      page = page_lookup[page_path]?
+      next unless page
+
+      scores = Hash(String, Int32).new(0)
+      taxonomy_names.each do |tax_name|
+        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        inv_tax = inverted[tax_name]?
+        next unless inv_tax
+        values.each do |term|
+          if candidates = inv_tax[term]?
+            candidates.each do |other_path|
+              next if other_path == page.path
+              scores[other_path] += 1
+            end
+          end
+        end
+      end
+
+      if scores.empty?
+        page.related_posts = [] of Models::Page
+        next
+      end
+
+      page.related_posts = scores.to_a
+        .select { |path, _| page_lookup[path]?.try(&.language) == page.language }
+        .sort_by! { |_, s| -s }
+        .first(limit)
+        .map { |path, _| page_lookup[path] }
+    end
+
+    pages_to_update
+  end
+
   # Aggregate authors from pages and data
   private def aggregate_site_authors(site : Models::Site)
     site.authors.clear
