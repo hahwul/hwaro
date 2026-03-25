@@ -149,6 +149,13 @@ module Hwaro
         # Incremental build: only re-parse and re-render pages whose source
         # files have been modified.  Falls back to a full build when the
         # necessary state from a previous build is not available.
+        #
+        # Optimizations over a full build:
+        # - Only re-parses changed files (not all pages)
+        # - Diff-based taxonomy update (not full rebuild)
+        # - Re-links navigation only for affected sections
+        # - Recomputes series/related posts only for affected pages
+        # - Selectively invalidates Crinja caches
         def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions)
           config = @config
           site = @site
@@ -170,12 +177,17 @@ module Hwaro
           lazy_loading = site.config.markdown.lazy_loading
           include_drafts = options.drafts
 
-          # --- 1. Identify the Page objects that correspond to changed files ---
+          # --- 1. Identify changed pages and snapshot their state before re-parse ---
           changed_pages = [] of Models::Page
           affected_sections = Set(String).new
+          old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
+          old_series_names = {} of String => String?
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
+
+          # Snapshot old neighbors before re-linking (for render set)
+          old_neighbors = {} of String => {Models::Page?, Models::Page?}
 
           changed_content_files.each do |file|
             relative_path = begin
@@ -185,8 +197,12 @@ module Hwaro
             end
 
             page = pages_map[relative_path]?
-
             next unless page
+
+            # Snapshot before re-parse
+            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            old_series_names[page.path] = page.series
+            old_neighbors[page.path] = {page.lower, page.higher}
 
             # Re-read, re-parse front-matter and recalculate URL
             parse_single_page(page)
@@ -203,21 +219,57 @@ module Hwaro
             return
           end
 
-          # Filter out drafts if not including them
-          unless include_drafts
-            changed_pages.reject! { |p| p.draft }
-          end
+          # --- 2. Incrementally update relationships ---
+          # Run taxonomy update on ALL re-parsed pages first (including those about
+          # to be excluded), so excluded pages' old entries are properly removed.
+          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
 
-          # Filter out expired content
+          # Now identify pages that should be excluded (draft/expired)
+          excluded_pages = [] of Models::Page
+          unless include_drafts
+            excluded = changed_pages.select(&.draft)
+            excluded_pages.concat(excluded)
+            changed_pages.reject!(&.draft)
+          end
+          expired = changed_pages.select { |p| p.expires.try { |e| e <= Time.utc } || false }
+          excluded_pages.concat(expired)
           changed_pages.reject! { |p| p.expires.try { |e| e <= Time.utc } || false }
 
-          # --- 2. Rebuild relationships that depend on the changed pages ---
-          # Re-populate taxonomies (a changed page may have new/removed tags)
+          # Remove excluded pages from site indices and delete stale output files
+          unless excluded_pages.empty?
+            excluded_paths = excluded_pages.map(&.path).to_set
+            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
+            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
+            excluded_pages.each do |p|
+              stale_output = get_output_path(p, output_dir)
+              File.delete(stale_output) if File.exists?(stale_output)
+            end
+          end
+
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
-          rebuild_taxonomies(site, all_pages)
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
+
+          # Re-link navigation only for affected sections
+          relink_navigation_for_sections(site, affected_sections)
+
+          # Recompute series for affected series (if enabled), including old memberships
+          affected_series = if site.config.series.enabled
+                              recompute_series_for_pages(site, changed_pages, old_series_names)
+                            else
+                              Set(String).new
+                            end
+
+          # Recompute related posts selectively (if enabled)
+          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages)
+
+          # Invalidate Crinja caches for affected pages/sections
+          invalidate_caches_for_pages(changed_pages, affected_sections)
+          @crinja_cache_mutex.synchronize do
+            affected_series.each { |s| @series_crinja_cache.delete(s) }
+            related_pages_updated.each { |path| @related_posts_crinja_cache.delete(path) }
+          end
 
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = Set(Models::Page).new(changed_pages)
@@ -228,10 +280,31 @@ module Hwaro
             pages_to_render << section if section
           end
 
-          # Previous / next pages whose navigation links reference changed pages
+          # Previous / next pages (both old and new neighbors after re-linking)
           changed_pages.each do |page|
+            # New neighbors (after re-link)
             page.lower.try { |l| pages_to_render << l }
             page.higher.try { |h| pages_to_render << h }
+
+            # Old neighbors (before re-link, may have shifted)
+            if old = old_neighbors[page.path]?
+              old[0].try { |l| pages_to_render << l }
+              old[1].try { |h| pages_to_render << h }
+            end
+          end
+
+          # Pages in affected series (their series_index may have changed)
+          unless affected_series.empty?
+            site.pages.each do |p|
+              pages_to_render << p if p.series && affected_series.includes?(p.series)
+            end
+          end
+
+          # Pages whose related_posts were recomputed
+          related_pages_updated.each do |path|
+            if p = pages_map[path]?
+              pages_to_render << p
+            end
           end
 
           render_list = pages_to_render.to_a
@@ -252,7 +325,10 @@ module Hwaro
 
           cache.save if options.cache
 
-          # --- 5. Regenerate lightweight SEO / search files in parallel ---
+          # --- 5. Regenerate taxonomy index/term pages ---
+          Content::Taxonomies.generate(site, output_dir, templates, verbose)
+
+          # --- 6. Regenerate lightweight SEO / search files in parallel ---
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
@@ -279,6 +355,10 @@ module Hwaro
           Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
 
           pages_map = @pages_by_path || build_pages_by_path(site)
+          changed_pages = [] of Models::Page
+          affected_sections = Set(String).new
+          old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
+          old_series_names = {} of String => String?
 
           changed_content_files.each do |file|
             relative_path = begin
@@ -290,16 +370,25 @@ module Hwaro
             page = pages_map[relative_path]?
             next unless page
 
+            # Snapshot before re-parse
+            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            old_series_names[page.path] = page.series
+
             parse_single_page(page)
             page.generate_permalink(config.base_url)
+            changed_pages << page
+            affected_sections << page.section
+            page.ancestors.each { |ancestor| affected_sections << ancestor.section }
           end
 
-          # Rebuild taxonomies and lookup after content re-parse
-          all_pages = (site.pages + site.sections).as(Array(Models::Page))
-          rebuild_taxonomies(site, all_pages)
+          # Update all derived relationships before full re-render
+          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
           site.build_lookup_index
+          relink_navigation_for_sections(site, affected_sections)
+          recompute_series_for_pages(site, changed_pages, old_series_names) if site.config.series.enabled
+          recompute_related_posts_for_pages(site, changed_pages) if site.config.related.enabled
 
-          # Now do a full re-render with reloaded templates
+          # Now do a full re-render with reloaded templates (caches cleared there)
           run_rerender(options)
         end
 
@@ -484,6 +573,34 @@ module Hwaro
           if options.debug
             if debug_site = @site
               Utils::DebugPrinter.print(debug_site)
+            end
+          end
+        end
+
+        # Selectively invalidate Crinja caches for changed pages and affected sections.
+        # Fixes stale cache entries during incremental builds.
+        private def invalidate_caches_for_pages(
+          changed_pages : Array(Models::Page),
+          affected_sections : Set(String),
+        )
+          @crinja_cache_mutex.synchronize do
+            changed_pages.each do |page|
+              @page_crinja_value_cache.delete(page.path)
+              @related_posts_crinja_cache.delete(page.path)
+
+              if series_name = page.series
+                @series_crinja_cache.delete(series_name)
+              end
+
+              # Neighbors' cached values reference this page
+              page.lower.try { |l| @page_crinja_value_cache.delete(l.path) }
+              page.higher.try { |h| @page_crinja_value_cache.delete(h.path) }
+            end
+
+            affected_sections.each do |section_name|
+              @ancestors_crinja_cache.delete(section_name)
+              @section_pages_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
+              @section_assets_crinja_cache.delete(section_name)
             end
           end
         end
