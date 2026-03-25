@@ -74,6 +74,13 @@ module Hwaro
           page.insert_anchor_links = data[:insert_anchor_links]
           page.weight = data[:weight]
 
+          # Expiry support
+          page.expires = data[:expires]
+
+          # Series support
+          page.series = data[:series]
+          page.series_weight = data[:series_weight]
+
           if page.is_a?(Models::Section)
             page.transparent = data[:transparent]
             page.generate_feeds = data[:generate_feeds]

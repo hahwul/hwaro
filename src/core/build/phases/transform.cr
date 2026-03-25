@@ -168,6 +168,8 @@ module Hwaro::Core::Build::Phases::Transform
               tax_terms.delete(term) if term_pages.empty?
             end
           end
+          # Clean up empty taxonomy when all terms have been removed
+          site.taxonomies.delete(name) if tax_terms.empty?
         end
       end
 
@@ -221,16 +223,25 @@ module Hwaro::Core::Build::Phases::Transform
   end
 
   # Recompute series only for series that contain changed pages.
+  # Includes old_series_names so that series a page has left are also recomputed.
   # Returns the set of affected series names.
   private def recompute_series_for_pages(
     site : Models::Site,
     changed_pages : Array(Models::Page),
+    old_series_names : Hash(String, String?) = {} of String => String?,
   ) : Set(String)
     affected_series = Set(String).new
+
+    # Include current series from changed pages
     changed_pages.each do |page|
       if name = page.series
         affected_series << name
       end
+    end
+
+    # Include old series names (page may have left a series)
+    old_series_names.each_value do |name|
+      affected_series << name if name
     end
 
     return affected_series if affected_series.empty?
@@ -256,6 +267,17 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
+    # Clear series data for pages whose series became empty
+    affected_series.each do |series_name|
+      next if groups.has_key?(series_name)
+      site.pages.each do |page|
+        if page.series == series_name
+          page.series_index = 0
+          page.series_pages = [] of Models::Page
+        end
+      end
+    end
+
     affected_series
   end
 
@@ -272,17 +294,7 @@ module Hwaro::Core::Build::Phases::Transform
     limit = config.limit
     all_pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
 
-    # Collect paths of pages that need related_posts recomputed
-    changed_paths = changed_pages.map(&.path).to_set
-    pages_to_update = Set(String).new(changed_paths)
-
-    all_pages.each do |page|
-      if page.related_posts.any? { |rp| changed_paths.includes?(rp.path) }
-        pages_to_update << page.path
-      end
-    end
-
-    # Build inverted index (same structure as compute_related_posts)
+    # Build inverted index first (needed for both candidate discovery and scoring)
     inverted = {} of String => Hash(String, Array(String))
     page_lookup = {} of String => Models::Page
 
@@ -294,6 +306,33 @@ module Hwaro::Core::Build::Phases::Transform
           inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
           arr = inv_tax[term]? || (inv_tax[term] = [] of String)
           arr << page.path
+        end
+      end
+    end
+
+    # Collect paths of pages that need related_posts recomputed:
+    # 1. Changed pages themselves
+    # 2. Pages that previously referenced a changed page
+    # 3. Pages sharing any taxonomy term with changed pages (may become newly related)
+    changed_paths = changed_pages.map(&.path).to_set
+    pages_to_update = Set(String).new(changed_paths)
+
+    all_pages.each do |page|
+      if page.related_posts.any? { |rp| changed_paths.includes?(rp.path) }
+        pages_to_update << page.path
+      end
+    end
+
+    # Include pages sharing taxonomy terms with changed pages
+    changed_pages.each do |page|
+      taxonomy_names.each do |tax_name|
+        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        inv_tax = inverted[tax_name]?
+        next unless inv_tax
+        values.each do |term|
+          if candidates = inv_tax[term]?
+            candidates.each { |path| pages_to_update << path }
+          end
         end
       end
     end

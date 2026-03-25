@@ -1027,6 +1027,190 @@ describe "Incremental build integration" do
     end
   end
 
+  it "updates taxonomy pages when tags change during incremental build" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content", "posts"))
+      FileUtils.mkdir_p(File.join(dir, "templates"))
+
+      File.write(File.join(dir, "config.toml"), "title = \"Taxonomy Test\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tags\"\n")
+      File.write(File.join(dir, "templates", "page.html"), "<p>{{ content }}</p>")
+      File.write(File.join(dir, "templates", "section.html"), "<div>{{ content }}</div>")
+
+      File.write(File.join(dir, "content", "posts", "_index.md"), "---\ntitle: Posts\n---\n")
+      File.write(File.join(dir, "content", "posts", "post1.md"), "---\ntitle: Tagged Post\ndate: \"2025-01-01\"\ntags:\n  - crystal\n  - web\n---\nTagged content\n")
+      File.write(File.join(dir, "content", "posts", "post2.md"), "---\ntitle: Other Post\ndate: \"2025-01-02\"\ntags:\n  - crystal\n---\nOther content\n")
+
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new
+
+        builder.run(options)
+
+        # Verify taxonomy pages exist
+        File.exists?(File.join(dir, "public", "tags", "crystal", "index.html")).should be_true
+        File.exists?(File.join(dir, "public", "tags", "web", "index.html")).should be_true
+
+        # Change tags: remove "web", add "go"
+        sleep 0.05.seconds
+        File.write(File.join(dir, "content", "posts", "post1.md"), "---\ntitle: Tagged Post\ndate: \"2025-01-01\"\ntags:\n  - crystal\n  - go\n---\nUpdated tagged content\n")
+
+        builder.run_incremental(["content/posts/post1.md"], options)
+
+        # Updated content should appear
+        File.read(File.join(dir, "public", "posts", "post1", "index.html")).should contain("Updated tagged content")
+
+        # New tag page should be generated
+        File.exists?(File.join(dir, "public", "tags", "go", "index.html")).should be_true
+      end
+    end
+  end
+
+  it "updates navigation prev/next when date changes during incremental build" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content", "posts"))
+      FileUtils.mkdir_p(File.join(dir, "templates"))
+
+      File.write(File.join(dir, "config.toml"), %(title = "Nav Test"\nbase_url = "http://localhost"\n))
+      # Template that renders navigation links
+      File.write(File.join(dir, "templates", "page.html"),
+        "<p>{{ content }}</p>" \
+        "{% if page.lower %}<a class=\"prev\" href=\"{{ page.lower.url }}\">{{ page.lower.title }}</a>{% endif %}" \
+        "{% if page.higher %}<a class=\"next\" href=\"{{ page.higher.url }}\">{{ page.higher.title }}</a>{% endif %}")
+      File.write(File.join(dir, "templates", "section.html"), "<div>{{ content }}</div>")
+
+      File.write(File.join(dir, "content", "posts", "_index.md"), "---\ntitle: Posts\n---\n")
+      # Alpha is oldest, Beta middle, Gamma newest
+      # Dates must be quoted strings for YAML (unquoted dates become Time objects)
+      File.write(File.join(dir, "content", "posts", "alpha.md"), "---\ntitle: Alpha\ndate: \"2025-01-01\"\n---\nAlpha content\n")
+      File.write(File.join(dir, "content", "posts", "beta.md"), "---\ntitle: Beta\ndate: \"2025-01-02\"\n---\nBeta content\n")
+      File.write(File.join(dir, "content", "posts", "gamma.md"), "---\ntitle: Gamma\ndate: \"2025-01-03\"\n---\nGamma content\n")
+
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new
+
+        builder.run(options)
+
+        # Default sort is newest-first: [Gamma(Jan3), Beta(Jan2), Alpha(Jan1)]
+        # lower=previous in sorted order, higher=next in sorted order
+        # Beta (idx=1): lower=Gamma (idx=0), higher=Alpha (idx=2)
+        beta_html = File.read(File.join(dir, "public", "posts", "beta", "index.html"))
+        beta_html.should contain("class=\"prev\"")
+        beta_html.should contain("Gamma")
+        beta_html.should contain("class=\"next\"")
+        beta_html.should contain("Alpha")
+
+        # Now change Alpha's date to make it newest (after Gamma)
+        sleep 0.05.seconds
+        File.write(File.join(dir, "content", "posts", "alpha.md"), "---\ntitle: Alpha\ndate: \"2025-01-10\"\n---\nAlpha updated\n")
+
+        builder.run_incremental(["content/posts/alpha.md"], options)
+
+        # After re-linking, sort: [Alpha(Jan10), Gamma(Jan3), Beta(Jan2)]
+        # Beta (idx=2): lower=Gamma (idx=1), higher=nil (last element)
+        beta_html_after = File.read(File.join(dir, "public", "posts", "beta", "index.html"))
+        beta_html_after.should contain("class=\"prev\"")
+        beta_html_after.should contain("Gamma")
+        # Alpha is no longer Beta's next neighbor
+        beta_html_after.should_not contain("class=\"next\"")
+      end
+    end
+  end
+
+  it "handles page entering/leaving a series during incremental build" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content", "posts"))
+      FileUtils.mkdir_p(File.join(dir, "templates"))
+
+      File.write(File.join(dir, "config.toml"), %(title = "Series Test"\nbase_url = "http://localhost"\n\n[series]\nenabled = true\n))
+      File.write(File.join(dir, "templates", "page.html"),
+        "<p>{{ content }}</p>" \
+        "{% if page.series != \"\" %}<span class=\"series\">{{ page.series }}</span>{% endif %}" \
+        "{% if page.series_index > 0 %}<span class=\"idx\">{{ page.series_index }}</span>{% endif %}")
+      File.write(File.join(dir, "templates", "section.html"), "<div>{{ content }}</div>")
+
+      File.write(File.join(dir, "content", "posts", "_index.md"), "---\ntitle: Posts\n---\n")
+      File.write(File.join(dir, "content", "posts", "part1.md"), "---\ntitle: Part 1\ndate: \"2025-01-01\"\nseries: my-series\nseries_weight: 1\n---\nPart 1 content\n")
+      File.write(File.join(dir, "content", "posts", "part2.md"), "---\ntitle: Part 2\ndate: \"2025-01-02\"\nseries: my-series\nseries_weight: 2\n---\nPart 2 content\n")
+
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new
+
+        builder.run(options)
+
+        # Verify series is rendered
+        part1_html = File.read(File.join(dir, "public", "posts", "part1", "index.html"))
+        part1_html.should contain("my-series")
+        part1_html.should contain("<span class=\"idx\">1</span>")
+
+        # Remove part1 from the series
+        sleep 0.05.seconds
+        File.write(File.join(dir, "content", "posts", "part1.md"), "---\ntitle: Part 1\ndate: \"2025-01-01\"\n---\nPart 1 no longer in series\n")
+
+        builder.run_incremental(["content/posts/part1.md"], options)
+
+        # Part1 should no longer show series
+        part1_after = File.read(File.join(dir, "public", "posts", "part1", "index.html"))
+        part1_after.should_not contain("my-series")
+
+        # Part2 should be updated (series_index changes since part1 left)
+        part2_after = File.read(File.join(dir, "public", "posts", "part2", "index.html"))
+        part2_after.should contain("my-series")
+        part2_after.should contain("<span class=\"idx\">1</span>")
+      end
+    end
+  end
+
+  it "updates related_posts when a page gains new taxonomy terms" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content", "posts"))
+      FileUtils.mkdir_p(File.join(dir, "templates"))
+
+      File.write(File.join(dir, "config.toml"), %(title = "Related Test"\nbase_url = "http://localhost"\ntaxonomies = ["tags"]\n\n[related]\nenabled = true\nlimit = 5\ntaxonomies = ["tags"]\n))
+      File.write(File.join(dir, "templates", "page.html"),
+        "<p>{{ content }}</p>" \
+        "{% for rp in page.related_posts %}<a class=\"related\" href=\"{{ rp.url }}\">{{ rp.title }}</a>{% endfor %}")
+      File.write(File.join(dir, "templates", "section.html"), "<div>{{ content }}</div>")
+
+      File.write(File.join(dir, "content", "posts", "_index.md"), "---\ntitle: Posts\n---\n")
+      File.write(File.join(dir, "content", "posts", "post1.md"), "---\ntitle: Post One\ndate: \"2025-01-01\"\ntags:\n  - rust\n---\nPost one content\n")
+      File.write(File.join(dir, "content", "posts", "post2.md"), "---\ntitle: Post Two\ndate: \"2025-01-02\"\ntags:\n  - go\n---\nPost two content\n")
+      File.write(File.join(dir, "content", "posts", "post3.md"), "---\ntitle: Post Three\ndate: \"2025-01-03\"\ntags:\n  - go\n---\nPost three content\n")
+
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new
+
+        builder.run(options)
+
+        # Post1 has "rust" tag, no related posts with go-tagged posts
+        post1_html = File.read(File.join(dir, "public", "posts", "post1", "index.html"))
+        post1_html.should_not contain("Post Two")
+        post1_html.should_not contain("Post Three")
+
+        # Now add "go" tag to post1 — should become related to post2 and post3
+        sleep 0.05.seconds
+        File.write(File.join(dir, "content", "posts", "post1.md"), "---\ntitle: Post One\ndate: \"2025-01-01\"\ntags:\n  - rust\n  - go\n---\nPost one updated\n")
+
+        builder.run_incremental(["content/posts/post1.md"], options)
+
+        # Post1 should now list post2 and post3 as related
+        post1_after = File.read(File.join(dir, "public", "posts", "post1", "index.html"))
+        post1_after.should contain("Post Two")
+        post1_after.should contain("Post Three")
+
+        # Post2 should now list post1 as related (newly-related page)
+        post2_after = File.read(File.join(dir, "public", "posts", "post2", "index.html"))
+        post2_after.should contain("Post One")
+      end
+    end
+  end
+
   it "re-renders with updated template via run_rerender" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "content"))

@@ -219,19 +219,34 @@ module Hwaro
             return
           end
 
-          # Filter out drafts if not including them
-          unless include_drafts
-            changed_pages.reject! { |p| p.draft }
-          end
+          # --- 2. Incrementally update relationships ---
+          # Run taxonomy update on ALL re-parsed pages first (including those about
+          # to be excluded), so excluded pages' old entries are properly removed.
+          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
 
-          # Filter out expired content
+          # Now identify pages that should be excluded (draft/expired)
+          excluded_pages = [] of Models::Page
+          unless include_drafts
+            excluded = changed_pages.select(&.draft)
+            excluded_pages.concat(excluded)
+            changed_pages.reject!(&.draft)
+          end
+          expired = changed_pages.select { |p| p.expires.try { |e| e <= Time.utc } || false }
+          excluded_pages.concat(expired)
           changed_pages.reject! { |p| p.expires.try { |e| e <= Time.utc } || false }
 
-          # --- 2. Incrementally update relationships ---
-          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          # Remove excluded pages from site indices and delete stale output files
+          unless excluded_pages.empty?
+            excluded_paths = excluded_pages.map(&.path).to_set
+            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
+            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
+            excluded_pages.each do |p|
+              stale_output = get_output_path(p, output_dir)
+              File.delete(stale_output) if File.exists?(stale_output)
+            end
+          end
 
-          # Diff-based taxonomy update (only touches changed pages' entries)
-          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
@@ -239,9 +254,9 @@ module Hwaro
           # Re-link navigation only for affected sections
           relink_navigation_for_sections(site, affected_sections)
 
-          # Recompute series for affected series (if enabled)
+          # Recompute series for affected series (if enabled), including old memberships
           affected_series = if site.config.series.enabled
-                              recompute_series_for_pages(site, changed_pages)
+                              recompute_series_for_pages(site, changed_pages, old_series_names)
                             else
                               Set(String).new
                             end
@@ -280,10 +295,6 @@ module Hwaro
 
           # Pages in affected series (their series_index may have changed)
           unless affected_series.empty?
-            # Also include series from old snapshot (page may have left a series)
-            old_series_names.each_value do |name|
-              affected_series << name if name
-            end
             site.pages.each do |p|
               pages_to_render << p if p.series && affected_series.includes?(p.series)
             end
@@ -314,7 +325,10 @@ module Hwaro
 
           cache.save if options.cache
 
-          # --- 5. Regenerate lightweight SEO / search files in parallel ---
+          # --- 5. Regenerate taxonomy index/term pages ---
+          Content::Taxonomies.generate(site, output_dir, templates, verbose)
+
+          # --- 6. Regenerate lightweight SEO / search files in parallel ---
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
@@ -342,7 +356,9 @@ module Hwaro
 
           pages_map = @pages_by_path || build_pages_by_path(site)
           changed_pages = [] of Models::Page
+          affected_sections = Set(String).new
           old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
+          old_series_names = {} of String => String?
 
           changed_content_files.each do |file|
             relative_path = begin
@@ -356,15 +372,21 @@ module Hwaro
 
             # Snapshot before re-parse
             old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            old_series_names[page.path] = page.series
 
             parse_single_page(page)
             page.generate_permalink(config.base_url)
             changed_pages << page
+            affected_sections << page.section
+            page.ancestors.each { |ancestor| affected_sections << ancestor.section }
           end
 
-          # Diff-based taxonomy update and rebuild lookup
+          # Update all derived relationships before full re-render
           update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
           site.build_lookup_index
+          relink_navigation_for_sections(site, affected_sections)
+          recompute_series_for_pages(site, changed_pages, old_series_names) if site.config.series.enabled
+          recompute_related_posts_for_pages(site, changed_pages) if site.config.related.enabled
 
           # Now do a full re-render with reloaded templates (caches cleared there)
           run_rerender(options)
