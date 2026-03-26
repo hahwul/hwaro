@@ -210,6 +210,30 @@ describe "DateFilters" do
       result = render_filter("{{ d | date }}", vars)
       result.strip.should eq("12345")
     end
+
+    it "parses ISO 8601 datetime with T separator" do
+      vars = {"d" => Crinja::Value.new("2024-06-15T14:30:00")}
+      result = render_filter("{{ d | date(format='%Y-%m-%d %H:%M') }}", vars)
+      result.strip.should eq("2024-06-15 14:30")
+    end
+
+    it "parses datetime with space separator" do
+      vars = {"d" => Crinja::Value.new("2024-06-15 14:30:00")}
+      result = render_filter("{{ d | date(format='%Y-%m-%d %H:%M') }}", vars)
+      result.strip.should eq("2024-06-15 14:30")
+    end
+
+    it "parses RFC 3339 datetime with timezone" do
+      vars = {"d" => Crinja::Value.new("2024-06-15T14:30:00Z")}
+      result = render_filter("{{ d | date(format='%Y-%m-%d') }}", vars)
+      result.strip.should eq("2024-06-15")
+    end
+
+    it "parses RFC 3339 datetime with offset timezone" do
+      vars = {"d" => Crinja::Value.new("2024-06-15T14:30:00+09:00")}
+      result = render_filter("{{ d | date(format='%Y-%m-%d') }}", vars)
+      result.strip.should eq("2024-06-15")
+    end
   end
 end
 
@@ -374,6 +398,13 @@ describe "MiscFilters" do
       vars = {"text" => Crinja::Value.new("")}
       result = render_filter("{{ text | jsonify }}", vars)
       result.strip.should eq("\"\"")
+    end
+
+    it "escapes script tag closing to prevent XSS" do
+      vars = {"text" => Crinja::Value.new("</script>")}
+      result = render_filter("{{ text | jsonify }}", vars)
+      result.should_not contain("</script>")
+      result.should contain("<\\/script>")
     end
   end
 
@@ -793,6 +824,24 @@ describe "MathFilters" do
       result = render_filter("{{ val | ceil }}", vars)
       result.should eq("-2")
     end
+
+    it "handles integer input" do
+      vars = {"val" => Crinja::Value.new(7)}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("7")
+    end
+
+    it "handles zero" do
+      vars = {"val" => Crinja::Value.new(0.0)}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("0")
+    end
+
+    it "returns target for non-numeric input" do
+      vars = {"val" => Crinja::Value.new("hello")}
+      result = render_filter("{{ val | ceil }}", vars)
+      result.should eq("hello")
+    end
   end
 
   describe "floor" do
@@ -812,6 +861,24 @@ describe "MathFilters" do
       vars = {"val" => Crinja::Value.new(-2.3)}
       result = render_filter("{{ val | floor }}", vars)
       result.should eq("-3")
+    end
+
+    it "handles integer input" do
+      vars = {"val" => Crinja::Value.new(7)}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("7")
+    end
+
+    it "handles zero" do
+      vars = {"val" => Crinja::Value.new(0.0)}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("0")
+    end
+
+    it "returns target for non-numeric input" do
+      vars = {"val" => Crinja::Value.new("hello")}
+      result = render_filter("{{ val | floor }}", vars)
+      result.should eq("hello")
     end
   end
 end
@@ -850,6 +917,32 @@ describe "MiscFilters (extended)" do
       vars = {"val" => Crinja::Value.new(true)}
       result = render_filter("{{ val | inspect }}", vars)
       result.should eq("true")
+    end
+
+    it "inspects false boolean" do
+      vars = {"val" => Crinja::Value.new(false)}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("false")
+    end
+
+    it "inspects a float" do
+      vars = {"val" => Crinja::Value.new(3.14)}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("3.14")
+    end
+
+    it "inspects an empty array" do
+      items = Crinja::Value.new([] of Crinja::Value)
+      vars = {"val" => items}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should eq("[]")
+    end
+
+    it "inspects a string with special characters" do
+      vars = {"val" => Crinja::Value.new("hello \"world\"")}
+      result = render_filter("{{ val | inspect }}", vars)
+      result.should contain("hello")
+      result.should contain("world")
     end
   end
 end
