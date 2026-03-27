@@ -286,6 +286,11 @@ hwaro tool platform gitlab-ci     # Generate GitLab CI config
 hwaro tool import wordpress export.xml   # Import from WordPress
 hwaro tool import jekyll /path/to/site   # Import from Jekyll
 hwaro tool import hugo /path/to/site     # Import from Hugo
+hwaro tool import notion /path/to/export # Import from Notion
+hwaro tool import obsidian /path/to/vault # Import from Obsidian
+hwaro tool import hexo /path/to/site     # Import from Hexo
+hwaro tool import astro /path/to/site    # Import from Astro
+hwaro tool import eleventy /path/to/site # Import from Eleventy
 hwaro tool agents-md                    # Print local AGENTS.md to stdout
 hwaro tool agents-md --remote           # Print remote (lightweight) version
 hwaro tool agents-md --write            # Write AGENTS.md to file
@@ -308,7 +313,7 @@ hwaro tool convert to-yaml --json
 | [doctor](/start/tools/doctor/) | Diagnose config and content issues |
 | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
 | ci *(deprecated)* | Use `tool platform github-pages` instead |
-| import | Import content from WordPress, Jekyll, or Hugo |
+| import | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
 | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
 **Common Options:**
