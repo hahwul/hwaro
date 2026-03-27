@@ -36,10 +36,10 @@ describe Hwaro::Core::Build::CacheManager do
       stats = mgr.stats_for("test")
       stats.should_not be_nil
       stats = stats.not_nil!
-      stats.hits.should eq(2)
-      stats.misses.should eq(1)
-      stats.total.should eq(3)
-      stats.hit_rate.should be_close(66.67, 0.1)
+      stats[:hits].should eq(2)
+      stats[:misses].should eq(1)
+      (stats[:hits] + stats[:misses]).should eq(3)
+      stats[:hit_rate].should be_close(66.67, 0.1)
     end
 
     it "ignores unregistered layer names" do
@@ -51,7 +51,7 @@ describe Hwaro::Core::Build::CacheManager do
   end
 
   # ===========================================================================
-  # CacheStats
+  # CacheStats (internal)
   # ===========================================================================
   describe "CacheStats" do
     it "returns 0 hit rate when no activity" do
@@ -62,15 +62,15 @@ describe Hwaro::Core::Build::CacheManager do
 
     it "calculates hit rate correctly" do
       stats = Hwaro::Core::Build::CacheManager::CacheStats.new
-      stats.hits = 3
-      stats.misses = 1
+      3.times { stats.increment_hit }
+      1.times { stats.increment_miss }
       stats.hit_rate.should eq(75.0)
     end
 
     it "resets counters" do
       stats = Hwaro::Core::Build::CacheManager::CacheStats.new
-      stats.hits = 5
-      stats.misses = 3
+      5.times { stats.increment_hit }
+      3.times { stats.increment_miss }
       stats.reset
       stats.hits.should eq(0)
       stats.misses.should eq(0)
@@ -93,7 +93,7 @@ describe Hwaro::Core::Build::CacheManager do
       b_cleared.should be_true
     end
 
-    it "resets stats on clear" do
+    it "resets stats on clear by default" do
       mgr = Hwaro::Core::Build::CacheManager.new
       mgr.register("test", "Test", runtime: true) { nil }
       mgr.record_hit("test")
@@ -102,8 +102,21 @@ describe Hwaro::Core::Build::CacheManager do
       mgr.clear_all
 
       stats = mgr.stats_for("test").not_nil!
-      stats.hits.should eq(0)
-      stats.misses.should eq(0)
+      stats[:hits].should eq(0)
+      stats[:misses].should eq(0)
+    end
+
+    it "preserves stats when reset_stats: false" do
+      mgr = Hwaro::Core::Build::CacheManager.new
+      mgr.register("test", "Test", runtime: true) { nil }
+      mgr.record_hit("test")
+      mgr.record_miss("test")
+
+      mgr.clear_all(reset_stats: false)
+
+      stats = mgr.stats_for("test").not_nil!
+      stats[:hits].should eq(1)
+      stats[:misses].should eq(1)
     end
   end
 
@@ -118,6 +131,16 @@ describe Hwaro::Core::Build::CacheManager do
       mgr.clear_runtime
       runtime_cleared.should be_true
       persistent_cleared.should be_false
+    end
+
+    it "preserves stats when reset_stats: false" do
+      mgr = Hwaro::Core::Build::CacheManager.new
+      mgr.register("runtime", "Runtime", runtime: true) { nil }
+      mgr.record_hit("runtime")
+
+      mgr.clear_runtime(reset_stats: false)
+
+      mgr.stats_for("runtime").not_nil![:hits].should eq(1)
     end
   end
 
@@ -141,6 +164,17 @@ describe Hwaro::Core::Build::CacheManager do
       mgr = Hwaro::Core::Build::CacheManager.new
       mgr.clear("nonexistent")  # should not raise
     end
+
+    it "preserves stats when reset_stats: false" do
+      mgr = Hwaro::Core::Build::CacheManager.new
+      mgr.register("a", "A", runtime: true) { nil }
+      mgr.record_hit("a")
+      mgr.record_hit("a")
+
+      mgr.clear("a", reset_stats: false)
+
+      mgr.stats_for("a").not_nil![:hits].should eq(2)
+    end
   end
 
   # ===========================================================================
@@ -155,7 +189,7 @@ describe Hwaro::Core::Build::CacheManager do
 
       mgr.reset_stats
       cleared.should be_false  # cache not cleared
-      mgr.stats_for("test").not_nil!.hits.should eq(0)
+      mgr.stats_for("test").not_nil![:hits].should eq(0)
     end
   end
 
@@ -179,6 +213,22 @@ describe Hwaro::Core::Build::CacheManager do
       b_stats[:hits].should eq(0)
       b_stats[:misses].should eq(1)
       b_stats[:runtime].should be_false
+    end
+  end
+
+  describe "#stats_for" do
+    it "returns immutable snapshot" do
+      mgr = Hwaro::Core::Build::CacheManager.new
+      mgr.register("test", "Test", runtime: true) { nil }
+      mgr.record_hit("test")
+
+      snapshot = mgr.stats_for("test").not_nil!
+      snapshot[:hits].should eq(1)
+
+      # Further hits should not affect the already-returned snapshot
+      mgr.record_hit("test")
+      snapshot[:hits].should eq(1)  # snapshot is frozen
+      mgr.stats_for("test").not_nil![:hits].should eq(2)  # new snapshot reflects update
     end
   end
 

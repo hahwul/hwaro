@@ -377,7 +377,11 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
-          @cache_manager.report
+          if options.verbose
+            @cache_manager.report_verbose
+          else
+            @cache_manager.report
+          end
         end
 
         # Incremental parse of changed content + full re-render with reloaded templates.
@@ -478,7 +482,11 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.success "Re-render complete! Rendered #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
-          @cache_manager.report
+          if verbose
+            @cache_manager.report_verbose
+          else
+            @cache_manager.report
+          end
         end
 
         # Copy only the specified static files to the output directory.

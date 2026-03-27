@@ -4,7 +4,7 @@
 # Each cache registers with the manager, enabling:
 # - Bulk invalidation (clear all / clear runtime only)
 # - Selective invalidation for incremental builds
-# - Cache hit/miss tracking and stats reporting
+# - Cache hit/miss tracking and stats reporting (lock-free via Atomic)
 # - Debug-friendly status inspection
 
 require "../../utils/logger"
@@ -13,12 +13,30 @@ module Hwaro
   module Core
     module Build
       class CacheManager
-        # Tracks hit/miss counts for a named cache layer.
+        # Lock-free hit/miss counters using Atomic operations.
+        # Safe for concurrent access from parallel render fibers
+        # without requiring mutex synchronization.
         class CacheStats
-          property hits : Int64 = 0_i64
-          property misses : Int64 = 0_i64
+          @hits : Atomic(Int64) = Atomic(Int64).new(0_i64)
+          @misses : Atomic(Int64) = Atomic(Int64).new(0_i64)
 
           def initialize
+          end
+
+          def hits : Int64
+            @hits.get(:relaxed)
+          end
+
+          def misses : Int64
+            @misses.get(:relaxed)
+          end
+
+          def increment_hit
+            @hits.add(1, :relaxed)
+          end
+
+          def increment_miss
+            @misses.add(1, :relaxed)
           end
 
           def total : Int64
@@ -26,13 +44,14 @@ module Hwaro
           end
 
           def hit_rate : Float64
-            return 0.0 if total == 0
-            (hits.to_f64 / total.to_f64) * 100.0
+            t = total
+            return 0.0 if t == 0
+            (hits.to_f64 / t.to_f64) * 100.0
           end
 
           def reset
-            @hits = 0_i64
-            @misses = 0_i64
+            @hits.set(0_i64, :relaxed)
+            @misses.set(0_i64, :relaxed)
           end
         end
 
@@ -68,53 +87,54 @@ module Hwaro
           end
         end
 
-        # Record a cache hit for the named layer.
+        # Record a cache hit for the named layer (lock-free).
         def record_hit(name : String)
-          @mutex.synchronize do
-            if layer = @layers[name]?
-              layer.stats.hits += 1
-            end
+          if layer = @layers[name]?
+            layer.stats.increment_hit
           end
         end
 
-        # Record a cache miss for the named layer.
+        # Record a cache miss for the named layer (lock-free).
         def record_miss(name : String)
-          @mutex.synchronize do
-            if layer = @layers[name]?
-              layer.stats.misses += 1
-            end
+          if layer = @layers[name]?
+            layer.stats.increment_miss
           end
         end
 
         # Clear all registered caches (both runtime and persistent).
-        def clear_all
+        # Pass `reset_stats: false` to preserve hit/miss counters (e.g. for
+        # memory-management clears where you still want end-of-build reporting).
+        def clear_all(reset_stats : Bool = true)
           @mutex.synchronize do
             @layers.each_value do |layer|
               layer.clear_proc.call
-              layer.stats.reset
+              layer.stats.reset if reset_stats
             end
           end
         end
 
         # Clear only runtime (in-memory) caches, preserving persistent caches.
-        def clear_runtime
+        # Pass `reset_stats: false` to preserve hit/miss counters.
+        def clear_runtime(reset_stats : Bool = true)
           @mutex.synchronize do
             @layers.each_value do |layer|
               if layer.runtime
                 layer.clear_proc.call
-                layer.stats.reset
+                layer.stats.reset if reset_stats
               end
             end
           end
         end
 
         # Clear specific named caches.
-        def clear(*names : String)
+        # Pass `reset_stats: false` to preserve hit/miss counters across clears
+        # (useful for streaming batch clears where stats should span the whole build).
+        def clear(*names : String, reset_stats : Bool = true)
           @mutex.synchronize do
             names.each do |name|
               if layer = @layers[name]?
                 layer.clear_proc.call
-                layer.stats.reset
+                layer.stats.reset if reset_stats
               end
             end
           end
@@ -122,31 +142,28 @@ module Hwaro
 
         # Reset all hit/miss counters without clearing cache contents.
         def reset_stats
-          @mutex.synchronize do
-            @layers.each_value { |layer| layer.stats.reset }
+          @layers.each_value { |layer| layer.stats.reset }
+        end
+
+        # Get an immutable stats snapshot for a specific cache layer.
+        def stats_for(name : String) : {hits: Int64, misses: Int64, hit_rate: Float64}?
+          if layer = @layers[name]?
+            s = layer.stats
+            {hits: s.hits, misses: s.misses, hit_rate: s.hit_rate}
           end
         end
 
-        # Get stats for a specific cache layer.
-        def stats_for(name : String) : CacheStats?
-          @mutex.synchronize do
-            @layers[name]?.try(&.stats)
-          end
-        end
-
-        # Return a snapshot of all layer stats as an array of tuples.
+        # Return a snapshot of all layer stats as an array of named tuples.
         def all_stats : Array({name: String, description: String, runtime: Bool, hits: Int64, misses: Int64, hit_rate: Float64})
-          @mutex.synchronize do
-            @layers.values.map do |layer|
-              {
-                name:        layer.name,
-                description: layer.description,
-                runtime:     layer.runtime,
-                hits:        layer.stats.hits,
-                misses:      layer.stats.misses,
-                hit_rate:    layer.stats.hit_rate,
-              }
-            end
+          @layers.values.map do |layer|
+            {
+              name:        layer.name,
+              description: layer.description,
+              runtime:     layer.runtime,
+              hits:        layer.stats.hits,
+              misses:      layer.stats.misses,
+              hit_rate:    layer.stats.hit_rate,
+            }
           end
         end
 

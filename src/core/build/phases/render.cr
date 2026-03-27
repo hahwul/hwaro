@@ -90,6 +90,7 @@ module Hwaro::Core::Build::Phases::Render
         "section_assets_crinja",
         "ancestors_crinja",
         "related_posts_crinja",
+        reset_stats: false,
       )
       GC.collect
     end
