@@ -210,6 +210,39 @@ describe Hwaro::Services::Importers::EleventyImporter do
       end
     end
 
+    it "merges directory data defaults into posts" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        # Create directory data file (posts.json)
+        File.write(File.join(posts_dir, "posts.json"), %({"layout": "post.njk", "tags": ["post"]}))
+
+        # Create post without layout
+        File.write(File.join(posts_dir, "data-merge.md"), <<-ELEVENTY
+        ---
+        title: "Data Merge Test"
+        ---
+        Content.
+        ELEVENTY
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::EleventyImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "data-merge.md"))
+        content.should contain("template = \"post.njk\"")
+        content.should contain("title = \"Data Merge Test\"")
+      end
+    end
+
     it "returns error result for non-existent directory" do
       options = Hwaro::Config::Options::ImportOptions.new(
         source_type: "eleventy",

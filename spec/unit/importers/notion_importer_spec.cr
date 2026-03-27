@@ -119,6 +119,27 @@ describe Hwaro::Services::Importers::NotionImporter do
       result.message.should contain("not found")
     end
 
+    it "converts Notion bookmark embeds to standard links" do
+      Dir.mktmpdir do |dir|
+        post_content = "# Bookmarks\n\n[bookmark](https://example.com)\n\nMore text."
+        File.write(File.join(dir, "bookmarks.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "notion",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::NotionImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "bookmarks.md"))
+        content.should contain("[https://example.com](https://example.com)")
+        content.should_not contain("[bookmark]")
+      end
+    end
+
     it "returns success with zero imports when no files exist" do
       Dir.mktmpdir do |dir|
         output_dir = File.join(dir, "output")

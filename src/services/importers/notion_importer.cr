@@ -8,9 +8,6 @@ module Hwaro
         # Notion exported markdown uses YAML frontmatter or embedded metadata
         # Notion export structure: folder per page, with .md files and assets
 
-        # Regex to detect Notion-specific database property tables
-        NOTION_PROPERTY_PATTERN = /^[\w\s]+:\s*.+$/
-
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
@@ -145,14 +142,7 @@ module Hwaro
           # Determine slug
           slug = slug_from_notion_filename(file_path)
 
-          # Determine section from directory structure
-          relative = file_path.sub(base_path, "").lstrip('/')
-          parts = relative.split("/")
-          section = if parts.size > 1
-                      "posts"
-                    else
-                      "posts"
-                    end
+          section = "posts"
 
           frontmatter = generate_frontmatter(fields)
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose)

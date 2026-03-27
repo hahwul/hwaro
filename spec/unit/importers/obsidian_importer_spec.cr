@@ -202,6 +202,65 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    it "extracts inline tags from body into frontmatter" do
+      Dir.mktmpdir do |dir|
+        post_content = <<-OBSIDIAN
+        ---
+        title: "Tagged Note"
+        ---
+        Some content with #crystal and #programming tags.
+        OBSIDIAN
+
+        File.write(File.join(dir, "tagged-note.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "tagged-note.md"))
+        content.should contain("tags = [\"crystal\", \"programming\"]")
+      end
+    end
+
+    it "preserves markdown headings when removing inline tags" do
+      Dir.mktmpdir do |dir|
+        post_content = <<-OBSIDIAN
+        ---
+        title: "Headings"
+        ---
+        ## Section One
+
+        Content with #tag here.
+
+        ### Sub Section
+
+        More content.
+        OBSIDIAN
+
+        File.write(File.join(dir, "headings.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "headings.md"))
+        content.should contain("## Section One")
+        content.should contain("### Sub Section")
+      end
+    end
+
     it "returns error result for non-existent directory" do
       options = Hwaro::Config::Options::ImportOptions.new(
         source_type: "obsidian",

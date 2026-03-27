@@ -308,16 +308,21 @@ module Hwaro
 
           if frontmatter_yaml
             if dir_defaults
-              # Parse file frontmatter and merge dir defaults underneath
+              # Append directory defaults for keys not present in file frontmatter
               begin
                 file_yaml = YAML.parse(frontmatter_yaml)
                 if file_yaml.as_h?
-                  merged = {} of String => String
+                  extra_lines = [] of String
                   dir_defaults.each do |k, v|
-                    merged[k] = v.raw.to_s unless file_yaml[k]?
+                    unless file_yaml[k]?
+                      extra_lines << "#{k}: #{v.raw.inspect}"
+                    end
                   end
-                  # Return original frontmatter (dir data is for fields not in file)
-                  return frontmatter_yaml
+                  if extra_lines.empty?
+                    return frontmatter_yaml
+                  else
+                    return frontmatter_yaml + "\n" + extra_lines.join("\n")
+                  end
                 end
               rescue
                 return frontmatter_yaml

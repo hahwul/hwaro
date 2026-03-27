@@ -93,8 +93,6 @@ module Hwaro
 
           fields = Hash(String, String | Bool | Array(String) | Nil).new
 
-          is_draft = false
-
           if frontmatter_yaml
             yaml = YAML.parse(frontmatter_yaml)
 
@@ -128,7 +126,6 @@ module Hwaro
             # Draft
             if draft = yaml["draft"]?
               if draft.raw == true
-                is_draft = true
                 unless include_drafts
                   return :skipped
                 end

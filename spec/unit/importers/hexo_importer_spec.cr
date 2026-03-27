@@ -221,6 +221,44 @@ describe Hwaro::Services::Importers::HexoImporter do
       end
     end
 
+    it "handles nested categories" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "source", "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        post_content = <<-HEXO
+        ---
+        title: "Nested Categories"
+        categories:
+          - - tech
+            - web
+          - design
+        tags:
+          - frontend
+        ---
+        Content.
+        HEXO
+
+        File.write(File.join(posts_dir, "nested-cats.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "hexo",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::HexoImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "nested-cats.md"))
+        content.should contain("\"frontend\"")
+        content.should contain("\"tech\"")
+        content.should contain("\"web\"")
+        content.should contain("\"design\"")
+      end
+    end
+
     it "returns error result for non-existent directory" do
       options = Hwaro::Config::Options::ImportOptions.new(
         source_type: "hexo",

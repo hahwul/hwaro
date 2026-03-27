@@ -232,8 +232,8 @@ module Hwaro
           result = body
 
           # Convert embeds ![[file]] to markdown image/link
-          result = result.gsub(EMBED_PATTERN) do |_, match|
-            filename = match[1]
+          result = result.gsub(EMBED_PATTERN) do
+            filename = $1
             if filename.matches?(/\.(png|jpg|jpeg|gif|svg|webp|avif)$/i)
               "![#{filename}](#{filename})"
             else
@@ -242,9 +242,9 @@ module Hwaro
           end
 
           # Convert wiki-links [[Page|Display]] to standard markdown links
-          result = result.gsub(WIKILINK_PATTERN) do |_, match|
-            page = match[1]
-            display = match[2]? || page
+          result = result.gsub(WIKILINK_PATTERN) do
+            page = $1
+            display = $~[2]? || page
             slug = slugify(page)
             "[#{display}](#{slug})"
           end
@@ -257,11 +257,11 @@ module Hwaro
               line
             elsif in_code_block
               line
+            elsif line.matches?(/^\s*\#{1,6}\s/)
+              # Preserve markdown headings
+              line
             else
-              line.gsub(/(?<!\w)#([a-zA-Z][\w\-\/]*)/) do |tag_match|
-                # Keep headings (# followed by space)
-                ""
-              end.rstrip
+              line.gsub(/(?<!\w)#([a-zA-Z][\w\-\/]*)/, "").rstrip
             end
           end
           result = lines.join("\n")
