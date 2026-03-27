@@ -21,6 +21,7 @@ require "toml"
 require "json"
 require "crinja"
 require "./cache"
+require "./cache_manager"
 require "./parallel"
 require "./shortcode_processor"
 require "./phases/initialize"
@@ -111,9 +112,45 @@ module Hwaro
         @crinja_cache_mutex : Mutex = Mutex.new(:reentrant)
         # Mutex to protect created_dirs set during parallel rendering
         @created_dirs_mutex : Mutex = Mutex.new
+        # Unified cache manager for all cache layers
+        @cache_manager : CacheManager = CacheManager.new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
+          setup_cache_manager
+        end
+
+        # Access cache manager for external inspection
+        def cache_manager : CacheManager
+          @cache_manager
+        end
+
+        # Register all cache layers with the unified manager
+        private def setup_cache_manager
+          @cache_manager.register("compiled_templates", "Compiled Crinja template ASTs", runtime: true) do
+            @compiled_templates_cache.clear
+          end
+          @cache_manager.register("page_crinja_value", "Page→Crinja::Value conversions", runtime: true) do
+            @page_crinja_value_cache.clear
+          end
+          @cache_manager.register("section_pages_crinja", "Section page lists as Crinja values", runtime: true) do
+            @section_pages_crinja_cache.clear
+          end
+          @cache_manager.register("section_assets_crinja", "Section asset lists as Crinja values", runtime: true) do
+            @section_assets_crinja_cache.clear
+          end
+          @cache_manager.register("series_crinja", "Series page lists as Crinja values", runtime: true) do
+            @series_crinja_cache.clear
+          end
+          @cache_manager.register("ancestors_crinja", "Ancestor pages as Crinja values", runtime: true) do
+            @ancestors_crinja_cache.clear
+          end
+          @cache_manager.register("related_posts_crinja", "Related posts as Crinja values", runtime: true) do
+            @related_posts_crinja_cache.clear
+          end
+          @cache_manager.register("build_cache", "Persistent file-change tracking (.hwaro_cache.json)", runtime: false) do
+            @cache.try(&.clear)
+          end
         end
 
         # Access lifecycle for external hook registration
@@ -340,6 +377,11 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          if options.verbose
+            @cache_manager.report_verbose
+          else
+            @cache_manager.report
+          end
         end
 
         # Incremental parse of changed content + full re-render with reloaded templates.
@@ -405,14 +447,9 @@ module Hwaro
           Logger.info "Template change detected. Re-rendering all pages..."
           start_time = Time.instant
 
-          # Reload templates from disk & reset compiled template cache
+          # Reload templates from disk & reset all runtime caches
           @templates = nil
-          @compiled_templates_cache.clear
-          @section_pages_crinja_cache.clear
-          @section_assets_crinja_cache.clear
-          @page_crinja_value_cache.clear
-          @ancestors_crinja_cache.clear
-          @related_posts_crinja_cache.clear
+          @cache_manager.clear_runtime
           templates = load_templates
           @templates = templates
 
@@ -445,6 +482,11 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.success "Re-render complete! Rendered #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          if verbose
+            @cache_manager.report_verbose
+          else
+            @cache_manager.report
+          end
         end
 
         # Copy only the specified static files to the output directory.
@@ -537,13 +579,8 @@ module Hwaro
           # Reset internal caches (preserve @config loaded above)
           @site = nil
           @templates = nil
-          @compiled_templates_cache.clear
-          @section_pages_crinja_cache.clear
-          @section_assets_crinja_cache.clear
+          @cache_manager.clear_runtime
           @created_dirs.clear
-          @page_crinja_value_cache.clear
-          @ancestors_crinja_cache.clear
-          @related_posts_crinja_cache.clear
 
           # Execute build phases through lifecycle
           result = execute_phases(ctx, profiler)
@@ -562,6 +599,13 @@ module Hwaro
           # Print profiling report if enabled
           profiler.report
           profiler.template_report
+
+          # Print cache stats
+          if options.verbose
+            @cache_manager.report_verbose
+          else
+            @cache_manager.report
+          end
 
           # Run post-build hooks
           unless post_hooks.empty?

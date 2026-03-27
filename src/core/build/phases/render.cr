@@ -84,11 +84,14 @@ module Hwaro::Core::Build::Phases::Render
 
       # Release rendered HTML and per-section/page caches to free memory
       batch.each { |page| page.content = "" }
-      @section_pages_crinja_cache.clear
-      @section_assets_crinja_cache.clear
-      @page_crinja_value_cache.clear
-      @ancestors_crinja_cache.clear
-      @related_posts_crinja_cache.clear
+      @cache_manager.clear(
+        "page_crinja_value",
+        "section_pages_crinja",
+        "section_assets_crinja",
+        "ancestors_crinja",
+        "related_posts_crinja",
+        reset_stats: false,
+      )
       GC.collect
     end
 
@@ -541,11 +544,15 @@ module Hwaro::Core::Build::Phases::Render
       # Most pages share the same base template string, so this avoids
       # re-parsing the template AST on every page render.
       cache_key = processed_template.hash
-      crinja_template = cache[cache_key]? || begin
-        compiled = env.from_string(processed_template)
-        cache[cache_key] = compiled
-        compiled
-      end
+      crinja_template = if cached = cache[cache_key]?
+                           @cache_manager.record_hit("compiled_templates")
+                           cached
+                         else
+                           @cache_manager.record_miss("compiled_templates")
+                           compiled = env.from_string(processed_template)
+                           cache[cache_key] = compiled
+                           compiled
+                         end
       crinja_template.render(vars)
     rescue ex : Crinja::TemplateNotFoundError
       msg = "Template error for #{page.path}: #{ex.message}"
@@ -594,7 +601,12 @@ module Hwaro::Core::Build::Phases::Render
   # a superset of fields needed by all consumers.
   private def cached_page_crinja_value(p : Models::Page, default_language : String) : Crinja::Value
     @crinja_cache_mutex.synchronize do
-      @page_crinja_value_cache[p.path]? || begin
+      if cached = @page_crinja_value_cache[p.path]?
+        @cache_manager.record_hit("page_crinja_value")
+        next cached
+      end
+      @cache_manager.record_miss("page_crinja_value")
+      begin
         val = Crinja::Value.new({
           "path"         => Crinja::Value.new(p.path),
           "title"        => Crinja::Value.new(p.title),
@@ -643,7 +655,12 @@ module Hwaro::Core::Build::Phases::Render
   ) : Array(Crinja::Value)
     cache_key = "#{section_name}:#{language}"
     @crinja_cache_mutex.synchronize do
-      @section_pages_crinja_cache[cache_key]? || begin
+      if cached = @section_pages_crinja_cache[cache_key]?
+        @cache_manager.record_hit("section_pages_crinja")
+        next cached
+      end
+      @cache_manager.record_miss("section_pages_crinja")
+      begin
         pages = site.pages_for_section(section_name, language)
 
         # Use section's sort_by setting if available, otherwise sort by title
@@ -920,16 +937,19 @@ module Hwaro::Core::Build::Phases::Render
     # Build ancestors array (cached per section — pages in the same section share ancestors)
     ancestors_cache_key = page.section
     ancestors_array = @crinja_cache_mutex.synchronize do
-      @ancestors_crinja_cache[ancestors_cache_key]? || begin
-        arr = page.ancestors.map do |ancestor|
-          Crinja::Value.new({
-            "title" => Crinja::Value.new(ancestor.title),
-            "url"   => Crinja::Value.new(ancestor.url),
-          })
-        end
-        @ancestors_crinja_cache[ancestors_cache_key] = arr
-        arr
+      if cached = @ancestors_crinja_cache[ancestors_cache_key]?
+        @cache_manager.record_hit("ancestors_crinja")
+        next cached
       end
+      @cache_manager.record_miss("ancestors_crinja")
+      arr = page.ancestors.map do |ancestor|
+        Crinja::Value.new({
+          "title" => Crinja::Value.new(ancestor.title),
+          "url"   => Crinja::Value.new(ancestor.url),
+        })
+      end
+      @ancestors_crinja_cache[ancestors_cache_key] = arr
+      arr
     end
 
     # Page object with all properties
@@ -966,22 +986,33 @@ module Hwaro::Core::Build::Phases::Render
       "series"          => Crinja::Value.new(page.series || ""),
       "series_index"    => Crinja::Value.new(page.series_index),
       "series_pages"    => @crinja_cache_mutex.synchronize {
-        page.series.try { |s| @series_crinja_cache[s]? } || begin
-          val = Crinja::Value.new(page.series_pages.map { |sp|
-            cached_page_crinja_value(sp, default_lang)
-          })
-          page.series.try { |s| @series_crinja_cache[s] = val }
-          val
+        # Skip tracking for pages without series to avoid inflating miss counts
+        unless page.series
+          next Crinja::Value.new([] of Crinja::Value)
         end
+        cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+        if cached_series
+          @cache_manager.record_hit("series_crinja")
+          next cached_series
+        end
+        @cache_manager.record_miss("series_crinja")
+        val = Crinja::Value.new(page.series_pages.map { |sp|
+          cached_page_crinja_value(sp, default_lang)
+        })
+        page.series.try { |s| @series_crinja_cache[s] = val }
+        val
       },
       "related_posts" => @crinja_cache_mutex.synchronize {
-        @related_posts_crinja_cache[page.path]? || begin
-          val = Crinja::Value.new(page.related_posts.map { |rp|
-            cached_page_crinja_value(rp, default_lang)
-          })
-          @related_posts_crinja_cache[page.path] = val
-          val
+        if cached = @related_posts_crinja_cache[page.path]?
+          @cache_manager.record_hit("related_posts_crinja")
+          next cached
         end
+        @cache_manager.record_miss("related_posts_crinja")
+        val = Crinja::Value.new(page.related_posts.map { |rp|
+          cached_page_crinja_value(rp, default_lang)
+        })
+        @related_posts_crinja_cache[page.path] = val
+        val
       },
     }
     vars["page"] = Crinja::Value.new(page_obj)
@@ -1045,11 +1076,14 @@ module Hwaro::Core::Build::Phases::Render
         current_section = page.section
         # Use cached section assets to avoid re-allocating per page
         section_assets_val = @crinja_cache_mutex.synchronize do
-          @section_assets_crinja_cache[page.section]?.try { |arr| Crinja::Value.new(arr) } || begin
-            arr = section_page.assets.map { |a| Crinja::Value.new(a) }
-            @section_assets_crinja_cache[page.section] = arr
-            Crinja::Value.new(arr)
+          if cached_arr = @section_assets_crinja_cache[page.section]?
+            @cache_manager.record_hit("section_assets_crinja")
+            next Crinja::Value.new(cached_arr)
           end
+          @cache_manager.record_miss("section_assets_crinja")
+          arr = section_page.assets.map { |a| Crinja::Value.new(a) }
+          @section_assets_crinja_cache[page.section] = arr
+          Crinja::Value.new(arr)
         end
       end
     end
