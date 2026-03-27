@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.9.0
+
+### Added
+- Notion, Obsidian, Hexo, Astro, and Eleventy importers for `tool import`
+- Unified `CacheManager` for centralized cache layer management
+- `logo_position` option for auto OG image generation
+- Unit tests for TextUtils, SortUtils, Sitemap, and ConfigSnippets
+
+### Changed
+- Optimize incremental rebuild to skip unchanged content parsing
+- Improve serve mode incremental rebuild with debounce and simplified strategy
+- Unify config snippets as single source of truth for doctor detection
+- Extract shared logo_coordinates helper and eliminate magic numbers
+
+### Fixed
+- robots.txt merging bug and remove GPTBot from defaults
+- Obsidian syntax bugs and Eleventy merge issues
+- Debounce race condition and order-aware merge in serve rebuild
+
 ## v0.8.0
 
 ### Added
