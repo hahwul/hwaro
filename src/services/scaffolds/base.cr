@@ -316,17 +316,7 @@ module Hwaro
         end
 
         protected def plugins_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Plugins
-          # =============================================================================
-          # Configure content processors and extensions
-
-          [plugins]
-          processors = ["markdown"]
-
-          TOML
+          ConfigSnippets.plugins
         end
 
         protected def pagination_config : String
@@ -351,39 +341,11 @@ module Hwaro
         end
 
         protected def highlight_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Syntax Highlighting
-          # =============================================================================
-          # Code block syntax highlighting using Highlight.js
-
-          [highlight]
-          enabled = true
-          theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
-          use_cdn = true            # Set to false to use local assets
-
-          TOML
+          ConfigSnippets.highlight
         end
 
         protected def og_config : String
-          <<-TOML
-
-          # =============================================================================
-          # OpenGraph & Twitter Cards
-          # =============================================================================
-          # Default meta tags for social sharing
-          # Page-level settings (front matter) override these defaults
-
-          [og]
-          default_image = "/images/og-default.png"   # Default image for social sharing
-          type = "article"                           # OpenGraph type (website, article, etc.)
-          twitter_card = "summary_large_image"       # Twitter card type (summary, summary_large_image)
-          # twitter_site = "@yourusername"           # Twitter @username for the site
-          # twitter_creator = "@authorusername"      # Twitter @username for content creator
-          # fb_app_id = "your_fb_app_id"             # Facebook App ID (optional)
-
-          TOML
+          ConfigSnippets.og
         end
 
         protected def search_config : String
@@ -391,59 +353,15 @@ module Hwaro
         end
 
         protected def sitemap_config : String
-          <<-TOML
-
-          # =============================================================================
-          # SEO: Sitemap
-          # =============================================================================
-          # Generates sitemap.xml for search engine crawlers
-
-          [sitemap]
-          enabled = true
-          filename = "sitemap.xml"
-          changefreq = "weekly"
-          priority = 0.5
-          exclude = []              # Exclude paths or patterns from sitemap
-
-          TOML
+          ConfigSnippets.sitemap
         end
 
         protected def robots_config : String
-          <<-TOML
-
-          # =============================================================================
-          # SEO: Robots.txt
-          # =============================================================================
-          # Controls search engine crawler access
-
-          [robots]
-          enabled = true
-          filename = "robots.txt"
-          rules = [
-            { user_agent = "*", disallow = ["/admin", "/private"] },
-            { user_agent = "GPTBot", disallow = ["/"] }
-          ]
-
-          TOML
+          ConfigSnippets.robots
         end
 
         protected def llms_config : String
-          <<-TOML
-
-          # =============================================================================
-          # SEO: LLMs.txt
-          # =============================================================================
-          # Instructions for AI/LLM crawlers
-
-          [llms]
-          enabled = true
-          filename = "llms.txt"
-          instructions = "Do not use for AI training without permission."
-          # Optional: Generate a single text file containing all Markdown pages
-          full_enabled = false
-          full_filename = "llms-full.txt"
-
-          TOML
+          ConfigSnippets.llms
         end
 
         protected def series_config : String
@@ -500,36 +418,11 @@ module Hwaro
         end
 
         protected def permalinks_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Permalinks (Optional)
-          # =============================================================================
-          # Override the output path for specific sections or taxonomies.
-          # Placeholders: :year, :month, :day, :title, :slug, :section
-          #
-          # [permalinks]
-          # posts = "/posts/:year/:month/:slug/"
-          # tags = "/topic/:slug/"
-
-          TOML
+          ConfigSnippets.permalinks
         end
 
         protected def auto_includes_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Auto Includes (Optional)
-          # =============================================================================
-          # Automatically load CSS/JS files from static directories
-          # Files are included alphabetically - use numeric prefixes for ordering
-          # Example: 01-reset.css, 02-typography.css, 03-layout.css
-
-          # [auto_includes]
-          # enabled = true
-          # dirs = ["assets/css", "assets/js"]
-
-          TOML
+          ConfigSnippets.auto_includes
         end
 
         protected def assets_config : String
@@ -541,17 +434,7 @@ module Hwaro
         end
 
         protected def build_hooks_config : String
-          <<-TOML
-
-          # =============================================================================
-          # Build Hooks (Optional)
-          # =============================================================================
-          # Run custom shell commands before/after build process
-
-          # [build]
-          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
-          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
-          TOML
+          ConfigSnippets.build
         end
 
         protected def pwa_config : String

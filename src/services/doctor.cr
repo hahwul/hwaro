@@ -104,7 +104,7 @@ module Hwaro
       end
 
       # Sections that are advanced/niche — skipped when minimal: true
-      OPTIONAL_SECTIONS = Set{"pwa", "amp", "assets", "deployment", "image_processing", "og.auto_image", "image_processing.lqip"}
+      OPTIONAL_SECTIONS = Set{"pwa", "amp", "assets", "deployment", "image_processing", "og.auto_image", "image_processing.lqip", "build", "permalinks", "auto_includes"}
 
       # Append missing config sections to config.toml.
       # When minimal is true, skip advanced optional sections (pwa, amp, assets, etc.)
