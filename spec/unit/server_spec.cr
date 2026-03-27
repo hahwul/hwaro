@@ -495,7 +495,7 @@ describe Hwaro::Services::ChangeSet do
       merged.empty?.should be_true
     end
 
-    it "cancels add/remove in reverse order too" do
+    it "treats remove→add as net add (atomic save via delete+move)" do
       cs1 = Hwaro::Services::ChangeSet.new(
         modified_content: [] of String,
         modified_templates: [] of String,
@@ -514,7 +514,7 @@ describe Hwaro::Services::ChangeSet do
       )
 
       merged = cs1.merge(cs2)
-      merged.added_files.should be_empty
+      merged.added_files.should eq(["content/posts/old.md"])
       merged.removed_files.should be_empty
     end
 

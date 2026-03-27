@@ -164,18 +164,22 @@ module Hwaro
       # Merge another ChangeSet into this one, combining all buckets.
       # Used during debounce to batch rapid successive changes.
       #
-      # Handles add/remove cancellation: if a file was added in one
-      # changeset and removed in the other, both entries cancel out
-      # (the net effect is no change for that file).
+      # Order-aware semantics (self happens first, then other):
+      # - add→remove cancels out (file created then deleted = no-op)
+      # - remove→add keeps the add (file deleted then recreated = net add,
+      #   e.g. atomic save via delete+move)
       def merge(other : ChangeSet) : ChangeSet
-        all_added = (@added_files + other.added_files).uniq
-        all_removed = (@removed_files + other.removed_files).uniq
+        self_only_added = @added_files - other.removed_files
+        self_only_removed = @removed_files - other.added_files
+        other_only_added = other.added_files - @removed_files
+        other_only_removed = other.removed_files - @added_files
 
-        # Cancel out files that were both added and removed during the
-        # debounce window — the net effect is no structural change.
-        cancelled = all_added & all_removed
-        net_added = all_added - cancelled
-        net_removed = all_removed - cancelled
+        # remove→add: file existed, was removed in self, re-added in other.
+        # Treat as net add so we don't skip a rebuild.
+        revived = @removed_files & other.added_files
+
+        net_added = (self_only_added + other_only_added + revived).uniq
+        net_removed = (self_only_removed + other_only_removed).uniq
 
         ChangeSet.new(
           modified_content: (@modified_content + other.modified_content).uniq,
@@ -318,8 +322,7 @@ module Hwaro
             # This batches rapid successive saves (e.g. multi-file save,
             # IDE format-on-save) into a single rebuild.
             unless changeset.empty?
-              changeset = debounce_changes(changeset, last_mtimes)
-              last_mtimes = scan_mtimes
+              changeset, last_mtimes = debounce_changes(changeset, last_mtimes)
 
               begin
                 apply_changeset(changeset, build_options)
@@ -334,7 +337,7 @@ module Hwaro
 
       # Wait for rapid successive changes to settle, merging all detected
       # changesets into one.  Returns the merged changeset.
-      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, Time)) : ChangeSet
+      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, Time)) : {ChangeSet, Hash(String, Time)}
         merged = initial
         current_mtimes = last_mtimes
         iterations = 0
@@ -359,7 +362,7 @@ module Hwaro
           end
         end
 
-        merged
+        {merged, current_mtimes}
       end
 
       # Diff two mtime snapshots and return a categorised ChangeSet.
@@ -442,7 +445,7 @@ module Hwaro
         end
 
         # Copy static files if they changed alongside content/template changes
-        if strategy != :static && !changeset.modified_static.empty?
+        if strategy != :static && strategy != :full && !changeset.modified_static.empty?
           copy_static(changeset, build_options)
         end
 
