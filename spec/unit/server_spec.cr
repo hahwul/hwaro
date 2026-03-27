@@ -423,6 +423,269 @@ describe Hwaro::Services::ChangeSet do
     end
   end
 
+  describe "#merge" do
+    it "combines two changesets with deduplication" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/posts/a.md"],
+        modified_templates: [] of String,
+        modified_static: ["static/css/style.css"],
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/posts/a.md", "content/posts/b.md"],
+        modified_templates: ["templates/page.html"],
+        modified_static: [] of String,
+        added_files: ["content/posts/new.md"],
+        removed_files: [] of String,
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.modified_content.should eq(["content/posts/a.md", "content/posts/b.md"])
+      merged.modified_templates.should eq(["templates/page.html"])
+      merged.modified_static.should eq(["static/css/style.css"])
+      merged.added_files.should eq(["content/posts/new.md"])
+    end
+
+    it "propagates config_changed from either side" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: true,
+      )
+
+      cs1.merge(cs2).config_changed.should be_true
+      cs2.merge(cs1).config_changed.should be_true
+    end
+
+    it "cancels out files that are both added and removed" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: ["content/posts/temp.md"],
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/posts/temp.md"],
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.added_files.should be_empty
+      merged.removed_files.should be_empty
+      merged.empty?.should be_true
+    end
+
+    it "cancels add/remove in reverse order too" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/posts/old.md"],
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: ["content/posts/old.md"],
+        removed_files: [] of String,
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.added_files.should be_empty
+      merged.removed_files.should be_empty
+    end
+
+    it "only cancels overlapping entries, keeps the rest" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: ["content/a.md", "content/b.md"],
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/b.md", "content/c.md"],
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.added_files.should eq(["content/a.md"])
+      merged.removed_files.should eq(["content/c.md"])
+    end
+
+    it "merges two empty changesets" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.empty?.should be_true
+    end
+
+    it "merges removed files with deduplication" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/old.md"],
+        config_changed: false,
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/old.md", "content/other.md"],
+        config_changed: false,
+      )
+
+      merged = cs1.merge(cs2)
+      merged.removed_files.should eq(["content/old.md", "content/other.md"])
+    end
+  end
+
+  describe "#rebuild_strategy" do
+    it "returns :full for config changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: true,
+      )
+      cs.rebuild_strategy.should eq(:full)
+    end
+
+    it "returns :full for added files" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: ["content/new.md"],
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:full)
+    end
+
+    it "returns :templates for template-only changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: ["templates/page.html"],
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:templates)
+    end
+
+    it "returns :incremental for content-only changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/posts/hello.md"],
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:incremental)
+    end
+
+    it "returns :static for static-only changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: ["static/css/style.css"],
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:static)
+    end
+
+    it "returns :content_and_template for mixed content+template changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/posts/hello.md"],
+        modified_templates: ["templates/page.html"],
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:content_and_template)
+    end
+  end
+
+  describe "#description" do
+    it "describes content changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/a.md", "content/b.md"],
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.description.should eq("2 content file(s)")
+    end
+
+    it "describes mixed changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/a.md"],
+        modified_templates: ["templates/page.html"],
+        modified_static: [] of String,
+        added_files: ["content/new.md"],
+        removed_files: [] of String,
+        config_changed: true,
+      )
+      cs.description.should eq("1 content, 1 template, 1 added, config file(s)")
+    end
+  end
+
   describe "classification priority" do
     it "full rebuild takes precedence over content incremental" do
       cs = Hwaro::Services::ChangeSet.new(

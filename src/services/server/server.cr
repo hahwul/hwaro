@@ -160,11 +160,77 @@ module Hwaro
           @removed_files.empty? &&
           !@config_changed
       end
+
+      # Merge another ChangeSet into this one, combining all buckets.
+      # Used during debounce to batch rapid successive changes.
+      #
+      # Handles add/remove cancellation: if a file was added in one
+      # changeset and removed in the other, both entries cancel out
+      # (the net effect is no change for that file).
+      def merge(other : ChangeSet) : ChangeSet
+        all_added = (@added_files + other.added_files).uniq
+        all_removed = (@removed_files + other.removed_files).uniq
+
+        # Cancel out files that were both added and removed during the
+        # debounce window — the net effect is no structural change.
+        cancelled = all_added & all_removed
+        net_added = all_added - cancelled
+        net_removed = all_removed - cancelled
+
+        ChangeSet.new(
+          modified_content: (@modified_content + other.modified_content).uniq,
+          modified_templates: (@modified_templates + other.modified_templates).uniq,
+          modified_static: (@modified_static + other.modified_static).uniq,
+          added_files: net_added,
+          removed_files: net_removed,
+          config_changed: @config_changed || other.config_changed,
+        )
+      end
+
+      # Determine the optimal rebuild strategy for this changeset.
+      def rebuild_strategy : Symbol
+        if needs_full_rebuild?
+          :full
+        elsif templates_only?
+          :templates
+        elsif content_and_template_only?
+          :content_and_template
+        elsif content_incremental?
+          :incremental
+        elsif static_only?
+          :static
+        else
+          :full
+        end
+      end
+
+      # Human-readable description of the change for logging.
+      def description : String
+        parts = [] of String
+        parts << "#{@modified_content.size} content" unless @modified_content.empty?
+        parts << "#{@modified_templates.size} template" unless @modified_templates.empty?
+        parts << "#{@modified_static.size} static" unless @modified_static.empty?
+        parts << "#{@added_files.size} added" unless @added_files.empty?
+        parts << "#{@removed_files.size} removed" unless @removed_files.empty?
+        parts << "config" if @config_changed
+        parts.join(", ") + " file(s)"
+      end
     end
 
     class Server
       @builder : Core::Build::Builder
       @live_reload_handler : LiveReloadHandler?
+
+      # Debounce interval: after detecting changes, wait this long for
+      # additional changes to settle before triggering a rebuild.
+      DEBOUNCE_INTERVAL = 300.milliseconds
+
+      # Maximum number of debounce iterations before forcing a rebuild.
+      # Prevents indefinite blocking when files are being written continuously.
+      MAX_DEBOUNCE_ITERATIONS = 10
+
+      # Polling interval for the file watcher.
+      POLL_INTERVAL = 500.milliseconds
 
       def initialize
         @builder = Core::Build::Builder.new
@@ -241,13 +307,20 @@ module Hwaro
         last_mtimes = scan_mtimes
 
         loop do
-          sleep 1.seconds
+          sleep POLL_INTERVAL
 
           current_mtimes = scan_mtimes
           if current_mtimes != last_mtimes
             changeset = detect_changes(last_mtimes, current_mtimes)
+            last_mtimes = current_mtimes
 
+            # Debounce: wait for changes to settle before rebuilding.
+            # This batches rapid successive saves (e.g. multi-file save,
+            # IDE format-on-save) into a single rebuild.
             unless changeset.empty?
+              changeset = debounce_changes(changeset, last_mtimes)
+              last_mtimes = scan_mtimes
+
               begin
                 apply_changeset(changeset, build_options)
               rescue ex
@@ -255,10 +328,38 @@ module Hwaro
                 Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
               end
             end
-
-            last_mtimes = current_mtimes
           end
         end
+      end
+
+      # Wait for rapid successive changes to settle, merging all detected
+      # changesets into one.  Returns the merged changeset.
+      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, Time)) : ChangeSet
+        merged = initial
+        current_mtimes = last_mtimes
+        iterations = 0
+
+        loop do
+          sleep DEBOUNCE_INTERVAL
+          iterations += 1
+
+          new_mtimes = scan_mtimes
+          if new_mtimes != current_mtimes
+            additional = detect_changes(current_mtimes, new_mtimes)
+            current_mtimes = new_mtimes
+            merged = merged.merge(additional) unless additional.empty?
+
+            if iterations >= MAX_DEBOUNCE_ITERATIONS
+              Logger.debug "[Watch] Debounce cap reached (#{MAX_DEBOUNCE_ITERATIONS} iterations). Proceeding with rebuild."
+              break
+            end
+          else
+            # No more changes — settled
+            break
+          end
+        end
+
+        merged
       end
 
       # Diff two mtime snapshots and return a categorised ChangeSet.
@@ -322,51 +423,35 @@ module Hwaro
         end
       end
 
-      # Choose the cheapest rebuild strategy for a given ChangeSet.
+      # Choose the cheapest rebuild strategy for a given ChangeSet and execute it.
       private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
-        if changeset.needs_full_rebuild?
-          reason = if changeset.config_changed
-                     "config"
-                   elsif !changeset.added_files.empty?
-                     "new files"
-                   else
-                     "deleted files"
-                   end
-          Logger.info "\n[Watch] Structural change detected (#{reason}). Full rebuild..."
+        strategy = changeset.rebuild_strategy
+        Logger.info "\n[Watch] Change detected (#{changeset.description}). Strategy: #{strategy}..."
+
+        case strategy
+        when :full
           @builder.run(build_options)
-        elsif changeset.templates_only?
-          Logger.info "\n[Watch] Template change detected (#{changeset.modified_templates.size} file(s)). Re-rendering..."
+        when :templates
           @builder.run_rerender(build_options)
-        elsif changeset.content_incremental?
-          count = changeset.modified_content.size
-          Logger.info "\n[Watch] Content change detected (#{count} file(s)). Incremental rebuild..."
+        when :incremental
           @builder.run_incremental(changeset.modified_content, build_options)
-
-          # Also copy any static files that changed alongside content
-          unless changeset.modified_static.empty?
-            output_dir = sanitize_output_dir(build_options.output_dir)
-            @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
-          end
-        elsif changeset.static_only?
-          Logger.info "\n[Watch] Static file change detected (#{changeset.modified_static.size} file(s)). Copying..."
-          output_dir = sanitize_output_dir(build_options.output_dir)
-          @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
-        elsif changeset.content_and_template_only?
-          # Content + template changes: re-parse changed content then re-render all
-          Logger.info "\n[Watch] Content + template changes detected. Incremental parse + full re-render..."
+        when :content_and_template
           @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
+        when :static
+          copy_static(changeset, build_options)
+        end
 
-          unless changeset.modified_static.empty?
-            output_dir = sanitize_output_dir(build_options.output_dir)
-            @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
-          end
-        else
-          # Structural changes (added/deleted files, config) → full rebuild
-          Logger.info "\n[Watch] Structural change detected. Full rebuild..."
-          @builder.run(build_options)
+        # Copy static files if they changed alongside content/template changes
+        if strategy != :static && !changeset.modified_static.empty?
+          copy_static(changeset, build_options)
         end
 
         @live_reload_handler.try(&.notify_reload)
+      end
+
+      private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
+        output_dir = sanitize_output_dir(build_options.output_dir)
+        @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
       end
 
       private def open_browser_url(url : String)
