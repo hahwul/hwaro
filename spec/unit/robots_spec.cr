@@ -251,7 +251,7 @@ describe Hwaro::Content::Seo::Robots do
       end
     end
 
-    it "handles a rule with empty allow and disallow lists" do
+    it "adds explicit Allow: / when both allow and disallow are empty" do
       config = Hwaro::Models::Config.new
       config.robots.enabled = true
 
@@ -265,8 +265,34 @@ describe Hwaro::Content::Seo::Robots do
 
         content = File.read(File.join(output_dir, "robots.txt"))
         content.should contain("User-agent: SomeBot")
-        content.should_not contain("Allow:")
-        content.should_not contain("Disallow:")
+        content.should contain("Allow: /")
+      end
+    end
+
+    it "does not add implicit Allow when disallow is present" do
+      config = Hwaro::Models::Config.new
+      config.robots.enabled = true
+
+      rule1 = Hwaro::Models::RobotsRule.new("*")
+      rule1.allow = [] of String
+      rule1.disallow = [] of String
+
+      rule2 = Hwaro::Models::RobotsRule.new("GPTBot")
+      rule2.allow = [] of String
+      rule2.disallow = ["/"]
+
+      config.robots.rules = [rule1, rule2]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Robots.generate(config, output_dir)
+
+        content = File.read(File.join(output_dir, "robots.txt"))
+        # First rule should have explicit Allow: /
+        # Second rule should only have Disallow: /
+        lines = content.lines
+        gptbot_idx = lines.index { |l| l.includes?("User-agent: GPTBot") }.not_nil!
+        # The line after GPTBot should be Disallow, not Allow
+        lines[gptbot_idx + 1].should contain("Disallow: /")
       end
     end
 
