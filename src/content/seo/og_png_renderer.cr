@@ -257,10 +257,16 @@ module Hwaro
 
             # 6. Logo image
             if logo_image_path
+              logo_x, logo_y = case ai.logo_position
+                               when "bottom-right" then {WIDTH - 80 - 48, HEIGHT - 100}
+                               when "top-left"     then {80, 20}
+                               when "top-right"    then {WIDTH - 80 - 48, 20}
+                               else                     {80, HEIGHT - 100} # bottom-left
+                               end
               if clogo = cached_logo
-                blit_cached_image(pixels, clogo, 80, HEIGHT - 100)
+                blit_cached_image(pixels, clogo, logo_x, logo_y)
               else
-                composite_image(pixels, logo_image_path, 80, HEIGHT - 100, 48, 48)
+                composite_image(pixels, logo_image_path, logo_x, logo_y, 48, 48)
               end
             end
 
@@ -332,7 +338,7 @@ module Hwaro
           # Site name
           if ai.show_title
             site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
-            site_x = ai.logo ? 140_f32 : 80_f32
+            site_x = (ai.logo && ai.logo_position == "bottom-left") ? 140_f32 : 80_f32
             LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
           end
         end

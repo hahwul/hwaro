@@ -148,16 +148,24 @@ module Hwaro
           total_text_height = title_block_height + desc_block_height + 20
           title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
 
+          # Compute logo position
+          logo_x, logo_y = case ai.logo_position
+                           when "bottom-right" then {WIDTH - 80 - 48, HEIGHT - 100}
+                           when "top-left"     then {80, 20}
+                           when "top-right"    then {WIDTH - 80 - 48, 20}
+                           else                     {80, HEIGHT - 100} # bottom-left
+                           end
+
           # Build logo element
           logo_svg = ""
           if ai.logo
             if logo_data_uri
-              logo_svg = %(<image href="#{logo_data_uri}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
+              logo_svg = %(<image href="#{logo_data_uri}" x="#{logo_x}" y="#{logo_y}" width="48" height="48" />)
             else
               # Fallback: reference logo as URL (file not found or not pre-computed)
               logo_url = ai.logo.not_nil!.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
-              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
+              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="48" height="48" />)
             end
           end
 
@@ -209,7 +217,12 @@ module Hwaro
 
             # Site name at bottom (controlled by show_title)
             if ai.show_title
-              svg << %(<text x="#{logo_svg.empty? ? 80 : 140}" y="#{HEIGHT - 65}" )
+              site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
+                              140
+                            else
+                              80
+                            end
+              svg << %(<text x="#{site_name_x}" y="#{HEIGHT - 65}" )
               svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
               svg << %(font-size="22" font-weight="600" fill="#{accent}">)
               svg << site_name

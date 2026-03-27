@@ -267,6 +267,7 @@ module Hwaro
       property overlay_opacity : Float64
       property format : String
       property font_path : String?
+      property logo_position : String
 
       def initialize
         @enabled = false
@@ -284,6 +285,7 @@ module Hwaro
         @overlay_opacity = 0.5
         @format = "svg"
         @font_path = nil
+        @logo_position = "bottom-left"
       end
     end
 
@@ -957,6 +959,11 @@ module Hwaro
           config.og.auto_image.overlay_opacity = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
           config.og.auto_image.font_path = ai["font_path"]?.try(&.as_s?)
+          if lp = ai["logo_position"]?.try(&.as_s?)
+            if {"bottom-left", "bottom-right", "top-left", "top-right"}.includes?(lp)
+              config.og.auto_image.logo_position = lp
+            end
+          end
         end
       end
 
