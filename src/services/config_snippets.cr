@@ -122,6 +122,7 @@ module Hwaro
           # accent_color = "#e94560"
           # font_size = 48
           # logo = "static/logo.png"
+          # logo_position = "bottom-left"  # bottom-left, bottom-right, top-left, top-right
           # output_dir = "og-images"
           # show_title = true
           # style = "default"              # default, dots, grid, diagonal, gradient, waves, minimal

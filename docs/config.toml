@@ -250,6 +250,7 @@ text_color = "#ffffff"
 accent_color = "#e94560"
 font_size = 48
 logo = "static/hwaro.png"
+logo_position = "bottom-left"
 output_dir = "og-images"
 show_title = true
 style = "default"

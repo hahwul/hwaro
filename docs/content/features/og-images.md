@@ -27,6 +27,7 @@ text_color = "#ffffff"
 accent_color = "#e94560"
 font_size = 48
 logo = "static/logo.png"
+logo_position = "bottom-left"
 output_dir = "og-images"
 show_title = true
 style = "default"
@@ -45,6 +46,7 @@ format = "svg"
 | accent_color | string | `"#e94560"` | Accent color for bars and site name |
 | font_size | int | `48` | Title font size in pixels |
 | logo | string | — | Logo file path (e.g., `static/logo.png`). Embedded as base64 data URI |
+| logo_position | string | `"bottom-left"` | Logo placement: `bottom-left`, `bottom-right`, `top-left`, `top-right` |
 | output_dir | string | `"og-images"` | Directory for generated images |
 | show_title | bool | `true` | Show site name at the bottom of the image |
 | style | string | `"default"` | Style preset for background pattern |

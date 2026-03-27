@@ -16,6 +16,12 @@ module Hwaro
         WIDTH  = 1200
         HEIGHT =  630
 
+        LOGO_SIZE          =  48
+        LOGO_MARGIN        =  80
+        LOGO_TOP_Y         =  20
+        LOGO_BOTTOM_OFFSET = 100
+        LOGO_TEXT_GAP      =  12 # gap between logo and site name text
+
         MIME_TYPES = {
           ".png"  => "image/png",
           ".jpg"  => "image/jpeg",
@@ -78,7 +84,7 @@ module Hwaro
 
           # Pre-decode and resize images once for PNG rendering
           if png_available
-            cached_logo = OgPngRenderer.load_image(logo_abs_path, 48, 48) if logo_abs_path
+            cached_logo = OgPngRenderer.load_image(logo_abs_path, LOGO_SIZE, LOGO_SIZE) if logo_abs_path
             cached_bg = OgPngRenderer.load_image(bg_abs_path, WIDTH, HEIGHT) if bg_abs_path
           end
 
@@ -148,16 +154,19 @@ module Hwaro
           total_text_height = title_block_height + desc_block_height + 20
           title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
 
+          # Compute logo position
+          logo_x, logo_y = logo_coordinates(ai.logo_position)
+
           # Build logo element
           logo_svg = ""
           if ai.logo
             if logo_data_uri
-              logo_svg = %(<image href="#{logo_data_uri}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
+              logo_svg = %(<image href="#{logo_data_uri}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             else
               # Fallback: reference logo as URL (file not found or not pre-computed)
               logo_url = ai.logo.not_nil!.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
-              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="80" y="#{HEIGHT - 100}" width="48" height="48" />)
+              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             end
           end
 
@@ -209,7 +218,12 @@ module Hwaro
 
             # Site name at bottom (controlled by show_title)
             if ai.show_title
-              svg << %(<text x="#{logo_svg.empty? ? 80 : 140}" y="#{HEIGHT - 65}" )
+              site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
+                              LOGO_MARGIN + LOGO_SIZE + LOGO_TEXT_GAP
+                            else
+                              LOGO_MARGIN
+                            end
+              svg << %(<text x="#{site_name_x}" y="#{HEIGHT - 65}" )
               svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
               svg << %(font-size="22" font-weight="600" fill="#{accent}">)
               svg << site_name
@@ -290,6 +304,17 @@ module Hwaro
           data = File.open(file_path, "rb") { |f| f.getb_to_end }
           encoded = Base64.strict_encode(data)
           "data:#{mime};base64,#{encoded}"
+        end
+
+        # Compute logo (x, y) for a given position string.
+        # Shared by both SVG and PNG renderers.
+        def self.logo_coordinates(position : String) : Tuple(Int32, Int32)
+          case position
+          when "bottom-right" then {WIDTH - LOGO_MARGIN - LOGO_SIZE, HEIGHT - LOGO_BOTTOM_OFFSET}
+          when "top-left"     then {LOGO_MARGIN, LOGO_TOP_Y}
+          when "top-right"    then {WIDTH - LOGO_MARGIN - LOGO_SIZE, LOGO_TOP_Y}
+          else                     {LOGO_MARGIN, HEIGHT - LOGO_BOTTOM_OFFSET} # bottom-left
+          end
         end
 
         # Word-wrap text to fit within a character limit per line.

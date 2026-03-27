@@ -87,6 +87,31 @@ describe Hwaro::Models::AutoImageConfig do
       ai.format.should eq("png")
     end
 
+    it "has default logo_position of bottom-left" do
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.logo_position.should eq("bottom-left")
+    end
+
+    it "loads logo_position from TOML" do
+      config = make_og_config(<<-TOML)
+      [og.auto_image]
+      enabled = true
+      logo_position = "top-right"
+      TOML
+
+      config.og.auto_image.logo_position.should eq("top-right")
+    end
+
+    it "ignores invalid logo_position values" do
+      config = make_og_config(<<-TOML)
+      [og.auto_image]
+      enabled = true
+      logo_position = "center"
+      TOML
+
+      config.og.auto_image.logo_position.should eq("bottom-left")
+    end
+
     it "loads font_path from TOML" do
       config = make_og_config(<<-TOML)
       [og.auto_image]
@@ -194,6 +219,84 @@ describe Hwaro::Content::Seo::OgImage do
 
       svg.should contain("<image")
       svg.should contain("/nonexistent-logo.png")
+    end
+
+    it "places logo at bottom-right when logo_position is bottom-right" do
+      Dir.mktmpdir do |dir|
+        logo_path = File.join(dir, "logo.png")
+        File.open(logo_path, "wb") { |f| f.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) }
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Test"
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.logo = logo_path
+        config.og.auto_image.logo_position = "bottom-right"
+
+        logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
+
+        svg.should contain("x=\"1072\"")
+      end
+    end
+
+    it "places logo at top-left when logo_position is top-left" do
+      Dir.mktmpdir do |dir|
+        logo_path = File.join(dir, "logo.png")
+        File.open(logo_path, "wb") { |f| f.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) }
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Test"
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.logo = logo_path
+        config.og.auto_image.logo_position = "top-left"
+
+        logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
+
+        svg.should contain("x=\"80\" y=\"20\"")
+      end
+    end
+
+    it "places logo at top-right when logo_position is top-right" do
+      Dir.mktmpdir do |dir|
+        logo_path = File.join(dir, "logo.png")
+        File.open(logo_path, "wb") { |f| f.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) }
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Test"
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.logo = logo_path
+        config.og.auto_image.logo_position = "top-right"
+
+        logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
+
+        svg.should contain("x=\"1072\" y=\"20\"")
+      end
+    end
+
+    it "does not offset site name when logo is bottom-right" do
+      Dir.mktmpdir do |dir|
+        logo_path = File.join(dir, "logo.png")
+        File.open(logo_path, "wb") { |f| f.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) }
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Test"
+
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.logo = logo_path
+        config.og.auto_image.logo_position = "bottom-right"
+
+        logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
+
+        # Site name should be at x=80 (not offset to 140) since logo is not bottom-left
+        svg.should contain("<text x=\"80\" y=\"#{Hwaro::Content::Seo::OgImage::HEIGHT - 65}\"")
+      end
     end
 
     it "hides site name when show_title is false" do
