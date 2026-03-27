@@ -24,8 +24,7 @@ module Hwaro
           enabled = true
           filename = "robots.txt"
           rules = [
-            { user_agent = "*", disallow = ["/admin", "/private"] },
-            { user_agent = "GPTBot", disallow = ["/"] }
+            { user_agent = "*", disallow = ["/admin", "/private"] }
           ]
 
           [llms]
@@ -118,8 +117,7 @@ module Hwaro
           enabled = true
           filename = "robots.txt"
           rules = [
-            { user_agent = "*", disallow = ["/admin", "/private"] },
-            { user_agent = "GPTBot", disallow = ["/"] }
+            { user_agent = "*", disallow = ["/admin", "/private"] }
           ]
 
           [llms]
@@ -229,8 +227,7 @@ module Hwaro
             str << "enabled = true\n"
             str << "filename = \"robots.txt\"\n"
             str << "rules = [\n"
-            str << "  { user_agent = \"*\", disallow = [\"/admin\", \"/private\"] },\n"
-            str << "  { user_agent = \"GPTBot\", disallow = [\"/\"] }\n"
+            str << "  { user_agent = \"*\", disallow = [\"/admin\", \"/private\"] }\n"
             str << "]\n\n"
             str << "[llms]\n"
             str << "enabled = true\n"

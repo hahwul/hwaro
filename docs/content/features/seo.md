@@ -147,6 +147,25 @@ Control search engine crawling.
 enabled = true
 ```
 
+With custom rules:
+
+```toml
+[robots]
+enabled = true
+rules = [
+  { user_agent = "*", disallow = ["/admin", "/private"] },
+  { user_agent = "GPTBot", disallow = ["/"] }
+]
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| enabled | bool | true | Generate `robots.txt` |
+| filename | string | "robots.txt" | Output filename |
+| rules | array | [] | List of user-agent rules with `allow` and `disallow` paths |
+
+When no rules are configured, Hwaro generates a default allow-all rule. If a rule has both `allow` and `disallow` empty, an explicit `Allow: /` is added to prevent ambiguous behavior.
+
 ### Output
 
 ```

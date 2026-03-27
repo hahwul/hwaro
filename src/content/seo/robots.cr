@@ -21,6 +21,11 @@ module Hwaro
                 str << "Disallow: #{path.gsub('\n', ' ')}\n"
               end
 
+              # When both allow and disallow are empty, explicitly allow all
+              if rule.allow.empty? && rule.disallow.empty?
+                str << "Allow: /\n"
+              end
+
               str << "\n"
             end
 
