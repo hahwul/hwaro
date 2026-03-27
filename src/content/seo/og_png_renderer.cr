@@ -261,7 +261,7 @@ module Hwaro
               if clogo = cached_logo
                 blit_cached_image(pixels, clogo, logo_x, logo_y)
               else
-                composite_image(pixels, logo_image_path, logo_x, logo_y, 48, 48)
+                composite_image(pixels, logo_image_path, logo_x, logo_y, OgImage::LOGO_SIZE, OgImage::LOGO_SIZE)
               end
             end
 
@@ -333,7 +333,7 @@ module Hwaro
           # Site name
           if ai.show_title
             site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
-            site_x = (ai.logo && ai.logo_position == "bottom-left") ? 140_f32 : 80_f32
+            site_x = (ai.logo && ai.logo_position == "bottom-left") ? (OgImage::LOGO_MARGIN + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : OgImage::LOGO_MARGIN.to_f32
             LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
           end
         end

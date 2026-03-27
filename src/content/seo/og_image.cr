@@ -16,6 +16,12 @@ module Hwaro
         WIDTH  = 1200
         HEIGHT =  630
 
+        LOGO_SIZE          =  48
+        LOGO_MARGIN        =  80
+        LOGO_TOP_Y         =  20
+        LOGO_BOTTOM_OFFSET = 100
+        LOGO_TEXT_GAP      =  12 # gap between logo and site name text
+
         MIME_TYPES = {
           ".png"  => "image/png",
           ".jpg"  => "image/jpeg",
@@ -213,9 +219,9 @@ module Hwaro
             # Site name at bottom (controlled by show_title)
             if ai.show_title
               site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
-                              140
+                              LOGO_MARGIN + LOGO_SIZE + LOGO_TEXT_GAP
                             else
-                              80
+                              LOGO_MARGIN
                             end
               svg << %(<text x="#{site_name_x}" y="#{HEIGHT - 65}" )
               svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
@@ -300,24 +306,20 @@ module Hwaro
           "data:#{mime};base64,#{encoded}"
         end
 
-        # Word-wrap text to fit within a character limit per line.
-        # Handles CJK characters (which have no spaces) by allowing
-        # breaks between any CJK characters.
-        LOGO_SIZE   = 48
-        LOGO_MARGIN = 80
-        LOGO_TOP_Y  = 20
-
         # Compute logo (x, y) for a given position string.
         # Shared by both SVG and PNG renderers.
         def self.logo_coordinates(position : String) : Tuple(Int32, Int32)
           case position
-          when "bottom-right" then {WIDTH - LOGO_MARGIN - LOGO_SIZE, HEIGHT - 100}
+          when "bottom-right" then {WIDTH - LOGO_MARGIN - LOGO_SIZE, HEIGHT - LOGO_BOTTOM_OFFSET}
           when "top-left"     then {LOGO_MARGIN, LOGO_TOP_Y}
           when "top-right"    then {WIDTH - LOGO_MARGIN - LOGO_SIZE, LOGO_TOP_Y}
-          else                     {LOGO_MARGIN, HEIGHT - 100} # bottom-left
+          else                     {LOGO_MARGIN, HEIGHT - LOGO_BOTTOM_OFFSET} # bottom-left
           end
         end
 
+        # Word-wrap text to fit within a character limit per line.
+        # Handles CJK characters (which have no spaces) by allowing
+        # breaks between any CJK characters.
         private def self.word_wrap(text : String, max_chars : Int32) : Array(String)
           return [] of String if text.empty?
           max_chars = 10 if max_chars < 10 # safety minimum
