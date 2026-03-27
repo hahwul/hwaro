@@ -257,12 +257,7 @@ module Hwaro
 
             # 6. Logo image
             if logo_image_path
-              logo_x, logo_y = case ai.logo_position
-                               when "bottom-right" then {WIDTH - 80 - 48, HEIGHT - 100}
-                               when "top-left"     then {80, 20}
-                               when "top-right"    then {WIDTH - 80 - 48, 20}
-                               else                     {80, HEIGHT - 100} # bottom-left
-                               end
+              logo_x, logo_y = OgImage.logo_coordinates(ai.logo_position)
               if clogo = cached_logo
                 blit_cached_image(pixels, clogo, logo_x, logo_y)
               else

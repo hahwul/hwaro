@@ -295,7 +295,7 @@ describe Hwaro::Content::Seo::OgImage do
         svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
 
         # Site name should be at x=80 (not offset to 140) since logo is not bottom-left
-        svg.should contain("<text x=\"80\" y=\"#{630 - 65}\"")
+        svg.should contain("<text x=\"80\" y=\"#{Hwaro::Content::Seo::OgImage::HEIGHT - 65}\"")
       end
     end
 

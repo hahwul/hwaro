@@ -78,7 +78,7 @@ module Hwaro
 
           # Pre-decode and resize images once for PNG rendering
           if png_available
-            cached_logo = OgPngRenderer.load_image(logo_abs_path, 48, 48) if logo_abs_path
+            cached_logo = OgPngRenderer.load_image(logo_abs_path, LOGO_SIZE, LOGO_SIZE) if logo_abs_path
             cached_bg = OgPngRenderer.load_image(bg_abs_path, WIDTH, HEIGHT) if bg_abs_path
           end
 
@@ -149,23 +149,18 @@ module Hwaro
           title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
 
           # Compute logo position
-          logo_x, logo_y = case ai.logo_position
-                           when "bottom-right" then {WIDTH - 80 - 48, HEIGHT - 100}
-                           when "top-left"     then {80, 20}
-                           when "top-right"    then {WIDTH - 80 - 48, 20}
-                           else                     {80, HEIGHT - 100} # bottom-left
-                           end
+          logo_x, logo_y = logo_coordinates(ai.logo_position)
 
           # Build logo element
           logo_svg = ""
           if ai.logo
             if logo_data_uri
-              logo_svg = %(<image href="#{logo_data_uri}" x="#{logo_x}" y="#{logo_y}" width="48" height="48" />)
+              logo_svg = %(<image href="#{logo_data_uri}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             else
               # Fallback: reference logo as URL (file not found or not pre-computed)
               logo_url = ai.logo.not_nil!.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
-              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="48" height="48" />)
+              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             end
           end
 
@@ -308,6 +303,21 @@ module Hwaro
         # Word-wrap text to fit within a character limit per line.
         # Handles CJK characters (which have no spaces) by allowing
         # breaks between any CJK characters.
+        LOGO_SIZE   = 48
+        LOGO_MARGIN = 80
+        LOGO_TOP_Y  = 20
+
+        # Compute logo (x, y) for a given position string.
+        # Shared by both SVG and PNG renderers.
+        def self.logo_coordinates(position : String) : Tuple(Int32, Int32)
+          case position
+          when "bottom-right" then {WIDTH - LOGO_MARGIN - LOGO_SIZE, HEIGHT - 100}
+          when "top-left"     then {LOGO_MARGIN, LOGO_TOP_Y}
+          when "top-right"    then {WIDTH - LOGO_MARGIN - LOGO_SIZE, LOGO_TOP_Y}
+          else                     {LOGO_MARGIN, HEIGHT - 100} # bottom-left
+          end
+        end
+
         private def self.word_wrap(text : String, max_chars : Int32) : Array(String)
           return [] of String if text.empty?
           max_chars = 10 if max_chars < 10 # safety minimum
