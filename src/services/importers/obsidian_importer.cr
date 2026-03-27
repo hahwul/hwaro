@@ -216,8 +216,8 @@ module Hwaro
               next
             end
             next if in_code_block
-            # Skip headings
-            next if line.starts_with?("#") && line[1]? == ' '
+            # Skip headings (all markdown heading levels)
+            next if line.matches?(/^\s*\#{1,6}\s/)
 
             line.scan(OBSIDIAN_TAG_PATTERN) do |match|
               tag = match[1]

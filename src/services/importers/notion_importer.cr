@@ -183,8 +183,11 @@ module Hwaro
         end
 
         private def clean_notion_content(body : String) : String
-          # Convert Notion callout blocks (> emoji text) to standard blockquotes
           result = body
+
+          # Convert Notion callout blocks (> emoji text) to plain blockquotes
+          # Example: '> 💡 Some tip' -> '> Some tip'
+          result = result.gsub(/^> [^\w\s]\s+(.+)$/m, "> \\1")
 
           # Convert Notion bookmark embeds to links
           result = result.gsub(/\[bookmark\]\((.+?)\)/, "[\\1](\\1)")

@@ -187,10 +187,15 @@ module Hwaro
               fields["image"] = image.as_s? || image.raw.to_s
             end
 
-            # Permalink slug
+            # Permalink slug — normalize to safe filename
             if permalink = yaml["permalink"]?
               if ps = permalink.as_s?
-                slug = ps unless ps.empty?
+                unless ps.empty?
+                  # Strip leading/trailing slashes and extensions, take last segment
+                  normalized = ps.strip("/").sub(/\.\w+$/, "")
+                  parts = normalized.split("/")
+                  slug = slugify(parts.last) unless parts.empty?
+                end
               end
             end
           else

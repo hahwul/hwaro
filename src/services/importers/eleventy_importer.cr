@@ -201,14 +201,16 @@ module Hwaro
               end
             end
 
-            # Draft
-            if draft_val = yaml["draft"]? || yaml["eleventyExcludeFromCollections"]?
-              if draft_val.raw == true
-                unless include_drafts
-                  return :skipped
-                end
-                fields["draft"] = true
+            # Draft or excluded from collections
+            draft_val = yaml["draft"]?
+            exclude_val = yaml["eleventyExcludeFromCollections"]?
+            is_draft = !draft_val.nil? && draft_val.raw == true
+            is_excluded = !exclude_val.nil? && exclude_val.raw == true
+            if is_draft || is_excluded
+              unless include_drafts
+                return :skipped
               end
+              fields["draft"] = true
             end
 
             # Tags (11ty uses tags for collection membership)
@@ -308,21 +310,18 @@ module Hwaro
 
           if frontmatter_yaml
             if dir_defaults
-              # Append directory defaults for keys not present in file frontmatter
               begin
                 file_yaml = YAML.parse(frontmatter_yaml)
-                if file_yaml.as_h?
-                  extra_lines = [] of String
+                if file_hash = file_yaml.as_h?
+                  # Build merged hash: directory defaults + file overrides
+                  merged = {} of YAML::Any => YAML::Any
                   dir_defaults.each do |k, v|
-                    unless file_yaml[k]?
-                      extra_lines << "#{k}: #{v.raw.inspect}"
-                    end
+                    merged[YAML::Any.new(k)] = v
                   end
-                  if extra_lines.empty?
-                    return frontmatter_yaml
-                  else
-                    return frontmatter_yaml + "\n" + extra_lines.join("\n")
+                  file_hash.each do |k, v|
+                    merged[k] = v
                   end
+                  return YAML.dump(merged).strip
                 end
               rescue
                 return frontmatter_yaml
@@ -331,11 +330,11 @@ module Hwaro
             frontmatter_yaml
           elsif dir_defaults
             # Build YAML from directory data only
-            lines = [] of String
+            hash = {} of YAML::Any => YAML::Any
             dir_defaults.each do |k, v|
-              lines << "#{k}: #{v.raw.inspect}"
+              hash[YAML::Any.new(k)] = v
             end
-            lines.join("\n")
+            YAML.dump(hash).strip
           else
             nil
           end
