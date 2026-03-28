@@ -179,12 +179,15 @@ module Hwaro
           begin
             mtime = File.info(file_path).modification_time.to_unix_ms
 
-            # Compute hash outside the lock to minimize contention
-            existing = @entries[file_path]?
-            if existing && existing.mtime == mtime && existing.output_path == output_path
-              return
+            # Fast path: skip update if entry is unchanged (protected by mutex)
+            @mutex.synchronize do
+              existing = @entries[file_path]?
+              if existing && existing.mtime == mtime && existing.output_path == output_path
+                return
+              end
             end
 
+            # Compute hash outside the lock to minimize contention
             content_hash = compute_file_hash(file_path)
 
             entry = CacheEntry.new(
@@ -197,7 +200,11 @@ module Hwaro
             )
 
             @mutex.synchronize do
-              @entries[file_path] = entry
+              # Re-check under lock: another fiber may have written a newer entry
+              current = @entries[file_path]?
+              if current.nil? || current.mtime <= mtime
+                @entries[file_path] = entry
+              end
             end
           rescue ex
             Logger.debug "Cache: failed to update entry for #{file_path}: #{ex.message}"
