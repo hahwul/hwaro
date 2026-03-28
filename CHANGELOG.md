@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.1
+
+### Changed
+- Upgrade snapcraft base from core20 to core24
+
+### Fixed
+- Fix concurrency bugs, ReDoS, and I/O error handling
+
 ## v0.9.0
 
 ### Added

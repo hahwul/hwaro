@@ -18,3 +18,13 @@ test:
 # Fix lint
 fix:
     crystal tool format
+
+# Check version consistency
+alias vc := version-check
+version-check:
+    crystal run scripts/version_check.cr
+
+# Update version
+alias vu := version-update
+version-update:
+    crystal run scripts/version_update.cr
