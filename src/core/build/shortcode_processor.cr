@@ -170,8 +170,11 @@ module Hwaro
         private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil) : String
           env = crinja_env_override || crinja_env
 
-          # Inject args directly into shared context, then restore — avoids expensive .dup
-          args.each { |key, value| context[key] = Crinja::Value.new(value) }
+          # Use a local copy of context with args merged to avoid mutating
+          # shared state — the original inject-then-restore approach was unsafe
+          # under parallel builds where multiple fibers share the same context.
+          local_context = context.dup
+          args.each { |key, value| local_context[key] = Crinja::Value.new(value) }
 
           begin
             # Cache compiled shortcode templates by content hash to avoid
@@ -184,12 +187,10 @@ module Hwaro
               @compiled_templates_cache[cache_key] = compiled
               compiled
             end
-            crinja_template.render(context)
+            crinja_template.render(local_context)
           rescue ex : Crinja::TemplateError
             Logger.warn "Shortcode template error: #{ex.message}"
             ""
-          ensure
-            args.each_key { |key| context.delete(key) }
           end
         end
 
