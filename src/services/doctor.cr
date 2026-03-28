@@ -65,7 +65,7 @@ module Hwaro
       def missing_config_sections : Array(String)
         return [] of String unless File.exists?(@config_path)
 
-        raw_text = File.read(@config_path)
+        raw_text = File.read(@config_path) rescue return [] of String
 
         begin
           raw = TOML.parse(raw_text)
