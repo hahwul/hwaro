@@ -179,10 +179,12 @@ module Hwaro
           begin
             mtime = File.info(file_path).modification_time.to_unix_ms
 
-            # Fast path: skip update if entry is unchanged (lock-free read)
-            existing = @entries[file_path]?
-            if existing && existing.mtime == mtime && existing.output_path == output_path
-              return
+            # Fast path: skip update if entry is unchanged (protected by mutex)
+            @mutex.synchronize do
+              existing = @entries[file_path]?
+              if existing && existing.mtime == mtime && existing.output_path == output_path
+                return
+              end
             end
 
             # Compute hash outside the lock to minimize contention

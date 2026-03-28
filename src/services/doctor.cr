@@ -65,7 +65,12 @@ module Hwaro
       def missing_config_sections : Array(String)
         return [] of String unless File.exists?(@config_path)
 
-        raw_text = File.read(@config_path) rescue return [] of String
+        raw_text = begin
+          File.read(@config_path)
+        rescue ex : IO::Error | File::Error
+          Logger.debug "Doctor: cannot read #{@config_path}: #{ex.message}"
+          return [] of String
+        end
 
         begin
           raw = TOML.parse(raw_text)
