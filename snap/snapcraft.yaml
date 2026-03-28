@@ -24,7 +24,6 @@ parts:
     #crystal-channel: latest/stable
     override-build: |
       curl -fsSL https://crystal-lang.org/install.sh | sudo bash
-      craftctl default
       shards install --production
       shards build --release --no-debug --production
       cp ./bin/hwaro $CRAFT_PART_INSTALL/
