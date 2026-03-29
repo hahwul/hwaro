@@ -77,5 +77,50 @@ describe Hwaro::Utils::HtmlMinifier do
       result.should_not contain("line")
       result.should_not contain("comment")
     end
+
+    it "preserves content inside pre/code blocks unchanged" do
+      html = "<pre><code>  line1\n  line2\n  line3</code></pre>"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should contain("line1")
+      result.should contain("line2")
+    end
+
+    it "handles nested comments edge case" do
+      html = "<p>A</p><!-- outer <!-- inner --> --><p>B</p>"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should contain("<p>A</p>")
+      result.should contain("<p>B</p>")
+    end
+
+    it "collapses exactly 3 blank lines to 2" do
+      html = "<p>A</p>\n\n\n<p>B</p>"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should eq("<p>A</p>\n\n<p>B</p>")
+    end
+
+    it "preserves 2 blank lines unchanged" do
+      html = "<p>A</p>\n\n<p>B</p>"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should eq("<p>A</p>\n\n<p>B</p>")
+    end
+
+    it "handles multiple pre blocks" do
+      html = "<pre>\n  <code>first</code>\n</pre>\n<p>gap</p>\n<pre>\n  <code>second</code>\n</pre>"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should contain("<pre><code")
+      result.should contain("first")
+      result.should contain("second")
+    end
+
+    it "handles comments adjacent to preserved more marker" do
+      html = "<!-- remove this --><!-- more -->"
+      result = Hwaro::Utils::HtmlMinifier.minify(html)
+      result.should_not contain("remove this")
+      result.should contain("<!-- more -->")
+    end
+
+    it "handles whitespace-only content" do
+      Hwaro::Utils::HtmlMinifier.minify("   \n\n\n   ").should eq("")
+    end
   end
 end

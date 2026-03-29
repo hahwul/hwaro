@@ -155,6 +155,200 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "task lists (extended)" do
+    it "handles * marker" do
+      content = "* [x] Done with star"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists(content)
+      result.should contain("checked disabled")
+    end
+
+    it "handles + marker" do
+      content = "+ [ ] Todo with plus"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists(content)
+      result.should contain("<input type=\"checkbox\" disabled>")
+    end
+
+    it "handles indented task items" do
+      content = "  - [x] Indented done\n    - [ ] Deeper indent"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists(content)
+      result.should contain("checked disabled")
+      result.should contain("checkbox\" disabled>")
+    end
+
+    it "does not match inside paragraphs (no list marker)" do
+      content = "This is [x] not a task"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists(content)
+      result.should eq(content)
+    end
+
+    it "handles empty content" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists("")
+      result.should eq("")
+    end
+  end
+
+  describe "definition lists (extended)" do
+    it "escapes HTML in terms" do
+      content = "<script>alert(1)</script>\n: Safe definition"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("&lt;script&gt;")
+      result.should_not contain("<script>alert")
+    end
+
+    it "escapes HTML in definitions" do
+      content = "Term\n: <b>bold</b> text"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("&lt;b&gt;")
+    end
+
+    it "does not create dl when definition is on first line only" do
+      content = ": orphan definition"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      # No term before the definition, so it should not be parsed as dl
+      result.should_not contain("<dl>")
+    end
+
+    it "handles definition with leading whitespace" do
+      content = "Term\n  : Indented definition"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>Indented definition</dd>")
+    end
+
+    it "handles multiple terms with blank line between groups" do
+      content = "Term1\n: Def1\n\nTerm2\n: Def2"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dt>Term1</dt>")
+      result.should contain("<dd>Def1</dd>")
+    end
+
+    it "handles content before and after definition list" do
+      content = "Intro paragraph\n\nTerm\n: Definition\n\nOutro paragraph"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("Intro paragraph")
+      result.should contain("<dl>")
+      result.should contain("Outro paragraph")
+    end
+  end
+
+  describe "footnotes (extended)" do
+    it "handles footnote keys with special characters (dashes)" do
+      content = "Text[^my--note].\n\n[^my--note]: Note with dashes"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      result.should contain("fnref-")
+      result.should contain("[1]")
+    end
+
+    it "handles footnote keys with colons" do
+      content = "Text[^key:val].\n\n[^key:val]: Note with colon"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      result.should contain("[1]")
+    end
+
+    it "ignores undefined footnote references" do
+      content = "Text[^undefined] here."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      result.should contain("[^undefined]")
+    end
+
+    it "handles duplicate references to same footnote" do
+      content = "First[^1] and second[^1].\n\n[^1]: Shared note"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      # Both should get the same number
+      matches = result.scan(/\[1\]/)
+      matches.size.should eq(2)
+    end
+
+    it "handles footnote content with HTML" do
+      content = "Text[^1].\n\n[^1]: Note with <em>emphasis</em>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      result.should contain("HWARO-FN")
+    end
+
+    it "postprocess handles footnotes with special chars roundtrip" do
+      # Simulate the preprocess -> postprocess cycle
+      content = "Text[^a--b].\n\n[^a--b]: Note with -- dashes"
+      preprocessed = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      # Wrap in paragraph tags like Markd would
+      html = "<p>#{preprocessed}</p>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)
+      result.should contain("<section class=\"footnotes\">")
+      result.should contain("Note with -- dashes")
+    end
+
+    it "postprocess skips invalid footnote numbers" do
+      html = "<p>Text</p>\n<!--HWARO-FOOTNOTES-START-->\n<!--HWARO-FN:key:0:text-->\n<!--HWARO-FOOTNOTES-END-->\n"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)
+      # num <= 0 should be skipped, resulting in no footnotes section
+      result.should_not contain("<section class=\"footnotes\">")
+    end
+  end
+
+  describe "math (extended)" do
+    it "handles multiline display math" do
+      content = "$$\na + b\n= c\n$$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("math-display")
+      result.should contain("a + b")
+    end
+
+    it "does not match escaped dollar signs" do
+      content = "Price is \\$5 each"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should_not contain("math-inline")
+    end
+
+    it "does not match dollar amount like $100" do
+      content = "It costs $100 to buy"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      # $100 ends with digit, should not match due to (?!\d) lookahead
+      result.should_not contain("math-inline")
+    end
+
+    it "handles math with ampersand" do
+      content = "$$a & b$$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("&amp;")
+    end
+
+    it "handles multiple inline math expressions" do
+      content = "Both $x$ and $y$ are variables."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      matches = result.scan(/math-inline/)
+      matches.size.should eq(2)
+    end
+
+    it "handles empty display math" do
+      content = "$$$$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("math-display")
+    end
+  end
+
+  describe "mermaid (extended)" do
+    it "decodes &amp; in mermaid content" do
+      html = "<pre><code class=\"language-mermaid\">A --&amp;gt;|label&amp;| B</code></pre>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_mermaid(html)
+      result.should contain("<div class=\"mermaid\">")
+      result.should contain("A --&gt;|label&| B")
+    end
+
+    it "handles mermaid block with multiple lines" do
+      html = "<pre><code class=\"language-mermaid\">graph TD\n  A --> B\n  B --> C</code></pre>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_mermaid(html)
+      result.should contain("<div class=\"mermaid\">")
+      result.should contain("A --> B")
+      result.should contain("B --> C")
+      result.should_not contain("<pre>")
+    end
+
+    it "preserves multiple mermaid blocks" do
+      html = "<pre><code class=\"language-mermaid\">graph LR\nA-->B</code></pre><p>text</p><pre><code class=\"language-mermaid\">pie\n\"A\": 50</code></pre>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_mermaid(html)
+      matches = result.scan(/class="mermaid"/)
+      matches.size.should eq(2)
+    end
+  end
+
   describe "preprocess integration" do
     it "applies all enabled extensions" do
       config = make_config(task_lists: true, footnotes: true, definition_lists: true, math: true)
