@@ -58,7 +58,10 @@ module Hwaro
               result << "<dl>"
               while i < lines.size
                 term = lines[i].strip
-                break if term.empty?
+                if term.empty?
+                  i += 1
+                  break
+                end
 
                 result << "<dt>#{HTML.escape(term)}</dt>"
                 i += 1
