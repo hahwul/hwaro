@@ -228,6 +228,12 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<dl>")
       result.should contain("Outro paragraph")
     end
+
+    it "does not infinite loop when empty line precedes orphan definition" do
+      content = "\n: orphan definition"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should_not contain("<dt></dt>")
+    end
   end
 
   describe "footnotes (extended)" do
