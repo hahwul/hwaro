@@ -63,6 +63,42 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".slugify (extended)" do
+    it "handles consecutive separators of mixed types" do
+      Hwaro::Utils::TextUtils.slugify("a - _ - b").should eq("a-b")
+    end
+
+    it "handles CJK followed immediately by ASCII" do
+      Hwaro::Utils::TextUtils.slugify("한글abc").should eq("한글abc")
+    end
+
+    it "handles ASCII followed immediately by CJK" do
+      Hwaro::Utils::TextUtils.slugify("abc한글").should eq("abc한글")
+    end
+
+    it "drops emoji characters" do
+      Hwaro::Utils::TextUtils.slugify("Hello 👋 World").should eq("hello-world")
+    end
+
+    it "handles very long string" do
+      long = "a" * 1000
+      Hwaro::Utils::TextUtils.slugify(long).should eq(long)
+    end
+
+    it "handles string ending with symbols" do
+      Hwaro::Utils::TextUtils.slugify("hello!!!").should eq("hello")
+    end
+
+    it "handles only spaces" do
+      Hwaro::Utils::TextUtils.slugify("   ").should eq("")
+    end
+
+    it "handles Hangul Jamo characters" do
+      # ㄱ is in Hangul Jamo range 0x1100-0x11FF
+      Hwaro::Utils::TextUtils.slugify("ᄀᄁ test").should eq("ᄀᄁ-test")
+    end
+  end
+
   describe ".escape_xml" do
     it "escapes ampersand" do
       Hwaro::Utils::TextUtils.escape_xml("Tom & Jerry").should eq("Tom &amp; Jerry")
@@ -131,6 +167,42 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".strip_html (extended)" do
+    it "handles unclosed tag at end" do
+      Hwaro::Utils::TextUtils.strip_html("Hello <b>world").should eq("Hello world")
+    end
+
+    it "handles tag-only input" do
+      Hwaro::Utils::TextUtils.strip_html("<div><span></span></div>").should eq("")
+    end
+
+    it "does not add space before punctuation after tag" do
+      Hwaro::Utils::TextUtils.strip_html("Hello</b>!").should eq("Hello!")
+    end
+
+    it "handles deeply nested tags" do
+      Hwaro::Utils::TextUtils.strip_html("<div><p><span><b><i>deep</i></b></span></p></div>").should eq("deep")
+    end
+
+    it "handles multiple consecutive tags" do
+      Hwaro::Utils::TextUtils.strip_html("<br/><br/><hr/>Text").should eq("Text")
+    end
+
+    it "handles mixed inline and block tags" do
+      Hwaro::Utils::TextUtils.strip_html("<p>Para 1</p><p>Para 2</p>").should eq("Para 1 Para 2")
+    end
+
+    it "handles tags with complex attributes" do
+      Hwaro::Utils::TextUtils.strip_html("<a href=\"url\" class=\"link\" data-x=\"y\">text</a>").should eq("text")
+    end
+
+    it "handles > in text content (treated as tag close)" do
+      # The simple parser treats < as tag-open and > as tag-close,
+      # so bare > in text gets consumed as a tag boundary
+      Hwaro::Utils::TextUtils.strip_html("a > b").should eq("a b")
+    end
+  end
+
   describe ".cjk_char?" do
     it "returns true for CJK Unified Ideograph" do
       Hwaro::Utils::TextUtils.cjk_char?('中').should be_true
@@ -188,6 +260,43 @@ describe Hwaro::Utils::TextUtils do
 
     it "handles pure ASCII" do
       Hwaro::Utils::TextUtils.tokenize_cjk("abc def").should eq("abc def")
+    end
+
+    it "handles multiple CJK runs separated by ASCII" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("한글test테스트").should eq("한글test테스 스트")
+    end
+
+    it "handles CJK run of exactly 3 characters" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("가나다").should eq("가나 나다")
+    end
+
+    it "handles mixed hiragana and kanji" do
+      Hwaro::Utils::TextUtils.tokenize_cjk("あ漢字").should eq("あ漢 漢字")
+    end
+  end
+
+  describe ".cjk_char? (extended)" do
+    it "returns true for CJK Extension A" do
+      # U+3400 is in CJK Extension A range
+      Hwaro::Utils::TextUtils.cjk_char?('\u{3400}').should be_true
+    end
+
+    it "returns true for CJK Compatibility" do
+      # U+3300 is in CJK Compatibility range
+      Hwaro::Utils::TextUtils.cjk_char?('\u{3300}').should be_true
+    end
+
+    it "returns true for CJK Compatibility Forms" do
+      # U+FE30 is in CJK Compatibility Forms range
+      Hwaro::Utils::TextUtils.cjk_char?('\u{FE30}').should be_true
+    end
+
+    it "returns false for space" do
+      Hwaro::Utils::TextUtils.cjk_char?(' ').should be_false
+    end
+
+    it "returns false for emoji" do
+      Hwaro::Utils::TextUtils.cjk_char?('😀').should be_false
     end
   end
 end

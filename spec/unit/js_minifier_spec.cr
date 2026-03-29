@@ -491,5 +491,38 @@ describe Hwaro::Utils::JsMinifier do
       # The */ is just literal characters
       result.should contain("*/")
     end
+
+    it "handles nested braces inside template literal interpolation" do
+      js = "var s = `${obj.map(x => { return x; })}`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("`${obj.map(x => { return x; })}`")
+    end
+
+    it "handles multiple template literal interpolations" do
+      js = "var s = `${a} + ${b} = ${a + b}`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("${a}")
+      result.should contain("${b}")
+      result.should contain("${a + b}")
+    end
+
+    it "handles comment-like pattern in template literal" do
+      js = "var s = `// not a comment\n/* also not */`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("// not a comment")
+      result.should contain("/* also not */")
+    end
+
+    it "preserves regex-like division after parenthesis" do
+      js = "var x = (a + b) / c;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("(a + b) / c")
+    end
+
+    it "handles string with backslash at end" do
+      js = %{var s = "end\\\\"; var x = 1;}
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("var x = 1;")
+    end
   end
 end

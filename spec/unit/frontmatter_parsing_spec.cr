@@ -1280,6 +1280,94 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   # ---------------------------------------------------------------------------
+  # Series and expires fields
+  # ---------------------------------------------------------------------------
+  describe "series and expires fields" do
+    it "parses series from TOML" do
+      raw = <<-MD
+      +++
+      title = "Part 1"
+      series = "My Tutorial"
+      series_weight = 1
+      +++
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:series].should eq("My Tutorial")
+      result[:series_weight].should eq(1)
+    end
+
+    it "parses series from YAML" do
+      raw = <<-MD
+      ---
+      title: Part 2
+      series: My Tutorial
+      series_weight: 2
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:series].should eq("My Tutorial")
+      result[:series_weight].should eq(2)
+    end
+
+    it "defaults series to nil" do
+      raw = <<-MD
+      ---
+      title: Post
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:series].should be_nil
+      result[:series_weight].should eq(0)
+    end
+
+    it "parses expires from TOML" do
+      raw = <<-MD
+      +++
+      title = "Expiring"
+      expires = "2025-12-31"
+      +++
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:expires].should_not be_nil
+      result[:expires].not_nil!.year.should eq(2025)
+    end
+
+    it "parses expires from YAML" do
+      raw = <<-MD
+      ---
+      title: Expiring
+      expires: "2025-06-30"
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:expires].should_not be_nil
+      result[:expires].not_nil!.month.should eq(6)
+    end
+
+    it "defaults expires to nil" do
+      raw = <<-MD
+      ---
+      title: Post
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:expires].should be_nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Date parsing edge cases
   # ---------------------------------------------------------------------------
   describe "date parsing" do
@@ -1323,6 +1411,150 @@ describe Hwaro::Content::Processors::Markdown do
 
       result = processor.parse(raw)
       result[:date].should be_nil
+    end
+
+    it "parses RFC 3339 date with timezone" do
+      raw = <<-MD
+      ---
+      title: Post
+      date: "2024-06-15T10:30:00+09:00"
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:date].should_not be_nil
+      result[:date].not_nil!.year.should eq(2024)
+      result[:date].not_nil!.month.should eq(6)
+    end
+
+    it "parses RFC 3339 date with Z timezone" do
+      raw = <<-MD
+      ---
+      title: Post
+      date: "2024-01-01T00:00:00Z"
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:date].should_not be_nil
+      result[:date].not_nil!.year.should eq(2024)
+    end
+
+    it "parses date with space-separated time" do
+      raw = <<-MD
+      ---
+      title: Post
+      date: "2024-06-15 14:30:00"
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:date].should_not be_nil
+      result[:date].not_nil!.hour.should eq(14)
+    end
+
+    it "handles empty date string gracefully" do
+      raw = <<-MD
+      ---
+      title: Post
+      date: ""
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:date].should be_nil
+    end
+
+    it "handles invalid date string gracefully" do
+      raw = <<-MD
+      ---
+      title: Post
+      date: "not-a-date"
+      ---
+      Body
+      MD
+
+      result = processor.parse(raw)
+      result[:date].should be_nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Anchor links and TOC
+  # ---------------------------------------------------------------------------
+  describe "render_with_anchors" do
+    it "inserts anchor links before heading content" do
+      content = "# Hello World"
+      html, _toc = processor.render_with_anchors(content, anchor_style: "before")
+      html.should contain("anchor")
+      html.should contain("href=\"#hello-world\"")
+    end
+
+    it "inserts anchor links after heading content" do
+      content = "# Hello World"
+      html, _toc = processor.render_with_anchors(content, anchor_style: "after")
+      html.should contain("anchor")
+      html.should contain("href=\"#hello-world\"")
+    end
+
+    it "does not insert anchors with default heading style" do
+      content = "# Hello World"
+      html, _toc = processor.render_with_anchors(content, anchor_style: "heading")
+      html.should_not contain("class=\"anchor\"")
+    end
+
+    it "returns TOC headers" do
+      content = "# H1\n## H2\n### H3"
+      _html, toc = processor.render_with_anchors(content)
+      toc.size.should be >= 1
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # TOC with duplicate heading IDs
+  # ---------------------------------------------------------------------------
+  describe "TOC duplicate heading IDs" do
+    it "generates unique IDs for duplicate headings" do
+      content = "## Section\n\nContent\n\n## Section\n\nMore content\n\n## Section"
+      html, toc = Hwaro::Processor::Markdown.render(content)
+      # All three headings should have unique IDs
+      html.should contain("id=\"section\"")
+      html.should contain("id=\"section-1\"")
+      html.should contain("id=\"section-2\"")
+    end
+
+    it "builds nested TOC tree" do
+      content = "## Parent\n\n### Child\n\n## Sibling"
+      _html, toc = Hwaro::Processor::Markdown.render(content)
+      toc.size.should eq(2) # Parent and Sibling at top level
+      toc[0].children.size.should eq(1) # Child under Parent
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Markdown render edge cases
+  # ---------------------------------------------------------------------------
+  describe "render edge cases" do
+    it "handles content with no headings or images" do
+      content = "Just a simple paragraph."
+      html, toc = Hwaro::Processor::Markdown.render(content)
+      html.should contain("simple paragraph")
+      toc.should be_empty
+    end
+
+    it "handles empty content" do
+      html, toc = Hwaro::Processor::Markdown.render("")
+      toc.should be_empty
+    end
+
+    it "handles content with only inline HTML" do
+      content = "Hello <strong>world</strong>"
+      html, _toc = Hwaro::Processor::Markdown.render(content)
+      html.should contain("<strong>world</strong>")
     end
   end
 end

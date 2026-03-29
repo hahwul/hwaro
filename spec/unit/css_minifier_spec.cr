@@ -658,5 +658,38 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain(".class-100{")
       result.should_not contain("\n")
     end
+
+    it "handles nested calc() expressions" do
+      css = ".box { width: calc(100% - calc(2 * 20px)); }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("calc(100% - calc(2 * 20px))")
+    end
+
+    it "handles url() without quotes" do
+      css = "body { background: url(image.png); }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("url(image.png)")
+    end
+
+    it "handles @import with string (no url)" do
+      css = "@import \"base.css\";\nbody { color: red; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("\"base.css\"")
+      result.should contain("color:red")
+    end
+
+    it "handles CSS with only whitespace between rules" do
+      css = ".a { color: red; }    .b { color: blue; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain(".a{color:red}")
+      result.should contain(".b{color:blue}")
+    end
+
+    it "handles comment inside url() value (preserved)" do
+      css = "body { background: url('path/to/file.png'); /* actual comment */ }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("url('path/to/file.png')")
+      result.should_not contain("actual comment")
+    end
   end
 end
