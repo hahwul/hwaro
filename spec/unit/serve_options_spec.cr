@@ -10,6 +10,7 @@ describe Hwaro::Config::Options::ServeOptions do
       opts.base_url.should be_nil
       opts.drafts.should be_false
       opts.include_expired.should be_false
+      opts.include_future.should be_false
       opts.minify.should be_false
       opts.open_browser.should be_false
       opts.verbose.should be_false
@@ -44,6 +45,7 @@ describe Hwaro::Config::Options::ServeOptions do
         base_url: "https://example.com",
         drafts: true,
         include_expired: true,
+        include_future: true,
         minify: true,
         verbose: true,
         profile: true,
@@ -58,6 +60,7 @@ describe Hwaro::Config::Options::ServeOptions do
       build.base_url.should eq("https://example.com")
       build.drafts.should be_true
       build.include_expired.should be_true
+      build.include_future.should be_true
       build.minify.should be_true
       build.parallel.should be_true
       build.verbose.should be_true

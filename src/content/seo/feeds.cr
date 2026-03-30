@@ -144,12 +144,18 @@ module Hwaro
             pages = pages.first(config.feeds.limit)
           end
 
+          # Determine whether feed content will be plain text or HTML.
+          # get_content_for_feed returns plain text when:
+          # - full_content is false (uses description or 300-char summary)
+          # - truncate > 0 (strips HTML and truncates)
+          is_text = !config.feeds.full_content || config.feeds.truncate > 0
+
           # Generate feed content
           feed_content = case feed_type
                          when "atom"
-                           generate_atom(pages, config, filename, config.feeds.truncate > 0, feed_title, base_path, language)
+                           generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
                          else
-                           generate_rss(pages, config, filename, config.feeds.truncate > 0, feed_title, base_path, language)
+                           generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
                          end
 
           # Write feed file (basename prevents path traversal via config filename)

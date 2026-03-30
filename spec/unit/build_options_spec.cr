@@ -9,6 +9,7 @@ describe Hwaro::Config::Options::BuildOptions do
       opts.base_url.should be_nil
       opts.drafts.should be_false
       opts.include_expired.should be_false
+      opts.include_future.should be_false
       opts.minify.should be_false
       opts.parallel.should be_true
       opts.cache.should be_false
