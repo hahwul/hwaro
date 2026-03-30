@@ -77,7 +77,7 @@ module Hwaro
           fields.each do |field|
             case field
             when "title"
-              title = page.title
+              title = Utils::TextUtils.strip_html(page.title)
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               # Convert markdown to plain text
