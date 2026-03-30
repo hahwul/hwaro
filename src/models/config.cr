@@ -471,9 +471,9 @@ module Hwaro
         @safe = false
         @lazy_loading = false
         @emoji = false
-        @footnotes = false
-        @task_lists = false
-        @definition_lists = false
+        @footnotes = true
+        @task_lists = true
+        @definition_lists = true
         @mermaid = false
         @math = false
         @math_engine = "katex"
