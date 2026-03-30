@@ -169,6 +169,8 @@ module Hwaro
             output_dir: options.output_dir,
             base_url: options.base_url,
             drafts: options.drafts,
+            include_expired: options.include_expired,
+            include_future: options.include_future,
             minify: options.minify,
             parallel: options.parallel,
             cache: options.cache,
@@ -261,16 +263,24 @@ module Hwaro
           # to be excluded), so excluded pages' old entries are properly removed.
           update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
 
-          # Now identify pages that should be excluded (draft/expired)
+          # Now identify pages that should be excluded (draft/expired/future)
           excluded_pages = [] of Models::Page
+          now = Time.utc
           unless include_drafts
             excluded = changed_pages.select(&.draft)
             excluded_pages.concat(excluded)
             changed_pages.reject!(&.draft)
           end
-          expired = changed_pages.select { |p| p.expires.try { |e| e <= Time.utc } || false }
-          excluded_pages.concat(expired)
-          changed_pages.reject! { |p| p.expires.try { |e| e <= Time.utc } || false }
+          unless options.include_expired
+            expired = changed_pages.select { |p| p.expires.try { |e| e <= now } || false }
+            excluded_pages.concat(expired)
+            changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
+          end
+          unless options.include_future
+            future = changed_pages.select { |p| p.date.try { |d| d > now } || false }
+            excluded_pages.concat(future)
+            changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
+          end
 
           # Remove excluded pages from site indices and delete stale output files
           unless excluded_pages.empty?
@@ -515,6 +525,8 @@ module Hwaro
           output_dir : String = "public",
           base_url : String? = nil,
           drafts : Bool = false,
+          include_expired : Bool = false,
+          include_future : Bool = false,
           minify : Bool = false,
           parallel : Bool = true,
           cache : Bool = false,
@@ -555,6 +567,8 @@ module Hwaro
             output_dir: output_dir,
             base_url: base_url,
             drafts: drafts,
+            include_expired: include_expired,
+            include_future: include_future,
             minify: minify,
             parallel: parallel,
             cache: cache,

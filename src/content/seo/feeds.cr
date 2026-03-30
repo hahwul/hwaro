@@ -144,12 +144,18 @@ module Hwaro
             pages = pages.first(config.feeds.limit)
           end
 
+          # Determine whether feed content will be plain text or HTML.
+          # get_content_for_feed returns plain text when:
+          # - full_content is false (uses description or 300-char summary)
+          # - truncate > 0 (strips HTML and truncates)
+          is_text = !config.feeds.full_content || config.feeds.truncate > 0
+
           # Generate feed content
           feed_content = case feed_type
                          when "atom"
-                           generate_atom(pages, config, filename, config.feeds.truncate > 0, feed_title, base_path, language)
+                           generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
                          else
-                           generate_rss(pages, config, filename, config.feeds.truncate > 0, feed_title, base_path, language)
+                           generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
                          end
 
           # Write feed file (basename prevents path traversal via config filename)
@@ -206,7 +212,7 @@ module Hwaro
               str << "      <link>#{escaped_url}</link>\n"
               str << "      <guid>#{escaped_url}</guid>\n"
 
-              content = get_content_for_feed(page, config.feeds.truncate)
+              content = get_content_for_feed(page, config)
               str << "      <description>#{Utils::TextUtils.escape_xml(content)}</description>\n"
 
               if pub_date = page.date
@@ -264,7 +270,7 @@ module Hwaro
               entry_date = (page.updated || page.date || now).to_utc
               str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
 
-              content = get_content_for_feed(page, config.feeds.truncate)
+              content = get_content_for_feed(page, config)
               content_type = is_text ? "text" : "html"
               str << "    <content type=\"#{content_type}\">#{Utils::TextUtils.escape_xml(content)}</content>\n"
 
@@ -275,7 +281,19 @@ module Hwaro
           end
         end
 
-        private def self.get_content_for_feed(page : Models::Page, truncate : Int32) : String
+        private def self.get_content_for_feed(page : Models::Page, config : Models::Config) : String
+          truncate = config.feeds.truncate
+          full_content = config.feeds.full_content
+
+          # When full_content is false, prefer the front matter description
+          unless full_content
+            if desc = page.description
+              return desc unless desc.empty?
+            end
+            # Fall back to truncated content (default 300 chars)
+            truncate = 300 if truncate <= 0
+          end
+
           # Reuse already-rendered HTML from the Render phase when available,
           # avoiding an expensive duplicate Markdown → HTML conversion.
           html_content = if !page.content.empty?

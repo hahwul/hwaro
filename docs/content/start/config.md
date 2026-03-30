@@ -69,9 +69,9 @@ See [Build Hooks](/features/build-hooks/) for error handling and use cases.
 safe = false
 lazy_loading = true
 emoji = true
-footnotes = false
-task_lists = false
-definition_lists = false
+footnotes = true
+task_lists = true
+definition_lists = true
 mermaid = false
 math = false
 math_engine = "katex"
@@ -82,9 +82,9 @@ math_engine = "katex"
 | safe | bool | false | Strip raw HTML from markdown |
 | lazy_loading | bool | false | Automatically add `loading="lazy"` to images |
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
-| footnotes | bool | false | Enable footnote syntax (`[^1]`) |
-| task_lists | bool | false | Enable task list syntax (`- [ ]` / `- [x]`) |
-| definition_lists | bool | false | Enable definition list syntax (`Term\n: Definition`) |
+| footnotes | bool | true | Enable footnote syntax (`[^1]`) |
+| task_lists | bool | true | Enable task list syntax (`- [ ]` / `- [x]`) |
+| definition_lists | bool | true | Enable definition list syntax (`Term\n: Definition`) |
 | mermaid | bool | false | Render ` ```mermaid ` blocks as `<div class="mermaid">` |
 | math | bool | false | Enable math syntax (`$...$` and `$$...$$`) |
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |

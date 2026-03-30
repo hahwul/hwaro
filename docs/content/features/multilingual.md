@@ -360,15 +360,16 @@ language_name = "日本語"
 generate_feed = false   # No /ja/rss.xml will be generated
 ```
 
-Language feeds share the same `sections`, `limit`, and `truncate` settings from the global `[feeds]` config:
+Language feeds share the same `sections`, `limit`, `truncate`, and `full_content` settings from the global `[feeds]` config:
 
 ```toml
 [feeds]
 enabled = true
-type = "rss"       # or "atom"
+type = "rss"           # or "atom"
 limit = 20
 truncate = 0
-sections = []      # empty = all sections
+full_content = true    # false = description/summary only
+sections = []          # empty = all sections
 default_language_only = true
 ```
 

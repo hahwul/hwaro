@@ -353,6 +353,7 @@ module Hwaro
           # enabled = true
           # type = "rss"
           # limit = 10
+          # full_content = true
           # sections = []
 
           TOML
@@ -369,6 +370,7 @@ module Hwaro
           filename = ""             # Leave empty for default (rss.xml or atom.xml)
           type = "rss"              # "rss" or "atom"
           truncate = 0              # Truncate content to N characters (0 = full content)
+          full_content = true       # true = full HTML in feed, false = description/summary only
           limit = 10                # Maximum number of items in feed
           sections = []             # Limit to specific sections, e.g., ["posts"]
 

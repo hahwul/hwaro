@@ -66,8 +66,24 @@ Generate RSS feeds for your site and sections.
 ```toml
 [feeds]
 enabled = true
-limit = 20
+type = "rss"              # "rss" or "atom"
+limit = 20                # Maximum number of items
+truncate = 0              # Truncate to N characters (0 = no truncation)
+full_content = true       # true = full HTML body, false = description/summary only
+filename = ""             # Leave empty for default (rss.xml or atom.xml)
+sections = []             # Limit to specific sections, e.g., ["posts"]
 ```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enable feed generation |
+| `type` | `"rss"` | Feed format: `"rss"` or `"atom"` |
+| `limit` | `10` | Maximum number of items in feed |
+| `truncate` | `0` | Truncate content to N characters (0 = full content) |
+| `full_content` | `true` | `true` = full HTML in feed, `false` = use front matter `description` or auto-generated summary |
+| `filename` | `""` | Custom filename (empty = `rss.xml` or `atom.xml`) |
+| `sections` | `[]` | Limit feed to specific sections |
+| `default_language_only` | `true` | Multilingual: main feed includes default language only |
 
 ### Section Feeds
 
@@ -118,7 +134,7 @@ language_name = "日本語"
 generate_feed = false   # No /ja/rss.xml will be generated
 ```
 
-Language feeds share the same `sections`, `limit`, and `truncate` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, and Atom feeds include an `xml:lang` attribute. The feed title includes the language name (e.g., `"My Site (한국어)"`).
+Language feeds share the same `sections`, `limit`, `truncate`, and `full_content` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, and Atom feeds include an `xml:lang` attribute. The feed title includes the language name (e.g., `"My Site (한국어)"`).
 
 ### Template Links
 

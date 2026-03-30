@@ -26,6 +26,7 @@ module Hwaro
           # Content filtering
           DRAFTS_FLAG,
           INCLUDE_EXPIRED_FLAG,
+          INCLUDE_FUTURE_FLAG,
 
           # Build behavior
           MINIFY_FLAG,
@@ -104,6 +105,7 @@ module Hwaro
           # Content filtering
           drafts = false
           include_expired = false
+          include_future = false
 
           # Build behavior
           minify = false
@@ -136,6 +138,7 @@ module Hwaro
             # Content filtering
             CLI.register_flag(parser, DRAFTS_FLAG) { |_| drafts = true }
             CLI.register_flag(parser, INCLUDE_EXPIRED_FLAG) { |_| include_expired = true }
+            CLI.register_flag(parser, INCLUDE_FUTURE_FLAG) { |_| include_future = true }
 
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
@@ -163,6 +166,7 @@ module Hwaro
             base_url: base_url,
             drafts: drafts,
             include_expired: include_expired,
+            include_future: include_future,
             minify: minify,
             parallel: parallel,
             cache: cache,

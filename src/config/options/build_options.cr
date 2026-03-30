@@ -6,6 +6,7 @@ module Hwaro
         property base_url : String?
         property drafts : Bool
         property include_expired : Bool
+        property include_future : Bool
         property minify : Bool
         property parallel : Bool
         property cache : Bool
@@ -27,6 +28,7 @@ module Hwaro
           @base_url : String? = nil,
           @drafts : Bool = false,
           @include_expired : Bool = false,
+          @include_future : Bool = false,
           @minify : Bool = false,
           @parallel : Bool = true,
           @cache : Bool = false,

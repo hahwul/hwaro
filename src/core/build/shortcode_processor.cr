@@ -63,11 +63,11 @@ module Hwaro
         end
 
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, depth : Int32 = 0) : String
-          # 1. Block shortcodes: {% name(args) %}body{% end %}
-          processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
+          # 1. Block shortcodes: {% name(args) %}body{% end %} or {% name args %}body{% end %}
+          processed = content.gsub(/\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}(.*?)\{\%\s*end\s*\%\}/m) do |match|
             name = $1
-            args_str = $2
-            body = $3.strip
+            args_str = $2? || $3?
+            body = $4.strip
 
             # Recursively process nested shortcodes in body (with depth limit)
             if depth < MAX_SHORTCODE_NESTING && (body.includes?("{{") || body.includes?("{%"))

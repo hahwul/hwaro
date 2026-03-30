@@ -50,7 +50,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     # repeated traversals, and calls invalidate_all_pages_cache at most once.
     include_drafts = ctx.options.drafts
     filter_expired = !ctx.options.include_expired
-    now = filter_expired ? Time.utc : Time.utc # evaluated once
+    filter_future = !ctx.options.include_future
+    now = Time.utc
     soon = now + 7.days
 
     # Warn about pages expiring soon (before filtering)
@@ -68,6 +69,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     sections_before = ctx.sections.size
     failed_count = 0
     expired_count = 0
+    future_count = 0
 
     filter = ->(p : Models::Page) do
       if p.parse_failed
@@ -77,6 +79,9 @@ module Hwaro::Core::Build::Phases::ParseContent
         true
       elsif filter_expired && (p.expires.try { |e| e <= now } || false)
         expired_count += 1
+        true
+      elsif filter_future && (p.date.try { |d| d > now } || false)
+        future_count += 1
         true
       else
         false
@@ -92,6 +97,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
 
     Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
+    Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
     Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
 
     # Show included draft content paths when --drafts flag is used

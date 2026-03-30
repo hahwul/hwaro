@@ -48,6 +48,7 @@ module Hwaro
     PROFILE_FLAG               = FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile")
     DRAFTS_FLAG                = FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content")
     INCLUDE_EXPIRED_FLAG       = FlagInfo.new(short: nil, long: "--include-expired", description: "Include expired content")
+    INCLUDE_FUTURE_FLAG        = FlagInfo.new(short: nil, long: "--include-future", description: "Include future-dated content")
     MINIFY_FLAG                = FlagInfo.new(short: nil, long: "--minify", description: "Minify HTML output (and minified json, xml)")
     BASE_URL_FLAG              = FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL")
     SKIP_CACHE_BUSTING_FLAG    = FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources")

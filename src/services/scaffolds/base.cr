@@ -110,8 +110,8 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ page.description | e }}">
+            <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
             {{ og_all_tags }}
             #{styles}
             {{ highlight_css }}
@@ -409,6 +409,7 @@ module Hwaro
           filename = ""             # Leave empty for default (rss.xml or atom.xml)
           type = "rss"              # "rss" or "atom"
           truncate = 0              # Truncate content to N characters (0 = full content)
+          full_content = true       # true = full HTML in feed, false = description/summary only
           limit = 10                # Maximum number of items in feed
           sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
           # default_language_only = true  # Multilingual: true = main feed has default language only
