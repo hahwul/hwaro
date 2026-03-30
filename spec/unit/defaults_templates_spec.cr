@@ -5,9 +5,9 @@ describe Hwaro::Services::Defaults::TemplateSamples do
   describe ".header" do
     it "returns a string containing expected tags" do
       header = Hwaro::Services::Defaults::TemplateSamples.header
-      header.should contain("{{ site.description }}")
-      header.should contain("{{ page.title }}")
-      header.should contain("{{ site.title }}")
+      header.should contain("{{ site.description | e }}")
+      header.should contain("{{ page.title | e }}")
+      header.should contain("{{ site.title | e }}")
       header.should contain("{{ page.section }}")
       header.should contain("{{ base_url }}")
     end
@@ -32,7 +32,7 @@ describe Hwaro::Services::Defaults::TemplateSamples do
   describe ".section" do
     it "returns a string containing expected tags" do
       section = Hwaro::Services::Defaults::TemplateSamples.section
-      section.should contain("{{ page.title }}")
+      section.should contain("{{ page.title | e }}")
       section.should contain("{{ section.list }}")
       section.should contain("{{ pagination }}")
     end
@@ -50,7 +50,7 @@ describe Hwaro::Services::Defaults::TemplateSamples do
     it "returns a string containing expected tags" do
       alert = Hwaro::Services::Defaults::TemplateSamples.alert
       alert.should contain("{{ type | upper }}")
-      alert.should contain("{{ message }}")
+      alert.should contain("{{ body }}")
     end
   end
 
@@ -58,7 +58,7 @@ describe Hwaro::Services::Defaults::TemplateSamples do
     it "returns a string containing expected tags" do
       taxonomy = Hwaro::Services::Defaults::TemplateSamples.taxonomy
       taxonomy.should contain("Browse all terms in this taxonomy")
-      taxonomy.should contain("{{ page.title }}")
+      taxonomy.should contain("{{ page.title | e }}")
     end
   end
 
@@ -66,7 +66,7 @@ describe Hwaro::Services::Defaults::TemplateSamples do
     it "returns a string containing expected tags" do
       taxonomy_term = Hwaro::Services::Defaults::TemplateSamples.taxonomy_term
       taxonomy_term.should contain("Posts tagged with this term")
-      taxonomy_term.should contain("{{ page.title }}")
+      taxonomy_term.should contain("{{ page.title | e }}")
     end
   end
 end

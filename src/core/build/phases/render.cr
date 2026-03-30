@@ -37,6 +37,17 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
+    # Detect duplicate output paths (slug collisions)
+    seen_urls = Hash(String, String).new
+    all_pages.each do |page|
+      url = page.url
+      if prev_path = seen_urls[url]?
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' overwrites '#{prev_path}'"
+      else
+        seen_urls[url] = page.path
+      end
+    end
+
     profiler.start_phase("Render")
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
       global_vars = build_global_vars(site, ctx.options.cache_busting)

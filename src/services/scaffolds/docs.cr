@@ -110,13 +110,14 @@ module Hwaro
         protected def header_template : String
           <<-HTML
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="{{ page_language }}">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ page.description | e }}">
+            <title>{{ page.title | e }} - {{ site.title | e }}</title>
             {{ og_all_tags }}
+            {{ hreflang_tags }}
             #{styles}
             {{ highlight_css }}
             {{ auto_includes_css }}
@@ -983,7 +984,7 @@ module Hwaro
           <div class="docs-container">
           #{docs_sidebar_html}
             <main class="docs-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
           {% include "footer.html" %}
           HTML
@@ -998,7 +999,7 @@ module Hwaro
           <div class="docs-container">
           #{docs_sidebar_html}
             <main class="docs-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
 
               <h2>In This Section</h2>
@@ -1327,7 +1328,7 @@ Shortcodes are reusable content snippets you can embed in your Markdown.
 In your Markdown content:
 
 ```jinja
-{{ alert(type="info", message="This is an info alert") }}
+{{ alert(type="info", body="This is an info alert") }}
 ```
 
 ## Built-in Shortcodes
@@ -1337,7 +1338,7 @@ In your Markdown content:
 Display an alert box:
 
 ```jinja
-{{ alert(type="warning", message="Be careful!") }}
+{{ alert(type="warning", body="Be careful!") }}
 ```
 
 Types: `info`, `warning`, `tip`, `note`
@@ -1361,9 +1362,9 @@ Types: `info`, `warning`, `tip`, `note`
 
 ```jinja
 {# templates/shortcodes/alert.html #}
-{% if type and message %}
+{% if type and body %}
 <div class="alert alert-{{ type }}">
-  {{ message | safe }}
+  {{ body | safe }}
 </div>
 {% endif %}
 ```

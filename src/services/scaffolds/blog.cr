@@ -117,13 +117,14 @@ module Hwaro
         protected def header_template : String
           <<-HTML
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="{{ page_language }}">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ page.description | e }}">
+            <title>{{ page.title | e }} - {{ site.title | e }}</title>
             {{ og_all_tags }}
+            {{ hreflang_tags }}
             #{styles}
             {{ highlight_css }}
             {{ auto_includes_css }}
@@ -796,7 +797,7 @@ module Hwaro
           #{search_overlay_html}
           <div class="blog-container">
             <main class="blog-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
           {% include "footer.html" %}
           HTML
@@ -810,7 +811,7 @@ module Hwaro
           #{search_overlay_html}
           <div class="blog-container">
             <main class="blog-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
 
               <ul class="section-list">
@@ -831,7 +832,7 @@ module Hwaro
             <main class="blog-main">
               <article class="post">
                 <header class="post-header">
-                  <h1>{{ page.title }}</h1>
+                  <h1>{{ page.title | e }}</h1>
                   <div class="post-meta">
                     <time>{{ page.date }}</time>
                   </div>
@@ -926,8 +927,6 @@ module Hwaro
           <<-CONTENT
 +++
 title = "Posts"
-paginate = 10
-pagination_enabled = true
 +++
 
 Browse all blog posts below.
