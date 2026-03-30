@@ -110,8 +110,8 @@ module Hwaro
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ page.description | e }}">
+            <title>{{ page.title | e }} - {{ site.title | e }}</title>
             {{ og_all_tags }}
             #{styles}
             {{ highlight_css }}
