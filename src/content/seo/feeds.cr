@@ -24,6 +24,10 @@ module Hwaro
           if config.feeds.enabled
             site_pages = pages.reject { |p| p.draft || !p.render || p.is_a?(Models::Section) }
 
+            # Deduplicate by URL (keep last occurrence, matching build behavior)
+            seen_urls = Set(String).new
+            site_pages = site_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse
+
             # Filter by section if configured for main feed
             if !config.feeds.sections.empty?
               site_pages = site_pages.select { |p|

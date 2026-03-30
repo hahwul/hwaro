@@ -66,12 +66,12 @@ module Hwaro
         private def bare_header_template : String
           <<-HTML
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="{{ page_language }}">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ page.description | e }}">
+            <title>{{ page.title | e }} - {{ site.title | e }}</title>
           </head>
           <body>
             <header>
@@ -101,7 +101,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main>
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
               <ul>
                 {{ section.list }}
@@ -130,7 +130,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main>
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
             </main>
           {% include "footer.html" %}
@@ -142,7 +142,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main>
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
             </main>
           {% include "footer.html" %}

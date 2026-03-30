@@ -97,7 +97,7 @@ module Hwaro
         protected def alert_shortcode : String
           <<-HTML
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-            <strong>{{ type | upper }}:</strong> {{ message }}
+            <strong>{{ type | upper }}:</strong> {{ body }}
           </div>
           HTML
         end
@@ -106,13 +106,14 @@ module Hwaro
         protected def header_template : String
           <<-HTML
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="{{ page_language }}">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <meta name="description" content="{{ page.description | e }}">
             <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
             {{ og_all_tags }}
+            {{ hreflang_tags }}
             #{styles}
             {{ highlight_css }}
             {{ auto_includes_css }}
@@ -157,7 +158,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               {{ content }}
               <ul class="section-list">
                 {{ section.list }}
@@ -186,7 +187,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
               {{ content }}
             </main>
@@ -199,7 +200,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
             <main class="site-main">
-              <h1>{{ page.title }}</h1>
+              <h1>{{ page.title | e }}</h1>
               <p class="taxonomy-desc">Posts tagged with this term:</p>
               {{ content }}
             </main>

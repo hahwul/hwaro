@@ -5,12 +5,12 @@ module Hwaro
         def self.header : String
           <<-HTML
           <!DOCTYPE html>
-          <html lang="en">
+          <html lang="{{ page_language }}">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ site.description }}">
-            <title>{{ page.title }} - {{ site.title }}</title>
+            <meta name="description" content="{{ site.description | e }}">
+            <title>{{ page.title | e }} - {{ site.title | e }}</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2rem; color: #333; }
               header { margin-bottom: 2rem; border-bottom: 1px solid #eaeaea; padding-bottom: 1rem; }
@@ -65,7 +65,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page.title }}</h1>
+            <h1>{{ page.title | e }}</h1>
             {{ content }}
 
           <ul class="section-list">
@@ -93,7 +93,7 @@ module Hwaro
         def self.alert : String
           <<-HTML
           <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-            <strong>{{ type | upper }}:</strong> {{ message }}
+            <strong>{{ type | upper }}:</strong> {{ body }}
           </div>
           HTML
         end
@@ -102,7 +102,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page.title }}</h1>
+            <h1>{{ page.title | e }}</h1>
             <p>Browse all terms in this taxonomy:</p>
             {{ content }}
           </main>
@@ -114,7 +114,7 @@ module Hwaro
           <<-HTML
           {% include "header.html" %}
           <main>
-            <h1>{{ page.title }}</h1>
+            <h1>{{ page.title | e }}</h1>
             <p>Posts tagged with this term:</p>
             {{ content }}
           </main>

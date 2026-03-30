@@ -18,6 +18,10 @@ module Hwaro
 
           sitemap_pages = pages.select { |p| p.in_sitemap && p.render }
 
+          # Deduplicate by URL (keep last occurrence, matching build behavior)
+          seen_urls = Set(String).new
+          sitemap_pages = sitemap_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse
+
           # Filter out excluded paths
           unless site.config.sitemap.exclude.empty?
             excluded_paths = site.config.sitemap.exclude.map do |path|

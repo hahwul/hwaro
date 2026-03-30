@@ -22,6 +22,10 @@ module Hwaro
         # Filter out draft pages and pages with in_search_index = false
         search_pages = pages.reject { |p| p.draft || !p.in_search_index }
 
+        # Deduplicate by URL (keep last occurrence, matching build behavior)
+        seen_urls = Set(String).new
+        search_pages = search_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse
+
         # Filter out excluded paths
         unless config.search.exclude.empty?
           excluded_paths = config.search.exclude.map do |path|
