@@ -21,9 +21,9 @@ mermaid = true
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| task_lists | bool | false | Checkbox lists (`- [ ]` / `- [x]`) |
-| definition_lists | bool | false | Definition lists (`Term\n: Definition`) |
-| footnotes | bool | false | Footnotes (`[^1]`) |
+| task_lists | bool | true | Checkbox lists (`- [ ]` / `- [x]`) |
+| definition_lists | bool | true | Definition lists (`Term\n: Definition`) |
+| footnotes | bool | true | Footnotes (`[^1]`) |
 | math | bool | false | Math expressions (`$...$` and `$$...$$`) |
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
 | mermaid | bool | false | Mermaid diagram blocks |

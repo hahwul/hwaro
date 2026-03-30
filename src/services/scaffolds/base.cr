@@ -409,6 +409,7 @@ module Hwaro
           filename = ""             # Leave empty for default (rss.xml or atom.xml)
           type = "rss"              # "rss" or "atom"
           truncate = 0              # Truncate content to N characters (0 = full content)
+          full_content = true       # true = full HTML in feed, false = description/summary only
           limit = 10                # Maximum number of items in feed
           sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
           # default_language_only = true  # Multilingual: true = main feed has default language only

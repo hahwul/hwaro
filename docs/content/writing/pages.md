@@ -106,6 +106,21 @@ Build with expired content: `hwaro build --include-expired`
 
 Pages expiring within 7 days generate a build warning.
 
+### Future-Dated Content
+
+Pages with a `date` in the future are automatically excluded from builds. This is useful for scheduling content.
+
+```markdown
++++
+title = "Coming Soon"
+date = 2099-01-01
++++
+
+Published only after the date arrives.
+```
+
+Build with future content: `hwaro build --include-future`
+
 ### Series Post
 
 ```markdown
