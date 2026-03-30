@@ -111,7 +111,7 @@ module Hwaro
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <meta name="description" content="{{ page.description | e }}">
-            <title>{{ page.title | e }} - {{ site.title | e }}</title>
+            <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
             {{ og_all_tags }}
             #{styles}
             {{ highlight_css }}
