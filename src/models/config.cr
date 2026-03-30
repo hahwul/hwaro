@@ -87,6 +87,7 @@ module Hwaro
       property limit : Int32
       property sections : Array(String)
       property default_language_only : Bool
+      property full_content : Bool
 
       def initialize
         @enabled = false
@@ -96,6 +97,7 @@ module Hwaro
         @limit = 10
         @sections = [] of String
         @default_language_only = true
+        @full_content = true
       end
     end
 
@@ -863,6 +865,7 @@ module Hwaro
           config.feeds.sections = sections.compact_map(&.as_s?)
         end
         config.feeds.default_language_only = bool_value(s["default_language_only"]?, config.feeds.default_language_only)
+        config.feeds.full_content = bool_value(s["full_content"]?, config.feeds.full_content)
       end
 
       private def self.load_search(config : Config)
