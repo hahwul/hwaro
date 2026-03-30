@@ -99,11 +99,22 @@ module Hwaro
         end
 
         private def filter_drafts(ctx : Core::Lifecycle::BuildContext)
-          unless ctx.options.drafts
-            ctx.pages.reject! { |p| p.draft }
-            ctx.sections.reject! { |s| s.draft }
-            ctx.invalidate_all_pages_cache
+          include_drafts = ctx.options.drafts
+          filter_expired = !ctx.options.include_expired
+          filter_future = !ctx.options.include_future
+          now = Time.utc
+
+          filter = ->(p : Models::Page) do
+            (!include_drafts && p.draft) ||
+              (filter_expired && (p.expires.try { |e| e <= now } || false)) ||
+              (filter_future && (p.date.try { |d| d > now } || false))
           end
+
+          before = ctx.pages.size + ctx.sections.size
+          ctx.pages.reject!(&filter)
+          ctx.sections.reject!(&filter)
+          after = ctx.pages.size + ctx.sections.size
+          ctx.invalidate_all_pages_cache if before != after
         end
 
         private def calculate_urls(ctx : Core::Lifecycle::BuildContext)
