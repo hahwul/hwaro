@@ -5,10 +5,12 @@ default:
 
 # Serve documents page with builded binary
 dev:
+    @[ -f bin/hwaro ] || just build
     bin/hwaro serve -i docs
 
 # Build binary
 build:
+    shards install
     shards build
 
 # Run all tests
@@ -18,6 +20,12 @@ test:
 # Fix lint
 fix:
     crystal tool format
+
+# Clean build artifacts
+clean:
+    rm -f src/ext/stb_impl.o
+    rm -rf bin/
+    rm -rf lib/
 
 # Check version consistency
 alias vc := version-check
