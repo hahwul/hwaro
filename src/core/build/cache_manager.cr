@@ -59,7 +59,7 @@ module Hwaro
         private class Layer
           property name : String
           property description : String
-          property runtime : Bool  # true = per-build runtime cache; false = persistent
+          property runtime : Bool # true = per-build runtime cache; false = persistent
           property clear_proc : Proc(Nil)
           property stats : CacheStats
 

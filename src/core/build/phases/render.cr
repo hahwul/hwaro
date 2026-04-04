@@ -556,14 +556,14 @@ module Hwaro::Core::Build::Phases::Render
       # re-parsing the template AST on every page render.
       cache_key = processed_template.hash
       crinja_template = if cached = cache[cache_key]?
-                           @cache_manager.record_hit("compiled_templates")
-                           cached
-                         else
-                           @cache_manager.record_miss("compiled_templates")
-                           compiled = env.from_string(processed_template)
-                           cache[cache_key] = compiled
-                           compiled
-                         end
+                          @cache_manager.record_hit("compiled_templates")
+                          cached
+                        else
+                          @cache_manager.record_miss("compiled_templates")
+                          compiled = env.from_string(processed_template)
+                          cache[cache_key] = compiled
+                          compiled
+                        end
       crinja_template.render(vars)
     rescue ex : Crinja::TemplateNotFoundError
       msg = "Template error for #{page.path}: #{ex.message}"

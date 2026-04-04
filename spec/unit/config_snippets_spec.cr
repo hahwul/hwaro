@@ -120,9 +120,9 @@ describe Hwaro::Services::ConfigSnippets do
 
   describe "all snippets are non-empty strings" do
     {% for method in ["plugins", "highlight", "og", "sitemap", "robots", "llms",
-                       "feeds", "build", "permalinks", "auto_includes", "series",
-                       "related", "search", "pagination", "markdown", "assets",
-                       "image_processing", "deployment", "pwa", "amp"] %}
+                      "feeds", "build", "permalinks", "auto_includes", "series",
+                      "related", "search", "pagination", "markdown", "assets",
+                      "image_processing", "deployment", "pwa", "amp"] %}
       it "{{method.id}}(commented: true) is non-empty" do
         Hwaro::Services::ConfigSnippets.{{method.id}}(commented: true).should_not be_empty
       end

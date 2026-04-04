@@ -1530,7 +1530,7 @@ describe Hwaro::Content::Processors::Markdown do
     it "builds nested TOC tree" do
       content = "## Parent\n\n### Child\n\n## Sibling"
       _html, toc = Hwaro::Processor::Markdown.render(content)
-      toc.size.should eq(2) # Parent and Sibling at top level
+      toc.size.should eq(2)             # Parent and Sibling at top level
       toc[0].children.size.should eq(1) # Child under Parent
     end
   end

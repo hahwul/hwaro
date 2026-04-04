@@ -78,10 +78,10 @@ module Hwaro
 
         # Extract base path from base_url for subpath deployments
         base_path = unless config.base_url.empty?
-                      URI.parse(config.base_url).path.rstrip("/")
-                    else
-                      ""
-                    end
+          URI.parse(config.base_url).path.rstrip("/")
+        else
+          ""
+        end
 
         pages.map do |page|
           data = {} of String => String | Array(String)

@@ -162,7 +162,7 @@ describe Hwaro::Core::Build::CacheManager do
 
     it "ignores unregistered names" do
       mgr = Hwaro::Core::Build::CacheManager.new
-      mgr.clear("nonexistent")  # should not raise
+      mgr.clear("nonexistent") # should not raise
     end
 
     it "preserves stats when reset_stats: false" do
@@ -188,7 +188,7 @@ describe Hwaro::Core::Build::CacheManager do
       mgr.record_hit("test")
 
       mgr.reset_stats
-      cleared.should be_false  # cache not cleared
+      cleared.should be_false # cache not cleared
       mgr.stats_for("test").not_nil![:hits].should eq(0)
     end
   end
@@ -227,8 +227,8 @@ describe Hwaro::Core::Build::CacheManager do
 
       # Further hits should not affect the already-returned snapshot
       mgr.record_hit("test")
-      snapshot[:hits].should eq(1)  # snapshot is frozen
-      mgr.stats_for("test").not_nil![:hits].should eq(2)  # new snapshot reflects update
+      snapshot[:hits].should eq(1)                       # snapshot is frozen
+      mgr.stats_for("test").not_nil![:hits].should eq(2) # new snapshot reflects update
     end
   end
 

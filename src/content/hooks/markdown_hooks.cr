@@ -106,8 +106,8 @@ module Hwaro
 
           filter = ->(p : Models::Page) do
             (!include_drafts && p.draft) ||
-              (filter_expired && (p.expires.try { |e| e <= now } || false)) ||
-              (filter_future && (p.date.try { |d| d > now } || false))
+            (filter_expired && (p.expires.try { |e| e <= now } || false)) ||
+            (filter_future && (p.date.try { |d| d > now } || false))
           end
 
           before = ctx.pages.size + ctx.sections.size
