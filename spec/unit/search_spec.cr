@@ -287,7 +287,8 @@ describe Hwaro::Content::Search do
         Hwaro::Content::Search.generate([page], config, output_dir)
 
         content = File.read(File.join(output_dir, "search.json"))
-        content.should contain("/test/")
+        parsed = JSON.parse(content)
+        parsed[0]["url"].as_s.should eq("/test/")
       end
     end
 
