@@ -307,16 +307,15 @@ hwaro tool convert to-yaml --json
 
 **Subcommands:**
 
-| Subcommand | Description |
-|------------|-------------|
-| [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
-| [list](/start/tools/list/) | List content files by status (all, drafts, published) |
-| [check-links](/start/tools/deadlink/) | Check for dead links in content files |
-| [doctor](/start/tools/doctor/) | Diagnose config and content issues |
-| [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
-| ci *(deprecated)* | Use `tool platform github-pages` instead |
-| import | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
-| [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
+| Category | Subcommand | Description |
+|----------|------------|-------------|
+| Content | [list](/start/tools/list/) | List content files by status (all, drafts, published) |
+| Content | [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
+| Content | [check-links](/start/tools/deadlink/) | Check for dead links in content files |
+| Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
+| Site | [doctor](/start/tools/doctor/) | Diagnose config and content issues |
+| Site | import | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
+| Site | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
 **Common Options:**
 

@@ -102,9 +102,13 @@ module Hwaro
           "Site"    => ["platform", "doctor", "import", "agents-md"],
         }
 
+        # Hidden from help but still executable (e.g. deprecated commands)
+        HIDDEN = Set{"ci"}
+
         private def print_help
-          max_len = ToolCommand.subcommands.max_of(&.name.size)
-          sub_by_name = ToolCommand.subcommands.index_by(&.name)
+          visible = ToolCommand.subcommands.reject { |s| HIDDEN.includes?(s.name) }
+          max_len = visible.max_of(&.name.size)
+          sub_by_name = visible.index_by(&.name)
 
           Logger.info "Usage: hwaro tool <subcommand> [options]"
           Logger.info ""
@@ -122,8 +126,8 @@ module Hwaro
             end
           end
 
-          # Show uncategorized commands (e.g. deprecated ones)
-          uncategorized = ToolCommand.subcommands.reject { |s| categorized.includes?(s.name) }
+          # Show uncategorized commands
+          uncategorized = visible.reject { |s| categorized.includes?(s.name) }
           unless uncategorized.empty?
             Logger.info ""
             Logger.info "  Other:"
