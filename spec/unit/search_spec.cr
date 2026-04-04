@@ -228,6 +228,70 @@ describe Hwaro::Content::Search do
       end
     end
 
+    it "prepends base_url path to URLs for subpath deployments" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title", "url"]
+      config.base_url = "https://example.github.io/mysite"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/get_started/installation/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/mysite/get_started/installation/")
+      end
+    end
+
+    it "prepends base_url path to fallback URL when url not in fields" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title"]
+      config.base_url = "https://example.github.io/mysite"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/get_started/installation/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/mysite/get_started/installation/")
+      end
+    end
+
+    it "does not modify URLs when base_url has no subpath" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title", "url"]
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        parsed = JSON.parse(content)
+        parsed[0]["url"].as_s.should eq("/test/")
+      end
+    end
+
     it "handles empty pages array" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true

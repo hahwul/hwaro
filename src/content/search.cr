@@ -4,6 +4,7 @@ require "../utils/logger"
 require "../utils/text_utils"
 require "./processors/markdown"
 require "json"
+require "uri"
 
 module Hwaro
   module Content
@@ -75,6 +76,13 @@ module Hwaro
         fields = config.search.fields.map(&.downcase)
         cjk = config.search.tokenize_cjk
 
+        # Extract base path from base_url for subpath deployments
+        base_path = unless config.base_url.empty?
+                      URI.parse(config.base_url).path.rstrip("/")
+                    else
+                      ""
+                    end
+
         pages.map do |page|
           data = {} of String => String | Array(String)
 
@@ -98,7 +106,7 @@ module Hwaro
             when "tags"
               data["tags"] = page.tags
             when "url"
-              data["url"] = page.url
+              data["url"] = base_path + page.url
             when "section"
               data["section"] = page.section
             when "description"
@@ -108,7 +116,7 @@ module Hwaro
           end
 
           # Always include URL even if not in fields list
-          data["url"] = page.url unless data.has_key?("url")
+          data["url"] = base_path + page.url unless data.has_key?("url")
 
           data
         end
