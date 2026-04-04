@@ -96,14 +96,42 @@ module Hwaro
           end
         end
 
+        # Category display order and membership for help output
+        CATEGORIES = {
+          "Content" => ["list", "convert", "check-links"],
+          "Site"    => ["platform", "doctor", "import", "agents-md"],
+        }
+
         private def print_help
           max_len = ToolCommand.subcommands.max_of(&.name.size)
+          sub_by_name = ToolCommand.subcommands.index_by(&.name)
+
           Logger.info "Usage: hwaro tool <subcommand> [options]"
           Logger.info ""
           Logger.info "Available subcommands:"
-          ToolCommand.subcommands.each do |sub|
-            Logger.info "  #{sub.name.ljust(max_len + 2)} #{sub.description}"
+
+          categorized = Set(String).new
+          CATEGORIES.each do |category, names|
+            Logger.info ""
+            Logger.info "  #{category}:"
+            names.each do |name|
+              if sub = sub_by_name[name]?
+                Logger.info "    #{sub.name.ljust(max_len + 2)} #{sub.description}"
+                categorized << name
+              end
+            end
           end
+
+          # Show uncategorized commands (e.g. deprecated ones)
+          uncategorized = ToolCommand.subcommands.reject { |s| categorized.includes?(s.name) }
+          unless uncategorized.empty?
+            Logger.info ""
+            Logger.info "  Other:"
+            uncategorized.each do |sub|
+              Logger.info "    #{sub.name.ljust(max_len + 2)} #{sub.description}"
+            end
+          end
+
           Logger.info ""
           Logger.info "Run 'hwaro tool <subcommand> --help' for more information on a subcommand."
         end
