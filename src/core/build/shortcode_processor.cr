@@ -20,8 +20,8 @@ module Hwaro
         # NOTE: POSITIONAL_ARG_REGEX is reserved for future use
         # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
         MAX_SHORTCODE_NESTING = 5
-        BLOCK_OPEN_RE  = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
-        BLOCK_CLOSE_RE = /\{\%\s*end\s*\%\}/
+        BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
+        BLOCK_CLOSE_RE        = /\{\%\s*end\s*\%\}/
 
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
