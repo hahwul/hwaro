@@ -24,6 +24,7 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'release')
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: x86_64
