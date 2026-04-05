@@ -33,6 +33,7 @@ module Hwaro
         "image_processing" => "Image resizing and LQIP placeholder generation",
         "pwa"              => "Progressive Web App (manifest.json, service worker)",
         "amp"              => "AMP page generation",
+        "doctor"           => "Doctor diagnostics settings (ignore rules)",
       }
 
       # Sub-sections that doctor checks when the parent section exists
@@ -129,6 +130,36 @@ module Hwaro
           # enabled = true
           # path_prefix = "amp"        # Output under /amp/ prefix
           # sections = ["posts"]       # Limit to specific sections (empty = all)
+
+          TOML
+        end
+      end
+
+      def self.doctor(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+          # =============================================================================
+          # Doctor
+          # =============================================================================
+          # Configure doctor diagnostics behavior
+
+          # [doctor]
+          # ignore = ["content-draft", "content-description-missing"]
+
+          TOML
+        else
+          <<-TOML
+
+          # =============================================================================
+          # Doctor
+          # =============================================================================
+          # Configure doctor diagnostics behavior
+          # Add rule IDs to the ignore list to suppress known issues
+          # Run `hwaro doctor --json` to see rule IDs in the output
+
+          [doctor]
+          ignore = []
 
           TOML
         end
@@ -852,6 +883,7 @@ module Hwaro
         when "image_processing"      then image_processing(commented: true)
         when "pwa"                   then pwa(commented: true)
         when "amp"                   then amp(commented: true)
+        when "doctor"                then doctor(commented: true)
         when "content.files"         then content_files
         when "og.auto_image"         then og_auto_image
         when "image_processing.lqip" then image_processing_lqip
