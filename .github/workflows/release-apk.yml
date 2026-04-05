@@ -81,7 +81,7 @@ jobs:
           pkgname=hwaro
           pkgver=${{ env.VERSION }}
           pkgrel=0
-          pkgdesc="Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface."
+          pkgdesc="Lightweight and fast Static Site Generator(SSG) written in Crystal."
           url="https://github.com/hahwul/hwaro"
           arch="${{ matrix.arch }}"
           license="MIT"
