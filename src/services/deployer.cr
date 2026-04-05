@@ -211,13 +211,13 @@ module Hwaro
 
         Logger.info "Plan: copy #{to_copy.size}, delete #{to_delete.size}, skip #{skipped}"
 
-        if effective.confirm && !confirm?("Proceed with deploy to #{dest_dir}?")
-          Logger.warn "Cancelled."
+        if effective.dry_run
+          log_plan(to_copy, to_delete)
           return true
         end
 
-        if effective.dry_run
-          log_plan(to_copy, to_delete)
+        if effective.confirm && !confirm?("Proceed with deploy to #{dest_dir}?")
+          Logger.warn "Cancelled."
           return true
         end
 

@@ -87,17 +87,21 @@ module Hwaro
           end
         end
 
-        # Record a cache hit for the named layer (lock-free).
+        # Record a cache hit for the named layer.
         def record_hit(name : String)
-          if layer = @layers[name]?
-            layer.stats.increment_hit
+          @mutex.synchronize do
+            if layer = @layers[name]?
+              layer.stats.increment_hit
+            end
           end
         end
 
-        # Record a cache miss for the named layer (lock-free).
+        # Record a cache miss for the named layer.
         def record_miss(name : String)
-          if layer = @layers[name]?
-            layer.stats.increment_miss
+          @mutex.synchronize do
+            if layer = @layers[name]?
+              layer.stats.increment_miss
+            end
           end
         end
 
@@ -142,7 +146,9 @@ module Hwaro
 
         # Reset all hit/miss counters without clearing cache contents.
         def reset_stats
-          @layers.each_value { |layer| layer.stats.reset }
+          @mutex.synchronize do
+            @layers.each_value { |layer| layer.stats.reset }
+          end
         end
 
         # Get an immutable stats snapshot for a specific cache layer.

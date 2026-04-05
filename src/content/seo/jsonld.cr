@@ -153,7 +153,7 @@ module Hwaro
           return "" if steps.empty?
 
           base = config.base_url_stripped
-          url = "#{base}#{page.url}"
+          url = "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
 
           json = JSON.build do |j|
             j.object do

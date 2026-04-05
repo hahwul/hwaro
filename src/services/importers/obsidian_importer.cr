@@ -210,12 +210,20 @@ module Hwaro
           tags = [] of String
           # Skip code blocks when extracting tags
           in_code_block = false
+          fence_close_re : Regex? = nil
           body.each_line do |line|
-            if line.starts_with?("```")
-              in_code_block = !in_code_block
+            if in_code_block
+              if fence_close_re.try(&.match(line))
+                in_code_block = false
+                fence_close_re = nil
+              end
               next
             end
-            next if in_code_block
+            if match = line.match(/^(\s*(`{3,}|~{3,}))/)
+              in_code_block = true
+              fence_close_re = Regex.new("^\\s*#{Regex.escape(match[2])}\\s*$")
+              next
+            end
             # Skip headings (all markdown heading levels)
             next if line.matches?(/^\s*\#{1,6}\s/)
 
@@ -251,11 +259,17 @@ module Hwaro
 
           # Remove inline tags (already extracted to frontmatter)
           in_code_block = false
+          fence_close_re : Regex? = nil
           lines = result.split("\n").map do |line|
-            if line.starts_with?("```")
-              in_code_block = !in_code_block
+            if in_code_block
+              if fence_close_re.try(&.match(line))
+                in_code_block = false
+                fence_close_re = nil
+              end
               line
-            elsif in_code_block
+            elsif (fence_match = line.match(/^(\s*(`{3,}|~{3,}))/))
+              in_code_block = true
+              fence_close_re = Regex.new("^\\s*#{Regex.escape(fence_match[2])}\\s*$")
               line
             elsif line.matches?(/^\s*\#{1,6}\s/)
               # Preserve markdown headings

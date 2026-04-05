@@ -373,4 +373,20 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should eq(content)
     end
   end
+
+  describe "definition list with multiple blank lines" do
+    it "keeps single dl across double blank lines between term groups" do
+      content = "Term1\n: Def1\n\n\nTerm2\n: Def2"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.scan(/<dl>/).size.should eq(1)
+      result.should contain("<dt>Term1</dt>")
+      result.should contain("<dt>Term2</dt>")
+    end
+
+    it "keeps single dl across triple blank lines" do
+      content = "Term1\n: Def1\n\n\n\nTerm2\n: Def2"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.scan(/<dl>/).size.should eq(1)
+    end
+  end
 end

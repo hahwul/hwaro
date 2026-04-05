@@ -16,7 +16,7 @@ module Hwaro
       # Regex constants for HTML minification
       private REGEX_PRE_OPEN    = /<pre([^>]*)>\s*<code/
       private REGEX_PRE_CLOSE   = /<\/code>\s*<\/pre>/
-      private REGEX_COMMENTS    = /<!--(?!\[if|\s*more\s*-->).*?-->/m
+      private REGEX_COMMENTS    = /<!--(?!\[if|#|\s*more\s*-->).*?-->/m
       private REGEX_BLANK_LINES = /\n{3,}/
 
       # Perform conservative HTML minification

@@ -447,7 +447,7 @@ module Hwaro::Core::Build::Phases::Render
 
       ensure_dir(File.dirname(dest_path))
 
-      redirect_url = page.redirect_to || page.url
+      redirect_url = page.url
       File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
       Logger.action :create, dest_path, :yellow if verbose
     end

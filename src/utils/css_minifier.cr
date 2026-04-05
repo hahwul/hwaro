@@ -54,7 +54,20 @@ module Hwaro
         # ── Step 5: Remove space around structural characters ─────────────
         result = result.gsub(/\s*\{\s*/, "{")
         result = result.gsub(/\s*\}\s*/, "}")
-        result = result.gsub(/\s*:\s*/, ":")
+        # Only remove spaces around `:` inside declaration blocks (after `{`)
+        # and parenthesized expressions (e.g. media queries `(max-width: 600px)`)
+        # to preserve descendant combinator spaces in selectors (e.g. `div :hover`)
+        result = result.gsub(/\{([^}]*)\}/) do |block_match|
+          inner = $1
+          "{" + inner.gsub(/\s*:\s*/, ":") + "}"
+        end
+        # Only strip colon spaces inside at-rule conditions (e.g. @media (max-width: 600px))
+        # Avoid stripping inside functional pseudo-classes like :is(div :hover)
+        result = result.gsub(/@[\w-]+[^{]*\{/) do |at_header|
+          at_header.gsub(/\(([^)]*)\)/) do
+            "(" + $1.gsub(/\s*:\s*/, ":") + ")"
+          end
+        end
         result = result.gsub(/\s*;\s*/, ";")
         result = result.gsub(/\s*,\s*/, ",")
 
