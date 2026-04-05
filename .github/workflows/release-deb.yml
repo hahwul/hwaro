@@ -12,44 +12,47 @@ on:
         required: false
         type: boolean
         default: false
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Build and Release Binaries"]
+    types: [completed]
 permissions:
   contents: write
 jobs:
   build-deb:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'release')
     strategy:
       matrix:
         arch: [amd64, arm64]
     runs-on: ubuntu-latest
     steps:
-      - name: Install Crystal
-        uses: crystal-lang/install-crystal@v1
       - name: Checkout source code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.ref }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.event.workflow_run.head_branch }}
       - name: Get Version
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RAW_VERSION="${{ github.event.inputs.version }}"
           else
-            RAW_VERSION="${GITHUB_REF#refs/tags/}"
+            RAW_VERSION="${{ github.event.workflow_run.head_branch }}"
           fi
           # Strip leading 'v' if present
           VERSION="${RAW_VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Resolved version: $VERSION"
-      - name: Build hwaro Binary
+      - name: Download prebuilt binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker run --rm --platform linux/${{ matrix.arch }} -v $(pwd):/hwaro -w /hwaro --entrypoint="" 84codes/crystal:latest-alpine sh -c "
-            apk add --no-cache yaml-dev git curl &&
-            shards install --production &&
-            crystal build src/main.cr -o hwaro --release --no-debug --static
-          "
+          ARCH_NAME=${{ matrix.arch == 'amd64' && 'x86_64' || 'arm64' }}
+          gh release download "v${{ env.VERSION }}" \
+            --pattern "hwaro-v${{ env.VERSION }}-linux-${ARCH_NAME}" \
+            --output hwaro
+          chmod +x hwaro
       - name: Create Debian Package Structure
         run: |
           mkdir -p hwaro_${{ env.VERSION }}_${{ matrix.arch }}/DEBIAN
@@ -77,7 +80,7 @@ jobs:
           name: hwaro_${{ env.VERSION }}_${{ matrix.arch }}.deb
           path: hwaro_${{ env.VERSION }}_${{ matrix.arch }}.deb
       - name: Upload .deb to Release
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.upload_to_release)
+        if: github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.upload_to_release)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
