@@ -76,25 +76,24 @@ jobs:
           mkdir -p /home/builder/hwaro
           cp hwaro /home/builder/hwaro/
           cp LICENSE /home/builder/hwaro/
-          cat > /home/builder/hwaro/APKBUILD << 'APKEOF'
+          cat > /home/builder/hwaro/APKBUILD <<APKEOF
           # Maintainer: HAHWUL <hahwul@gmail.com>
           pkgname=hwaro
-          pkgver=${VERSION}
+          pkgver=${{ env.VERSION }}
           pkgrel=0
           pkgdesc="Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface."
           url="https://github.com/hahwul/hwaro"
-          arch="${APK_ARCH}"
+          arch="${{ matrix.arch }}"
           license="MIT"
           source=""
           options="!check"
 
           package() {
-            install -Dm755 "$srcdir/../hwaro" "$pkgdir/usr/bin/hwaro"
-            install -Dm644 "$srcdir/../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+          	install -Dm755 "\$srcdir/../hwaro" "\$pkgdir/usr/bin/hwaro"
+          	install -Dm644 "\$srcdir/../LICENSE" "\$pkgdir/usr/share/licenses/\$pkgname/LICENSE"
           }
           APKEOF
-          sed -i "s/\${VERSION}/${{ env.VERSION }}/g" /home/builder/hwaro/APKBUILD
-          sed -i "s/\${APK_ARCH}/${{ matrix.arch }}/g" /home/builder/hwaro/APKBUILD
+          sed -i 's/^          //' /home/builder/hwaro/APKBUILD
           chown -R builder:builder /home/builder/hwaro
 
       - name: Build .apk package
@@ -106,9 +105,7 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir -p output
-          cp /home/builder/packages/*/hwaro-${{ env.VERSION }}-r0.apk output/ 2>/dev/null || \
-          cp /home/builder/packages/*/*/hwaro-${{ env.VERSION }}-r0.apk output/ 2>/dev/null || \
-          find /home/builder/packages -name "*.apk" -exec cp {} output/ \;
+          find /home/builder/packages -name "*.apk" ! -name "APKINDEX*" -exec cp {} output/ \;
           ls -la output/
 
       - name: Upload artifacts
