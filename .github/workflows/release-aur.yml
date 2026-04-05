@@ -44,7 +44,7 @@ jobs:
       - name: Publish to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
         with:
-          pkgname: hwaro-bin
+          pkgname: hwaro
           pkgbuild: aur/PKGBUILD
           commit_username: hahwul
           commit_email: hahwul@gmail.com
