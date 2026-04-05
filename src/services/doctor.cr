@@ -14,7 +14,7 @@ require "./config_snippets"
 module Hwaro
   module Services
     # Represents a single diagnostic issue found by the doctor
-    record Issue, level : Symbol, category : String, file : String?, message : String do
+    record Issue, id : String, level : Symbol, category : String, file : String?, message : String do
       include JSON::Serializable
 
       @[JSON::Field(converter: Hwaro::Services::Issue::SymbolConverter)]
@@ -54,11 +54,12 @@ module Hwaro
 
       def run : Array(Issue)
         issues = [] of Issue
-        check_config(issues)
+        config = check_config(issues)
         check_templates(issues)
         check_content(issues)
         check_directory_structure(issues)
-        issues
+        ignore = config.try(&.doctor.ignore) || [] of String
+        issues.reject { |i| ignore.includes?(i.id) }
       end
 
       # Returns the list of config section keys missing from the user's config.toml
@@ -148,52 +149,52 @@ module Hwaro
         ConfigSnippets.doctor_snippet_for(key)
       end
 
-      private def check_config(issues : Array(Issue))
+      private def check_config(issues : Array(Issue)) : Models::Config?
         unless File.exists?(@config_path)
-          issues << Issue.new(level: :warning, category: "config", file: @config_path, message: "Config file not found")
-          return
+          issues << Issue.new(id: "config-not-found", level: :warning, category: "config", file: @config_path, message: "Config file not found")
+          return nil
         end
 
         begin
           config = Models::Config.load(@config_path)
         rescue ex
-          issues << Issue.new(level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
-          return
+          issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
+          return nil
         end
 
         # base_url check
         if config.base_url.empty?
-          issues << Issue.new(level: :warning, category: "config", file: @config_path, message: "base_url is not set")
+          issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path, message: "base_url is not set")
         else
           unless config.base_url.starts_with?("http://") || config.base_url.starts_with?("https://")
-            issues << Issue.new(level: :warning, category: "config", file: @config_path,
+            issues << Issue.new(id: "base-url-scheme", level: :warning, category: "config", file: @config_path,
               message: "base_url should start with http:// or https://")
           end
           if config.base_url.ends_with?("/")
-            issues << Issue.new(level: :warning, category: "config", file: @config_path,
+            issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
               message: "base_url should not end with a trailing slash")
           end
         end
 
         # title check
         if config.title == "Hwaro Site"
-          issues << Issue.new(level: :warning, category: "config", file: @config_path, message: "title is still the default value \"Hwaro Site\"")
+          issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path, message: "title is still the default value \"Hwaro Site\"")
         end
 
         # feeds: enabled but filename empty
         if config.feeds.enabled && config.feeds.filename.empty?
-          issues << Issue.new(level: :warning, category: "config", file: @config_path, message: "feeds.enabled is true but feeds.filename is not set")
+          issues << Issue.new(id: "feeds-filename-missing", level: :warning, category: "config", file: @config_path, message: "feeds.enabled is true but feeds.filename is not set")
         end
 
         # sitemap changefreq validity
         unless VALID_CHANGEFREQS.includes?(config.sitemap.changefreq)
-          issues << Issue.new(level: :warning, category: "config", file: @config_path,
+          issues << Issue.new(id: "sitemap-changefreq-invalid", level: :warning, category: "config", file: @config_path,
             message: "sitemap.changefreq \"#{config.sitemap.changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
         end
 
         # sitemap priority range
         unless 0.0 <= config.sitemap.priority <= 1.0
-          issues << Issue.new(level: :warning, category: "config", file: @config_path,
+          issues << Issue.new(id: "sitemap-priority-range", level: :warning, category: "config", file: @config_path,
             message: "sitemap.priority #{config.sitemap.priority} is out of range (expected: 0.0–1.0)")
         end
 
@@ -201,13 +202,13 @@ module Hwaro
         taxonomy_names = config.taxonomies.map(&.name)
         duplicates = taxonomy_names.tally.select { |_, count| count > 1 }.keys
         duplicates.each do |name|
-          issues << Issue.new(level: :warning, category: "config", file: @config_path,
+          issues << Issue.new(id: "taxonomy-duplicate", level: :warning, category: "config", file: @config_path,
             message: "Duplicate taxonomy name: \"#{name}\"")
         end
 
         # search format validity
         if config.search.enabled && !VALID_SEARCH_FORMATS.includes?(config.search.format)
-          issues << Issue.new(level: :warning, category: "config", file: @config_path,
+          issues << Issue.new(id: "search-format-invalid", level: :warning, category: "config", file: @config_path,
             message: "search.format \"#{config.search.format}\" is not supported (expected: #{VALID_SEARCH_FORMATS.join(", ")})")
         end
 
@@ -215,12 +216,14 @@ module Hwaro
         lang_codes = config.languages.keys
         lang_duplicates = lang_codes.tally.select { |_, count| count > 1 }.keys
         lang_duplicates.each do |code|
-          issues << Issue.new(level: :warning, category: "config", file: @config_path,
+          issues << Issue.new(id: "language-duplicate", level: :warning, category: "config", file: @config_path,
             message: "Duplicate language code: \"#{code}\"")
         end
 
         # Check for missing config sections
         check_missing_config_sections(issues)
+
+        config
       end
 
       private def check_missing_config_sections(issues : Array(Issue))
@@ -229,7 +232,7 @@ module Hwaro
 
         missing.each do |key|
           desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
-          issues << Issue.new(level: :info, category: "config_missing", file: @config_path,
+          issues << Issue.new(id: "missing-config-#{key}", level: :info, category: "config_missing", file: @config_path,
             message: "Missing config section [#{key}] (#{desc}) — run 'hwaro doctor --fix' to add it")
         end
       end
@@ -263,19 +266,19 @@ module Hwaro
 
         # title check
         if title.nil? || title == "Untitled"
-          issues << Issue.new(level: :warning, category: "content", file: file_path,
+          issues << Issue.new(id: "content-title-missing", level: :warning, category: "content", file: file_path,
             message: title.nil? ? "Missing title in frontmatter" : "Title is \"Untitled\"")
         end
 
         # description check
         if description.nil?
-          issues << Issue.new(level: :warning, category: "content", file: file_path,
+          issues << Issue.new(id: "content-description-missing", level: :warning, category: "content", file: file_path,
             message: "Missing description in frontmatter")
         end
 
         # draft info
         if draft == true
-          issues << Issue.new(level: :info, category: "content", file: file_path,
+          issues << Issue.new(id: "content-draft", level: :info, category: "content", file: file_path,
             message: "File is marked as draft")
         end
 
@@ -285,7 +288,7 @@ module Hwaro
         # internal link check
         check_internal_links(file_path, content, issues)
       rescue ex
-        issues << Issue.new(level: :error, category: "content", file: file_path,
+        issues << Issue.new(id: "content-read-error", level: :error, category: "content", file: file_path,
           message: "Failed to read file: #{ex.message}")
       end
 
@@ -307,7 +310,7 @@ module Hwaro
             end
             return result
           rescue ex
-            issues << Issue.new(level: :error, category: "content", file: file_path,
+            issues << Issue.new(id: "content-frontmatter-toml-error", level: :error, category: "content", file: file_path,
               message: "TOML frontmatter parse error: #{ex.message}")
             return nil
           end
@@ -334,7 +337,7 @@ module Hwaro
             end
             return nil
           rescue ex
-            issues << Issue.new(level: :error, category: "content", file: file_path,
+            issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
             return nil
           end
@@ -348,7 +351,7 @@ module Hwaro
         # Extract body after frontmatter, stripping code blocks
         body = strip_code_blocks(extract_body(content))
         body.scan(/!\[\s*\]\([^\)]+\)/) do |match|
-          issues << Issue.new(level: :warning, category: "content", file: file_path,
+          issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
             message: "Image missing alt text: #{match[0]}")
         end
       end
@@ -385,7 +388,7 @@ module Hwaro
                    File.exists?(File.join(target, "index.md"))
 
           unless exists
-            issues << Issue.new(level: :warning, category: "content", file: file_path,
+            issues << Issue.new(id: "content-internal-link-broken", level: :warning, category: "content", file: file_path,
               message: "Possible broken internal link: #{raw_url}")
           end
         end
@@ -394,7 +397,7 @@ module Hwaro
       # Check templates directory for required files
       private def check_templates(issues : Array(Issue))
         unless Dir.exists?(@templates_dir)
-          issues << Issue.new(level: :warning, category: "template", file: nil,
+          issues << Issue.new(id: "template-dir-missing", level: :warning, category: "template", file: nil,
             message: "Templates directory not found: #{@templates_dir}")
           return
         end
@@ -402,7 +405,7 @@ module Hwaro
         %w[page.html section.html].each do |required|
           path = File.join(@templates_dir, required)
           unless File.exists?(path)
-            issues << Issue.new(level: :warning, category: "template", file: path,
+            issues << Issue.new(id: "template-required-missing", level: :warning, category: "template", file: path,
               message: "Required template file missing: #{required}")
           end
         end
@@ -425,7 +428,7 @@ module Hwaro
         opens = stripped.scan(/\{%[-\s]*\b(if|for|block|macro)\b/).size
         closes = stripped.scan(/\{%[-\s]*\bend(if|for|block|macro)\b/).size
         if opens != closes
-          issues << Issue.new(level: :warning, category: "template", file: file_path,
+          issues << Issue.new(id: "template-unclosed-block", level: :warning, category: "template", file: file_path,
             message: "Possible unclosed template block tag (#{opens} opened, #{closes} closed)")
         end
 
@@ -433,11 +436,11 @@ module Hwaro
         open_vars = stripped.scan(/\{\{/).size
         close_vars = stripped.scan(/\}\}/).size
         if open_vars != close_vars
-          issues << Issue.new(level: :warning, category: "template", file: file_path,
+          issues << Issue.new(id: "template-mismatched-vars", level: :warning, category: "template", file: file_path,
             message: "Mismatched {{ }} variable tags (#{open_vars} opened, #{close_vars} closed)")
         end
       rescue ex
-        issues << Issue.new(level: :error, category: "template", file: file_path,
+        issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
           message: "Failed to read template: #{ex.message}")
       end
 
@@ -454,7 +457,7 @@ module Hwaro
           has_index = File.exists?(File.join(child, "_index.md")) ||
                       File.exists?(File.join(child, "_index.markdown"))
           unless has_index
-            issues << Issue.new(level: :info, category: "structure", file: child,
+            issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
               message: "Section directory missing _index.md: #{entry}/")
           end
         end

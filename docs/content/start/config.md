@@ -150,6 +150,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[pwa]` | [PWA](/features/pwa/) | Progressive Web App support |
 | `[amp]` | [AMP](/features/amp/) | Accelerated Mobile Pages |
 | `[deployment]` | [Deploy](/deploy/) | Deploy targets configuration |
+| `[doctor]` | [Doctor](/start/tools/doctor/) | Suppress known diagnostic issues |
 | `languages.*` | [Multilingual](/features/multilingual/) | Multi-language support |
 
 ## Plugins

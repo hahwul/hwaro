@@ -499,6 +499,32 @@ describe Hwaro::Services::Doctor do
       end
     end
 
+    describe "ignore rules" do
+      it "suppresses issues matching ignore list" do
+        config = %(title = "Hwaro Site"\nbase_url = "https://example.com"\n[doctor]\nignore = ["title-default"]\n)
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "title-default" }.should be_false
+      end
+
+      it "does not suppress issues not in ignore list" do
+        config = %(title = "Hwaro Site"\nbase_url = "https://example.com"\n[doctor]\nignore = ["base-url-missing"]\n)
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "title-default" }.should be_true
+      end
+
+      it "works with empty ignore list" do
+        config = %(title = "Hwaro Site"\nbase_url = "https://example.com"\n[doctor]\nignore = []\n)
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "title-default" }.should be_true
+      end
+
+      it "suppresses content issues" do
+        config = base_config("\n[doctor]\nignore = [\"content-description-missing\"]\n")
+        issues = run_doctor(config, {"test.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\n+++\n\nHello"})
+        issues.any? { |i| i.id == "content-description-missing" }.should be_false
+      end
+    end
+
     describe "directory structure" do
       it "reports info when section dir missing _index.md" do
         Dir.mktmpdir do |dir|

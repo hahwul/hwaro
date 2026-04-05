@@ -605,6 +605,14 @@ module Hwaro
       end
     end
 
+    class DoctorConfig
+      property ignore : Array(String)
+
+      def initialize
+        @ignore = [] of String
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -632,6 +640,7 @@ module Hwaro
       property pwa : PwaConfig
       property amp : AmpConfig
       property image_processing : ImageProcessingConfig
+      property doctor : DoctorConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -663,6 +672,7 @@ module Hwaro
         @pwa = PwaConfig.new
         @amp = AmpConfig.new
         @image_processing = ImageProcessingConfig.new
+        @doctor = DoctorConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -739,6 +749,7 @@ module Hwaro
         load_pwa(config)
         load_amp(config)
         load_image_processing(config)
+        load_doctor(config)
         load_deployment(config)
 
         config
@@ -1142,6 +1153,14 @@ module Hwaro
           config.image_processing.lqip_enabled = bool_value(lqip["enabled"]?, config.image_processing.lqip_enabled)
           config.image_processing.lqip_width = int_value(lqip["width"]?, config.image_processing.lqip_width).clamp(8, 128)
           config.image_processing.lqip_quality = int_value(lqip["quality"]?, config.image_processing.lqip_quality).clamp(1, 100)
+        end
+      end
+
+      private def self.load_doctor(config : Config)
+        return unless s = config.raw["doctor"]?.try(&.as_h?)
+
+        if ignore = s["ignore"]?.try(&.as_a?)
+          config.doctor.ignore = ignore.compact_map(&.as_s?)
         end
       end
 
