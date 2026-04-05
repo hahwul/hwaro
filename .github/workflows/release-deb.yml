@@ -68,7 +68,7 @@ jobs:
           Version: ${{ env.VERSION }}
           Architecture: ${{ matrix.arch }}
           Maintainer: HAHWUL <hahwul@gmail.com>, KSG <ksg97031@gmail.com>
-          Description: Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface.
+          Description: Lightweight and fast Static Site Generator(SSG) written in Crystal.
           Depends: libc6 (>= 2.17)
           EOF
       - name: Build .deb Package
