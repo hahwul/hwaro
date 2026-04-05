@@ -36,7 +36,11 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          apk add --no-cache alpine-sdk sudo github-cli
+          apk add --no-cache alpine-sdk sudo github-cli git
+
+      - name: Fix git safe directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout source code
         uses: actions/checkout@v6
