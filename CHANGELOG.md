@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.10.1
+
+### Added
+- `doctor.ignore_rules` config option to suppress known doctor issues (#318)
+- Alpine APK package build workflow (#311)
+- RPM package build workflow
+- AUR package and auto-publish workflow
+- APK, DEB, RPM, and AUR installation methods to docs
+
+### Changed
+- Optimize `.deb` build by reusing prebuilt release binaries (#310)
+- Use ARM native runners for CI Docker build instead of QEMU emulation (#309)
+- Improve GHCR build performance: fix cache scope and parallelize platforms (#308)
+- Rename AUR package from `hwaro-bin` to `hwaro`
+
+### Fixed
+- 19 bugs across core, content, services, and utils modules (#319)
+- Config double parsing and doctor self-report issue
+- Various packaging workflow fixes (descriptions, indentation, fail-fast)
+
 ## v0.10.0
 
 ### Added
