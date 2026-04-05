@@ -73,9 +73,13 @@ module Hwaro
                   i += 1
                 end
 
-                # Skip blank lines between term groups within the same dl
-                if i < lines.size && lines[i].strip.empty? && i + 1 < lines.size && i + 2 < lines.size && lines[i + 2].lstrip.starts_with?(": ")
-                  i += 1
+                # Skip one or more blank lines between term groups within the same dl
+                peek = i
+                while peek < lines.size && lines[peek].strip.empty?
+                  peek += 1
+                end
+                if peek > i && peek + 1 < lines.size && lines[peek + 1].lstrip.starts_with?(": ")
+                  i = peek
                   next
                 end
                 break

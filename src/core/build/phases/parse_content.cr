@@ -10,7 +10,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     profiler.start_phase("ParseContent")
     result = @lifecycle.run_phase(Lifecycle::Phase::ParseContent, ctx) do
       # Default parsing if no hooks registered
-      unless @lifecycle.has_hooks?(Lifecycle::HookPoint::AfterReadContent)
+      unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeParseContent)
         parse_content_default(ctx)
       end
     end

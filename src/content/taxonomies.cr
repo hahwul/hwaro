@@ -306,10 +306,11 @@ module Hwaro
       end
 
       private def self.page_url(base_url : String, page_number : Int32, paginate_path : String = "page") : String
+        normalized = base_url.ends_with?("/") ? base_url : "#{base_url}/"
         if page_number == 1
-          base_url
+          normalized
         else
-          "#{base_url}#{paginate_path}/#{page_number}/"
+          "#{normalized}#{paginate_path}/#{page_number}/"
         end
       end
 

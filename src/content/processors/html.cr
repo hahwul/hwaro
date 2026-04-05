@@ -50,8 +50,18 @@ module Hwaro
             .gsub(/<\/code>\s*<\/pre>/, "</code></pre>")   # </code>\n</pre> -> </code></pre>
 
           # Remove HTML comments (but not conditional comments like <!--[if IE]>)
-          # Also preserve <!-- more --> markers used for content summaries
-          minified = cleaned.gsub(/<!--(?!\[if|\s*more\s*-->).*?-->/m, "")
+          # Also preserve <!-- more --> markers and SSI directives (<!--#...-->)
+          # First protect script/style block contents, then strip comments, then restore
+          preserves = [] of String
+          cleaned = cleaned.gsub(/<(script|style)\b[^>]*>.*?<\/\1>/mi) do |block|
+            idx = preserves.size
+            preserves << block
+            "\x00HTML_PRESERVE_#{idx}\x00"
+          end
+          minified = cleaned.gsub(/<!--(?!\[if|#|\s*more\s*-->).*?-->/m, "")
+          minified = minified.gsub(/\x00HTML_PRESERVE_(\d+)\x00/) do
+            preserves[$1.to_i]
+          end
 
           # Remove trailing whitespace on each line
           minified = minified.gsub(/[ \t]+$/m, "")

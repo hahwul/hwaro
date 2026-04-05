@@ -220,8 +220,10 @@ module Hwaro
 
         # Clear all cache entries
         def clear
-          @entries.clear
-          @metadata = CacheMetadata.new
+          @mutex.synchronize do
+            @entries.clear
+            @metadata = CacheMetadata.new
+          end
           File.delete(@cache_path) if File.exists?(@cache_path)
         end
 

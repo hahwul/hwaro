@@ -16,8 +16,8 @@ module Hwaro
       # Group 3: bare var name            (from $VAR)
       #
       # NOTE: Nested ${...} in default values is not supported.
-      # Use a flat default value: ${VAR:-fallback}
-      PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}|\$([A-Za-z_][A-Za-z0-9_]*)\b/
+      # Default values may contain `}` as long as it's inside balanced braces.
+      PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*(?:\{[^}]*\}[^}]*)*))?\}|\$([A-Za-z_][A-Za-z0-9_]*)\b/
 
       # Substitute environment variables in the given string.
       # Returns the substituted string and a list of missing variable names.

@@ -538,7 +538,7 @@ module Hwaro
 
           result = String::Builder.new(html.bytesize)
           pos = 0
-          len = html.bytesize
+          len = html.size
 
           while pos < len
             # Check for <code or <pre tags (bounded check avoids O(n) substring)
@@ -549,7 +549,7 @@ module Hwaro
                 close_tag = is_code ? "</code>" : "</pre>"
                 end_pos = html.index(close_tag, pos)
                 if end_pos
-                  block_end = end_pos + close_tag.bytesize
+                  block_end = end_pos + close_tag.size
                   result << html[pos, block_end - pos]
                   pos = block_end
                   next
@@ -601,7 +601,7 @@ module Hwaro
           # Select format based on string pattern to avoid exception-based control flow
           fmt = if str.includes?('T')
                   # Could be RFC 3339 (with timezone) or plain ISO
-                  if str.includes?('+') || str.includes?('Z') || str.matches?(/\d{2}-\d{2}$/)
+                  if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
                     begin
                       return Time.parse_rfc3339(str)
                     rescue
