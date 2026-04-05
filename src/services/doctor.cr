@@ -48,19 +48,18 @@ module Hwaro
       @content_dir : String
       @config_path : String
       @templates_dir : String
-      @ignore : Array(String)
 
       def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates")
-        @ignore = load_ignore_list
       end
 
       def run : Array(Issue)
         issues = [] of Issue
-        check_config(issues)
+        config = check_config(issues)
         check_templates(issues)
         check_content(issues)
         check_directory_structure(issues)
-        issues.reject { |i| @ignore.includes?(i.id) }
+        ignore = config.try(&.doctor.ignore) || [] of String
+        issues.reject { |i| ignore.includes?(i.id) }
       end
 
       # Returns the list of config section keys missing from the user's config.toml
@@ -150,28 +149,17 @@ module Hwaro
         ConfigSnippets.doctor_snippet_for(key)
       end
 
-      # Load ignore list from config.toml [doctor] section
-      private def load_ignore_list : Array(String)
-        return [] of String unless File.exists?(@config_path)
-        begin
-          config = Models::Config.load(@config_path)
-          config.doctor.ignore
-        rescue
-          [] of String
-        end
-      end
-
-      private def check_config(issues : Array(Issue))
+      private def check_config(issues : Array(Issue)) : Models::Config?
         unless File.exists?(@config_path)
           issues << Issue.new(id: "config-not-found", level: :warning, category: "config", file: @config_path, message: "Config file not found")
-          return
+          return nil
         end
 
         begin
           config = Models::Config.load(@config_path)
         rescue ex
           issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
-          return
+          return nil
         end
 
         # base_url check
@@ -234,6 +222,8 @@ module Hwaro
 
         # Check for missing config sections
         check_missing_config_sections(issues)
+
+        config
       end
 
       private def check_missing_config_sections(issues : Array(Issue))

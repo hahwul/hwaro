@@ -33,7 +33,6 @@ module Hwaro
         "image_processing" => "Image resizing and LQIP placeholder generation",
         "pwa"              => "Progressive Web App (manifest.json, service worker)",
         "amp"              => "AMP page generation",
-        "doctor"           => "Doctor diagnostics settings (ignore rules)",
       }
 
       # Sub-sections that doctor checks when the parent section exists
