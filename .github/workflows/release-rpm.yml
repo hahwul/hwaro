@@ -72,7 +72,7 @@ jobs:
           cat > nfpm.yaml <<EOF
           name: hwaro
           arch: ${{ matrix.arch }}
-          version: v${{ env.VERSION }}
+          version: ${{ env.VERSION }}
           maintainer: HAHWUL <hahwul@gmail.com>
           description: "Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface."
           license: MIT
