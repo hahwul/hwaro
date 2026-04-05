@@ -20,17 +20,47 @@ brew install hwaro
 sudo snap install hwaro
 ```
 
+## APK (Alpine Linux)
+
+Download the `.apk` package from the [latest release](https://github.com/hahwul/hwaro/releases/latest) and install it:
+
+```bash
+apk add --allow-untrusted hwaro-*.apk
+```
+
+## DEB (Debian/Ubuntu)
+
+Download the `.deb` package from the [latest release](https://github.com/hahwul/hwaro/releases/latest) and install it:
+
+```bash
+sudo dpkg -i hwaro_*_amd64.deb
+```
+
+## RPM (Fedora/RHEL/CentOS)
+
+Download the `.rpm` package from the [latest release](https://github.com/hahwul/hwaro/releases/latest) and install it:
+
+```bash
+sudo rpm -i hwaro-*.x86_64.rpm
+```
+
+## AUR (Arch Linux)
+
+```bash
+yay -S hwaro
+```
+
 ## Pre-built Binary
 
 Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
 
-1. Download the archive for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
-2. Extract the archive and move the binary to a directory in your PATH.
+1. Download the binary for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
+2. Move the binary to a directory in your PATH.
 
 ```bash
 # Example for Linux (amd64)
-tar -xzf hwaro-linux-amd64.tar.gz
-sudo mv hwaro /usr/local/bin/
+chmod +x hwaro-v*-linux-x86_64
+sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 ```
 
 ## From Source
