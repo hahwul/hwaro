@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: ubuntu-24.04-arm
+            platform: linux
+          - os: macos-latest
+            platform: macos
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Crystal
@@ -32,7 +38,7 @@ jobs:
           else
             echo "ARCH=unknown" >> $GITHUB_ENV
           fi
-      - if: matrix.os == 'ubuntu-latest'
+      - if: matrix.platform == 'linux'
         name: Build binary (Linux)
         run: |
           mkdir -p build
@@ -43,7 +49,7 @@ jobs:
             mkdir -p build &&
             crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static
           "
-      - if: startsWith(matrix.os, 'macos')
+      - if: matrix.platform == 'macos'
         name: Build binary (macOS)
         run: |
           mkdir -p build
