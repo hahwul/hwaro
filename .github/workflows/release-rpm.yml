@@ -74,7 +74,7 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ env.VERSION }}
           maintainer: HAHWUL <hahwul@gmail.com>
-          description: "Hunt every Endpoint in your code, expose Shadow APIs, map the Attack Surface."
+          description: "Lightweight and fast Static Site Generator(SSG) written in Crystal."
           license: MIT
           depends:
             - glibc >= 2.17
