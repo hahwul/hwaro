@@ -524,5 +524,44 @@ describe Hwaro::Utils::JsMinifier do
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("var x = 1;")
     end
+
+    # =========================================================================
+    # Regex literal preservation
+    # =========================================================================
+    it "preserves regex literal in assignment" do
+      js = "var re = /foo/gi;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("/foo/gi")
+    end
+
+    it "preserves regex literal after operator" do
+      js = "if (/bar/.test(x)) {}"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("/bar/.test(x)")
+    end
+
+    it "preserves regex literal after comma" do
+      js = "fn(a, /pattern/)"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("/pattern/")
+    end
+
+    it "preserves regex with escaped slash" do
+      js = "var re = /foo\\/bar/;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("/foo\\/bar/")
+    end
+
+    it "treats slash after identifier as division" do
+      js = "var x = a / b;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("a / b")
+    end
+
+    it "treats slash after closing paren as division" do
+      js = "var x = (a + b) / c;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("(a + b) / c")
+    end
   end
 end

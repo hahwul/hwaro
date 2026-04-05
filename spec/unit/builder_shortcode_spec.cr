@@ -452,4 +452,46 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("iframe")
     end
   end
+
+  describe "nested block shortcodes" do
+    it "handles nested block shortcodes of the same type" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/box" => "<div class=\"box\">{{ body }}</div>",
+      }
+      context = {} of String => Crinja::Value
+
+      content = "{% box %}outer {% box %}inner{% end %} after{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should contain("<div class=\"box\">inner</div>")
+      result.should contain("outer")
+      result.should contain("after")
+    end
+
+    it "handles unmatched end tag gracefully" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/note" => "<span>{{ body }}</span>",
+      }
+      context = {} of String => Crinja::Value
+
+      content = "{% end %} {% note %}hello{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should contain("{% end %}")
+      result.should contain("<span>hello</span>")
+    end
+
+    it "emits opening tag as literal when no matching end" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/wrap" => "<div>{{ body }}</div>",
+      }
+      context = {} of String => Crinja::Value
+
+      content = "{% wrap %}no end tag"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should contain("{% wrap %}")
+      result.should contain("no end tag")
+    end
+  end
 end

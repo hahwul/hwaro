@@ -691,5 +691,26 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("url('path/to/file.png')")
       result.should_not contain("actual comment")
     end
+
+    # =========================================================================
+    # Descendant combinator preservation
+    # =========================================================================
+    it "preserves space before pseudo-class in descendant combinator" do
+      css = "div :hover { color: red; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("div :hover")
+    end
+
+    it "preserves space before pseudo-class in complex selector" do
+      css = ".container :first-child { margin: 0; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain(".container :first-child")
+    end
+
+    it "still removes colon spaces inside declaration blocks" do
+      css = "div :hover { color : red ; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("color:red")
+    end
   end
 end

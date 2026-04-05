@@ -117,5 +117,11 @@ describe Hwaro::Utils::EnvSubstitutor do
     ensure
       ENV.delete("HWARO_EMPTY_BARE")
     end
+
+    it "allows balanced braces in default value" do
+      result, missing = Hwaro::Utils::EnvSubstitutor.substitute("${HWARO_UNSET_JSON:-{\"key\": 1}}")
+      result.should eq("{\"key\": 1}")
+      missing.should be_empty
+    end
   end
 end

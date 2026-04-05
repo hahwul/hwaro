@@ -20,6 +20,8 @@ module Hwaro
         # NOTE: POSITIONAL_ARG_REGEX is reserved for future use
         # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
         MAX_SHORTCODE_NESTING = 5
+        BLOCK_OPEN_RE  = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
+        BLOCK_CLOSE_RE = /\{\%\s*end\s*\%\}/
 
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
@@ -83,8 +85,8 @@ module Hwaro
         # block shortcodes of the same type. Scans for opening tags {% name(...) %}
         # and closing tags {% end %}, tracking nesting depth to pair them correctly.
         private def process_block_shortcodes(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, depth : Int32) : String
-          open_re = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
-          close_re = /\{\%\s*end\s*\%\}/
+          open_re = BLOCK_OPEN_RE
+          close_re = BLOCK_CLOSE_RE
 
           result = String::Builder.new
           pos = 0

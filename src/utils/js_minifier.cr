@@ -143,6 +143,11 @@ module Hwaro
       # non-whitespace character before the slash: if it could end an
       # expression (identifier char, digit, `)`, `]`), it's division;
       # otherwise (operator, `(`, `[`, `{`, `,`, `;`, `!`, line start) it's regex.
+      #
+      # Known limitation: keywords that end with an alphanumeric char and precede
+      # a regex literal (e.g. `return /foo/`, `typeof /re/`, `void /re/`,
+      # `case /re/`, `throw /re/`) are misclassified as division because
+      # full keyword-aware tokenization is not performed.
       private def regex_context?(chars : String, pos : Int32) : Bool
         j = pos - 1
         while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')

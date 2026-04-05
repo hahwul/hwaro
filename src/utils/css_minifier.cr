@@ -61,9 +61,12 @@ module Hwaro
           inner = $1
           "{" + inner.gsub(/\s*:\s*/, ":") + "}"
         end
-        result = result.gsub(/\(([^)]*)\)/) do |paren_match|
-          inner = $1
-          "(" + inner.gsub(/\s*:\s*/, ":") + ")"
+        # Only strip colon spaces inside at-rule conditions (e.g. @media (max-width: 600px))
+        # Avoid stripping inside functional pseudo-classes like :is(div :hover)
+        result = result.gsub(/@[\w-]+[^{]*\{/) do |at_header|
+          at_header.gsub(/\(([^)]*)\)/) do
+            "(" + $1.gsub(/\s*:\s*/, ":") + ")"
+          end
         end
         result = result.gsub(/\s*;\s*/, ";")
         result = result.gsub(/\s*,\s*/, ",")
