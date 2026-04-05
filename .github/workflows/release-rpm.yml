@@ -88,6 +88,7 @@ jobs:
               file_info:
                 mode: 0644
           EOF
+          sed -i 's/^          //' nfpm.yaml
           nfpm package --packager rpm --target hwaro-${{ env.VERSION }}.${{ matrix.arch }}.rpm
 
       - name: Upload artifacts
