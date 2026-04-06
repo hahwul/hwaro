@@ -103,8 +103,8 @@ jobs:
       - name: Build .apk package
         run: |
           cd /home/builder/hwaro
-          sudo -u builder abuild -F checksum
-          sudo -u builder abuild -Fr
+          sudo -u builder -H abuild -F checksum
+          sudo -u builder -H abuild -Fr
 
       - name: Copy artifacts
         run: |
