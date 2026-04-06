@@ -90,7 +90,7 @@ jobs:
           arch="${{ matrix.arch }}"
           license="MIT"
           source=""
-          options="!check"
+          options="!check !strip"
 
           package() {
           	install -Dm755 "\$srcdir/../hwaro" "\$pkgdir/usr/bin/hwaro"
