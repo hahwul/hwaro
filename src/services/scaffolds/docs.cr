@@ -1413,7 +1413,7 @@ hwaro init [path] [options]
 
 | Option | Description |
 |--------|-------------|
-| `--scaffold TYPE` | Scaffold type: simple, blog, blog-dark, docs, docs-dark (default: simple) |
+| `--scaffold TYPE` | Scaffold type: simple, blog, blog-dark, docs, docs-dark, book, book-dark (default: simple) |
 | `--force` | Overwrite existing files |
 | `--skip-sample-content` | Don't create sample content |
 
@@ -1425,6 +1425,8 @@ hwaro init my-blog --scaffold blog
 hwaro init my-blog --scaffold blog-dark
 hwaro init my-docs --scaffold docs --force
 hwaro init my-docs --scaffold docs-dark
+hwaro init my-book --scaffold book
+hwaro init my-book --scaffold book-dark
 ```
 
 ## hwaro build

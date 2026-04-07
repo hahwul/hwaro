@@ -24,6 +24,17 @@ Built-in scaffolds:
 | `blog-dark` | Blog with dark theme |
 | `docs` | Documentation with sidebar |
 | `docs-dark` | Documentation with dark theme |
+| `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
+| `book-dark` | Book with dark theme |
+
+{% preview_gallery() %}
+<div class="preview-item"><img src="/images/scaffolds/scaffold-simple.png" alt="simple scaffold" loading="lazy"><div class="preview-label"><code>simple</code> — Landing pages, small sites</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-blog.png" alt="blog scaffold" loading="lazy"><div class="preview-label"><code>blog</code> — Posts with tags and categories</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-docs.png" alt="docs scaffold" loading="lazy"><div class="preview-label"><code>docs</code> — Documentation with sidebar</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-docs-dark.png" alt="docs-dark scaffold" loading="lazy"><div class="preview-label"><code>docs-dark</code> — Documentation, dark theme</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-book.png" alt="book scaffold" loading="lazy"><div class="preview-label"><code>book</code> — Book with chapters</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-book-dark.png" alt="book-dark scaffold" loading="lazy"><div class="preview-label"><code>book-dark</code> — Book, dark theme</div></div>
+{% end %}
 
 ## 2. Start Development Server
 
