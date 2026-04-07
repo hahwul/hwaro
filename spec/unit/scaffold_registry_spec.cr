@@ -38,6 +38,18 @@ describe Hwaro::Services::Scaffolds::Registry do
       scaffold.should_not be_nil
       scaffold.type.should eq(Hwaro::Config::Options::ScaffoldType::DocsDark)
     end
+
+    it "returns Book scaffold" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Book)
+      scaffold.should_not be_nil
+      scaffold.type.should eq(Hwaro::Config::Options::ScaffoldType::Book)
+    end
+
+    it "returns BookDark scaffold" do
+      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::BookDark)
+      scaffold.should_not be_nil
+      scaffold.type.should eq(Hwaro::Config::Options::ScaffoldType::BookDark)
+    end
   end
 
   describe ".has?" do
@@ -48,20 +60,22 @@ describe Hwaro::Services::Scaffolds::Registry do
       Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Docs).should be_true
       Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::BlogDark).should be_true
       Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::DocsDark).should be_true
+      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Book).should be_true
+      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::BookDark).should be_true
     end
   end
 
   describe ".all" do
     it "returns all registered scaffolds" do
       all = Hwaro::Services::Scaffolds::Registry.all
-      all.size.should be >= 6
+      all.size.should be >= 8
     end
   end
 
   describe ".list" do
     it "returns tuples of type name and description" do
       list = Hwaro::Services::Scaffolds::Registry.list
-      list.size.should be >= 6
+      list.size.should be >= 8
       list.each do |name, description|
         name.should_not be_empty
         description.should_not be_empty
@@ -76,6 +90,8 @@ describe Hwaro::Services::Scaffolds::Registry do
       names.should contain("docs")
       names.should contain("blog-dark")
       names.should contain("docs-dark")
+      names.should contain("book")
+      names.should contain("book-dark")
     end
   end
 

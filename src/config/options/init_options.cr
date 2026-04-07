@@ -9,6 +9,8 @@ module Hwaro
         Docs     # Documentation-focused with sidebar, TOC
         BlogDark # Blog-focused with dark theme
         DocsDark # Documentation-focused with dark theme
+        Book     # Book-focused with chapters, like mdBook
+        BookDark # Book-focused with dark theme
 
         def self.from_string(value : String) : ScaffoldType
           case value.downcase
@@ -24,8 +26,12 @@ module Hwaro
             BlogDark
           when "docs-dark"
             DocsDark
+          when "book"
+            Book
+          when "book-dark"
+            BookDark
           else
-            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, bare, blog, blog-dark, docs, docs-dark")
+            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, bare, blog, blog-dark, docs, docs-dark, book, book-dark")
           end
         end
 
@@ -37,6 +43,8 @@ module Hwaro
           when Docs     then "docs"
           when BlogDark then "blog-dark"
           when DocsDark then "docs-dark"
+          when Book     then "book"
+          when BookDark then "book-dark"
           else               "simple"
           end
         end
