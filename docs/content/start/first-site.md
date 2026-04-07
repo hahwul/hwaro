@@ -16,16 +16,16 @@ cd my-site
 
 Built-in scaffolds:
 
-| Scaffold | Description |
-|----------|-------------|
-| `simple` | Landing pages, small sites (default) |
-| `bare` | Minimal structure with semantic HTML only |
-| `blog` | Posts with tags and categories |
-| `blog-dark` | Blog with dark theme |
-| `docs` | Documentation with sidebar |
-| `docs-dark` | Documentation with dark theme |
-| `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
-| `book-dark` | Book with dark theme |
+| Scaffold | Description | Preview |
+|----------|-------------|---------|
+| `simple` | Landing pages, small sites (default) | ![simple](/images/scaffolds/scaffold-simple.png) |
+| `bare` | Minimal structure with semantic HTML only | ![bare](/images/scaffolds/scaffold-bare.png) |
+| `blog` | Posts with tags and categories | ![blog](/images/scaffolds/scaffold-blog.png) |
+| `blog-dark` | Blog with dark theme | ![blog-dark](/images/scaffolds/scaffold-blog-dark.png) |
+| `docs` | Documentation with sidebar | ![docs](/images/scaffolds/scaffold-docs.png) |
+| `docs-dark` | Documentation with dark theme | ![docs-dark](/images/scaffolds/scaffold-docs-dark.png) |
+| `book` | Book with chapters, prev/next navigation, keyboard shortcuts | ![book](/images/scaffolds/scaffold-book.png) |
+| `book-dark` | Book with dark theme | ![book-dark](/images/scaffolds/scaffold-book-dark.png) |
 
 ## 2. Start Development Server
 
