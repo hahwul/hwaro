@@ -115,8 +115,8 @@ module Hwaro
 
           fields.each do |key, value|
             case value
-            when Nil    then next
-            when Bool   then lines << "#{key} = #{value}"
+            when Nil  then next
+            when Bool then lines << "#{key} = #{value}"
             when String
               next if value.empty?
               lines << "#{key} = #{value.inspect}"

@@ -297,7 +297,6 @@ module Hwaro
           end
         end
       end
-
     end
   end
 end

@@ -50,11 +50,11 @@ module Hwaro
               toml_data.each do |key, value|
                 raw = value.raw
                 case raw
-                when String then fields[key] = raw
-                when Bool   then fields[key] = raw
-                when Int64  then fields[key] = raw.to_s
+                when String  then fields[key] = raw
+                when Bool    then fields[key] = raw
+                when Int64   then fields[key] = raw.to_s
                 when Float64 then fields[key] = raw.to_s
-                when Time   then fields[key] = raw.to_s("%Y-%m-%dT%H:%M:%S%:z")
+                when Time    then fields[key] = raw.to_s("%Y-%m-%dT%H:%M:%S%:z")
                 when Array
                   arr = raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
                   fields[key] = arr unless arr.empty?
