@@ -1304,7 +1304,7 @@ title = "Introduction"
 weight = 0
 +++
 
-Welcome to **{{ site.title }}**. This book is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
+Welcome to **My Book**. This book is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
 
 ## What This Book Covers
 
