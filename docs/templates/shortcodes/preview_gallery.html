@@ -1,0 +1,45 @@
+<div class="preview-gallery">
+{{ body }}
+</div>
+<style>
+.preview-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.preview-gallery .preview-item {
+  border: 1px solid var(--border-light, #e8e8ed);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.preview-gallery .preview-item:hover {
+  border-color: var(--border, #d2d2d7);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.preview-gallery .preview-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.preview-gallery .preview-item .preview-label {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary, #6e6e73);
+  border-top: 1px solid var(--border-light, #e8e8ed);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.preview-gallery .preview-item .preview-label code {
+  font-size: 0.75rem;
+  background: var(--bg-code, #f5f5f7);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+@media (max-width: 600px) {
+  .preview-gallery {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

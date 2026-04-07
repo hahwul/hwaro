@@ -16,16 +16,25 @@ cd my-site
 
 Built-in scaffolds:
 
-| Scaffold | Description | Preview |
-|----------|-------------|---------|
-| `simple` | Landing pages, small sites (default) | ![simple](/images/scaffolds/scaffold-simple.png) |
-| `bare` | Minimal structure with semantic HTML only | ![bare](/images/scaffolds/scaffold-bare.png) |
-| `blog` | Posts with tags and categories | ![blog](/images/scaffolds/scaffold-blog.png) |
-| `blog-dark` | Blog with dark theme | ![blog-dark](/images/scaffolds/scaffold-blog-dark.png) |
-| `docs` | Documentation with sidebar | ![docs](/images/scaffolds/scaffold-docs.png) |
-| `docs-dark` | Documentation with dark theme | ![docs-dark](/images/scaffolds/scaffold-docs-dark.png) |
-| `book` | Book with chapters, prev/next navigation, keyboard shortcuts | ![book](/images/scaffolds/scaffold-book.png) |
-| `book-dark` | Book with dark theme | ![book-dark](/images/scaffolds/scaffold-book-dark.png) |
+| Scaffold | Description |
+|----------|-------------|
+| `simple` | Landing pages, small sites (default) |
+| `bare` | Minimal structure with semantic HTML only |
+| `blog` | Posts with tags and categories |
+| `blog-dark` | Blog with dark theme |
+| `docs` | Documentation with sidebar |
+| `docs-dark` | Documentation with dark theme |
+| `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
+| `book-dark` | Book with dark theme |
+
+{% preview_gallery() %}
+<div class="preview-item"><img src="/images/scaffolds/scaffold-simple.png" alt="simple scaffold" loading="lazy"><div class="preview-label"><code>simple</code> — Landing pages, small sites</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-blog.png" alt="blog scaffold" loading="lazy"><div class="preview-label"><code>blog</code> — Posts with tags and categories</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-docs.png" alt="docs scaffold" loading="lazy"><div class="preview-label"><code>docs</code> — Documentation with sidebar</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-docs-dark.png" alt="docs-dark scaffold" loading="lazy"><div class="preview-label"><code>docs-dark</code> — Documentation, dark theme</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-book.png" alt="book scaffold" loading="lazy"><div class="preview-label"><code>book</code> — Book with chapters</div></div>
+<div class="preview-item"><img src="/images/scaffolds/scaffold-book-dark.png" alt="book-dark scaffold" loading="lazy"><div class="preview-label"><code>book-dark</code> — Book, dark theme</div></div>
+{% end %}
 
 ## 2. Start Development Server
 
