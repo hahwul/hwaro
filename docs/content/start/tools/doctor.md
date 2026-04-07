@@ -1,10 +1,12 @@
 +++
 title = "doctor"
-description = "Diagnose config and content issues"
+description = "Diagnose config, template, and structure issues"
 weight = 4
 +++
 
-Diagnose configuration and content issues in your Hwaro site.
+Diagnose configuration, template, and structure issues in your Hwaro site.
+
+> For content validation (frontmatter, alt text, internal links), use [`hwaro tool validate`](/start/tools/validate/).
 
 ```bash
 hwaro doctor
@@ -56,15 +58,6 @@ hwaro doctor --json
 - Unclosed block tags (`if`, `for`, `block`, `macro` without matching `end`)
 - Mismatched `{{ }}` variable tags
 
-**Content diagnostics:**
-
-- Missing `title` in frontmatter
-- Missing `description` in frontmatter
-- Images without alt text (`![](url)`)
-- Broken internal links (`@/` prefixed paths that don't resolve)
-- Frontmatter parse errors (TOML/YAML)
-- Draft files (reported as info)
-
 **Structure diagnostics:**
 
 - Section directories missing `_index.md`
@@ -78,12 +71,12 @@ Config:
   ⚠ config.toml: base_url is not set
   ⚠ config.toml: feeds.enabled is true but feeds.filename is not set
 
-Content:
-  ⚠ content/blog/draft.md: Missing description in frontmatter
-  ℹ content/blog/draft.md: File is marked as draft
-  ⚠ content/about.md: Image missing alt text: ![](photo.jpg)
+Structure:
+  ℹ content/docs: Section directory missing _index.md: docs/
 
-Found 0 error(s), 3 warning(s), 1 info(s)
+Found 0 error(s), 2 warning(s), 1 info(s)
+
+Tip: Use 'hwaro tool validate' for content checks
 ```
 
 ## Ignoring Known Issues
@@ -93,8 +86,8 @@ If doctor reports issues you are aware of and want to suppress, add their rule I
 ```toml
 [doctor]
 ignore = [
-  "content-draft",
-  "content-description-missing",
+  "title-default",
+  "structure-missing-index",
 ]
 ```
 
@@ -117,14 +110,6 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
 | `search-format-invalid` | config | Unsupported search.format |
 | `language-duplicate` | config | Duplicate language code |
 | `missing-config-*` | config_missing | Missing config section (e.g. `missing-config-pwa`) |
-| `content-title-missing` | content | Missing or "Untitled" title |
-| `content-description-missing` | content | Missing description |
-| `content-draft` | content | File marked as draft |
-| `content-alt-text-missing` | content | Image without alt text |
-| `content-internal-link-broken` | content | Broken internal link |
-| `content-frontmatter-toml-error` | content | TOML frontmatter parse error |
-| `content-frontmatter-yaml-error` | content | YAML frontmatter parse error |
-| `content-read-error` | content | Failed to read content file |
 | `template-dir-missing` | template | Templates directory not found |
 | `template-required-missing` | template | Required template missing |
 | `template-unclosed-block` | template | Unclosed block tag |
@@ -143,27 +128,13 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
       "category": "config",
       "file": "config.toml",
       "message": "base_url is not set"
-    },
-    {
-      "id": "content-description-missing",
-      "level": "warning",
-      "category": "content",
-      "file": "content/blog/draft.md",
-      "message": "Missing description in frontmatter"
-    },
-    {
-      "id": "content-draft",
-      "level": "info",
-      "category": "content",
-      "file": "content/blog/draft.md",
-      "message": "File is marked as draft"
     }
   ],
   "summary": {
     "errors": 0,
-    "warnings": 2,
-    "infos": 1,
-    "total": 3
+    "warnings": 1,
+    "infos": 0,
+    "total": 1
   }
 }
 ```

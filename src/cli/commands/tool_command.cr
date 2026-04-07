@@ -5,14 +5,18 @@
 #   hwaro tool <subcommand> [options]
 #
 # Available subcommands:
-#   convert  - Convert frontmatter between YAML and TOML formats
-#   list     - List content files by status
-#   check-links - Check for dead links
-#   doctor   - Diagnose config and content issues
-#   platform - Generate hosting platform config files
-#   ci       - Generate CI/CD workflow files
-#   import   - Import content from other systems
-#   agents-md - Generate or update AGENTS.md file
+#   convert       - Convert frontmatter between YAML and TOML formats
+#   list          - List content files by status
+#   check-links   - Check for dead links
+#   stats         - Show content statistics
+#   validate      - Validate content frontmatter and markup
+#   unused-assets - Find unreferenced static files
+#   doctor        - Diagnose config, template, and structure issues
+#   platform      - Generate hosting platform config files
+#   ci            - Generate CI/CD workflow files
+#   import        - Import content from other systems
+#   export        - Export content to other platforms
+#   agents-md     - Generate or update AGENTS.md file
 
 require "option_parser"
 require "../metadata"
@@ -23,6 +27,10 @@ require "./tool/doctor_command"
 require "./tool/platform_command"
 require "./tool/ci_command"
 require "./tool/import_command"
+require "./tool/export_command"
+require "./tool/stats_command"
+require "./tool/validate_command"
+require "./tool/unused_assets_command"
 require "./tool/agents_md_command"
 require "../../utils/logger"
 
@@ -32,7 +40,7 @@ module Hwaro
       class ToolCommand
         # Single source of truth for command metadata
         NAME               = "tool"
-        DESCRIPTION        = "Utility tools (convert, list, check-links, doctor, ...)"
+        DESCRIPTION        = "Utility tools (stats, validate, export, doctor, ...)"
         POSITIONAL_ARGS    = [] of String
         POSITIONAL_CHOICES = [] of String
 
@@ -57,6 +65,10 @@ module Hwaro
         register_sub(Tool::PlatformCommand.metadata) { |args| Tool::PlatformCommand.new.run(args) }
         register_sub(Tool::CICommand.metadata) { |args| Tool::CICommand.new.run(args) }
         register_sub(Tool::ImportCommand.metadata) { |args| Tool::ImportCommand.new.run(args) }
+        register_sub(Tool::ExportCommand.metadata) { |args| Tool::ExportCommand.new.run(args) }
+        register_sub(Tool::StatsCommand.metadata) { |args| Tool::StatsCommand.new.run(args) }
+        register_sub(Tool::ValidateCommand.metadata) { |args| Tool::ValidateCommand.new.run(args) }
+        register_sub(Tool::UnusedAssetsCommand.metadata) { |args| Tool::UnusedAssetsCommand.new.run(args) }
         register_sub(Tool::AgentsMdCommand.metadata) { |args| Tool::AgentsMdCommand.new.run(args) }
 
         def self.subcommands : Array(CommandInfo)
@@ -98,8 +110,8 @@ module Hwaro
 
         # Category display order and membership for help output
         CATEGORIES = {
-          "Content" => ["list", "convert", "check-links"],
-          "Site"    => ["platform", "doctor", "import", "agents-md"],
+          "Content" => ["list", "convert", "check-links", "stats", "validate", "unused-assets"],
+          "Site"    => ["platform", "doctor", "import", "export", "agents-md"],
         }
 
         # Hidden from help but still executable (e.g. deprecated commands)

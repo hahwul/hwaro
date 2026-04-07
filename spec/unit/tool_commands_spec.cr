@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 8 subcommands" do
+    it "returns 12 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(8)
+      subs.size.should eq(12)
     end
 
     it "includes convert subcommand" do
@@ -58,6 +58,26 @@ describe Hwaro::CLI::Commands::ToolCommand do
     it "includes agents-md subcommand" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
       subs.any? { |s| s.name == "agents-md" }.should be_true
+    end
+
+    it "includes stats subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "stats" }.should be_true
+    end
+
+    it "includes validate subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "validate" }.should be_true
+    end
+
+    it "includes unused-assets subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "unused-assets" }.should be_true
+    end
+
+    it "includes export subcommand" do
+      subs = Hwaro::CLI::Commands::ToolCommand.subcommands
+      subs.any? { |s| s.name == "export" }.should be_true
     end
   end
 end

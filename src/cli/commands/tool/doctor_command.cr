@@ -12,7 +12,7 @@ module Hwaro
         class DoctorCommand
           # Single source of truth for command metadata
           NAME               = "doctor"
-          DESCRIPTION        = "Diagnose config and content issues"
+          DESCRIPTION        = "Diagnose config, template, and structure issues"
           POSITIONAL_ARGS    = [] of String
           POSITIONAL_CHOICES = [] of String
 
@@ -87,11 +87,9 @@ module Hwaro
             Logger.info "    ☐ taxonomies (duplicates)"
             Logger.info "    ☐ search (format)"
             Logger.info ""
-            Logger.info "  #{content_dir}/"
-            Logger.info "    ☐ frontmatter (title, description)"
-            Logger.info "    ☐ frontmatter parse errors"
-            Logger.info "    ☐ image alt text"
-            Logger.info "    ☐ draft status"
+            Logger.info "  templates/"
+            Logger.info "    ☐ required files (page.html, section.html)"
+            Logger.info "    ☐ template syntax"
             Logger.info ""
 
             if issues.empty?
@@ -102,7 +100,6 @@ module Hwaro
             # Group by category
             config_issues = issues.select { |i| i.category == "config" }
             config_missing = issues.select { |i| i.category == "config_missing" }
-            content_issues = issues.select { |i| i.category == "content" }
             template_issues = issues.select { |i| i.category == "template" }
             structure_issues = issues.select { |i| i.category == "structure" }
 
@@ -115,12 +112,6 @@ module Hwaro
             unless config_missing.empty?
               Logger.info "Missing Config Sections (run 'hwaro doctor --fix' to add):"
               config_missing.each { |issue| print_issue(issue) }
-              Logger.info ""
-            end
-
-            unless content_issues.empty?
-              Logger.info "Content:"
-              content_issues.each { |issue| print_issue(issue) }
               Logger.info ""
             end
 
@@ -142,6 +133,8 @@ module Hwaro
             infos = issues.count { |i| i.level == :info }
 
             Logger.info "Found #{errors} error(s), #{warnings} warning(s), #{infos} info(s)"
+            Logger.info ""
+            Logger.info "Tip: Use 'hwaro tool validate' for content checks"
           end
 
           private def run_fix(doctor : Services::Doctor, minimal : Bool = false)

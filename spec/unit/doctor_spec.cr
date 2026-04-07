@@ -103,126 +103,6 @@ describe Hwaro::Services::Doctor do
       end
     end
 
-    describe "content diagnostics" do
-      it "warns on missing title in TOML frontmatter" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ndate = \"2024-01-01\"\n+++\n\nHello"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.any? { |i| i.message.includes?("Missing title") }.should be_true
-      end
-
-      it "warns on Untitled title" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"Untitled\"\ndate = \"2024-01-01\"\n+++\n\nHello"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.any? { |i| i.message.includes?("Untitled") }.should be_true
-      end
-
-      it "warns on missing description" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"My Post\"\ndate = \"2024-01-01\"\n+++\n\nHello"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.any? { |i| i.message.includes?("Missing description") }.should be_true
-      end
-
-      it "does not warn on missing date" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"My Post\"\ndescription = \"A post\"\n+++\n\nHello"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.any? { |i| i.message.includes?("Missing date") }.should be_false
-      end
-
-      it "reports draft files as info" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"Draft Post\"\ndraft = true\ndate = \"2024-01-01\"\ndescription = \"A draft\"\n+++\n\nHello"})
-        draft_issues = issues.select { |i| i.message.includes?("draft") && i.level == :info }
-        draft_issues.size.should eq(1)
-      end
-
-      it "warns on image missing alt text" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n![](image.png)\n"})
-        issues.any? { |i| i.message.includes?("alt text") }.should be_true
-      end
-
-      it "does not warn on image with alt text" do
-        issues = run_doctor(base_config, {"test.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n![A photo](image.png)\n"})
-        issues.any? { |i| i.message.includes?("alt text") }.should be_false
-      end
-
-      it "reports TOML frontmatter parse errors" do
-        issues = run_doctor(base_config, {"bad.md" => "+++\ntitle = [invalid\n+++\n\nContent"})
-        issues.any? { |i| i.level == :error && i.message.includes?("TOML frontmatter parse error") }.should be_true
-      end
-
-      it "handles YAML frontmatter" do
-        issues = run_doctor(base_config, {"test.md" => "---\ntitle: \"My YAML Post\"\ndate: \"2024-01-01\"\ndescription: \"A post\"\n---\n\nHello"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.any? { |i| i.message.includes?("Missing title") }.should be_false
-      end
-
-      it "no issues for well-formed content" do
-        issues = run_doctor(base_config, {"good.md" => "+++\ntitle = \"Good Post\"\ndate = \"2024-01-01\"\ndescription = \"A good post\"\n+++\n\n![Screenshot](img.png)\n"})
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.should be_empty
-      end
-
-      it "skips content check when content dir missing" do
-        issues = run_doctor(base_config)
-        content_issues = issues.select { |i| i.category == "content" }
-        content_issues.should be_empty
-      end
-
-      it "warns on broken @/ internal link" do
-        files = {
-          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[Link](@/nonexistent/page.md)\n",
-        }
-        issues = run_doctor(base_config, files)
-        issues.any? { |i| i.message.includes?("broken internal link") }.should be_true
-      end
-
-      it "does not warn on valid @/ internal link" do
-        Dir.mktmpdir do |dir|
-          config_path = File.join(dir, "config.toml")
-          File.write(config_path, base_config)
-          content_dir = File.join(dir, "content")
-          FileUtils.mkdir_p(File.join(content_dir, "about"))
-          File.write(File.join(content_dir, "about", "_index.md"), "+++\ntitle = \"About\"\ndate = \"2024-01-01\"\ndescription = \"About\"\n+++\n")
-          File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[About](@/about/_index.md)\n")
-
-          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path)
-          issues = doctor.run
-          issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
-        end
-      end
-
-      it "does not flag web path links as broken" do
-        files = {
-          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[CLI](/start/cli/#deploy)\n",
-        }
-        issues = run_doctor(base_config, files)
-        issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
-      end
-
-      it "does not flag @/ links inside code blocks" do
-        files = {
-          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n```markdown\n[Link](@/nonexistent/page.md)\n```\n",
-        }
-        issues = run_doctor(base_config, files)
-        issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
-      end
-
-      it "does not flag images inside code blocks" do
-        files = {
-          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n```markdown\n![](example.png)\n```\n",
-        }
-        issues = run_doctor(base_config, files)
-        issues.any? { |i| i.message.includes?("alt text") }.should be_false
-      end
-
-      it "does not flag external links as broken" do
-        files = {
-          "post.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"A post\"\n+++\n\n[Google](https://google.com)\n",
-        }
-        issues = run_doctor(base_config, files)
-        issues.any? { |i| i.message.includes?("broken internal link") }.should be_false
-      end
-    end
-
     describe "config — base_url format" do
       it "warns when base_url has no protocol" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "example.com"\n))
@@ -518,10 +398,10 @@ describe Hwaro::Services::Doctor do
         issues.any? { |i| i.id == "title-default" }.should be_true
       end
 
-      it "suppresses content issues" do
-        config = base_config("\n[doctor]\nignore = [\"content-description-missing\"]\n")
-        issues = run_doctor(config, {"test.md" => "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\n+++\n\nHello"})
-        issues.any? { |i| i.id == "content-description-missing" }.should be_false
+      it "suppresses issues by id" do
+        config = base_config("\n[doctor]\nignore = [\"title-default\"]\n")
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "title-default" }.should be_false
       end
     end
 
