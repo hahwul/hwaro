@@ -660,6 +660,7 @@ module Hwaro
           .book-nav-arrow--prev {
             left: 16px;
             z-index: 60;
+            transition: left 0.25s ease, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
           }
 
           .book-nav-arrow--next {
@@ -938,8 +939,21 @@ module Hwaro
               }
             }
 
+            function updatePrevArrowPosition() {
+              if (!prevLink || !sidebar) return;
+              if (!isMobile.matches && !sidebar.classList.contains('collapsed')) {
+                prevLink.style.left = 'calc(var(--sidebar-w) + 16px)';
+              } else {
+                prevLink.style.left = '16px';
+              }
+            }
+
             applySidebarState();
-            isMobile.addEventListener('change', applySidebarState);
+            updatePrevArrowPosition();
+            isMobile.addEventListener('change', function () {
+              applySidebarState();
+              updatePrevArrowPosition();
+            });
 
             if (toggle && sidebar) {
               toggle.addEventListener('click', function () {
@@ -949,6 +963,7 @@ module Hwaro
                   var collapsed = sidebar.classList.toggle('collapsed');
                   localStorage.setItem(SIDEBAR_KEY, collapsed ? 'collapsed' : 'open');
                 }
+                updatePrevArrowPosition();
               });
               // Close sidebar overlay when clicking outside on mobile
               document.addEventListener('click', function (e) {

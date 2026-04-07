@@ -316,7 +316,7 @@ module Hwaro
           .book-nav-arrow:hover { color: var(--text); border-color: var(--text-muted); box-shadow: var(--shadow); text-decoration: none; }
           .book-nav-arrow:active { transform: translateY(-50%) scale(0.95); }
           .book-nav-arrow svg { width: 18px; height: 18px; }
-          .book-nav-arrow--prev { left: 16px; z-index: 60; }
+          .book-nav-arrow--prev { left: 16px; z-index: 60; transition: left 0.25s ease, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
           .book-nav-arrow--next { right: 16px; }
 
           .book-nav-arrow .book-nav-tooltip {
