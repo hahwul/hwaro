@@ -1201,7 +1201,7 @@ module Hwaro
         # Sidebar
         private def book_sidebar_html : String
           <<-HTML
-            <aside class="book-sidebar">
+            <aside class="book-sidebar collapsed">
               <div class="chapter-group">
                 <span class="chapter-title">Introduction</span>
                 <ul class="chapter-links">

@@ -17,6 +17,7 @@ Create a new site:
 hwaro init my-site
 hwaro init my-site --scaffold blog
 hwaro init my-site --scaffold docs
+hwaro init my-site --scaffold book
 ```
 
 You can also use a remote scaffold from a GitHub repository:
@@ -37,7 +38,7 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 
 | Flag | Description |
 |------|-------------|
-| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `blog-dark`, `docs`, `docs-dark`) or remote source (`github:user/repo[/path]`, URL) |
+| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `blog-dark`, `docs`, `docs-dark`, `book`, `book-dark`) or remote source (`github:user/repo[/path]`, URL) |
 | --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
 | -f, --force | Force creation even if directory is not empty |
 | --skip-agents-md | Skip creating AGENTS.md file |

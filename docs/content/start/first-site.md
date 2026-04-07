@@ -24,6 +24,8 @@ Built-in scaffolds:
 | `blog-dark` | Blog with dark theme |
 | `docs` | Documentation with sidebar |
 | `docs-dark` | Documentation with dark theme |
+| `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
+| `book-dark` | Book with dark theme |
 
 ## 2. Start Development Server
 
