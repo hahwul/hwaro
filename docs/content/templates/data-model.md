@@ -291,8 +291,8 @@ Rendered HTML content is available as the top-level `content` variable.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| page.lower | Page? | Previous page in section |
-| page.higher | Page? | Next page in section |
+| page.lower | Page? | Previous page in reading order |
+| page.higher | Page? | Next page in reading order |
 | page.ancestors | Array<Page> | Parent section chain |
 | page.translations | Array<TranslationLink> | Language variants |
 
@@ -329,6 +329,8 @@ Rendered HTML content is available as the top-level `content` variable.
 ## Navigation Objects
 
 ### page.lower / page.higher
+
+Navigation follows the flat reading order across the entire site, similar to mdBook or Docusaurus. Pages are ordered depth-first through the section tree: **section index → section pages → subsections (recursive)**. Within each section, pages are sorted by the section's `sort_by` setting (weight, date, or title).
 
 | Property | Type | Description |
 |----------|------|-------------|
