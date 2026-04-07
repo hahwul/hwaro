@@ -261,9 +261,10 @@ describe "Build Integration: Prev/Next navigation" do
         "page.html"    => "LOWER={% if page.lower %}{{ page.lower.title }}{% else %}NONE{% endif %}|HIGHER={% if page.higher %}{{ page.higher.title }}{% else %}NONE{% endif %}",
       },
     ) do
-      # With sort_by=title order: AAA, BBB, CCC
+      # With sort_by=title order: Blog (section index), AAA, BBB, CCC
+      # Cross-section flat navigation: section index is included
       a_html = File.read("public/blog/a/index.html")
-      a_html.should contain("LOWER=NONE")
+      a_html.should contain("LOWER=Blog")
       a_html.should contain("HIGHER=BBB")
 
       b_html = File.read("public/blog/b/index.html")
@@ -1171,8 +1172,9 @@ describe "Build Integration: Sort by weight" do
       section_html.should contain("Advanced,")
 
       # Verify ordering via lower/higher navigation
+      # Cross-section flat navigation: section index (Docs) comes before Intro
       intro_html = File.read("public/docs/intro/index.html")
-      intro_html.should contain("LOWER=NONE")
+      intro_html.should contain("LOWER=Docs")
       intro_html.should contain("HIGHER=Basics")
 
       basics_html = File.read("public/docs/basics/index.html")

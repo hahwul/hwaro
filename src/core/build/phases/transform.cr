@@ -32,11 +32,17 @@ module Hwaro::Core::Build::Phases::Transform
     Lifecycle::HookResult::Continue
   end
 
-  # Link lower/higher page navigation for previous/next page links
+  # Link lower/higher page navigation for previous/next page links.
+  # Builds a flat ordered list following sidebar/TOC order (like mdBook/Docusaurus):
+  # section index → section pages → subsection index → subsection pages → ...
+  # This enables cross-section navigation following the natural reading order.
   private def link_page_navigation(ctx : Lifecycle::BuildContext)
-    # Group pages by section
-    pages_by_section = {} of String => Array(Models::Page)
+    # Build sections lookup
+    sections_by_path = {} of String => Models::Section
+    ctx.sections.each { |s| sections_by_path[s.section] = s }
 
+    # Group non-index pages by section
+    pages_by_section = {} of String => Array(Models::Page)
     ctx.pages.each do |page|
       next if page.is_index
       section = page.section
@@ -44,20 +50,59 @@ module Hwaro::Core::Build::Phases::Transform
       pages_by_section[section] << page
     end
 
-    # For each section, sort pages and link lower/higher
+    # Sort pages within each section using the section's sort_by setting
     pages_by_section.each do |section_name, pages|
-      # Find section to get sort_by setting
-      section = ctx.sections.find { |s| s.section == section_name }
+      section = sections_by_path[section_name]?
       sort_by = section.try(&.sort_by) || "date"
       reverse = section.try(&.reverse) || false
-
-      # Sort pages
       sorted = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+      pages_by_section[section_name] = sorted
+    end
 
-      # Link lower (previous) and higher (next)
-      sorted.each_with_index do |page, idx|
-        page.lower = idx > 0 ? sorted[idx - 1] : nil
-        page.higher = idx < sorted.size - 1 ? sorted[idx + 1] : nil
+    # Find top-level sections (no parent) and sort by weight
+    top_sections = ctx.sections.select { |s| !s.section.includes?("/") }
+    top_sections.sort_by!(&.weight)
+
+    # Recursively flatten sections into reading order
+    flat_list = [] of Models::Page
+    flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
+
+    # Add any orphan pages not belonging to any section
+    section_names = sections_by_path.keys.to_set
+    ctx.pages.each do |page|
+      next if page.is_index
+      next if section_names.includes?(page.section)
+      flat_list << page unless flat_list.includes?(page)
+    end
+
+    # Link lower (previous) and higher (next) across the entire flat list
+    flat_list.each_with_index do |page, idx|
+      page.lower = idx > 0 ? flat_list[idx - 1] : nil
+      page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
+    end
+  end
+
+  # Recursively flatten a list of sections into depth-first reading order.
+  # For each section: section index (if renderable) → pages → subsections (recursive)
+  private def flatten_section_tree(
+    sections : Array(Models::Section),
+    sections_by_path : Hash(String, Models::Section),
+    pages_by_section : Hash(String, Array(Models::Page)),
+    result : Array(Models::Page),
+  )
+    sections.each do |section|
+      # Add section index page if it renders
+      result << section if section.render
+
+      # Add sorted pages in this section
+      if pages = pages_by_section[section.section]?
+        pages.each { |p| result << p }
+      end
+
+      # Recurse into subsections (sorted by weight)
+      if section.subsections.size > 0
+        sorted_subsections = section.subsections.sort_by(&.weight)
+        flatten_section_tree(sorted_subsections, sections_by_path, pages_by_section, result)
       end
     end
   end
@@ -197,28 +242,47 @@ module Hwaro::Core::Build::Phases::Transform
     affected_tax_keys
   end
 
-  # Re-link lower/higher navigation only for sections that contain changed pages.
+  # Re-link lower/higher navigation for the entire site.
+  # Since navigation is now cross-section (flat), any change requires a full relink.
   private def relink_navigation_for_sections(
     site : Models::Site,
     affected_sections : Set(String),
   )
-    affected_sections.each do |section_name|
-      section_pages = site.pages_by_section[section_name]?
-      next unless section_pages
+    # Build a BuildContext-compatible structure for reuse
+    sections_by_path = {} of String => Models::Section
+    site.sections.each { |s| sections_by_path[s.section] = s }
 
-      non_index_pages = section_pages.reject(&.is_index)
-      next if non_index_pages.empty?
+    pages_by_section = {} of String => Array(Models::Page)
+    site.pages.each do |page|
+      next if page.is_index
+      section = page.section
+      pages_by_section[section] ||= [] of Models::Page
+      pages_by_section[section] << page
+    end
 
-      section = site.sections_by_name[section_name]?
+    pages_by_section.each do |section_name, pages|
+      section = sections_by_path[section_name]?
       sort_by = section.try(&.sort_by) || "date"
       reverse = section.try(&.reverse) || false
+      pages_by_section[section_name] = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+    end
 
-      sorted = Utils::SortUtils.sort_pages(non_index_pages, sort_by, reverse)
+    top_sections = site.sections.select { |s| !s.section.includes?("/") }
+    top_sections.sort_by!(&.weight)
 
-      sorted.each_with_index do |page, idx|
-        page.lower = idx > 0 ? sorted[idx - 1] : nil
-        page.higher = idx < sorted.size - 1 ? sorted[idx + 1] : nil
-      end
+    flat_list = [] of Models::Page
+    flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
+
+    section_names = sections_by_path.keys.to_set
+    site.pages.each do |page|
+      next if page.is_index
+      next if section_names.includes?(page.section)
+      flat_list << page unless flat_list.includes?(page)
+    end
+
+    flat_list.each_with_index do |page, idx|
+      page.lower = idx > 0 ? flat_list[idx - 1] : nil
+      page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
     end
   end
 

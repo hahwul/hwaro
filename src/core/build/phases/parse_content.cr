@@ -22,9 +22,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       Content::Multilingual.link_translations!(ctx.all_pages, config)
     end
 
-    # Link lower/higher page navigation and build ancestors
-    link_page_navigation(ctx)
+    # Build subsections first (needed for flat navigation ordering)
     build_subsections(ctx)
+    # Link lower/higher page navigation
+    link_page_navigation(ctx)
     collect_assets(ctx)
     populate_taxonomies(ctx)
 
