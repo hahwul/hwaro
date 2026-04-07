@@ -61,6 +61,16 @@ describe Hwaro::CLI::Commands::CompletionCommand do
       output.should contain("compgen")
       output.should contain("COMPREPLY")
     end
+
+    it "includes new tool subcommands in bash" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
+    end
   end
 
   describe "zsh completion" do
@@ -95,6 +105,16 @@ describe Hwaro::CLI::Commands::CompletionCommand do
 
       # completion command should have positional choices
       output.should contain("completion)")
+    end
+
+    it "includes new tool subcommands in zsh" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
     end
   end
 
@@ -141,6 +161,16 @@ describe Hwaro::CLI::Commands::CompletionCommand do
 
       # Should have -d for description syntax
       output.should contain("-d")
+    end
+
+    it "includes new tool subcommands in fish" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
     end
   end
 end

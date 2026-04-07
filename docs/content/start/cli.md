@@ -261,49 +261,50 @@ hwaro deploy --dry-run
 
 ### doctor
 
-Diagnose config and content issues (top-level shortcut):
+Diagnose config, template, and structure issues (top-level shortcut):
 
 ```bash
-hwaro doctor               # Diagnose config and content issues
+hwaro doctor               # Diagnose config, template, and structure issues
 hwaro doctor --fix         # Add missing config sections to config.toml
 ```
 
-See [doctor](/start/tools/doctor/) for details. `hwaro tool doctor` also works as an alias.
+For content validation, use `hwaro tool validate`. See [doctor](/start/tools/doctor/) for details.
 
 ### tool
 
 Utility tools for content management:
 
 ```bash
-hwaro tool convert to-yaml      # Convert frontmatter to YAML
-hwaro tool convert to-toml      # Convert frontmatter to TOML
+# Content tools
 hwaro tool list all             # List all content files
 hwaro tool list drafts          # List draft files
-hwaro tool list published       # List published files
+hwaro tool convert to-yaml      # Convert frontmatter to YAML
+hwaro tool convert to-toml      # Convert frontmatter to TOML
 hwaro tool check-links          # Check for dead external links
+hwaro tool stats                # Show content statistics
+hwaro tool validate             # Validate content frontmatter and markup
+hwaro tool unused-assets        # Find unreferenced static files
+
+# Site tools
 hwaro tool platform netlify       # Generate Netlify config
 hwaro tool platform vercel        # Generate Vercel config
 hwaro tool platform cloudflare    # Generate Cloudflare Pages config
 hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
 hwaro tool platform gitlab-ci     # Generate GitLab CI config
-hwaro tool import wordpress export.xml   # Import from WordPress
-hwaro tool import jekyll /path/to/site   # Import from Jekyll
-hwaro tool import hugo /path/to/site     # Import from Hugo
-hwaro tool import notion /path/to/export # Import from Notion
-hwaro tool import obsidian /path/to/vault # Import from Obsidian
-hwaro tool import hexo /path/to/site     # Import from Hexo
-hwaro tool import astro /path/to/site    # Import from Astro
-hwaro tool import eleventy /path/to/site # Import from Eleventy
-hwaro tool agents-md                    # Print local AGENTS.md to stdout
-hwaro tool agents-md --remote           # Print remote (lightweight) version
-hwaro tool agents-md --write            # Write AGENTS.md to file
-hwaro tool agents-md --remote --write   # Write remote version to file
+hwaro tool doctor                 # Diagnose config/template/structure issues
+hwaro tool import hugo /path      # Import from Hugo
+hwaro tool import jekyll /path    # Import from Jekyll
+hwaro tool export hugo            # Export to Hugo format
+hwaro tool export jekyll          # Export to Jekyll format
+hwaro tool agents-md --write      # Write AGENTS.md to file
 
 # JSON output
 hwaro tool list all --json
+hwaro tool stats --json
+hwaro tool validate --json
+hwaro tool unused-assets --json
 hwaro tool doctor --json
 hwaro tool check-links --json
-hwaro tool convert to-yaml --json
 ```
 
 **Subcommands:**
@@ -313,9 +314,13 @@ hwaro tool convert to-yaml --json
 | Content | [list](/start/tools/list/) | List content files by status (all, drafts, published) |
 | Content | [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
 | Content | [check-links](/start/tools/deadlink/) | Check for dead links in content files |
+| Content | [stats](/start/tools/stats/) | Show content statistics |
+| Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
+| Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
 | Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
-| Site | [doctor](/start/tools/doctor/) | Diagnose config and content issues |
+| Site | [doctor](/start/tools/doctor/) | Diagnose config, template, and structure issues |
 | Site | import | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
+| Site | [export](/start/tools/export/) | Export content to Hugo or Jekyll |
 | Site | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
 **Common Options:**
