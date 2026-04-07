@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.11.0
+
+### Added
+- `book` and `book-dark` scaffold types with sidebar navigation (#320)
+- Cross-section flat navigation (`page.lower`/`page.higher`) like mdBook/Docusaurus (#321)
+- `tool stats`, `tool validate`, `tool unused-assets`, `tool export` commands
+- Incremental OG image generation with content-hash caching
+- Scaffold preview screenshots and `preview_gallery` shortcode in docs
+
+### Changed
+- Refactor `doctor` command alongside new tool subcommands
+- Update CLI docs and completion specs for new tool subcommands
+- `page.lower`/`page.higher` now follows flat reading order across sections
+
+### Fixed
+- Deploy failure on large sites by suppressing git commit output
+- Unprocessed template variable in book scaffold content
+- Prev arrow overlapping sidebar when open
+- Sidebar flash on load in book scaffold
+- APK build failures (tracedeps, strip, CARCH for cross-arch packaging)
+- AUR publish workflow failures
+
 ## v0.10.1
 
 ### Added
