@@ -89,7 +89,7 @@ main() {
     git config user.email "github-actions-bot@users.noreply.${GITHUB_HOSTNAME}"
     git add .
 
-    git commit -m "Deploy ${TARGET_REPOSITORY} to ${TARGET_REPOSITORY}:${remote_branch}"
+    git commit -q -m "Deploy ${TARGET_REPOSITORY} to ${TARGET_REPOSITORY}:${remote_branch}"
     git push --force "${remote_repo}" gh_action:"${remote_branch}"
 
     echo "🚀 Deploy complete!"
