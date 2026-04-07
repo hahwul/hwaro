@@ -83,6 +83,10 @@ If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### OG Image Caching
+
+The action automatically caches OG images between deploys. Before each build, it restores previously generated images from the `gh-pages` branch and enables `--cache` mode. Only pages with changed content (title, description, URL) or updated OG config will have their images regenerated. This significantly speeds up builds for large sites.
+
 ### Configure GitHub Pages
 
 1. Go to repository **Settings** → **Pages**

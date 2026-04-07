@@ -295,6 +295,22 @@ When a `logo` file path is configured and the file exists, the logo is read and 
 
 If the file is not found at build time, the logo falls back to a URL reference (SVG only).
 
+## Incremental Generation
+
+Hwaro tracks a content hash for each page (title, description, URL) and a config hash for OG-related settings. On subsequent builds, only pages whose content or config has changed are regenerated — unchanged images are skipped.
+
+This is managed via a `.og_manifest.json` file stored alongside the generated images. As long as the output directory is preserved between builds (e.g., using `--cache` mode), incremental generation works automatically.
+
+When deploying via the GitHub Actions (`hahwul/hwaro` action), OG image caching is handled automatically — the action restores previously generated images from the `gh-pages` branch before building and enables `--cache` mode.
+
+### What triggers regeneration
+
+| Change | Regenerates |
+|--------|-------------|
+| Page title, description, or URL | That page only |
+| OG config (colors, style, format, etc.) | All pages |
+| Image file missing on disk | That page only |
+
 ## Behavior
 
 - Pages with a custom `image` in front matter are **skipped** (the custom image takes priority)

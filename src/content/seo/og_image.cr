@@ -1,5 +1,7 @@
 require "base64"
+require "digest/sha256"
 require "file_utils"
+require "json"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
@@ -91,7 +93,15 @@ module Hwaro
           img_dir = File.join(output_dir, ai.output_dir)
           FileUtils.mkdir_p(img_dir) unless Dir.exists?(img_dir)
 
+          # Load manifest for incremental generation
+          manifest_path = File.join(img_dir, ".og_manifest.json")
+          config_hash = compute_config_hash(config)
+          old_config_hash, old_entries = load_manifest(manifest_path)
+          new_entries = {} of String => String
+          config_changed = old_config_hash != config_hash
+
           generated = 0
+          skipped = 0
 
           pages.each do |page|
             next if page.draft
@@ -104,6 +114,21 @@ module Hwaro
             url_slug = page.url.gsub("/", "-").strip("-")
             slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
             slug = "page" if slug.empty?
+
+            page_hash = compute_page_hash(page)
+            new_entries[slug] = page_hash
+
+            # Determine expected output file extension
+            ext = (format == "png" && png_available) ? "png" : "svg"
+            expected_file = File.join(img_dir, "#{slug}.#{ext}")
+
+            # Skip if content unchanged, config unchanged, and file exists
+            if !config_changed && old_entries[slug]? == page_hash && File.exists?(expected_file)
+              page.image = "/#{ai.output_dir}/#{slug}.#{ext}"
+              skipped += 1
+              Logger.debug "  OG image: #{page.image} (cached)" if verbose
+              next
+            end
 
             if format == "png" && png_available
               png_filename = "#{slug}.png"
@@ -129,7 +154,11 @@ module Hwaro
             Logger.debug "  OG image: #{page.image}" if verbose
           end
 
-          Logger.info "  Generated #{generated} OG image(s)" if generated > 0
+          save_manifest(manifest_path, config_hash, new_entries)
+
+          if generated > 0 || skipped > 0
+            Logger.info "  Generated #{generated} OG image(s)#{skipped > 0 ? ", skipped #{skipped} unchanged" : ""}"
+          end
         end
 
         # Render an SVG image for a page
@@ -388,6 +417,52 @@ module Hwaro
             (code >= 0x30A0 && code <= 0x30FF) || # Katakana
             (code >= 0xAC00 && code <= 0xD7AF) || # Hangul Syllables
             (code >= 0xFF00 && code <= 0xFFEF)    # Fullwidth Forms
+        end
+
+        # Compute a hash of OG-relevant config properties.
+        def self.compute_config_hash(config : Models::Config) : String
+          ai = config.og.auto_image
+          Digest::SHA256.hexdigest(
+            "#{config.title}|#{ai.background}|#{ai.text_color}|#{ai.accent_color}|" \
+            "#{ai.font_size}|#{ai.logo}|#{ai.logo_position}|#{ai.show_title}|" \
+            "#{ai.style}|#{ai.pattern_opacity}|#{ai.pattern_scale}|" \
+            "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}"
+          )
+        end
+
+        # Compute a hash of page content that affects OG image rendering.
+        def self.compute_page_hash(page : Models::Page) : String
+          Digest::SHA256.hexdigest("#{page.title}|#{page.description}|#{page.url}")
+        end
+
+        # Load the OG manifest file. Returns {config_hash, entries}.
+        def self.load_manifest(manifest_path : String) : Tuple(String, Hash(String, String))
+          return {"", {} of String => String} unless File.exists?(manifest_path)
+          data = JSON.parse(File.read(manifest_path))
+          config_hash = data["config_hash"]?.try(&.as_s) || ""
+          entries = {} of String => String
+          if e = data["entries"]?.try(&.as_h)
+            e.each { |k, v| entries[k] = v.as_s }
+          end
+          {config_hash, entries}
+        rescue
+          {"", {} of String => String}
+        end
+
+        # Save the OG manifest file.
+        def self.save_manifest(manifest_path : String, config_hash : String, entries : Hash(String, String))
+          json = JSON.build do |j|
+            j.object do
+              j.field "version", 1
+              j.field "config_hash", config_hash
+              j.field "entries" do
+                j.object do
+                  entries.each { |k, v| j.field k, v }
+                end
+              end
+            end
+          end
+          File.write(manifest_path, json)
         end
 
         private def self.escape_xml(text : String) : String

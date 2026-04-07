@@ -606,6 +606,193 @@ describe Hwaro::Content::Seo::OgImage do
     end
   end
 
+  describe ".compute_config_hash" do
+    it "returns consistent hash for same config" do
+      config = Hwaro::Models::Config.new
+      config.title = "My Site"
+      hash1 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+      hash2 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+      hash1.should eq(hash2)
+      hash1.size.should eq(64)
+    end
+
+    it "returns different hash when config changes" do
+      config = Hwaro::Models::Config.new
+      config.title = "My Site"
+      hash1 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+
+      config.og.auto_image.accent_color = "#ff0000"
+      hash2 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+      hash1.should_not eq(hash2)
+    end
+  end
+
+  describe ".compute_page_hash" do
+    it "returns consistent hash for same page" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Hello"
+      page.description = "World"
+      page.url = "/posts/hello/"
+      hash1 = Hwaro::Content::Seo::OgImage.compute_page_hash(page)
+      hash2 = Hwaro::Content::Seo::OgImage.compute_page_hash(page)
+      hash1.should eq(hash2)
+    end
+
+    it "returns different hash when title changes" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Hello"
+      page.url = "/posts/hello/"
+      hash1 = Hwaro::Content::Seo::OgImage.compute_page_hash(page)
+
+      page.title = "Changed"
+      hash2 = Hwaro::Content::Seo::OgImage.compute_page_hash(page)
+      hash1.should_not eq(hash2)
+    end
+  end
+
+  describe "manifest" do
+    it "creates manifest file after generation" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        manifest_path = File.join(dir, "og-images", ".og_manifest.json")
+        File.exists?(manifest_path).should be_true
+
+        data = JSON.parse(File.read(manifest_path))
+        data["version"].should eq(1)
+        data["config_hash"].as_s.size.should eq(64)
+        data["entries"].as_h.has_key?("posts-my-post").should be_true
+      end
+    end
+
+    it "skips unchanged pages on second generation" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        svg_path = File.join(dir, "og-images", "posts-my-post.svg")
+        mtime1 = File.info(svg_path).modification_time
+
+        # Reset page.image to simulate fresh build context
+        page.image = nil
+        sleep 100.milliseconds
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        mtime2 = File.info(svg_path).modification_time
+        mtime2.should eq(mtime1)
+        page.image.should eq("/og-images/posts-my-post.svg")
+      end
+    end
+
+    it "regenerates when title changes" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Original Title"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+        svg_path = File.join(dir, "og-images", "posts-my-post.svg")
+        content1 = File.read(svg_path)
+
+        page.image = nil
+        page.title = "Updated Title"
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        content2 = File.read(svg_path)
+        content2.should_not eq(content1)
+        content2.should contain("Updated Title")
+      end
+    end
+
+    it "regenerates all when config changes" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+        svg_path = File.join(dir, "og-images", "posts-my-post.svg")
+        content1 = File.read(svg_path)
+
+        page.image = nil
+        config.og.auto_image.accent_color = "#ff0000"
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        content2 = File.read(svg_path)
+        content2.should_not eq(content1)
+      end
+    end
+
+    it "regenerates when file is missing despite manifest entry" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        svg_path = File.join(dir, "og-images", "posts-my-post.svg")
+        File.delete(svg_path)
+
+        page.image = nil
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        File.exists?(svg_path).should be_true
+      end
+    end
+
+    it "round-trips manifest correctly" do
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, "manifest.json")
+        entries = {"slug-a" => "hash1", "slug-b" => "hash2"}
+        Hwaro::Content::Seo::OgImage.save_manifest(manifest_path, "confighash", entries)
+
+        config_hash, loaded = Hwaro::Content::Seo::OgImage.load_manifest(manifest_path)
+        config_hash.should eq("confighash")
+        loaded.should eq(entries)
+      end
+    end
+
+    it "returns empty manifest for missing file" do
+      config_hash, entries = Hwaro::Content::Seo::OgImage.load_manifest("/nonexistent/path.json")
+      config_hash.should eq("")
+      entries.should be_empty
+    end
+  end
+
   describe ".split_into_segments" do
     it "splits Latin text by whitespace" do
       segments = Hwaro::Content::Seo::OgImage.split_into_segments("Hello World")

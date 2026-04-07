@@ -40,6 +40,44 @@ if [[ -z "$GITHUB_TOKEN" ]] && [[ "$BUILD_ONLY" == "false" ]]; then
     exit 1
 fi
 
+restore_og_cache() {
+    local remote_url="https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@${GITHUB_HOSTNAME}/${TARGET_REPOSITORY}.git"
+    local og_dir="${OUT_DIR}/og-images"
+
+    # Check if gh-pages branch exists on remote
+    if ! git ls-remote --exit-code --heads "${remote_url}" "${PAGES_BRANCH}" &>/dev/null; then
+        echo "No ${PAGES_BRANCH} branch found, skipping OG image cache restore"
+        return 0
+    fi
+
+    echo "Restoring OG image cache from ${PAGES_BRANCH}..."
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+
+    git clone --depth 1 --branch "${PAGES_BRANCH}" --filter=blob:none --sparse \
+        "${remote_url}" "$tmp_dir" 2>/dev/null || {
+        echo "Failed to clone ${PAGES_BRANCH}, skipping cache"
+        rm -rf "$tmp_dir"
+        return 0
+    }
+
+    (cd "$tmp_dir" && git sparse-checkout set og-images 2>/dev/null) || {
+        rm -rf "$tmp_dir"
+        return 0
+    }
+
+    if [ -d "$tmp_dir/og-images" ]; then
+        mkdir -p "$og_dir"
+        cp -a "$tmp_dir/og-images/." "$og_dir/"
+        local count
+        count=$(find "$og_dir" -type f \( -name '*.png' -o -name '*.svg' \) | wc -l)
+        echo "Restored ${count} cached OG images"
+    fi
+
+    rm -rf "$tmp_dir"
+}
+
 main() {
     echo "🔥 Starting Hwaro build..."
 
@@ -56,17 +94,25 @@ main() {
     git config --global --unset-all credential.helper 2>/dev/null || true
     git config --global --unset-all http.extraheader 2>/dev/null || true
 
+    # Restore OG image cache before building (requires token for remote access)
+    if [[ "$BUILD_ONLY" != "true" ]] && [[ -n "$GITHUB_TOKEN" ]]; then
+        restore_og_cache
+    fi
+
     # Show hwaro version
     version=$(hwaro --version)
     echo "Using $version"
 
+    # Enable cache mode to preserve restored OG images
+    if [[ -n "$BUILD_FLAGS" ]]; then
+        BUILD_FLAGS="--cache $BUILD_FLAGS"
+    else
+        BUILD_FLAGS="--cache"
+    fi
+
     # Build the site
     echo "Building with flags: ${BUILD_FLAGS:-(none)}"
-    if [[ -n "$BUILD_FLAGS" ]]; then
-        hwaro build $BUILD_FLAGS
-    else
-        hwaro build
-    fi
+    hwaro build $BUILD_FLAGS
 
     if [[ "$BUILD_ONLY" == "true" ]]; then
         echo "✅ Build complete. Deployment skipped by request."
