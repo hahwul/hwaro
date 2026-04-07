@@ -144,5 +144,109 @@ describe Hwaro::Services::Exporters::HugoExporter do
         content.should contain("lastmod")
       end
     end
+
+    it "maps image to images array" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\nimage = \"cover.jpg\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        content.should contain("images = [\"cover.jpg\"]")
+      end
+    end
+
+    it "maps expires to expiryDate" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\nexpires = \"2025-12-31\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        content.should contain("expiryDate")
+      end
+    end
+
+    it "rewrites @/ internal links" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\n+++\n\n[About](@/about/_index.md)\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        content.should_not contain("@/")
+        content.should contain("[About]")
+      end
+    end
+
+    it "exports files without draft field as published" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "pub.md"), "+++\ntitle = \"Published\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir, drafts: false)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(1)
+        result.skipped_count.should eq(0)
+      end
+    end
+
+    it "exports tags correctly" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\ntags = [\"go\", \"web\"]\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        content.should contain("tags = [\"go\", \"web\"]")
+      end
+    end
+
+    it "handles mixed published and draft files" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "pub.md"), "+++\ntitle = \"Pub\"\n+++\n\nA\n")
+        File.write(File.join(content_dir, "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\n+++\n\nB\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir, drafts: false)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(1)
+        result.skipped_count.should eq(1)
+      end
+    end
   end
 end

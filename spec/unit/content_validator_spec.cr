@@ -193,5 +193,220 @@ describe Hwaro::Services::ContentValidator do
         errors_and_warnings.should be_empty
       end
     end
+
+    it "detects invalid date format" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad-date.md"), "---\ntitle: Post\ndescription: Desc\ndate: not-a-date\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-date-invalid" }.should be_true
+      end
+    end
+
+    it "accepts various valid date formats" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "d1.md"), "---\ntitle: P1\ndescription: D\ndate: \"2024-01-15\"\n---\n\nA\n")
+        File.write(File.join(content_dir, "d2.md"), "---\ntitle: P2\ndescription: D\ndate: \"2024-01-15 10:30:00\"\n---\n\nA\n")
+        File.write(File.join(content_dir, "d3.md"), "---\ntitle: P3\ndescription: D\ndate: \"2024-01-15T10:30:00\"\n---\n\nA\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-date-invalid" }.should be_false
+      end
+    end
+
+    it "detects YAML frontmatter parse errors" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad-yaml.md"), "---\ntitle: [invalid yaml\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-frontmatter-yaml-error" }.should be_true
+      end
+    end
+
+    it "does not warn on all-lowercase tags" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "good-tags.md"), "---\ntitle: Post\ndescription: Desc\ntags:\n  - crystal\n  - web-dev\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-tag-mixed-case" }.should be_false
+      end
+    end
+
+    it "does not warn on all-uppercase tags" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "upper-tags.md"), "---\ntitle: Post\ndescription: Desc\ntags:\n  - AWS\n  - CLI\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-tag-mixed-case" }.should be_false
+      end
+    end
+
+    it "detects multiple images missing alt text" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "multi.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n![](a.png)\n\nText\n\n![](b.png)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        alt_issues = issues.select { |i| i.id == "content-alt-text-missing" }
+        alt_issues.size.should eq(2)
+      end
+    end
+
+    it "handles internal links with anchors" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "target.md"), "---\ntitle: Target\ndescription: T\n---\n\nContent\n")
+        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: S\n---\n\n[Link](@/target.md#section)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
+    it "handles internal links with query params" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "target.md"), "---\ntitle: Target\ndescription: T\n---\n\nContent\n")
+        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: S\n---\n\n[Link](@/target.md?ref=home)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
+    it "skips @/ links with empty path" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "empty-link.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n[Link](@/)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
+    it "does not flag external links" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "ext.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n[Google](https://google.com)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
+    it "handles files with no frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "no-fm.md"), "# Just markdown\n\nNo frontmatter here.\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.level == :error }.should be_false
+      end
+    end
+
+    it "handles .markdown extension files" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.markdown"), "---\ntitle: Markdown Ext\ndescription: Desc\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        errors_and_warnings = issues.select { |i| i.level == :error || i.level == :warning }
+        errors_and_warnings.should be_empty
+      end
+    end
+
+    it "detects mixed-case tags in TOML frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "toml-tags.md"), "+++\ntitle = \"Post\"\ndescription = \"Desc\"\ntags = [\"Crystal\", \"web\"]\n+++\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-tag-mixed-case" && i.message.includes?("Crystal") }.should be_true
+      end
+    end
+
+    it "ignores images in inline code" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "inline-code.md"), "---\ntitle: Post\ndescription: Desc\n---\n\nUse `![](example.png)` for images.\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-alt-text-missing" }.should be_false
+      end
+    end
+
+    it "ignores @/ links in code blocks" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "code-link.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n```md\n[Link](@/nonexistent.md)\n```\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
+    it "validates internal link to section directory with _index.md" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(File.join(content_dir, "about"))
+
+        File.write(File.join(content_dir, "about", "_index.md"), "---\ntitle: About\ndescription: About\n---\n\nAbout\n")
+        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: S\n---\n\n[About](@/about)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
   end
 end

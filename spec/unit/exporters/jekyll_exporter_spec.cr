@@ -135,5 +135,131 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         File.exists?(File.join(output_dir, "about", "index.md")).should be_true
       end
     end
+
+    it "handles posts without date (no date prefix)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "no-date.md"), "+++\ntitle = \"No Date\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        # Should be in _posts without date prefix
+        File.exists?(File.join(output_dir, "_posts", "no-date.md")).should be_true
+      end
+    end
+
+    it "handles short date strings without crashing" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "short-date.md"), "+++\ntitle = \"Post\"\ndate = \"2024\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        # Should not crash, exported without date prefix
+        result.exported_count.should eq(1)
+        File.exists?(File.join(output_dir, "_posts", "short-date.md")).should be_true
+      end
+    end
+
+    it "converts YAML frontmatter to YAML" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "yaml.md"), "---\ntitle: YAML Post\ndate: \"2024-05-20\"\ntags:\n  - ruby\n---\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(1)
+        content = File.read(File.join(output_dir, "_posts", "2024-05-20-yaml.md"))
+        content.should contain("---")
+        content.should contain("title:")
+        content.should contain("- ruby")
+      end
+    end
+
+    it "removes date prefix from draft filenames" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\ndate = \"2024-06-15\"\n+++\n\nDraft\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+        exporter.run(options)
+
+        # Draft should not have date prefix
+        File.exists?(File.join(output_dir, "_drafts", "draft.md")).should be_true
+        File.exists?(File.join(output_dir, "_drafts", "2024-06-15-draft.md")).should be_false
+      end
+    end
+
+    it "exports posts in subdirectories" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "blog"))
+
+        File.write(File.join(content_dir, "blog", "post.md"), "+++\ntitle = \"Blog Post\"\ndate = \"2024-03-10\"\n+++\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "_posts", "blog", "2024-03-10-post.md")).should be_true
+      end
+    end
+
+    it "rewrites @/ internal links" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\n+++\n\n[About](@/about/_index.md)\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        files = Dir.glob(File.join(output_dir, "_posts", "*.md"))
+        content = File.read(files.first)
+        content.should_not contain("@/")
+      end
+    end
+
+    it "includes categories in YAML frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ncategories:\n  - tech\n  - blog\n---\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        files = Dir.glob(File.join(output_dir, "_posts", "*.md"))
+        content = File.read(files.first)
+        content.should contain("categories:")
+        content.should contain("- tech")
+      end
+    end
   end
 end
