@@ -50,6 +50,26 @@ sudo rpm -i hwaro-*.x86_64.rpm
 yay -S hwaro
 ```
 
+## Nix
+
+### Install
+
+```bash
+nix profile install github:hahwul/hwaro
+```
+
+### Run without installing
+
+```bash
+nix run github:hahwul/hwaro -- --version
+```
+
+### Development shell
+
+```bash
+nix develop github:hahwul/hwaro
+```
+
 ## Pre-built Binary
 
 Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
