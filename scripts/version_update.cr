@@ -5,6 +5,7 @@ SHARD_FILE     = "shard.yml"
 HWARO_FILE     = "src/hwaro.cr"
 SNAPCRAFT_FILE = "snap/snapcraft.yaml"
 SPEC_FILE      = "spec/hwaro_spec.cr"
+FLAKE_FILE     = "flake.nix"
 
 # Extract version from shard.yml
 def get_shard_version : String?
@@ -42,6 +43,17 @@ def get_spec_version : String?
   begin
     content = File.read(SPEC_FILE)
     match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
+    match ? match[1] : nil
+  rescue
+    nil
+  end
+end
+
+# Extract version from flake.nix
+def get_flake_version : String?
+  begin
+    content = File.read(FLAKE_FILE)
+    match = content.match(/version\s*=\s*"([^"]+)"/)
     match ? match[1] : nil
   rescue
     nil
@@ -100,6 +112,19 @@ def update_spec_version(new_version : String) : Bool
   end
 end
 
+# Update flake.nix version
+def update_flake_version(new_version : String) : Bool
+  begin
+    content = File.read(FLAKE_FILE)
+    updated = content.gsub(/^(\s*version\s*=\s*")[\d.]+(";\s*)$/m, "\\1#{new_version}\\2")
+    File.write(FLAKE_FILE, updated)
+    true
+  rescue ex
+    puts "  Error updating #{FLAKE_FILE}: #{ex.message}"
+    false
+  end
+end
+
 # Validate version format (semver-like: X.Y.Z)
 def valid_version?(version : String) : Bool
   !!(version =~ /^\d+\.\d+\.\d+$/)
@@ -116,16 +141,18 @@ shard_v = get_shard_version
 hwaro_v = get_hwaro_version
 snapcraft_v = get_snapcraft_version
 spec_v = get_spec_version
+flake_v = get_flake_version
 
 puts "Current versions:"
 puts "  #{SHARD_FILE.ljust(25)} #{shard_v || "Not found"}"
 puts "  #{HWARO_FILE.ljust(25)} #{hwaro_v || "Not found"}"
 puts "  #{SNAPCRAFT_FILE.ljust(25)} #{snapcraft_v || "Not found"}"
 puts "  #{SPEC_FILE.ljust(25)} #{spec_v || "Not found"}"
+puts "  #{FLAKE_FILE.ljust(25)} #{flake_v || "Not found"}"
 puts
 
 # Check if versions match
-versions = [shard_v, hwaro_v, snapcraft_v, spec_v].compact
+versions = [shard_v, hwaro_v, snapcraft_v, spec_v, flake_v].compact
 unique_versions = versions.uniq
 
 if unique_versions.size > 1
@@ -203,6 +230,17 @@ if spec_v
   total_count += 1
   print "  Updating #{SPEC_FILE}... "
   if update_spec_version(new_version)
+    puts "✓"
+    success_count += 1
+  else
+    puts "✗"
+  end
+end
+
+if flake_v
+  total_count += 1
+  print "  Updating #{FLAKE_FILE}... "
+  if update_flake_version(new_version)
     puts "✓"
     success_count += 1
   else

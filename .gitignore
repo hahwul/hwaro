@@ -19,5 +19,8 @@ benchmark
 # stb compiled object
 src/ext/stb_impl.o
 
+# Nix
+/result
+
 # macOS
 .DS_Store
