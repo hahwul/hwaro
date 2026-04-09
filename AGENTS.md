@@ -1,102 +1,131 @@
 # Hwaro - Agent Instructions
 
 ## Overview
-Hwaro is a fast, lifecycle-driven static site generator written in Crystal. It features a sophisticated hook system and a pluggable architecture for content processing.
+Hwaro is a fast, lifecycle-driven static site generator written in Crystal. Features a hook-based build pipeline, pluggable processors, multi-layer caching, and parallel content processing.
 
-## Core Architecture
-### Directory Structure
-- `src/cli/`: Command registry and implementation.
-- `src/content/`: Processors (Markdown, HTML), Hooks (SEO, Taxonomies), and Pagination.
-- `src/core/`: Build orchestration, Cache, and Lifecycle management.
-- `src/models/`: Core data structures (`Page`, `Site`, `Section`, `Config`).
-- `src/services/`: Scaffolding, Development Server, and Deployment.
-
-### Architectural Patterns
-1. **Lifecycle Hook System**: 8 phases (Initialize, ReadContent, ParseContent, Transform, Render, Generate, Write, Finalize). Modules register `before/after` hooks via `Hookable` interface.
-2. **Registry Pattern**: Used for dynamic discovery of Processors, Commands, and Scaffolds.
-3. **BuildContext**: A shared state container carrying pages, sections, and metadata across the entire build lifecycle.
-
-## Development Guide
-### Extending Hwaro
-- **New Processor**: Inherit `Hwaro::Content::Processors::Base`, implement `process`, and register in `Registry`.
-- **New Command**: Define `NAME`, `DESCRIPTION`, and `FLAGS` (using `FlagInfo`) in the command class. Register in `src/cli/runner.cr`.
-- **New Hook**: Implement `register_hooks(manager)`, then add to `src/content/hooks.cr`.
-
-## Security Patterns
-- **HTML/XML output**: Use `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
-- **Inline JavaScript**: Escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
-- **TOML front matter**: Always use safe type casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`). Never use `.as_s`, `.as_bool`, etc. without nil guard.
-- **Crinja filter arguments**: Use `.to_s` instead of `.as_s` for safe conversion.
-- **Paths**: Always use `PathUtils.sanitize_path` for user-provided or content-derived paths.
-
-## Performance Patterns
-- **Single-pass processing**: Prefer `String.build` with char-by-char iteration over chained `.gsub()` for escaping/stripping.
-- **Bounded string operations**: Use `html[pos, n]` instead of `html[pos..]` in loops to avoid O(n) substring allocations.
-- **Crinja value caching**: Cache `Crinja::Value` arrays per-section and per-page. Clear caches at all reset points.
-
-## Maintenance & Standards
-### Config Change Checklist
-When adding or modifying `config.toml` options, update **all** of the following:
-1. **Model**: `src/models/config.cr` (property, default, and loader).
-2. **Config Snippets**: `src/services/config_snippets.cr` — shared TOML snippets used by both `hwaro init` (scaffold) and `hwaro tool doctor --fix`. Each snippet method accepts `commented` param to switch between scaffold (full docs, real values) and doctor (all commented out) variants.
-3. **Scaffolds**: If the option belongs to a scaffold-only section (not in `config_snippets.cr`), update `src/services/scaffolds/base.cr` directly.
-4. **Tests**: Update `spec/unit/config_spec.cr` and relevant feature specs.
-
-### Guidelines
-- **Logging**: Use `Logger.action` for file operations and `Logger.progress` for bulk tasks.
-- **CLI**: Ensure `FLAGS` are correctly defined for automated shell completion generation.
-
-## Testing
-- **Unit**: `spec/unit/` for logic and models.
-- **Functional**: `spec/functional/` for CLI and integration tests.
-- **Content**: `spec/content/` for SEO and processor output validation.
-
-## Documentation Site
-
-The `docs/` directory is a self-contained Hwaro site that builds the project documentation.
-
-### Build & Verify
-
+## Build & Run
 ```bash
-bin/hwaro build -i docs    # Build docs site
-# Output: docs/public/
+just build          # shards install && shards build → bin/hwaro
+just test           # crystal spec (unit + functional + content)
+just fix            # crystal tool format
+just dev            # Serve docs site locally (bin/hwaro serve -i docs)
+just clean          # Remove bin/, lib/, stb_impl.o
+```
+Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
+
+## Directory Structure
+```
+src/
+  cli/              # Runner, metadata (FlagInfo), commands/, commands/tool/
+  config/options/   # Typed option classes per command (BuildOptions, ServeOptions, etc.)
+  content/
+    processors/     # Base, Markdown, Template, HTML, XML, JSON, Image, SyntaxHighlighter
+    filters/        # Crinja filters: string, collection, date, html, url, i18n, math, misc
+    hooks/          # Markdown, SEO, Taxonomy, Asset, PWA, AMP, OgImage, Image hooks
+    seo/            # Feeds, Sitemap, Robots, JsonLD, Tags, LLMs, PWA, OgPngRenderer
+    pagination/     # Paginator, Renderer
+  core/
+    lifecycle/      # Manager, Hooks (HookResult/Hookable/HookDSL), Phases, BuildContext
+    build/          # Builder, CacheManager, ShortcodeProcessor, Parallel, phases/
+  models/           # Page, Section, Site, Config, Toc, Deployment
+  services/
+    scaffolds/      # Registry + 8 built-in (simple/bare/blog/docs/book + dark variants) + remote
+    importers/      # WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy
+    exporters/      # Jekyll, Hugo
+    server/         # Dev server with live reload and file watching
+    defaults/       # Default content, templates, config
+  utils/            # Logger, PathUtils, TextUtils, CrinjaUtils, Profiler, minifiers
+  ext/              # Crinja patches, stb_image bindings, fonts
+spec/
+  unit/             # Component-level tests (~150 files)
+  functional/       # End-to-end build tests (~20 files, use build_helper.cr)
+  content/seo/      # SEO output validation
 ```
 
-Always build after changes to verify rendering.
+## Architecture
 
-### Directory Structure
+### Lifecycle Pipeline
+8 sequential phases, each with `before`/`after` hook points (16 total):
+```
+Initialize → ReadContent → ParseContent → Transform → Render → Generate → Write → Finalize
+```
+- **BuildContext**: Shared state container (pages, sections, site, config, cache) passed through all phases.
+- **Hook registration**: Modules implement `Hookable` interface, register via `Manager#on(HookPoint, priority:, name:)`.
+- **HookResult**: `Continue` | `Skip` | `Abort`.
 
-- `docs/content/`: Markdown documentation pages.
-- `docs/data/sidebar.yml`: Sidebar navigation structure (supports nested groups).
-- `docs/templates/`: Jinja2 templates for the docs site.
-- `docs/static/assets/css/`: Stylesheets, numbered by load order (`01-variables` → `08-shortcodes`).
-- `docs/config.toml`: Docs site configuration.
+### Registry Pattern
+Used for: Processors (`ContentProcessors::Base`), Commands (`CommandRegistry`), Scaffolds (`Scaffolds::Registry`), Hooks (`Manager`).
 
-### Landing Page
+### CLI
+- Commands define `NAME`, `DESCRIPTION`, `FLAGS` (array of `FlagInfo`), `POSITIONAL_ARGS`.
+- Tool subcommands: list, convert, check-links, stats, validate, unused-assets, platform, doctor, import, export, agents-md, ci.
+- Shell completion auto-generated from `CommandRegistry` metadata.
+- `doctor` is a top-level alias for `tool doctor`.
 
-The landing page (`/`) uses a **separate template** (`docs/templates/index.html`) with dedicated CSS (`07-landing.css`). The markdown content in `docs/content/index.md` is **not rendered** — all landing content is in the template directly.
+### Caching (Multi-layer)
+1. **Build cache** (`.hwaro_cache.json`) - File mtime + content hash.
+2. **Template compilation cache** - Compiled Crinja AST keyed by `UInt64`.
+3. **Crinja value caches** - Per-page, per-section, per-series, per-ancestor. Cleared at phase transitions.
+4. **Site lookup indices** - `pages_by_section`, `sections_by_parent`, `sections_by_name`.
 
-### Sidebar
+### Models
+- **Page**: 50+ properties (title, date, draft, tags, content, url, word_count, reading_time, series, authors, extra, etc.).
+- **Section**: Extends Page with paginate, sort_by, reverse, transparent, subsections.
+- **Site**: Aggregator with lookup indices, taxonomy maps, data/authors hashes.
+- **Config**: Nested structures for feeds, sitemap, robots, search, SEO, image processing, multilingual.
 
-`docs/data/sidebar.yml` supports two item types:
-- **Link**: `{ title, url }` — a navigation link.
-- **Nested group**: `{ title, items: [...] }` — a collapsible group header with child links (used in Features section).
+## Development Guide
 
-### Content Conventions
+### Adding a New Processor
+1. Inherit `Hwaro::Content::Processors::Base`, implement `process(context : ProcessorContext) : ProcessorResult`.
+2. Register in processor `Registry`.
 
-- **Front matter**: Always TOML (`+++`), not YAML (`---`).
-- **`weight` field**: Controls page ordering within a section. No duplicates.
-- **`toc = true`**: Add to pages longer than ~40 lines for table of contents.
-- **Features docs**: Place a config example (`config.toml` snippet) near the top.
-- **See Also**: End pages with `## See Also` linking to 2-4 related pages.
-- **Full Reference blocks**: Key pages (Pages, Sections, Config) include a "Full Front Matter Reference" or "Full Example" section with a copy-pasteable block of all available fields.
+### Adding a New Command
+1. Create class in `src/cli/commands/` with `NAME`, `DESCRIPTION`, `FLAGS` (using `FlagInfo`), and `run(args)`.
+2. Register in `src/cli/runner.cr` via `CommandRegistry.register(metadata, &handler)`.
 
-### Docs Site Sections
+### Adding a New Hook
+1. Implement `Hwaro::Core::Lifecycle::Hookable` with `register_hooks(manager)`.
+2. Register in `src/content/hooks.cr`.
 
-| Section | Path | Purpose |
-|---------|------|---------|
-| Start | `content/start/` | Installation, first site, CLI, config |
-| Writing | `content/writing/` | Pages, sections, taxonomies, shortcodes, archetypes |
-| Templates | `content/templates/` | Syntax, data model, functions, filters |
-| Features | `content/features/` | All built-in features (grouped in sidebar) |
-| Deploy | `content/deploy/` | Platform-specific deployment guides |
+### Adding a Config Option
+Update **all** of the following:
+1. `src/models/config.cr` — property, default, and loader.
+2. `src/services/config_snippets.cr` — shared TOML snippets (accepts `commented` param for scaffold vs doctor variants).
+3. `src/services/scaffolds/base.cr` — if scaffold-only section.
+4. `spec/unit/config_spec.cr` and relevant feature specs.
+
+## Coding Patterns
+
+### Security
+- **HTML/XML output**: `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
+- **Inline JS**: Escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
+- **TOML front matter**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`), never unchecked `.as_s`.
+- **Crinja filter args**: Use `.to_s` instead of `.as_s`.
+- **Paths**: Always use `PathUtils.sanitize_path` for user-provided or content-derived paths.
+
+### Performance
+- **String building**: Prefer `String.build` with char-by-char iteration over chained `.gsub()`.
+- **Bounded substrings**: Use `html[pos, n]` instead of `html[pos..]` in loops to avoid O(n) allocations.
+- **Crinja value caching**: Cache `Crinja::Value` arrays per-section/page. Clear at all reset points.
+
+### Logging
+- `Logger.action(label, message, color)` — file operations (right-justified label).
+- `Logger.progress(current, total)` — progress bar with percentage.
+- `Logger.timed(message, &block)` — timing wrapper.
+- Levels: `debug`, `info`, `warn`, `error`, `success`.
+
+### Testing
+- **Unit tests**: Isolated components, minimal objects, helper methods (e.g., `load_config`, `render_filter`).
+- **Functional tests**: Use `build_site()` helper (creates temp dir, writes files, runs build, yields for assertions, auto-cleans).
+- Logger output suppressed via `Logger.io = IO::Memory.new` in spec_helper.
+- No fixtures directory — inline data creation with temp dirs (`Dir.mktmpdir`).
+
+## Documentation Site (`docs/`)
+Build: `bin/hwaro build -i docs` → `docs/public/`. Always build after changes to verify.
+
+- `docs/content/` — Markdown pages (sections: start, writing, templates, features, deploy).
+- `docs/data/sidebar.yml` — Navigation (link items + nested groups).
+- `docs/templates/` — Jinja2 templates. Landing page (`index.html`) uses separate template; `index.md` content is not rendered.
+- `docs/static/assets/css/` — Numbered by load order (`01-variables` → `08-shortcodes`).
+- Front matter: TOML (`+++`), `weight` for ordering, `toc = true` for long pages.
