@@ -79,5 +79,23 @@ describe Hwaro::Config::Options::ServeOptions do
       build.should_not be_nil
       build.streaming?.should be_false
     end
+
+    it "derives base_url from host and port when not explicitly set" do
+      serve = Hwaro::Config::Options::ServeOptions.new(host: "0.0.0.0", port: 8080)
+      build = serve.to_build_options
+      build.base_url.should eq("http://0.0.0.0:8080")
+    end
+
+    it "uses default host:port for base_url when no options provided" do
+      serve = Hwaro::Config::Options::ServeOptions.new
+      build = serve.to_build_options
+      build.base_url.should eq("http://127.0.0.1:3000")
+    end
+
+    it "preserves explicit --base-url over derived host:port" do
+      serve = Hwaro::Config::Options::ServeOptions.new(port: 8080, base_url: "https://example.com")
+      build = serve.to_build_options
+      build.base_url.should eq("https://example.com")
+    end
   end
 end
