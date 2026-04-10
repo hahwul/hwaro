@@ -90,12 +90,14 @@ module Hwaro
               return dest
             end
 
-            # Guard against excessive memory allocation (use Int64 to avoid overflow)
-            buf_size = out_w.to_i64 * out_h.to_i64 * channels.to_i64
-            if buf_size > MAX_PIXELS * 4 # 4 channels max
-              Logger.debug "Output image too large '#{source}': #{out_w}x#{out_h}x#{channels} = #{buf_size} bytes"
+            # Guard against excessive memory allocation
+            # Check pixel count before multiplying by channels to prevent Int64 overflow
+            pixel_count = out_w.to_i64 * out_h.to_i64
+            if pixel_count > MAX_PIXELS
+              Logger.debug "Output image too large '#{source}': #{out_w}x#{out_h} = #{pixel_count} pixels"
               return nil
             end
+            buf_size = pixel_count * channels.to_i64
 
             # Allocate output buffer with LibC.malloc for deterministic C interop
             out_pixels = LibC.malloc(buf_size).as(UInt8*)
@@ -188,8 +190,9 @@ module Hwaro
           out_w, out_h = calculate_dimensions(src_w, src_h, effective_width, 0)
           return nil if out_w <= 0 || out_h <= 0
 
-          buf_size = out_w.to_i64 * out_h.to_i64 * channels.to_i64
-          return nil if buf_size > MAX_PIXELS
+          pixel_count = out_w.to_i64 * out_h.to_i64
+          return nil if pixel_count > MAX_PIXELS
+          buf_size = pixel_count * channels.to_i64
 
           thumb_pixels = LibC.malloc(buf_size).as(UInt8*)
           return nil if thumb_pixels.null?
@@ -282,17 +285,17 @@ module Hwaro
             return {result_map, lqip_uri, dom_color}
           end
 
+          # Declare outside begin so ensure always has a valid pointer to free
+          smallest_pixels : UInt8* = Pointer(UInt8).null
+          smallest_w = 0_i32
+          smallest_h = 0_i32
+
           begin
             return {result_map, lqip_uri, dom_color} if src_w <= 0 || src_h <= 0 || channels <= 0
 
             ext = File.extname(source).downcase
             basename = File.basename(source, File.extname(source))
             FileUtils.mkdir_p(dest_dir)
-
-            # Track smallest resized variant for LQIP source optimization
-            smallest_pixels : UInt8* = Pointer(UInt8).null
-            smallest_w = 0_i32
-            smallest_h = 0_i32
 
             # Resize variants (sorted ascending so smallest is processed first)
             sorted_widths = widths.sort
@@ -308,33 +311,34 @@ module Hwaro
                 next
               end
 
-              buf_size = out_w.to_i64 * out_h.to_i64 * channels.to_i64
-              next if buf_size > MAX_PIXELS * 4
+              pixel_count = out_w.to_i64 * out_h.to_i64
+              next if pixel_count > MAX_PIXELS
+              buf_size = pixel_count * channels.to_i64
 
               out_pixels = LibC.malloc(buf_size).as(UInt8*)
               next if out_pixels.null?
 
-              resized = LibStb.stbir_resize_uint8_linear(
-                pixels, src_w, src_h, 0,
-                out_pixels, out_w, out_h, 0,
-                channels
-              )
-              if resized.null?
-                LibC.free(out_pixels.as(Void*))
-                next
-              end
+              begin
+                resized = LibStb.stbir_resize_uint8_linear(
+                  pixels, src_w, src_h, 0,
+                  out_pixels, out_w, out_h, 0,
+                  channels
+                )
+                unless resized.null?
+                  if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
+                    result_map[width] = dest
+                  end
 
-              if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
-                result_map[width] = dest
-              end
-
-              # Keep the smallest variant alive as LQIP source (free previous if any)
-              if lqip_width > 0 && smallest_pixels.null?
-                smallest_pixels = out_pixels
-                smallest_w = out_w
-                smallest_h = out_h
-              else
-                LibC.free(out_pixels.as(Void*))
+                  # Keep the smallest variant alive as LQIP source
+                  if lqip_width > 0 && smallest_pixels.null?
+                    smallest_pixels = out_pixels
+                    smallest_w = out_w
+                    smallest_h = out_h
+                    out_pixels = Pointer(UInt8).null
+                  end
+                end
+              ensure
+                LibC.free(out_pixels.as(Void*)) unless out_pixels.null?
               end
             end
 
@@ -352,9 +356,8 @@ module Hwaro
               end
             end
 
-            # Free the kept smallest variant
-            LibC.free(smallest_pixels.as(Void*)) unless smallest_pixels.null?
           ensure
+            LibC.free(smallest_pixels.as(Void*)) unless smallest_pixels.null?
             LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
           end
 
