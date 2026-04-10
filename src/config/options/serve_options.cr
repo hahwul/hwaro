@@ -51,9 +51,13 @@ module Hwaro
 
         # Convert to BuildOptions for initial build
         def to_build_options : BuildOptions
+          # When no explicit --base-url is provided, derive from serve host:port
+          # so that generated URLs reflect the actual server address
+          effective_base_url = @base_url || "http://#{@host}:#{@port}"
+
           BuildOptions.new(
             output_dir: "public",
-            base_url: @base_url,
+            base_url: effective_base_url,
             drafts: @drafts,
             include_expired: @include_expired,
             include_future: @include_future,
