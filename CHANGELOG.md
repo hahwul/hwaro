@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.1
+
+### Added
+- Nix flake environment for development and packaging
+- Nix installation guide to docs
+- Tests for i18n filters, shortcode nesting, and deployer helpers
+
+### Changed
+- Improve AGENTS.md with missing sections and compressed structure
+- Update showcase examples in landing page
+
+### Fixed
+- SSRF, CRLF injection, integer overflow, and CSWSH security vulnerabilities
+- Integer overflow and memory leak in image processor
+- `serve -p` flag not reflecting in `base_url` when `--base-url` is unset
+
 ## v0.11.0
 
 ### Added
