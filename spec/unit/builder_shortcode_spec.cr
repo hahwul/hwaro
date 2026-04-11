@@ -493,5 +493,66 @@ describe Hwaro::Core::Build::Builder do
       result.should contain("{% wrap %}")
       result.should contain("no end tag")
     end
+
+    it "stops body recursion at MAX_SHORTCODE_NESTING depth" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/box"  => "<div class=\"box\">{{ body }}</div>",
+        "shortcodes/note" => "<span class=\"note\">{{ body }}</span>",
+      }
+      context = {} of String => Crinja::Value
+
+      # Build 6 nested box levels + inner note + box: total 8 opens.
+      # At depth=5, the outermost remaining block (box) is rendered, but its
+      # body ({% note %}{% box %}deep{% end %}{% end %}) is NOT recursively
+      # processed because depth(5) >= MAX_SHORTCODE_NESTING(5).
+      content = "{% box %}{% box %}{% box %}{% box %}{% box %}{% box %}{% note %}{% box %}deep{% end %}{% end %}{% end %}{% end %}{% end %}{% end %}{% end %}{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+
+      # The outer 6 box levels should all be rendered as <div>
+      result.scan("<div class=\"box\">").size.should eq(6)
+      # The inner shortcodes beyond depth limit remain as raw text
+      result.should contain("{% note %}{% box %}deep{% end %}{% end %}")
+      # The note template was NOT applied
+      result.should_not contain("<span class=\"note\">")
+    end
+
+    it "processes nested shortcodes within depth limit" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/box" => "<div class=\"box\">{{ body }}</div>",
+      }
+      context = {} of String => Crinja::Value
+
+      # 2 levels deep — well within limit
+      content = "{% box %}{% box %}hello{% end %}{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should eq("<div class=\"box\"><div class=\"box\">hello</div></div>")
+    end
+
+    it "handles multiple unmatched end tags" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/note" => "<span>{{ body }}</span>",
+      }
+      context = {} of String => Crinja::Value
+
+      content = "{% end %}{% end %}{% note %}text{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should contain("{% end %}")
+      result.should contain("<span>text</span>")
+    end
+
+    it "renders block shortcode with empty body" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/empty" => "<section>{{ body }}</section>",
+      }
+      context = {} of String => Crinja::Value
+
+      content = "{% empty %}{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context)
+      result.should eq("<section></section>")
+    end
   end
 end

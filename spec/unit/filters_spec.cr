@@ -946,3 +946,110 @@ describe "MiscFilters (extended)" do
     end
   end
 end
+
+# =============================================================================
+# I18n Filters
+# =============================================================================
+describe "I18nFilters" do
+  describe "t (translate)" do
+    it "translates key using current language" do
+      translations = {
+        Crinja::Value.new("ko") => Crinja::Value.new({
+          Crinja::Value.new("greeting") => Crinja::Value.new("안녕하세요"),
+        }),
+        Crinja::Value.new("en") => Crinja::Value.new({
+          Crinja::Value.new("greeting") => Crinja::Value.new("Hello"),
+        }),
+      }
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new(translations),
+        "page_language"          => Crinja::Value.new("ko"),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      result = render_filter("{{ \"greeting\" | t }}", vars)
+      result.should eq("안녕하세요")
+    end
+
+    it "falls back to default language when key missing in current language" do
+      translations = {
+        Crinja::Value.new("ko") => Crinja::Value.new({} of Crinja::Value => Crinja::Value),
+        Crinja::Value.new("en") => Crinja::Value.new({
+          Crinja::Value.new("greeting") => Crinja::Value.new("Hello"),
+        }),
+      }
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new(translations),
+        "page_language"          => Crinja::Value.new("ko"),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      result = render_filter("{{ \"greeting\" | t }}", vars)
+      result.should eq("Hello")
+    end
+
+    it "returns key itself when no translation found" do
+      translations = {
+        Crinja::Value.new("en") => Crinja::Value.new({} of Crinja::Value => Crinja::Value),
+      }
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new(translations),
+        "page_language"          => Crinja::Value.new("en"),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      result = render_filter("{{ \"missing_key\" | t }}", vars)
+      result.should eq("missing_key")
+    end
+
+    it "returns key when no translations data available" do
+      vars = {} of String => Crinja::Value
+      result = render_filter("{{ \"hello\" | t }}", vars)
+      result.should eq("hello")
+    end
+
+    it "defaults language to en when page_language is empty" do
+      translations = {
+        Crinja::Value.new("en") => Crinja::Value.new({
+          Crinja::Value.new("title") => Crinja::Value.new("Title"),
+        }),
+      }
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new(translations),
+        "page_language"          => Crinja::Value.new(""),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      result = render_filter("{{ \"title\" | t }}", vars)
+      result.should eq("Title")
+    end
+  end
+
+  describe "pluralize" do
+    it "returns singular when count is 1" do
+      vars = {"count" => Crinja::Value.new(1)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("item")
+    end
+
+    it "returns plural when count is 0" do
+      vars = {"count" => Crinja::Value.new(0)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("items")
+    end
+
+    it "returns plural when count is greater than 1" do
+      vars = {"count" => Crinja::Value.new(5)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("items")
+    end
+
+    it "returns plural for negative count" do
+      vars = {"count" => Crinja::Value.new(-1)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("items")
+    end
+
+    it "defaults to 0 for non-numeric input" do
+      vars = {"count" => Crinja::Value.new("abc")}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("items")
+    end
+  end
+end
