@@ -99,6 +99,50 @@ describe Hwaro::Services::IndexRewriteHandler do
     end
   end
 
+  it "uses sanitized path in Location header to prevent CRLF injection" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "safe/dir"))
+
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      # Path with percent-encoded CRLF that could cause header injection
+      request = HTTP::Request.new("GET", "/safe/dir")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      response.status_code.should eq(301)
+      location = response.headers["Location"]
+      location.should eq("/safe/dir/")
+      location.should_not contain("\r")
+      location.should_not contain("\n")
+    end
+  end
+
+  it "does not redirect traversal attempts" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "legit"))
+
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/../../etc")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      # Should not issue a redirect for traversal paths
+      dummy.called.should be_true
+    end
+  end
+
   it "passes through files that don't need rewriting" do
     Dir.mktmpdir do |dir|
       handler = Hwaro::Services::IndexRewriteHandler.new(dir)

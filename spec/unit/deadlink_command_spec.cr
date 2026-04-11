@@ -153,6 +153,60 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     end
   end
 
+  describe "#private_host? (SSRF protection)" do
+    it "blocks localhost" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_host_for_test?("localhost").should be_true
+    end
+
+    it "blocks .local domains" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_host_for_test?("myhost.local").should be_true
+    end
+
+    it "blocks .internal domains" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_host_for_test?("service.internal").should be_true
+    end
+
+    it "blocks 127.0.0.1 (loopback)" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_host_for_test?("127.0.0.1").should be_true
+    end
+
+    it "allows public domains" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_host_for_test?("example.com").should be_false
+    end
+  end
+
+  describe "#private_172?" do
+    it "returns true for 172.16.x.x" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_172_for_test?("172.16.0.1").should be_true
+    end
+
+    it "returns true for 172.31.x.x" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_172_for_test?("172.31.255.255").should be_true
+    end
+
+    it "returns false for 172.15.x.x (below range)" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_172_for_test?("172.15.0.1").should be_false
+    end
+
+    it "returns false for 172.32.x.x (above range)" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_172_for_test?("172.32.0.1").should be_false
+    end
+
+    it "returns false for non-172 addresses" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.private_172_for_test?("192.168.1.1").should be_false
+    end
+  end
+
   describe "#check_internal_links" do
     it "detects broken internal links" do
       Dir.mktmpdir do |dir|
@@ -213,5 +267,13 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
 
   def check_internal_links_for_test(links : Array(Link), content_dir : String) : Array(Result)
     check_internal_links(links, content_dir)
+  end
+
+  def private_host_for_test?(host : String) : Bool
+    private_host?(host)
+  end
+
+  def private_172_for_test?(ip : String) : Bool
+    private_172?(ip)
   end
 end

@@ -13,6 +13,21 @@ module Hwaro
 
       def call(context)
         if context.request.path == LIVE_RELOAD_PATH
+          # Validate Origin header to prevent Cross-Site WebSocket Hijacking.
+          # Only allow connections from the same host the dev server is bound to.
+          origin = context.request.headers["Origin"]?
+          host = context.request.headers["Host"]?
+          if origin && host
+            origin_uri = URI.parse(origin)
+            origin_host = origin_uri.host
+            server_host = host.split(":").first?
+            unless origin_host == server_host || origin_host == "localhost" || origin_host == "127.0.0.1" || origin_host == "::1"
+              context.response.status_code = 403
+              context.response.print "Forbidden: invalid origin"
+              return
+            end
+          end
+
           ws = HTTP::WebSocketHandler.new do |socket, _ctx|
             @sockets << socket
             socket.on_close do

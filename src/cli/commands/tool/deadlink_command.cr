@@ -1,5 +1,6 @@
 require "json"
 require "http/client"
+require "socket"
 require "uri"
 require "file"
 require "option_parser"
@@ -229,6 +230,13 @@ module Hwaro
                   error_message = nil
                   begin
                     uri = URI.parse(link.url)
+                    host = uri.host
+                    if host && private_host?(host)
+                      status = -1
+                      error_message = "Skipped: private/internal address"
+                      results_channel.send(Result.new(link: link, status: status, error: error_message))
+                      next
+                    end
                     client = HTTP::Client.new(uri)
                     client.connect_timeout = timeout_seconds.seconds
                     client.read_timeout = timeout_seconds.seconds
@@ -258,6 +266,38 @@ module Hwaro
 
             # Collect all results
             links.size.times.map { results_channel.receive }.to_a
+          end
+
+          # Check if a hostname resolves to a private/internal IP address (SSRF protection).
+          private def private_host?(host : String) : Bool
+            return true if host == "localhost" || host.ends_with?(".local") || host.ends_with?(".internal")
+
+            begin
+              addrs = Socket::Addrinfo.resolve(host, 80, type: Socket::Type::STREAM)
+              addrs.any? do |addr|
+                ip = addr.ip_address.address
+                ip.starts_with?("127.") ||
+                  ip.starts_with?("10.") ||
+                  ip.starts_with?("192.168.") ||
+                  ip.starts_with?("169.254.") ||
+                  ip == "0.0.0.0" ||
+                  ip == "::1" ||
+                  ip == "::" ||
+                  ip.starts_with?("fc") || ip.starts_with?("fd") || # IPv6 ULA
+                  ip.starts_with?("fe80") ||                         # IPv6 link-local
+                  private_172?(ip)
+              end
+            rescue
+              false
+            end
+          end
+
+          private def private_172?(ip : String) : Bool
+            return false unless ip.starts_with?("172.")
+            parts = ip.split(".")
+            return false if parts.size < 2
+            second = parts[1].to_i? || return false
+            second >= 16 && second <= 31
           end
         end
       end

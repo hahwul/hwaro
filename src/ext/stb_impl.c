@@ -21,6 +21,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -174,9 +175,20 @@ typedef struct {
 static void hwaro_membuf_write(void *context, void *data, int size) {
     hwaro_membuf *mb = (hwaro_membuf *)context;
     if (mb->failed) return;
+    if (size < 0 || mb->len > INT_MAX - size) {
+        /* len + size would overflow int */
+        free(mb->buf);
+        mb->buf = NULL;
+        mb->len = 0;
+        mb->cap = 0;
+        mb->failed = 1;
+        return;
+    }
     if (mb->len + size > mb->cap) {
-        int new_cap = mb->cap * 2;
-        if (new_cap < mb->len + size) new_cap = mb->len + size;
+        int needed = mb->len + size;
+        /* Double capacity, guarding against overflow */
+        int new_cap = (mb->cap <= INT_MAX / 2) ? mb->cap * 2 : INT_MAX;
+        if (new_cap < needed) new_cap = needed;
         unsigned char *new_buf = (unsigned char *)realloc(mb->buf, new_cap);
         if (!new_buf) {
             free(mb->buf);
@@ -200,6 +212,18 @@ static void hwaro_membuf_write(void *context, void *data, int size) {
  */
 int hwaro_write_jpg_to_mem(const unsigned char *pixels, int w, int h, int comp,
                            int quality, unsigned char **out_buf, int *out_len) {
+    if (w <= 0 || h <= 0 || comp <= 0 || !pixels) {
+        *out_buf = NULL;
+        *out_len = 0;
+        return 0;
+    }
+    /* Guard against integer overflow: check w * h * comp without overflowing.
+     * INT_MAX / h / comp gives the maximum safe w value. */
+    if (w > INT_MAX / h || w * h > INT_MAX / comp) {
+        *out_buf = NULL;
+        *out_len = 0;
+        return 0;
+    }
     hwaro_membuf mb;
     mb.cap = w * h * comp;
     if (mb.cap < 1024) mb.cap = 1024;

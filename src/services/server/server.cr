@@ -49,8 +49,9 @@ module Hwaro
                      end
           if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
             context.response.status_code = 301
-            safe_path = path.gsub(/[\r\n]/, "")
-            context.response.headers["Location"] = safe_path + "/"
+            # Use the already-sanitized path for the Location header to prevent
+            # CRLF injection and path traversal in the redirect target.
+            context.response.headers["Location"] = "/" + sanitized + "/"
             return
           end
         end
