@@ -1633,6 +1633,21 @@ describe Hwaro::Services::LiveReloadInjectHandler do
   end
 end
 
+# Helper for LiveReloadHandler specs: builds a request targeting the
+# live reload endpoint with optional Origin/Host headers.
+private def build_ws_request(origin : String?, host : String?)
+  headers = HTTP::Headers.new
+  headers["Origin"] = origin if origin
+  headers["Host"] = host if host
+  HTTP::Request.new("GET", Hwaro::Services::LiveReloadHandler::LIVE_RELOAD_PATH, headers)
+end
+
+private def make_context(request : HTTP::Request)
+  io = IO::Memory.new
+  response = HTTP::Server::Response.new(io)
+  {HTTP::Server::Context.new(request, response), io, response}
+end
+
 describe Hwaro::Services::LiveReloadHandler do
   it "passes non-matching paths through" do
     handler = Hwaro::Services::LiveReloadHandler.new
@@ -1647,5 +1662,177 @@ describe Hwaro::Services::LiveReloadHandler do
     handler.call(context)
 
     dummy.called.should be_true
+  end
+
+  describe "Origin validation (CSWSH protection)" do
+    it "rejects mismatched Origin with 403" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = build_ws_request("http://evil.example.com", "localhost:3000")
+      context, io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should eq(403)
+      io.to_s.should contain("Forbidden")
+      dummy.called.should be_false
+    end
+
+    it "rejects Origin on a different host (cross-origin)" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://attacker.com", "example.com:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should eq(403)
+    end
+
+    it "allows Origin whose host matches the server Host header" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://example.com", "example.com:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      # Origin passed validation; WS handshake fails on missing upgrade
+      # headers, but we've confirmed the request was not 403'd by Origin check.
+      context.response.status_code.should_not eq(403)
+    end
+
+    it "always allows localhost origin" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://localhost:8080", "127.0.0.1:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should_not eq(403)
+    end
+
+    it "always allows 127.0.0.1 origin" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://127.0.0.1:8080", "example.com:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should_not eq(403)
+    end
+
+    it "always allows ::1 origin" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://[::1]:8080", "example.com:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should_not eq(403)
+    end
+
+    it "allows request when Origin header is absent (non-browser client)" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request(nil, "localhost:3000")
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should_not eq(403)
+    end
+
+    it "allows request when Host header is absent" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      request = build_ws_request("http://evil.example.com", nil)
+      context, _io, response = make_context(request)
+
+      handler.call(context)
+      response.close
+
+      context.response.status_code.should_not eq(403)
+    end
+  end
+
+  describe "#notify_reload" do
+    it "does not raise when there are no connected sockets" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      handler.notify_reload
+    end
+  end
+end
+
+describe Hwaro::Services::LiveReloadInjectHandler, "#inject_script" do
+  it "injects before the LAST </body> when multiple appear in content" do
+    handler = Hwaro::Services::LiveReloadInjectHandler.new(".")
+    html = "<html><body><pre>&lt;/body&gt; literal</pre><div>sentinel</body>trailing</body></html>"
+    result = handler.inject_script(html)
+
+    # Script must appear before the final </body>, not any earlier one
+    script_pos = result.index("__hwaro_livereload").not_nil!
+    last_body = result.rindex("</body>").not_nil!
+    script_pos.should be < last_body
+
+    # An earlier literal </body> should precede the injected script
+    first_body = result.index("</body>").not_nil!
+    first_body.should be < script_pos
+  end
+
+  it "appends script when no </body> tag exists" do
+    handler = Hwaro::Services::LiveReloadInjectHandler.new(".")
+    result = handler.inject_script("<p>hi</p>")
+    result.should end_with(Hwaro::Services::LiveReloadInjectHandler::LIVE_RELOAD_SCRIPT)
+  end
+end
+
+describe Hwaro::Services::LiveReloadInjectHandler, "path sanitization" do
+  it "passes through when path escapes public_dir via traversal" do
+    Dir.mktmpdir do |dir|
+      # Put an HTML file OUTSIDE public_dir that traversal would try to hit
+      outside = File.join(dir, "outside.html")
+      File.write(outside, "<html><body>SECRET</body></html>")
+
+      public_dir = File.join(dir, "public")
+      FileUtils.mkdir_p(public_dir)
+
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(public_dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/../outside.html")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      # Must not serve the outside file; delegate to next handler instead
+      dummy.called.should be_true
+      io.to_s.should_not contain("SECRET")
+    end
+  end
+
+  it "passes through when the requested HTML file does not exist" do
+    Dir.mktmpdir do |dir|
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/missing.html")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      dummy.called.should be_true
+    end
   end
 end

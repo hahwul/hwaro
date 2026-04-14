@@ -20,6 +20,10 @@ module Hwaro
           if origin && host
             origin_uri = URI.parse(origin)
             origin_host = origin_uri.host
+            # Strip brackets from IPv6 literals (e.g. "[::1]" -> "::1")
+            if origin_host && origin_host.starts_with?('[') && origin_host.ends_with?(']')
+              origin_host = origin_host[1..-2]
+            end
             server_host = host.split(":").first?
             unless origin_host == server_host || origin_host == "localhost" || origin_host == "127.0.0.1" || origin_host == "::1"
               context.response.status_code = 403
