@@ -1645,8 +1645,14 @@ end
 private def make_context(request : HTTP::Request)
   io = IO::Memory.new
   response = HTTP::Server::Response.new(io)
-  {HTTP::Server::Context.new(request, response), io, response}
+  {HTTP::Server::Context.new(request, response), io}
 end
+
+# Marker emitted by LiveReloadHandler when it rejects an Origin. Asserting on
+# this (rather than "not 403") proves the rejection branch was NOT taken,
+# since the WS handshake would also produce non-403 errors for unrelated
+# reasons (missing Upgrade headers, etc.).
+private ORIGIN_REJECT_MARKER = "Forbidden: invalid origin"
 
 describe Hwaro::Services::LiveReloadHandler do
   it "passes non-matching paths through" do
@@ -1671,93 +1677,95 @@ describe Hwaro::Services::LiveReloadHandler do
       handler.next = dummy
 
       request = build_ws_request("http://evil.example.com", "localhost:3000")
-      context, io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
       context.response.status_code.should eq(403)
-      io.to_s.should contain("Forbidden")
+      io.to_s.should contain(ORIGIN_REJECT_MARKER)
       dummy.called.should be_false
     end
 
     it "rejects Origin on a different host (cross-origin)" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://attacker.com", "example.com:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
       context.response.status_code.should eq(403)
+      io.to_s.should contain(ORIGIN_REJECT_MARKER)
     end
 
     it "allows Origin whose host matches the server Host header" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://example.com", "example.com:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      # Origin passed validation; WS handshake fails on missing upgrade
-      # headers, but we've confirmed the request was not 403'd by Origin check.
-      context.response.status_code.should_not eq(403)
+      # Origin validation must NOT reject. WS handshake fails for unrelated
+      # reasons (missing Upgrade headers), so asserting the rejection marker
+      # is absent is a tighter check than "status != 403".
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
 
     it "always allows localhost origin" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://localhost:8080", "127.0.0.1:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      context.response.status_code.should_not eq(403)
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
 
     it "always allows 127.0.0.1 origin" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://127.0.0.1:8080", "example.com:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      context.response.status_code.should_not eq(403)
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
 
     it "always allows ::1 origin" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://[::1]:8080", "example.com:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      context.response.status_code.should_not eq(403)
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
 
     it "allows request when Origin header is absent (non-browser client)" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request(nil, "localhost:3000")
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      context.response.status_code.should_not eq(403)
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
 
     it "allows request when Host header is absent" do
       handler = Hwaro::Services::LiveReloadHandler.new
       request = build_ws_request("http://evil.example.com", nil)
-      context, _io, response = make_context(request)
+      context, io = make_context(request)
 
       handler.call(context)
-      response.close
+      context.response.close
 
-      context.response.status_code.should_not eq(403)
+      io.to_s.should_not contain(ORIGIN_REJECT_MARKER)
     end
   end
 
@@ -1813,9 +1821,11 @@ describe Hwaro::Services::LiveReloadInjectHandler, "path sanitization" do
 
       handler.call(context)
 
-      # Must not serve the outside file; delegate to next handler instead
+      # Must not serve the outside file; delegate to next handler instead,
+      # and must not have written the injected script to the response.
       dummy.called.should be_true
       io.to_s.should_not contain("SECRET")
+      io.to_s.should_not contain("__hwaro_livereload")
     end
   end
 
