@@ -380,6 +380,127 @@ describe Hwaro::Core::Lifecycle::Manager do
       manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeRender).should be_true
       manager.hook_count.should eq(1)
     end
+
+    it "returns self so registrations can be chained" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.register(TestHookable.new).should be(manager)
+    end
+
+    it "registers multiple Hookables additively" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.register(TestHookable.new)
+      manager.register(TestHookable.new)
+      manager.hook_count.should eq(2)
+    end
+  end
+
+  describe "fluent registration" do
+    it "returns self from #on for chaining" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      result = manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "x") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      result.should be(manager)
+    end
+  end
+
+  describe "#register_hook (explicit handler)" do
+    it "registers a HookHandler directly" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      handler = Hwaro::Core::Lifecycle::HookHandler.new do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      manager.register_hook(
+        Hwaro::Core::Lifecycle::HookPoint::BeforeRender,
+        handler,
+        priority: 7,
+        name: "explicit",
+      )
+
+      hooks = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::BeforeRender)
+      hooks.size.should eq(1)
+      hooks.first.priority.should eq(7)
+      hooks.first.name.should eq("explicit")
+    end
+
+    it "re-sorts the hook list by priority after each registration" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      h1 = Hwaro::Core::Lifecycle::HookHandler.new { |_| Hwaro::Core::Lifecycle::HookResult::Continue }
+      h2 = Hwaro::Core::Lifecycle::HookHandler.new { |_| Hwaro::Core::Lifecycle::HookResult::Continue }
+      h3 = Hwaro::Core::Lifecycle::HookHandler.new { |_| Hwaro::Core::Lifecycle::HookResult::Continue }
+
+      point = Hwaro::Core::Lifecycle::HookPoint::BeforeRender
+      manager.register_hook(point, h1, priority: 1, name: "low")
+      manager.register_hook(point, h2, priority: 100, name: "high")
+      manager.register_hook(point, h3, priority: 50, name: "mid")
+
+      manager.hooks_at(point).map(&.name).should eq(["high", "mid", "low"])
+    end
+  end
+
+  describe "Manager.new(debug: true)" do
+    it "emits debug log lines for each fired hook without altering its result" do
+      # Capture and restore the global Logger.io / level so this test does
+      # not pollute other specs that read from spec_helper's IO::Memory.
+      previous_io = Hwaro::Logger.io
+      previous_level = Hwaro::Logger.level
+      sink = IO::Memory.new
+      Hwaro::Logger.io = sink
+      # Manager#trigger uses Logger.debug — bump the level so it isn't
+      # filtered (default is Info).
+      Hwaro::Logger.level = Hwaro::Logger::Level::Debug
+
+      begin
+        manager = Hwaro::Core::Lifecycle::Manager.new(debug: true)
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+
+        manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "debug-target") do |_ctx|
+          Hwaro::Core::Lifecycle::HookResult::Continue
+        end
+
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        sink.to_s.should contain("debug-target")
+      ensure
+        Hwaro::Logger.io = previous_io
+        Hwaro::Logger.level = previous_level
+      end
+    end
+  end
+
+  describe "#dump_hooks" do
+    it "does not raise when there are no hooks registered" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.dump_hooks
+    end
+
+    it "does not raise when hooks are present" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 5, name: "h") do |_|
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+      manager.dump_hooks
+    end
+  end
+
+  describe ".default class property" do
+    it "lazily creates a singleton Manager instance" do
+      a = Hwaro::Core::Lifecycle.default
+      b = Hwaro::Core::Lifecycle.default
+      a.should be(b)
+    end
+
+    it "allows overriding the default with a fresh Manager" do
+      # class_property's getter returns Manager? even though the block
+      # guarantees non-nil; not_nil! is needed for the setter signature.
+      original = Hwaro::Core::Lifecycle.default
+      replacement = Hwaro::Core::Lifecycle::Manager.new
+      Hwaro::Core::Lifecycle.default = replacement
+      Hwaro::Core::Lifecycle.default.should be(replacement)
+    ensure
+      # Restore the original singleton so other specs aren't affected
+      Hwaro::Core::Lifecycle.default = original.not_nil!
+    end
   end
 end
 

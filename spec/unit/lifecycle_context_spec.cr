@@ -439,4 +439,111 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.get_int("count").should eq(42)
     end
   end
+
+  describe "all_pages caching" do
+    it "memoizes the combined array across repeated calls" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.pages << Hwaro::Models::Page.new("a.md")
+      ctx.sections << Hwaro::Models::Section.new("b/_index.md")
+
+      first = ctx.all_pages
+      second = ctx.all_pages
+      # Same object identity proves the cached array was reused
+      first.should be(second)
+    end
+
+    it "returns a stale cached array when pages are mutated in-place" do
+      # Documents the known caveat: mutating pages/sections via << does NOT
+      # invalidate the cache. Callers must use the assignment setters
+      # (#pages= / #sections=) or call invalidate_all_pages_cache.
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.pages << Hwaro::Models::Page.new("a.md")
+
+      first = ctx.all_pages
+      first.size.should eq(1)
+
+      ctx.pages << Hwaro::Models::Page.new("b.md")
+      # Cache returns the previously-built array (still 1 element)
+      ctx.all_pages.size.should eq(1)
+
+      ctx.invalidate_all_pages_cache
+      ctx.all_pages.size.should eq(2)
+    end
+  end
+
+  describe "#pages= setter" do
+    it "auto-invalidates the all_pages cache" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.pages << Hwaro::Models::Page.new("a.md")
+      ctx.all_pages.size.should eq(1) # warm the cache
+
+      ctx.pages = [
+        Hwaro::Models::Page.new("x.md"),
+        Hwaro::Models::Page.new("y.md"),
+      ]
+      ctx.all_pages.size.should eq(2)
+      ctx.all_pages.map(&.path).sort.should eq(["x.md", "y.md"])
+    end
+
+    it "swaps in the assigned array by identity, not by copy" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.pages << Hwaro::Models::Page.new("a.md")
+
+      replacement = [] of Hwaro::Models::Page
+      ctx.pages = replacement
+      ctx.pages.should be(replacement)
+    end
+  end
+
+  describe "#sections= setter" do
+    it "auto-invalidates the all_pages cache" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.sections << Hwaro::Models::Section.new("a/_index.md")
+      ctx.all_pages.size.should eq(1) # warm the cache
+
+      ctx.sections = [
+        Hwaro::Models::Section.new("x/_index.md"),
+        Hwaro::Models::Section.new("y/_index.md"),
+      ]
+      ctx.all_pages.size.should eq(2)
+    end
+
+    it "swaps in the assigned array by identity, not by copy" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.sections << Hwaro::Models::Section.new("a/_index.md")
+
+      replacement = [] of Hwaro::Models::Section
+      ctx.sections = replacement
+      ctx.sections.should be(replacement)
+    end
+  end
+
+  describe "#invalidate_all_pages_cache" do
+    it "rebuilds the array on the next call to all_pages" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.pages << Hwaro::Models::Page.new("a.md")
+      first = ctx.all_pages
+
+      ctx.invalidate_all_pages_cache
+      second = ctx.all_pages
+      # Different object identity proves the array was rebuilt
+      first.should_not be(second)
+      second.size.should eq(1)
+    end
+
+    it "is safe to call when the cache has not been warmed" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      # No prior all_pages call — should not raise
+      ctx.invalidate_all_pages_cache
+      ctx.all_pages.should be_empty
+    end
+  end
 end

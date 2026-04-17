@@ -23,6 +23,10 @@ module Hwaro
       @@io = io
     end
 
+    def self.io : IO
+      @@io
+    end
+
     def self.level=(level : Level)
       @@level = level
     end
