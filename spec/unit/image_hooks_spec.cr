@@ -15,6 +15,16 @@ require "../../src/content/hooks/image_hooks"
 # The hook stores @@resize_map and @@lqip_map at class scope. Snapshot the
 # global state before each test and restore on exit so we don't pollute other
 # specs (e.g., functional builds that exercise real image pipelines).
+#
+# NOTES:
+# - resize_map / lqip_map already return a `.dup` of the internal hash, so
+#   `prior_*` is a copy. set_resize_map / set_lqip_map then store that copy
+#   as the new internal state — content is preserved, but identity will
+#   differ from the pre-test ivar. Tests must not assert reference identity
+#   on the class-level maps.
+# - The snapshot is captured before `yield`. Tests must not mutate the
+#   captured `prior_*` hashes mid-test (and they shouldn't have a reference
+#   to them anyway — they're locals here).
 private def with_image_hook_state(&)
   prior_resize = Hwaro::Content::Hooks::ImageHooks.resize_map
   prior_lqip = Hwaro::Content::Hooks::ImageHooks.lqip_map
@@ -211,12 +221,14 @@ describe Hwaro::Content::Hooks::ImageHooks do
   end
 
   describe "process_images via the registered hook" do
+    # All four skip-paths seed the resize_map with a sentinel entry so the
+    # assertion is "the hook DID NOT TOUCH state", not just "state ended
+    # empty" (which would also pass if the hook silently cleared the map).
+    sentinel_map = {"sentinel.png" => {1 => "sentinel-1.png"}}
+
     it "is a no-op (Continue) when ctx.options.skip_image_processing is true" do
       with_image_hook_state do
-        # Seed empty maps so we can confirm no mutation occurs
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {} of String => Hash(Int32, String)
-        )
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         config = Hwaro::Models::Config.new
         config.image_processing.enabled = true
@@ -236,15 +248,13 @@ describe Hwaro::Content::Hooks::ImageHooks do
           Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx
         )
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
       end
     end
 
     it "is a no-op when image_processing.enabled is false" do
       with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {} of String => Hash(Int32, String)
-        )
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         config = Hwaro::Models::Config.new
         config.image_processing.enabled = false
@@ -258,15 +268,13 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
         manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
 
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
       end
     end
 
     it "is a no-op when widths is empty" do
       with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {} of String => Hash(Int32, String)
-        )
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         config = Hwaro::Models::Config.new
         config.image_processing.enabled = true
@@ -280,15 +288,13 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
         manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
 
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
       end
     end
 
     it "is a no-op when ctx.config is nil" do
       with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {} of String => Hash(Int32, String)
-        )
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
         ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -300,7 +306,7 @@ describe Hwaro::Content::Hooks::ImageHooks do
           Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx
         )
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
       end
     end
   end
