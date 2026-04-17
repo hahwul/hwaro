@@ -126,6 +126,25 @@ describe Hwaro::Services::Exporters::Base do
       fields["title"].should eq("X")
       fields.has_key?("tags").should be_false
     end
+
+    it "formats TOML Time values as ISO8601 with offset" do
+      # TOML's native datetime values land in the special Time branch in
+      # exporters/base.cr — the value should be re-emitted as
+      # "%Y-%m-%dT%H:%M:%S%:z".
+      raw = "+++\ntitle = \"X\"\ndate = 2026-04-17T09:30:45+09:00\n+++\n\nbody"
+      fields, _ = TestExporter.new.test_parse_content(raw)
+      fields["title"].should eq("X")
+      fields["date"].as(String).should match(/^2026-04-17T\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/)
+    end
+
+    it "formats YAML Time values as ISO8601 with offset" do
+      # YAML's native ISO 8601 datetime triggers value.as_time? in the
+      # YAML branch; should also be re-emitted via the same format.
+      raw = "---\ntitle: X\ndate: 2026-04-17T09:30:45Z\n---\n\nbody"
+      fields, _ = TestExporter.new.test_parse_content(raw)
+      fields["title"].should eq("X")
+      fields["date"].as(String).should match(/^2026-04-17T\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/)
+    end
   end
 
   describe "#write_file" do

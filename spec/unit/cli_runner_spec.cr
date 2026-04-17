@@ -102,9 +102,11 @@ describe Hwaro::CLI::Runner do
       begin
         Hwaro::CLI::Runner.print_help
         output = sink.to_s
-        # `init` is first in the priority list; `help` is last but still in it
-        init_idx = output.index("init")
-        help_idx = output.index("help")
+        # Anchor to the start-of-line "  <name>" pattern (runner uses
+        # ljust(12)) so a stray "init"/"help" substring elsewhere in the
+        # banner can't shift the indices.
+        init_idx = output.index(/^  init\s/m)
+        help_idx = output.index(/^  help\s/m)
         init_idx.should_not be_nil
         help_idx.should_not be_nil
         init_idx.not_nil!.should be < help_idx.not_nil!
