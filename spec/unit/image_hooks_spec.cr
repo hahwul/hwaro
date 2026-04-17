@@ -1,0 +1,307 @@
+require "../spec_helper"
+require "../../src/content/hooks/image_hooks"
+
+# =============================================================================
+# Unit specs for ImageHooks. Covers:
+# - Class-level resize_map / lqip_map snapshot semantics
+# - find_resized exact / miss
+# - find_closest exact / round-up / fallback-to-largest / unknown URL
+# - find_lqip dup semantics (mutation isolation)
+# - register_hooks wiring (point, name, priority)
+# - process_images skip paths via the BeforeRender hook (no fixtures
+#   loaded → registered hook returns Continue and is a no-op)
+# =============================================================================
+
+# The hook stores @@resize_map and @@lqip_map at class scope. Snapshot the
+# global state before each test and restore on exit so we don't pollute other
+# specs (e.g., functional builds that exercise real image pipelines).
+private def with_image_hook_state(&)
+  prior_resize = Hwaro::Content::Hooks::ImageHooks.resize_map
+  prior_lqip = Hwaro::Content::Hooks::ImageHooks.lqip_map
+  begin
+    yield
+  ensure
+    Hwaro::Content::Hooks::ImageHooks.set_resize_map(prior_resize)
+    Hwaro::Content::Hooks::ImageHooks.set_lqip_map(prior_lqip)
+  end
+end
+
+describe Hwaro::Content::Hooks::ImageHooks do
+  describe ".resize_map" do
+    it "returns a duplicated snapshot (caller mutations don't leak back)" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/img.png" => {320 => "/img-320.png"}}
+        )
+        snapshot = Hwaro::Content::Hooks::ImageHooks.resize_map
+        snapshot["/intruder.png"] = {1 => "/intruder-1.png"}
+
+        # Class state must be unchanged
+        Hwaro::Content::Hooks::ImageHooks.resize_map
+          .has_key?("/intruder.png").should be_false
+      end
+    end
+  end
+
+  describe ".set_resize_map" do
+    it "replaces the entire resize map" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/a.png" => {1 => "/a-1.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/b.png" => {2 => "/b-2.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.resize_map.keys.should eq(["/b.png"])
+      end
+    end
+  end
+
+  describe ".find_resized" do
+    it "returns the resized URL when both URL and width are present" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/cat.png" => {320 => "/cat-320.png", 640 => "/cat-640.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_resized("/cat.png", 320)
+          .should eq("/cat-320.png")
+      end
+    end
+
+    it "returns nil when the URL is unknown" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_resized("/missing.png", 320)
+          .should be_nil
+      end
+    end
+
+    it "returns nil when the URL is known but the requested width is not" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/cat.png" => {320 => "/cat-320.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_resized("/cat.png", 999)
+          .should be_nil
+      end
+    end
+  end
+
+  describe ".find_closest" do
+    it "returns the exact width when it exists" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png", 1280 => "/p-1280.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 640)
+          .should eq("/p-640.png")
+      end
+    end
+
+    it "rounds up to the smallest width >= requested" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png", 1280 => "/p-1280.png"}}
+        )
+        # 500 → next available is 640
+        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 500)
+          .should eq("/p-640.png")
+      end
+    end
+
+    it "falls back to the largest width when none are >= requested" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png"}}
+        )
+        # 9999 has nothing larger → largest available (640)
+        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 9999)
+          .should eq("/p-640.png")
+      end
+    end
+
+    it "returns nil for an unknown URL" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_closest("/missing.png", 320)
+          .should be_nil
+      end
+    end
+
+    it "returns nil for a URL whose width-map is empty" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/empty.png" => {} of Int32 => String}
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_closest("/empty.png", 320)
+          .should be_nil
+      end
+    end
+  end
+
+  describe ".lqip_map / .find_lqip" do
+    it "returns nil for an unknown URL" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
+          {} of String => Hash(String, String)
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_lqip("/missing.png").should be_nil
+      end
+    end
+
+    it "returns the lqip data hash for a known URL" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
+          {"/p.png" => {"lqip" => "data:image/jpeg;base64,...", "dominant_color" => "#abcdef"}}
+        )
+        data = Hwaro::Content::Hooks::ImageHooks.find_lqip("/p.png")
+        data.should_not be_nil
+        data.not_nil!["lqip"].should start_with("data:")
+        data.not_nil!["dominant_color"].should eq("#abcdef")
+      end
+    end
+
+    it "returns a duplicated entry — mutation does not leak back" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
+          {"/p.png" => {"lqip" => "x", "dominant_color" => "#000000"}}
+        )
+        data = Hwaro::Content::Hooks::ImageHooks.find_lqip("/p.png").not_nil!
+        data["lqip"] = "tampered"
+
+        Hwaro::Content::Hooks::ImageHooks.find_lqip("/p.png").not_nil!["lqip"]
+          .should eq("x")
+      end
+    end
+
+    it ".lqip_map returns a duplicated snapshot" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
+          {"/p.png" => {"lqip" => "x", "dominant_color" => "#000"}}
+        )
+        snapshot = Hwaro::Content::Hooks::ImageHooks.lqip_map
+        snapshot["/intruder.png"] = {"lqip" => "y", "dominant_color" => "#fff"}
+
+        Hwaro::Content::Hooks::ImageHooks.lqip_map.has_key?("/intruder.png")
+          .should be_false
+      end
+    end
+  end
+
+  describe "#register_hooks" do
+    it "registers a single hook at BeforeRender with name 'image:resize'" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+
+      hooks = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::BeforeRender)
+      hooks.size.should eq(1)
+      hooks.first.name.should eq("image:resize")
+      hooks.first.priority.should eq(20)
+    end
+
+    it "does not register hooks at any other point" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+      manager.hook_count.should eq(1)
+    end
+  end
+
+  describe "process_images via the registered hook" do
+    it "is a no-op (Continue) when ctx.options.skip_image_processing is true" do
+      with_image_hook_state do
+        # Seed empty maps so we can confirm no mutation occurs
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+
+        config = Hwaro::Models::Config.new
+        config.image_processing.enabled = true
+        config.image_processing.widths = [320, 640]
+
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public",
+          skip_image_processing: true,
+        )
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        ctx.config = config
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+
+        result = manager.trigger(
+          Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx
+        )
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+      end
+    end
+
+    it "is a no-op when image_processing.enabled is false" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+
+        config = Hwaro::Models::Config.new
+        config.image_processing.enabled = false
+        config.image_processing.widths = [320]
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        ctx.config = config
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+        manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+      end
+    end
+
+    it "is a no-op when widths is empty" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+
+        config = Hwaro::Models::Config.new
+        config.image_processing.enabled = true
+        config.image_processing.widths = [] of Int32
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        ctx.config = config
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+        manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+      end
+    end
+
+    it "is a no-op when ctx.config is nil" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {} of String => Hash(Int32, String)
+        )
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        # ctx.config is left nil intentionally
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+        result = manager.trigger(
+          Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx
+        )
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+      end
+    end
+  end
+end
