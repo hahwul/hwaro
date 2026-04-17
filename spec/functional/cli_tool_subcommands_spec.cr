@@ -16,53 +16,68 @@ require "../spec_helper"
 
 private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
 
+# Pre-flight check: surface a clear error if the binary is missing rather
+# than letting every test fail with an inscrutable Process.run error.
+Spec.before_suite do
+  unless File.exists?(HWARO_BIN) && File::Info.executable?(HWARO_BIN)
+    raise "Binary #{HWARO_BIN} is missing or not executable. Run `shards build` first."
+  end
+end
+
 private def with_initialized_project(&)
   temp_dir = File.tempname("hwaro_test")
   Dir.mkdir(temp_dir)
   project_dir = File.join(temp_dir, "test_site")
   Dir.mkdir(project_dir)
   begin
-    Process.run(HWARO_BIN, ["init", project_dir],
+    init_status = Process.run(HWARO_BIN, ["init", project_dir],
       output: IO::Memory.new, error: IO::Memory.new)
+    init_status.success?.should be_true
     yield project_dir
   ensure
     FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
   end
 end
 
-private def run_hwaro(args : Array(String), chdir : String? = nil)
+# Every test in this file runs the binary inside a temp project directory,
+# so chdir is required (not optional). Process.run is invoked uniformly.
+private def run_hwaro(args : Array(String), chdir : String)
   output = IO::Memory.new
   error = IO::Memory.new
-  status = if chdir
-             Process.run(HWARO_BIN, args, chdir: chdir, output: output, error: error)
-           else
-             Process.run(HWARO_BIN, args, output: output, error: error)
-           end
+  status = Process.run(HWARO_BIN, args, chdir: chdir, output: output, error: error)
+  {status, output.to_s, error.to_s}
+end
+
+# Variant for router-level tests that don't require an initialized project.
+private def run_hwaro_no_chdir(args : Array(String))
+  output = IO::Memory.new
+  error = IO::Memory.new
+  status = Process.run(HWARO_BIN, args, output: output, error: error)
   {status, output.to_s, error.to_s}
 end
 
 describe "hwaro tool (router)" do
   it "exits 1 and prints help when no subcommand is given" do
-    status, output, _ = run_hwaro(["tool"])
+    status, output, _ = run_hwaro_no_chdir(["tool"])
     status.success?.should be_false
     output.should contain("Usage")
     output.should contain("subcommand")
   end
 
   it "exits 1 and prints 'Unknown subcommand' for unrecognized names" do
-    status, output, _ = run_hwaro(["tool", "nonexistent-subcommand"])
+    status, output, _ = run_hwaro_no_chdir(["tool", "nonexistent-subcommand"])
     status.success?.should be_false
     output.should contain("Unknown subcommand")
   end
 
   it "prints help and exits 0 when invoked with help" do
-    status, output, _ = run_hwaro(["tool", "help"])
+    status, output, _ = run_hwaro_no_chdir(["tool", "help"])
     status.success?.should be_true
     output.should contain("Available subcommands")
   end
 
   it "categorizes visible subcommands under Content / Site headings" do
-    status, output, _ = run_hwaro(["tool", "--help"])
+    status, output, _ = run_hwaro_no_chdir(["tool", "--help"])
     status.success?.should be_true
     output.should contain("Content:")
     output.should contain("Site:")
@@ -98,12 +113,12 @@ describe "hwaro tool unused-assets" do
 end
 
 describe "hwaro tool check-links" do
-  it "runs against an initialized project without crashing" do
+  it "exits 0 or 1 (no crash) on an initialized project" do
     with_initialized_project do |project_dir|
       status, _, _ = run_hwaro(["tool", "check-links"], chdir: project_dir)
-      # check-links may exit non-zero if the scaffold has broken links;
-      # we only verify it terminates with a defined exit code.
-      status.exit_code.should_not be_nil
+      # check-links exits 0 when no broken links and 1 when some are found.
+      # Anything else (e.g. signal-based exit from a crash) is a bug.
+      [0, 1].includes?(status.exit_code).should be_true
     end
   end
 end
@@ -171,6 +186,9 @@ describe "hwaro tool ci" do
         ["tool", "ci", "github-actions", "--stdout"], chdir: project_dir
       )
       output.should contain("DEPRECATED")
+      # Co-signal: the actual workflow content was also generated to stdout,
+      # confirming the deprecation log didn't short-circuit the command.
+      output.should contain("workflow")
     end
   end
 end
@@ -180,7 +198,8 @@ describe "hwaro tool agents-md" do
     with_initialized_project do |project_dir|
       # `init` writes AGENTS.md by default — remove it to verify the no-write
       # path of `tool agents-md` doesn't touch the file.
-      File.delete(File.join(project_dir, "AGENTS.md"))
+      agents_md = File.join(project_dir, "AGENTS.md")
+      File.delete(agents_md) if File.exists?(agents_md)
 
       status, output, _ = run_hwaro(["tool", "agents-md"], chdir: project_dir)
       status.success?.should be_true
@@ -191,7 +210,8 @@ describe "hwaro tool agents-md" do
 
   it "writes AGENTS.md when --write is passed" do
     with_initialized_project do |project_dir|
-      File.delete(File.join(project_dir, "AGENTS.md"))
+      agents_md = File.join(project_dir, "AGENTS.md")
+      File.delete(agents_md) if File.exists?(agents_md)
 
       status, _, _ = run_hwaro(
         ["tool", "agents-md", "--write", "--force"], chdir: project_dir
@@ -224,6 +244,16 @@ describe "hwaro tool import" do
       status, output, _ = run_hwaro(["tool", "import", "hugo"], chdir: project_dir)
       status.success?.should be_false
       output.should contain("Missing path")
+    end
+  end
+
+  it "exits 1 and reports an unknown source-type" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(
+        ["tool", "import", "definitely-not-real", "/tmp"], chdir: project_dir
+      )
+      status.success?.should be_false
+      output.should contain("Unknown source type")
     end
   end
 end
