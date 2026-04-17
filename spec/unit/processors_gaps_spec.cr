@@ -42,6 +42,10 @@ end
 
 # Capture and restore the registry around each test so we don't pollute other
 # specs that depend on the default-registered processors (markdown, html, ...).
+#
+# NOTE: The snapshot stores references to processor instances, not clones.
+# Tests inside the block must NOT mutate any processor's internal state, or
+# the restore will put a mutated instance back into the global registry.
 private def with_registry_snapshot(&)
   snapshot = {} of String => Hwaro::Content::Processors::Base
   Hwaro::Content::Processors::Registry.names.each do |n|
@@ -117,7 +121,9 @@ describe Hwaro::Content::Processors::Markdown do
       result.success.should be_true
       result.error.should be_nil
       result.content.should contain("Hello")
-      result.content.should contain("<h1")
+      # Regex match avoids false positives like <h10> while still allowing
+      # <h1> with arbitrary attributes (e.g. <h1 id="hello">).
+      result.content.should match(/<h1[\s>]/)
     end
 
     it "returns an empty (but successful) result for empty input" do
@@ -140,6 +146,13 @@ describe Hwaro::Content::Processors::Markdown do
 
   describe "front-matter typo warning" do
     it "warns when an unknown key is within Levenshtein distance 2 of a known key" do
+      # Precondition: the test's setup assumes `title` is a known key.
+      # If KNOWN_FRONT_MATTER_KEYS ever drops it, the typo logic would
+      # silently match a different key (or none), and the test below would
+      # pass for the wrong reason.
+      Hwaro::Content::Processors::Markdown::KNOWN_FRONT_MATTER_KEYS
+        .includes?("title").should be_true
+
       previous_io = Hwaro::Logger.io
       sink = IO::Memory.new
       Hwaro::Logger.io = sink
@@ -185,7 +198,7 @@ describe Hwaro::Content::Processors::Markdown do
       end
     end
 
-    it "is silent when file_path is empty (no source location to attribute)" do
+    it "skips warnings entirely when file_path is empty" do
       previous_io = Hwaro::Logger.io
       sink = IO::Memory.new
       Hwaro::Logger.io = sink
