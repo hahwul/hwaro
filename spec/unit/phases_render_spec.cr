@@ -19,7 +19,6 @@ module Hwaro::Core::Build
     def test_build_pages_by_path(site : Models::Site)
       build_pages_by_path(site)
     end
-
   end
 end
 
@@ -157,5 +156,4 @@ describe Hwaro::Core::Build::Phases::Render do
       result["blog/_index.md"].should eq(section)
     end
   end
-
 end

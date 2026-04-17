@@ -95,13 +95,14 @@ describe Hwaro::Core::Build::Phases::Transform do
   end
 
   describe "#link_page_navigation" do
-    it "links pages with lower/higher in flat order" do
+    it "links pages with lower/higher in flat reading order" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
 
       section = make_section("blog/_index.md", "blog")
       section.is_index = true
       section.weight = 1
+      # Sorted by weight ascending within the section
       page_a = make_page("blog/a.md", "blog")
       page_a.title = "A"
       page_a.weight = 1
@@ -115,9 +116,15 @@ describe Hwaro::Core::Build::Phases::Transform do
       builder = Hwaro::Core::Build::Builder.new
       builder.test_link_page_navigation(ctx)
 
-      # The first page in the flat list has no lower neighbor
-      [section, page_a, page_b].count(&.lower.nil?).should be >= 1
-      [section, page_a, page_b].count(&.higher.nil?).should be >= 1
+      # Flat order: section index → page_a (weight 1) → page_b (weight 2)
+      section.lower.should be_nil
+      section.higher.should eq(page_a)
+
+      page_a.lower.should eq(section)
+      page_a.higher.should eq(page_b)
+
+      page_b.lower.should eq(page_a)
+      page_b.higher.should be_nil
     end
   end
 

@@ -306,7 +306,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
           builder = Hwaro::Core::Build::Builder.new
           env_a = builder.test_create_fresh_crinja_env
           env_b = builder.test_create_fresh_crinja_env
-          env_a.object_id.should_not eq(env_b.object_id)
+          env_a.should_not be(env_b)
         end
       end
     end

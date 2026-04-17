@@ -55,7 +55,7 @@ describe Hwaro::Core::Build::Phases::Finalize do
       end
     end
 
-    it "aborts when the cache is not initialized" do
+    it "aborts when @cache is nil" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           builder = Hwaro::Core::Build::Builder.new
@@ -65,7 +65,7 @@ describe Hwaro::Core::Build::Phases::Finalize do
           ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
 
           profiler = Hwaro::Profiler.new(enabled: false)
-          # The phase wraps the action in run_phase, which converts a raised
+          # The phase raises "Cache not initialized"; run_phase converts the
           # exception into HookResult::Abort.
           result = builder.test_run_finalize(ctx, profiler)
           result.should eq(Hwaro::Core::Lifecycle::HookResult::Abort)
