@@ -51,16 +51,27 @@ describe Hwaro::Core::Build::Builder do
 
         result = builder.test_execute_phases(ctx, profiler)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+
+        # Initialize ran (config loaded onto ctx)
+        ctx.config.should_not be_nil
+        ctx.templates.should_not be_empty
+        # ReadContent + ParseContent ran (about.md surfaced as a page)
+        ctx.all_pages.size.should eq(1)
+        ctx.all_pages.first.title.should eq("About")
+        # Render ran (page count tallied) and Write ran (file on disk)
+        ctx.stats.pages_rendered.should eq(1)
         File.exists?("public/about/index.html").should be_true
       end
     end
 
-    it "stops at the first phase that returns Abort" do
+    it "stops at the first phase whose Before hook returns Abort" do
       with_minimal_site do
         builder = Hwaro::Core::Build::Builder.new
         builder.test_set_orch_run_config(Hwaro::Models::Config.new)
 
-        # Force ParseContent to abort by registering a hook that returns Abort
+        # The Before hook returning Abort short-circuits the ParseContent
+        # phase (via Manager#trigger), which run_phase propagates back to
+        # execute_phases, which then skips Render/Generate/Write/Finalize.
         builder.lifecycle.before(
           Hwaro::Core::Lifecycle::Phase::ParseContent, name: "force-abort"
         ) do |_ctx|
@@ -75,6 +86,7 @@ describe Hwaro::Core::Build::Builder do
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Abort)
         # Render did not run, so no output was generated
         File.exists?("public/about/index.html").should be_false
+        ctx.stats.pages_rendered.should eq(0)
       end
     end
   end

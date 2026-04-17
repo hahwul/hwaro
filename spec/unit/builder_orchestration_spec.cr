@@ -30,12 +30,14 @@ module Hwaro::Core::Build
       @page_crinja_value_cache["b.md"] = Crinja::Value.new("b")
       @related_posts_crinja_cache["a.md"] = Crinja::Value.new("ra")
       @series_crinja_cache["tutorial"] = Crinja::Value.new("series")
-      @ancestors_crinja_cache["blog"] = [] of Crinja::Value
-      @section_pages_crinja_cache["blog:en"] = [] of Crinja::Value
-      @section_pages_crinja_cache["blog:ko"] = [] of Crinja::Value
-      @section_pages_crinja_cache["other:en"] = [] of Crinja::Value
-      @section_assets_crinja_cache["blog"] = [] of Crinja::Value
-      @section_assets_crinja_cache["other"] = [] of Crinja::Value
+      # Seed with non-empty arrays so the eviction tests can distinguish
+      # "key removed" from "key emptied".
+      @ancestors_crinja_cache["blog"] = [Crinja::Value.new("blog-anc")]
+      @section_pages_crinja_cache["blog:en"] = [Crinja::Value.new("blog-en-1")]
+      @section_pages_crinja_cache["blog:ko"] = [Crinja::Value.new("blog-ko-1")]
+      @section_pages_crinja_cache["other:en"] = [Crinja::Value.new("other-en-1")]
+      @section_assets_crinja_cache["blog"] = [Crinja::Value.new("blog-asset")]
+      @section_assets_crinja_cache["other"] = [Crinja::Value.new("other-asset")]
     end
   end
 end
@@ -202,6 +204,9 @@ describe Hwaro::Core::Build::Builder do
       caches[:section_pages].has_key?("other:en").should be_true
       caches[:section_assets].has_key?("blog").should be_false
       caches[:section_assets].has_key?("other").should be_true
+      # Untouched entries keep their seeded contents
+      caches[:section_pages]["other:en"].size.should eq(1)
+      caches[:section_assets]["other"].size.should eq(1)
     end
 
     it "evicts neighbor pages from the Crinja cache" do

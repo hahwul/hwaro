@@ -71,10 +71,8 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       builder = Hwaro::Core::Build::Builder.new
       content = %({% missing %}body{% end %})
       result = builder.test_sc_process(content, {} of String => String)
-      # Block path returns the original block as fallback
-      result.should contain("{% missing %}")
-      result.should contain("body")
-      result.should contain("{% end %}")
+      # Block path returns the original block as fallback, byte-for-byte
+      result.should eq(content)
     end
   end
 
