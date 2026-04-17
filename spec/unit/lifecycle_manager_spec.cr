@@ -440,11 +440,11 @@ describe Hwaro::Core::Lifecycle::Manager do
 
   describe "Manager.new(debug: true)" do
     it "emits debug log lines for each fired hook without altering its result" do
-      # Swap a fresh IO::Memory in so we can read the debug output for this
-      # test only. Hwaro::Logger has no public io getter, so on cleanup we
-      # restore a fresh IO::Memory (matching spec_helper's default).
-      sink = IO::Memory.new
+      # Capture and restore the global Logger.io / level so this test does
+      # not pollute other specs that read from spec_helper's IO::Memory.
+      previous_io = Hwaro::Logger.io
       previous_level = Hwaro::Logger.level
+      sink = IO::Memory.new
       Hwaro::Logger.io = sink
       # Manager#trigger uses Logger.debug — bump the level so it isn't
       # filtered (default is Info).
@@ -462,7 +462,7 @@ describe Hwaro::Core::Lifecycle::Manager do
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
         sink.to_s.should contain("debug-target")
       ensure
-        Hwaro::Logger.io = IO::Memory.new
+        Hwaro::Logger.io = previous_io
         Hwaro::Logger.level = previous_level
       end
     end

@@ -404,10 +404,16 @@ describe Hwaro::Core::Lifecycle::Hookable do
     # Trigger each manager and confirm both invocations are observed by the
     # shared Hookable instance — guards against any future change that
     # would bind a Hookable to a single Manager.
+    # Derive the trigger point from CountingHookable's registered Phase
+    # so this test stays correct if the hookable's phase is ever changed.
+    before_render, _ = Hwaro::Core::Lifecycle.hook_points_for(Hwaro::Core::Lifecycle::Phase::Render)
+    a.has_hooks?(before_render).should be_true
+    b.has_hooks?(before_render).should be_true
+
     options = Hwaro::Config::Options::BuildOptions.new
     ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-    a.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
-    b.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+    a.trigger(before_render, ctx)
+    b.trigger(before_render, ctx)
     hookable.fired.should eq(2)
   end
 end
