@@ -47,7 +47,11 @@ describe Hwaro::Services::Scaffolds::Book do
 
     it "produces non-empty content for every file" do
       files = Hwaro::Services::Scaffolds::Book.new.content_files
-      files.each_value { |c| c.should_not be_empty }
+      files.each do |path, content|
+        # Custom failure message names the offending file so a regression
+        # is immediately localized.
+        fail "content for #{path} was empty" if content.empty?
+      end
     end
   end
 
@@ -81,10 +85,12 @@ describe Hwaro::Services::Scaffolds::Book do
       files.has_key?("js/book.js").should be_true
     end
 
-    it "ships non-empty CSS and JS payloads" do
+    it "ships real CSS and JS payloads (not just placeholders)" do
       files = Hwaro::Services::Scaffolds::Book.new.static_files
-      files["css/style.css"].size.should be > 100
-      files["js/book.js"].size.should be > 100
+      # Structural fingerprints catch a wider class of regression than an
+      # arbitrary byte-count threshold (e.g., truncation to a stub).
+      files["css/style.css"].should contain(":root")
+      files["js/book.js"].should contain("function")
     end
   end
 
@@ -102,7 +108,10 @@ describe Hwaro::Services::Scaffolds::Book do
 
     it "uses the light highlight.js theme by default" do
       config = Hwaro::Services::Scaffolds::Book.new.config_content
-      config.should contain(%(theme = "github"))
+      # `theme = "github"` is a prefix of `theme = "github-dark"`, so a
+      # negative-lookahead regex disambiguates the two values. (The line
+      # has a trailing comment, so a simple newline guard would miss.)
+      config.should match(/theme = "github"(?!-)/)
       config.should_not contain(%(theme = "github-dark"))
     end
 
@@ -138,12 +147,15 @@ describe Hwaro::Services::Scaffolds::BookDark do
     it "reuses Book's content_files (chapter structure)" do
       light = Hwaro::Services::Scaffolds::Book.new.content_files
       dark = Hwaro::Services::Scaffolds::BookDark.new.content_files
+      # Guard against the both-empty trivial case before comparing key sets.
+      dark.size.should be > 0
       dark.keys.sort.should eq(light.keys.sort)
     end
 
     it "reuses Book's template files structure" do
       light = Hwaro::Services::Scaffolds::Book.new.template_files
       dark = Hwaro::Services::Scaffolds::BookDark.new.template_files
+      dark.size.should be > 0
       dark.keys.sort.should eq(light.keys.sort)
     end
 
@@ -158,7 +170,8 @@ describe Hwaro::Services::Scaffolds::BookDark do
     it "uses the github-dark highlight theme" do
       config = Hwaro::Services::Scaffolds::BookDark.new.config_content
       config.should contain(%(theme = "github-dark"))
-      config.should_not contain(%(theme = "github"\n))
+      # Negative lookahead — see the matching Book test for rationale.
+      config.should_not match(/theme = "github"(?!-)/)
     end
 
     it "still names the scaffold 'My Book'" do
@@ -174,6 +187,9 @@ describe Hwaro::Services::Scaffolds::BookDark do
 end
 
 # A minimal concrete subclass to exercise Base's default and protected helpers.
+# Type returns Bare arbitrarily — this class is never registered with the
+# scaffold registry; it exists only so the abstract Base methods can be
+# instantiated and called.
 private class TestBaseScaffold < Hwaro::Services::Scaffolds::Base
   def type : Hwaro::Config::Options::ScaffoldType
     Hwaro::Config::Options::ScaffoldType::Bare
@@ -207,7 +223,10 @@ describe Hwaro::Services::Scaffolds::Base do
     it "ships the shared alert shortcode" do
       files = TestBaseScaffold.new.shortcode_files
       files.has_key?("shortcodes/alert.html").should be_true
-      # Alert shortcode references body and type via Jinja
+      # Alert shortcode references body and type via Jinja. The `{{ type`
+      # substring is intentionally truncated — the source uses
+      # `{{ type | upper }}`, and the partial form matches both the filtered
+      # and unfiltered forms.
       files["shortcodes/alert.html"].should contain("{{ body }}")
       files["shortcodes/alert.html"].should contain("{{ type")
     end
@@ -235,7 +254,8 @@ describe Hwaro::Services::Scaffolds::Base do
 
     it "uses the light highlight theme via the default config_highlight_theme" do
       out = TestBaseScaffold.new.config_content
-      out.should contain(%(theme = "github"))
+      # Negative lookahead disambiguates "github" from "github-dark".
+      out.should match(/theme = "github"(?!-)/)
       out.should_not contain(%(theme = "github-dark"))
     end
   end
