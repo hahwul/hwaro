@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p build
           # Use Alpine/musl-based Crystal container for proper static binary
-          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.19.1-alpine sh -c "
+          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.20.0-alpine sh -c "
             apk add --no-cache yaml-dev git curl &&
             shards install --release --no-debug --production &&
             mkdir -p build &&

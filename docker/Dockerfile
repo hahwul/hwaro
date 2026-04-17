@@ -1,5 +1,5 @@
 ##= BUILDER =##
-FROM crystallang/crystal:1.19.1 AS builder
+FROM crystallang/crystal:1.20.0 AS builder
 WORKDIR /hwaro
 COPY . .
 

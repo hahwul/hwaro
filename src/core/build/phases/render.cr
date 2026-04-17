@@ -614,7 +614,7 @@ module Hwaro::Core::Build::Phases::Render
     @crinja_cache_mutex.synchronize do
       if cached = @page_crinja_value_cache[p.path]?
         @cache_manager.record_hit("page_crinja_value")
-        next cached
+        next cached.as(Crinja::Value)
       end
       @cache_manager.record_miss("page_crinja_value")
       begin
@@ -668,7 +668,7 @@ module Hwaro::Core::Build::Phases::Render
     @crinja_cache_mutex.synchronize do
       if cached = @section_pages_crinja_cache[cache_key]?
         @cache_manager.record_hit("section_pages_crinja")
-        next cached
+        next cached.as(Array(Crinja::Value))
       end
       @cache_manager.record_miss("section_pages_crinja")
       begin
@@ -950,7 +950,7 @@ module Hwaro::Core::Build::Phases::Render
     ancestors_array = @crinja_cache_mutex.synchronize do
       if cached = @ancestors_crinja_cache[ancestors_cache_key]?
         @cache_manager.record_hit("ancestors_crinja")
-        next cached
+        next cached.as(Array(Crinja::Value))
       end
       @cache_manager.record_miss("ancestors_crinja")
       arr = page.ancestors.map do |ancestor|
@@ -1089,7 +1089,7 @@ module Hwaro::Core::Build::Phases::Render
         section_assets_val = @crinja_cache_mutex.synchronize do
           if cached_arr = @section_assets_crinja_cache[page.section]?
             @cache_manager.record_hit("section_assets_crinja")
-            next Crinja::Value.new(cached_arr)
+            next Crinja::Value.new(cached_arr).as(Crinja::Value)
           end
           @cache_manager.record_miss("section_assets_crinja")
           arr = section_page.assets.map { |a| Crinja::Value.new(a) }
