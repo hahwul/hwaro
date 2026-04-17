@@ -315,3 +315,103 @@ describe Hwaro::Core::Lifecycle::Manager do
     end
   end
 end
+
+# Additional Hookable / HookHandler invocation tests
+private class CountingHookable
+  include Hwaro::Core::Lifecycle::Hookable
+
+  property fired : Int32 = 0
+
+  def register_hooks(manager : Hwaro::Core::Lifecycle::Manager)
+    manager.before(Hwaro::Core::Lifecycle::Phase::Render, name: "counting") do |_ctx|
+      @fired += 1
+      Hwaro::Core::Lifecycle::HookResult::Continue
+    end
+  end
+end
+
+# Second class to verify HookDSL @@_pending_hooks is per-class, not shared
+module Hwaro::Core::Lifecycle
+  class IsolatedHookDSLClassA
+    include HookDSL
+  end
+
+  class IsolatedHookDSLClassB
+    include HookDSL
+  end
+end
+
+describe Hwaro::Core::Lifecycle::HookHandler do
+  it "is a Proc that maps BuildContext to HookResult" do
+    handler = Hwaro::Core::Lifecycle::HookHandler.new do |_ctx|
+      Hwaro::Core::Lifecycle::HookResult::Skip
+    end
+
+    options = Hwaro::Config::Options::BuildOptions.new
+    ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+    handler.call(ctx).should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
+  end
+end
+
+describe Hwaro::Core::Lifecycle::RegisteredHook do
+  describe "#handler.call" do
+    it "invokes the wrapped handler and returns its HookResult" do
+      handler = Hwaro::Core::Lifecycle::HookHandler.new do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Abort
+      end
+      hook = Hwaro::Core::Lifecycle::RegisteredHook.new(handler: handler, name: "x")
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      hook.handler.call(ctx).should eq(Hwaro::Core::Lifecycle::HookResult::Abort)
+    end
+  end
+end
+
+describe Hwaro::Core::Lifecycle::Hookable do
+  it "lets a Hookable register itself with a Manager via Manager#register" do
+    manager = Hwaro::Core::Lifecycle::Manager.new
+    hookable = CountingHookable.new
+    manager.register(hookable)
+    manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeRender).should be_true
+  end
+
+  it "fires the registered hook when the lifecycle is triggered" do
+    manager = Hwaro::Core::Lifecycle::Manager.new
+    hookable = CountingHookable.new
+    manager.register(hookable)
+
+    options = Hwaro::Config::Options::BuildOptions.new
+    ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+    manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+    hookable.fired.should eq(1)
+  end
+
+  it "supports registering the same Hookable on two managers independently" do
+    a = Hwaro::Core::Lifecycle::Manager.new
+    b = Hwaro::Core::Lifecycle::Manager.new
+    hookable = CountingHookable.new
+    a.register(hookable)
+    b.register(hookable)
+
+    a.hook_count.should eq(1)
+    b.hook_count.should eq(1)
+  end
+end
+
+describe "Hwaro::Core::Lifecycle::HookDSL per-class isolation" do
+  it "keeps @@_pending_hooks separate between including classes" do
+    Hwaro::Core::Lifecycle::IsolatedHookDSLClassA.pending_hooks.clear
+    Hwaro::Core::Lifecycle::IsolatedHookDSLClassB.pending_hooks.clear
+
+    Hwaro::Core::Lifecycle::IsolatedHookDSLClassA.on(
+      Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "a-only"
+    ) do |_ctx|
+      Hwaro::Core::Lifecycle::HookResult::Continue
+    end
+
+    Hwaro::Core::Lifecycle::IsolatedHookDSLClassA.pending_hooks.size.should eq(1)
+    Hwaro::Core::Lifecycle::IsolatedHookDSLClassB.pending_hooks.size.should eq(0)
+  end
+end
