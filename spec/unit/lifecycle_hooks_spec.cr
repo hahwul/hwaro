@@ -330,7 +330,10 @@ private class CountingHookable
   end
 end
 
-# Second class to verify HookDSL @@_pending_hooks is per-class, not shared
+# Second class to verify HookDSL @@_pending_hooks is per-class, not shared.
+# These classes must live inside Hwaro::Core::Lifecycle because HookDSL's
+# `macro included` references unqualified symbols (HookPoint, HookHandler,
+# Lifecycle.hook_points_for) that only resolve inside this namespace.
 module Hwaro::Core::Lifecycle
   class IsolatedHookDSLClassA
     include HookDSL
@@ -397,6 +400,15 @@ describe Hwaro::Core::Lifecycle::Hookable do
 
     a.hook_count.should eq(1)
     b.hook_count.should eq(1)
+
+    # Trigger each manager and confirm both invocations are observed by the
+    # shared Hookable instance — guards against any future change that
+    # would bind a Hookable to a single Manager.
+    options = Hwaro::Config::Options::BuildOptions.new
+    ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+    a.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+    b.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+    hookable.fired.should eq(2)
   end
 end
 

@@ -439,18 +439,32 @@ describe Hwaro::Core::Lifecycle::Manager do
   end
 
   describe "Manager.new(debug: true)" do
-    it "logs hook execution at debug level without affecting return values" do
-      manager = Hwaro::Core::Lifecycle::Manager.new(debug: true)
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+    it "emits debug log lines for each fired hook without altering its result" do
+      # Swap a fresh IO::Memory in so we can read the debug output for this
+      # test only. Hwaro::Logger has no public io getter, so on cleanup we
+      # restore a fresh IO::Memory (matching spec_helper's default).
+      sink = IO::Memory.new
+      previous_level = Hwaro::Logger.level
+      Hwaro::Logger.io = sink
+      # Manager#trigger uses Logger.debug — bump the level so it isn't
+      # filtered (default is Info).
+      Hwaro::Logger.level = Hwaro::Logger::Level::Debug
 
-      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "debug-target") do |_ctx|
-        Hwaro::Core::Lifecycle::HookResult::Continue
+      begin
+        manager = Hwaro::Core::Lifecycle::Manager.new(debug: true)
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+
+        manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, name: "debug-target") do |_ctx|
+          Hwaro::Core::Lifecycle::HookResult::Continue
+        end
+
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        sink.to_s.should contain("debug-target")
+      ensure
+        Hwaro::Logger.io = IO::Memory.new
+        Hwaro::Logger.level = previous_level
       end
-
-      # Logger output is captured by spec_helper's IO::Memory; we only verify
-      # the debug path doesn't change behavior.
-      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
     end
   end
 
@@ -477,6 +491,8 @@ describe Hwaro::Core::Lifecycle::Manager do
     end
 
     it "allows overriding the default with a fresh Manager" do
+      # class_property's getter returns Manager? even though the block
+      # guarantees non-nil; not_nil! is needed for the setter signature.
       original = Hwaro::Core::Lifecycle.default
       replacement = Hwaro::Core::Lifecycle::Manager.new
       Hwaro::Core::Lifecycle.default = replacement

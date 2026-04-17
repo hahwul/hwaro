@@ -488,12 +488,14 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.all_pages.map(&.path).sort.should eq(["x.md", "y.md"])
     end
 
-    it "replaces the pages array" do
+    it "swaps in the assigned array by identity, not by copy" do
       options = Hwaro::Config::Options::BuildOptions.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
       ctx.pages << Hwaro::Models::Page.new("a.md")
-      ctx.pages = [] of Hwaro::Models::Page
-      ctx.pages.should be_empty
+
+      replacement = [] of Hwaro::Models::Page
+      ctx.pages = replacement
+      ctx.pages.should be(replacement)
     end
   end
 
@@ -511,12 +513,14 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.all_pages.size.should eq(2)
     end
 
-    it "replaces the sections array" do
+    it "swaps in the assigned array by identity, not by copy" do
       options = Hwaro::Config::Options::BuildOptions.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
       ctx.sections << Hwaro::Models::Section.new("a/_index.md")
-      ctx.sections = [] of Hwaro::Models::Section
-      ctx.sections.should be_empty
+
+      replacement = [] of Hwaro::Models::Section
+      ctx.sections = replacement
+      ctx.sections.should be(replacement)
     end
   end
 
