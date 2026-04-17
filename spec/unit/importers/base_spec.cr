@@ -128,4 +128,51 @@ describe Hwaro::Services::Importers::Base do
       end
     end
   end
+
+  describe "#format_date" do
+    it "formats a Time as 'YYYY-MM-DD HH:MM:SS'" do
+      t = Time.utc(2026, 4, 17, 9, 30, 45)
+      TestImporter.new.test_format_date(t).should eq("2026-04-17 09:30:45")
+    end
+
+    it "round-trips with parse_date for the standard space-separated format" do
+      importer = TestImporter.new
+      original = "2026-04-17 09:30:45"
+      parsed = importer.test_parse_date(original).not_nil!
+      importer.test_format_date(parsed).should eq(original)
+    end
+
+    it "respects timezone-aware times by formatting in the same instant" do
+      # Time#to_s with the standard format renders local components — for a
+      # UTC Time the output should match the components as constructed.
+      t = Time.utc(2026, 12, 31, 23, 59, 59)
+      TestImporter.new.test_format_date(t).should eq("2026-12-31 23:59:59")
+    end
+  end
+end
+
+describe Hwaro::Services::Importers::ImportResult do
+  it "defaults all counters to 0 and success to true" do
+    r = Hwaro::Services::Importers::ImportResult.new
+    r.success.should be_true
+    r.message.should eq("")
+    r.imported_count.should eq(0)
+    r.skipped_count.should eq(0)
+    r.error_count.should eq(0)
+  end
+
+  it "accepts custom counters and message" do
+    r = Hwaro::Services::Importers::ImportResult.new(
+      success: false,
+      message: "import failed",
+      imported_count: 7,
+      skipped_count: 2,
+      error_count: 1,
+    )
+    r.success.should be_false
+    r.message.should eq("import failed")
+    r.imported_count.should eq(7)
+    r.skipped_count.should eq(2)
+    r.error_count.should eq(1)
+  end
 end
