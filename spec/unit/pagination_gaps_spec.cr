@@ -27,10 +27,10 @@ private def make_section(per_page : Int32? = nil, sort_by : String? = nil, rever
 end
 
 private def make_pages(count : Int32, &block : Int32, Hwaro::Models::Page ->) : Array(Hwaro::Models::Page)
+  # Caller's block is responsible for setting page.title (every test does).
   Array(Hwaro::Models::Page).new(count) do |i|
     p = Hwaro::Models::Page.new("blog/post-#{i}.md")
     p.section = "blog"
-    p.title = "Post #{i}"
     yield(i, p)
     p
   end
@@ -91,6 +91,9 @@ describe Hwaro::Content::Pagination::Paginator do
       result = paginator.paginate(section, pages)
 
       result.paginated_pages.size.should eq(1)
+      # All 3 items must land on that single page (not silently truncated)
+      result.paginated_pages.first.pages.size.should eq(3)
+      result.paginated_pages.first.total_items.should eq(3)
       result.paginated_pages.first.has_prev.should be_false
       result.paginated_pages.first.has_next.should be_false
     end
@@ -162,6 +165,9 @@ describe Hwaro::Content::Pagination::Paginator do
       result.paginated_pages[1].prev_url.should eq("/blog/")
       result.paginated_pages[2].prev_url.should eq("/blog/p/2/")
       result.paginated_pages.last.last_url.should eq("/blog/p/3/")
+      # Boundary: last page has no next_url; first page has no prev_url
+      result.paginated_pages.last.next_url.should be_nil
+      result.paginated_pages.first.prev_url.should be_nil
     end
   end
 end
@@ -236,9 +242,9 @@ describe Hwaro::Content::Pagination::Renderer do
       )
 
       html = renderer.render_pagination_nav(pp)
-      html.should contain("&lt;b&gt;")
-      html.should contain("&amp;c=")
-      html.should contain("&quot;d&quot;")
+      # Assert the full escaped href, not just the per-character substrings —
+      # rules out false positives where one escape happens to land elsewhere.
+      html.should contain(%(href="https://example.com/blog/q?a=&lt;b&gt;&amp;c=&quot;d&quot;/"))
       html.should_not contain("<b>")
     end
 
