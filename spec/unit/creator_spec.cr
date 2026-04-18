@@ -236,15 +236,32 @@ describe Hwaro::Services::Creator do
       end
     end
 
-    it "fails fast in non-TTY environments when title cannot be inferred" do
-      # Running under `crystal spec`, STDIN is not a TTY. The Creator must
-      # raise a clear usage error instead of hanging on `gets` at the
-      # interactive "Enter title:" prompt.
+    it "fails fast when title cannot be inferred (flag-only, no prompt)" do
+      # `hwaro new` is flag-only: the Creator must raise a clear usage error
+      # rather than falling back to an interactive `gets` prompt. This holds
+      # in both TTY and non-TTY environments.
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("content/drafts")
 
           options = Hwaro::Config::Options::NewOptions.new
+          creator = Hwaro::Services::Creator.new
+
+          expect_raises(Exception, /missing --title/) do
+            creator.run(options)
+          end
+        end
+      end
+    end
+
+    it "fails fast when path is a directory and title is missing" do
+      # Regression: `hwaro new posts/` (directory, no --title) should raise
+      # the same usage error since no title can be inferred from a directory.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/blog")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "blog")
           creator = Hwaro::Services::Creator.new
 
           expect_raises(Exception, /missing --title/) do
