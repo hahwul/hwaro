@@ -4,6 +4,7 @@ require "../metadata"
 require "../../config/options/build_options"
 require "../../core/build/builder"
 require "../../content/hooks"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -68,15 +69,20 @@ module Hwaro
 
           # --json implies quiet so only the final JSON document reaches stdout.
           Logger.quiet = true if json_output
+          Runner.json_mode = true if json_output
 
           if dir = input_dir
             unless Dir.exists?(dir)
+              err = Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Input directory does not exist: #{dir}",
+              )
               if json_output
-                puts({status: "error", error: {message: "Input directory does not exist: #{dir}"}}.to_json)
-                exit(1)
+                puts err.to_error_payload.to_json
+                exit(err.exit_code)
               end
-              Logger.error "Input directory does not exist: #{dir}"
-              exit(1)
+              Logger.error "Error [#{err.code}]: #{err.message}"
+              exit(err.exit_code)
             end
 
             # Only resolve output_dir to absolute path when -o was explicitly
@@ -105,9 +111,20 @@ module Hwaro
           begin
             builder.run(options)
           rescue ex
+            # Only wrap exceptions we can classify with confidence; others
+            # bubble up as plain Exceptions so their message keeps the
+            # legacy `Error: <message>` text form (per taxonomy scope).
+            err = classify_build_error(ex)
             if json_output
-              puts({status: "error", error: {message: ex.message || "build failed"}}.to_json)
-              exit(1)
+              payload = if err
+                          err.to_error_payload
+                        else
+                          {"status" => "error", "error" => {"message" => ex.message || "build failed"}}
+                        end
+              puts payload.to_json
+              exit(err ? err.exit_code : 1)
+            elsif err
+              raise err
             else
               raise ex
             end
@@ -130,6 +147,25 @@ module Hwaro
             }
             puts payload.to_json
           end
+        end
+
+        # Best-effort classification of build-time exceptions onto the
+        # taxonomy. Returns `nil` when we can't classify with confidence —
+        # the caller then rethrows the original exception so behavior stays
+        # backwards-compatible (generic `Error: <message>`, exit 1).
+        private def classify_build_error(ex : Exception) : Hwaro::HwaroError?
+          return ex if ex.is_a?(Hwaro::HwaroError)
+          msg = ex.message || "build failed"
+          lower = msg.downcase
+          code = if lower.includes?("config.toml") || lower.includes?("config file") ||
+                    lower.includes?("failed to load config") || lower.includes?("invalid config")
+                   Hwaro::Errors::HWARO_E_CONFIG
+                 elsif ex.class.name.includes?("Crinja")
+                   Hwaro::Errors::HWARO_E_TEMPLATE
+                 else
+                   return nil
+                 end
+          Hwaro::HwaroError.new(code: code, message: msg)
         end
 
         def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?, Bool }

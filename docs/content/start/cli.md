@@ -31,6 +31,48 @@ hwaro build --quiet
 NO_COLOR=1 hwaro doctor
 ```
 
+### Error taxonomy
+
+Classified failure paths emit a stable error code plus a matching
+process exit code so scripts, CI, and agents can branch reliably
+without parsing human messages.
+
+In text mode the error line is prefixed with the code:
+
+```
+Error [HWARO_E_USAGE]: missing <path> argument
+```
+
+Under `--json` (or `--quiet`) the classified error is emitted as a
+structured payload on stdout:
+
+```json
+{
+  "status": "error",
+  "error": {
+    "code": "HWARO_E_USAGE",
+    "category": "usage",
+    "message": "missing <path> argument",
+    "hint": "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details."
+  }
+}
+```
+
+Unclassified failures keep the legacy `Error: <message>` format and
+exit code `1`, so this is a strictly additive contract.
+
+| Code | Category | Exit | Description |
+|------|----------|------|-------------|
+| `HWARO_E_USAGE` | usage | 2 | Bad/missing flag, missing required argument, unknown command |
+| `HWARO_E_CONFIG` | config | 3 | `config.toml` missing, unparseable, or invalid |
+| `HWARO_E_TEMPLATE` | template | 4 | Crinja template render error |
+| `HWARO_E_CONTENT` | content | 5 | Content file parse error, invalid frontmatter |
+| `HWARO_E_IO` | io | 6 | Filesystem access error (missing dir, permission denied) |
+| `HWARO_E_NETWORK` | network | 7 | Deploy upload, remote scaffold fetch failure |
+| `HWARO_E_INTERNAL` | internal | 70 | Unrecoverable bug or unexpected state |
+| *(unclassified)* | — | 1 | Legacy/generic failure path |
+| *(success)* | — | 0 | Command completed normally |
+
 ## Commands
 
 ### init
@@ -97,7 +139,7 @@ Creates a Markdown file with front matter template. Supports **archetypes** for 
 | -s, --section NAME | Section directory (e.g. `blog`, `docs`) |
 | -a, --archetype NAME | Archetype to use |
 | --list-archetypes | List archetypes in the current project and exit |
-| --json | Emit machine-readable JSON output (with --list-archetypes) |
+| --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
 
 **Archetypes:**
 

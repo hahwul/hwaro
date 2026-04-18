@@ -1,3 +1,4 @@
+require "json"
 require "./metadata"
 require "./commands/init_command"
 require "./commands/build_command"
@@ -7,6 +8,7 @@ require "./commands/deploy_command"
 require "./commands/tool_command"
 require "./commands/doctor_command"
 require "./commands/completion_command"
+require "../utils/errors"
 require "../utils/logger"
 require "../utils/command_suggester"
 
@@ -91,16 +93,69 @@ module Hwaro
           if handler = CommandRegistry.get(command)
             handler.call(args)
           else
-            Runner.report_unknown_command(command)
-            exit(2)
+            # Classified usage error. The "Did you mean …" suggestion prints
+            # to stderr here (text mode only) so the final error line emitted
+            # by the rescue block below is the `Error [CODE]: …` form.
+            if args.any? { |a| a == "--json" }
+              @@json_mode = true
+            else
+              if suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
+                STDERR.puts "Did you mean '#{suggestion}'?"
+              end
+            end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "unknown command '#{command}'",
+              hint: "Run 'hwaro --help' to see all commands.",
+            )
           end
         end
+      rescue ex : Hwaro::HwaroError
+        Runner.emit_hwaro_error(ex)
+        exit(ex.exit_code)
       rescue ex : OptionParser::InvalidOption
-        Logger.error "Error: #{ex.message}"
-        exit(1)
+        # Treat bad flags as classified usage errors so exit codes stay
+        # consistent with the documented taxonomy.
+        err = Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: ex.message || "invalid option",
+        )
+        Runner.emit_hwaro_error(err)
+        exit(err.exit_code)
       rescue ex : Exception
         Logger.error "Error: #{ex.message}"
         exit(1)
+      end
+
+      # Track --json globally so the Runner's top-level rescue can emit the
+      # structured payload even after the subcommand consumed the flag.
+      # Command handlers set this via `Runner.json_mode = true` as soon as
+      # they parse the flag.
+      @@json_mode : Bool = false
+
+      def self.json_mode? : Bool
+        @@json_mode
+      end
+
+      def self.json_mode=(value : Bool)
+        @@json_mode = value
+      end
+
+      # Emit a classified error in either the quiet/JSON machine shape or the
+      # human-friendly `Error [CODE]: message` form. JSON mode is detected
+      # from `Runner.json_mode?` (set by commands that saw `--json`) or from
+      # the raw ARGV (unknown-command path, before any parser runs).
+      def self.emit_hwaro_error(err : Hwaro::HwaroError, io : IO = STDERR)
+        json = @@json_mode || ARGV.includes?("--json")
+        if json
+          STDOUT.puts err.to_error_payload.to_json
+        else
+          msg = "Error [#{err.code}]: #{err.message}"
+          Logger.error msg
+          if hint = err.hint
+            io.puts hint unless hint.empty?
+          end
+        end
       end
 
       # Strip `--quiet` / `-q` from argv and enable Logger.quiet when present.

@@ -4,6 +4,7 @@ require "../metadata"
 require "../../config/options/deploy_options"
 require "../../models/config"
 require "../../services/deployer"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -46,6 +47,7 @@ module Hwaro
           # Quiet logger so --json emits only the final JSON document. Human
           # --list-targets and --dry-run output is routed around Logger below.
           Logger.quiet = true if json_output
+          Runner.json_mode = true if json_output
 
           if list_targets
             print_targets(options.env, json: json_output)
@@ -60,8 +62,9 @@ module Hwaro
               ops = Services::Deployer.new.plan(options)
               STDOUT.puts ops.to_json
             rescue ex
-              STDOUT.puts({status: "error", error: {message: ex.message || "deploy plan failed"}}.to_json)
-              exit(1)
+              err = classify_deploy_error(ex, fallback_message: "deploy plan failed")
+              STDOUT.puts err.to_error_payload.to_json
+              exit(err.exit_code)
             end
             return
           end
@@ -73,20 +76,45 @@ module Hwaro
             ok = begin
               Services::Deployer.new.run(options)
             rescue ex
-              STDOUT.puts({status: "error", error: {message: ex.message || "deploy failed"}}.to_json)
-              exit(1)
+              err = classify_deploy_error(ex, fallback_message: "deploy failed")
+              STDOUT.puts err.to_error_payload.to_json
+              exit(err.exit_code)
             end
             if ok
               STDOUT.puts({"status" => "ok"}.to_json)
             else
-              STDOUT.puts({status: "error", error: {message: "deploy failed"}}.to_json)
-              exit(1)
+              err = Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_NETWORK,
+                message: "deploy failed",
+              )
+              STDOUT.puts err.to_error_payload.to_json
+              exit(err.exit_code)
             end
             return
           end
 
           ok = Services::Deployer.new.run(options)
           exit(1) unless ok
+        end
+
+        # Map deploy-time exceptions onto the taxonomy. Config-related errors
+        # get HWARO_E_CONFIG; anything else that bubbles up from the deployer
+        # is treated as HWARO_E_NETWORK since it almost always originates in
+        # an upload/remote step.
+        private def classify_deploy_error(ex : Exception, fallback_message : String) : Hwaro::HwaroError
+          return ex if ex.is_a?(Hwaro::HwaroError)
+          msg = ex.message || fallback_message
+          if config_error_message?(msg)
+            Hwaro::HwaroError.new(code: Hwaro::Errors::HWARO_E_CONFIG, message: msg)
+          else
+            Hwaro::HwaroError.new(code: Hwaro::Errors::HWARO_E_NETWORK, message: msg)
+          end
+        end
+
+        private def config_error_message?(msg : String) : Bool
+          lower = msg.downcase
+          lower.includes?("config.toml") || lower.includes?("config file") ||
+            lower.includes?("failed to load config") || lower.includes?("invalid config")
         end
 
         def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool, Bool}
@@ -139,12 +167,16 @@ module Hwaro
           config = begin
             Models::Config.load(env: env)
           rescue ex
+            err = Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: ex.message || "Failed to load config",
+            )
             if json
-              STDOUT.puts({status: "error", error: {message: ex.message || "Failed to load config"}}.to_json)
+              STDOUT.puts err.to_error_payload.to_json
             else
-              Logger.error(ex.message || "Failed to load config")
+              Logger.error "Error [#{err.code}]: #{err.message}"
             end
-            exit(1)
+            exit(err.exit_code)
           end
 
           deployment = config.deployment

@@ -78,6 +78,34 @@ describe Hwaro::CLI::Runner do
     end
   end
 
+  describe ".emit_hwaro_error" do
+    it "emits classified text to stderr when json_mode? is false" do
+      previous_json = Hwaro::CLI::Runner.json_mode?
+      previous_err_io = Hwaro::Logger.err_io
+      previous_color = Hwaro::Logger.color_enabled?
+      Hwaro::Logger.color_enabled = false
+      err_sink = IO::Memory.new
+      Hwaro::Logger.err_io = err_sink
+      Hwaro::CLI::Runner.json_mode = false
+
+      begin
+        err = Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: "missing <path> argument",
+          hint: "run hwaro new --help",
+        )
+        Hwaro::CLI::Runner.emit_hwaro_error(err, io: err_sink)
+        output = err_sink.to_s
+        output.should contain("Error [HWARO_E_USAGE]: missing <path> argument")
+        output.should contain("run hwaro new --help")
+      ensure
+        Hwaro::Logger.err_io = previous_err_io
+        Hwaro::Logger.color_enabled = previous_color
+        Hwaro::CLI::Runner.json_mode = previous_json
+      end
+    end
+  end
+
   describe ".print_help" do
     it "writes a Commands header followed by command names to Logger.io" do
       previous_io = Hwaro::Logger.io

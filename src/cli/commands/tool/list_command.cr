@@ -10,6 +10,7 @@ require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_lister"
+require "../../../utils/errors"
 require "../../../utils/logger"
 
 module Hwaro
@@ -56,11 +57,16 @@ module Hwaro
             end
 
             Logger.quiet = true if json_output
+            Runner.json_mode = true if json_output
 
             unless filter
               if json_output
-                puts({status: "error", error: {message: "Missing filter argument. Use 'all', 'drafts', or 'published'"}}.to_json)
-                exit(1)
+                err = Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "Missing filter argument. Use 'all', 'drafts', or 'published'",
+                )
+                puts err.to_error_payload.to_json
+                exit(err.exit_code)
               end
               Logger.error "Missing filter argument. Use 'all', 'drafts', or 'published'"
               Logger.info ""
@@ -89,8 +95,12 @@ module Hwaro
                                Services::ContentFilter::Published
                              else
                                if json_output
-                                 puts({status: "error", error: {message: "Unknown filter: #{filter}"}}.to_json)
-                                 exit(1)
+                                 err = Hwaro::HwaroError.new(
+                                   code: Hwaro::Errors::HWARO_E_USAGE,
+                                   message: "Unknown filter: #{filter}",
+                                 )
+                                 puts err.to_error_payload.to_json
+                                 exit(err.exit_code)
                                end
                                Logger.error "Unknown filter: #{filter}"
                                Logger.info "Use 'all', 'drafts', or 'published'"

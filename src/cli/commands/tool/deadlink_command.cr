@@ -5,6 +5,7 @@ require "uri"
 require "file"
 require "option_parser"
 require "../../metadata"
+require "../../../utils/errors"
 require "../../../utils/logger"
 
 module Hwaro
@@ -85,6 +86,7 @@ module Hwaro
             end
 
             Logger.quiet = true if json_output
+            Runner.json_mode = true if json_output
 
             if external_only && internal_only
               Logger.warn "--external-only and --internal-only cancel each other out; checking all links"
@@ -93,12 +95,16 @@ module Hwaro
             end
 
             unless Dir.exists?(target_dir)
+              err = Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Directory not found: #{target_dir}",
+              )
               if json_output
-                puts({status: "error", error: {message: "Directory not found: #{target_dir}"}}.to_json)
-                exit(1)
+                puts err.to_error_payload.to_json
+                exit(err.exit_code)
               end
-              Logger.error "Directory not found: #{target_dir}"
-              return
+              Logger.error "Error [#{err.code}]: #{err.message}"
+              exit(err.exit_code)
             end
 
             Logger.info "Starting dead link check in '#{target_dir}'..." unless json_output
