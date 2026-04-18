@@ -25,7 +25,7 @@ module Hwaro
       property title : String
       property draft : Bool
 
-      @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter)]
+      @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter, emit_null: true)]
       property date : Time?
 
       def initialize(
