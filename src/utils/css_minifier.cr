@@ -52,8 +52,10 @@ module Hwaro
         result = result.gsub(/\s+/, " ")
 
         # ── Step 5: Remove space around structural characters ─────────────
-        result = result.gsub(/\s*\{\s*/, "{")
-        result = result.gsub(/\s*\}\s*/, "}")
+        # Combined single-pass for `{`, `}`, `;`, `,` — these targets are
+        # disjoint (none can appear inside another's match) so one scan is
+        # equivalent to four sequential gsubs but allocates only one string.
+        result = result.gsub(/\s*([{};,])\s*/) { $1 }
         # Only remove spaces around `:` inside declaration blocks (after `{`)
         # and parenthesized expressions (e.g. media queries `(max-width: 600px)`)
         # to preserve descendant combinator spaces in selectors (e.g. `div :hover`)
@@ -68,8 +70,6 @@ module Hwaro
             "(" + $1.gsub(/\s*:\s*/, ":") + ")"
           end
         end
-        result = result.gsub(/\s*;\s*/, ";")
-        result = result.gsub(/\s*,\s*/, ",")
 
         # ── Step 6: Strip trailing semicolons before } ────────────────────
         result = result.gsub(/;\}/, "}")

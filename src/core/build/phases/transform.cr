@@ -569,8 +569,14 @@ module Hwaro::Core::Build::Phases::Transform
     end
 
     pages.each do |page|
-      # Count co-occurrences via inverted index: O(terms * avg_pages_per_term)
+      next if limit <= 0
+
+      # Count co-occurrences via inverted index: O(terms * avg_pages_per_term).
+      # Filter by language during accumulation — cross-language candidates are
+      # discarded from the final output anyway, so skipping them here produces
+      # identical results while reducing work for multilingual sites.
       scores = Hash(String, Int32).new(0)
+      page_lang = page.language
       taxonomy_names.each do |tax_name|
         values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
         inv_tax = inverted[tax_name]?
@@ -579,6 +585,7 @@ module Hwaro::Core::Build::Phases::Transform
           if candidates = inv_tax[term]?
             candidates.each do |other_path|
               next if other_path == page.path
+              next unless page_lookup[other_path].language == page_lang
               scores[other_path] += 1
             end
           end
@@ -587,12 +594,22 @@ module Hwaro::Core::Build::Phases::Transform
 
       next if scores.empty?
 
-      # Filter by language and build result
-      page.related_posts = scores.to_a
-        .select { |path, _| page_lookup[path]?.try(&.language) == page.language }
-        .sort_by! { |_, s| -s }
-        .first(limit)
-        .map { |path, _| page_lookup[path] }
+      # Bounded top-k selection — equivalent to `.sort_by { -s }.first(limit)`
+      # but O(n*k) instead of O(n log n) with fewer allocations. Ties break by
+      # scores-hash insertion order (which mirrors pages/taxonomy iteration),
+      # matching a stable descending sort.
+      top = [] of {String, Int32}
+      scores.each do |path, score|
+        idx = 0
+        while idx < top.size && score <= top[idx][1]
+          idx += 1
+        end
+        next if idx >= limit
+        top.insert(idx, {path, score})
+        top.pop if top.size > limit
+      end
+
+      page.related_posts = top.map { |path, _| page_lookup[path] }
     end
   end
 end
