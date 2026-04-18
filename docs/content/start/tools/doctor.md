@@ -44,7 +44,6 @@ hwaro doctor --json
 - `base_url` doesn't start with `http://` or `https://`
 - `base_url` has a trailing slash
 - `title` is still the default value
-- `feeds.enabled` is true but `feeds.filename` is empty
 - `sitemap.changefreq` has an invalid value
 - `sitemap.priority` is out of range (0.0–1.0)
 - Duplicate taxonomy names
@@ -69,12 +68,11 @@ Running diagnostics...
 
 Config:
   ⚠ config.toml: base_url is not set
-  ⚠ config.toml: feeds.enabled is true but feeds.filename is not set
 
 Structure:
   ℹ content/docs: Section directory missing _index.md: docs/
 
-Found 0 error(s), 2 warning(s), 1 info(s)
+Found 0 error(s), 1 warning(s), 1 info(s)
 
 Tip: Use 'hwaro tool validate' for content checks
 ```
@@ -103,7 +101,6 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
 | `base-url-scheme` | config | base_url doesn't start with http(s) |
 | `base-url-trailing-slash` | config | base_url has trailing slash |
 | `title-default` | config | Title is still default value |
-| `feeds-filename-missing` | config | feeds.enabled but filename empty |
 | `sitemap-changefreq-invalid` | config | Invalid sitemap.changefreq |
 | `sitemap-priority-range` | config | sitemap.priority out of range |
 | `taxonomy-duplicate` | config | Duplicate taxonomy name |

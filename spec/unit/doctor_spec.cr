@@ -52,9 +52,9 @@ describe Hwaro::Services::Doctor do
         issues.any? { |i| i.message.includes?("default value") }.should be_false
       end
 
-      it "warns when feeds enabled but filename empty" do
+      it "does not warn when feeds enabled with empty filename (uses runtime default)" do
         issues = run_doctor(base_config("\n[feeds]\nenabled = true\nfilename = \"\"\n"))
-        issues.any? { |i| i.message.includes?("feeds.filename") }.should be_true
+        issues.any? { |i| i.message.includes?("feeds.filename") }.should be_false
       end
 
       it "does not warn when feeds disabled" do
