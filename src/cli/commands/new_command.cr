@@ -1,4 +1,5 @@
 require "option_parser"
+require "json"
 require "../metadata"
 require "../../config/options/new_options"
 require "../../services/creator"
@@ -23,6 +24,11 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--tags", description: "Comma-separated tags", takes_value: true, value_hint: "TAGS"),
           FlagInfo.new(short: "-s", long: "--section", description: "Section directory (e.g. blog, docs)", takes_value: true, value_hint: "NAME"),
           FlagInfo.new(short: "-a", long: "--archetype", description: "Archetype to use", takes_value: true, value_hint: "NAME"),
+
+          # Introspection
+          FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
+          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-archetypes)"),
+
           HELP_FLAG,
         ]
 
@@ -36,7 +42,15 @@ module Hwaro
           )
         end
 
+        ARCHETYPES_DIR = "archetypes"
+
         def run(args : Array(String))
+          if args.includes?("--list-archetypes")
+            json_mode = args.includes?("--json")
+            print_archetypes(json_mode)
+            return
+          end
+
           options = parse_options(args)
 
           # Fail fast in non-TTY environments when required input would be missing.
@@ -50,6 +64,43 @@ module Hwaro
           end
 
           Services::Creator.new.run(options)
+        end
+
+        # Print archetypes found under the current project's archetypes/ dir.
+        # When the directory does not exist, the list is empty (not an error).
+        private def print_archetypes(json : Bool)
+          entries = discover_archetypes
+
+          if json
+            mapped = entries.map { |e| {name: e[:name], path: e[:path]} }
+            STDOUT.puts mapped.to_json
+          else
+            if entries.empty?
+              Logger.info "No archetypes found."
+              return
+            end
+
+            Logger.info "Available archetypes:"
+            entries.each do |e|
+              Logger.info "  #{e[:name].ljust(16)} #{e[:path]}"
+            end
+          end
+        end
+
+        private def discover_archetypes : Array(NamedTuple(name: String, path: String))
+          results = [] of NamedTuple(name: String, path: String)
+          return results unless Dir.exists?(ARCHETYPES_DIR)
+
+          Dir.glob(File.join(ARCHETYPES_DIR, "**", "*.md")).sort.each do |path|
+            # Strip the leading "archetypes/" segment and the ".md" suffix so
+            # the name matches how users pass it via --archetype.
+            prefix = "#{ARCHETYPES_DIR}/"
+            rel = path.starts_with?(prefix) ? path[prefix.size..] : path
+            name = rel.ends_with?(".md") ? rel[0...-3] : rel
+            results << {name: name, path: path}
+          end
+
+          results
         end
 
         def parse_options(args : Array(String)) : Config::Options::NewOptions

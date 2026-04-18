@@ -45,6 +45,8 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | --skip-sample-content | Skip creating sample content files |
 | --skip-taxonomies | Skip taxonomies configuration and templates |
 | --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`) |
+| --list-scaffolds | List available built-in scaffolds and exit |
+| --json | Emit machine-readable JSON output (with --list-scaffolds) |
 
 ### new
 
@@ -70,6 +72,8 @@ Creates a Markdown file with front matter template. Supports **archetypes** for 
 | --tags TAGS | Comma-separated tags |
 | -s, --section NAME | Section directory (e.g. `blog`, `docs`) |
 | -a, --archetype NAME | Archetype to use |
+| --list-archetypes | List archetypes in the current project and exit |
+| --json | Emit machine-readable JSON output (with --list-archetypes) |
 
 **Archetypes:**
 
@@ -258,6 +262,7 @@ hwaro deploy --dry-run
 | --force | Force upload/copy (ignore file comparisons) |
 | --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
+| --json | Emit machine-readable JSON output (with --list-targets) |
 
 ### doctor
 
