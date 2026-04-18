@@ -1,5 +1,6 @@
 require "toml"
 require "./deployment"
+require "../utils/errors"
 require "../utils/text_utils"
 require "../utils/env_substitutor"
 
@@ -699,14 +700,30 @@ module Hwaro
         @languages.values.sort_by(&.weight)
       end
 
+      # Load and parse a `config.toml` into a populated `Config`.
+      #
+      # Raises `Hwaro::HwaroError(HWARO_E_CONFIG)` directly at the source for
+      # file-not-found and TOML parse errors so every caller (build, deploy,
+      # doctor, tool, services) gets a classified error with exit code 3
+      # without having to do substring matching on the exception message.
+      # File-not-found is classified as HWARO_E_CONFIG rather than HWARO_E_IO
+      # because a missing `config.toml` is a config-level user error, not an
+      # arbitrary IO failure.
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config
         config = new
-        return config unless File.exists?(config_path)
+
+        unless File.exists?(config_path)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "config.toml not found at #{config_path}",
+            hint: "Run 'hwaro init' to scaffold a project, or cd into a directory containing config.toml.",
+          )
+        end
 
         # Read file content and substitute environment variables before TOML parsing
         raw_content = File.read(config_path)
         substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
-        config.raw = TOML.parse(substituted_content)
+        config.raw = parse_toml(substituted_content, config_path)
 
         # Merge environment-specific override (e.g. config.production.toml)
         if env_name = env
@@ -714,7 +731,7 @@ module Hwaro
           if File.exists?(env_path)
             env_content = File.read(env_path)
             env_substituted = Utils::EnvSubstitutor.substitute_with_warnings(env_content, env_path)
-            env_raw = TOML.parse(env_substituted)
+            env_raw = parse_toml(env_substituted, env_path)
             config.raw = deep_merge(config.raw, env_raw)
             Logger.info "Loaded environment config: #{env_path}"
           else
@@ -756,6 +773,22 @@ module Hwaro
       end
 
       # --- Private helpers -----------------------------------------------------------
+
+      # Parse a TOML string, re-raising any parser failure as a classified
+      # `HWARO_E_CONFIG` error so the CLI maps it to exit code 3 and the
+      # `--json` handlers emit the structured error payload. The hint points
+      # users at the offending file so they can fix the syntax.
+      private def self.parse_toml(content : String, path : String) : Hash(String, TOML::Any)
+        TOML.parse(content)
+      rescue ex : Hwaro::HwaroError
+        raise ex
+      rescue ex
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Invalid TOML in #{path}: #{ex.message}",
+          hint: "Check TOML syntax in #{path}.",
+        )
+      end
 
       # Deep-merge two TOML hashes.  Values in `override` take precedence.
       # Sub-tables (hashes) are merged recursively; all other types are replaced.

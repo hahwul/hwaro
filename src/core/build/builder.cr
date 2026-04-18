@@ -547,19 +547,12 @@ module Hwaro
           memory_limit : String? = nil,
           env : String? = nil,
         )
-          # Load config once and reuse throughout the build. Wrap config
-          # load failures with a classified HwaroError so callers (and
-          # `--json` consumers) can reliably branch on HWARO_E_CONFIG.
-          config = begin
-            Models::Config.load(env: env)
-          rescue ex : Hwaro::HwaroError
-            raise ex
-          rescue ex
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: ex.message || "Failed to load config",
-            )
-          end
+          # Load config once and reuse throughout the build.
+          # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
+          # for missing files and TOML parse failures, so callers (and
+          # `--json` consumers) can branch on HWARO_E_CONFIG without the
+          # build pipeline rewrapping the exception.
+          config = Models::Config.load(env: env)
           @config = config
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post

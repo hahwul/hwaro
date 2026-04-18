@@ -7,8 +7,9 @@ describe "Site Variables Integration" do
       FileUtils.mkdir_p(File.join(tmp_dir, "content/blog"))
       FileUtils.mkdir_p(File.join(tmp_dir, "templates"))
 
-      # Config
-      File.write(File.join(tmp_dir, "config.yml"), "title: Test Site\nbase_url: http://example.com")
+      # Config — Models::Config.load now raises HwaroError(HWARO_E_CONFIG)
+      # when config.toml is missing, so provide a minimal one.
+      File.write(File.join(tmp_dir, "config.toml"), %(title = "Test Site"\nbase_url = "http://example.com"))
 
       # Content
       File.write(File.join(tmp_dir, "content/index.md"), "---\ntitle: Home\n---\nHello")
