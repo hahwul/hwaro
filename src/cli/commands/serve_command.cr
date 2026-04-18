@@ -2,6 +2,7 @@ require "option_parser"
 require "../metadata"
 require "../../config/options/serve_options"
 require "../../services/server/server"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -71,11 +72,15 @@ module Hwaro
           # --json suppresses banners/action lines so the ready event is the
           # first line on stdout. Errors still go to stderr via Logger.error.
           Logger.quiet = true if options.json
+          Runner.json_mode = true if options.json
 
           if input_dir
             unless Dir.exists?(input_dir)
-              Logger.error "Input directory does not exist: #{input_dir}"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Input directory does not exist: #{input_dir}",
+                hint: "Check the path passed to -i/--input.",
+              )
             end
             Logger.info "Changing working directory to: #{input_dir}"
             Dir.cd(input_dir)

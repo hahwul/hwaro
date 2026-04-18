@@ -9,8 +9,10 @@
 
 require "http/client"
 require "json"
+require "socket"
 require "uri"
 require "./base"
+require "../../utils/errors"
 require "../../utils/path_utils"
 
 module Hwaro
@@ -245,11 +247,22 @@ module Hwaro
           unless response.status_code == 200
             case response.status_code
             when 404
-              raise "Repository not found: #{owner}/#{repo}"
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_NETWORK,
+                message: "Remote scaffold not found: #{owner}/#{repo}",
+                hint: "Check the repository name and that it is public.",
+              )
             when 403
-              raise "GitHub API rate limit exceeded. Try again later."
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_NETWORK,
+                message: "GitHub API rate limit exceeded while fetching #{owner}/#{repo}",
+                hint: "Try again later or set GITHUB_TOKEN for higher limits.",
+              )
             else
-              raise "Failed to fetch repository info: HTTP #{response.status_code}"
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_NETWORK,
+                message: "Failed to fetch repository info for #{owner}/#{repo}: HTTP #{response.status_code}",
+              )
             end
           end
 
@@ -261,7 +274,10 @@ module Hwaro
           response = github_api_get("/repos/#{owner}/#{repo}/git/trees/#{branch}?recursive=1")
 
           unless response.status_code == 200
-            raise "Failed to fetch repository tree: HTTP #{response.status_code}"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_NETWORK,
+              message: "Failed to fetch repository tree for #{owner}/#{repo}@#{branch}: HTTP #{response.status_code}",
+            )
           end
 
           data = JSON.parse(response.body)
@@ -308,6 +324,12 @@ module Hwaro
 
           begin
             client.get(path, headers: headers)
+          rescue ex : Socket::Error | IO::Error | OpenSSL::SSL::Error
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_NETWORK,
+              message: "Failed to reach GitHub API (#{path}): #{ex.message}",
+              hint: "Check your network connection and try again.",
+            )
           ensure
             client.close
           end
