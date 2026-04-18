@@ -68,7 +68,8 @@ module Hwaro
           exit(1)
         end
 
-        Logger.info "Initializing new Hwaro project in #{target_path}..."
+        target_label = target_path == "." ? "current directory" : "'#{target_path}'"
+        Logger.info "Initializing new Hwaro project in #{target_label}..."
         Logger.info "Using scaffold: #{scaffold.description}"
 
         is_multilingual = multilingual_languages.size > 1
