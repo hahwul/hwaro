@@ -11,6 +11,10 @@ module Hwaro
       def test_sanitize_output_dir(dir : String)
         sanitize_output_dir(dir)
       end
+
+      def test_ready_signal_line(host : String, port : Int32) : String
+        ready_signal_line(host, port)
+      end
     end
   end
 end
@@ -54,6 +58,32 @@ describe Hwaro::Services::Server do
     it "defaults to 'public' for absolute paths" do
       server = Hwaro::Services::Server.new
       server.test_sanitize_output_dir("/foo").should eq("public")
+    end
+  end
+
+  describe "#ready_signal_line" do
+    it "formats a single deterministic ready line with url and pid" do
+      server = Hwaro::Services::Server.new
+      line = server.test_ready_signal_line("127.0.0.1", 3000)
+      line.should eq("hwaro serve: ready url=http://127.0.0.1:3000 pid=#{Process.pid}")
+    end
+
+    it "is a single line (no embedded newlines)" do
+      server = Hwaro::Services::Server.new
+      line = server.test_ready_signal_line("127.0.0.1", 4567)
+      line.includes?('\n').should be_false
+    end
+
+    it "contains no ANSI color escape codes" do
+      server = Hwaro::Services::Server.new
+      line = server.test_ready_signal_line("0.0.0.0", 8080)
+      line.includes?('\e').should be_false
+    end
+
+    it "reflects the requested host and port" do
+      server = Hwaro::Services::Server.new
+      line = server.test_ready_signal_line("0.0.0.0", 8080)
+      line.should contain("url=http://0.0.0.0:8080")
     end
   end
 end
