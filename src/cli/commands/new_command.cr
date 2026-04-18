@@ -29,6 +29,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
           FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-archetypes)"),
 
+          QUIET_FLAG,
           HELP_FLAG,
         ]
 
@@ -122,6 +123,7 @@ module Hwaro
             parser.on("--tags TAGS", "Comma-separated tags") { |t| tags = t.split(",").map(&.strip).reject(&.empty?) }
             parser.on("-s NAME", "--section NAME", "Section directory (e.g. blog, docs)") { |s| section = s }
             parser.on("-a NAME", "--archetype NAME", "Archetype to use") { |a| archetype = a }
+            CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
               path = unknown.first if unknown.any?

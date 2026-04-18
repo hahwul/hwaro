@@ -114,6 +114,7 @@ Update **all** of the following:
 - `Logger.progress(current, total)` — progress bar with percentage.
 - `Logger.timed(message, &block)` — timing wrapper.
 - Levels: `debug`, `info`, `warn`, `error`, `success`.
+- Every command honors `--quiet`/`-q` (suppresses info/action/progress/success + banner; warn/error still emit on stderr) and the `NO_COLOR` env var (auto-detect also disables ANSI when stdout is not a TTY).
 
 ### Testing
 - **Unit tests**: Isolated components, minimal objects, helper methods (e.g., `load_config`, `render_filter`).

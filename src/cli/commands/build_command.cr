@@ -44,6 +44,7 @@ module Hwaro
 
           # Debug & output
           VERBOSE_FLAG,
+          QUIET_FLAG,
           PROFILE_FLAG,
           DEBUG_FLAG,
           HELP_FLAG,
@@ -156,6 +157,9 @@ module Hwaro
 
             # Debug & output
             CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
+            # --quiet is stripped upstream in Runner.apply_global_quiet!; this
+            # registration only ensures it appears in per-command --help.
+            CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }

@@ -9,9 +9,10 @@ require "../spec_helper"
 # plus filesystem side effects. CI builds the binary via `shards build`
 # before running specs.
 #
-# Note on streams: Hwaro::Logger.error / .info / .success all write to
-# Logger.io which defaults to STDOUT — not STDERR. Tests therefore assert
-# on the captured `output` stream, not `error`.
+# Note on streams: Hwaro::Logger.info / .success write to Logger.io (STDOUT
+# by default). Hwaro::Logger.warn / .error write to Logger.err_io (STDERR
+# by default). Tests assert on the captured stream that matches the
+# originating log method.
 # =============================================================================
 
 private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
@@ -160,11 +161,11 @@ describe "hwaro tool platform" do
 
   it "exits 1 and prints 'Unsupported platform' on an unknown platform" do
     with_initialized_project do |project_dir|
-      status, output, _ = run_hwaro(
+      status, _, err = run_hwaro(
         ["tool", "platform", "definitely-not-real"], chdir: project_dir
       )
       status.success?.should be_false
-      output.should contain("Unsupported platform")
+      err.should contain("Unsupported platform")
     end
   end
 
@@ -200,10 +201,11 @@ describe "hwaro tool ci" do
 
   it "warns about deprecation in favor of `tool platform github-pages`" do
     with_initialized_project do |project_dir|
-      _, output, _ = run_hwaro(
+      _, output, err = run_hwaro(
         ["tool", "ci", "github-actions", "--stdout"], chdir: project_dir
       )
-      output.should contain("DEPRECATED")
+      # Deprecation notice uses Logger.warn → stderr.
+      err.should contain("DEPRECATED")
       # Co-signal: the actual workflow content was also generated to stdout,
       # confirming the deprecation log didn't short-circuit the command.
       output.should contain("workflow")
@@ -251,27 +253,27 @@ end
 describe "hwaro tool import" do
   it "exits 1 and reports missing source-type" do
     with_initialized_project do |project_dir|
-      status, output, _ = run_hwaro(["tool", "import"], chdir: project_dir)
+      status, _, err = run_hwaro(["tool", "import"], chdir: project_dir)
       status.success?.should be_false
-      output.should contain("Missing source")
+      err.should contain("Missing source")
     end
   end
 
   it "exits 1 and reports missing path when only source-type is given" do
     with_initialized_project do |project_dir|
-      status, output, _ = run_hwaro(["tool", "import", "hugo"], chdir: project_dir)
+      status, _, err = run_hwaro(["tool", "import", "hugo"], chdir: project_dir)
       status.success?.should be_false
-      output.should contain("Missing path")
+      err.should contain("Missing path")
     end
   end
 
   it "exits 1 and reports an unknown source-type" do
     with_initialized_project do |project_dir|
-      status, output, _ = run_hwaro(
+      status, _, err = run_hwaro(
         ["tool", "import", "definitely-not-real", "/tmp"], chdir: project_dir
       )
       status.success?.should be_false
-      output.should contain("Unknown source type")
+      err.should contain("Unknown source type")
     end
   end
 end

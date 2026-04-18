@@ -67,6 +67,12 @@ module Hwaro
       end
 
       def run
+        # Global `--quiet` / `-q` is pre-parsed here so every command
+        # (including subcommands and help output) honors it without needing
+        # per-command OptionParser wiring. Removed entries no longer reach
+        # the command-level parser, so they never trigger InvalidOption.
+        Runner.apply_global_quiet!(ARGV)
+
         if ARGV.empty?
           Runner.print_help
           exit
@@ -95,6 +101,21 @@ module Hwaro
       rescue ex : Exception
         Logger.error "Error: #{ex.message}"
         exit(1)
+      end
+
+      # Strip `--quiet` / `-q` from argv and enable Logger.quiet when present.
+      # Mutates the given array in place so subsequent parsers don't see it.
+      def self.apply_global_quiet!(argv : Array(String))
+        found = false
+        argv.reject! do |arg|
+          if arg == "--quiet" || arg == "-q"
+            found = true
+            true
+          else
+            false
+          end
+        end
+        Logger.quiet = true if found
       end
 
       private def register_default_commands
@@ -161,6 +182,10 @@ module Hwaro
       end
 
       def self.print_help
+        # In quiet mode the banner and command listing are suppressed
+        # entirely — scripts/CI just get a silent help invocation.
+        return if Logger.quiet?
+
         art = [
           "                             ",
           "    █████████████████████    ",
@@ -172,11 +197,13 @@ module Hwaro
           "    █████████████████████    ",
         ]
 
+        use_color = Logger.color_enabled?
+        brand = use_color ? "Hwaro".colorize(:cyan).bold.to_s : "Hwaro"
         info = [
           "",
           "",
           "",
-          "  #{"Hwaro".colorize(:cyan).bold} v#{Hwaro::VERSION}",
+          "  #{brand} v#{Hwaro::VERSION}",
           "",
           "  A fast and lightweight static site",
           "  generator written in Crystal.",
@@ -190,7 +217,8 @@ module Hwaro
         Logger.info ""
         art.each_with_index do |line, i|
           right = info[i]? || ""
-          Logger.info "#{line.colorize(:light_red)}#{right}"
+          art_line = use_color ? line.colorize(:light_red).to_s : line
+          Logger.info "#{art_line}#{right}"
         end
 
         Logger.info ""
