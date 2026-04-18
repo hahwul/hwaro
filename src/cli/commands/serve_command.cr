@@ -38,7 +38,8 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server"),
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
-          FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes"),
+          FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes (default: enabled; kept for backwards compatibility)"),
+          FlagInfo.new(short: nil, long: "--no-live-reload", description: "Disable live reload on file changes"),
 
           # Skip options
           SKIP_OG_IMAGE_FLAG,
@@ -100,7 +101,7 @@ module Hwaro
           open_browser = false
           access_log = false
           error_overlay = true
-          live_reload = false
+          live_reload = true
 
           # Skip options
           skip_og_image = false
@@ -137,7 +138,8 @@ module Hwaro
             parser.on("--open", "Open browser after starting server") { open_browser = true }
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
-            parser.on("--live-reload", "Enable live reload on file changes") { live_reload = true }
+            parser.on("--live-reload", "Enable live reload on file changes (default: enabled; kept for backwards compatibility)") { live_reload = true }
+            parser.on("--no-live-reload", "Disable live reload on file changes") { live_reload = false }
 
             # Skip options
             CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
