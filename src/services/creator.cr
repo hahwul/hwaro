@@ -63,10 +63,16 @@ module Hwaro
           end
         end
 
-        # Prompt for title if still empty and no file path
+        # Prompt for title if still empty and no file path.
+        # Only prompt when stdin is an interactive TTY — otherwise fail fast
+        # so CI/agent environments don't hang on `gets`.
         if !full_path && title.empty?
-          print "Enter title: "
-          title = gets.try(&.chomp) || ""
+          if STDIN.tty?
+            print "Enter title: "
+            title = gets.try(&.chomp) || ""
+          else
+            raise "missing --title (or <path>.md) argument\nUsage: hwaro new <path> [options]\nRun 'hwaro new --help' for details."
+          end
         end
 
         if !full_path

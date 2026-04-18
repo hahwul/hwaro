@@ -38,6 +38,17 @@ module Hwaro
 
         def run(args : Array(String))
           options = parse_options(args)
+
+          # Fail fast in non-TTY environments when required input would be missing.
+          # Without this, Services::Creator falls back to an interactive `gets`
+          # prompt that hangs in CI, agent runs, or `hwaro new < /dev/null`.
+          if options.path.nil? && !STDIN.tty?
+            STDERR.puts "Error: missing <path> argument"
+            STDERR.puts "Usage: hwaro new <path> [options]"
+            STDERR.puts "Run 'hwaro new --help' for details."
+            exit(2)
+          end
+
           Services::Creator.new.run(options)
         end
 
