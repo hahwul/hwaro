@@ -10,6 +10,7 @@
 # - Static-only copy when only static files change
 
 require "http/server"
+require "json"
 require "../../core/build/builder"
 require "../../content/hooks"
 require "../../utils/logger"
@@ -249,15 +250,15 @@ module Hwaro
 
       def run(options : Config::Options::ServeOptions)
         build_options = options.to_build_options
-        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json)
       end
 
       def run(host : String = "127.0.0.1", port : Int32 = 3000, drafts : Bool = false)
         build_options = Config::Options::BuildOptions.new(drafts: drafts)
-        run_with_options(host, port, false, false, false, build_options)
+        run_with_options(host, port, false, false, false, build_options, false)
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions)
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false)
         Logger.info "Performing initial build..."
         @builder.run(build_options)
 
@@ -296,7 +297,7 @@ module Hwaro
         server = HTTP::Server.new(handlers)
 
         address = server.bind_tcp host, port
-        emit_ready_signal(host, port)
+        emit_ready_signal(host, port, json_output)
         server.listen
       end
 
@@ -313,10 +314,13 @@ module Hwaro
       # Coexists with the pretty "Serving site at …" banner logged earlier —
       # this is an additional single line, not a replacement.
       #
-      # See issue #360. A JSON variant will be added alongside the global
-      # `--json` flag in issue #356.
-      private def emit_ready_signal(host : String, port : Int32)
-        STDOUT.puts ready_signal_line(host, port)
+      # With `json: true` (the `--json` flag), the emitted line is a
+      # compact JSON document matching the schema from issue #356:
+      #   {"event":"ready","url":"...","host":"...","port":N,"pid":P}
+      # Otherwise the human-readable `hwaro serve: ready url=... pid=...`
+      # line from issue #360 is emitted.
+      private def emit_ready_signal(host : String, port : Int32, json : Bool = false)
+        STDOUT.puts(json ? ready_signal_json(host, port) : ready_signal_line(host, port))
         STDOUT.flush
       end
 
@@ -325,6 +329,18 @@ module Hwaro
       # capturing stdout.
       protected def ready_signal_line(host : String, port : Int32) : String
         "hwaro serve: ready url=http://#{host}:#{port} pid=#{Process.pid}"
+      end
+
+      # JSON variant of the ready signal — single-line document on stdout so
+      # CI scripts and agents can parse it with `jq` / `JSON.parse`.
+      protected def ready_signal_json(host : String, port : Int32) : String
+        {
+          "event" => "ready",
+          "url"   => "http://#{host}:#{port}",
+          "host"  => host,
+          "port"  => port,
+          "pid"   => Process.pid,
+        }.to_json
       end
 
       private def sanitize_output_dir(dir : String) : String

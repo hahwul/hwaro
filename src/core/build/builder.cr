@@ -125,6 +125,12 @@ module Hwaro
           @cache_manager
         end
 
+        # Access build context for external inspection (e.g. emitting JSON
+        # output after a build). Returns nil before `run` has been invoked.
+        def context : Lifecycle::BuildContext?
+          @context
+        end
+
         # Register all cache layers with the unified manager
         private def setup_cache_manager
           @cache_manager.register("compiled_templates", "Compiled Crinja template ASTs", runtime: true) do

@@ -51,6 +51,7 @@ module Hwaro
           QUIET_FLAG,
           PROFILE_FLAG,
           DEBUG_FLAG,
+          JSON_FLAG,
           HELP_FLAG,
         ]
 
@@ -66,6 +67,10 @@ module Hwaro
 
         def run(args : Array(String))
           input_dir, options = parse_options(args)
+
+          # --json suppresses banners/action lines so the ready event is the
+          # first line on stdout. Errors still go to stderr via Logger.error.
+          Logger.quiet = true if options.json
 
           if input_dir
             unless Dir.exists?(input_dir)
@@ -113,6 +118,7 @@ module Hwaro
           verbose = false
           profile = false
           debug = false
+          json_output = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro serve [options]"
@@ -152,6 +158,7 @@ module Hwaro
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
           end
 
@@ -177,6 +184,7 @@ module Hwaro
             cache: cache,
             stream: stream,
             memory_limit: memory_limit,
+            json: json_output,
           )}
         end
       end

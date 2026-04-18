@@ -48,11 +48,35 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            Logger.quiet = true if json_output
+
             stats = Services::ContentStats.new(content_dir: content_dir)
-            result = stats.run
+            begin
+              result = stats.run
+            rescue ex
+              if json_output
+                puts({status: "error", error: {message: ex.message || "stats failed"}}.to_json)
+                exit(1)
+              else
+                raise ex
+              end
+            end
 
             if json_output
-              puts result.to_json
+              payload = {
+                "total"      => result.total,
+                "published"  => result.published,
+                "drafts"     => result.drafts,
+                "word_count" => {
+                  "total"   => result.words_total,
+                  "average" => result.words_avg,
+                  "min"     => result.words_min,
+                  "max"     => result.words_max,
+                },
+                "tags"    => result.tags,
+                "monthly" => result.monthly,
+              }
+              puts payload.to_json
               return
             end
 

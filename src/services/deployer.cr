@@ -1,5 +1,6 @@
 require "file_utils"
 require "digest/sha256"
+require "json"
 require "set"
 require "uri"
 
@@ -17,6 +18,96 @@ module Hwaro
 
         def initialize(@copied : Int32 = 0, @deleted : Int32 = 0, @skipped : Int32 = 0)
         end
+      end
+
+      # A single planned deployment operation produced by `#plan`. Used by
+      # `hwaro deploy --dry-run --json` so agents/CI can parse the list of
+      # files that would be copied, updated, or deleted for each target.
+      record PlannedOp,
+        target : String,
+        action : String,
+        path : String,
+        source : String?,
+        destination : String? do
+        include JSON::Serializable
+      end
+
+      # Build a list of planned operations across all configured (or explicitly
+      # requested) targets without performing any filesystem writes or external
+      # commands. Returns an empty array when no targets resolve (caller is
+      # responsible for surfacing that as a friendly message or JSON error).
+      def plan(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(PlannedOp)
+        ops = [] of PlannedOp
+        config ||= Models::Config.load(env: options.env)
+        deployment = config.deployment
+
+        source_dir = options.source_dir || deployment.source_dir
+        source_dir = File.expand_path(source_dir)
+        return ops unless Dir.exists?(source_dir)
+
+        target_names =
+          if options.targets.any?
+            options.targets
+          elsif target = deployment.target
+            [target]
+          elsif deployment.targets.size > 0
+            [deployment.targets.first.name]
+          else
+            [] of String
+          end
+        return ops if target_names.empty?
+
+        targets = target_names.compact_map { |name| deployment.target_named(name) }
+        return ops if targets.empty?
+
+        targets.each do |target|
+          if command = target.command
+            ops << PlannedOp.new(
+              target: target.name,
+              action: "command",
+              path: expand_placeholders(command, source_dir, target),
+              source: source_dir,
+              destination: target.url,
+            )
+            next
+          end
+
+          url = target.url
+          next if url.empty?
+
+          if directory_destination = local_directory_destination(url)
+            dest_dir = File.expand_path(directory_destination)
+            desired = build_desired_map(source_dir, target)
+            existing = list_existing_files(dest_dir)
+
+            desired.each do |dest_rel, src_path|
+              dest_path = File.join(dest_dir, dest_rel)
+              if File.exists?(dest_path)
+                next if same_file?(src_path, dest_path)
+                ops << PlannedOp.new(target: target.name, action: "update", path: dest_rel, source: src_path, destination: dest_path)
+              else
+                ops << PlannedOp.new(target: target.name, action: "create", path: dest_rel, source: src_path, destination: dest_path)
+              end
+            end
+
+            desired_set = desired.keys.to_set
+            existing.each do |rel|
+              next if desired_set.includes?(rel)
+              next unless delete_candidate?(rel, target)
+              ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
+            end
+          elsif auto_command = auto_command_for_url(url, source_dir)
+            ops << PlannedOp.new(
+              target: target.name,
+              action: "command",
+              path: expand_placeholders(auto_command, source_dir, target),
+              source: source_dir,
+              destination: url,
+            )
+          end
+        end
+
+        ops
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool

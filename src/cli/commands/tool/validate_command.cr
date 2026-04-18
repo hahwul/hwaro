@@ -49,20 +49,31 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            Logger.quiet = true if json_output
+
             validator = Services::ContentValidator.new(content_dir: content_dir)
-            issues = validator.run
+            begin
+              issues = validator.run
+            rescue ex
+              if json_output
+                puts({status: "error", error: {message: ex.message || "validate failed"}}.to_json)
+                exit(1)
+              else
+                raise ex
+              end
+            end
 
             if json_output
-              result = {
-                "issues"  => issues,
-                "summary" => {
-                  "errors"   => issues.count { |i| i.level == :error },
-                  "warnings" => issues.count { |i| i.level == :warning },
-                  "infos"    => issues.count { |i| i.level == :info },
-                  "total"    => issues.size,
-                },
-              }
-              puts result.to_json
+              findings = issues.map do |issue|
+                {
+                  "file"     => issue.file,
+                  "line"     => nil.as(Int32?),
+                  "rule"     => issue.id,
+                  "severity" => issue.level.to_s,
+                  "message"  => issue.message,
+                }
+              end
+              puts({"findings" => findings}.to_json)
               return
             end
 

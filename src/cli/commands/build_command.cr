@@ -1,3 +1,4 @@
+require "json"
 require "option_parser"
 require "../metadata"
 require "../../config/options/build_options"
@@ -47,6 +48,7 @@ module Hwaro
           QUIET_FLAG,
           PROFILE_FLAG,
           DEBUG_FLAG,
+          JSON_FLAG,
           HELP_FLAG,
         ]
 
@@ -61,11 +63,18 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          result, input_dir = parse_options(args)
+          result, input_dir, json_output = parse_options(args)
           options, output_dir_explicit = result
+
+          # --json implies quiet so only the final JSON document reaches stdout.
+          Logger.quiet = true if json_output
 
           if dir = input_dir
             unless Dir.exists?(dir)
+              if json_output
+                puts({status: "error", error: {message: "Input directory does not exist: #{dir}"}}.to_json)
+                exit(1)
+              end
               Logger.error "Input directory does not exist: #{dir}"
               exit(1)
             end
@@ -92,10 +101,38 @@ module Hwaro
             builder.register(hookable)
           end
 
-          builder.run(options)
+          start = Time.instant
+          begin
+            builder.run(options)
+          rescue ex
+            if json_output
+              puts({status: "error", error: {message: ex.message || "build failed"}}.to_json)
+              exit(1)
+            else
+              raise ex
+            end
+          end
+
+          if json_output
+            ctx = builder.context
+            stats = ctx.try(&.stats)
+            duration_ms = if stats && stats.elapsed > 0
+                            stats.elapsed.round(2)
+                          else
+                            (Time.instant - start).total_milliseconds.round(2)
+                          end
+            payload = {
+              "status"              => "ok",
+              "pages_generated"     => stats.try(&.pages_rendered) || 0,
+              "duration_ms"         => duration_ms,
+              "cache_hits"          => stats.try(&.cache_hits) || 0,
+              "raw_files_processed" => stats.try(&.raw_files_processed) || 0,
+            }
+            puts payload.to_json
+          end
         end
 
-        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String? }
+        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?, Bool }
           # Path & URL
           input_dir = nil.as(String?)
           output_dir = "public"
@@ -126,6 +163,7 @@ module Hwaro
           verbose = false
           profile = false
           debug = false
+          json_output = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro build [options]"
@@ -162,6 +200,7 @@ module Hwaro
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
           end
 
@@ -185,7 +224,7 @@ module Hwaro
             env: env_name,
             skip_og_image: skip_og_image,
             skip_image_processing: skip_image_processing,
-          ), output_dir_explicit}, input_dir }
+          ), output_dir_explicit}, input_dir, json_output }
         end
       end
     end
