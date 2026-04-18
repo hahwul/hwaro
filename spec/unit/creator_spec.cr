@@ -236,6 +236,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "fails fast in non-TTY environments when title cannot be inferred" do
+      # Running under `crystal spec`, STDIN is not a TTY. The Creator must
+      # raise a clear usage error instead of hanging on `gets` at the
+      # interactive "Enter title:" prompt.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new
+          creator = Hwaro::Services::Creator.new
+
+          expect_raises(Exception, /missing --title/) do
+            creator.run(options)
+          end
+        end
+      end
+    end
+
     it "creates a file from a directory path using title slug" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
