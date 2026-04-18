@@ -70,31 +70,48 @@ module Hwaro
           end
 
           if json_output
-            # Real deploy with --json (no --dry-run) isn't part of this
-            # command's stable JSON schema yet. Fall back to returning a
-            # status document so agents aren't left with raw progress text.
-            ok = begin
-              Services::Deployer.new.run(options)
+            # Real deploy with --json (no --dry-run) returns a per-target
+            # summary. Schema per issue #374:
+            #   {"status": "ok"|"error",
+            #    "targets": [{"name","status","created","updated",
+            #                 "deleted","duration_ms","error"?}]}
+            # Config-load errors bubble up here and become a top-level
+            # error payload (shape unchanged from #356).
+            results = begin
+              Services::Deployer.new.deploy_structured(options)
             rescue ex
               err = classify_deploy_error(ex, fallback_message: "deploy failed")
               STDOUT.puts err.to_error_payload.to_json
               exit(err.exit_code)
             end
-            if ok
-              STDOUT.puts({"status" => "ok"}.to_json)
-            else
-              err = Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_NETWORK,
-                message: "deploy failed",
-              )
-              STDOUT.puts err.to_error_payload.to_json
-              exit(err.exit_code)
-            end
+
+            overall = results.all? { |r| r.status == "ok" } ? "ok" : "error"
+            payload = {"status" => overall, "targets" => results}
+            STDOUT.puts payload.to_json
+            exit(overall == "ok" ? 0 : worst_exit_for(results))
             return
           end
 
           ok = Services::Deployer.new.run(options)
           exit(1) unless ok
+        end
+
+        # Pick the most severe exit code across failing targets so CI can
+        # branch on whether a partial failure was config- vs upload-related.
+        # Numerically higher exit codes win (HWARO_E_NETWORK=7 beats
+        # HWARO_E_CONFIG=3). Falls back to EXIT_GENERIC (1) when there is
+        # no classified error (shouldn't happen in practice).
+        private def worst_exit_for(results : Array(Services::Deployer::DeployResult)) : Int32
+          worst = Hwaro::Errors::EXIT_GENERIC
+          results.each do |r|
+            next if r.status == "ok"
+            if err = r.error
+              code = err["code"]?
+              exit_code = code ? Hwaro::Errors.exit_for(code) : Hwaro::Errors::EXIT_GENERIC
+              worst = exit_code if exit_code > worst
+            end
+          end
+          worst
         end
 
         # Map deploy-time exceptions onto the taxonomy. Config-related errors

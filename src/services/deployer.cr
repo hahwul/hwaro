@@ -33,6 +33,36 @@ module Hwaro
         include JSON::Serializable
       end
 
+      # Per-target summary emitted by `#deploy_structured` for
+      # `hwaro deploy --json` (non dry-run). Shape is part of the stable
+      # JSON schema per issue #374 — agents/CI consume these fields.
+      #
+      # `error` is nil when `status == "ok"`. When set, it mirrors the
+      # classified `HwaroError` payload (`code`, `category`, `message`,
+      # `hint`) so the shape lines up with top-level error payloads.
+      record DeployResult,
+        name : String,
+        status : String,
+        created : Int32,
+        updated : Int32,
+        deleted : Int32,
+        duration_ms : Float64,
+        error : Hash(String, String?)? = nil do
+        include JSON::Serializable
+      end
+
+      # Counts collected while deploying a single target. Command-based
+      # targets report zeros since we can't introspect what the external
+      # tool did.
+      private struct TargetCounts
+        property created : Int32
+        property updated : Int32
+        property deleted : Int32
+
+        def initialize(@created : Int32 = 0, @updated : Int32 = 0, @deleted : Int32 = 0)
+        end
+      end
+
       # Build a list of planned operations across all configured (or explicitly
       # requested) targets without performing any filesystem writes or external
       # commands. Returns an empty array when no targets resolve (caller is
@@ -109,6 +139,180 @@ module Hwaro
         end
 
         ops
+      end
+
+      # Run a real deploy and return a per-target summary suitable for
+      # `hwaro deploy --json` (no `--dry-run`). Each target is deployed
+      # independently — an exception in one target is captured in its
+      # `DeployResult.error` and does NOT abort the remaining targets,
+      # so partial failures are visible to agents/CI.
+      #
+      # Config-load errors intentionally propagate as `HwaroError` so the
+      # caller can emit a top-level error payload (shape unchanged).
+      def deploy_structured(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(DeployResult)
+        results = [] of DeployResult
+        config ||= load_config_or_classify(options.env)
+        deployment = config.deployment
+
+        source_dir = options.source_dir || deployment.source_dir
+        source_dir = File.expand_path(source_dir)
+
+        unless Dir.exists?(source_dir)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Source directory not found: #{source_dir}",
+            hint: "Run 'hwaro build' first, or pass '--source DIR'.",
+          )
+        end
+
+        target_names =
+          if options.targets.any?
+            options.targets
+          elsif target = deployment.target
+            [target]
+          elsif deployment.targets.size > 0
+            [deployment.targets.first.name]
+          else
+            [] of String
+          end
+
+        return results if target_names.empty?
+
+        targets = target_names.compact_map do |name|
+          target = deployment.target_named(name)
+          unless target
+            results << DeployResult.new(
+              name: name,
+              status: "error",
+              created: 0, updated: 0, deleted: 0,
+              duration_ms: 0.0,
+              error: {
+                "code"     => Hwaro::Errors::HWARO_E_CONFIG,
+                "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_CONFIG).to_s,
+                "message"  => "Unknown deploy target: #{name}",
+                "hint"     => nil.as(String?),
+              } of String => String?,
+            )
+            nil
+          else
+            target
+          end
+        end
+
+        effective = EffectiveOptions.new(deployment, options)
+
+        targets.each do |target|
+          results << deploy_target_structured(target, source_dir, effective, deployment)
+        end
+
+        results
+      end
+
+      # Deploy a single target while capturing counts, timing, and any
+      # classified error. Exceptions raised below are caught here rather
+      # than propagating so one failing target doesn't abort the run.
+      private def deploy_target_structured(
+        target : Models::DeploymentTarget,
+        source_dir : String,
+        effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
+      ) : DeployResult
+        started = Time.instant
+        counts = TargetCounts.new
+        ok = false
+        error : Hwaro::HwaroError? = nil
+
+        begin
+          ok, counts = deploy_target_with_counts(target, source_dir, effective, deployment)
+        rescue ex : Hwaro::HwaroError
+          error = ex
+        rescue ex
+          error = Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_NETWORK,
+            message: ex.message || "Deploy target '#{target.name}' failed",
+          )
+        end
+
+        duration_ms = ((Time.instant - started).total_milliseconds * 100).round / 100
+
+        if err = error
+          return DeployResult.new(
+            name: target.name,
+            status: "error",
+            created: counts.created,
+            updated: counts.updated,
+            deleted: counts.deleted,
+            duration_ms: duration_ms,
+            error: {
+              "code"     => err.code,
+              "category" => err.category.to_s,
+              "message"  => err.message || "",
+              "hint"     => err.hint,
+            } of String => String?,
+          )
+        end
+
+        unless ok
+          return DeployResult.new(
+            name: target.name,
+            status: "error",
+            created: counts.created,
+            updated: counts.updated,
+            deleted: counts.deleted,
+            duration_ms: duration_ms,
+            error: {
+              "code"     => Hwaro::Errors::HWARO_E_NETWORK,
+              "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_NETWORK).to_s,
+              "message"  => "Deploy target '#{target.name}' failed",
+              "hint"     => nil.as(String?),
+            } of String => String?,
+          )
+        end
+
+        DeployResult.new(
+          name: target.name,
+          status: "ok",
+          created: counts.created,
+          updated: counts.updated,
+          deleted: counts.deleted,
+          duration_ms: duration_ms,
+          error: nil,
+        )
+      end
+
+      # Deploy a single target, returning both success and the collected
+      # counts so `#deploy_structured` can surface file-level stats.
+      private def deploy_target_with_counts(
+        target : Models::DeploymentTarget,
+        source_dir : String,
+        effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
+      ) : {Bool, TargetCounts}
+        Logger.action(:Deploy, "Target: #{target.name}")
+
+        if command = target.command
+          ok = deploy_via_command(target, source_dir, command, effective)
+          return {ok, TargetCounts.new}
+        end
+
+        url = target.url
+        if url.empty?
+          Logger.error "Target '#{target.name}' is missing 'url' (or 'command')."
+          return {false, TargetCounts.new}
+        end
+
+        if directory_destination = local_directory_destination(url)
+          return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective)
+        end
+
+        if auto_command = auto_command_for_url(url, source_dir)
+          Logger.debug "  Auto-generated command for #{url}"
+          ok = deploy_via_command(target, source_dir, auto_command, effective)
+          return {ok, TargetCounts.new}
+        end
+
+        Logger.error "Unsupported deploy target URL scheme for '#{target.name}': #{url}"
+        {false, TargetCounts.new}
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
@@ -281,6 +485,71 @@ module Hwaro
 
         Logger.success "Deploy command completed."
         true
+      end
+
+      # Variant of `#deploy_to_directory` that also returns per-action
+      # counts (created/updated/deleted) for JSON summary output.
+      private def deploy_to_directory_with_counts(
+        target : Models::DeploymentTarget,
+        source_dir : String,
+        dest_dir : String,
+        effective : EffectiveOptions,
+      ) : {Bool, TargetCounts}
+        counts = TargetCounts.new
+        dest_dir_expanded = File.expand_path(dest_dir)
+
+        if nested_path?(source_dir, dest_dir_expanded) || nested_path?(dest_dir_expanded, source_dir)
+          Logger.error "Refusing to deploy: source and destination overlap."
+          return {false, counts}
+        end
+
+        FileUtils.mkdir_p(dest_dir_expanded)
+
+        desired = build_desired_map(source_dir, target)
+        existing = list_existing_files(dest_dir_expanded)
+
+        return {false, counts} unless validate_strip_index_html_for_filesystem(target, desired.keys)
+        return {false, counts} unless validate_destination_paths(dest_dir_expanded, desired.keys)
+
+        to_delete = compute_deletes(existing, desired.keys, target)
+        if effective.max_deletes != -1 && to_delete.size > effective.max_deletes
+          Logger.error "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes})."
+          return {false, counts}
+        end
+
+        to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force)
+
+        if effective.dry_run
+          return {true, counts}
+        end
+
+        if effective.confirm && !confirm?("Proceed with deploy to #{dest_dir_expanded}?")
+          Logger.warn "Cancelled."
+          return {true, counts}
+        end
+
+        to_copy.each_with_index do |(dest_rel, src_path), idx|
+          Logger.progress(idx + 1, to_copy.size, "Copying ")
+          dest_path = File.join(dest_dir_expanded, dest_rel)
+          existed_before = File.exists?(dest_path)
+          FileUtils.mkdir_p(File.dirname(dest_path))
+          FileUtils.cp(src_path, dest_path)
+          if existed_before
+            counts.updated += 1
+          else
+            counts.created += 1
+          end
+        end
+
+        to_delete.each_with_index do |rel, idx|
+          Logger.progress(idx + 1, to_delete.size, "Deleting ")
+          FileUtils.rm(File.join(dest_dir_expanded, rel))
+          counts.deleted += 1
+        end
+
+        remove_empty_directories(dest_dir_expanded)
+        Logger.success "Deployed to #{dest_dir_expanded} (created #{counts.created}, updated #{counts.updated}, deleted #{counts.deleted})"
+        {true, counts}
       end
 
       private def deploy_to_directory(
