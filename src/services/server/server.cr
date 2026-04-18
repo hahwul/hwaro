@@ -296,7 +296,35 @@ module Hwaro
         server = HTTP::Server.new(handlers)
 
         address = server.bind_tcp host, port
+        emit_ready_signal(host, port)
         server.listen
+      end
+
+      # Emit a single deterministic, machine-parseable line indicating the
+      # server is bound and ready to accept connections. Scripts and agents
+      # can block on this line to know when `hwaro serve` is ready.
+      #
+      # Emitted AFTER `bind_tcp` succeeds (so the OS-level listening socket
+      # already accepts connections) and BEFORE `listen` starts the blocking
+      # accept loop. Written directly to STDOUT (no color, no log prefix) and
+      # flushed immediately so subprocess consumers see it without buffering
+      # delay.
+      #
+      # Coexists with the pretty "Serving site at …" banner logged earlier —
+      # this is an additional single line, not a replacement.
+      #
+      # See issue #360. A JSON variant will be added alongside the global
+      # `--json` flag in issue #356.
+      private def emit_ready_signal(host : String, port : Int32)
+        STDOUT.puts ready_signal_line(host, port)
+        STDOUT.flush
+      end
+
+      # Build the deterministic ready-signal line. Kept separate from
+      # `emit_ready_signal` so specs can assert on the format without
+      # capturing stdout.
+      protected def ready_signal_line(host : String, port : Int32) : String
+        "hwaro serve: ready url=http://#{host}:#{port} pid=#{Process.pid}"
       end
 
       private def sanitize_output_dir(dir : String) : String
