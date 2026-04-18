@@ -21,7 +21,7 @@ module Hwaro
             full_path = File.join("content", section, path)
             full_path += ".md" unless full_path.ends_with?(".md")
           else
-            # No path given, will prompt for title below
+            # No path given; title must be supplied via --title.
             full_path = nil
           end
 
@@ -63,16 +63,11 @@ module Hwaro
           end
         end
 
-        # Prompt for title if still empty and no file path.
-        # Only prompt when stdin is an interactive TTY — otherwise fail fast
-        # so CI/agent environments don't hang on `gets`.
+        # Require `--title` (or an explicit `<path>.md`) whenever the title
+        # cannot be inferred. The `new` command is flag-only: no interactive
+        # prompts, so behavior is predictable in TTY, CI, and agent runs.
         if !full_path && title.empty?
-          if STDIN.tty?
-            print "Enter title: "
-            title = gets.try(&.chomp) || ""
-          else
-            raise "missing --title (or <path>.md) argument\nUsage: hwaro new <path> [options]\nRun 'hwaro new --help' for details."
-          end
+          raise "missing --title (or <path>.md) argument\nUsage: hwaro new <path> [options]\nRun 'hwaro new --help' for details."
         end
 
         if !full_path

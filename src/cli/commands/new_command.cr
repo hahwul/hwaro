@@ -53,10 +53,10 @@ module Hwaro
 
           options = parse_options(args)
 
-          # Fail fast in non-TTY environments when required input would be missing.
-          # Without this, Services::Creator falls back to an interactive `gets`
-          # prompt that hangs in CI, agent runs, or `hwaro new < /dev/null`.
-          if options.path.nil? && !STDIN.tty?
+          # `hwaro new` is flag-only: there is no interactive prompt, so a
+          # missing <path> always fails fast with a clear usage error. This
+          # keeps behavior identical across TTY, CI, and agent environments.
+          if options.path.nil?
             STDERR.puts "Error: missing <path> argument"
             STDERR.puts "Usage: hwaro new <path> [options]"
             STDERR.puts "Run 'hwaro new --help' for details."
