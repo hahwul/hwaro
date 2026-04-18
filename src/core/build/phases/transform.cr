@@ -549,6 +549,7 @@ module Hwaro::Core::Build::Phases::Transform
     config = site.config.related
     taxonomy_names = config.taxonomies
     limit = config.limit
+    return if limit <= 0
     pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
 
     # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
@@ -569,8 +570,6 @@ module Hwaro::Core::Build::Phases::Transform
     end
 
     pages.each do |page|
-      next if limit <= 0
-
       # Count co-occurrences via inverted index: O(terms * avg_pages_per_term).
       # Filter by language during accumulation — cross-language candidates are
       # discarded from the final output anyway, so skipping them here produces
@@ -585,6 +584,8 @@ module Hwaro::Core::Build::Phases::Transform
           if candidates = inv_tax[term]?
             candidates.each do |other_path|
               next if other_path == page.path
+              # page_lookup[other_path] is guaranteed present: the inverted
+              # index is populated from the same `pages` iteration above.
               next unless page_lookup[other_path].language == page_lang
               scores[other_path] += 1
             end
@@ -597,7 +598,8 @@ module Hwaro::Core::Build::Phases::Transform
       # Bounded top-k selection — equivalent to `.sort_by { -s }.first(limit)`
       # but O(n*k) instead of O(n log n) with fewer allocations. Ties break by
       # scores-hash insertion order (which mirrors pages/taxonomy iteration),
-      # matching a stable descending sort.
+      # matching a stable descending sort. Optimal when limit is small
+      # (default 5); parity with sort near limit ≈ log₂(n).
       top = [] of {String, Int32}
       scores.each do |path, score|
         idx = 0
