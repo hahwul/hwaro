@@ -6,6 +6,7 @@ require "uri"
 
 require "../models/config"
 require "../utils/command_runner"
+require "../utils/errors"
 require "../utils/logger"
 
 module Hwaro
@@ -38,7 +39,7 @@ module Hwaro
       # responsible for surfacing that as a friendly message or JSON error).
       def plan(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(PlannedOp)
         ops = [] of PlannedOp
-        config ||= Models::Config.load(env: options.env)
+        config ||= load_config_or_classify(options.env)
         deployment = config.deployment
 
         source_dir = options.source_dir || deployment.source_dir
@@ -111,7 +112,7 @@ module Hwaro
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
-        config ||= Models::Config.load(env: options.env)
+        config ||= load_config_or_classify(options.env)
         deployment = config.deployment
 
         source_dir = options.source_dir || deployment.source_dir
@@ -160,6 +161,20 @@ module Hwaro
         end
 
         true
+      end
+
+      # Wrap config load errors with a classified HwaroError so the CLI
+      # surface consistently reports HWARO_E_CONFIG / exit 3 for bad
+      # `config.toml` instead of a generic exit 1.
+      private def load_config_or_classify(env : String?) : Models::Config
+        Models::Config.load(env: env)
+      rescue ex : Hwaro::HwaroError
+        raise ex
+      rescue ex
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: ex.message || "Failed to load config",
+        )
       end
 
       private class EffectiveOptions

@@ -26,6 +26,7 @@ require "toml"
 require "emoji"
 
 # Load utilities
+require "./utils/errors"
 require "./utils/logger"
 require "./utils/profiler"
 require "./utils/command_runner"

@@ -10,6 +10,7 @@ require "colorize"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_validator"
+require "../../../utils/errors"
 require "../../../utils/logger"
 
 module Hwaro
@@ -50,14 +51,19 @@ module Hwaro
             end
 
             Logger.quiet = true if json_output
+            Runner.json_mode = true if json_output
 
             validator = Services::ContentValidator.new(content_dir: content_dir)
             begin
               issues = validator.run
             rescue ex
               if json_output
-                puts({status: "error", error: {message: ex.message || "validate failed"}}.to_json)
-                exit(1)
+                err = Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_CONTENT,
+                  message: ex.message || "validate failed",
+                )
+                puts err.to_error_payload.to_json
+                exit(err.exit_code)
               else
                 raise ex
               end

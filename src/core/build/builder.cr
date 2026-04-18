@@ -41,6 +41,7 @@ require "../../content/seo/jsonld"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
+require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/profiler"
 require "../../utils/text_utils"
@@ -546,8 +547,19 @@ module Hwaro
           memory_limit : String? = nil,
           env : String? = nil,
         )
-          # Load config once and reuse throughout the build
-          config = Models::Config.load(env: env)
+          # Load config once and reuse throughout the build. Wrap config
+          # load failures with a classified HwaroError so callers (and
+          # `--json` consumers) can reliably branch on HWARO_E_CONFIG.
+          config = begin
+            Models::Config.load(env: env)
+          rescue ex : Hwaro::HwaroError
+            raise ex
+          rescue ex
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: ex.message || "Failed to load config",
+            )
+          end
           @config = config
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post

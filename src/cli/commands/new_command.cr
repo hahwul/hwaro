@@ -3,6 +3,7 @@ require "json"
 require "../metadata"
 require "../../config/options/new_options"
 require "../../services/creator"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -52,16 +53,23 @@ module Hwaro
             return
           end
 
-          options = parse_options(args)
+          options, json_output = parse_options(args)
+
+          # Signal json mode to the Runner so any HwaroError we raise is
+          # rendered as the structured payload on stdout instead of the
+          # human "Error [CODE]: …" line on stderr.
+          Runner.json_mode = true if json_output
 
           # `hwaro new` is flag-only: there is no interactive prompt, so a
-          # missing <path> always fails fast with a clear usage error. This
-          # keeps behavior identical across TTY, CI, and agent environments.
+          # missing <path> always fails fast with a classified usage error.
+          # Keeping this a HwaroError lets both text and --json consumers see
+          # the same taxonomy (code/category/exit).
           if options.path.nil?
-            STDERR.puts "Error: missing <path> argument"
-            STDERR.puts "Usage: hwaro new <path> [options]"
-            STDERR.puts "Run 'hwaro new --help' for details."
-            exit(2)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "missing <path> argument",
+              hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
+            )
           end
 
           Services::Creator.new.run(options)
@@ -104,7 +112,7 @@ module Hwaro
           results
         end
 
-        def parse_options(args : Array(String)) : Config::Options::NewOptions
+        def parse_options(args : Array(String)) : {Config::Options::NewOptions, Bool}
           path = nil.as(String?)
           title = nil.as(String?)
           archetype = nil.as(String?)
@@ -112,6 +120,7 @@ module Hwaro
           draft = nil.as(Bool?)
           tags = [] of String
           section = nil.as(String?)
+          json_output = args.includes?("--json")
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro new <path> [options]"
@@ -123,6 +132,7 @@ module Hwaro
             parser.on("--tags TAGS", "Comma-separated tags") { |t| tags = t.split(",").map(&.strip).reject(&.empty?) }
             parser.on("-s NAME", "--section NAME", "Section directory (e.g. blog, docs)") { |s| section = s }
             parser.on("-a NAME", "--archetype NAME", "Archetype to use") { |a| archetype = a }
+            parser.on("--json", "Emit machine-readable JSON output") { json_output = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
@@ -130,7 +140,7 @@ module Hwaro
             end
           end
 
-          Config::Options::NewOptions.new(
+          {Config::Options::NewOptions.new(
             path: path,
             title: title,
             archetype: archetype,
@@ -138,7 +148,7 @@ module Hwaro
             draft: draft,
             tags: tags,
             section: section,
-          )
+          ), json_output}
         end
       end
     end
