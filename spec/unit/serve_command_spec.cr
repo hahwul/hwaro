@@ -68,16 +68,22 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.port.should eq(4000)
     end
 
-    it "defaults live_reload to false" do
+    it "defaults live_reload to true" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options([] of String)
-      options.live_reload.should be_false
+      options.live_reload.should be_true
     end
 
-    it "sets live_reload to true when --live-reload is passed" do
+    it "keeps live_reload true when --live-reload is passed (backwards compat no-op)" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options(["--live-reload"])
       options.live_reload.should be_true
+    end
+
+    it "sets live_reload to false when --no-live-reload is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--no-live-reload"])
+      options.live_reload.should be_false
     end
 
     it "defaults skip_og_image to false" do
@@ -260,9 +266,22 @@ describe Hwaro::CLI::Commands::ServeCommand do
       flag_longs.should contain("--live-reload")
     end
 
+    it "has no-live-reload flag" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag_longs = meta.flags.map(&.long)
+      flag_longs.should contain("--no-live-reload")
+    end
+
     it "live-reload flag does not take a value" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata
       flag = meta.flags.find { |f| f.long == "--live-reload" }
+      flag.should_not be_nil
+      flag.not_nil!.takes_value.should be_false
+    end
+
+    it "no-live-reload flag does not take a value" do
+      meta = Hwaro::CLI::Commands::ServeCommand.metadata
+      flag = meta.flags.find { |f| f.long == "--no-live-reload" }
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_false
     end

@@ -190,14 +190,14 @@ When specified, Hwaro changes its working directory to the given path before bui
 
 ### serve
 
-Start a development server with live reload:
+Start a development server with live reload (enabled by default):
 
 ```bash
 hwaro serve
 hwaro serve --port 8080
 hwaro serve --open
 hwaro serve --access-log
-hwaro serve --live-reload
+hwaro serve --no-live-reload
 hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
@@ -218,7 +218,8 @@ hwaro serve -i /path/to/my-site -p 8080
 | -v, --verbose | Show detailed output |
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests) |
-| --live-reload | Enable browser live reload on file changes |
+| --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
+| --no-live-reload | Disable browser live reload on file changes |
 | --cache | Enable build caching (skip unchanged files) |
 | --stream | Enable streaming build to reduce memory usage |
 | --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
@@ -237,9 +238,11 @@ The server watches for file changes and rebuilds automatically. It uses **smart 
 | `static/` only | Static copy | Copies only changed static files |
 | Mixed / new / deleted files | Full rebuild | Rebuilds entire site |
 
-**About `--live-reload`:**
+**About live reload:**
 
-When enabled, the server injects a small WebSocket client script into every HTML response. After each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.
+Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.
+
+Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally). The `--live-reload` flag is kept as a no-op alias for backwards compatibility with existing invocations.
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
 
@@ -372,8 +375,8 @@ hwaro serve --drafts --verbose
 # Development with HTTP access log
 hwaro serve --access-log
 
-# Development with auto browser refresh
-hwaro serve --live-reload
+# Development without live reload (production-like serving)
+hwaro serve --no-live-reload
 
 # Production build
 hwaro build

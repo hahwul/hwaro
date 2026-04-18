@@ -17,7 +17,7 @@ describe Hwaro::Config::Options::ServeOptions do
       opts.debug.should be_false
       opts.access_log.should be_false
       opts.error_overlay.should be_true
-      opts.live_reload.should be_false
+      opts.live_reload.should be_true
       opts.profile.should be_false
       opts.cache_busting.should be_true
       opts.env.should be_nil

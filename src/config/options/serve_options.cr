@@ -37,7 +37,7 @@ module Hwaro
           @debug : Bool = false,
           @access_log : Bool = false,
           @error_overlay : Bool = true,
-          @live_reload : Bool = false,
+          @live_reload : Bool = true,
           @profile : Bool = false,
           @cache_busting : Bool = true,
           @env : String? = nil,
