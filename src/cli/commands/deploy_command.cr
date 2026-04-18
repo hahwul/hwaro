@@ -66,7 +66,12 @@ module Hwaro
             parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") { |n| max_deletes = n.to_i }
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
-            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+            CLI.register_flag(parser, HELP_FLAG) do |_|
+              Logger.info parser.to_s
+              hint = configured_targets_hint(env_name)
+              Logger.info hint unless hint.empty?
+              exit
+            end
           end
 
           targets = args.dup
@@ -95,10 +100,41 @@ module Hwaro
 
           Logger.info "Deployment targets:"
           deployment.targets.each do |t|
-            url = t.url.empty? ? "(no url)" : t.url
-            extra = t.command ? " (command)" : ""
-            Logger.info "  #{t.name.ljust(16)} #{url}#{extra}"
+            Logger.info "  #{t.name.ljust(16)} #{format_target_destination(t)}"
           end
+        end
+
+        # Builds the "Configured targets" hint appended to `--help` output.
+        # Returns an empty string when no `config.toml` is present so help stays
+        # unchanged outside of project directories. Parsing failures surface a
+        # friendly note instead of aborting `--help`.
+        def configured_targets_hint(env : String?, config_path : String = "config.toml") : String
+          return "" unless File.exists?(config_path)
+
+          begin
+            config = Models::Config.load(config_path, env: env)
+          rescue ex
+            return "\nConfigured targets: (could not read #{config_path}: #{ex.message})"
+          end
+
+          targets = config.deployment.targets
+          if targets.empty?
+            return "\nConfigured targets: (none defined in #{config_path})"
+          end
+
+          String.build do |str|
+            str << "\nConfigured targets (from " << config_path << "):\n"
+            targets.each do |t|
+              str << "  " << t.name.ljust(16) << ' ' << format_target_destination(t) << '\n'
+            end
+          end
+        end
+
+        # Render the most informative destination string for a deployment target.
+        private def format_target_destination(target : Models::DeploymentTarget) : String
+          url = target.url.empty? ? "(no url)" : target.url
+          extra = target.command ? " (command)" : ""
+          "#{url}#{extra}"
         end
       end
     end

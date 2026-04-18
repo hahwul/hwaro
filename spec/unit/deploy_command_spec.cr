@@ -64,4 +64,60 @@ describe Hwaro::CLI::Commands::DeployCommand do
       options.targets.should eq(["production"])
     end
   end
+
+  describe "#configured_targets_hint" do
+    it "returns empty string when config.toml is missing" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+      Dir.mktmpdir do |dir|
+        missing = File.join(dir, "missing.toml")
+        cmd.configured_targets_hint(nil, missing).should eq("")
+      end
+    end
+
+    it "reports no targets when config has none" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, "title = \"Empty\"\n")
+        hint = cmd.configured_targets_hint(nil, path)
+        hint.should contain("Configured targets")
+        hint.should contain("(none defined in")
+      end
+    end
+
+    it "lists configured deployment targets" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, <<-TOML)
+        title = "Demo"
+
+        [[deployment.targets]]
+        name = "production"
+        url = "s3://my-bucket"
+
+        [[deployment.targets]]
+        name = "staging"
+        url = "netlify:site-id"
+        TOML
+
+        hint = cmd.configured_targets_hint(nil, path)
+        hint.should contain("Configured targets (from")
+        hint.should contain("production")
+        hint.should contain("s3://my-bucket")
+        hint.should contain("staging")
+        hint.should contain("netlify:site-id")
+      end
+    end
+
+    it "returns a friendly note when config.toml cannot be parsed" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, "this is = = invalid toml [[\n")
+        hint = cmd.configured_targets_hint(nil, path)
+        hint.should contain("could not read")
+      end
+    end
+  end
 end
