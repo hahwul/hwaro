@@ -110,21 +110,21 @@ module Hwaro
           start = Time.instant
           begin
             builder.run(options)
-          rescue ex
-            # Only wrap exceptions we can classify with confidence; others
-            # bubble up as plain Exceptions so their message keeps the
-            # legacy `Error: <message>` text form (per taxonomy scope).
-            err = classify_build_error(ex)
+          rescue ex : Hwaro::HwaroError
+            # Classified errors (config, template, content, …) are raised at
+            # their source sites now, so we just forward the payload / rethrow.
             if json_output
-              payload = if err
-                          err.to_error_payload
-                        else
-                          {"status" => "error", "error" => {"message" => ex.message || "build failed"}}
-                        end
-              puts payload.to_json
-              exit(err ? err.exit_code : 1)
-            elsif err
-              raise err
+              puts ex.to_error_payload.to_json
+              exit(ex.exit_code)
+            else
+              raise ex
+            end
+          rescue ex
+            # Unclassified failures keep the legacy `Error: <message>` text
+            # form and exit 1. JSON mode still emits a minimal error envelope.
+            if json_output
+              puts({"status" => "error", "error" => {"message" => ex.message || "build failed"}}.to_json)
+              exit(1)
             else
               raise ex
             end
@@ -147,32 +147,6 @@ module Hwaro
             }
             puts payload.to_json
           end
-        end
-
-        # Best-effort classification of build-time exceptions onto the
-        # taxonomy. Returns `nil` when we can't classify with confidence —
-        # the caller then rethrows the original exception so behavior stays
-        # backwards-compatible (generic `Error: <message>`, exit 1).
-        #
-        # Template and content errors are now raised as `HwaroError`
-        # directly from their rescue sites (see
-        # `src/content/processors/template.cr`,
-        # `src/core/build/phases/render.cr`, and
-        # `src/content/processors/markdown.cr`), so this method only keeps
-        # the string-match fallback for config-load paths that still raise
-        # plain exceptions. That branch will be retired once config loading
-        # surfaces HwaroError directly.
-        private def classify_build_error(ex : Exception) : Hwaro::HwaroError?
-          return ex if ex.is_a?(Hwaro::HwaroError)
-          msg = ex.message || "build failed"
-          lower = msg.downcase
-          code = if lower.includes?("config.toml") || lower.includes?("config file") ||
-                    lower.includes?("failed to load config") || lower.includes?("invalid config")
-                   Hwaro::Errors::HWARO_E_CONFIG
-                 else
-                   return nil
-                 end
-          Hwaro::HwaroError.new(code: code, message: msg)
         end
 
         def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?, Bool }

@@ -11,6 +11,54 @@ private def load_config(toml : String) : Hwaro::Models::Config
 end
 
 describe Hwaro::Models::Config do
+  # ---------------------------------------------------------------------------
+  # Classified error surface: Models::Config.load raises HwaroError directly
+  # so callers don't have to substring-match plain exceptions. See
+  # src/models/config.cr and src/utils/errors.cr.
+  # ---------------------------------------------------------------------------
+
+  describe ".load classified errors" do
+    it "raises HwaroError(HWARO_E_CONFIG) when the file is missing" do
+      Dir.mktmpdir do |dir|
+        missing_path = File.join(dir, "config.toml")
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Models::Config.load(missing_path)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        err.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+        (err.message || "").should contain(missing_path)
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) for malformed TOML" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, "this = = broken\n")
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Models::Config.load(path)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        err.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+        (err.message || "").should contain(path)
+        (err.message || "").downcase.should contain("invalid toml")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) when an env override file has malformed TOML" do
+      Dir.mktmpdir do |dir|
+        base_path = File.join(dir, "config.toml")
+        env_path = File.join(dir, "config.production.toml")
+        File.write(base_path, %(title = "Base"))
+        File.write(env_path, "this = = broken\n")
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Models::Config.load(base_path, env: "production")
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain(env_path)
+      end
+    end
+  end
+
   describe "#initialize" do
     it "has default values" do
       config = Hwaro::Models::Config.new

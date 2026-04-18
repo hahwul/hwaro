@@ -15,6 +15,10 @@ module Hwaro::Core::Build
     it "loads data and aggregates authors" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
+          # Minimal config.toml — Models::Config.load now raises
+          # HwaroError(HWARO_E_CONFIG) when the file is missing.
+          File.write("config.toml", %(title = "Test"))
+
           # Create data directory
           FileUtils.mkdir_p("data")
           File.write("data/authors.yml", <<-YAML

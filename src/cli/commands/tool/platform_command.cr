@@ -83,11 +83,12 @@ module Hwaro
               exit(1)
             end
 
-            unless File.exists?("config.toml")
-              Logger.warn "config.toml not found. Running outside a Hwaro project directory?"
-            end
-
-            config = Models::Config.load
+            config = if File.exists?("config.toml")
+                       Models::Config.load
+                     else
+                       Logger.warn "config.toml not found. Running outside a Hwaro project directory?"
+                       Models::Config.new
+                     end
             generator = Services::PlatformConfig.new(config)
             content = generator.generate(platform_name)
             filename = if op = output_path

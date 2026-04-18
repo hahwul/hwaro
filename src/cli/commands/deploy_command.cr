@@ -61,10 +61,15 @@ module Hwaro
             begin
               ops = Services::Deployer.new.plan(options)
               STDOUT.puts ops.to_json
+            rescue ex : Hwaro::HwaroError
+              STDOUT.puts ex.to_error_payload.to_json
+              exit(ex.exit_code)
             rescue ex
-              err = classify_deploy_error(ex, fallback_message: "deploy plan failed")
-              STDOUT.puts err.to_error_payload.to_json
-              exit(err.exit_code)
+              # Any plain exception that reaches us here is no longer a
+              # config-load error (Models::Config.load raises HwaroError
+              # directly) — keep the legacy minimal envelope and exit 1.
+              STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy plan failed"}}.to_json)
+              exit(1)
             end
             return
           end
@@ -75,14 +80,16 @@ module Hwaro
             #   {"status": "ok"|"error",
             #    "targets": [{"name","status","created","updated",
             #                 "deleted","duration_ms","error"?}]}
-            # Config-load errors bubble up here and become a top-level
-            # error payload (shape unchanged from #356).
+            # Config-load errors bubble up here as HwaroError and become a
+            # top-level error payload (shape unchanged from #356).
             results = begin
               Services::Deployer.new.deploy_structured(options)
+            rescue ex : Hwaro::HwaroError
+              STDOUT.puts ex.to_error_payload.to_json
+              exit(ex.exit_code)
             rescue ex
-              err = classify_deploy_error(ex, fallback_message: "deploy failed")
-              STDOUT.puts err.to_error_payload.to_json
-              exit(err.exit_code)
+              STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy failed"}}.to_json)
+              exit(1)
             end
 
             overall = results.all? { |r| r.status == "ok" } ? "ok" : "error"
@@ -112,26 +119,6 @@ module Hwaro
             end
           end
           worst
-        end
-
-        # Map deploy-time exceptions onto the taxonomy. Config-related errors
-        # get HWARO_E_CONFIG; anything else that bubbles up from the deployer
-        # is treated as HWARO_E_NETWORK since it almost always originates in
-        # an upload/remote step.
-        private def classify_deploy_error(ex : Exception, fallback_message : String) : Hwaro::HwaroError
-          return ex if ex.is_a?(Hwaro::HwaroError)
-          msg = ex.message || fallback_message
-          if config_error_message?(msg)
-            Hwaro::HwaroError.new(code: Hwaro::Errors::HWARO_E_CONFIG, message: msg)
-          else
-            Hwaro::HwaroError.new(code: Hwaro::Errors::HWARO_E_NETWORK, message: msg)
-          end
-        end
-
-        private def config_error_message?(msg : String) : Bool
-          lower = msg.downcase
-          lower.includes?("config.toml") || lower.includes?("config file") ||
-            lower.includes?("failed to load config") || lower.includes?("invalid config")
         end
 
         def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool, Bool}
@@ -183,17 +170,13 @@ module Hwaro
         private def print_targets(env : String? = nil, json : Bool = false)
           config = begin
             Models::Config.load(env: env)
-          rescue ex
-            err = Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: ex.message || "Failed to load config",
-            )
+          rescue ex : Hwaro::HwaroError
             if json
-              STDOUT.puts err.to_error_payload.to_json
+              STDOUT.puts ex.to_error_payload.to_json
             else
-              Logger.error "Error [#{err.code}]: #{err.message}"
+              Logger.error "Error [#{ex.code}]: #{ex.message}"
             end
-            exit(err.exit_code)
+            exit(ex.exit_code)
           end
 
           deployment = config.deployment
