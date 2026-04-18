@@ -309,6 +309,132 @@ describe Hwaro::Logger do
     end
   end
 
+  describe ".color_enabled?" do
+    it "returns false when NO_COLOR env var is set to a non-empty value" do
+      original_override = Hwaro::Logger.color_enabled? # snapshot pre-change
+      Hwaro::Logger.color_enabled = nil                # restore auto-detect
+      original = ENV["NO_COLOR"]?
+      ENV["NO_COLOR"] = "1"
+      Hwaro::Logger.color_enabled?.should be_false
+      if orig = original
+        ENV["NO_COLOR"] = orig
+      else
+        ENV.delete("NO_COLOR")
+      end
+      # Restore previous explicit state (tests tail each other).
+      Hwaro::Logger.color_enabled = original_override
+    end
+
+    it "returns false when NO_COLOR is set but empty (auto-detect fallback)" do
+      # Per spec https://no-color.org, NO_COLOR only disables color when
+      # non-empty. With an empty value we fall through to the TTY check.
+      original_override = Hwaro::Logger.color_enabled?
+      Hwaro::Logger.color_enabled = nil
+      original = ENV["NO_COLOR"]?
+      ENV["NO_COLOR"] = ""
+      # In test runs STDOUT is usually not a TTY, so this is still false.
+      Hwaro::Logger.color_enabled?.should eq(STDOUT.tty?)
+      if orig = original
+        ENV["NO_COLOR"] = orig
+      else
+        ENV.delete("NO_COLOR")
+      end
+      Hwaro::Logger.color_enabled = original_override
+    end
+
+    it "honors explicit override via color_enabled=" do
+      original = ENV["NO_COLOR"]?
+      ENV["NO_COLOR"] = "1"
+      Hwaro::Logger.color_enabled = true
+      Hwaro::Logger.color_enabled?.should be_true
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.color_enabled?.should be_false
+      # Restore auto-detect
+      Hwaro::Logger.color_enabled = nil
+      if orig = original
+        ENV["NO_COLOR"] = orig
+      else
+        ENV.delete("NO_COLOR")
+      end
+    end
+
+    it "suppresses ANSI escape sequences in emitted output when disabled" do
+      Hwaro::Logger.color_enabled = false
+      output = capture_logger_output { Hwaro::Logger.success("done") }
+      output.should contain("done")
+      output.should_not contain("\e[")
+      output = capture_logger_output { Hwaro::Logger.error("boom") }
+      output.should contain("boom")
+      output.should_not contain("\e[")
+      output = capture_logger_output { Hwaro::Logger.warn("careful") }
+      output.should contain("careful")
+      output.should_not contain("\e[")
+      output = capture_logger_output { Hwaro::Logger.action("Creating", "file") }
+      output.should contain("Creating")
+      output.should contain("file")
+      output.should_not contain("\e[")
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "emits ANSI escape sequences when enabled (and the colorize lib is active)" do
+      # The `colorize` shard strips ANSI when writing to non-TTY targets, so
+      # we explicitly re-enable it for this assertion and restore afterwards.
+      original = Colorize.enabled?
+      Colorize.enabled = true
+      Hwaro::Logger.color_enabled = true
+      output = capture_logger_output { Hwaro::Logger.success("done") }
+      output.should contain("\e[")
+      Hwaro::Logger.color_enabled = nil
+      Colorize.enabled = original
+    end
+  end
+
+  describe ".quiet=" do
+    it "suppresses info output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.info("should be silent") }
+      output.should_not contain("should be silent")
+      Hwaro::Logger.quiet = false
+    end
+
+    it "suppresses success output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.success("hidden success") }
+      output.should_not contain("hidden success")
+      Hwaro::Logger.quiet = false
+    end
+
+    it "suppresses action output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.action("Creating", "file.md") }
+      output.should_not contain("Creating")
+      output.should_not contain("file.md")
+      Hwaro::Logger.quiet = false
+    end
+
+    it "suppresses progress output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.progress(5, 10, "Building: ") }
+      output.should_not contain("Building:")
+      output.should_not contain("50.0%")
+      Hwaro::Logger.quiet = false
+    end
+
+    it "still emits warn output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.warn("important warning") }
+      output.should contain("important warning")
+      Hwaro::Logger.quiet = false
+    end
+
+    it "still emits error output" do
+      Hwaro::Logger.quiet = true
+      output = capture_logger_output { Hwaro::Logger.error("fatal thing") }
+      output.should contain("fatal thing")
+      Hwaro::Logger.quiet = false
+    end
+  end
+
   describe "Level enum" do
     it "has Debug as lowest level" do
       (Hwaro::Logger::Level::Debug < Hwaro::Logger::Level::Info).should be_true

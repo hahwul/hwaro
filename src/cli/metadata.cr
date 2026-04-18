@@ -43,6 +43,7 @@ module Hwaro
 
     # Global flags - shared across multiple commands
     VERBOSE_FLAG               = FlagInfo.new(short: "-v", long: "--verbose", description: "Show detailed output")
+    QUIET_FLAG                 = FlagInfo.new(short: "-q", long: "--quiet", description: "Suppress info output and banner (errors still shown on stderr)")
     DEBUG_FLAG                 = FlagInfo.new(short: nil, long: "--debug", description: "Print debug information")
     ENV_FLAG                   = FlagInfo.new(short: "-e", long: "--env", description: "Environment name (loads config.<env>.toml override)", takes_value: true, value_hint: "ENV")
     PROFILE_FLAG               = FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile")

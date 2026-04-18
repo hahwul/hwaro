@@ -46,6 +46,7 @@ module Hwaro
         POSITIONAL_CHOICES = [] of String
 
         FLAGS = [
+          QUIET_FLAG,
           HELP_FLAG,
         ]
 

@@ -22,6 +22,7 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing config sections)"),
             FlagInfo.new(short: nil, long: "--minimal", description: "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)"),
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -74,6 +75,7 @@ module Hwaro
               parser.on("--fix", "Auto-fix issues (add missing config sections)") { fix_mode = true }
               parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
@@ -192,10 +194,10 @@ module Hwaro
           end
 
           # Returns true when we should suppress color + Unicode glyphs
-          # (non-TTY stdout OR NO_COLOR env var set).
+          # Delegates to `Logger.color_enabled?` so NO_COLOR / non-TTY / explicit
+          # overrides are all honored consistently across the CLI.
           private def plain_output? : Bool
-            return true if ENV.has_key?("NO_COLOR") && !ENV["NO_COLOR"].empty?
-            !STDOUT.tty?
+            !Logger.color_enabled?
           end
 
           private def status_glyph(level : Symbol?, plain : Bool) : String

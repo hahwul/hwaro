@@ -7,6 +7,30 @@ toc = true
 
 Hwaro provides commands for creating, building, and serving your site.
 
+## Global flags
+
+These flags work with every top-level command and control how the CLI
+writes to the terminal. They are especially useful for scripts, CI logs,
+and AI agents that want clean output.
+
+| Flag / Env var | Description |
+|----------------|-------------|
+| `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. |
+| `NO_COLOR` (env) | When set to any non-empty value, suppresses ANSI color codes from every command's output. Follows the [no-color.org](https://no-color.org) cross-tool convention. |
+
+Colors are also disabled automatically when stdout is not a TTY (for
+example when piping to `cat`, redirecting to a file, or running inside
+most CI systems). Set `NO_COLOR=1` to force-disable color everywhere;
+no extra flag is needed.
+
+```bash
+# Silent build for scripts and CI — only warnings/errors surface.
+hwaro build --quiet
+
+# Plain ASCII (no ANSI escapes) even when stdout is a TTY.
+NO_COLOR=1 hwaro doctor
+```
+
 ## Commands
 
 ### init

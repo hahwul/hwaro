@@ -36,6 +36,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
 
           # Debug & output
+          QUIET_FLAG,
           HELP_FLAG,
         ]
 
@@ -148,6 +149,7 @@ module Hwaro
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
 
             # Debug & output
+            CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             parser.on("-h", "--help", "Show this help") do
               Logger.info parser.to_s
               Logger.info ""

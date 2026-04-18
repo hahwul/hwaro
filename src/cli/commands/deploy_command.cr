@@ -26,6 +26,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
           FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-targets)"),
           ENV_FLAG,
+          QUIET_FLAG,
           HELP_FLAG,
         ]
 
@@ -70,6 +71,7 @@ module Hwaro
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
             parser.on("--json", "Emit machine-readable JSON output (with --list-targets)") { json_output = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
+            CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) do |_|
               Logger.info parser.to_s
               hint = configured_targets_hint(env_name)

@@ -50,6 +50,34 @@ describe Hwaro::CLI::Runner do
     end
   end
 
+  describe ".apply_global_quiet!" do
+    it "strips --quiet and sets Logger.quiet = true" do
+      argv = ["--quiet", "build", "--verbose"]
+      Hwaro::Logger.quiet = false
+      Hwaro::CLI::Runner.apply_global_quiet!(argv)
+      argv.should eq(["build", "--verbose"])
+      Hwaro::Logger.quiet?.should be_true
+      Hwaro::Logger.quiet = false
+    end
+
+    it "strips -q short form" do
+      argv = ["build", "-q", "--verbose"]
+      Hwaro::Logger.quiet = false
+      Hwaro::CLI::Runner.apply_global_quiet!(argv)
+      argv.should eq(["build", "--verbose"])
+      Hwaro::Logger.quiet?.should be_true
+      Hwaro::Logger.quiet = false
+    end
+
+    it "is a no-op when neither flag is present" do
+      argv = ["build", "--verbose"]
+      Hwaro::Logger.quiet = false
+      Hwaro::CLI::Runner.apply_global_quiet!(argv)
+      argv.should eq(["build", "--verbose"])
+      Hwaro::Logger.quiet?.should be_false
+    end
+  end
+
   describe ".print_help" do
     it "writes a Commands header followed by command names to Logger.io" do
       previous_io = Hwaro::Logger.io
@@ -87,6 +115,24 @@ describe Hwaro::CLI::Runner do
         Hwaro::CLI::Runner.print_help
         sink.to_s.should contain("v#{Hwaro::VERSION}")
       ensure
+        Hwaro::Logger.io = previous_io
+        Hwaro::Logger.level = previous_level
+      end
+    end
+
+    it "is silent when Logger.quiet? is true" do
+      previous_io = Hwaro::Logger.io
+      previous_level = Hwaro::Logger.level
+      sink = IO::Memory.new
+      Hwaro::Logger.io = sink
+      Hwaro::Logger.level = Hwaro::Logger::Level::Info
+      Hwaro::Logger.quiet = true
+
+      begin
+        Hwaro::CLI::Runner.print_help
+        sink.to_s.should eq("")
+      ensure
+        Hwaro::Logger.quiet = false
         Hwaro::Logger.io = previous_io
         Hwaro::Logger.level = previous_level
       end
