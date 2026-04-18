@@ -153,6 +153,15 @@ module Hwaro
         # taxonomy. Returns `nil` when we can't classify with confidence —
         # the caller then rethrows the original exception so behavior stays
         # backwards-compatible (generic `Error: <message>`, exit 1).
+        #
+        # Template and content errors are now raised as `HwaroError`
+        # directly from their rescue sites (see
+        # `src/content/processors/template.cr`,
+        # `src/core/build/phases/render.cr`, and
+        # `src/content/processors/markdown.cr`), so this method only keeps
+        # the string-match fallback for config-load paths that still raise
+        # plain exceptions. That branch will be retired once config loading
+        # surfaces HwaroError directly.
         private def classify_build_error(ex : Exception) : Hwaro::HwaroError?
           return ex if ex.is_a?(Hwaro::HwaroError)
           msg = ex.message || "build failed"
@@ -160,8 +169,6 @@ module Hwaro
           code = if lower.includes?("config.toml") || lower.includes?("config file") ||
                     lower.includes?("failed to load config") || lower.includes?("invalid config")
                    Hwaro::Errors::HWARO_E_CONFIG
-                 elsif ex.class.name.includes?("Crinja")
-                   Hwaro::Errors::HWARO_E_TEMPLATE
                  else
                    return nil
                  end

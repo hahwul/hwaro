@@ -16,6 +16,7 @@ require "csv"
 require "crinja"
 require "./filters/*"
 require "../../utils/crinja_utils"
+require "../../utils/errors"
 
 module Hwaro
   module Content
@@ -171,24 +172,44 @@ module Hwaro
         def render(template_string : String, context : TemplateContext) : String
           template = @env.from_string(template_string)
           template.render(context.to_crinja_vars)
+        rescue ex : Crinja::Error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_TEMPLATE,
+            message: "Template error: #{ex.message}",
+          )
         end
 
         # Render a template string with raw hash
         def render(template_string : String, variables : Hash(String, Crinja::Value)) : String
           template = @env.from_string(template_string)
           template.render(variables)
+        rescue ex : Crinja::Error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_TEMPLATE,
+            message: "Template error: #{ex.message}",
+          )
         end
 
         # Load and render a template by name
         def render_template(template_name : String, context : TemplateContext) : String
           template = @env.get_template(template_name)
           template.render(context.to_crinja_vars)
+        rescue ex : Crinja::Error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_TEMPLATE,
+            message: "Template error in '#{template_name}': #{ex.message}",
+          )
         end
 
         # Load and render a template by name with raw hash
         def render_template(template_name : String, variables : Hash(String, Crinja::Value)) : String
           template = @env.get_template(template_name)
           template.render(variables)
+        rescue ex : Crinja::Error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_TEMPLATE,
+            message: "Template error in '#{template_name}': #{ex.message}",
+          )
         end
 
         # Register custom filters specific to Hwaro

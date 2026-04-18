@@ -956,7 +956,7 @@ describe Hwaro::Content::Processors::Markdown do
   # Malformed front matter recovery
   # ---------------------------------------------------------------------------
   describe "malformed front matter" do
-    it "recovers from invalid TOML and returns defaults" do
+    it "raises HWARO_E_CONTENT for invalid TOML when a file path is given" do
       raw = <<-MD
       +++
       title = "Valid"
@@ -965,12 +965,15 @@ describe Hwaro::Content::Processors::Markdown do
       Body content
       MD
 
-      result = processor.parse(raw, "test.md")
-      # Should not crash; falls back to defaults for fields it can't parse
-      result[:content].should contain("Body content")
+      err = expect_raises(Hwaro::HwaroError) do
+        processor.parse(raw, "test.md")
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      err.exit_code.should eq(5)
+      (err.message || "").should contain("test.md")
     end
 
-    it "recovers from invalid YAML and returns defaults" do
+    it "raises HWARO_E_CONTENT for invalid YAML when a file path is given" do
       raw = <<-MD
       ---
       title: Valid
@@ -979,8 +982,34 @@ describe Hwaro::Content::Processors::Markdown do
       Body content
       MD
 
-      result = processor.parse(raw, "test.md")
-      # Should not crash; falls back to defaults
+      err = expect_raises(Hwaro::HwaroError) do
+        processor.parse(raw, "test.md")
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      err.exit_code.should eq(5)
+      (err.message || "").should contain("test.md")
+    end
+
+    it "falls back to defaults when no file path is given (library use)" do
+      raw_toml = <<-MD
+      +++
+      title = "Valid"
+      invalid_syntax :::
+      +++
+      Body content
+      MD
+      result = processor.parse(raw_toml)
+      # Library-style invocation preserves the previous graceful behaviour
+      result[:content].should contain("Body content")
+
+      raw_yaml = <<-MD
+      ---
+      title: Valid
+      invalid: [unterminated
+      ---
+      Body content
+      MD
+      result = processor.parse(raw_yaml)
       result[:content].should contain("Body content")
     end
 

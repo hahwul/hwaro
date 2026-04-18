@@ -2,10 +2,12 @@ require "../spec_helper"
 
 describe Hwaro::Services::ContentValidator do
   describe "#run" do
-    it "returns empty array when content directory does not exist" do
+    it "raises HwaroError(HWARO_E_CONTENT) when content directory does not exist" do
       validator = Hwaro::Services::ContentValidator.new("/nonexistent/path/content")
-      result = validator.run
-      result.should eq([] of Hwaro::Services::Issue)
+      err = expect_raises(Hwaro::HwaroError) { validator.run }
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      err.exit_code.should eq(5)
+      (err.message || "").should contain("/nonexistent/path/content")
     end
 
     it "returns no issues for well-formed content" do

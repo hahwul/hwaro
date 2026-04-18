@@ -82,6 +82,10 @@ module Hwaro
                 Logger.error "  ✖ Build aborted by hook: #{hook.name}"
                 return result
               end
+            rescue ex : Hwaro::HwaroError
+              # Classified errors propagate unchanged so the CLI can surface
+              # them with their documented exit code / JSON payload.
+              raise ex
             rescue ex
               Logger.error "  Hook '#{hook.name}' failed at #{point}: #{ex.message}"
               Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
@@ -105,6 +109,10 @@ module Hwaro
           # Phase action
           begin
             yield
+          rescue ex : Hwaro::HwaroError
+            # Classified phase-action errors propagate to the CLI so exit
+            # code + JSON payload stay stable; don't downgrade to Abort.
+            raise ex
           rescue ex
             Logger.error "Phase #{phase} failed: #{ex.message}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"

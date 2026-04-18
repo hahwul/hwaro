@@ -14,6 +14,7 @@ require "./base"
 require "./syntax_highlighter"
 require "./markdown_extensions"
 require "../../models/toc"
+require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/text_utils"
 
@@ -238,7 +239,23 @@ module Hwaro
 
         # Extract front matter fields from TOML content
         private def extract_from_toml(raw : String, file_path : String)
-          toml_fm = TOML.parse(raw)
+          toml_fm = begin
+            TOML.parse(raw)
+          rescue ex
+            # Top-level frontmatter parse failure — surface as HWARO_E_CONTENT
+            # so `hwaro build --json` emits a structured error with exit 5.
+            # When called without a file_path (library use), preserve the
+            # previous graceful-nil behaviour.
+            if file_path.empty?
+              Logger.warn "Invalid TOML: #{ex.message}"
+              return nil
+            end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "Invalid TOML frontmatter in #{file_path}: #{ex.message}",
+              hint: "Check TOML frontmatter between `+++` fences",
+            )
+          end
 
           date = parse_toml_time(toml_fm["date"]?)
           updated = parse_toml_time(toml_fm["updated"]?)
@@ -260,6 +277,8 @@ module Hwaro
 
           result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
+        rescue ex : Hwaro::HwaroError
+          raise ex
         rescue ex
           Logger.warn "Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil
@@ -267,7 +286,23 @@ module Hwaro
 
         # Extract front matter fields from YAML content
         private def extract_from_yaml(raw : String, file_path : String)
-          yaml_fm = YAML.parse(raw)
+          yaml_fm = begin
+            YAML.parse(raw)
+          rescue ex
+            # Top-level frontmatter parse failure — surface as HWARO_E_CONTENT
+            # so `hwaro build --json` emits a structured error with exit 5.
+            # When called without a file_path (library use), preserve the
+            # previous graceful-nil behaviour.
+            if file_path.empty?
+              Logger.warn "Invalid YAML: #{ex.message}"
+              return nil
+            end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "Invalid YAML frontmatter in #{file_path}: #{ex.message}",
+              hint: "Check YAML frontmatter between `---` fences",
+            )
+          end
           return nil unless yaml_fm.as_h?
 
           date = parse_time(yaml_fm["date"]?.try(&.as_s?))
@@ -294,6 +329,8 @@ module Hwaro
 
           result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
+        rescue ex : Hwaro::HwaroError
+          raise ex
         rescue ex
           Logger.warn "Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
           nil

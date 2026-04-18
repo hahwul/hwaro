@@ -883,4 +883,37 @@ describe Hwaro::Content::Processors::Template do
       result.should eq("© #{Time.local.year} My Site")
     end
   end
+
+  describe "error classification" do
+    it "raises HwaroError(HWARO_E_TEMPLATE) for a broken template string" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/about/"
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      # Unclosed `{{` — Crinja raises a parse error which the engine
+      # wraps as HwaroError(HWARO_E_TEMPLATE).
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Content::Processors::Template.process("{{ unclosed", context)
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+      err.category.should eq(:template)
+      err.exit_code.should eq(4)
+      (err.message || "").should contain("Template error")
+    end
+
+    it "raises HwaroError(HWARO_E_TEMPLATE) for an unclosed block tag" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Content::Processors::Template.process("{% if true %}oops", context)
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+      err.exit_code.should eq(4)
+    end
+  end
 end
