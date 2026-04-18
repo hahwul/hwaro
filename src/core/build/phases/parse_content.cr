@@ -186,6 +186,11 @@ module Hwaro::Core::Build::Phases::ParseContent
     pages.each do |page|
       begin
         parse_single_page(page)
+      rescue ex : Hwaro::HwaroError
+        # Classified frontmatter errors (HWARO_E_CONTENT) must abort the
+        # build so scripts and CI see a stable exit code, rather than
+        # silently skipping the offending page.
+        raise ex
       rescue ex
         page.parse_failed = true
         Logger.warn "Failed to parse #{page.path}: #{ex.message}"
@@ -209,12 +214,22 @@ module Hwaro::Core::Build::Phases::ParseContent
     pages.each { |page| work_queue.send(page) }
     work_queue.close
 
+    # Track the first classified frontmatter error seen by any worker so
+    # the build can abort deterministically after draining the queue.
+    classified_error : Hwaro::HwaroError? = nil
+    error_mutex = Mutex.new
+
     # Spawn workers
     worker_count.times do
       spawn do
         while page = work_queue.receive?
           begin
             parse_single_page(page)
+          rescue ex : Hwaro::HwaroError
+            error_mutex.synchronize do
+              classified_error ||= ex
+            end
+            page.parse_failed = true
           rescue ex
             page.parse_failed = true
             Logger.warn "Failed to parse #{page.path}: #{ex.message}"
@@ -226,6 +241,13 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Wait for all pages to finish
     pages.size.times { done.receive }
+
+    # Surface the first classified frontmatter error now that all workers
+    # have drained. We prefer this over re-raising inside the worker fiber
+    # so the build aborts predictably after the parallel phase completes.
+    if err = classified_error
+      raise err
+    end
   end
 
   private def calculate_page_url(page : Models::Page)

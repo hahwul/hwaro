@@ -8,6 +8,7 @@ require "json"
 require "yaml"
 require "toml"
 require "./doctor"
+require "../utils/errors"
 require "../utils/logger"
 
 module Hwaro
@@ -24,9 +25,19 @@ module Hwaro
       end
 
       def run : Array(Issue)
-        issues = [] of Issue
-        return issues unless Dir.exists?(@content_dir)
+        # Inability to validate at all (e.g. the content directory does
+        # not exist) is classified as HWARO_E_CONTENT — the validator
+        # cannot produce findings, so the caller needs a distinct failure
+        # signal rather than an empty "looks good" result.
+        unless Dir.exists?(@content_dir)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "Content directory '#{@content_dir}' does not exist",
+            hint: "Create it or pass --content-dir DIR to point at your content root.",
+          )
+        end
 
+        issues = [] of Issue
         find_content_files.each do |file_path|
           validate_file(file_path, issues)
         end

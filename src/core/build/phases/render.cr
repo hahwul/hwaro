@@ -154,6 +154,11 @@ module Hwaro::Core::Build::Phases::Render
     pages.each_with_index { |page, idx| work_queue.send({page, idx}) }
     work_queue.close
 
+    # Track the first classified error seen by any worker so the build
+    # can abort deterministically after draining the result channel.
+    classified_error : Hwaro::HwaroError? = nil
+    error_mutex = Mutex.new
+
     # Spawn workers, each with its own Crinja env and template cache
     worker_count.times do |worker_id|
       env = worker_envs[worker_id]
@@ -174,6 +179,12 @@ module Hwaro::Core::Build::Phases::Render
             output_path = get_output_path(page, output_dir)
             cache.update(source_path, output_path)
             results.send(true)
+          rescue ex : Hwaro::HwaroError
+            error_mutex.synchronize do
+              classified_error ||= ex
+            end
+            Logger.error "Parallel render failed for #{page.path}: #{ex.message}"
+            results.send(false)
           rescue ex
             Logger.error "Parallel render failed for #{page.path}: #{ex.message}"
             Logger.debug "  Template: #{determine_template(page, templates)}, Section: #{page.section}"
@@ -189,6 +200,14 @@ module Hwaro::Core::Build::Phases::Render
     pages.size.times do
       count += 1 if results.receive
     end
+
+    # Surface the first classified error now that all workers have drained
+    # so the CLI sees the documented exit code / JSON payload instead of
+    # a silent `status=ok, pages_generated=0`.
+    if err = classified_error
+      raise err
+    end
+
     count
   end
 
@@ -565,16 +584,15 @@ module Hwaro::Core::Build::Phases::Render
                           compiled
                         end
       crinja_template.render(vars)
-    rescue ex : Crinja::TemplateNotFoundError
-      msg = "Template error for #{page.path}: #{ex.message}"
-      Logger.warn "#{msg}"
-      page.build_warnings << msg unless page.build_warnings.includes?(msg)
-      content
     rescue ex : Crinja::Error
-      msg = "Template error for #{page.path}: #{ex.message}"
-      Logger.warn "#{msg}"
-      page.build_warnings << msg unless page.build_warnings.includes?(msg)
-      content
+      # Classify as a template error so `hwaro build --json` surfaces a
+      # stable HWARO_E_TEMPLATE code (exit 4). Previously these errors
+      # were downgraded to build warnings, which hid misconfigured
+      # templates from scripts and CI.
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_TEMPLATE,
+        message: "Template error for #{page.path}: #{ex.message}",
+      )
     end
   end
 
