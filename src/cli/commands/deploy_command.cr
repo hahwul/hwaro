@@ -1,4 +1,5 @@
 require "option_parser"
+require "json"
 require "../metadata"
 require "../../config/options/deploy_options"
 require "../../models/config"
@@ -23,6 +24,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
           FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
           FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
+          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-targets)"),
           ENV_FLAG,
           HELP_FLAG,
         ]
@@ -38,9 +40,9 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          options, list_targets = parse_options(args)
+          options, list_targets, json_output = parse_options(args)
           if list_targets
-            print_targets(options.env)
+            print_targets(options.env, json: json_output)
             return
           end
 
@@ -48,13 +50,14 @@ module Hwaro
           exit(1) unless ok
         end
 
-        def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool}
+        def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool, Bool}
           source_dir = nil.as(String?)
           dry_run = nil.as(Bool?)
           confirm = nil.as(Bool?)
           force = nil.as(Bool?)
           max_deletes = nil.as(Int32?)
           list_targets = false
+          json_output = false
           env_name = ENV["HWARO_ENV"]? || nil
 
           OptionParser.parse(args) do |parser|
@@ -65,6 +68,7 @@ module Hwaro
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
             parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") { |n| max_deletes = n.to_i }
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
+            parser.on("--json", "Emit machine-readable JSON output (with --list-targets)") { json_output = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
             CLI.register_flag(parser, HELP_FLAG) do |_|
               Logger.info parser.to_s
@@ -87,12 +91,36 @@ module Hwaro
               env: env_name,
             ),
             list_targets,
+            json_output,
           }
         end
 
-        private def print_targets(env : String? = nil)
-          config = Models::Config.load(env: env)
+        private def print_targets(env : String? = nil, json : Bool = false)
+          config = begin
+            Models::Config.load(env: env)
+          rescue ex
+            if json
+              STDOUT.puts({error: {message: ex.message || "Failed to load config"}}.to_json)
+            else
+              Logger.error(ex.message || "Failed to load config")
+            end
+            exit(1)
+          end
+
           deployment = config.deployment
+
+          if json
+            mapped = deployment.targets.map do |t|
+              {
+                name:    t.name,
+                url:     t.url,
+                command: t.command,
+              }
+            end
+            STDOUT.puts mapped.to_json
+            return
+          end
+
           if deployment.targets.empty?
             Logger.info "No deployment targets configured."
             return

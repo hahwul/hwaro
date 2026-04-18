@@ -1,7 +1,9 @@
 require "option_parser"
+require "json"
 require "../metadata"
 require "../../config/options/init_options"
 require "../../services/initializer"
+require "../../services/scaffolds/registry"
 require "../../services/scaffolds/remote"
 require "../../utils/logger"
 
@@ -29,6 +31,10 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--skip-sample-content", description: "Skip creating sample content files"),
           FlagInfo.new(short: nil, long: "--skip-taxonomies", description: "Skip taxonomies configuration and templates"),
 
+          # Introspection
+          FlagInfo.new(short: nil, long: "--list-scaffolds", description: "List available built-in scaffolds and exit"),
+          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
+
           # Debug & output
           HELP_FLAG,
         ]
@@ -44,8 +50,36 @@ module Hwaro
         end
 
         def run(args : Array(String))
+          # Handle introspection flags before full option parsing so users can
+          # list scaffolds without supplying any other arguments.
+          if args.includes?("--list-scaffolds")
+            json_mode = args.includes?("--json")
+            print_scaffolds(json_mode)
+            return
+          end
+
           options = parse_options(args)
           Services::Initializer.new.run(options)
+        end
+
+        # Print the list of built-in scaffolds.
+        #
+        # Remote scaffolds are user-supplied (e.g. `github:owner/repo`) and
+        # cannot be enumerated without additional input, so only built-ins
+        # are listed here.
+        private def print_scaffolds(json : Bool)
+          entries = Services::Scaffolds::Registry.all.map do |scaffold|
+            {name: scaffold.type.to_s, description: scaffold.description, kind: "builtin"}
+          end
+
+          if json
+            STDOUT.puts entries.to_json
+          else
+            Logger.info "Available scaffolds:"
+            entries.each do |e|
+              Logger.info "  #{e[:name].ljust(10)} - #{e[:description]}"
+            end
+          end
         end
 
         def parse_options(args : Array(String)) : Config::Options::InitOptions
