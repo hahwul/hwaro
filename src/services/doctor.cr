@@ -173,11 +173,6 @@ module Hwaro
           issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path, message: "title is still the default value \"Hwaro Site\"")
         end
 
-        # feeds: enabled but filename empty
-        if config.feeds.enabled && config.feeds.filename.empty?
-          issues << Issue.new(id: "feeds-filename-missing", level: :warning, category: "config", file: @config_path, message: "feeds.enabled is true but feeds.filename is not set")
-        end
-
         # sitemap changefreq validity
         unless VALID_CHANGEFREQS.includes?(config.sitemap.changefreq)
           issues << Issue.new(id: "sitemap-changefreq-invalid", level: :warning, category: "config", file: @config_path,
