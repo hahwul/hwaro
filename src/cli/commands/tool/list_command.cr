@@ -55,7 +55,13 @@ module Hwaro
               end
             end
 
+            Logger.quiet = true if json_output
+
             unless filter
+              if json_output
+                puts({status: "error", error: {message: "Missing filter argument. Use 'all', 'drafts', or 'published'"}}.to_json)
+                exit(1)
+              end
               Logger.error "Missing filter argument. Use 'all', 'drafts', or 'published'"
               Logger.info ""
               Logger.info "Usage: hwaro tool list <all|drafts|published> [options]"
@@ -82,6 +88,10 @@ module Hwaro
                              when "published", "pub"
                                Services::ContentFilter::Published
                              else
+                               if json_output
+                                 puts({status: "error", error: {message: "Unknown filter: #{filter}"}}.to_json)
+                                 exit(1)
+                               end
                                Logger.error "Unknown filter: #{filter}"
                                Logger.info "Use 'all', 'drafts', or 'published'"
                                exit(1)

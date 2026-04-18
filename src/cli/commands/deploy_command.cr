@@ -24,7 +24,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
           FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
           FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
-          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-targets)"),
+          JSON_FLAG,
           ENV_FLAG,
           QUIET_FLAG,
           HELP_FLAG,
@@ -42,8 +42,46 @@ module Hwaro
 
         def run(args : Array(String))
           options, list_targets, json_output = parse_options(args)
+
+          # Quiet logger so --json emits only the final JSON document. Human
+          # --list-targets and --dry-run output is routed around Logger below.
+          Logger.quiet = true if json_output
+
           if list_targets
             print_targets(options.env, json: json_output)
+            return
+          end
+
+          # --dry-run + --json: return the planned ops as a JSON array and
+          # exit without actually deploying. Schema per issue #356:
+          #   [{target, action: "create"|"update"|"delete"|"command", path, source, destination}]
+          if json_output && options.dry_run == true
+            begin
+              ops = Services::Deployer.new.plan(options)
+              STDOUT.puts ops.to_json
+            rescue ex
+              STDOUT.puts({status: "error", error: {message: ex.message || "deploy plan failed"}}.to_json)
+              exit(1)
+            end
+            return
+          end
+
+          if json_output
+            # Real deploy with --json (no --dry-run) isn't part of this
+            # command's stable JSON schema yet. Fall back to returning a
+            # status document so agents aren't left with raw progress text.
+            ok = begin
+              Services::Deployer.new.run(options)
+            rescue ex
+              STDOUT.puts({status: "error", error: {message: ex.message || "deploy failed"}}.to_json)
+              exit(1)
+            end
+            if ok
+              STDOUT.puts({"status" => "ok"}.to_json)
+            else
+              STDOUT.puts({status: "error", error: {message: "deploy failed"}}.to_json)
+              exit(1)
+            end
             return
           end
 
@@ -69,7 +107,7 @@ module Hwaro
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
             parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") { |n| max_deletes = n.to_i }
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
-            parser.on("--json", "Emit machine-readable JSON output (with --list-targets)") { json_output = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) do |_|
@@ -102,7 +140,7 @@ module Hwaro
             Models::Config.load(env: env)
           rescue ex
             if json
-              STDOUT.puts({error: {message: ex.message || "Failed to load config"}}.to_json)
+              STDOUT.puts({status: "error", error: {message: ex.message || "Failed to load config"}}.to_json)
             else
               Logger.error(ex.message || "Failed to load config")
             end

@@ -23,6 +23,7 @@ module Hwaro
         property cache : Bool
         property stream : Bool
         property memory_limit : String?
+        property json : Bool
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -46,6 +47,7 @@ module Hwaro
           @cache : Bool = false,
           @stream : Bool = false,
           @memory_limit : String? = nil,
+          @json : Bool = false,
         )
         end
 

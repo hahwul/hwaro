@@ -190,6 +190,24 @@ describe Hwaro::CLI::Commands::BuildCommand do
       end
     end
 
+    it "defaults json flag to false" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      _, _, json_output = cmd.parse_options([] of String)
+      json_output.should be_false
+    end
+
+    it "parses --json flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      _, _, json_output = cmd.parse_options(["--json"])
+      json_output.should be_true
+    end
+
+    it "parses -j short json flag" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      _, _, json_output = cmd.parse_options(["-j"])
+      json_output.should be_true
+    end
+
     it "CLI --memory-limit overrides HWARO_MEMORYLIMIT env var" do
       ENV["HWARO_MEMORYLIMIT"] = "1G"
       begin

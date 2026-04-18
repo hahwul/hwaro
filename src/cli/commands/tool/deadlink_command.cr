@@ -84,6 +84,8 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            Logger.quiet = true if json_output
+
             if external_only && internal_only
               Logger.warn "--external-only and --internal-only cancel each other out; checking all links"
               external_only = false
@@ -91,6 +93,10 @@ module Hwaro
             end
 
             unless Dir.exists?(target_dir)
+              if json_output
+                puts({status: "error", error: {message: "Directory not found: #{target_dir}"}}.to_json)
+                exit(1)
+              end
               Logger.error "Directory not found: #{target_dir}"
               return
             end
@@ -103,11 +109,8 @@ module Hwaro
             if external_links.empty? && internal_links.empty?
               if json_output
                 puts({
-                  "dead_links"      => [] of Result,
-                  "total_links"     => 0,
-                  "external_links"  => 0,
-                  "internal_links"  => 0,
-                  "dead_link_count" => 0,
+                  "dead_internal" => [] of Result,
+                  "dead_external" => [] of Result,
                 }.to_json)
               else
                 Logger.info "✔ No links found."
@@ -127,11 +130,8 @@ module Hwaro
 
             if json_output
               puts({
-                "dead_links"      => dead_external + dead_internal,
-                "total_links"     => total,
-                "external_links"  => external_links.size,
-                "internal_links"  => internal_links.size,
-                "dead_link_count" => dead_total,
+                "dead_internal" => dead_internal,
+                "dead_external" => dead_external,
               }.to_json)
               return
             end
@@ -284,7 +284,7 @@ module Hwaro
                   ip == "::1" ||
                   ip == "::" ||
                   ip.starts_with?("fc") || ip.starts_with?("fd") || # IPv6 ULA
-                  ip.starts_with?("fe80") ||                         # IPv6 link-local
+                  ip.starts_with?("fe80") ||                        # IPv6 link-local
                   private_172?(ip)
               end
             rescue

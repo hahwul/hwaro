@@ -110,6 +110,20 @@ describe "hwaro tool stats" do
       status.success?.should be_true
     end
   end
+
+  it "emits JSON matching the documented schema under --json" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(["tool", "stats", "--json"], chdir: project_dir)
+      status.success?.should be_true
+      # Must be a single JSON object parseable by external tools.
+      parsed = JSON.parse(output.strip)
+      parsed["total"].as_i?.should_not be_nil
+      parsed["published"].as_i?.should_not be_nil
+      parsed["drafts"].as_i?.should_not be_nil
+      parsed["word_count"]["total"].as_i?.should_not be_nil
+      parsed["tags"].as_h?.should_not be_nil
+    end
+  end
 end
 
 describe "hwaro tool validate" do
@@ -118,6 +132,15 @@ describe "hwaro tool validate" do
       status, _, _ = run_hwaro(["tool", "validate"], chdir: project_dir)
       # Default scaffold has no validation errors → exit 0
       status.success?.should be_true
+    end
+  end
+
+  it "emits {findings:[…]} under --json" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(["tool", "validate", "--json"], chdir: project_dir)
+      status.success?.should be_true
+      parsed = JSON.parse(output.strip)
+      parsed["findings"].as_a?.should_not be_nil
     end
   end
 end
@@ -138,6 +161,15 @@ describe "hwaro tool check-links" do
       # check-links exits 0 when no broken links and 1 when some are found.
       # Anything else (e.g. signal-based exit from a crash) is a bug.
       [0, 1].includes?(status.exit_code).should be_true
+    end
+  end
+
+  it "emits {dead_internal, dead_external} under --json" do
+    with_initialized_project do |project_dir|
+      _, output, _ = run_hwaro(["tool", "check-links", "--json", "--internal-only"], chdir: project_dir)
+      parsed = JSON.parse(output.strip)
+      parsed["dead_internal"].as_a?.should_not be_nil
+      parsed["dead_external"].as_a?.should_not be_nil
     end
   end
 end
