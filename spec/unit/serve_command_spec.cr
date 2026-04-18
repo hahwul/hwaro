@@ -165,6 +165,22 @@ describe Hwaro::CLI::Commands::ServeCommand do
     end
   end
 
+  describe "#run" do
+    it "raises HwaroError(HWARO_E_IO) when the input directory is missing" do
+      missing = File.join(Dir.tempdir, "hwaro-does-not-exist-#{Random.rand(1_000_000)}")
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["-i", missing])
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+      err.exit_code.should eq(6)
+      err.category.should eq(:io)
+      err.message.not_nil!.should contain(missing)
+    end
+  end
+
   describe "metadata" do
     it "has correct name" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata

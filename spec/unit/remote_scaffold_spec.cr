@@ -159,6 +159,15 @@ end
 
 # Helper to test the private extract_front_matter method
 class TestRemoteHelper < Hwaro::Services::Scaffolds::Remote
+  # Canned HTTP response that subclasses can swap in instead of calling GitHub.
+  @@stub_status : Int32 = 200
+  @@stub_body : String = ""
+
+  def self.stub_response(status : Int32, body : String = "")
+    @@stub_status = status
+    @@stub_body = body
+  end
+
   def initialize
     @config_data = ""
     @content_data = {} of String => String
@@ -175,5 +184,61 @@ class TestRemoteHelper < Hwaro::Services::Scaffolds::Remote
 
   def do_extract(content : String) : String
     extract_front_matter(content)
+  end
+
+  # Invoke the private fetch_default_branch with the stubbed response so we
+  # can assert the classification behavior without talking to github.com.
+  def do_fetch_default_branch(owner : String, repo : String) : String
+    fetch_default_branch(owner, repo)
+  end
+
+  # Override the private HTTP hop so the classifier path can be exercised
+  # deterministically.
+  private def github_api_get(path : String) : HTTP::Client::Response
+    HTTP::Client::Response.new(@@stub_status, @@stub_body)
+  end
+end
+
+describe Hwaro::Services::Scaffolds::Remote do
+  describe "#fetch_default_branch error classification" do
+    it "raises HwaroError(HWARO_E_NETWORK) with exit 7 on HTTP 404" do
+      TestRemoteHelper.stub_response(404, %({"message":"Not Found"}))
+      helper = TestRemoteHelper.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        helper.do_fetch_default_branch("this-does-not-exist", "nope")
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+      err.category.should eq(:network)
+      err.exit_code.should eq(7)
+      err.message.not_nil!.should contain("this-does-not-exist/nope")
+    end
+
+    it "raises HwaroError(HWARO_E_NETWORK) with exit 7 on HTTP 403 rate limit" do
+      TestRemoteHelper.stub_response(403, %({"message":"API rate limit exceeded"}))
+      helper = TestRemoteHelper.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        helper.do_fetch_default_branch("some-owner", "some-repo")
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+      err.exit_code.should eq(7)
+      err.message.not_nil!.should contain("rate limit")
+    end
+
+    it "raises HwaroError(HWARO_E_NETWORK) with exit 7 on generic HTTP failure" do
+      TestRemoteHelper.stub_response(500, %({"message":"Internal Server Error"}))
+      helper = TestRemoteHelper.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        helper.do_fetch_default_branch("some-owner", "some-repo")
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+      err.exit_code.should eq(7)
+      err.message.not_nil!.should contain("HTTP 500")
+    end
   end
 end
