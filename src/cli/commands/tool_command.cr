@@ -33,6 +33,7 @@ require "./tool/validate_command"
 require "./tool/unused_assets_command"
 require "./tool/agents_md_command"
 require "../../utils/logger"
+require "../../utils/command_suggester"
 
 module Hwaro
   module CLI
@@ -101,11 +102,22 @@ module Hwaro
             if handler = @@sub_handlers[subcommand]?
               handler.call(args)
             else
-              Logger.error "Unknown subcommand: #{subcommand}"
-              print_help
-              exit(1)
+              ToolCommand.report_unknown_subcommand(subcommand)
+              exit(2)
             end
           end
+        end
+
+        # Concise unknown-subcommand error emitted to stderr, mirroring the
+        # top-level Runner behavior. No full help dump here — users can run
+        # `hwaro tool --help` to see every subcommand.
+        def self.report_unknown_subcommand(subcommand : String, io : IO = STDERR)
+          io.puts "Error: unknown command 'tool #{subcommand}'"
+          candidates = ToolCommand.subcommands.map(&.name)
+          if suggestion = Utils::CommandSuggester.suggest(subcommand, candidates)
+            io.puts "Did you mean '#{suggestion}'?"
+          end
+          io.puts "Run 'hwaro tool --help' to see all subcommands."
         end
 
         # Category display order and membership for help output

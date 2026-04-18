@@ -8,6 +8,7 @@ require "./commands/tool_command"
 require "./commands/doctor_command"
 require "./commands/completion_command"
 require "../utils/logger"
+require "../utils/command_suggester"
 
 module Hwaro
   module CLI
@@ -84,9 +85,8 @@ module Hwaro
           if handler = CommandRegistry.get(command)
             handler.call(args)
           else
-            Logger.error "Unknown command: #{command}"
-            Runner.print_help
-            exit(1)
+            Runner.report_unknown_command(command)
+            exit(2)
           end
         end
       rescue ex : OptionParser::InvalidOption
@@ -147,6 +147,17 @@ module Hwaro
         CommandRegistry.register(CommandInfo.new(name: "help", description: "Show help")) do |_|
           Runner.print_help
         end
+      end
+
+      # Write a concise unknown-command error to stderr with an optional
+      # "Did you mean" suggestion. Intentionally avoids dumping the ASCII
+      # banner or full command list — users can run `hwaro --help` for that.
+      def self.report_unknown_command(command : String, io : IO = STDERR)
+        io.puts "Error: unknown command '#{command}'"
+        if suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
+          io.puts "Did you mean '#{suggestion}'?"
+        end
+        io.puts "Run 'hwaro --help' to see all commands."
       end
 
       def self.print_help

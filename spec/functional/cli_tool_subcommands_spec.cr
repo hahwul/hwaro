@@ -64,10 +64,28 @@ describe "hwaro tool (router)" do
     output.should contain("subcommand")
   end
 
-  it "exits 1 and prints 'Unknown subcommand' for unrecognized names" do
-    status, output, _ = run_hwaro_no_chdir(["tool", "nonexistent-subcommand"])
+  it "exits 2 and prints a concise unknown-command error to stderr" do
+    status, output, error = run_hwaro_no_chdir(["tool", "nonexistent-subcommand"])
     status.success?.should be_false
-    output.should contain("Unknown subcommand")
+    status.exit_code.should eq(2)
+    # Concise error goes to stderr, not stdout — the full help/banner
+    # must NOT be dumped on a typo.
+    error.should contain("unknown command 'tool nonexistent-subcommand'")
+    error.should contain("hwaro tool --help")
+    output.should_not contain("Available subcommands")
+  end
+
+  it "suggests the closest subcommand for near-miss typos" do
+    status, _, error = run_hwaro_no_chdir(["tool", "stts"])
+    status.exit_code.should eq(2)
+    error.should contain("Did you mean 'stats'?")
+  end
+
+  it "omits the suggestion when no candidate is close" do
+    status, _, error = run_hwaro_no_chdir(["tool", "xyzabc"])
+    status.exit_code.should eq(2)
+    error.should_not contain("Did you mean")
+    error.should contain("hwaro tool --help")
   end
 
   it "prints help and exits 0 when invoked with help" do
