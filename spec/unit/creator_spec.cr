@@ -483,6 +483,82 @@ describe Hwaro::Services::Creator do
           end
         end
       end
+
+      it "does not wrap `_index.md` section indices" do
+        # Section indices look like bundles shape-wise but mean something
+        # different; wrapping to `_index/index.md` would create a phantom
+        # section.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/_index.md", title: "Posts", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/_index.md").should be_true
+            File.exists?("content/posts/_index/index.md").should be_false
+          end
+        end
+      end
+
+      it "refuses bundle creation when a single-file sibling already exists" do
+        # Both `posts/hello.md` (sibling) and `posts/hello/index.md`
+        # (bundle) would render to the same URL — we'd rather fail loudly
+        # than silently duplicate the page.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/hello.md", "+++\ntitle = \"Existing\"\n+++\n")
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/hello.md", title: "Hello", bundle: true)
+            expect_raises(Exception, /sibling already exists/) do
+              Hwaro::Services::Creator.new.run(options)
+            end
+
+            # Existing file left untouched, bundle not created.
+            File.read("content/posts/hello.md").should contain("Existing")
+            File.exists?("content/posts/hello/index.md").should be_false
+          end
+        end
+      end
+
+      it "warns and ignores unknown hwaro directives" do
+        # Typos like `<!-- hwaro: bundlr=true -->` used to silently no-op.
+        # Now they warn and bundle mode is not activated (behaviour check
+        # substitutes for asserting on Logger output).
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/tools")
+            FileUtils.mkdir_p("archetypes")
+            File.write(
+              "archetypes/tools.md",
+              "<!-- hwaro: bundlr=true -->\n+++\ntitle = \"{{ title }}\"\n+++\n"
+            )
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "tools/saw.md", title: "Saw")
+            Hwaro::Services::Creator.new.run(options)
+
+            # Unknown key → no bundle reshape; single file wins.
+            File.exists?("content/tools/saw.md").should be_true
+            Dir.exists?("content/tools/saw").should be_false
+          end
+        end
+      end
+
+      it "works with --section + --bundle together" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "hello.md", title: "Hello", section: "blog", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/blog/hello/index.md").should be_true
+            File.exists?("content/blog/hello.md").should be_false
+          end
+        end
+      end
     end
   end
 end
