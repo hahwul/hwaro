@@ -95,7 +95,18 @@ If no specific archetype matches, uses `archetypes/default.md`.
 
 ### 5. Built-in Template
 
-If no archetypes exist, uses the built-in default template.
+If no archetypes exist, uses the built-in default template. The format and
+default fields of that template are controlled by `[content.new]` in
+`config.toml`:
+
+```toml
+[content.new]
+front_matter_format = "toml"         # "toml" (default) or "yaml"
+default_fields = ["description"]      # extra keys to scaffold with empty values
+```
+
+Fields that overlap with the built-ins (`title`, `date`, `draft`, `tags`)
+are ignored so they aren't duplicated with empty values.
 
 ## Usage Examples
 

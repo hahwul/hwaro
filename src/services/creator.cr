@@ -1,6 +1,7 @@
 require "file_utils"
 require "time"
 require "../config/options/new_options"
+require "../models/config"
 require "../utils/logger"
 
 module Hwaro
@@ -8,7 +9,7 @@ module Hwaro
     class Creator
       ARCHETYPES_DIR = "archetypes"
 
-      def run(options : Config::Options::NewOptions)
+      def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
         path = options.path
         title = options.title || ""
 
@@ -93,10 +94,11 @@ module Hwaro
         # Find archetype
         archetype_content = find_archetype(options.archetype, full_path)
 
+        content_new = (config || Models::Config.new).content_new
         content = if archetype_content
                     process_archetype(archetype_content, title, date, is_draft, tags)
                   else
-                    generate_default_content(title, date, is_draft, tags)
+                    generate_default_content(title, date, is_draft, tags, content_new)
                   end
 
         if File.exists?(full_path)
@@ -167,20 +169,60 @@ module Hwaro
         content
       end
 
-      private def generate_default_content(title : String, date : String, is_draft : Bool, tags : Array(String)) : String
-        safe_title = title.gsub("\"", "\\\"").gsub("\n", " ")
+      # Built-in scaffold used when no archetype matches. Format and extra
+      # fields are driven by `[content.new]` in `config.toml` so the output
+      # matches the rest of the site's conventions (TOML by default to align
+      # with the shipped scaffolds).
+      private def generate_default_content(
+        title : String,
+        date : String,
+        is_draft : Bool,
+        tags : Array(String),
+        content_new : Models::ContentNewConfig,
+      ) : String
+        if content_new.toml?
+          build_toml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+        else
+          build_yaml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+        end
+      end
+
+      private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+        safe_title = escape_string(title)
+        String.build do |str|
+          str << "+++\n"
+          str << "title = \"#{safe_title}\"\n"
+          str << "date = \"#{date}\"\n"
+          extra_fields.each { |f| str << "#{f} = \"\"\n" }
+          str << "draft = true\n" if is_draft
+          unless tags.empty?
+            rendered = tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")
+            str << "tags = [#{rendered}]\n"
+          end
+          str << "+++\n\n"
+          str << "# #{title}\n"
+        end
+      end
+
+      private def build_yaml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+        safe_title = escape_string(title)
         String.build do |str|
           str << "---\n"
           str << "title: \"#{safe_title}\"\n"
           str << "date: #{date}\n"
+          extra_fields.each { |f| str << "#{f}: \"\"\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"
-            tags.each { |tag| str << "  - \"#{tag.gsub("\"", "\\\"")}\"\n" }
+            tags.each { |tag| str << "  - \"#{escape_string(tag)}\"\n" }
           end
           str << "---\n\n"
           str << "# #{title}\n"
         end
+      end
+
+      private def escape_string(value : String) : String
+        value.gsub("\"", "\\\"").gsub("\n", " ")
       end
     end
   end

@@ -2,6 +2,7 @@ require "option_parser"
 require "json"
 require "../metadata"
 require "../../config/options/new_options"
+require "../../models/config"
 require "../../services/creator"
 require "../../utils/errors"
 require "../../utils/logger"
@@ -72,7 +73,19 @@ module Hwaro
             )
           end
 
-          Services::Creator.new.run(options)
+          Services::Creator.new.run(options, load_config_if_present)
+        end
+
+        # Try to load `config.toml` so `hwaro new` can honour site-level
+        # preferences (front matter format, default fields). Missing or
+        # malformed config falls back to defaults silently — `hwaro new` must
+        # keep working in freshly-scaffolded or in-flight projects.
+        private def load_config_if_present : Models::Config?
+          return nil unless File.exists?("config.toml")
+          Models::Config.load
+        rescue ex
+          Logger.debug "Skipping config load for 'new': #{ex.message}"
+          nil
         end
 
         # Print archetypes found under the current project's archetypes/ dir.

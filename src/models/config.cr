@@ -192,6 +192,42 @@ module Hwaro
       end
     end
 
+    # `hwaro new` content scaffolding configuration.
+    #
+    # Controls what `hwaro new` writes when there is no matching archetype:
+    #   - `front_matter_format` — "toml" (default) or "yaml"
+    #   - `default_fields`      — extra front matter keys (e.g. "description")
+    #     emitted with empty values so users can fill them in without having
+    #     to remember them.
+    #
+    # Fields listed in `default_fields` that overlap with built-ins
+    # (`title`, `date`, `draft`, `tags`) are ignored because those have
+    # dedicated handling and values.
+    class ContentNewConfig
+      FORMAT_TOML = "toml"
+      FORMAT_YAML = "yaml"
+      VALID_FORMATS = {FORMAT_TOML, FORMAT_YAML}
+      BUILTIN_FIELDS = {"title", "date", "draft", "tags"}
+
+      property front_matter_format : String
+      property default_fields : Array(String)
+
+      def initialize
+        @front_matter_format = FORMAT_TOML
+        @default_fields = ["description"]
+      end
+
+      def toml? : Bool
+        @front_matter_format == FORMAT_TOML
+      end
+
+      # Extra fields, with built-ins filtered out and duplicates removed,
+      # preserving configured order.
+      def extra_fields : Array(String)
+        @default_fields.reject { |f| BUILTIN_FIELDS.includes?(f) }.uniq
+      end
+    end
+
     # Auto-includes configuration for automatic CSS/JS loading
     class AutoIncludesConfig
       property enabled : Bool
@@ -625,6 +661,7 @@ module Hwaro
       property search : SearchConfig
       property plugins : PluginConfig
       property content_files : ContentFilesConfig
+      property content_new : ContentNewConfig
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
@@ -657,6 +694,7 @@ module Hwaro
         @search = SearchConfig.new
         @plugins = PluginConfig.new
         @content_files = ContentFilesConfig.new
+        @content_new = ContentNewConfig.new
         @pagination = PaginationConfig.new
         @highlight = HighlightConfig.new
         @auto_includes = AutoIncludesConfig.new
@@ -751,6 +789,7 @@ module Hwaro
         load_search(config)
         load_plugins(config)
         load_content_files(config)
+        load_content_new(config)
         load_pagination(config)
         load_highlight(config)
         load_auto_includes(config)
@@ -953,6 +992,30 @@ module Hwaro
 
         if disallow_paths_any
           config.content_files.disallow_paths = ContentFilesConfig.normalize_paths(string_or_array(disallow_paths_any))
+        end
+      end
+
+      # Loads `hwaro new` scaffold settings from `[content.new]` (preferred)
+      # or falls back to flat keys under `[content]` so short configs like
+      # `[content]\nfront_matter_format = "yaml"` also work.
+      private def self.load_content_new(config : Config)
+        return unless content_section = config.raw["content"]?.try(&.as_h?)
+
+        # Prefer the nested `[content.new]` table; fall back to flat keys on
+        # `[content]` for single-option configs.
+        section = content_section["new"]?.try(&.as_h?) || content_section
+
+        if format = section["front_matter_format"]?.try(&.as_s?)
+          normalized = format.downcase
+          if ContentNewConfig::VALID_FORMATS.includes?(normalized)
+            config.content_new.front_matter_format = normalized
+          else
+            Logger.warn "Unknown content.new.front_matter_format '#{format}', keeping '#{config.content_new.front_matter_format}'"
+          end
+        end
+
+        if fields = section["default_fields"]?.try(&.as_a?)
+          config.content_new.default_fields = fields.compact_map(&.as_s?)
         end
       end
 
