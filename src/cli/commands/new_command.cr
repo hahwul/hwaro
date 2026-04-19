@@ -26,6 +26,8 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--tags", description: "Comma-separated tags", takes_value: true, value_hint: "TAGS"),
           FlagInfo.new(short: "-s", long: "--section", description: "Section directory (e.g. blog, docs)", takes_value: true, value_hint: "NAME"),
           FlagInfo.new(short: "-a", long: "--archetype", description: "Archetype to use", takes_value: true, value_hint: "NAME"),
+          FlagInfo.new(short: nil, long: "--bundle", description: "Create a leaf-bundle directory (foo/index.md) instead of a single file"),
+          FlagInfo.new(short: nil, long: "--no-bundle", description: "Create a single file (foo.md); overrides config default"),
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
@@ -131,6 +133,7 @@ module Hwaro
           draft = nil.as(Bool?)
           tags = [] of String
           section = nil.as(String?)
+          bundle = nil.as(Bool?)
           json_output = args.includes?("--json")
 
           OptionParser.parse(args) do |parser|
@@ -143,6 +146,11 @@ module Hwaro
             parser.on("--tags TAGS", "Comma-separated tags") { |t| tags = t.split(",").map(&.strip).reject(&.empty?) }
             parser.on("-s NAME", "--section NAME", "Section directory (e.g. blog, docs)") { |s| section = s }
             parser.on("-a NAME", "--archetype NAME", "Archetype to use") { |a| archetype = a }
+            # `--bundle` / `--no-bundle` are mutually exclusive in intent but
+            # OptionParser doesn't enforce that — last one wins, which matches
+            # typical Unix convention.
+            parser.on("--bundle", "Create a leaf-bundle directory (foo/index.md)") { bundle = true }
+            parser.on("--no-bundle", "Create a single file (foo.md)") { bundle = false }
             parser.on("--json", "Emit machine-readable JSON output") { json_output = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
@@ -159,6 +167,7 @@ module Hwaro
             draft: draft,
             tags: tags,
             section: section,
+            bundle: bundle,
           ), json_output}
         end
       end

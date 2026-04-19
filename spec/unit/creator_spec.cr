@@ -371,5 +371,118 @@ describe Hwaro::Services::Creator do
         end
       end
     end
+
+    # Precedence: CLI --bundle > archetype directive > config > single.
+    # These tests each isolate a single layer so regressions in the
+    # resolver show up independently.
+    describe "bundle (leaf-bundle) layout" do
+      it "creates foo/index.md when --bundle is passed on the CLI" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/hello.md", title: "Hello", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/hello/index.md").should be_true
+            File.exists?("content/posts/hello.md").should be_false
+          end
+        end
+      end
+
+      it "--no-bundle (bundle=false) forces a single file even when config defaults to bundle" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            config = Hwaro::Models::Config.new
+            config.content_new.bundle = true
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/solo.md", title: "Solo", bundle: false)
+            Hwaro::Services::Creator.new.run(options, config)
+
+            File.exists?("content/posts/solo.md").should be_true
+            Dir.exists?("content/posts/solo").should be_false
+          end
+        end
+      end
+
+      it "falls back to the config default when --bundle is unspecified" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            config = Hwaro::Models::Config.new
+            config.content_new.bundle = true
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/defaulted.md", title: "Defaulted")
+            Hwaro::Services::Creator.new.run(options, config)
+
+            File.exists?("content/posts/defaulted/index.md").should be_true
+          end
+        end
+      end
+
+      it "honours `<!-- hwaro: bundle -->` directive in an archetype and strips it" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/tools")
+            FileUtils.mkdir_p("archetypes")
+            File.write(
+              "archetypes/tools.md",
+              "<!-- hwaro: bundle -->\n+++\ntitle = \"{{ title }}\"\nkind = \"tool\"\n+++\n\n# {{ title }}\n"
+            )
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "tools/drill.md", title: "Drill")
+            Hwaro::Services::Creator.new.run(options)
+
+            bundle_path = "content/tools/drill/index.md"
+            File.exists?(bundle_path).should be_true
+            content = File.read(bundle_path)
+            # Directive must not leak into generated content.
+            content.should_not contain("hwaro:")
+            content.should contain("title = \"Drill\"")
+            content.should contain("kind = \"tool\"")
+          end
+        end
+      end
+
+      it "lets CLI --no-bundle override an archetype directive" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/tools")
+            FileUtils.mkdir_p("archetypes")
+            File.write(
+              "archetypes/tools.md",
+              "<!-- hwaro: bundle=true -->\n+++\ntitle = \"{{ title }}\"\n+++\n"
+            )
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "tools/saw.md", title: "Saw", bundle: false)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/tools/saw.md").should be_true
+            Dir.exists?("content/tools/saw").should be_false
+          end
+        end
+      end
+
+      it "is idempotent when the path already ends in index.md" do
+        # Guards against double-wrapping: `hwaro new foo/index.md --bundle`
+        # must not produce `foo/index/index.md`.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/foo")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "foo/index.md", title: "Foo", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/foo/index.md").should be_true
+            File.exists?("content/foo/index/index.md").should be_false
+          end
+        end
+      end
+    end
   end
 end

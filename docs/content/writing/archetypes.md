@@ -105,10 +105,32 @@ default fields of that template are controlled by `[content.new]` in
 [content.new]
 front_matter_format = "toml"         # "toml" (default) or "yaml"
 default_fields = ["description"]      # extra keys to scaffold with empty values
+bundle = false                        # true: scaffold foo/index.md instead of foo.md
 ```
 
 Fields that overlap with the built-ins (`title`, `date`, `draft`, `tags`)
 are ignored so they aren't duplicated with empty values.
+
+### Leaf-bundle (directory) layout
+
+When you plan to add multilingual siblings (`index.ko.md`) or colocated
+images next to a page, you want the directory-per-page layout:
+
+```
+content/abcd/
+└── index.md
+```
+
+Pick the layout per invocation, per archetype, or per site:
+
+- **CLI:** `hwaro new posts/hello.md --bundle` (or `--no-bundle` to force
+  the single-file form).
+- **Archetype:** put `<!-- hwaro: bundle -->` as the first line of the
+  archetype so any `hwaro new` using it defaults to bundle mode. The
+  directive is stripped from the generated content.
+- **Config:** `bundle = true` under `[content.new]` sets the house style.
+
+Priority is CLI > archetype > config > single-file (the default).
 
 ## Usage Examples
 
