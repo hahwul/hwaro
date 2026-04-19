@@ -313,6 +313,31 @@ Alias for `url_for()`. You can use either name:
 
 ---
 
+### asset()
+
+Resolve a bundled or fingerprinted asset to its final URL. When the [asset pipeline](/features/asset-pipeline/) is enabled, the input name is looked up in the build manifest so you always get the hashed filename.
+
+```jinja
+<link rel="stylesheet" href="{{ asset(name='main.css') }}">
+<script src="{{ asset(name='app.js') }}"></script>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| name | String | Bundle or asset name (e.g. `main.css`, `app.js`) |
+
+**Returns:** String — absolute URL under `base_url`. When no manifest entry is found, the name is returned as a path under `base_url` unchanged, so templates keep working before you turn the pipeline on.
+
+---
+
+### asset_url()
+
+Alias for `asset()`. Use whichever reads better in your templates.
+
+---
+
 ### now()
 
 Get current datetime:

@@ -28,6 +28,7 @@ start_url = "/"
 icons = ["static/icon-192.png", "static/icon-512.png"]
 offline_page = "/offline.html"
 precache_urls = ["/", "/about/", "/css/main.css"]
+cache_strategy = "cache-first"
 ```
 
 | Key | Type | Default | Description |
@@ -42,6 +43,7 @@ precache_urls = ["/", "/about/", "/css/main.css"]
 | icons | array | [] | Icon file paths |
 | offline_page | string | — | Fallback page when offline |
 | precache_urls | array | [] | URLs to cache during service worker install |
+| cache_strategy | string | `"cache-first"` | Asset fetch strategy: `cache-first`, `network-first`, or `stale-while-revalidate` |
 
 ## Icon Sizing
 
@@ -79,9 +81,19 @@ Add the manifest link and service worker registration to your base template:
 The generated service worker uses:
 
 - **Precache on install** — URLs listed in `precache_urls` plus `start_url` are cached immediately
-- **Cache-first for assets** — Subsequent requests serve from cache, falling back to network
-- **Network-first for navigation** — Page navigations try the network first, falling back to the offline page
+- **Asset fetching** — Controlled by `cache_strategy` (see below)
+- **Network-first for navigation** — Page navigations always try the network first, falling back to the offline page
 - **Automatic cache versioning** — Old caches are cleaned up on service worker activation
+
+Set `cache_strategy` to pick how assets (non-navigation requests) are served:
+
+| Value | Behavior |
+|-------|----------|
+| `cache-first` (default) | Serve from cache if present, otherwise fetch from network and cache the response. Fastest for static sites. |
+| `network-first` | Try the network first; fall back to cache on failure. Use when you want fresh content but offline resilience. |
+| `stale-while-revalidate` | Serve the cached copy immediately and refresh the cache in the background. Balances speed and freshness. |
+
+Unknown values log a warning and fall back to `cache-first`.
 
 ## Offline Page
 

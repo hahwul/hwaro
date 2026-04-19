@@ -36,6 +36,7 @@ pattern_scale = 1.0
 background_image = "static/og-bg.jpg"
 overlay_opacity = 0.5
 format = "svg"
+font_path = "static/fonts/Inter-Bold.ttf"
 ```
 
 | Key | Type | Default | Description |
@@ -55,6 +56,7 @@ format = "svg"
 | background_image | string | — | Background image file path. Embedded as base64 data URI |
 | overlay_opacity | float | `0.5` | Opacity of the color overlay on background images (0.0–1.0) |
 | format | string | `"svg"` | Output format: `"svg"` or `"png"` |
+| font_path | string | — | Path to a custom `.ttf` / `.otf` font file for PNG output. Falls back to system fonts, then the bundled DejaVu Sans Bold |
 
 ## Style Presets
 
