@@ -199,6 +199,12 @@ module Hwaro
     #   - `default_fields`      — extra front matter keys (e.g. "description")
     #     emitted with empty values so users can fill them in without having
     #     to remember them.
+    #   - `bundle`              — when true, new pages default to the
+    #     leaf-bundle layout (`foo/index.md`) instead of a single file
+    #     (`foo.md`), which is the shape needed for multilingual siblings
+    #     and colocated page assets. Overridden by an archetype's own
+    #     `<!-- hwaro: bundle -->` directive, and by `--bundle`/`--no-bundle`
+    #     on the CLI (CLI > archetype > config).
     #
     # Fields listed in `default_fields` that overlap with built-ins
     # (`title`, `date`, `draft`, `tags`) are ignored because those have
@@ -211,10 +217,12 @@ module Hwaro
 
       property front_matter_format : String
       property default_fields : Array(String)
+      property bundle : Bool
 
       def initialize
         @front_matter_format = FORMAT_TOML
         @default_fields = ["description"]
+        @bundle = false
       end
 
       def toml? : Bool
@@ -1006,6 +1014,7 @@ module Hwaro
         nested = content_section["new"]?.try(&.as_h?)
         format_any = nested.try(&.[]?("front_matter_format")) || content_section["front_matter_format"]?
         fields_any = nested.try(&.[]?("default_fields")) || content_section["default_fields"]?
+        bundle_any = nested.try(&.[]?("bundle")) || content_section["bundle"]?
 
         if format = format_any.try(&.as_s?)
           normalized = format.downcase
@@ -1018,6 +1027,10 @@ module Hwaro
 
         if fields = fields_any.try(&.as_a?)
           config.content_new.default_fields = fields.compact_map(&.as_s?)
+        end
+
+        if bundle = bundle_any.try(&.as_bool?)
+          config.content_new.bundle = bundle
         end
       end
 

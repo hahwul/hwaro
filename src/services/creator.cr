@@ -9,6 +9,18 @@ module Hwaro
     class Creator
       ARCHETYPES_DIR = "archetypes"
 
+      # `<!-- hwaro: KEY[=VALUE], KEY[=VALUE] -->` directive that an
+      # archetype can put on its very first line to declare metadata
+      # hwaro should honour (and strip) before applying the template.
+      # Keeping it an HTML comment means the archetype still parses
+      # cleanly if hwaro isn't the one reading it.
+      HWARO_DIRECTIVE_RE = /\A<!--\s*hwaro:\s*(.*?)\s*-->\s*\n?/
+
+      # Keys accepted inside `<!-- hwaro: ... -->`. Anything else is
+      # logged as a warning so typos (`bundlr=true`) surface instead of
+      # silently becoming no-ops.
+      KNOWN_DIRECTIVES = {"bundle"}
+
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
         path = options.path
         title = options.title || ""
@@ -91,10 +103,35 @@ module Hwaro
         date = options.date || Time.local.to_s("%Y-%m-%d %H:%M:%S")
         tags = options.tags
 
-        # Find archetype
-        archetype_content = find_archetype(options.archetype, full_path)
+        # Find archetype, extracting any hwaro directives (e.g. bundle=true)
+        # before substitution so they don't end up in generated content.
+        raw_archetype_content = find_archetype(options.archetype, full_path)
+        archetype_content, archetype_directives =
+          extract_directives(raw_archetype_content)
 
         content_new = (config || Models::Config.new).content_new
+
+        # Resolve bundle mode: CLI > archetype directive > config default.
+        # The CLI form is an explicit tri-state (`Bool?`) so `--no-bundle`
+        # really overrides rather than defaulting back.
+        bundle_mode = options.bundle
+        bundle_mode = archetype_directives["bundle"]?.try { |v| v == "true" } if bundle_mode.nil?
+        bundle_mode = content_new.bundle if bundle_mode.nil?
+
+        # Reshape `<dir>/<name>.md` → `<dir>/<name>/index.md` when bundle
+        # mode is active. Skipped if the path is already an `index.md`
+        # or `_index.md` so repeated invocations (and accidental bundle
+        # mode on section indices) don't create `foo/index/index.md`.
+        if bundle_mode && !bundle_path?(full_path)
+          candidate = bundle_path_for(full_path)
+          if bundle_collides_with_sibling?(candidate)
+            raise "Cannot create bundle at #{candidate}: single-file sibling already exists. Remove the existing file or omit --bundle."
+          end
+          full_path = candidate
+          base_dir = File.dirname(full_path)
+          FileUtils.mkdir_p(base_dir) unless Dir.exists?(base_dir)
+        end
+
         content = if archetype_content
                     process_archetype(archetype_content, title, date, is_draft, tags)
                   else
@@ -107,6 +144,54 @@ module Hwaro
 
         File.write(full_path, content)
         Logger.info "Created new content: #{full_path}"
+      end
+
+      # Returns `{stripped_content, directives}`. When the archetype's first
+      # line is `<!-- hwaro: k=v, k2=v2 -->`, that line is removed from the
+      # content and the directives are returned as a hash. Shorthand keys
+      # without `=VALUE` are treated as `k = "true"`. Unknown keys warn
+      # (but don't fail) so typos surface instead of silently no-oping.
+      private def extract_directives(content : String?) : {String?, Hash(String, String)}
+        directives = {} of String => String
+        return {nil, directives} unless content
+
+        match = HWARO_DIRECTIVE_RE.match(content)
+        return {content, directives} unless match
+
+        match[1].split(",").each do |pair|
+          k, _, v = pair.strip.partition("=")
+          key = k.strip
+          next if key.empty?
+          unless KNOWN_DIRECTIVES.includes?(key)
+            Logger.warn "Unknown hwaro directive '#{key}' in archetype; ignoring. Known keys: #{KNOWN_DIRECTIVES.to_a.sort.join(", ")}."
+            next
+          end
+          directives[key] = v.strip.empty? ? "true" : v.strip
+        end
+        {content.sub(HWARO_DIRECTIVE_RE, ""), directives}
+      end
+
+      # `index.md` and `_index.md` are already "in bundle shape" — the
+      # former is a page bundle's leaf file and the latter is a section
+      # index. Wrapping either into `<name>/index.md` would be nonsense
+      # (`posts/_index/index.md` creates a phantom section).
+      private def bundle_path?(path : String) : Bool
+        basename = File.basename(path)
+        basename == "index.md" || basename == "_index.md"
+      end
+
+      private def bundle_path_for(path : String) : String
+        base = File.basename(path, ".md")
+        File.join(File.dirname(path), base, "index.md")
+      end
+
+      # True when switching `<name>.md` to `<name>/index.md` would
+      # collide with an existing single-file sibling on disk. Both would
+      # render to the same URL, so we refuse rather than silently create
+      # a duplicate.
+      private def bundle_collides_with_sibling?(full_path : String) : Bool
+        sibling_md = full_path.rchop("/index.md") + ".md"
+        File.exists?(sibling_md) && File.file?(sibling_md)
       end
 
       private def find_archetype(explicit_archetype : String?, path : String) : String?

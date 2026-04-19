@@ -100,6 +100,21 @@ describe Hwaro::CLI::Commands::NewCommand do
         cmd.parse_options(["--unknown"])
       end
     end
+
+    it "defaults bundle to nil (fall back to archetype/config)" do
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      options, _ = cmd.parse_options(["post.md"])
+      options.bundle.should be_nil
+    end
+
+    it "parses --bundle as true and --no-bundle as false" do
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      options, _ = cmd.parse_options(["post.md", "--bundle"])
+      options.bundle.should be_true
+
+      options, _ = cmd.parse_options(["post.md", "--no-bundle"])
+      options.bundle.should be_false
+    end
   end
 
   # A malformed `config.toml` must surface as the same classified

@@ -753,6 +753,16 @@ describe Hwaro::Models::Config do
       config.content_new.default_fields = ["title", "description", "date", "author"]
       config.content_new.extra_fields.should eq(["description", "author"])
     end
+
+    it "defaults bundle to false and loads it from [content.new]" do
+      Hwaro::Models::Config.new.content_new.bundle.should be_false
+
+      config = load_config(<<-TOML)
+      [content.new]
+      bundle = true
+      TOML
+      config.content_new.bundle.should be_true
+    end
   end
 
   # ---------------------------------------------------------------------------

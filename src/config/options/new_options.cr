@@ -9,6 +9,10 @@ module Hwaro
         property draft : Bool?
         property tags : Array(String)
         property section : String?
+        # `--bundle` / `--no-bundle`. `nil` means "user didn't specify";
+        # Creator then consults the archetype directive and the config
+        # default in that order (CLI > archetype > config > single).
+        property bundle : Bool?
 
         def initialize(
           @path : String? = nil,
@@ -18,6 +22,7 @@ module Hwaro
           @draft : Bool? = nil,
           @tags : Array(String) = [] of String,
           @section : String? = nil,
+          @bundle : Bool? = nil,
         )
         end
       end
