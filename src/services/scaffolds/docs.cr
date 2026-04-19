@@ -1086,7 +1086,7 @@ You should see the version number if Hwaro is installed correctly.
 
 ## Next Steps
 
-Once installed, proceed to the [Quick Start](/getting-started/quick-start.html) guide.
+Once installed, proceed to the [Quick Start](/getting-started/quick-start/) guide.
 CONTENT
         end
 
@@ -1136,8 +1136,8 @@ Visit `http://localhost:3000` to see your site.
 
 ## Next Steps
 
-- Read about [Configuration](/getting-started/configuration.html)
-- Learn about [Content Management](/guide/content-management.html)
+- Read about [Configuration](/getting-started/configuration/)
+- Learn about [Content Management](/guide/content-management/)
 CONTENT
         end
 
@@ -1178,7 +1178,7 @@ enabled = true
 
 ## Full Reference
 
-See the [Configuration Reference](/reference/config.html) for all available options.
+See the [Configuration Reference](/reference/config/) for all available options.
 CONTENT
         end
 
@@ -1230,7 +1230,7 @@ Each content file starts with front matter in TOML format:
 ```markdown
 +++
 title = "Page Title"
-date = "2024-01-01"
+date = "2026-01-01"
 description = "Page description for SEO"
 +++
 
@@ -1246,7 +1246,7 @@ Sections are directories containing related content. Each section should have an
 Link to other pages using relative paths:
 
 ```markdown
-[Installation](/getting-started/installation.html)
+[Installation](/getting-started/installation/)
 ```
 
 ## Images
