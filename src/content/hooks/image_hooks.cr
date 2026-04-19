@@ -121,9 +121,44 @@ module Hwaro
 
           return if jobs.empty?
 
-          # Phase 2: Process in parallel with bounded concurrency
+          # Phase 2: Split jobs into "already fresh" (reuse from previous
+          # rebuild's maps) and "needs work". Snapshot previous maps first
+          # so watch-triggered rebuilds don't re-decode unchanged images.
+          # Without this, adding one image to a serve session re-processes
+          # every image in the project (see issue #389).
+          previous_resize_map = @@resize_map_mutex.synchronize { @@resize_map.dup }
+          previous_lqip_map = @@lqip_map_mutex.synchronize { @@lqip_map.dup }
+
           new_map = {} of String => Hash(Int32, String)
           new_lqip_map = {} of String => Hash(String, String)
+          jobs_to_process = [] of ImageJob
+          reused_count = 0
+
+          jobs.each do |job|
+            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths)
+            if reused_widths && (!lqip_enabled || previous_lqip_map.has_key?(job.original_url))
+              width_urls = {} of Int32 => String
+              reused_widths.each do |width, filename|
+                width_urls[width] = job.url_prefix + filename
+              end
+              new_map[job.original_url] = width_urls
+              if lqip_enabled && (lqip = previous_lqip_map[job.original_url]?)
+                new_lqip_map[job.original_url] = lqip
+              end
+              reused_count += 1
+            else
+              jobs_to_process << job
+            end
+          end
+
+          if jobs_to_process.empty?
+            @@resize_map_mutex.synchronize { @@resize_map = new_map }
+            @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+            Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
+            return
+          end
+
+          # Phase 3: Process the work set in parallel with bounded concurrency
           map_mutex = Mutex.new
           work_channel = Channel(ImageJob?).new(CONCURRENCY)
           done_channel = Channel(Nil).new
@@ -143,7 +178,7 @@ module Hwaro
           end
 
           # Feed jobs
-          jobs.each { |job| work_channel.send(job) }
+          jobs_to_process.each { |job| work_channel.send(job) }
           CONCURRENCY.times { work_channel.send(nil) } # sentinel to stop workers
 
           # Wait for all workers
@@ -151,9 +186,48 @@ module Hwaro
 
           @@resize_map_mutex.synchronize { @@resize_map = new_map }
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
-          resized_count = new_map.values.sum(&.size)
+          # Count variants (widths × successful jobs), matching the pre-#389
+          # meaning. Counting source images instead would silently halve/third
+          # the number users see and make the "Generated N" line less useful
+          # for verifying that configured widths actually produced output.
+          resized_count = jobs_to_process.sum { |j| new_map[j.original_url]?.try(&.size) || 0 }
           Logger.success "  Generated #{resized_count} resized image(s)." if resized_count > 0
+          Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
           Logger.success "  Generated #{new_lqip_map.size} LQIP placeholder(s)." if new_lqip_map.size > 0
+        end
+
+        # Returns a `width => filename` map when every expected destination
+        # file already exists on disk with an mtime at least as new as the
+        # source (i.e. decoding/resizing would produce bit-identical output).
+        # Returns nil when any destination is missing, stale, or empty —
+        # caller then processes the image normally. Empty is checked so a
+        # killed serve mid-write doesn't leave a zero-byte file that would
+        # pass an mtime check and get served as a broken image.
+        #
+        # Caller must also verify LQIP cache separately; LQIP can't be
+        # reconstructed from disk bytes.
+        def self.reusable_widths(
+          source_path : String,
+          dest_dir : String,
+          widths : Array(Int32),
+        ) : Hash(Int32, String)?
+          return nil unless File.exists?(source_path)
+          source_info = File.info(source_path)
+          source_mtime = source_info.modification_time
+
+          ext = File.extname(source_path)
+          basename = File.basename(source_path, ext)
+          result = {} of Int32 => String
+          widths.each do |width|
+            filename = "#{basename}_#{width}w#{ext}"
+            dest = File.join(dest_dir, filename)
+            return nil unless File.exists?(dest)
+            dest_info = File.info(dest)
+            return nil if dest_info.modification_time < source_mtime
+            return nil if dest_info.size == 0
+            result[width] = filename
+          end
+          result
         end
 
         # Resize a single image to all widths + generate LQIP (one decode pass)
