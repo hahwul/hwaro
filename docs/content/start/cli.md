@@ -111,6 +111,7 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | --skip-sample-content | Skip creating sample content files |
 | --skip-taxonomies | Skip taxonomies configuration and templates |
 | --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`) |
+| --minimal-config | Generate minimal `config.toml` without comments or optional sections |
 | --list-scaffolds | List available built-in scaffolds and exit |
 | --json | Emit machine-readable JSON output (with --list-scaffolds) |
 
@@ -138,6 +139,8 @@ Creates a Markdown file with front matter template. Supports **archetypes** for 
 | --tags TAGS | Comma-separated tags |
 | -s, --section NAME | Section directory (e.g. `blog`, `docs`) |
 | -a, --archetype NAME | Archetype to use |
+| --bundle | Create a leaf-bundle directory (`foo/index.md`) instead of a single file |
+| --no-bundle | Force a single file (`foo.md`); overrides `[content.new].bundle = true` |
 | --list-archetypes | List archetypes in the current project and exit |
 | --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
 
