@@ -1230,7 +1230,7 @@ Each content file starts with front matter in TOML format:
 ```markdown
 +++
 title = "Page Title"
-date = "2026-01-01"
+date = "#{Time.utc.to_s("%Y-%m-%d")}"
 description = "Page description for SEO"
 +++
 

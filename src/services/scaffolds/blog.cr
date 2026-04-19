@@ -857,6 +857,12 @@ module Hwaro
           NAV
         end
 
+        # Generates a sample post date relative to today, so a freshly
+        # scaffolded site never shows a stale "last post was in 2024" feel.
+        private def sample_date(offset_days : Int32) : String
+          (Time.utc - offset_days.days).to_s("%Y-%m-%d")
+        end
+
         # Content files
         private def render_page(
           title : String,
@@ -952,7 +958,7 @@ CONTENT
             title: "Hello World",
             body: body,
             skip_taxonomies: skip_taxonomies,
-            date: "2026-01-15",
+            date: sample_date(10),
             description: "My first blog post using Hwaro static site generator.",
             tags: ["introduction", "hello"],
             categories: ["general"],
@@ -995,7 +1001,7 @@ CONTENT
             title: "Getting Started with Hwaro",
             body: body,
             skip_taxonomies: skip_taxonomies,
-            date: "2026-01-20",
+            date: sample_date(5),
             description: "A beginner's guide to building websites with Hwaro.",
             tags: ["tutorial", "getting-started", "hwaro"],
             categories: ["tutorials"],
@@ -1035,8 +1041,8 @@ CONTENT
 
           ## Links and Images
 
-          - [Link text](https://example.com)
-          - ![Alt text](/path/to/image.jpg)
+          - [Link text](https://example.com) using `[text](url)`
+          - Image syntax: `![Alt text](path/to/image.jpg)`
 
           ## Blockquotes
 
@@ -1050,7 +1056,7 @@ CONTENT
             title: "Markdown Tips and Tricks",
             body: body,
             skip_taxonomies: skip_taxonomies,
-            date: "2026-01-25",
+            date: sample_date(0),
             description: "Learn useful Markdown formatting techniques for your blog posts.",
             tags: ["markdown", "writing", "tips"],
             categories: ["tutorials"],
