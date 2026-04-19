@@ -29,8 +29,13 @@ module Hwaro::Core::Build::Phases::Initialize
         end
       end
 
-      setup_output_dir(output_dir, cache_enabled)
-      copy_static_files(output_dir, verbose, cache_enabled)
+      # `preserve_output` keeps existing output files between rebuilds (used
+      # by `hwaro serve` watch rebuilds) so mtime-based skip logic in hooks
+      # like image processing can actually short-circuit. For a cold build
+      # we always wipe to guarantee a clean state.
+      keep_output = cache_enabled || ctx.options.preserve_output
+      setup_output_dir(output_dir, keep_output)
+      copy_static_files(output_dir, verbose, keep_output)
 
       config = @config || raise "Config not loaded"
       if url = ctx.options.base_url

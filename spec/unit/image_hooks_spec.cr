@@ -310,4 +310,67 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
   end
+
+  # Regression coverage for #389: on watch rebuilds we want the hook to
+  # skip images whose source is unchanged and whose resized files already
+  # exist. These tests cover the pure predicate; end-to-end reuse is
+  # exercised by `process_images` via the path through this helper.
+  describe ".reusable_widths" do
+    it "returns a width => filename map when all destinations are fresh" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
+        File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
+        result.should_not be_nil
+        result.not_nil![320].should eq("photo_320w.jpg")
+        result.not_nil![640].should eq("photo_640w.jpg")
+      end
+    end
+
+    it "returns nil when any destination is missing" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        # Only the 320w variant exists
+        File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320, 640])
+          .should be_nil
+      end
+    end
+
+    it "returns nil when a destination is older than the source" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        dest = File.join(dest_dir, "photo_320w.jpg")
+
+        # Write the destination first, then touch the source to be newer.
+        File.write(dest, "old")
+        File.touch(dest, Time.utc - 5.minutes)
+        File.write(source, "src")
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320])
+          .should be_nil
+      end
+    end
+
+    it "returns nil when the source file is missing" do
+      Dir.mktmpdir do |dir|
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(File.join(dir, "missing.jpg"), dir, [320])
+          .should be_nil
+      end
+    end
+  end
 end

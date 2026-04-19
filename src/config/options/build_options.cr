@@ -22,6 +22,11 @@ module Hwaro
         property env : String?
         property skip_og_image : Bool
         property skip_image_processing : Bool
+        # Keep existing output files between rebuilds. Used by `hwaro serve`'s
+        # watch-triggered rebuilds so repeated full rebuilds don't wipe the
+        # already-processed resized images (see `ImageHooks#process_images`
+        # mtime-skip logic, which only works when destinations survive).
+        property preserve_output : Bool
 
         def initialize(
           @output_dir : String = "public",
@@ -44,6 +49,7 @@ module Hwaro
           @env : String? = nil,
           @skip_og_image : Bool = false,
           @skip_image_processing : Bool = false,
+          @preserve_output : Bool = false,
         )
         end
 

@@ -262,8 +262,15 @@ module Hwaro
         Logger.info "Performing initial build..."
         @builder.run(build_options)
 
+        # Watch-triggered rebuilds should preserve the already-built output
+        # so per-image mtime-skip (and any future incremental hook logic)
+        # can short-circuit. Cold start still wipes — see above — to keep
+        # serve honest about fresh state.
+        watch_options = build_options.dup
+        watch_options.preserve_output = true
+
         spawn do
-          watch_for_changes(build_options)
+          watch_for_changes(watch_options)
         end
 
         url = "http://#{host}:#{port}"
