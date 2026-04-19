@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.12.0
+
+### Added
+- Leaf-bundle layout for `hwaro new` with `--bundle`, archetype, and config support (#391)
+- Scaffold `archetypes/default.md` on `hwaro init` (#388)
+- Configurable front matter with description default for `hwaro new` (#387)
+- `--json` output for `build`, `serve`, `deploy`, and `tool` subcommands (#372)
+- Per-target summary in `hwaro deploy --json` (#377)
+- JSON introspection for scaffolds, archetypes, and deploy targets (#368)
+- Stable error taxonomy with consistent exit codes (#373)
+- `HwaroError` classification for IO, network, template, and content errors (#378, #380)
+- Global `--quiet` flag and `NO_COLOR` support (#371)
+- Live reload enabled by default for `hwaro serve` (#370)
+- Deterministic ready signal from `hwaro serve` (#367)
+- Closest-match suggestion on unknown command/subcommand (#366)
+- Configured deploy targets shown in `deploy --help` (#364)
+- Inline status glyphs in doctor output (#365)
+- Crystal 1.20 support (#342)
+- Docs coverage for remaining CLI flags, config keys, template helpers, `tool import`, `serve --no-error-overlay`, and `check-links` filename (#392, #393)
+
+### Changed
+- `hwaro new` is flag-only; dropped interactive title prompt (#369)
+- Skip image reprocessing for unchanged sources on serve rebuilds (#390)
+- Top-k related posts and combined CSS structural-char pass (#382)
+- Raise `HwaroError(HWARO_E_CONFIG)` at config-load source (#379)
+- Switch CI to official `crystallang/crystal` image
+- Expanded unit and functional specs across scaffolds, build phases, lifecycle, pagination, content processors, image hooks, live reload, and tool subcommands (#338, #339, #340, #341, #343, #344, #345, #346, #347)
+
+### Fixed
+- Broken check-links URL and missing OG image alt text in docs (#394)
+- Scaffold sample dates and broken docs links (#383)
+- Always emit `date` field in `tool list --json` (#376)
+- Spurious `feeds.filename` doctor warning (#363)
+- Interactive prompt hang in non-TTY environments for `hwaro new` (#362)
+- Stray dots in `init` output for current directory (#361)
+- IPv6 loopback allowlist in `LiveReloadHandler`
+
 ## v0.11.1
 
 ### Added

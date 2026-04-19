@@ -76,7 +76,7 @@ module Hwaro
     # Auto-detect unless explicitly set. Disabled when `NO_COLOR` env var
     # is set to any non-empty value, or when STDOUT is not a TTY.
     def self.color_enabled? : Bool
-      if override = @@color_enabled
+      unless (override = @@color_enabled).nil?
         return override
       end
       return false if ENV.has_key?("NO_COLOR") && !ENV["NO_COLOR"].empty?
