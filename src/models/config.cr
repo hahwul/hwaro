@@ -996,16 +996,18 @@ module Hwaro
       end
 
       # Loads `hwaro new` scaffold settings from `[content.new]` (preferred)
-      # or falls back to flat keys under `[content]` so short configs like
-      # `[content]\nfront_matter_format = "yaml"` also work.
+      # or falls back to flat keys on `[content]` so short configs like
+      # `[content]\nfront_matter_format = "yaml"` also work. The fallback is
+      # scoped to the two recognised keys so unrelated `[content]` sub-tables
+      # (e.g. `[content.files]`) can never be misread as `new`-scaffold input.
       private def self.load_content_new(config : Config)
         return unless content_section = config.raw["content"]?.try(&.as_h?)
 
-        # Prefer the nested `[content.new]` table; fall back to flat keys on
-        # `[content]` for single-option configs.
-        section = content_section["new"]?.try(&.as_h?) || content_section
+        nested = content_section["new"]?.try(&.as_h?)
+        format_any = nested.try(&.[]?("front_matter_format")) || content_section["front_matter_format"]?
+        fields_any = nested.try(&.[]?("default_fields")) || content_section["default_fields"]?
 
-        if format = section["front_matter_format"]?.try(&.as_s?)
+        if format = format_any.try(&.as_s?)
           normalized = format.downcase
           if ContentNewConfig::VALID_FORMATS.includes?(normalized)
             config.content_new.front_matter_format = normalized
@@ -1014,7 +1016,7 @@ module Hwaro
           end
         end
 
-        if fields = section["default_fields"]?.try(&.as_a?)
+        if fields = fields_any.try(&.as_a?)
           config.content_new.default_fields = fields.compact_map(&.as_s?)
         end
       end

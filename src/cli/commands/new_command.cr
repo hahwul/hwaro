@@ -77,15 +77,13 @@ module Hwaro
         end
 
         # Try to load `config.toml` so `hwaro new` can honour site-level
-        # preferences (front matter format, default fields). Missing or
-        # malformed config falls back to defaults silently — `hwaro new` must
-        # keep working in freshly-scaffolded or in-flight projects.
+        # preferences (front matter format, default fields). A missing
+        # `config.toml` is tolerated (freshly-scaffolded projects), but a
+        # malformed one is surfaced as the same classified HwaroError every
+        # other command raises — silent fallback would mask user typos.
         private def load_config_if_present : Models::Config?
           return nil unless File.exists?("config.toml")
           Models::Config.load
-        rescue ex
-          Logger.debug "Skipping config load for 'new': #{ex.message}"
-          nil
         end
 
         # Print archetypes found under the current project's archetypes/ dir.

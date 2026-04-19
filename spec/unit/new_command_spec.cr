@@ -101,4 +101,23 @@ describe Hwaro::CLI::Commands::NewCommand do
       end
     end
   end
+
+  # A malformed `config.toml` must surface as the same classified
+  # HWARO_E_CONFIG error that every other command raises. Silently falling
+  # back to defaults would hide user typos from `hwaro new`.
+  describe "#run with malformed config" do
+    it "raises HwaroError(HWARO_E_CONFIG) when config.toml is broken" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", "this = = broken\n")
+          FileUtils.mkdir_p("content/drafts")
+
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["post.md", "-t", "Hello"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        end
+      end
+    end
+  end
 end
