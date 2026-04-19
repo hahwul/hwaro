@@ -23,6 +23,14 @@ describe Hwaro::Config::Options::BuildOptions do
       opts.stream.should be_false
       opts.memory_limit.should be_nil
       opts.env.should be_nil
+      opts.preserve_output.should be_false
+    end
+
+    it "round-trips preserve_output" do
+      # `preserve_output = true` is what `hwaro serve` flips on for watch
+      # rebuilds so the output dir isn't wiped between keystrokes (see #389).
+      opts = Hwaro::Config::Options::BuildOptions.new(preserve_output: true)
+      opts.preserve_output.should be_true
     end
 
     it "accepts custom values" do

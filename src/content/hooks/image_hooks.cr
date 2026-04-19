@@ -154,7 +154,7 @@ module Hwaro
           if jobs_to_process.empty?
             @@resize_map_mutex.synchronize { @@resize_map = new_map }
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
-            Logger.debug "  Image processing: reused #{reused_count} cached result(s); no decode needed."
+            Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
 
@@ -186,25 +186,34 @@ module Hwaro
 
           @@resize_map_mutex.synchronize { @@resize_map = new_map }
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
-          resized_count = jobs_to_process.size
+          # Count variants (widths × successful jobs), matching the pre-#389
+          # meaning. Counting source images instead would silently halve/third
+          # the number users see and make the "Generated N" line less useful
+          # for verifying that configured widths actually produced output.
+          resized_count = jobs_to_process.sum { |j| new_map[j.original_url]?.try(&.size) || 0 }
           Logger.success "  Generated #{resized_count} resized image(s)." if resized_count > 0
-          Logger.debug "  Image processing: reused #{reused_count} cached result(s)." if reused_count > 0
+          Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
           Logger.success "  Generated #{new_lqip_map.size} LQIP placeholder(s)." if new_lqip_map.size > 0
         end
 
         # Returns a `width => filename` map when every expected destination
         # file already exists on disk with an mtime at least as new as the
         # source (i.e. decoding/resizing would produce bit-identical output).
-        # Returns nil when any destination is missing or stale — caller then
-        # processes the image normally. Caller must also verify LQIP cache
-        # separately; LQIP can't be reconstructed from disk bytes.
+        # Returns nil when any destination is missing, stale, or empty —
+        # caller then processes the image normally. Empty is checked so a
+        # killed serve mid-write doesn't leave a zero-byte file that would
+        # pass an mtime check and get served as a broken image.
+        #
+        # Caller must also verify LQIP cache separately; LQIP can't be
+        # reconstructed from disk bytes.
         def self.reusable_widths(
           source_path : String,
           dest_dir : String,
           widths : Array(Int32),
         ) : Hash(Int32, String)?
           return nil unless File.exists?(source_path)
-          source_mtime = File.info(source_path).modification_time
+          source_info = File.info(source_path)
+          source_mtime = source_info.modification_time
 
           ext = File.extname(source_path)
           basename = File.basename(source_path, ext)
@@ -213,7 +222,9 @@ module Hwaro
             filename = "#{basename}_#{width}w#{ext}"
             dest = File.join(dest_dir, filename)
             return nil unless File.exists?(dest)
-            return nil if File.info(dest).modification_time < source_mtime
+            dest_info = File.info(dest)
+            return nil if dest_info.modification_time < source_mtime
+            return nil if dest_info.size == 0
             result[width] = filename
           end
           result

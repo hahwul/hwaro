@@ -372,5 +372,22 @@ describe Hwaro::Content::Hooks::ImageHooks do
           .should be_nil
       end
     end
+
+    it "returns nil when a destination is zero bytes" do
+      # Defends against a killed serve leaving a half-written resized file:
+      # mtime is valid but the file is empty, and reusing it would serve a
+      # corrupt image. Cheaper to reprocess than to serve broken bytes.
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_320w.jpg"), "")
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320])
+          .should be_nil
+      end
+    end
   end
 end
