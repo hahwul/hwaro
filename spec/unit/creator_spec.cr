@@ -1,4 +1,5 @@
 require "../spec_helper"
+require "../../src/models/config"
 require "../../src/services/creator"
 
 describe Hwaro::Services::Creator do
@@ -18,8 +19,8 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"My First Post\"")
-          content.should contain("draft: true")
+          content.should contain("title = \"My First Post\"")
+          content.should contain("draft = true")
         end
       end
     end
@@ -38,7 +39,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"My Custom Title\"")
+          content.should contain("title = \"My Custom Title\"")
         end
       end
     end
@@ -74,7 +75,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"My Blog Post\"")
+          content.should contain("title = \"My Blog Post\"")
         end
       end
     end
@@ -163,8 +164,8 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"Fallback Test\"")
-          content.should contain("date: ")
+          content.should contain("title = \"Fallback Test\"")
+          content.should contain("date = ")
         end
       end
     end
@@ -199,7 +200,7 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"My Draft Post\"")
+          content.should contain("title = \"My Draft Post\"")
         end
       end
     end
@@ -287,7 +288,86 @@ describe Hwaro::Services::Creator do
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title: \"Breaking News! (2024)\"")
+          content.should contain("title = \"Breaking News! (2024)\"")
+        end
+      end
+    end
+
+    it "defaults to TOML front matter with a description field" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/drafts/post.md")
+          content.should contain("+++\n")
+          content.should contain("title = \"Hello\"")
+          content.should contain("description = \"\"")
+          content.should_not contain("---\n")
+        end
+      end
+    end
+
+    it "emits YAML front matter when config selects yaml" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "yaml"
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/drafts/post.md")
+          content.should contain("---\n")
+          content.should contain("title: \"Hello\"")
+          content.should contain("description: \"\"")
+          content.should_not contain("+++\n")
+        end
+      end
+    end
+
+    it "honours custom default_fields from config" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = ["description", "author", "summary"]
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/drafts/post.md")
+          content.should contain("description = \"\"")
+          content.should contain("author = \"\"")
+          content.should contain("summary = \"\"")
+        end
+      end
+    end
+
+    it "ignores built-in fields listed in default_fields" do
+      # Built-ins (title/date/draft/tags) have dedicated rendering. Listing
+      # them in default_fields must not duplicate them with empty values.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = ["title", "date", "draft", "tags", "description"]
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/drafts/post.md")
+          content.scan("title = ").size.should eq(1)
+          content.scan("date = ").size.should eq(1)
+          content.should_not contain("title = \"\"")
+          content.should_not contain("date = \"\"")
+          content.should contain("description = \"\"")
         end
       end
     end

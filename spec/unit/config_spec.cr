@@ -706,6 +706,56 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
+  # `hwaro new` content scaffold defaults
+  # ---------------------------------------------------------------------------
+
+  describe "content.new configuration" do
+    it "defaults to TOML front matter with a description field" do
+      config = Hwaro::Models::Config.new
+      config.content_new.front_matter_format.should eq("toml")
+      config.content_new.default_fields.should eq(["description"])
+      config.content_new.toml?.should be_true
+    end
+
+    it "loads front_matter_format and default_fields from [content.new]" do
+      config = load_config(<<-TOML)
+      [content.new]
+      front_matter_format = "yaml"
+      default_fields = ["description", "summary"]
+      TOML
+
+      config.content_new.front_matter_format.should eq("yaml")
+      config.content_new.default_fields.should eq(["description", "summary"])
+      config.content_new.toml?.should be_false
+    end
+
+    it "accepts flat keys on [content] as a shorthand" do
+      config = load_config(<<-TOML)
+      [content]
+      front_matter_format = "YAML"
+      TOML
+
+      # Case-insensitive normalization keeps configs tolerant of casing.
+      config.content_new.front_matter_format.should eq("yaml")
+    end
+
+    it "keeps the default format when the configured value is unknown" do
+      config = load_config(<<-TOML)
+      [content.new]
+      front_matter_format = "json"
+      TOML
+
+      config.content_new.front_matter_format.should eq("toml")
+    end
+
+    it "filters built-in fields out of extra_fields" do
+      config = Hwaro::Models::Config.new
+      config.content_new.default_fields = ["title", "description", "date", "author"]
+      config.content_new.extra_fields.should eq(["description", "author"])
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Pagination
   # ---------------------------------------------------------------------------
 
