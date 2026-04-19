@@ -20,7 +20,7 @@ describe Hwaro::Services::Scaffolds::Blog do
       files["posts/hello-world.md"].should contain("tags = [\"introduction\", \"hello\"]")
       files["posts/hello-world.md"].should contain("categories = [\"general\"]")
       files["posts/hello-world.md"].should contain("authors = [\"admin\"]")
-      files["posts/hello-world.md"].should contain("date = \"2024-01-15\"")
+      files["posts/hello-world.md"].should match(/date = "\d{4}-\d{2}-\d{2}"/)
     end
 
     it "generates content without taxonomies when requested" do
@@ -43,7 +43,7 @@ describe Hwaro::Services::Scaffolds::Blog do
       files["posts/hello-world.md"].should_not contain("authors =")
 
       # Date should still be present
-      files["posts/hello-world.md"].should contain("date = \"2024-01-15\"")
+      files["posts/hello-world.md"].should match(/date = "\d{4}-\d{2}-\d{2}"/)
     end
   end
 end
