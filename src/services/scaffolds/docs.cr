@@ -65,13 +65,17 @@ module Hwaro
         end
 
         protected def docs_archetype : String
+          # `weight` is commented out intentionally: every docs section
+          # page shouldn't default to the same weight or ordering becomes
+          # non-deterministic. Users who care about ordering should set
+          # it explicitly per page.
           <<-MD
           +++
           title = "{{ title }}"
           date = "{{ date }}"
           draft = {{ draft }}
           description = ""
-          weight = 10
+          # weight = 10
           toc = true
           tags = {{ tags }}
           +++

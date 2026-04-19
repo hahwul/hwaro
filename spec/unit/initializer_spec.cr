@@ -179,7 +179,10 @@ describe Hwaro::Services::Initializer do
             File.exists?(File.join(target, "archetypes", "#{name}.md")).should be_true
           end
           content = File.read(File.join(target, "archetypes", "guide.md"))
-          content.should contain("weight = 10")
+          # `weight` is commented out so every new docs page doesn't
+          # default to the same weight and collide on ordering.
+          content.should contain("# weight = 10")
+          content.should_not match(/^weight = /m)
           content.should contain("toc = true")
         end
       end
