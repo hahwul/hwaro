@@ -62,6 +62,13 @@ module Hwaro
           @shortcode_data
         end
 
+        # Remote scaffolds mirror the upstream repo verbatim; we don't
+        # inject a built-in `default.md` because the remote might deliberately
+        # not use archetypes, or already ship its own under `archetypes/`.
+        def archetype_files : Hash(String, String)
+          {} of String => String
+        end
+
         def config_content(skip_taxonomies : Bool = false) : String
           @config_data
         end

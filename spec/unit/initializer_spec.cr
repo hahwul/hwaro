@@ -1,5 +1,6 @@
 require "../spec_helper"
 require "../../src/services/initializer"
+require "../../src/services/creator"
 require "file_utils"
 
 describe Hwaro::Services::Initializer do
@@ -129,6 +130,79 @@ describe Hwaro::Services::Initializer do
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
           Dir.exists?(File.join(target, "templates")).should be_true
+        end
+      end
+    end
+
+    describe "archetypes" do
+      it "creates archetypes/default.md for built-in scaffolds" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(target)
+
+          archetype_path = File.join(target, "archetypes", "default.md")
+          File.exists?(archetype_path).should be_true
+
+          content = File.read(archetype_path)
+          content.should contain("+++")
+          content.should contain("title = \"{{ title }}\"")
+          content.should contain("description = \"\"")
+        end
+      end
+
+      it "ships a posts archetype with the blog scaffold" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
+          )
+
+          posts_path = File.join(target, "archetypes", "posts.md")
+          File.exists?(posts_path).should be_true
+
+          content = File.read(posts_path)
+          content.should contain("authors = []")
+          content.should contain("categories = []")
+        end
+      end
+
+      it "ships section archetypes with the docs scaffold" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
+          )
+
+          %w[getting-started guide reference].each do |name|
+            File.exists?(File.join(target, "archetypes", "#{name}.md")).should be_true
+          end
+          content = File.read(File.join(target, "archetypes", "guide.md"))
+          content.should contain("weight = 10")
+          content.should contain("toc = true")
+        end
+      end
+
+      it "makes `hwaro new` pick up the scaffolded default archetype" do
+        # Regression: the whole point of shipping `archetypes/default.md`
+        # is that `Services::Creator#find_archetype` should match it for
+        # fresh sites, producing TOML front matter with `description`
+        # instead of the hardcoded built-in template.
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(target)
+
+          Dir.cd(target) do
+            FileUtils.mkdir_p("content/drafts")
+            options = Hwaro::Config::Options::NewOptions.new(path: "hello.md", title: "Hello")
+            Hwaro::Services::Creator.new.run(options)
+
+            content = File.read("content/drafts/hello.md")
+            content.should contain("+++")
+            content.should contain("title = \"Hello\"")
+            content.should contain("description = \"\"")
+          end
         end
       end
     end

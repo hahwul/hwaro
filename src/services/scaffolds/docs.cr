@@ -51,6 +51,36 @@ module Hwaro
           files
         end
 
+        # Docs ships section-specific archetypes so `hwaro new
+        # getting-started/foo.md`, `guide/foo.md`, and `reference/foo.md`
+        # each auto-match (see `Services::Creator#find_archetype`) with
+        # docs-shaped front matter (weight/toc) that a generic
+        # `default.md` would miss.
+        def archetype_files : Hash(String, String)
+          super.merge({
+            "getting-started.md" => docs_archetype,
+            "guide.md"           => docs_archetype,
+            "reference.md"       => docs_archetype,
+          })
+        end
+
+        protected def docs_archetype : String
+          <<-MD
+          +++
+          title = "{{ title }}"
+          date = "{{ date }}"
+          draft = {{ draft }}
+          description = ""
+          weight = 10
+          toc = true
+          tags = {{ tags }}
+          +++
+
+          # {{ title }}
+
+          MD
+        end
+
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
             "header.html"  => header_template,
