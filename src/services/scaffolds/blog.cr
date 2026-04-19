@@ -156,6 +156,34 @@ module Hwaro
           }
         end
 
+        # Blog ships a `posts.md` archetype in addition to `default.md` so
+        # `hwaro new posts/<slug>.md` auto-matches it (see
+        # `Services::Creator#find_archetype`) and scaffolds blog-shaped
+        # front matter (authors/categories) without the user having to
+        # write the archetype themselves.
+        def archetype_files : Hash(String, String)
+          super.merge({
+            "posts.md" => posts_archetype,
+          })
+        end
+
+        protected def posts_archetype : String
+          <<-MD
+          +++
+          title = "{{ title }}"
+          date = "{{ date }}"
+          draft = {{ draft }}
+          description = ""
+          authors = []
+          categories = []
+          tags = {{ tags }}
+          +++
+
+          # {{ title }}
+
+          MD
+        end
+
         private def css_content : String
           <<-CSS
           :root {

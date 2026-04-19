@@ -43,6 +43,39 @@ module Hwaro
           }
         end
 
+        # Returns archetype files (path relative to `archetypes/`) as a
+        # hash of path => content. The default set ships a `default.md`
+        # that `hwaro new` picks up automatically (see
+        # `Services::Creator#find_archetype`), which both makes the
+        # archetype slot discoverable and ensures scaffolded content gets
+        # reasonable default front matter (TOML + `description`) without
+        # relying on the built-in template. Subclasses can extend this to
+        # add section-specific archetypes (e.g. `posts.md`).
+        def archetype_files : Hash(String, String)
+          {
+            "default.md" => default_archetype,
+          }
+        end
+
+        # Built-in default archetype content (TOML front matter).
+        # `Services::Creator` substitutes `{{ title }}`, `{{ date }}`,
+        # `{{ draft }}`, and `{{ tags }}`; other fields (description) ship
+        # with empty values for users to fill in.
+        protected def default_archetype : String
+          <<-MD
+          +++
+          title = "{{ title }}"
+          date = "{{ date }}"
+          draft = {{ draft }}
+          description = ""
+          tags = {{ tags }}
+          +++
+
+          # {{ title }}
+
+          MD
+        end
+
         # Returns the config.toml content
         abstract def config_content(skip_taxonomies : Bool = false) : String
 

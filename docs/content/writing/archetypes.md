@@ -7,6 +7,8 @@ toc = true
 
 Archetypes are content templates that define default front matter and content structure for new pages. When you create content with `hwaro new`, archetypes provide consistent starting points.
 
+`hwaro init` ships a starter `archetypes/default.md` (and scaffold-specific archetypes like `posts.md` for the blog scaffold) so `hwaro new` picks up TOML front matter with a `description` field out of the box. Edit or extend them to match your site's conventions.
+
 ## Overview
 
 Archetypes live in the `archetypes/` directory at your project root:

@@ -98,6 +98,10 @@ module Hwaro
         # Create static files
         create_scaffold_static_files(target_path, scaffold)
 
+        # Create archetype files so `hwaro new` has templates to match
+        # against and the archetype convention is discoverable.
+        create_scaffold_archetypes(target_path, scaffold)
+
         # Create config.toml
         config_content = if minimal_config
                            scaffold.minimal_config_content(skip_taxonomies)
@@ -170,6 +174,31 @@ module Hwaro
         shortcode_files = scaffold.shortcode_files
         shortcode_files.each do |relative_path, content|
           full_path = File.join(templates_dir, relative_path)
+          create_file(full_path, content)
+        end
+      end
+
+      # Writes the scaffold's archetype files under `archetypes/` so
+      # `hwaro new` can match them via `Services::Creator#find_archetype`.
+      # Creating the directory — even for scaffolds that ship no archetype
+      # files (e.g. remote) — would leave a confusing empty folder, so we
+      # skip both directory creation and file writes when the scaffold
+      # returns no archetypes.
+      private def create_scaffold_archetypes(target_path : String, scaffold : Scaffolds::Base)
+        archetype_files = scaffold.archetype_files
+        return if archetype_files.empty?
+
+        archetypes_dir = File.join(target_path, "archetypes")
+        create_directory(archetypes_dir)
+
+        archetype_files.each do |relative_path, content|
+          full_path = File.join(archetypes_dir, relative_path)
+          dir_path = File.dirname(full_path)
+
+          unless Dir.exists?(dir_path)
+            create_directory(dir_path)
+          end
+
           create_file(full_path, content)
         end
       end
