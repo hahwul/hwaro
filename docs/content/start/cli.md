@@ -388,7 +388,7 @@ hwaro tool check-links --json
 |----------|------------|-------------|
 | Content | [list](/start/tools/list/) | List content files by status (all, drafts, published) |
 | Content | [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
-| Content | [check-links](/start/tools/deadlink/) | Check for dead links in content files |
+| Content | [check-links](/start/tools/check-links/) | Check for dead links in content files |
 | Content | [stats](/start/tools/stats/) | Show content statistics |
 | Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |

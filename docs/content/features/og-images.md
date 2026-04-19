@@ -7,7 +7,7 @@ toc = true
 
 Hwaro can automatically generate Open Graph (OG) preview images for pages that don't have a custom image set. These images are used by social media platforms when your content is shared.
 
-![](/og-images/features-og-images.png)
+![Auto-generated OG image for the Auto OG Images page](/og-images/features-og-images.png)
 *Example: This is the og image of this page.*
 
 ## How It Works
