@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.1
+
+### Fixed
+- `InternalLinkResolver` dropping `base_url` path prefix on `@/` links, causing 404s on subpath deployments (#397)
+
 ## v0.12.0
 
 ### Added
