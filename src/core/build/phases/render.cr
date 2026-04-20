@@ -301,7 +301,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Resolve internal @/ links to actual page URLs
     if pages_by_path = @pages_by_path
-      html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path)
+      html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
     end
 
     # Store rendered HTML in page.content for reuse by Feed/Search generators
