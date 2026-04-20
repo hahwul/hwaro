@@ -1,4 +1,5 @@
 require "html"
+require "uri"
 
 # Internal Link Resolver
 #
@@ -25,8 +26,18 @@ module Hwaro
         # - `html` — rendered HTML string
         # - `pages_by_path` — map from content path (e.g. "blog/post.md") to Page
         # - `source_path` — path of the page being rendered (for warning messages)
-        def resolve(html : String, pages_by_path : Hash(String, Models::Page), source_path : String) : String
+        # - `base_url` — site base_url, used to prepend the path component (e.g. "/noir")
+        #   so links work when the site is served from a subpath. When empty or root,
+        #   no prefix is added and behavior matches the previous output.
+        def resolve(
+          html : String,
+          pages_by_path : Hash(String, Models::Page),
+          source_path : String,
+          base_url : String = "",
+        ) : String
           return html unless html.includes?("@/")
+
+          base_path = base_url.empty? ? "" : URI.parse(base_url).path.rstrip("/")
 
           html.gsub(INTERNAL_LINK_REGEX) do |match|
             content_path = $1
@@ -38,7 +49,8 @@ module Hwaro
             end
 
             if page = pages_by_path[content_path]?
-              url = HTML.escape(page.url)
+              page_url = page.url.starts_with?("/") ? page.url : "/#{page.url}"
+              url = HTML.escape("#{base_path}#{page_url}")
               if anchor && !anchor.empty?
                 "href=\"#{url}##{HTML.escape(anchor)}\""
               else

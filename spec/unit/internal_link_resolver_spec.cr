@@ -67,5 +67,50 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
       result.should eq html
     end
+
+    it "prepends base_url path component when site is served from a subpath" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(
+        html, pages, "index.md", "https://example.github.io/project"
+      )
+      result.should eq %(<a href="/project/blog/post/">link</a>)
+    end
+
+    it "prepends base_url path to links with anchors" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md#section">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(
+        html, pages, "index.md", "https://example.github.io/project"
+      )
+      result.should eq %(<a href="/project/blog/post/#section">link</a>)
+    end
+
+    it "does not add prefix when base_url has no path component" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(
+        html, pages, "index.md", "https://example.com"
+      )
+      result.should eq %(<a href="/blog/post/">link</a>)
+    end
+
+    it "handles trailing slash in base_url" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(
+        html, pages, "index.md", "https://example.github.io/project/"
+      )
+      result.should eq %(<a href="/project/blog/post/">link</a>)
+    end
+
+    it "handles nested base path" do
+      pages = {"docs/_index.md" => make_page("docs/_index.md", "/docs/")}
+      html = %(<a href="@/docs/_index.md">docs</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(
+        html, pages, "index.md", "https://example.com/a/b"
+      )
+      result.should eq %(<a href="/a/b/docs/">docs</a>)
+    end
   end
 end
