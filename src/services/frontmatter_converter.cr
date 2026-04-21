@@ -176,8 +176,6 @@ module Hwaro
           yaml_to_toml(content)
         when {FrontmatterFormat::TOML, FrontmatterFormat::YAML}
           toml_to_yaml(content)
-        else
-          nil
         end
       end
 
@@ -196,8 +194,6 @@ module Hwaro
             Logger.debug "YAML parse error: #{ex.message}"
             nil
           end
-        else
-          nil
         end
       end
 
@@ -216,8 +212,6 @@ module Hwaro
             Logger.debug "TOML parse error: #{ex.message}"
             nil
           end
-        else
-          nil
         end
       end
 
@@ -248,7 +242,7 @@ module Hwaro
 
             if value.as_h?
               tables[key_str] = value
-            elsif is_array_of_tables?(value)
+            elsif array_of_tables?(value)
               array_tables[key_str] = value
             else
               simple_values[key_str] = value
@@ -278,10 +272,10 @@ module Hwaro
           end
         end
 
-        private def is_array_of_tables?(value : YAML::Any) : Bool
+        private def array_of_tables?(value : YAML::Any) : Bool
           return false unless value.as_a?
           return false if value.as_a.empty?
-          value.as_a.all? { |v| v.as_h? }
+          value.as_a.all?(&.as_h?)
         end
 
         private def format_path(path : Array(String)) : String

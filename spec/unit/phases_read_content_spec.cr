@@ -135,7 +135,7 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           ctx = make_ctx(Hwaro::Models::Config.new)
           builder.test_collect_content_paths(ctx)
 
-          ctx.raw_files.map(&.relative_path).sort.should eq(["data.json", "feed.xml"])
+          ctx.raw_files.map(&.relative_path).sort!.should eq(["data.json", "feed.xml"])
         end
       end
     end

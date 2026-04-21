@@ -644,10 +644,12 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
         mtime = File.info(test_file).modification_time.to_unix_ms
 
-        new_json = %({
-          "metadata":{"template_hash":"abc","config_hash":"def"},
-          "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}]
-        })
+        new_json = <<-JSON
+          {
+            "metadata":{"template_hash":"abc","config_hash":"def"},
+            "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}]
+          }
+          JSON
         File.write(cache_path, new_json)
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
@@ -693,10 +695,12 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
         mtime = File.info(test_file).modification_time.to_unix_ms
 
-        json_with_extra = %({
-          "metadata":{"template_hash":"","config_hash":""},
-          "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":"","unknown_field":"value"}]
-        })
+        json_with_extra = <<-JSON
+          {
+            "metadata":{"template_hash":"","config_hash":""},
+            "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":"","unknown_field":"value"}]
+          }
+          JSON
         File.write(cache_path, json_with_extra)
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)

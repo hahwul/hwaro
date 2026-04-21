@@ -94,7 +94,7 @@ module Hwaro
 
         # Get all registered processors (cached and sorted by priority)
         def self.all : Array(Base)
-          @@sorted_processors ||= @@processors.values.sort_by(&.priority).reverse
+          @@sorted_processors ||= @@processors.values.sort_by!(&.priority).reverse!
         end
 
         # Get processors that can handle a specific file

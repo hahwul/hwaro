@@ -74,10 +74,10 @@ describe Hwaro::Content::Processors::Html do
 
     it "preserves meaningful structure and indentation" do
       html = <<-HTML
-      <div>
-        <p>Paragraph</p>
-      </div>
-      HTML
+        <div>
+          <p>Paragraph</p>
+        </div>
+        HTML
       processor = Hwaro::Content::Processors::Html.new
       result = processor.test_minify_html(html)
       result.should eq("<div>\n  <p>Paragraph</p>\n</div>")

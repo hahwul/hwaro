@@ -16,7 +16,7 @@ module Hwaro
       # Return the closest candidate to `input`, or nil when no candidate
       # is close enough to confidently suggest.
       def suggest(input : String, candidates : Enumerable(String)) : String?
-        return nil if input.empty?
+        return if input.empty?
 
         best : String? = nil
         best_distance = Int32::MAX
@@ -29,7 +29,7 @@ module Hwaro
           end
         end
 
-        return nil if best.nil?
+        return if best.nil?
 
         # Accept the match if it is close by edit distance, or if the
         # input and candidate share a meaningful (>= 3 char) prefix.

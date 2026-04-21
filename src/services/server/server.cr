@@ -45,8 +45,6 @@ module Hwaro
           public_real = File.realpath(@public_dir) rescue @public_dir
           resolved = if File.exists?(fs_path.to_s)
                        File.realpath(fs_path) rescue nil
-                     else
-                       nil
                      end
           if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
             context.response.status_code = 301
@@ -303,7 +301,7 @@ module Hwaro
 
         server = HTTP::Server.new(handlers)
 
-        address = server.bind_tcp host, port
+        server.bind_tcp host, port
         emit_ready_signal(host, port, json_output)
         server.listen
       end

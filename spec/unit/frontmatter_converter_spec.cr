@@ -449,13 +449,13 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "nested.md")
 
         yaml_content = <<-YAML
-title: Nested Test
-owner:
-  name: John Doe
-  details:
-    age: 30
-    city: New York
-YAML
+          title: Nested Test
+          owner:
+            name: John Doe
+            details:
+              age: 30
+              city: New York
+          YAML
         File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
 
         result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
@@ -480,13 +480,13 @@ YAML
         file_path = File.join(dir, "array_tables.md")
 
         yaml_content = <<-YAML
-title: Array Tables
-servers:
-  - name: alpha
-    ip: 10.0.0.1
-  - name: beta
-    ip: 10.0.0.2
-YAML
+          title: Array Tables
+          servers:
+            - name: alpha
+              ip: 10.0.0.1
+            - name: beta
+              ip: 10.0.0.2
+          YAML
         File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
 
         result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)

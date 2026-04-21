@@ -836,8 +836,8 @@ describe "Builder#inject_error_overlay" do
     result.should contain("Build Warning")
     result.should contain("No template found for test.md")
     # Overlay should be before </body>
-    overlay_pos = result.index("hwaro-error-overlay").not_nil!
-    body_pos = result.rindex("</body>").not_nil!
+    overlay_pos = result.index!("hwaro-error-overlay")
+    body_pos = result.rindex!("</body>")
     overlay_pos.should be < body_pos
   end
 
@@ -1186,10 +1186,6 @@ describe "Incremental build integration" do
         original_alpha.should contain("Alpha original content")
         original_beta.should contain("Beta original content")
         original_about.should contain("About page content")
-
-        # Record mtime of beta so we can verify it is NOT re-rendered
-        beta_mtime_before = File.info(beta_path).modification_time
-        about_mtime_before = File.info(about_path).modification_time
 
         # Small sleep so mtime changes are detectable
         sleep 0.05.seconds
@@ -1614,8 +1610,8 @@ describe Hwaro::Services::LiveReloadInjectHandler do
       content.should contain("__hwaro_livereload")
       content.should contain("location.reload()")
       # Script should be before </body>
-      script_pos = content.index("__hwaro_livereload").not_nil!
-      body_pos = content.rindex("</body>").not_nil!
+      script_pos = content.index!("__hwaro_livereload")
+      body_pos = content.rindex!("</body>")
       script_pos.should be < body_pos
       dummy.called.should be_false
     end
@@ -1814,12 +1810,12 @@ describe Hwaro::Services::LiveReloadInjectHandler, "#inject_script" do
     result = handler.inject_script(html)
 
     # Script must appear before the final </body>, not any earlier one
-    script_pos = result.index("__hwaro_livereload").not_nil!
-    last_body = result.rindex("</body>").not_nil!
+    script_pos = result.index!("__hwaro_livereload")
+    last_body = result.rindex!("</body>")
     script_pos.should be < last_body
 
     # An earlier literal </body> should precede the injected script
-    first_body = result.index("</body>").not_nil!
+    first_body = result.index!("</body>")
     first_body.should be < script_pos
   end
 

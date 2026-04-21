@@ -26,7 +26,7 @@ private def make_section(per_page : Int32? = nil, sort_by : String? = nil, rever
   s
 end
 
-private def make_pages(count : Int32, &block : Int32, Hwaro::Models::Page ->) : Array(Hwaro::Models::Page)
+private def make_pages(count : Int32, & : Int32, Hwaro::Models::Page ->) : Array(Hwaro::Models::Page)
   # Caller's block is responsible for setting page.title (every test does).
   Array(Hwaro::Models::Page).new(count) do |i|
     p = Hwaro::Models::Page.new("blog/post-#{i}.md")

@@ -62,7 +62,7 @@ module Hwaro
           end
 
           # Build Hugo frontmatter (TOML)
-          hugo_fields = {} of String => String | Bool | Array(String) | Nil
+          hugo_fields = {} of String => (String | Bool | Array(String))?
 
           # Direct mappings
           %w[title date description draft weight].each do |key|
@@ -110,7 +110,7 @@ module Hwaro
           :exported
         end
 
-        private def generate_toml_frontmatter(fields : Hash(String, String | Bool | Array(String) | Nil)) : String
+        private def generate_toml_frontmatter(fields : Hash(String, (String | Bool | Array(String))?)) : String
           lines = ["+++"]
 
           fields.each do |key, value|

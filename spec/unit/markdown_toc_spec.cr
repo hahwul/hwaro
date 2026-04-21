@@ -4,12 +4,12 @@ describe Hwaro::Content::Processors::Markdown do
   describe "TOC generation" do
     it "generates correct TOC structure" do
       content = <<-MARKDOWN
-      # Header 1
-      ## Header 1.1
-      ### Header 1.1.1
-      ## Header 1.2
-      # Header 2
-      MARKDOWN
+        # Header 1
+        ## Header 1.1
+        ### Header 1.1.1
+        ## Header 1.2
+        # Header 2
+        MARKDOWN
 
       _, toc = Hwaro::Content::Processors::Markdown.new.render(content)
 
@@ -31,11 +31,11 @@ describe Hwaro::Content::Processors::Markdown do
 
     it "ignores non-header tags" do
       content = <<-MARKDOWN
-      <hr>
-      <div class="h1">Not a header</div>
+        <hr>
+        <div class="h1">Not a header</div>
 
-      # Header
-      MARKDOWN
+        # Header
+        MARKDOWN
 
       _, toc = Hwaro::Content::Processors::Markdown.new.render(content)
       toc.size.should eq(1)
@@ -44,13 +44,13 @@ describe Hwaro::Content::Processors::Markdown do
 
     it "handles header levels correctly with char check optimization" do
       content = <<-MARKDOWN
-      # H1
-      ## H2
-      ### H3
-      #### H4
-      ##### H5
-      ###### H6
-      MARKDOWN
+        # H1
+        ## H2
+        ### H3
+        #### H4
+        ##### H5
+        ###### H6
+        MARKDOWN
 
       _, toc = Hwaro::Content::Processors::Markdown.new.render(content)
 

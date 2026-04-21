@@ -91,7 +91,7 @@ module Hwaro
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_astro_file(raw)
 
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
 
           if frontmatter_yaml
             yaml = YAML.parse(frontmatter_yaml)

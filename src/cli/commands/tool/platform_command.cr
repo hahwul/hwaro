@@ -68,7 +68,7 @@ module Hwaro
                 exit
               end
               parser.unknown_args do |unknown|
-                platform = unknown.first? if unknown.any?
+                platform = unknown.first? if unknown.present?
               end
             end
 

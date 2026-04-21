@@ -111,7 +111,7 @@ module Hwaro
       private def count_words(body : String) : Int32
         # Strip code blocks, then count whitespace-separated tokens
         stripped = body.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
-        stripped.split(/\s+/).reject(&.empty?).size
+        stripped.split(/\s+/).count { |w| !w.empty? }
       end
 
       private def extract_tags(content : String) : Array(String)

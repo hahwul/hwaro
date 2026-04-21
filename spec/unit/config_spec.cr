@@ -78,11 +78,11 @@ describe Hwaro::Models::Config do
   describe "loading top-level properties from TOML" do
     it "loads title, description, base_url, default_language" do
       config = load_config(<<-TOML)
-      title = "My Site"
-      description = "A great site"
-      base_url = "https://example.com"
-      default_language = "ko"
-      TOML
+        title = "My Site"
+        description = "A great site"
+        base_url = "https://example.com"
+        default_language = "ko"
+        TOML
 
       config.title.should eq("My Site")
       config.description.should eq("A great site")
@@ -107,14 +107,14 @@ describe Hwaro::Models::Config do
     it "merges env config on top of base config" do
       Dir.cd(Dir.tempdir) do
         File.write("config.toml", <<-TOML)
-        title = "My Site"
-        base_url = "http://localhost"
-        description = "Base desc"
-        TOML
+          title = "My Site"
+          base_url = "http://localhost"
+          description = "Base desc"
+          TOML
 
         File.write("config.production.toml", <<-TOML)
-        base_url = "https://example.com"
-        TOML
+          base_url = "https://example.com"
+          TOML
 
         config = Hwaro::Models::Config.load("config.toml", env: "production")
         config.title.should eq("My Site")
@@ -126,19 +126,19 @@ describe Hwaro::Models::Config do
     it "deep-merges nested sections" do
       Dir.cd(Dir.tempdir) do
         File.write("config.toml", <<-TOML)
-        title = "My Site"
-        [sitemap]
-        enabled = true
-        changefreq = "weekly"
-        TOML
+          title = "My Site"
+          [sitemap]
+          enabled = true
+          changefreq = "weekly"
+          TOML
 
         File.write("config.staging.toml", <<-TOML)
-        [sitemap]
-        changefreq = "daily"
-        TOML
+          [sitemap]
+          changefreq = "daily"
+          TOML
 
         config = Hwaro::Models::Config.load("config.toml", env: "staging")
-        config.sitemap.enabled.should eq(true)
+        config.sitemap.enabled.should be_true
         config.sitemap.changefreq.should eq("daily")
       end
     end
@@ -214,7 +214,7 @@ describe Hwaro::Models::Config do
   describe "sitemap configuration" do
     it "has default sitemap configuration" do
       config = Hwaro::Models::Config.new
-      config.sitemap.enabled.should eq(false)
+      config.sitemap.enabled.should be_false
       config.sitemap.filename.should eq("sitemap.xml")
       config.sitemap.changefreq.should eq("weekly")
       config.sitemap.priority.should eq(0.5)
@@ -238,15 +238,15 @@ describe Hwaro::Models::Config do
 
     it "loads sitemap settings from TOML with enabled = true" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [sitemap]
-      enabled = true
-      filename = "map.xml"
-      changefreq = "daily"
-      priority = 0.9
-      exclude = ["/secret"]
-      TOML
+        [sitemap]
+        enabled = true
+        filename = "map.xml"
+        changefreq = "daily"
+        priority = 0.9
+        exclude = ["/secret"]
+        TOML
 
       config.sitemap.enabled.should be_true
       config.sitemap.filename.should eq("map.xml")
@@ -257,29 +257,29 @@ describe Hwaro::Models::Config do
 
     it "loads sitemap enabled = false from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [sitemap]
-      enabled = false
-      TOML
+        [sitemap]
+        enabled = false
+        TOML
 
       config.sitemap.enabled.should be_false
     end
 
     it "handles backward-compatible boolean sitemap = true" do
       config = load_config(<<-TOML)
-      title = "Test"
-      sitemap = true
-      TOML
+        title = "Test"
+        sitemap = true
+        TOML
 
       config.sitemap.enabled.should be_true
     end
 
     it "handles backward-compatible boolean sitemap = false" do
       config = load_config(<<-TOML)
-      title = "Test"
-      sitemap = false
-      TOML
+        title = "Test"
+        sitemap = false
+        TOML
 
       # sitemap = false is parsed by as_bool? branch only when value is true,
       # so with false the sitemap_bool variable won't be truthy and we fall through.
@@ -295,7 +295,7 @@ describe Hwaro::Models::Config do
   describe "robots configuration" do
     it "has default robots configuration" do
       config = Hwaro::Models::Config.new
-      config.robots.enabled.should eq(true)
+      config.robots.enabled.should be_true
       config.robots.filename.should eq("robots.txt")
       config.robots.rules.should eq([] of Hwaro::Models::RobotsRule)
     end
@@ -315,12 +315,12 @@ describe Hwaro::Models::Config do
 
     it "loads robots enabled = true from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [robots]
-      enabled = true
-      filename = "bots.txt"
-      TOML
+        [robots]
+        enabled = true
+        filename = "bots.txt"
+        TOML
 
       config.robots.enabled.should be_true
       config.robots.filename.should eq("bots.txt")
@@ -328,31 +328,31 @@ describe Hwaro::Models::Config do
 
     it "loads robots enabled = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [robots]
-      enabled = false
-      TOML
+        [robots]
+        enabled = false
+        TOML
 
       config.robots.enabled.should be_false
     end
 
     it "loads robots rules from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [robots]
-      enabled = true
+        [robots]
+        enabled = true
 
-      [[robots.rules]]
-      user_agent = "Googlebot"
-      allow = ["/public/"]
-      disallow = ["/private/", "/admin/"]
+        [[robots.rules]]
+        user_agent = "Googlebot"
+        allow = ["/public/"]
+        disallow = ["/private/", "/admin/"]
 
-      [[robots.rules]]
-      user_agent = "*"
-      disallow = ["/secret/"]
-      TOML
+        [[robots.rules]]
+        user_agent = "*"
+        disallow = ["/secret/"]
+        TOML
 
       config.robots.rules.size.should eq(2)
       config.robots.rules[0].user_agent.should eq("Googlebot")
@@ -370,10 +370,10 @@ describe Hwaro::Models::Config do
   describe "llms configuration" do
     it "has default llms configuration" do
       config = Hwaro::Models::Config.new
-      config.llms.enabled.should eq(true)
+      config.llms.enabled.should be_true
       config.llms.filename.should eq("llms.txt")
       config.llms.instructions.should eq("")
-      config.llms.full_enabled.should eq(false)
+      config.llms.full_enabled.should be_false
       config.llms.full_filename.should eq("llms-full.txt")
     end
 
@@ -392,15 +392,15 @@ describe Hwaro::Models::Config do
 
     it "loads all llms settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [llms]
-      enabled = true
-      filename = "ai.txt"
-      instructions = "Do not crawl"
-      full_enabled = true
-      full_filename = "ai-full.txt"
-      TOML
+        [llms]
+        enabled = true
+        filename = "ai.txt"
+        instructions = "Do not crawl"
+        full_enabled = true
+        full_filename = "ai-full.txt"
+        TOML
 
       config.llms.enabled.should be_true
       config.llms.filename.should eq("ai.txt")
@@ -411,33 +411,33 @@ describe Hwaro::Models::Config do
 
     it "loads llms enabled = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [llms]
-      enabled = false
-      TOML
+        [llms]
+        enabled = false
+        TOML
 
       config.llms.enabled.should be_false
     end
 
     it "loads llms full_enabled = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [llms]
-      full_enabled = false
-      TOML
+        [llms]
+        full_enabled = false
+        TOML
 
       config.llms.full_enabled.should be_false
     end
 
     it "loads llms full_enabled = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [llms]
-      full_enabled = true
-      TOML
+        [llms]
+        full_enabled = true
+        TOML
 
       config.llms.full_enabled.should be_true
     end
@@ -450,7 +450,7 @@ describe Hwaro::Models::Config do
   describe "feeds configuration" do
     it "has default feeds configuration" do
       config = Hwaro::Models::Config.new
-      config.feeds.enabled.should eq(false)
+      config.feeds.enabled.should be_false
       config.feeds.filename.should eq("")
       config.feeds.type.should eq("rss")
       config.feeds.truncate.should eq(0)
@@ -478,17 +478,17 @@ describe Hwaro::Models::Config do
 
     it "loads all feeds settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      enabled = true
-      filename = "feed.xml"
-      type = "atom"
-      truncate = 100
-      limit = 25
-      sections = ["blog", "news"]
-      default_language_only = false
-      TOML
+        [feeds]
+        enabled = true
+        filename = "feed.xml"
+        type = "atom"
+        truncate = 100
+        limit = 25
+        sections = ["blog", "news"]
+        default_language_only = false
+        TOML
 
       config.feeds.enabled.should be_true
       config.feeds.filename.should eq("feed.xml")
@@ -501,67 +501,67 @@ describe Hwaro::Models::Config do
 
     it "loads default_language_only as true from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      enabled = true
-      default_language_only = true
-      TOML
+        [feeds]
+        enabled = true
+        default_language_only = true
+        TOML
 
       config.feeds.default_language_only.should be_true
     end
 
     it "defaults default_language_only to true when not specified in TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      enabled = true
-      TOML
+        [feeds]
+        enabled = true
+        TOML
 
       config.feeds.default_language_only.should be_true
     end
 
     it "loads feeds enabled = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      enabled = false
-      TOML
+        [feeds]
+        enabled = false
+        TOML
 
       config.feeds.enabled.should be_false
     end
 
     it "loads feeds enabled = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      enabled = true
-      TOML
+        [feeds]
+        enabled = true
+        TOML
 
       config.feeds.enabled.should be_true
     end
 
     it "supports backward-compatible 'generate' key" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      generate = true
-      TOML
+        [feeds]
+        generate = true
+        TOML
 
       config.feeds.enabled.should be_true
     end
 
     it "supports backward-compatible generate = false" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [feeds]
-      generate = false
-      TOML
+        [feeds]
+        generate = false
+        TOML
 
       config.feeds.enabled.should be_false
     end
@@ -574,7 +574,7 @@ describe Hwaro::Models::Config do
   describe "search configuration" do
     it "has default search configuration" do
       config = Hwaro::Models::Config.new
-      config.search.enabled.should eq(false)
+      config.search.enabled.should be_false
       config.search.format.should eq("fuse_json")
       config.search.fields.should eq(["title", "content"])
       config.search.filename.should eq("search.json")
@@ -598,15 +598,15 @@ describe Hwaro::Models::Config do
 
     it "loads all search settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [search]
-      enabled = true
-      format = "fuse_javascript"
-      filename = "idx.json"
-      fields = ["title", "tags", "url"]
-      exclude = ["/draft/"]
-      TOML
+        [search]
+        enabled = true
+        format = "fuse_javascript"
+        filename = "idx.json"
+        fields = ["title", "tags", "url"]
+        exclude = ["/draft/"]
+        TOML
 
       config.search.enabled.should be_true
       config.search.format.should eq("fuse_javascript")
@@ -617,22 +617,22 @@ describe Hwaro::Models::Config do
 
     it "loads search enabled = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [search]
-      enabled = false
-      TOML
+        [search]
+        enabled = false
+        TOML
 
       config.search.enabled.should be_false
     end
 
     it "loads search enabled = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [search]
-      enabled = true
-      TOML
+        [search]
+        enabled = true
+        TOML
 
       config.search.enabled.should be_true
     end
@@ -657,11 +657,11 @@ describe Hwaro::Models::Config do
 
     it "loads plugins processors from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [plugins]
-      processors = ["markdown", "html", "custom"]
-      TOML
+        [plugins]
+        processors = ["markdown", "html", "custom"]
+        TOML
 
       config.plugins.processors.should eq(["markdown", "html", "custom"])
     end
@@ -682,13 +682,13 @@ describe Hwaro::Models::Config do
 
     it "loads allow/deny rules from config.toml" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [content.files]
-      allow_extensions = ["jpg", ".png", "MD"]
-      disallow_extensions = ["png"]
-      disallow_paths = ["private/**", "**/_*"]
-      TOML
+        [content.files]
+        allow_extensions = ["jpg", ".png", "MD"]
+        disallow_extensions = ["png"]
+        disallow_paths = ["private/**", "**/_*"]
+        TOML
 
       config.content_files.enabled?.should be_true
       config.content_files.allow_extensions.should eq([".jpg", ".png", ".md"])
@@ -719,10 +719,10 @@ describe Hwaro::Models::Config do
 
     it "loads front_matter_format and default_fields from [content.new]" do
       config = load_config(<<-TOML)
-      [content.new]
-      front_matter_format = "yaml"
-      default_fields = ["description", "summary"]
-      TOML
+        [content.new]
+        front_matter_format = "yaml"
+        default_fields = ["description", "summary"]
+        TOML
 
       config.content_new.front_matter_format.should eq("yaml")
       config.content_new.default_fields.should eq(["description", "summary"])
@@ -731,9 +731,9 @@ describe Hwaro::Models::Config do
 
     it "accepts flat keys on [content] as a shorthand" do
       config = load_config(<<-TOML)
-      [content]
-      front_matter_format = "YAML"
-      TOML
+        [content]
+        front_matter_format = "YAML"
+        TOML
 
       # Case-insensitive normalization keeps configs tolerant of casing.
       config.content_new.front_matter_format.should eq("yaml")
@@ -741,9 +741,9 @@ describe Hwaro::Models::Config do
 
     it "keeps the default format when the configured value is unknown" do
       config = load_config(<<-TOML)
-      [content.new]
-      front_matter_format = "json"
-      TOML
+        [content.new]
+        front_matter_format = "json"
+        TOML
 
       config.content_new.front_matter_format.should eq("toml")
     end
@@ -758,9 +758,9 @@ describe Hwaro::Models::Config do
       Hwaro::Models::Config.new.content_new.bundle.should be_false
 
       config = load_config(<<-TOML)
-      [content.new]
-      bundle = true
-      TOML
+        [content.new]
+        bundle = true
+        TOML
       config.content_new.bundle.should be_true
     end
   end
@@ -772,7 +772,7 @@ describe Hwaro::Models::Config do
   describe "pagination configuration" do
     it "has default pagination configuration" do
       config = Hwaro::Models::Config.new
-      config.pagination.enabled.should eq(false)
+      config.pagination.enabled.should be_false
       config.pagination.per_page.should eq(10)
     end
 
@@ -787,12 +787,12 @@ describe Hwaro::Models::Config do
 
     it "loads all pagination settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [pagination]
-      enabled = true
-      per_page = 15
-      TOML
+        [pagination]
+        enabled = true
+        per_page = 15
+        TOML
 
       config.pagination.enabled.should be_true
       config.pagination.per_page.should eq(15)
@@ -800,22 +800,22 @@ describe Hwaro::Models::Config do
 
     it "loads pagination enabled = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [pagination]
-      enabled = false
-      TOML
+        [pagination]
+        enabled = false
+        TOML
 
       config.pagination.enabled.should be_false
     end
 
     it "loads pagination enabled = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [pagination]
-      enabled = true
-      TOML
+        [pagination]
+        enabled = true
+        TOML
 
       config.pagination.enabled.should be_true
     end
@@ -828,9 +828,9 @@ describe Hwaro::Models::Config do
   describe "highlight configuration" do
     it "has default highlight configuration" do
       config = Hwaro::Models::Config.new
-      config.highlight.enabled.should eq(true)
+      config.highlight.enabled.should be_true
       config.highlight.theme.should eq("github")
-      config.highlight.use_cdn.should eq(true)
+      config.highlight.use_cdn.should be_true
     end
 
     it "can update highlight settings" do
@@ -846,13 +846,13 @@ describe Hwaro::Models::Config do
 
     it "loads all highlight settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [highlight]
-      enabled = true
-      theme = "dracula"
-      use_cdn = true
-      TOML
+        [highlight]
+        enabled = true
+        theme = "dracula"
+        use_cdn = true
+        TOML
 
       config.highlight.enabled.should be_true
       config.highlight.theme.should eq("dracula")
@@ -861,22 +861,22 @@ describe Hwaro::Models::Config do
 
     it "loads highlight enabled = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [highlight]
-      enabled = false
-      TOML
+        [highlight]
+        enabled = false
+        TOML
 
       config.highlight.enabled.should be_false
     end
 
     it "loads highlight use_cdn = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [highlight]
-      use_cdn = false
-      TOML
+        [highlight]
+        use_cdn = false
+        TOML
 
       config.highlight.use_cdn.should be_false
     end
@@ -889,7 +889,7 @@ describe Hwaro::Models::Config do
   describe "auto_includes configuration" do
     it "has default auto_includes configuration" do
       config = Hwaro::Models::Config.new
-      config.auto_includes.enabled.should eq(false)
+      config.auto_includes.enabled.should be_false
       config.auto_includes.dirs.should eq([] of String)
     end
 
@@ -904,12 +904,12 @@ describe Hwaro::Models::Config do
 
     it "loads all auto_includes settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [auto_includes]
-      enabled = true
-      dirs = ["css", "js"]
-      TOML
+        [auto_includes]
+        enabled = true
+        dirs = ["css", "js"]
+        TOML
 
       config.auto_includes.enabled.should be_true
       config.auto_includes.dirs.should eq(["css", "js"])
@@ -917,22 +917,22 @@ describe Hwaro::Models::Config do
 
     it "loads auto_includes enabled = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [auto_includes]
-      enabled = false
-      TOML
+        [auto_includes]
+        enabled = false
+        TOML
 
       config.auto_includes.enabled.should be_false
     end
 
     it "loads auto_includes enabled = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [auto_includes]
-      enabled = true
-      TOML
+        [auto_includes]
+        enabled = true
+        TOML
 
       config.auto_includes.enabled.should be_true
     end
@@ -972,16 +972,16 @@ describe Hwaro::Models::Config do
 
     it "loads all opengraph settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [og]
-      default_image = "/img/og.png"
-      twitter_card = "summary"
-      twitter_site = "@site"
-      twitter_creator = "@creator"
-      fb_app_id = "999"
-      type = "website"
-      TOML
+        [og]
+        default_image = "/img/og.png"
+        twitter_card = "summary"
+        twitter_site = "@site"
+        twitter_creator = "@creator"
+        fb_app_id = "999"
+        type = "website"
+        TOML
 
       config.og.default_image.should eq("/img/og.png")
       config.og.twitter_card.should eq("summary")
@@ -1020,19 +1020,19 @@ describe Hwaro::Models::Config do
 
     it "loads taxonomies from TOML with all properties" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [[taxonomies]]
-      name = "tags"
-      feed = true
-      sitemap = true
-      paginate_by = 20
+        [[taxonomies]]
+        name = "tags"
+        feed = true
+        sitemap = true
+        paginate_by = 20
 
-      [[taxonomies]]
-      name = "categories"
-      feed = false
-      sitemap = false
-      TOML
+        [[taxonomies]]
+        name = "categories"
+        feed = false
+        sitemap = false
+        TOML
 
       config.taxonomies.size.should eq(2)
 
@@ -1048,36 +1048,36 @@ describe Hwaro::Models::Config do
 
     it "loads taxonomy feed = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [[taxonomies]]
-      name = "tags"
-      feed = true
-      TOML
+        [[taxonomies]]
+        name = "tags"
+        feed = true
+        TOML
 
       config.taxonomies[0].feed.should be_true
     end
 
     it "loads taxonomy feed = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [[taxonomies]]
-      name = "tags"
-      feed = false
-      TOML
+        [[taxonomies]]
+        name = "tags"
+        feed = false
+        TOML
 
       config.taxonomies[0].feed.should be_false
     end
 
     it "loads taxonomy sitemap = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [[taxonomies]]
-      name = "tags"
-      sitemap = false
-      TOML
+        [[taxonomies]]
+        name = "tags"
+        sitemap = false
+        TOML
 
       config.taxonomies[0].sitemap.should be_false
     end
@@ -1105,12 +1105,12 @@ describe Hwaro::Models::Config do
 
     it "loads build hooks from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [build.hooks]
-      pre = ["npm ci", "npx tsc"]
-      post = ["./deploy.sh"]
-      TOML
+        [build.hooks]
+        pre = ["npm ci", "npx tsc"]
+        post = ["./deploy.sh"]
+        TOML
 
       config.build.hooks.pre.should eq(["npm ci", "npx tsc"])
       config.build.hooks.post.should eq(["./deploy.sh"])
@@ -1124,9 +1124,9 @@ describe Hwaro::Models::Config do
   describe "markdown configuration" do
     it "has default markdown configuration" do
       config = Hwaro::Models::Config.new
-      config.markdown.safe.should eq(false)
-      config.markdown.lazy_loading.should eq(false)
-      config.markdown.emoji.should eq(false)
+      config.markdown.safe.should be_false
+      config.markdown.lazy_loading.should be_false
+      config.markdown.emoji.should be_false
     end
 
     it "can update markdown settings" do
@@ -1142,13 +1142,13 @@ describe Hwaro::Models::Config do
 
     it "loads all markdown settings from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      safe = true
-      lazy_loading = true
-      emoji = true
-      TOML
+        [markdown]
+        safe = true
+        lazy_loading = true
+        emoji = true
+        TOML
 
       config.markdown.safe.should be_true
       config.markdown.lazy_loading.should be_true
@@ -1157,66 +1157,66 @@ describe Hwaro::Models::Config do
 
     it "loads markdown safe = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      safe = false
-      TOML
+        [markdown]
+        safe = false
+        TOML
 
       config.markdown.safe.should be_false
     end
 
     it "loads markdown safe = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      safe = true
-      TOML
+        [markdown]
+        safe = true
+        TOML
 
       config.markdown.safe.should be_true
     end
 
     it "loads markdown lazy_loading = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      lazy_loading = false
-      TOML
+        [markdown]
+        lazy_loading = false
+        TOML
 
       config.markdown.lazy_loading.should be_false
     end
 
     it "loads markdown lazy_loading = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      lazy_loading = true
-      TOML
+        [markdown]
+        lazy_loading = true
+        TOML
 
       config.markdown.lazy_loading.should be_true
     end
 
     it "loads markdown emoji = false from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      emoji = false
-      TOML
+        [markdown]
+        emoji = false
+        TOML
 
       config.markdown.emoji.should be_false
     end
 
     it "loads markdown emoji = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [markdown]
-      emoji = true
-      TOML
+        [markdown]
+        emoji = true
+        TOML
 
       config.markdown.emoji.should be_true
     end
@@ -1278,21 +1278,21 @@ describe Hwaro::Models::Config do
 
     it "loads languages from TOML with all properties" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [languages.ko]
-      language_name = "한국어"
-      weight = 2
-      generate_feed = true
-      build_search_index = true
-      taxonomies = ["tags", "categories"]
+        [languages.ko]
+        language_name = "한국어"
+        weight = 2
+        generate_feed = true
+        build_search_index = true
+        taxonomies = ["tags", "categories"]
 
-      [languages.ja]
-      language_name = "日本語"
-      weight = 3
-      generate_feed = false
-      build_search_index = false
-      TOML
+        [languages.ja]
+        language_name = "日本語"
+        weight = 3
+        generate_feed = false
+        build_search_index = false
+        TOML
 
       config.languages.size.should eq(2)
 
@@ -1312,48 +1312,48 @@ describe Hwaro::Models::Config do
 
     it "loads language generate_feed = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [languages.ko]
-      language_name = "Korean"
-      generate_feed = false
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        generate_feed = false
+        TOML
 
       config.languages["ko"].generate_feed.should be_false
     end
 
     it "loads language generate_feed = true from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [languages.ko]
-      language_name = "Korean"
-      generate_feed = true
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        generate_feed = true
+        TOML
 
       config.languages["ko"].generate_feed.should be_true
     end
 
     it "loads language build_search_index = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [languages.ko]
-      language_name = "Korean"
-      build_search_index = false
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        build_search_index = false
+        TOML
 
       config.languages["ko"].build_search_index.should be_false
     end
 
     it "loads language build_search_index = true from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [languages.ko]
-      language_name = "Korean"
-      build_search_index = true
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        build_search_index = true
+        TOML
 
       config.languages["ko"].build_search_index.should be_true
     end
@@ -1371,12 +1371,12 @@ describe Hwaro::Models::Config do
 
     it "loads permalinks from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [permalinks]
-      "old/posts" = "posts"
-      "2023/drafts" = "archive/2023"
-      TOML
+        [permalinks]
+        "old/posts" = "posts"
+        "2023/drafts" = "archive/2023"
+        TOML
 
       config.permalinks["old/posts"].should eq("posts")
       config.permalinks["2023/drafts"].should eq("archive/2023")
@@ -1390,31 +1390,31 @@ describe Hwaro::Models::Config do
   describe "deployment configuration" do
     it "loads deployment targets from config.toml" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [deployment]
-      target = "prod"
-      confirm = true
-      dryRun = true
-      maxDeletes = 10
-      source_dir = "dist"
+        [deployment]
+        target = "prod"
+        confirm = true
+        dryRun = true
+        maxDeletes = 10
+        source_dir = "dist"
 
-      [[deployment.targets]]
-      name = "prod"
-      url = "file://./out"
-      include = "**/*.html"
-      exclude = "**/drafts/**"
+        [[deployment.targets]]
+        name = "prod"
+        url = "file://./out"
+        include = "**/*.html"
+        exclude = "**/drafts/**"
 
-      [[deployment.targets]]
-      name = "s3"
-      url = "s3://my-bucket"
-      command = "aws s3 sync {source}/ {url} --delete"
+        [[deployment.targets]]
+        name = "s3"
+        url = "s3://my-bucket"
+        command = "aws s3 sync {source}/ {url} --delete"
 
-      [[deployment.matchers]]
-      pattern = "^.+\\\\.css$"
-      cacheControl = "max-age=31536000"
-      gzip = true
-      TOML
+        [[deployment.matchers]]
+        pattern = "^.+\\\\.css$"
+        cacheControl = "max-age=31536000"
+        gzip = true
+        TOML
 
       config.deployment.target.should eq("prod")
       config.deployment.confirm.should be_true
@@ -1439,22 +1439,22 @@ describe Hwaro::Models::Config do
 
     it "loads deployment confirm = false from TOML (overrides default false)" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [deployment]
-      confirm = false
-      TOML
+        [deployment]
+        confirm = false
+        TOML
 
       config.deployment.confirm.should be_false
     end
 
     it "loads deployment confirm = true from TOML" do
       config = load_config(<<-TOML)
-      title = "Test"
+        title = "Test"
 
-      [deployment]
-      confirm = true
-      TOML
+        [deployment]
+        confirm = true
+        TOML
 
       config.deployment.confirm.should be_true
     end
@@ -1490,53 +1490,53 @@ describe Hwaro::Models::Config do
       #   language.generate_feed       true  -> false
       #   language.build_search_index  true  -> false
       config = load_config(<<-TOML)
-      title = "Bool Test"
+        title = "Bool Test"
 
-      [sitemap]
-      enabled = true
+        [sitemap]
+        enabled = true
 
-      [robots]
-      enabled = false
+        [robots]
+        enabled = false
 
-      [llms]
-      enabled = false
-      full_enabled = true
+        [llms]
+        enabled = false
+        full_enabled = true
 
-      [feeds]
-      enabled = true
-      default_language_only = false
+        [feeds]
+        enabled = true
+        default_language_only = false
 
-      [search]
-      enabled = true
+        [search]
+        enabled = true
 
-      [pagination]
-      enabled = true
+        [pagination]
+        enabled = true
 
-      [highlight]
-      enabled = false
-      use_cdn = false
+        [highlight]
+        enabled = false
+        use_cdn = false
 
-      [auto_includes]
-      enabled = true
+        [auto_includes]
+        enabled = true
 
-      [markdown]
-      safe = true
-      lazy_loading = true
-      emoji = true
+        [markdown]
+        safe = true
+        lazy_loading = true
+        emoji = true
 
-      [deployment]
-      confirm = true
+        [deployment]
+        confirm = true
 
-      [[taxonomies]]
-      name = "tags"
-      feed = true
-      sitemap = false
+        [[taxonomies]]
+        name = "tags"
+        feed = true
+        sitemap = false
 
-      [languages.ko]
-      language_name = "Korean"
-      generate_feed = false
-      build_search_index = false
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        generate_feed = false
+        build_search_index = false
+        TOML
 
       config.sitemap.enabled.should be_true
       config.robots.enabled.should be_false
@@ -1564,53 +1564,53 @@ describe Hwaro::Models::Config do
     it "loads every boolean matching its default value (identity round-trip)" do
       # Every boolean set to its default — must not silently flip.
       config = load_config(<<-TOML)
-      title = "Identity Test"
+        title = "Identity Test"
 
-      [sitemap]
-      enabled = false
+        [sitemap]
+        enabled = false
 
-      [robots]
-      enabled = true
+        [robots]
+        enabled = true
 
-      [llms]
-      enabled = true
-      full_enabled = false
+        [llms]
+        enabled = true
+        full_enabled = false
 
-      [feeds]
-      enabled = false
-      default_language_only = true
+        [feeds]
+        enabled = false
+        default_language_only = true
 
-      [search]
-      enabled = false
+        [search]
+        enabled = false
 
-      [pagination]
-      enabled = false
+        [pagination]
+        enabled = false
 
-      [highlight]
-      enabled = true
-      use_cdn = true
+        [highlight]
+        enabled = true
+        use_cdn = true
 
-      [auto_includes]
-      enabled = false
+        [auto_includes]
+        enabled = false
 
-      [markdown]
-      safe = false
-      lazy_loading = false
-      emoji = false
+        [markdown]
+        safe = false
+        lazy_loading = false
+        emoji = false
 
-      [deployment]
-      confirm = false
+        [deployment]
+        confirm = false
 
-      [[taxonomies]]
-      name = "tags"
-      feed = false
-      sitemap = true
+        [[taxonomies]]
+        name = "tags"
+        feed = false
+        sitemap = true
 
-      [languages.ko]
-      language_name = "Korean"
-      generate_feed = true
-      build_search_index = true
-      TOML
+        [languages.ko]
+        language_name = "Korean"
+        generate_feed = true
+        build_search_index = true
+        TOML
 
       config.sitemap.enabled.should be_false
       config.robots.enabled.should be_true
@@ -1637,34 +1637,34 @@ describe Hwaro::Models::Config do
 
     it "preserves defaults when boolean keys are absent from TOML" do
       config = load_config(<<-TOML)
-      title = "Absent Keys"
+        title = "Absent Keys"
 
-      [sitemap]
-      filename = "map.xml"
+        [sitemap]
+        filename = "map.xml"
 
-      [robots]
-      filename = "bots.txt"
+        [robots]
+        filename = "bots.txt"
 
-      [llms]
-      filename = "llms.txt"
+        [llms]
+        filename = "llms.txt"
 
-      [search]
-      format = "fuse_json"
+        [search]
+        format = "fuse_json"
 
-      [pagination]
-      per_page = 5
+        [pagination]
+        per_page = 5
 
-      [highlight]
-      theme = "monokai"
+        [highlight]
+        theme = "monokai"
 
-      [auto_includes]
-      dirs = ["css"]
+        [auto_includes]
+        dirs = ["css"]
 
-      [markdown]
+        [markdown]
 
-      [deployment]
-      source_dir = "out"
-      TOML
+        [deployment]
+        source_dir = "out"
+        TOML
 
       # All booleans should remain at their defaults
       config.sitemap.enabled.should be_false       # default: false
@@ -1691,7 +1691,7 @@ end
 describe Hwaro::Models::SitemapConfig do
   it "has default values" do
     config = Hwaro::Models::SitemapConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.filename.should eq("sitemap.xml")
     config.changefreq.should eq("weekly")
     config.priority.should eq(0.5)
@@ -1711,7 +1711,7 @@ end
 describe Hwaro::Models::RobotsConfig do
   it "has default values" do
     config = Hwaro::Models::RobotsConfig.new
-    config.enabled.should eq(true)
+    config.enabled.should be_true
     config.filename.should eq("robots.txt")
     config.rules.should eq([] of Hwaro::Models::RobotsRule)
   end
@@ -1720,10 +1720,10 @@ end
 describe Hwaro::Models::LlmsConfig do
   it "has default values" do
     config = Hwaro::Models::LlmsConfig.new
-    config.enabled.should eq(true)
+    config.enabled.should be_true
     config.filename.should eq("llms.txt")
     config.instructions.should eq("")
-    config.full_enabled.should eq(false)
+    config.full_enabled.should be_false
     config.full_filename.should eq("llms-full.txt")
   end
 end
@@ -1731,7 +1731,7 @@ end
 describe Hwaro::Models::SearchConfig do
   it "has default values" do
     config = Hwaro::Models::SearchConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.format.should eq("fuse_json")
     config.fields.should eq(["title", "content"])
     config.filename.should eq("search.json")
@@ -1741,7 +1741,7 @@ end
 describe Hwaro::Models::FeedConfig do
   it "has default values" do
     config = Hwaro::Models::FeedConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.filename.should eq("")
     config.type.should eq("rss")
     config.truncate.should eq(0)
@@ -1760,7 +1760,7 @@ end
 describe Hwaro::Models::PaginationConfig do
   it "has default values" do
     config = Hwaro::Models::PaginationConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.per_page.should eq(10)
   end
 end
@@ -1768,9 +1768,9 @@ end
 describe Hwaro::Models::HighlightConfig do
   it "has default values" do
     config = Hwaro::Models::HighlightConfig.new
-    config.enabled.should eq(true)
+    config.enabled.should be_true
     config.theme.should eq("github")
-    config.use_cdn.should eq(true)
+    config.use_cdn.should be_true
   end
 
   describe "css_tag" do
@@ -1808,8 +1808,8 @@ describe Hwaro::Models::TaxonomyConfig do
   it "has default values" do
     config = Hwaro::Models::TaxonomyConfig.new("tags")
     config.name.should eq("tags")
-    config.feed.should eq(false)
-    config.sitemap.should eq(true)
+    config.feed.should be_false
+    config.sitemap.should be_true
     config.paginate_by.should be_nil
   end
 end
@@ -1833,9 +1833,9 @@ end
 describe Hwaro::Models::MarkdownConfig do
   it "has default values" do
     config = Hwaro::Models::MarkdownConfig.new
-    config.safe.should eq(false)
-    config.lazy_loading.should eq(false)
-    config.emoji.should eq(false)
+    config.safe.should be_false
+    config.lazy_loading.should be_false
+    config.emoji.should be_false
   end
 end
 
@@ -1845,8 +1845,8 @@ describe Hwaro::Models::LanguageConfig do
     config.code.should eq("en")
     config.language_name.should eq("en")
     config.weight.should eq(1)
-    config.generate_feed.should eq(true)
-    config.build_search_index.should eq(true)
+    config.generate_feed.should be_true
+    config.build_search_index.should be_true
     config.taxonomies.should eq(["tags", "categories"])
   end
 end
@@ -1854,7 +1854,7 @@ end
 describe Hwaro::Models::AutoIncludesConfig do
   it "has default values" do
     config = Hwaro::Models::AutoIncludesConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.dirs.should eq([] of String)
   end
 end

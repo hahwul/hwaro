@@ -71,7 +71,7 @@ describe Hwaro::Services::UnusedAssets do
 
         result.total_assets.should eq(2)
         result.unused_count.should eq(1)
-        result.unused_files.any? { |f| f.ends_with?("unused.jpg") }.should be_true
+        result.unused_files.any?(&.ends_with?("unused.jpg")).should be_true
       end
     end
 

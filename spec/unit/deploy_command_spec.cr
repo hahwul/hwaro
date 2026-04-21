@@ -97,16 +97,16 @@ describe Hwaro::CLI::Commands::DeployCommand do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "config.toml")
         File.write(path, <<-TOML)
-        title = "Demo"
+          title = "Demo"
 
-        [[deployment.targets]]
-        name = "production"
-        url = "s3://my-bucket"
+          [[deployment.targets]]
+          name = "production"
+          url = "s3://my-bucket"
 
-        [[deployment.targets]]
-        name = "staging"
-        url = "netlify:site-id"
-        TOML
+          [[deployment.targets]]
+          name = "staging"
+          url = "netlify:site-id"
+          TOML
 
         hint = cmd.configured_targets_hint(nil, path)
         hint.should contain("Configured targets (from")

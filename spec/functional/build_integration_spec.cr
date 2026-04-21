@@ -67,12 +67,12 @@ describe "Build Integration: URL generation" do
 
   it "applies permalink remapping from config" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [permalinks]
-    "old/posts" = "posts"
-    TOML
+      [permalinks]
+      "old/posts" = "posts"
+      TOML
 
     build_site(
       config,
@@ -284,13 +284,13 @@ end
 describe "Build Integration: Pagination" do
   it "produces paginated output directories" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [pagination]
-    enabled = true
-    per_page = 2
-    TOML
+      [pagination]
+      enabled = true
+      per_page = 2
+      TOML
 
     build_site(
       config,
@@ -572,12 +572,12 @@ end
 describe "Build Integration: Taxonomy pages" do
   it "generates taxonomy index and term pages" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [[taxonomies]]
-    name = "tags"
-    TOML
+      [[taxonomies]]
+      name = "tags"
+      TOML
 
     build_site(
       config,
@@ -614,12 +614,12 @@ end
 describe "Build Integration: SEO files" do
   it "generates sitemap.xml" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [sitemap]
-    enabled = true
-    TOML
+      [sitemap]
+      enabled = true
+      TOML
 
     build_site(
       config,
@@ -635,12 +635,12 @@ describe "Build Integration: SEO files" do
 
   it "generates robots.txt" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [robots]
-    enabled = true
-    TOML
+      [robots]
+      enabled = true
+      TOML
 
     build_site(
       config,
@@ -655,15 +655,15 @@ describe "Build Integration: SEO files" do
 
   it "generates RSS feed" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
-    description = "A test site"
+      title = "Test"
+      base_url = "http://localhost"
+      description = "A test site"
 
-    [feeds]
-    enabled = true
-    type = "rss"
-    filename = "rss.xml"
-    TOML
+      [feeds]
+      enabled = true
+      type = "rss"
+      filename = "rss.xml"
+      TOML
 
     build_site(
       config,
@@ -690,13 +690,13 @@ end
 describe "Build Integration: Search index" do
   it "generates search.json" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [search]
-    enabled = true
-    fields = ["title", "url"]
-    TOML
+      [search]
+      enabled = true
+      fields = ["title", "url"]
+      TOML
 
     build_site(
       config,
@@ -720,14 +720,14 @@ end
 describe "Build Integration: OG tags" do
   it "renders og_tags and twitter_tags in template" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [og]
-    default_image = "/img/default.png"
-    twitter_card = "summary_large_image"
-    twitter_site = "@testsite"
-    TOML
+      [og]
+      default_image = "/img/default.png"
+      twitter_card = "summary_large_image"
+      twitter_site = "@testsite"
+      TOML
 
     build_site(
       config,
@@ -894,13 +894,13 @@ end
 describe "Build Integration: Auto includes" do
   it "generates CSS/JS link/script tags for auto_includes" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [auto_includes]
-    enabled = true
-    dirs = ["assets/css", "assets/js"]
-    TOML
+      [auto_includes]
+      enabled = true
+      dirs = ["assets/css", "assets/js"]
+      TOML
 
     build_site(
       config,
@@ -926,13 +926,13 @@ end
 describe "Build Integration: Highlight tags" do
   it "renders highlight CSS/JS tags when highlight is enabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [highlight]
-    enabled = true
-    theme = "github-dark"
-    TOML
+      [highlight]
+      enabled = true
+      theme = "github-dark"
+      TOML
 
     build_site(
       config,
@@ -1005,12 +1005,12 @@ end
 describe "Build Integration: in_sitemap exclusion" do
   it "excludes pages with in_sitemap: false from sitemap" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [sitemap]
-    enabled = true
-    TOML
+      [sitemap]
+      enabled = true
+      TOML
 
     build_site(
       config,
@@ -1463,12 +1463,12 @@ end
 describe "Build Integration: Emoji" do
   it "converts emoji shortcodes when enabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [markdown]
-    emoji = true
-    TOML
+      [markdown]
+      emoji = true
+      TOML
 
     build_site(
       config,
@@ -1489,12 +1489,12 @@ end
 describe "Build Integration: Lazy loading" do
   it "adds loading=lazy to images when enabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [markdown]
-    lazy_loading = true
-    TOML
+      [markdown]
+      lazy_loading = true
+      TOML
 
     build_site(
       config,
@@ -1514,12 +1514,12 @@ end
 describe "Build Integration: Safe mode" do
   it "strips raw HTML when safe mode is enabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [markdown]
-    safe = true
-    TOML
+      [markdown]
+      safe = true
+      TOML
 
     build_site(
       config,
@@ -1615,15 +1615,15 @@ end
 describe "Build Integration: Multiple taxonomies" do
   it "generates pages for multiple taxonomy types" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [[taxonomies]]
-    name = "tags"
+      [[taxonomies]]
+      name = "tags"
 
-    [[taxonomies]]
-    name = "categories"
-    TOML
+      [[taxonomies]]
+      name = "categories"
+      TOML
 
     build_site(
       config,

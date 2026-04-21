@@ -204,12 +204,12 @@ describe Hwaro::Core::Build::CacheManager do
       stats = mgr.all_stats
       stats.size.should eq(2)
 
-      a_stats = stats.find { |s| s[:name] == "a" }.not_nil!
+      a_stats = stats.find! { |s| s[:name] == "a" }
       a_stats[:hits].should eq(1)
       a_stats[:misses].should eq(0)
       a_stats[:runtime].should be_true
 
-      b_stats = stats.find { |s| s[:name] == "b" }.not_nil!
+      b_stats = stats.find! { |s| s[:name] == "b" }
       b_stats[:hits].should eq(0)
       b_stats[:misses].should eq(1)
       b_stats[:runtime].should be_false

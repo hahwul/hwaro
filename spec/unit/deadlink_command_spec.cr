@@ -30,12 +30,12 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     it "extracts multiple links from one file" do
       Dir.mktmpdir do |dir|
         content = <<-MD
-        # Test
-        [Link1](https://example.com/1)
-        Some text here
-        [Link2](https://example.com/2)
-        ![Image](https://cdn.example.com/img.jpg)
-        MD
+          # Test
+          [Link1](https://example.com/1)
+          Some text here
+          [Link2](https://example.com/2)
+          ![Image](https://cdn.example.com/img.jpg)
+          MD
         File.write(File.join(dir, "test.md"), content)
 
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
@@ -52,10 +52,10 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     it "ignores relative links (non http/https)" do
       Dir.mktmpdir do |dir|
         content = <<-MD
-        [Relative](/relative/path/)
-        [Also Relative](../sibling/)
-        [Absolute](https://example.com/abs)
-        MD
+          [Relative](/relative/path/)
+          [Also Relative](../sibling/)
+          [Absolute](https://example.com/abs)
+          MD
         File.write(File.join(dir, "test.md"), content)
 
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
@@ -123,7 +123,7 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
         links = cmd.find_internal_links_for_test(dir)
 
         links.size.should eq(2)
-        links.map(&.kind).uniq.should eq([:internal])
+        links.map(&.kind).uniq!.should eq([:internal])
       end
     end
 

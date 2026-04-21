@@ -11,8 +11,8 @@ describe Hwaro::Services::LiveReloadInjectHandler do
       result.should contain("__hwaro_livereload")
       result.should contain("</body>")
       # Script should appear before </body>
-      script_idx = result.index("__hwaro_livereload").not_nil!
-      body_idx = result.index("</body>").not_nil!
+      script_idx = result.index!("__hwaro_livereload")
+      body_idx = result.index!("</body>")
       script_idx.should be < body_idx
     end
 

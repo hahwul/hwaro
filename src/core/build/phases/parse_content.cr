@@ -105,7 +105,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     if include_drafts
       draft_pages = ctx.all_pages.select(&.draft)
       if draft_pages.size > 0
-        max_url_len = draft_pages.max_of { |p| p.url.size }
+        max_url_len = draft_pages.max_of(&.url.size)
         pad = {max_url_len, 24}.max
         Logger.info "Including #{draft_pages.size} draft(s):"
         draft_pages.each do |p|

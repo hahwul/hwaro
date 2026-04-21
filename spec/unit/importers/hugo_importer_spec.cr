@@ -24,126 +24,126 @@ private def write_hugo_content(hugo_dir : String, relative_path : String, conten
 end
 
 TOML_POST = <<-MD
-+++
-title = "Hello from Hugo"
-date = "2024-06-15 10:00:00"
-description = "A test post"
-tags = ["crystal", "static-site"]
-draft = false
-slug = "hello-hugo"
-weight = "10"
-+++
+  +++
+  title = "Hello from Hugo"
+  date = "2024-06-15 10:00:00"
+  description = "A test post"
+  tags = ["crystal", "static-site"]
+  draft = false
+  slug = "hello-hugo"
+  weight = "10"
+  +++
 
-This is the body of the post.
-MD
+  This is the body of the post.
+  MD
 
 YAML_POST = <<-MD
----
-title: "YAML Post"
-date: "2024-07-20 14:30:00"
-lastmod: "2024-08-01 09:00:00"
-description: "Written in YAML"
-tags:
-  - yaml
-  - hugo
-categories:
-  - tutorials
-draft: false
----
+  ---
+  title: "YAML Post"
+  date: "2024-07-20 14:30:00"
+  lastmod: "2024-08-01 09:00:00"
+  description: "Written in YAML"
+  tags:
+    - yaml
+    - hugo
+  categories:
+    - tutorials
+  draft: false
+  ---
 
-YAML content goes here.
-MD
+  YAML content goes here.
+  MD
 
 DRAFT_POST = <<-MD
-+++
-title = "Secret Draft"
-date = "2024-05-01 08:00:00"
-draft = true
-+++
+  +++
+  title = "Secret Draft"
+  date = "2024-05-01 08:00:00"
+  draft = true
+  +++
 
-This is a draft.
-MD
+  This is a draft.
+  MD
 
 SHORTCODE_POST = <<-MD
-+++
-title = "Shortcode Post"
-date = "2024-09-01 12:00:00"
-+++
+  +++
+  title = "Shortcode Post"
+  date = "2024-09-01 12:00:00"
+  +++
 
-Here is a figure shortcode: {{< figure src="image.png" >}}
-And a highlight: {{% highlight go %}}
-fmt.Println("hello")
-{{% /highlight %}}
-MD
+  Here is a figure shortcode: {{< figure src="image.png" >}}
+  And a highlight: {{% highlight go %}}
+  fmt.Println("hello")
+  {{% /highlight %}}
+  MD
 
 INDEX_POST = <<-MD
-+++
-title = "Blog Section"
-description = "All blog posts"
-+++
+  +++
+  title = "Blog Section"
+  description = "All blog posts"
+  +++
 
-Welcome to the blog.
-MD
+  Welcome to the blog.
+  MD
 
 IMAGE_TOML_POST = <<-MD
-+++
-title = "Post with Image"
-date = "2024-10-01 00:00:00"
-images = ["https://example.com/hero.jpg", "https://example.com/thumb.jpg"]
-+++
+  +++
+  title = "Post with Image"
+  date = "2024-10-01 00:00:00"
+  images = ["https://example.com/hero.jpg", "https://example.com/thumb.jpg"]
+  +++
 
-Image post body.
-MD
+  Image post body.
+  MD
 
 FEATURED_IMAGE_POST = <<-MD
-+++
-title = "Featured Image Post"
-date = "2024-10-02 00:00:00"
-featured_image = "https://example.com/featured.jpg"
-+++
+  +++
+  title = "Featured Image Post"
+  date = "2024-10-02 00:00:00"
+  featured_image = "https://example.com/featured.jpg"
+  +++
 
-Featured image body.
-MD
+  Featured image body.
+  MD
 
 SERIES_POST = <<-MD
-+++
-title = "Series Part 1"
-date = "2024-11-01 00:00:00"
-series = "My Series"
-+++
+  +++
+  title = "Series Part 1"
+  date = "2024-11-01 00:00:00"
+  series = "My Series"
+  +++
 
-Series content.
-MD
+  Series content.
+  MD
 
 ALIASES_POST = <<-MD
-+++
-title = "Aliased Post"
-date = "2024-11-15 00:00:00"
-aliases = ["/old-url", "/another-old-url"]
-+++
+  +++
+  title = "Aliased Post"
+  date = "2024-11-15 00:00:00"
+  aliases = ["/old-url", "/another-old-url"]
+  +++
 
-Aliased body.
-MD
+  Aliased body.
+  MD
 
 EXPIRY_POST = <<-MD
-+++
-title = "Expiring Post"
-date = "2024-12-01 00:00:00"
-expiryDate = "2025-06-01 00:00:00"
-+++
+  +++
+  title = "Expiring Post"
+  date = "2024-12-01 00:00:00"
+  expiryDate = "2025-06-01 00:00:00"
+  +++
 
-This post expires.
-MD
+  This post expires.
+  MD
 
 SUMMARY_POST = <<-MD
-+++
-title = "Summary Post"
-date = "2024-12-15 00:00:00"
-summary = "A summary instead of description"
-+++
+  +++
+  title = "Summary Post"
+  date = "2024-12-15 00:00:00"
+  summary = "A summary instead of description"
+  +++
 
-Summary body.
-MD
+  Summary body.
+  MD
 
 describe Hwaro::Services::Importers::HugoImporter do
   describe "#run" do

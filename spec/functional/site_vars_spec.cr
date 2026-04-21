@@ -19,11 +19,11 @@ describe "Site Variables Integration" do
       # Template
       # We check lengths. We assume filters 'length' works (it's standard Jinja).
       template = <<-HTML
-      Pages: {{ site.pages | length }}
-      Sections: {{ site.sections | length }}
-      Taxonomies: {{ site.taxonomies | length }}
-      Tags: {{ site.taxonomies.tags.items | length }}
-      HTML
+        Pages: {{ site.pages | length }}
+        Sections: {{ site.sections | length }}
+        Taxonomies: {{ site.taxonomies | length }}
+        Tags: {{ site.taxonomies.tags.items | length }}
+        HTML
       File.write(File.join(tmp_dir, "templates/page.html"), template)
 
       # Run Build
@@ -56,9 +56,9 @@ describe "Site Variables Integration" do
       File.write(File.join(tmp_dir, "content/index.md"), "---\ntitle: Home\n---\nHello")
 
       template = <<-HTML
-      SITE_TITLE={{ site_title }}
-      BASE_URL={{ base_url }}
-      HTML
+        SITE_TITLE={{ site_title }}
+        BASE_URL={{ base_url }}
+        HTML
       File.write(File.join(tmp_dir, "templates/page.html"), template)
 
       Dir.cd(tmp_dir) do

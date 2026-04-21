@@ -85,7 +85,7 @@ describe Hwaro::Utils::EnvSubstitutor do
 
     it "deduplicates missing variable names" do
       ENV.delete("HWARO_DUP")
-      result, missing = Hwaro::Utils::EnvSubstitutor.substitute("${HWARO_DUP} and ${HWARO_DUP}")
+      _, missing = Hwaro::Utils::EnvSubstitutor.substitute("${HWARO_DUP} and ${HWARO_DUP}")
       missing.size.should eq(1)
       missing.should eq(["HWARO_DUP"])
     end

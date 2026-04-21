@@ -10,10 +10,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_url == "/about/" %}
-      <p>About page</p>
-      {% endif %}
-      TPL
+        {% if page_url == "/about/" %}
+        <p>About page</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>About page</p>")
@@ -27,10 +27,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_url == "/about/" %}
-      <p>About page</p>
-      {% endif %}
-      TPL
+        {% if page_url == "/about/" %}
+        <p>About page</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should_not contain("<p>About page</p>")
@@ -44,12 +44,12 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_url == "/about/" %}
-      <p>About page</p>
-      {% else %}
-      <p>Other page</p>
-      {% endif %}
-      TPL
+        {% if page_url == "/about/" %}
+        <p>About page</p>
+        {% else %}
+        <p>Other page</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>About page</p>")
@@ -64,12 +64,12 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_url == "/about/" %}
-      <p>About page</p>
-      {% else %}
-      <p>Other page</p>
-      {% endif %}
-      TPL
+        {% if page_url == "/about/" %}
+        <p>About page</p>
+        {% else %}
+        <p>Other page</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should_not contain("<p>About page</p>")
@@ -84,10 +84,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_section != "docs" %}
-      <p>Not docs</p>
-      {% endif %}
-      TPL
+        {% if page_section != "docs" %}
+        <p>Not docs</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Not docs</p>")
@@ -104,10 +104,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <h1>{{ page_title }}</h1>
-      <p>Section: {{ page_section }}</p>
-      <p>Site: {{ site_title }}</p>
-      TPL
+        <h1>{{ page_title }}</h1>
+        <p>Section: {{ page_section }}</p>
+        <p>Site: {{ site_title }}</p>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<h1>Test Page</h1>")
@@ -124,10 +124,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page.draft %}
-      <p>Draft</p>
-      {% endif %}
-      TPL
+        {% if page.draft %}
+        <p>Draft</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Draft</p>")
@@ -142,10 +142,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if not page.draft %}
-      <p>Published</p>
-      {% endif %}
-      TPL
+        {% if not page.draft %}
+        <p>Published</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Published</p>")
@@ -159,8 +159,8 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <h1>{{ page_title | upper }}</h1>
-      TPL
+        <h1>{{ page_title | upper }}</h1>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<h1>HELLO WORLD</h1>")
@@ -176,8 +176,8 @@ describe Hwaro::Content::Processors::Template do
       context.add("empty_var", nil)
 
       template = <<-TPL
-      <p>{{ empty_var | default("No description") }}</p>
-      TPL
+        <p>{{ empty_var | default("No description") }}</p>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>No description</p>")
@@ -191,14 +191,14 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_section == "blog" %}
-      <p>Blog</p>
-      {% elif page_section == "docs" %}
-      <p>Documentation</p>
-      {% else %}
-      <p>Other</p>
-      {% endif %}
-      TPL
+        {% if page_section == "blog" %}
+        <p>Blog</p>
+        {% elif page_section == "docs" %}
+        <p>Documentation</p>
+        {% else %}
+        <p>Other</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should_not contain("<p>Blog</p>")
@@ -214,12 +214,12 @@ describe Hwaro::Content::Processors::Template do
       context.add("items", ["apple", "banana", "cherry"])
 
       template = <<-TPL
-      <ul>
-      {% for item in items %}
-      <li>{{ item }}</li>
-      {% endfor %}
-      </ul>
-      TPL
+        <ul>
+        {% for item in items %}
+        <li>{{ item }}</li>
+        {% endfor %}
+        </ul>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<li>apple</li>")
@@ -236,12 +236,12 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_section == "blog" %}
-        {% if not page.draft %}
-        <p>Published blog post</p>
+        {% if page_section == "blog" %}
+          {% if not page.draft %}
+          <p>Published blog post</p>
+          {% endif %}
         {% endif %}
-      {% endif %}
-      TPL
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Published blog post</p>")
@@ -256,10 +256,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_section == "blog" and not page.draft %}
-      <p>Published blog post</p>
-      {% endif %}
-      TPL
+        {% if page_section == "blog" and not page.draft %}
+        <p>Published blog post</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Published blog post</p>")
@@ -273,10 +273,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_section == "blog" or page_section == "news" %}
-      <p>Content section</p>
-      {% endif %}
-      TPL
+        {% if page_section == "blog" or page_section == "news" %}
+        <p>Content section</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Content section</p>")
@@ -290,10 +290,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page_url is startswith("/blog/") %}
-      <p>Blog post</p>
-      {% endif %}
-      TPL
+        {% if page_url is startswith("/blog/") %}
+        <p>Blog post</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>Blog post</p>")
@@ -309,10 +309,10 @@ describe Hwaro::Content::Processors::Template do
       context.add("empty_var", "")
 
       template = <<-TPL
-      {% if empty_var == "" %}
-      <p>No description</p>
-      {% endif %}
-      TPL
+        {% if empty_var == "" %}
+        <p>No description</p>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>No description</p>")
@@ -326,10 +326,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {% if page.toc %}
-      <div class="toc">Table of Contents</div>
-      {% endif %}
-      TPL
+        {% if page.toc %}
+        <div class="toc">Table of Contents</div>
+        {% endif %}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<div class=\"toc\">Table of Contents</div>")
@@ -343,8 +343,8 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <a href="{{ base_url }}/about/">About</a>
-      TPL
+        <a href="{{ base_url }}/about/">About</a>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<a href=\"https://example.com/about/\">About</a>")
@@ -360,10 +360,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <h1>{{ site.title }}</h1>
-      <p>{{ site.description }}</p>
-      <a href="{{ site.base_url }}">Home</a>
-      TPL
+        <h1>{{ site.title }}</h1>
+        <p>{{ site.description }}</p>
+        <a href="{{ site.base_url }}">Home</a>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<h1>My Site</h1>")
@@ -382,11 +382,11 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <h1>{{ page.title }}</h1>
-      <p>{{ page.description }}</p>
-      <a href="{{ page.url }}">Link</a>
-      <span>{{ page.section }}</span>
-      TPL
+        <h1>{{ page.title }}</h1>
+        <p>{{ page.description }}</p>
+        <a href="{{ page.url }}">Link</a>
+        <span>{{ page.section }}</span>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<h1>My Page</h1>")
@@ -402,10 +402,10 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <h1>{{ section.title }}</h1>
-      <p>{{ section.description }}</p>
-      <div>{{ section.list }}</div>
-      TPL
+        <h1>{{ section.title }}</h1>
+        <p>{{ section.description }}</p>
+        <div>{{ section.list }}</div>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<h1></h1>")
@@ -420,8 +420,8 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      <div>{{ toc_obj.html }}</div><span>{% for h in toc_obj.headers %}H{% endfor %}</span>
-      TPL
+        <div>{{ toc_obj.html }}</div><span>{% for h in toc_obj.headers %}H{% endfor %}</span>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<div></div>")
@@ -435,8 +435,8 @@ describe Hwaro::Content::Processors::Template do
       context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
       template = <<-TPL
-      {{ seo.canonical_url }}|{{ seo.og_type }}|{{ seo.twitter_card }}
-      TPL
+        {{ seo.canonical_url }}|{{ seo.og_type }}|{{ seo.twitter_card }}
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("||")
@@ -452,10 +452,10 @@ describe Hwaro::Content::Processors::Template do
       context.add("count", 42)
 
       template = <<-TPL
-      <p>{{ custom_var }}</p>
-      {% if is_special %}<p>Special!</p>{% endif %}
-      <p>Count: {{ count }}</p>
-      TPL
+        <p>{{ custom_var }}</p>
+        {% if is_special %}<p>Special!</p>{% endif %}
+        <p>Count: {{ count }}</p>
+        TPL
 
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should contain("<p>custom value</p>")

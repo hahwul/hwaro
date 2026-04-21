@@ -134,7 +134,7 @@ module Hwaro
 
         # Collapse multiple blank lines
         lines = result.lines.map(&.rstrip)
-        lines.reject! { |l| l.empty? }
+        lines.reject!(&.empty?)
         lines.join("\n").strip
       end
 

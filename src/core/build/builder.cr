@@ -220,7 +220,6 @@ module Hwaro
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
           safe = site.config.markdown.safe
-          lazy_loading = site.config.markdown.lazy_loading
           include_drafts = options.drafts
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
@@ -704,7 +703,7 @@ module Hwaro
           return result if result != Lifecycle::HookResult::Continue
 
           if ctx.options.streaming?
-            ctx.all_pages.each { |page| page.raw_content = "" }
+            ctx.all_pages.each(&.raw_content=(""))
             GC.collect
           end
 
@@ -713,7 +712,7 @@ module Hwaro
           return result if result != Lifecycle::HookResult::Continue
 
           # Phase: Finalize
-          result = execute_finalize_phase(ctx, profiler)
+          execute_finalize_phase(ctx, profiler)
         end
       end
     end

@@ -170,42 +170,42 @@ describe Hwaro::Services::Scaffolds::Docs do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("getting-started") }.should be_true
+      keys.any?(&.includes?("getting-started")).should be_true
     end
 
     it "includes guide section" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("guide") }.should be_true
+      keys.any?(&.includes?("guide")).should be_true
     end
 
     it "includes reference section" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("reference") }.should be_true
+      keys.any?(&.includes?("reference")).should be_true
     end
 
     it "includes installation content" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("installation") }.should be_true
+      keys.any?(&.includes?("installation")).should be_true
     end
 
     it "includes quick-start content" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("quick-start") }.should be_true
+      keys.any?(&.includes?("quick-start")).should be_true
     end
 
     it "includes configuration content" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.content_files
       keys = files.keys
-      keys.any? { |k| k.includes?("configuration") }.should be_true
+      keys.any?(&.includes?("configuration")).should be_true
     end
 
     it "has more content files than simple scaffold" do
@@ -300,7 +300,7 @@ describe Hwaro::Services::Scaffolds::BlogDark do
     it "has the same content files as Blog" do
       dark = Hwaro::Services::Scaffolds::BlogDark.new
       light = Hwaro::Services::Scaffolds::Blog.new
-      dark.content_files.keys.sort.should eq(light.content_files.keys.sort)
+      dark.content_files.keys.sort!.should eq(light.content_files.keys.sort!)
     end
   end
 
@@ -308,7 +308,7 @@ describe Hwaro::Services::Scaffolds::BlogDark do
     it "has the same template files as Blog" do
       dark = Hwaro::Services::Scaffolds::BlogDark.new
       light = Hwaro::Services::Scaffolds::Blog.new
-      dark.template_files.keys.sort.should eq(light.template_files.keys.sort)
+      dark.template_files.keys.sort!.should eq(light.template_files.keys.sort!)
     end
   end
 
@@ -360,7 +360,7 @@ describe Hwaro::Services::Scaffolds::DocsDark do
     it "has the same content files as Docs" do
       dark = Hwaro::Services::Scaffolds::DocsDark.new
       light = Hwaro::Services::Scaffolds::Docs.new
-      dark.content_files.keys.sort.should eq(light.content_files.keys.sort)
+      dark.content_files.keys.sort!.should eq(light.content_files.keys.sort!)
     end
   end
 
@@ -368,7 +368,7 @@ describe Hwaro::Services::Scaffolds::DocsDark do
     it "has the same template files as Docs" do
       dark = Hwaro::Services::Scaffolds::DocsDark.new
       light = Hwaro::Services::Scaffolds::Docs.new
-      dark.template_files.keys.sort.should eq(light.template_files.keys.sort)
+      dark.template_files.keys.sort!.should eq(light.template_files.keys.sort!)
     end
   end
 

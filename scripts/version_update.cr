@@ -9,120 +9,100 @@ FLAKE_FILE     = "flake.nix"
 
 # Extract version from shard.yml
 def get_shard_version : String?
-  begin
-    shard = YAML.parse(File.read(SHARD_FILE))
-    shard["version"].as_s
-  rescue
-    nil
-  end
+  shard = YAML.parse(File.read(SHARD_FILE))
+  shard["version"].as_s
+rescue
+  nil
 end
 
 # Extract VERSION from src/hwaro.cr
 def get_hwaro_version : String?
-  begin
-    content = File.read(HWARO_FILE)
-    match = content.match(/VERSION\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read(HWARO_FILE)
+  match = content.match(/VERSION\s*=\s*"([^"]+)"/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Extract version from snapcraft.yaml
 def get_snapcraft_version : String?
-  begin
-    snapcraft = YAML.parse(File.read(SNAPCRAFT_FILE))
-    snapcraft["version"].as_s
-  rescue
-    nil
-  end
+  snapcraft = YAML.parse(File.read(SNAPCRAFT_FILE))
+  snapcraft["version"].as_s
+rescue
+  nil
 end
 
 # Extract version from spec/hwaro_spec.cr
 def get_spec_version : String?
-  begin
-    content = File.read(SPEC_FILE)
-    match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read(SPEC_FILE)
+  match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Extract version from flake.nix
 def get_flake_version : String?
-  begin
-    content = File.read(FLAKE_FILE)
-    match = content.match(/version\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read(FLAKE_FILE)
+  match = content.match(/version\s*=\s*"([^"]+)"/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Update shard.yml version
 def update_shard_version(new_version : String) : Bool
-  begin
-    content = File.read(SHARD_FILE)
-    updated = content.gsub(/^(version:\s*)[\d.]+/m, "\\1#{new_version}")
-    File.write(SHARD_FILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{SHARD_FILE}: #{ex.message}"
-    false
-  end
+  content = File.read(SHARD_FILE)
+  updated = content.gsub(/^(version:\s*)[\d.]+/m, "\\1#{new_version}")
+  File.write(SHARD_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{SHARD_FILE}: #{ex.message}"
+  false
 end
 
 # Update src/hwaro.cr VERSION
 def update_hwaro_version(new_version : String) : Bool
-  begin
-    content = File.read(HWARO_FILE)
-    updated = content.gsub(/VERSION\s*=\s*"[^"]+"/, "VERSION = \"#{new_version}\"")
-    File.write(HWARO_FILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{HWARO_FILE}: #{ex.message}"
-    false
-  end
+  content = File.read(HWARO_FILE)
+  updated = content.gsub(/VERSION\s*=\s*"[^"]+"/, "VERSION = \"#{new_version}\"")
+  File.write(HWARO_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{HWARO_FILE}: #{ex.message}"
+  false
 end
 
 # Update snapcraft.yaml version
 def update_snapcraft_version(new_version : String) : Bool
-  begin
-    content = File.read(SNAPCRAFT_FILE)
-    updated = content.gsub(/^(version:\s*)['"]?[\d.]+['"]?/m, "\\1#{new_version}")
-    File.write(SNAPCRAFT_FILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{SNAPCRAFT_FILE}: #{ex.message}"
-    false
-  end
+  content = File.read(SNAPCRAFT_FILE)
+  updated = content.gsub(/^(version:\s*)['"]?[\d.]+['"]?/m, "\\1#{new_version}")
+  File.write(SNAPCRAFT_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{SNAPCRAFT_FILE}: #{ex.message}"
+  false
 end
 
 # Update spec/hwaro_spec.cr version
 def update_spec_version(new_version : String) : Bool
-  begin
-    content = File.read(SPEC_FILE)
-    updated = content.gsub(/VERSION\.should eq\("[^"]+"\)/, "VERSION.should eq(\"#{new_version}\")")
-    File.write(SPEC_FILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{SPEC_FILE}: #{ex.message}"
-    false
-  end
+  content = File.read(SPEC_FILE)
+  updated = content.gsub(/VERSION\.should eq\("[^"]+"\)/, "VERSION.should eq(\"#{new_version}\")")
+  File.write(SPEC_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{SPEC_FILE}: #{ex.message}"
+  false
 end
 
 # Update flake.nix version
 def update_flake_version(new_version : String) : Bool
-  begin
-    content = File.read(FLAKE_FILE)
-    updated = content.gsub(/^(\s*version\s*=\s*")[\d.]+(";\s*)$/m, "\\1#{new_version}\\2")
-    File.write(FLAKE_FILE, updated)
-    true
-  rescue ex
-    puts "  Error updating #{FLAKE_FILE}: #{ex.message}"
-    false
-  end
+  content = File.read(FLAKE_FILE)
+  updated = content.gsub(/^(\s*version\s*=\s*")[\d.]+(";\s*)$/m, "\\1#{new_version}\\2")
+  File.write(FLAKE_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{FLAKE_FILE}: #{ex.message}"
+  false
 end
 
 # Validate version format (semver-like: X.Y.Z)

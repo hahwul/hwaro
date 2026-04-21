@@ -8,13 +8,13 @@ describe "Content expiry" do
     it "parses expires field from TOML front matter" do
       processor = Hwaro::Content::Processors::Markdown.new
       content = <<-MD
-      +++
-      title = "Expiring Post"
-      expires = 2025-12-31
-      +++
+        +++
+        title = "Expiring Post"
+        expires = 2025-12-31
+        +++
 
-      Content here
-      MD
+        Content here
+        MD
 
       result = processor.parse(content)
       result[:expires].should_not be_nil
@@ -26,12 +26,12 @@ describe "Content expiry" do
     it "returns nil expires when not set" do
       processor = Hwaro::Content::Processors::Markdown.new
       content = <<-MD
-      +++
-      title = "Normal Post"
-      +++
+        +++
+        title = "Normal Post"
+        +++
 
-      Content here
-      MD
+        Content here
+        MD
 
       result = processor.parse(content)
       result[:expires].should be_nil
@@ -40,13 +40,13 @@ describe "Content expiry" do
     it "does not put expires into extra" do
       processor = Hwaro::Content::Processors::Markdown.new
       content = <<-MD
-      +++
-      title = "Expiring Post"
-      expires = 2025-06-15
-      +++
+        +++
+        title = "Expiring Post"
+        expires = 2025-06-15
+        +++
 
-      Content here
-      MD
+        Content here
+        MD
 
       result = processor.parse(content)
       result[:extra].has_key?("expires").should be_false

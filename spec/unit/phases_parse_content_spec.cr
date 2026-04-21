@@ -100,7 +100,7 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         builder.test_parse_single_page(section)
 
         section.sort_by.should eq("weight")
-        section.reverse.should eq(true)
+        section.reverse.should be_true
         section.transparent.should be_true
       end
     end
@@ -153,7 +153,7 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         pages = ["a.md", "b.md", "c.md"].map { |p| Hwaro::Models::Page.new(p) }
         builder.test_parse_content_parallel(pages)
 
-        pages.map(&.title).sort.should eq(["A", "B", "C"])
+        pages.map(&.title).sort!.should eq(["A", "B", "C"])
       end
     end
   end
@@ -176,7 +176,7 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         ]
 
         builder.test_parse_content_default(ctx)
-        ctx.pages.map(&.title).sort.should eq(["Published"])
+        ctx.pages.map(&.title).sort!.should eq(["Published"])
       end
     end
 
@@ -212,7 +212,7 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         ctx.pages = [Hwaro::Models::Page.new("future.md"), Hwaro::Models::Page.new("now.md")]
 
         builder.test_parse_content_default(ctx)
-        ctx.pages.map(&.title).sort.should eq(["Now"])
+        ctx.pages.map(&.title).sort!.should eq(["Now"])
       end
     end
 
@@ -231,7 +231,7 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         ctx.pages = [Hwaro::Models::Page.new("old.md"), Hwaro::Models::Page.new("live.md")]
 
         builder.test_parse_content_default(ctx)
-        ctx.pages.map(&.title).sort.should eq(["Live"])
+        ctx.pages.map(&.title).sort!.should eq(["Live"])
       end
     end
   end

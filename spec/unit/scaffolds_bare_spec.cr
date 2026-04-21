@@ -47,7 +47,7 @@ describe Hwaro::Services::Scaffolds::Bare do
       with_tax = scaffold.content_files(skip_taxonomies: false)
       without_tax = scaffold.content_files(skip_taxonomies: true)
 
-      with_tax.keys.sort.should eq(without_tax.keys.sort)
+      with_tax.keys.sort!.should eq(without_tax.keys.sort!)
     end
   end
 

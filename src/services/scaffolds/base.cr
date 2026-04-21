@@ -63,17 +63,17 @@ module Hwaro
         # with empty values for users to fill in.
         protected def default_archetype : String
           <<-MD
-          +++
-          title = "{{ title }}"
-          date = "{{ date }}"
-          draft = {{ draft }}
-          description = ""
-          tags = {{ tags }}
-          +++
+            +++
+            title = "{{ title }}"
+            date = "{{ date }}"
+            draft = {{ draft }}
+            description = ""
+            tags = {{ tags }}
+            +++
 
-          # {{ title }}
+            # {{ title }}
 
-          MD
+            MD
         end
 
         # Returns the config.toml content
@@ -129,116 +129,116 @@ module Hwaro
         # Common shortcode: alert (Jinja2 syntax)
         protected def alert_shortcode : String
           <<-HTML
-          <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-            <strong>{{ type | upper }}:</strong> {{ body }}
-          </div>
-          HTML
+            <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
+              <strong>{{ type | upper }}:</strong> {{ body }}
+            </div>
+            HTML
         end
 
         # Common template: header (Jinja2 syntax)
         protected def header_template : String
           <<-HTML
-          <!DOCTYPE html>
-          <html lang="{{ page_language }}">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta name="description" content="{{ page.description | e }}">
-            <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
-            {{ og_all_tags }}
-            {{ hreflang_tags }}
-            #{styles}
-            {{ highlight_css }}
-            {{ auto_includes_css }}
-          </head>
-          <body data-section="{{ page.section }}">
-            <div class="site-wrapper">
-              <header class="site-header">
-                <a href="{{ base_url }}/" class="site-logo">{{ site.title }}</a>
-                #{navigation}
-              </header>
+            <!DOCTYPE html>
+            <html lang="{{ page_language }}">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <meta name="description" content="{{ page.description | e }}">
+              <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
+              {{ og_all_tags }}
+              {{ hreflang_tags }}
+              #{styles}
+              {{ highlight_css }}
+              {{ auto_includes_css }}
+            </head>
+            <body data-section="{{ page.section }}">
+              <div class="site-wrapper">
+                <header class="site-header">
+                  <a href="{{ base_url }}/" class="site-logo">{{ site.title }}</a>
+                  #{navigation}
+                </header>
 
-          HTML
+            HTML
         end
 
         # Common template: footer (Jinja2 syntax)
         protected def footer_template : String
           <<-HTML
-              <footer class="site-footer">
-                <p>Powered by Hwaro</p>
-              </footer>
-            </div>
-            {{ highlight_js }}
-            {{ auto_includes_js }}
-          </body>
-          </html>
-          HTML
+                <footer class="site-footer">
+                  <p>Powered by Hwaro</p>
+                </footer>
+              </div>
+              {{ highlight_js }}
+              {{ auto_includes_js }}
+            </body>
+            </html>
+            HTML
         end
 
         # Common template: page (Jinja2 syntax)
         protected def page_template : String
           <<-HTML
-          {% include "header.html" %}
-            <main class="site-main">
-              {{ content }}
-            </main>
-          {% include "footer.html" %}
-          HTML
+            {% include "header.html" %}
+              <main class="site-main">
+                {{ content }}
+              </main>
+            {% include "footer.html" %}
+            HTML
         end
 
         # Common template: section (Jinja2 syntax)
         protected def section_template : String
           <<-HTML
-          {% include "header.html" %}
-            <main class="site-main">
-              <h1>{{ page.title | e }}</h1>
-              {{ content }}
-              <ul class="section-list">
-                {{ section.list }}
-              </ul>
-              {{ pagination }}
-            </main>
-          {% include "footer.html" %}
-          HTML
+            {% include "header.html" %}
+              <main class="site-main">
+                <h1>{{ page.title | e }}</h1>
+                {{ content }}
+                <ul class="section-list">
+                  {{ section.list }}
+                </ul>
+                {{ pagination }}
+              </main>
+            {% include "footer.html" %}
+            HTML
         end
 
         # Common template: 404 (Jinja2 syntax)
         protected def not_found_template : String
           <<-HTML
-          {% include "header.html" %}
-            <main class="site-main">
-              <h1>404 Not Found</h1>
-              <p>The page you are looking for does not exist.</p>
-              <p><a href="{{ base_url }}/">Return to Home</a></p>
-            </main>
-          {% include "footer.html" %}
-          HTML
+            {% include "header.html" %}
+              <main class="site-main">
+                <h1>404 Not Found</h1>
+                <p>The page you are looking for does not exist.</p>
+                <p><a href="{{ base_url }}/">Return to Home</a></p>
+              </main>
+            {% include "footer.html" %}
+            HTML
         end
 
         # Common template: taxonomy (Jinja2 syntax)
         protected def taxonomy_template : String
           <<-HTML
-          {% include "header.html" %}
-            <main class="site-main">
-              <h1>{{ page.title | e }}</h1>
-              <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
-              {{ content }}
-            </main>
-          {% include "footer.html" %}
-          HTML
+            {% include "header.html" %}
+              <main class="site-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
+                {{ content }}
+              </main>
+            {% include "footer.html" %}
+            HTML
         end
 
         # Common template: taxonomy_term (Jinja2 syntax)
         protected def taxonomy_term_template : String
           <<-HTML
-          {% include "header.html" %}
-            <main class="site-main">
-              <h1>{{ page.title | e }}</h1>
-              <p class="taxonomy-desc">Posts tagged with this term:</p>
-              {{ content }}
-            </main>
-          {% include "footer.html" %}
-          HTML
+            {% include "header.html" %}
+              <main class="site-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Posts tagged with this term:</p>
+                {{ content }}
+              </main>
+            {% include "footer.html" %}
+            HTML
         end
 
         # Override in subclasses to customize styles
@@ -297,56 +297,56 @@ module Hwaro
                 .site-wrapper { padding: 0 1rem; }
               }
             </style>
-          CSS
+            CSS
         end
 
         # Override in subclasses to customize navigation (Jinja2 syntax)
         protected def navigation : String
           <<-NAV
-                <nav>
-                  <a href="{{ base_url }}/">Home</a>
-                  <a href="{{ base_url }}/about/">About</a>
-                </nav>
-          NAV
+            <nav>
+              <a href="{{ base_url }}/">Home</a>
+              <a href="{{ base_url }}/about/">About</a>
+            </nav>
+            NAV
         end
 
         # Common config sections
         protected def base_config(title : String = "My Hwaro Site", description : String = "Welcome to my new Hwaro site.") : String
           <<-TOML
-          # =============================================================================
-          # Site Configuration
-          # =============================================================================
+            # =============================================================================
+            # Site Configuration
+            # =============================================================================
 
-          title = "#{title}"
-          description = "#{description}"
-          base_url = "http://localhost:3000"
+            title = "#{title}"
+            description = "#{description}"
+            base_url = "http://localhost:3000"
 
-          TOML
+            TOML
         end
 
         protected def multilingual_config : String
           <<-TOML
 
-          # =============================================================================
-          # Multilingual (Optional)
-          # =============================================================================
-          # Enable multilingual routing by defining languages and a default language.
-          # Then add language variants using filename suffixes:
-          # - content/about.md -> /about/
-          # - content/about.ko.md -> /ko/about/
-          # - content/about/index.ko.md -> /ko/about/
+            # =============================================================================
+            # Multilingual (Optional)
+            # =============================================================================
+            # Enable multilingual routing by defining languages and a default language.
+            # Then add language variants using filename suffixes:
+            # - content/about.md -> /about/
+            # - content/about.ko.md -> /ko/about/
+            # - content/about/index.ko.md -> /ko/about/
 
-          # default_language = "en"
-          #
-          # [languages.en]
-          # language_name = "English"
-          # weight = 1
-          #
-          # [languages.ko]
-          # language_name = "한국어"
-          # weight = 2
+            # default_language = "en"
+            #
+            # [languages.en]
+            # language_name = "English"
+            # weight = 1
+            #
+            # [languages.ko]
+            # language_name = "한국어"
+            # weight = 2
 
-          TOML
+            TOML
         end
 
         protected def plugins_config : String
@@ -360,18 +360,18 @@ module Hwaro
         protected def content_files_config : String
           <<-TOML
 
-          # =============================================================================
-          # Content Files
-          # =============================================================================
-          # Publish non-Markdown files from `content/` into the output directory.
-          # Example: content/about/profile.jpg -> /about/profile.jpg
+            # =============================================================================
+            # Content Files
+            # =============================================================================
+            # Publish non-Markdown files from `content/` into the output directory.
+            # Example: content/about/profile.jpg -> /about/profile.jpg
 
-          [content.files]
-          allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
-          # disallow_extensions = ["psd"]
-          # disallow_paths = ["private/**", "**/_*"]
+            [content.files]
+            allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
+            # disallow_extensions = ["psd"]
+            # disallow_paths = ["private/**", "**/_*"]
 
-          TOML
+            TOML
         end
 
         protected def highlight_config : String
@@ -409,47 +409,47 @@ module Hwaro
         protected def taxonomies_config : String
           <<-TOML
 
-          # =============================================================================
-          # Taxonomies
-          # =============================================================================
-          # Define content classification systems (tags, categories, etc.)
+            # =============================================================================
+            # Taxonomies
+            # =============================================================================
+            # Define content classification systems (tags, categories, etc.)
 
-          [[taxonomies]]
-          name = "tags"
-          feed = true
-          sitemap = false
+            [[taxonomies]]
+            name = "tags"
+            feed = true
+            sitemap = false
 
-          [[taxonomies]]
-          name = "categories"
-          paginate_by = 5
+            [[taxonomies]]
+            name = "categories"
+            paginate_by = 5
 
-          [[taxonomies]]
-          name = "authors"
+            [[taxonomies]]
+            name = "authors"
 
-          TOML
+            TOML
         end
 
         protected def feeds_config(sections : Array(String) = [] of String) : String
           sections_str = sections.empty? ? "[]" : "[\"#{sections.join("\", \"")}\"]"
           <<-TOML
 
-          # =============================================================================
-          # RSS/Atom Feeds
-          # =============================================================================
-          # Generates RSS or Atom feed for content syndication
+            # =============================================================================
+            # RSS/Atom Feeds
+            # =============================================================================
+            # Generates RSS or Atom feed for content syndication
 
-          [feeds]
-          enabled = true
-          filename = ""             # Leave empty for default (rss.xml or atom.xml)
-          type = "rss"              # "rss" or "atom"
-          truncate = 0              # Truncate content to N characters (0 = full content)
-          full_content = true       # true = full HTML in feed, false = description/summary only
-          limit = 10                # Maximum number of items in feed
-          sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
-          # default_language_only = true  # Multilingual: true = main feed has default language only
-          #                               #              false = main feed includes all languages
+            [feeds]
+            enabled = true
+            filename = ""             # Leave empty for default (rss.xml or atom.xml)
+            type = "rss"              # "rss" or "atom"
+            truncate = 0              # Truncate content to N characters (0 = full content)
+            full_content = true       # true = full HTML in feed, false = description/summary only
+            limit = 10                # Maximum number of items in feed
+            sections = #{sections_str}   # Limit to specific sections, e.g., ["posts"]
+            # default_language_only = true  # Multilingual: true = main feed has default language only
+            #                               #              false = main feed includes all languages
 
-          TOML
+            TOML
         end
 
         protected def permalinks_config : String

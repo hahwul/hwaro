@@ -500,9 +500,9 @@ describe Hwaro::Content::Seo::Llms do
         Hwaro::Content::Seo::Llms.generate_full([page_z, page_a, page_m], config, output_dir)
 
         content = File.read(File.join(output_dir, "llms-full.txt"))
-        a_pos = content.index("Title: A Page").not_nil!
-        m_pos = content.index("Title: M Page").not_nil!
-        z_pos = content.index("Title: Z Page").not_nil!
+        a_pos = content.index!("Title: A Page")
+        m_pos = content.index!("Title: M Page")
+        z_pos = content.index!("Title: Z Page")
         a_pos.should be < m_pos
         m_pos.should be < z_pos
       end
@@ -669,17 +669,17 @@ end
 describe Hwaro::Models::LlmsConfig do
   it "has default values" do
     config = Hwaro::Models::LlmsConfig.new
-    config.enabled.should eq(true)
+    config.enabled.should be_true
     config.filename.should eq("llms.txt")
     config.instructions.should eq("")
-    config.full_enabled.should eq(false)
+    config.full_enabled.should be_false
     config.full_filename.should eq("llms-full.txt")
   end
 
   it "allows setting enabled" do
     config = Hwaro::Models::LlmsConfig.new
     config.enabled = true
-    config.enabled.should eq(true)
+    config.enabled.should be_true
   end
 
   it "allows setting custom filename" do
@@ -697,7 +697,7 @@ describe Hwaro::Models::LlmsConfig do
   it "allows setting full_enabled" do
     config = Hwaro::Models::LlmsConfig.new
     config.full_enabled = true
-    config.full_enabled.should eq(true)
+    config.full_enabled.should be_true
   end
 
   it "allows setting full_filename" do

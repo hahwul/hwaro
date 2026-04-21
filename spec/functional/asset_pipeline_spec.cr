@@ -5,20 +5,20 @@ describe "Asset Pipeline: End-to-end build" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         config_toml = <<-TOML
-        title = "Asset Test"
-        base_url = "https://example.com"
+          title = "Asset Test"
+          base_url = "https://example.com"
 
-        [assets]
-        enabled = true
-        minify = true
-        fingerprint = true
-        source_dir = "static"
-        output_dir = "assets"
+          [assets]
+          enabled = true
+          minify = true
+          fingerprint = true
+          source_dir = "static"
+          output_dir = "assets"
 
-        [[assets.bundles]]
-        name = "main.css"
-        files = ["css/reset.css", "css/style.css"]
-        TOML
+          [[assets.bundles]]
+          name = "main.css"
+          files = ["css/reset.css", "css/style.css"]
+          TOML
 
         File.write("config.toml", config_toml)
         FileUtils.mkdir_p("content")
@@ -58,18 +58,18 @@ describe "Asset Pipeline: End-to-end build" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         config_toml = <<-TOML
-        title = "Asset Test"
-        base_url = ""
+          title = "Asset Test"
+          base_url = ""
 
-        [assets]
-        enabled = true
-        minify = false
-        fingerprint = false
+          [assets]
+          enabled = true
+          minify = false
+          fingerprint = false
 
-        [[assets.bundles]]
-        name = "bundle.js"
-        files = ["app.js"]
-        TOML
+          [[assets.bundles]]
+          name = "bundle.js"
+          files = ["app.js"]
+          TOML
 
         File.write("config.toml", config_toml)
         FileUtils.mkdir_p("content")

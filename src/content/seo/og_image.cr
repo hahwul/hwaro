@@ -188,12 +188,12 @@ module Hwaro
 
           # Build logo element
           logo_svg = ""
-          if ai.logo
+          if logo = ai.logo
             if logo_data_uri
               logo_svg = %(<image href="#{logo_data_uri}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             else
               # Fallback: reference logo as URL (file not found or not pre-computed)
-              logo_url = ai.logo.not_nil!.lchop("static/")
+              logo_url = logo.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
               logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             end
@@ -330,7 +330,7 @@ module Hwaro
         def self.file_to_data_uri(file_path : String) : String
           ext = File.extname(file_path).downcase
           mime = MIME_TYPES[ext]? || "application/octet-stream"
-          data = File.open(file_path, "rb") { |f| f.getb_to_end }
+          data = File.open(file_path, "rb", &.getb_to_end)
           encoded = Base64.strict_encode(data)
           "data:#{mime};base64,#{encoded}"
         end

@@ -1,0 +1,38 @@
+# Ameba configuration for hwaro.
+# Run `bin/ameba` after `shards install` to lint locally.
+
+Documentation:
+  Enabled: false
+
+# Short block parameter names (|k|, |v|, |tp|, etc.) are idiomatic here.
+Naming/BlockParameterName:
+  Enabled: false
+
+# Many model properties return Bool via typed getters (e.g. `draft : Bool`).
+# Renaming them would break the public template API.
+Naming/QueryBoolMethods:
+  Enabled: false
+
+# `io=` style accessors are used intentionally for test injection.
+Naming/AccessorMethodName:
+  Enabled: false
+
+# Acceptable style when the block contains multiple statements.
+Style/MultilineCurlyBlock:
+  Enabled: false
+
+# Hwaro has several large pipeline/dispatch methods (builder, importers,
+# shortcode_processor). Tracked for future refactors rather than gated in CI.
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+# Specs use `.not_nil!` heavily as a test-time assertion; a nil there fails
+# the test loudly, which is the intent.
+Lint/NotNil:
+  Excluded:
+    - spec/**/*.cr
+
+# spec/functional/support/ holds helper modules, not specs.
+Lint/SpecFilename:
+  Excluded:
+    - spec/functional/support/**/*.cr

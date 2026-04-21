@@ -84,7 +84,7 @@ module Hwaro
         # malformed one is surfaced as the same classified HwaroError every
         # other command raises — silent fallback would mask user typos.
         private def load_config_if_present : Models::Config?
-          return nil unless File.exists?("config.toml")
+          return unless File.exists?("config.toml")
           Models::Config.load
         end
 
@@ -155,7 +155,7 @@ module Hwaro
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             parser.unknown_args do |unknown|
-              path = unknown.first if unknown.any?
+              path = unknown.first if unknown.present?
             end
           end
 

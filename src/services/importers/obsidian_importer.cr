@@ -89,7 +89,7 @@ module Hwaro
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_markdown_file(raw)
 
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
           tags = [] of String
 
           if frontmatter_yaml
@@ -227,8 +227,8 @@ module Hwaro
             # Skip headings (all markdown heading levels)
             next if line.matches?(/^\s*\#{1,6}\s/)
 
-            line.scan(OBSIDIAN_TAG_PATTERN) do |match|
-              tag = match[1]
+            line.scan(OBSIDIAN_TAG_PATTERN) do |tag_match|
+              tag = tag_match[1]
               # Convert nested tags (tag/subtag) to just the leaf
               tags << tag.gsub("/", "-")
             end
@@ -267,7 +267,7 @@ module Hwaro
                 fence_close_re = nil
               end
               line
-            elsif (fence_match = line.match(/^(\s*(`{3,}|~{3,}))/))
+            elsif fence_match = line.match(/^(\s*(`{3,}|~{3,}))/)
               in_code_block = true
               fence_close_re = Regex.new("^\\s*#{Regex.escape(fence_match[2])}\\s*$")
               line

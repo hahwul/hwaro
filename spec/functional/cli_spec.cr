@@ -35,8 +35,6 @@ describe "CLI Commands" do
         output_io = IO::Memory.new
         error_io = IO::Memory.new
         status = Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["init", project_dir], output: output_io, error: error_io)
-        output = output_io.to_s
-        error = error_io.to_s
 
         status.success?.should be_true
 
@@ -72,14 +70,12 @@ describe "CLI Commands" do
         # Initialize project
         init_output_io = IO::Memory.new
         init_error_io = IO::Memory.new
-        init_status = Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["init", project_dir], output: init_output_io, error: init_error_io)
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["init", project_dir], output: init_output_io, error: init_error_io)
 
         # Run hwaro build
         build_output_io = IO::Memory.new
         build_error_io = IO::Memory.new
         status = Process.run(File.expand_path("../../bin/hwaro", __DIR__), ["build"], chdir: project_dir, output: build_output_io, error: build_error_io)
-        output = build_output_io.to_s
-        error = build_error_io.to_s
 
         status.success?.should be_true
 

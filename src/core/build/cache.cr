@@ -313,7 +313,7 @@ module Hwaro
         # Compute a combined checksum for a set of template files
         def self.compute_templates_hash(templates : Hash(String, String)) : String
           digest = Digest::MD5.new
-          templates.keys.sort.each do |name|
+          templates.keys.sort!.each do |name|
             digest.update(name)
             digest.update(templates[name])
           end

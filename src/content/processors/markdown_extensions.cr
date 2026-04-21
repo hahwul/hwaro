@@ -31,7 +31,7 @@ module Hwaro
         TASK_LIST_RE = /^(\s*[-*+]\s)\[([ xX])\]/m
 
         def preprocess_task_lists(content : String) : String
-          content.gsub(TASK_LIST_RE) do |match|
+          content.gsub(TASK_LIST_RE) do |_|
             prefix = $1
             checked = $2.downcase == "x"
             if checked
@@ -128,7 +128,7 @@ module Hwaro
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
-          if ref_order.any?
+          if ref_order.present?
             result += "\n<!--HWARO-FOOTNOTES-START-->\n"
             ref_order.each do |key, num|
               text = footnotes[key]? || ""

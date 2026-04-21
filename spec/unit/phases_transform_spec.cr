@@ -271,7 +271,7 @@ describe Hwaro::Core::Build::Phases::Transform do
           builder = Hwaro::Core::Build::Builder.new
           builder.test_collect_assets(ctx)
 
-          page.assets.any? { |a| a.ends_with?("cover.png") }.should be_true
+          page.assets.any?(&.ends_with?("cover.png")).should be_true
         end
       end
     end

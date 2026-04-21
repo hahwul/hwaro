@@ -61,7 +61,7 @@ module Hwaro
         # Only remove spaces around `:` inside declaration blocks (after `{`)
         # and parenthesized expressions (e.g. media queries `(max-width: 600px)`)
         # to preserve descendant combinator spaces in selectors (e.g. `div :hover`)
-        result = result.gsub(/\{([^}]*)\}/) do |block_match|
+        result = result.gsub(/\{([^}]*)\}/) do |_|
           inner = $1
           "{" + inner.gsub(/\s*:\s*/, ":") + "}"
         end

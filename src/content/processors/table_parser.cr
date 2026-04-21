@@ -69,7 +69,7 @@ module Hwaro
 
               str << "</tr>\n</thead>\n"
 
-              if @rows.any?
+              if @rows.present?
                 str << "<tbody>\n"
                 @rows.each do |row|
                   str << "<tr>\n"

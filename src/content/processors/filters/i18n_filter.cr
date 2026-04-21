@@ -41,7 +41,6 @@ module Hwaro
                   if default_entries = lang_hash[default_val]?
                     if val = default_entries.as_h[key_val]?
                       result = val.to_s
-                      found = true
                     end
                   end
                 end

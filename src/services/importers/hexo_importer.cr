@@ -103,7 +103,7 @@ module Hwaro
           frontmatter_yaml, body = parse_hexo_file(raw)
           filename = File.basename(file_info[:path])
 
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
 
           slug = extract_slug(filename)
           filename_date = extract_date_from_filename(filename)
@@ -253,8 +253,6 @@ module Hwaro
         private def extract_date_from_filename(filename : String) : Time?
           if match = FILENAME_PATTERN.match(filename)
             parse_date(match[1])
-          else
-            nil
           end
         end
       end

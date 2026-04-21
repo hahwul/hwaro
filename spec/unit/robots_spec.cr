@@ -245,8 +245,8 @@ describe Hwaro::Content::Seo::Robots do
         content.should contain("Sitemap: https://mysite.com/sitemap.xml")
 
         # Verify Sitemap is at the end
-        sitemap_pos = content.index("Sitemap:").not_nil!
-        last_disallow_pos = content.rindex("Disallow:").not_nil!
+        sitemap_pos = content.index!("Sitemap:")
+        last_disallow_pos = content.rindex!("Disallow:")
         sitemap_pos.should be > last_disallow_pos
       end
     end
@@ -290,7 +290,7 @@ describe Hwaro::Content::Seo::Robots do
         # First rule should have explicit Allow: /
         # Second rule should only have Disallow: /
         lines = content.lines
-        gptbot_idx = lines.index { |l| l.includes?("User-agent: GPTBot") }.not_nil!
+        gptbot_idx = lines.index!(&.includes?("User-agent: GPTBot"))
         # The line after GPTBot should be Disallow, not Allow
         lines[gptbot_idx + 1].should contain("Disallow: /")
       end
@@ -314,8 +314,8 @@ describe Hwaro::Content::Seo::Robots do
         content = File.read(File.join(output_dir, "robots.txt"))
 
         # Check that rules are separated by a blank line
-        googlebot_idx = content.index("User-agent: Googlebot").not_nil!
-        bingbot_idx = content.index("User-agent: Bingbot").not_nil!
+        googlebot_idx = content.index!("User-agent: Googlebot")
+        bingbot_idx = content.index!("User-agent: Bingbot")
         between = content[googlebot_idx..bingbot_idx]
         between.should contain("\n\n")
       end

@@ -2,11 +2,11 @@ require "../spec_helper"
 
 private def make_amp_config(toml : String = "") : Hwaro::Models::Config
   config_str = <<-TOML
-  title = "Test Site"
-  description = "A test site"
-  base_url = "https://example.com"
-  #{toml}
-  TOML
+    title = "Test Site"
+    description = "A test site"
+    base_url = "https://example.com"
+    #{toml}
+    TOML
 
   File.tempfile("hwaro-amp", ".toml") do |file|
     file.print(config_str)
@@ -29,11 +29,11 @@ describe Hwaro::Models::AmpConfig do
   describe "loading from TOML" do
     it "loads amp config" do
       config = make_amp_config(<<-TOML)
-      [amp]
-      enabled = true
-      path_prefix = "mobile"
-      sections = ["posts", "blog"]
-      TOML
+        [amp]
+        enabled = true
+        path_prefix = "mobile"
+        sections = ["posts", "blog"]
+        TOML
 
       config.amp.enabled.should be_true
       config.amp.path_prefix.should eq("mobile")
@@ -50,10 +50,10 @@ describe Hwaro::Models::AmpConfig do
 
     it "returns true only for configured sections" do
       config = make_amp_config(<<-TOML)
-      [amp]
-      enabled = true
-      sections = ["posts"]
-      TOML
+        [amp]
+        enabled = true
+        sections = ["posts"]
+        TOML
 
       config.amp.section_enabled?("posts").should be_true
       config.amp.section_enabled?("pages").should be_false
@@ -191,10 +191,10 @@ describe Hwaro::Content::Seo::Amp do
     it "generates AMP page from canonical HTML" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)
-        [amp]
-        enabled = true
-        sections = ["posts"]
-        TOML
+          [amp]
+          enabled = true
+          sections = ["posts"]
+          TOML
 
         page = Hwaro::Models::Page.new("test.md")
         page.url = "/posts/hello/"
@@ -227,10 +227,10 @@ describe Hwaro::Content::Seo::Amp do
     it "skips sections not in configured list" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)
-        [amp]
-        enabled = true
-        sections = ["posts"]
-        TOML
+          [amp]
+          enabled = true
+          sections = ["posts"]
+          TOML
 
         page = Hwaro::Models::Page.new("test.md")
         page.url = "/about/"
@@ -250,10 +250,10 @@ describe Hwaro::Content::Seo::Amp do
     it "uses custom path prefix" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)
-        [amp]
-        enabled = true
-        path_prefix = "mobile"
-        TOML
+          [amp]
+          enabled = true
+          path_prefix = "mobile"
+          TOML
 
         page = Hwaro::Models::Page.new("test.md")
         page.url = "/posts/hello/"
@@ -273,9 +273,9 @@ describe Hwaro::Content::Seo::Amp do
     it "skips draft pages" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)
-        [amp]
-        enabled = true
-        TOML
+          [amp]
+          enabled = true
+          TOML
 
         page = Hwaro::Models::Page.new("test.md")
         page.url = "/posts/draft/"

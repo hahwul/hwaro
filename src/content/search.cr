@@ -25,7 +25,7 @@ module Hwaro
 
         # Deduplicate by URL (keep last occurrence, matching build behavior)
         seen_urls = Set(String).new
-        search_pages = search_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse
+        search_pages = search_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse!
 
         # Filter out excluded paths
         unless config.search.exclude.empty?
@@ -77,11 +77,11 @@ module Hwaro
         cjk = config.search.tokenize_cjk
 
         # Extract base path from base_url for subpath deployments
-        base_path = unless config.base_url.empty?
-          URI.parse(config.base_url).path.rstrip("/")
-        else
-          ""
-        end
+        base_path = if config.base_url.empty?
+                      ""
+                    else
+                      URI.parse(config.base_url).path.rstrip("/")
+                    end
 
         pages.map do |page|
           data = {} of String => String | Array(String)

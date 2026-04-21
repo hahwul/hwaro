@@ -10,13 +10,13 @@ require "./support/build_helper"
 describe "SEO: llms.txt generation" do
   it "generates llms.txt with instructions" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [llms]
-    enabled = true
-    instructions = "This is a test site about Crystal programming."
-    TOML
+      [llms]
+      enabled = true
+      instructions = "This is a test site about Crystal programming."
+      TOML
 
     build_site(
       config,
@@ -31,14 +31,14 @@ describe "SEO: llms.txt generation" do
 
   it "generates llms-full.txt with page content" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [llms]
-    enabled = true
-    instructions = "Test instructions"
-    full_enabled = true
-    TOML
+      [llms]
+      enabled = true
+      instructions = "Test instructions"
+      full_enabled = true
+      TOML
 
     build_site(
       config,
@@ -59,12 +59,12 @@ describe "SEO: llms.txt generation" do
 
   it "does not generate llms.txt when disabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [llms]
-    enabled = false
-    TOML
+      [llms]
+      enabled = false
+      TOML
 
     build_site(
       config,
@@ -79,15 +79,15 @@ end
 describe "SEO: Atom feed generation" do
   it "generates Atom feed" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
-    description = "A test site"
+      title = "Test"
+      base_url = "http://localhost"
+      description = "A test site"
 
-    [feeds]
-    enabled = true
-    type = "atom"
-    filename = "atom.xml"
-    TOML
+      [feeds]
+      enabled = true
+      type = "atom"
+      filename = "atom.xml"
+      TOML
 
     build_site(
       config,
@@ -111,26 +111,26 @@ end
 describe "SEO: Multiple features simultaneously" do
   it "generates sitemap, robots, feed, and llms.txt together" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
-    description = "Multi-SEO test"
+      title = "Test"
+      base_url = "http://localhost"
+      description = "Multi-SEO test"
 
-    [sitemap]
-    enabled = true
+      [sitemap]
+      enabled = true
 
-    [robots]
-    enabled = true
+      [robots]
+      enabled = true
 
-    [feeds]
-    enabled = true
-    type = "rss"
-    filename = "rss.xml"
+      [feeds]
+      enabled = true
+      type = "rss"
+      filename = "rss.xml"
 
-    [llms]
-    enabled = true
-    instructions = "Multi SEO"
-    full_enabled = true
-    TOML
+      [llms]
+      enabled = true
+      instructions = "Multi SEO"
+      full_enabled = true
+      TOML
 
     build_site(
       config,
@@ -169,14 +169,14 @@ end
 describe "SEO: Sitemap with custom configuration" do
   it "generates sitemap with configured changefreq and priority" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [sitemap]
-    enabled = true
-    changefreq = "daily"
-    priority = 0.8
-    TOML
+      [sitemap]
+      enabled = true
+      changefreq = "daily"
+      priority = 0.8
+      TOML
 
     build_site(
       config,
@@ -200,13 +200,13 @@ describe "SEO: Sitemap with custom configuration" do
 
   it "excludes configured paths from sitemap" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [sitemap]
-    enabled = true
-    exclude = ["/secret/"]
-    TOML
+      [sitemap]
+      enabled = true
+      exclude = ["/secret/"]
+      TOML
 
     build_site(
       config,
@@ -226,21 +226,21 @@ end
 describe "SEO: Robots.txt with custom rules" do
   it "generates robots.txt with multiple user-agent rules" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [robots]
-    enabled = true
+      [robots]
+      enabled = true
 
-    [[robots.rules]]
-    user_agent = "*"
-    allow = ["/"]
-    disallow = ["/private/", "/admin/"]
+      [[robots.rules]]
+      user_agent = "*"
+      allow = ["/"]
+      disallow = ["/private/", "/admin/"]
 
-    [[robots.rules]]
-    user_agent = "Googlebot"
-    allow = ["/"]
-    TOML
+      [[robots.rules]]
+      user_agent = "Googlebot"
+      allow = ["/"]
+      TOML
 
     build_site(
       config,
@@ -257,13 +257,13 @@ end
 describe "SEO: Search index with different formats" do
   it "generates search index with content field" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [search]
-    enabled = true
-    fields = ["title", "url", "content"]
-    TOML
+      [search]
+      enabled = true
+      fields = ["title", "url", "content"]
+      TOML
 
     build_site(
       config,
@@ -283,13 +283,13 @@ describe "SEO: Search index with different formats" do
 
   it "excludes pages with in_search_index: false" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [search]
-    enabled = true
-    fields = ["title", "url"]
-    TOML
+      [search]
+      enabled = true
+      fields = ["title", "url"]
+      TOML
 
     build_site(
       config,
@@ -309,15 +309,15 @@ end
 describe "SEO: Atom feed with multiple posts" do
   it "generates Atom feed with correct entry structure" do
     config = <<-TOML
-    title = "Test Site"
-    base_url = "http://localhost"
-    description = "A test site"
+      title = "Test Site"
+      base_url = "http://localhost"
+      description = "A test site"
 
-    [feeds]
-    enabled = true
-    type = "atom"
-    filename = "atom.xml"
-    TOML
+      [feeds]
+      enabled = true
+      type = "atom"
+      filename = "atom.xml"
+      TOML
 
     build_site(
       config,
@@ -345,15 +345,15 @@ end
 describe "SEO: RSS feed content verification" do
   it "generates RSS with proper channel and item structure" do
     config = <<-TOML
-    title = "My Site"
-    base_url = "http://localhost"
-    description = "Site description"
+      title = "My Site"
+      base_url = "http://localhost"
+      description = "Site description"
 
-    [feeds]
-    enabled = true
-    type = "rss"
-    filename = "feed.xml"
-    TOML
+      [feeds]
+      enabled = true
+      type = "rss"
+      filename = "feed.xml"
+      TOML
 
     build_site(
       config,
@@ -379,13 +379,13 @@ end
 describe "SEO: llms.txt content structure" do
   it "includes page titles and URLs in llms.txt" do
     config = <<-TOML
-    title = "My Site"
-    base_url = "http://localhost"
+      title = "My Site"
+      base_url = "http://localhost"
 
-    [llms]
-    enabled = true
-    instructions = "This is My Site."
-    TOML
+      [llms]
+      enabled = true
+      instructions = "This is My Site."
+      TOML
 
     build_site(
       config,

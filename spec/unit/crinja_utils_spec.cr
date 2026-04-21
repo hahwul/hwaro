@@ -87,13 +87,13 @@ describe Hwaro::Utils::CrinjaUtils do
 
     it "converts nested YAML structures" do
       yaml_str = <<-YAML
-      person:
-        name: Bob
-        hobbies:
-          - reading
-          - coding
-        active: true
-      YAML
+        person:
+          name: Bob
+          hobbies:
+            - reading
+            - coding
+          active: true
+        YAML
       yaml = YAML.parse(yaml_str)
       result = Hwaro::Utils::CrinjaUtils.from_yaml(yaml)
       vars = {"data" => result}
@@ -257,10 +257,10 @@ describe Hwaro::Utils::CrinjaUtils do
 
     it "converts a nested TOML table" do
       toml_str = <<-TOML
-      [server]
-      host = "localhost"
-      port = 8080
-      TOML
+        [server]
+        host = "localhost"
+        port = 8080
+        TOML
       toml = TOML.parse(toml_str)
       result = Hwaro::Utils::CrinjaUtils.from_toml(toml)
       vars = {"data" => result}
@@ -277,12 +277,12 @@ describe Hwaro::Utils::CrinjaUtils do
 
     it "converts TOML with array of tables" do
       toml_str = <<-TOML
-      [[items]]
-      name = "first"
+        [[items]]
+        name = "first"
 
-      [[items]]
-      name = "second"
-      TOML
+        [[items]]
+        name = "second"
+        TOML
       toml = TOML.parse(toml_str)
       result = Hwaro::Utils::CrinjaUtils.from_toml(toml)
       vars = {"data" => result}

@@ -99,8 +99,8 @@ describe Hwaro::Core::Lifecycle do
 
     it "has matching before/after pairs" do
       hook_points = Hwaro::Core::Lifecycle::HookPoint.values
-      before_hooks = hook_points.select { |hp| hp.to_s.starts_with?("Before") }
-      after_hooks = hook_points.select { |hp| hp.to_s.starts_with?("After") }
+      before_hooks = hook_points.select(&.to_s.starts_with?("Before"))
+      after_hooks = hook_points.select(&.to_s.starts_with?("After"))
 
       before_hooks.size.should eq(8)
       after_hooks.size.should eq(8)

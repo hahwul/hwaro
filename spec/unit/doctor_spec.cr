@@ -39,27 +39,27 @@ describe Hwaro::Services::Doctor do
 
       it "warns when base_url is empty" do
         issues = run_doctor(%(title = "My Site"\n))
-        issues.any? { |i| i.message.includes?("base_url") }.should be_true
+        issues.any?(&.message.includes?("base_url")).should be_true
       end
 
       it "warns when title is default" do
         issues = run_doctor(%(title = "Hwaro Site"\nbase_url = "https://example.com"\n))
-        issues.any? { |i| i.message.includes?("default value") }.should be_true
+        issues.any?(&.message.includes?("default value")).should be_true
       end
 
       it "does not warn when title is custom" do
         issues = run_doctor(base_config)
-        issues.any? { |i| i.message.includes?("default value") }.should be_false
+        issues.any?(&.message.includes?("default value")).should be_false
       end
 
       it "does not warn when feeds enabled with empty filename (uses runtime default)" do
         issues = run_doctor(base_config("\n[feeds]\nenabled = true\nfilename = \"\"\n"))
-        issues.any? { |i| i.message.includes?("feeds.filename") }.should be_false
+        issues.any?(&.message.includes?("feeds.filename")).should be_false
       end
 
       it "does not warn when feeds disabled" do
         issues = run_doctor(base_config("\n[feeds]\nenabled = false\n"))
-        issues.any? { |i| i.message.includes?("feeds.filename") }.should be_false
+        issues.any?(&.message.includes?("feeds.filename")).should be_false
       end
 
       it "warns on invalid sitemap changefreq" do
@@ -69,7 +69,7 @@ describe Hwaro::Services::Doctor do
 
       it "does not warn on valid sitemap changefreq" do
         issues = run_doctor(base_config("\n[sitemap]\nchangefreq = \"daily\"\n"))
-        issues.any? { |i| i.message.includes?("changefreq") }.should be_false
+        issues.any?(&.message.includes?("changefreq")).should be_false
       end
 
       it "warns on sitemap priority out of range" do
@@ -79,22 +79,22 @@ describe Hwaro::Services::Doctor do
 
       it "warns on duplicate taxonomy names" do
         issues = run_doctor(base_config("\n[[taxonomies]]\nname = \"tags\"\n\n[[taxonomies]]\nname = \"tags\"\n"))
-        issues.any? { |i| i.message.includes?("Duplicate taxonomy") }.should be_true
+        issues.any?(&.message.includes?("Duplicate taxonomy")).should be_true
       end
 
       it "does not warn on unique taxonomy names" do
         issues = run_doctor(base_config("\n[[taxonomies]]\nname = \"tags\"\n\n[[taxonomies]]\nname = \"categories\"\n"))
-        issues.any? { |i| i.message.includes?("Duplicate taxonomy") }.should be_false
+        issues.any?(&.message.includes?("Duplicate taxonomy")).should be_false
       end
 
       it "warns on invalid search format when search enabled" do
         issues = run_doctor(base_config("\n[search]\nenabled = true\nformat = \"invalid_format\"\n"))
-        issues.any? { |i| i.message.includes?("search.format") }.should be_true
+        issues.any?(&.message.includes?("search.format")).should be_true
       end
 
       it "does not warn on valid search format" do
         issues = run_doctor(base_config("\n[search]\nenabled = true\nformat = \"fuse_json\"\n"))
-        issues.any? { |i| i.message.includes?("search.format") }.should be_false
+        issues.any?(&.message.includes?("search.format")).should be_false
       end
 
       it "reports error on invalid config TOML" do
@@ -106,17 +106,17 @@ describe Hwaro::Services::Doctor do
     describe "config — base_url format" do
       it "warns when base_url has no protocol" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "example.com"\n))
-        issues.any? { |i| i.message.includes?("http://") }.should be_true
+        issues.any?(&.message.includes?("http://")).should be_true
       end
 
       it "warns when base_url has trailing slash" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com/"\n))
-        issues.any? { |i| i.message.includes?("trailing slash") }.should be_true
+        issues.any?(&.message.includes?("trailing slash")).should be_true
       end
 
       it "does not warn on proper base_url" do
         issues = run_doctor(base_config)
-        issues.any? { |i| i.message.includes?("trailing slash") }.should be_false
+        issues.any?(&.message.includes?("trailing slash")).should be_false
         issues.any? { |i| i.message.includes?("http://") && i.message.includes?("https://") }.should be_false
       end
     end
@@ -146,8 +146,8 @@ describe Hwaro::Services::Doctor do
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
           issues = doctor.run
           tpl_issues = issues.select { |i| i.category == "template" }
-          tpl_issues.any? { |i| i.message.includes?("section.html") }.should be_true
-          tpl_issues.any? { |i| i.message.includes?("page.html") }.should be_false
+          tpl_issues.any?(&.message.includes?("section.html")).should be_true
+          tpl_issues.any?(&.message.includes?("page.html")).should be_false
         end
       end
 
@@ -192,92 +192,92 @@ describe Hwaro::Services::Doctor do
 
         # Should mention pwa, amp among others
         messages = missing_issues.map(&.message)
-        messages.any? { |m| m.includes?("[pwa]") }.should be_true
-        messages.any? { |m| m.includes?("[amp]") }.should be_true
+        messages.any?(&.includes?("[pwa]")).should be_true
+        messages.any?(&.includes?("[amp]")).should be_true
       end
 
       it "reports og.auto_image when [og] exists but sub-section is missing" do
         config = <<-TOML
-        title = "My Site"
-        base_url = "https://example.com"
-        [og]
-        default_image = "/img.png"
-        TOML
+          title = "My Site"
+          base_url = "https://example.com"
+          [og]
+          default_image = "/img.png"
+          TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.any? { |i| i.message.includes?("[og.auto_image]") }.should be_true
+        missing_issues.any?(&.message.includes?("[og.auto_image]")).should be_true
       end
 
       it "does not report og.auto_image when [og] itself is missing" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"))
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.none? { |i| i.message.includes?("[og.auto_image]") }.should be_true
+        missing_issues.none?(&.message.includes?("[og.auto_image]")).should be_true
       end
 
       it "does not report sections that exist" do
         config = <<-TOML
-        title = "My Site"
-        base_url = "https://example.com"
-        [pwa]
-        enabled = false
-        [amp]
-        enabled = false
-        TOML
+          title = "My Site"
+          base_url = "https://example.com"
+          [pwa]
+          enabled = false
+          [amp]
+          enabled = false
+          TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
 
-        missing_issues.none? { |i| i.message.includes?("[pwa]") }.should be_true
-        missing_issues.none? { |i| i.message.includes?("[amp]") }.should be_true
+        missing_issues.none?(&.message.includes?("[pwa]")).should be_true
+        missing_issues.none?(&.message.includes?("[amp]")).should be_true
       end
 
       it "does not report commented-out sections as missing" do
         config = <<-TOML
-        title = "My Site"
-        base_url = "https://example.com"
-        # [pwa]
-        # enabled = true
-        # [amp]
-        # enabled = true
-        TOML
+          title = "My Site"
+          base_url = "https://example.com"
+          # [pwa]
+          # enabled = true
+          # [amp]
+          # enabled = true
+          TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
 
-        missing_issues.none? { |i| i.message.includes?("[pwa]") }.should be_true
-        missing_issues.none? { |i| i.message.includes?("[amp]") }.should be_true
+        missing_issues.none?(&.message.includes?("[pwa]")).should be_true
+        missing_issues.none?(&.message.includes?("[amp]")).should be_true
       end
 
       it "does not report commented-out sub-sections as missing" do
         config = <<-TOML
-        title = "My Site"
-        base_url = "https://example.com"
-        [og]
-        default_image = "/img.png"
-        # [og.auto_image]
-        # enabled = true
-        TOML
+          title = "My Site"
+          base_url = "https://example.com"
+          [og]
+          default_image = "/img.png"
+          # [og.auto_image]
+          # enabled = true
+          TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.none? { |i| i.message.includes?("[og.auto_image]") }.should be_true
+        missing_issues.none?(&.message.includes?("[og.auto_image]")).should be_true
       end
 
       it "does not report og.auto_image when it exists" do
         config = <<-TOML
-        title = "My Site"
-        base_url = "https://example.com"
-        [og]
-        default_image = "/img.png"
-        [og.auto_image]
-        enabled = false
-        TOML
+          title = "My Site"
+          base_url = "https://example.com"
+          [og]
+          default_image = "/img.png"
+          [og.auto_image]
+          enabled = false
+          TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.none? { |i| i.message.includes?("[og.auto_image]") }.should be_true
+        missing_issues.none?(&.message.includes?("[og.auto_image]")).should be_true
       end
 
       it "suggests --fix in issue messages" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"))
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.all? { |i| i.message.includes?("--fix") }.should be_true
+        missing_issues.all?(&.message.includes?("--fix")).should be_true
       end
     end
 

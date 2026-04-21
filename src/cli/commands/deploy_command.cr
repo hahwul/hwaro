@@ -96,7 +96,6 @@ module Hwaro
             payload = {"status" => overall, "targets" => results}
             STDOUT.puts payload.to_json
             exit(overall == "ok" ? 0 : worst_exit_for(results))
-            return
           end
 
           ok = Services::Deployer.new.run(options)

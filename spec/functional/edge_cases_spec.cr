@@ -240,9 +240,9 @@ describe "Edge Cases: Section sort_by configuration" do
       },
     ) do
       html = File.read("public/docs/index.html")
-      intro_pos = html.index("Intro,").not_nil!
-      setup_pos = html.index("Setup,").not_nil!
-      usage_pos = html.index("Usage,").not_nil!
+      intro_pos = html.index!("Intro,")
+      setup_pos = html.index!("Setup,")
+      usage_pos = html.index!("Usage,")
       (intro_pos < setup_pos).should be_true
       (setup_pos < usage_pos).should be_true
     end
@@ -275,12 +275,12 @@ end
 describe "Edge Cases: Page with multiple taxonomy terms" do
   it "assigns page to multiple tags" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [taxonomies]
-    tags = { name = "tags", feed = false }
-    TOML
+      [taxonomies]
+      tags = { name = "tags", feed = false }
+      TOML
 
     build_site(
       config,

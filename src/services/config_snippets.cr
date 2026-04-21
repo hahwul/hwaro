@@ -63,42 +63,42 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # PWA (Progressive Web App) (Optional)
-          # =============================================================================
-          # Generate manifest.json and service worker for offline access
+            # =============================================================================
+            # PWA (Progressive Web App) (Optional)
+            # =============================================================================
+            # Generate manifest.json and service worker for offline access
 
-          # [pwa]
-          # enabled = true
-          # name = "My Site"
-          # short_name = "Site"
-          # theme_color = "#ffffff"
-          # background_color = "#ffffff"
-          # display = "standalone"
-          # icons = ["static/icon-192.png", "static/icon-512.png"]
+            # [pwa]
+            # enabled = true
+            # name = "My Site"
+            # short_name = "Site"
+            # theme_color = "#ffffff"
+            # background_color = "#ffffff"
+            # display = "standalone"
+            # icons = ["static/icon-192.png", "static/icon-512.png"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # PWA (Progressive Web App) (Optional)
-          # =============================================================================
-          # Generate manifest.json and service worker for offline access and installability
+            # =============================================================================
+            # PWA (Progressive Web App) (Optional)
+            # =============================================================================
+            # Generate manifest.json and service worker for offline access and installability
 
-          # [pwa]
-          # enabled = true
-          # name = "My Site"
-          # short_name = "Site"
-          # theme_color = "#ffffff"
-          # background_color = "#ffffff"
-          # display = "standalone"
-          # start_url = "/"
-          # icons = ["static/icon-192.png", "static/icon-512.png"]
-          # offline_page = "/offline.html"
-          # precache_urls = ["/", "/about/"]
+            # [pwa]
+            # enabled = true
+            # name = "My Site"
+            # short_name = "Site"
+            # theme_color = "#ffffff"
+            # background_color = "#ffffff"
+            # display = "standalone"
+            # start_url = "/"
+            # icons = ["static/icon-192.png", "static/icon-512.png"]
+            # offline_page = "/offline.html"
+            # precache_urls = ["/", "/about/"]
 
-          TOML
+            TOML
         end
       end
 
@@ -106,31 +106,31 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # AMP (Accelerated Mobile Pages) (Optional)
-          # =============================================================================
-          # Generate AMP-compliant versions of content pages
+            # =============================================================================
+            # AMP (Accelerated Mobile Pages) (Optional)
+            # =============================================================================
+            # Generate AMP-compliant versions of content pages
 
-          # [amp]
-          # enabled = true
-          # path_prefix = "amp"
-          # sections = ["posts"]
+            # [amp]
+            # enabled = true
+            # path_prefix = "amp"
+            # sections = ["posts"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # AMP (Accelerated Mobile Pages) (Optional)
-          # =============================================================================
-          # Generate AMP-compliant versions of content pages
+            # =============================================================================
+            # AMP (Accelerated Mobile Pages) (Optional)
+            # =============================================================================
+            # Generate AMP-compliant versions of content pages
 
-          # [amp]
-          # enabled = true
-          # path_prefix = "amp"        # Output under /amp/ prefix
-          # sections = ["posts"]       # Limit to specific sections (empty = all)
+            # [amp]
+            # enabled = true
+            # path_prefix = "amp"        # Output under /amp/ prefix
+            # sections = ["posts"]       # Limit to specific sections (empty = all)
 
-          TOML
+            TOML
         end
       end
 
@@ -138,29 +138,29 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Doctor
-          # =============================================================================
-          # Configure doctor diagnostics behavior
+            # =============================================================================
+            # Doctor
+            # =============================================================================
+            # Configure doctor diagnostics behavior
 
-          # [doctor]
-          # ignore = ["content-draft", "content-description-missing"]
+            # [doctor]
+            # ignore = ["content-draft", "content-description-missing"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Doctor
-          # =============================================================================
-          # Configure doctor diagnostics behavior
-          # Add rule IDs to the ignore list to suppress known issues
-          # Run `hwaro doctor --json` to see rule IDs in the output
+            # =============================================================================
+            # Doctor
+            # =============================================================================
+            # Configure doctor diagnostics behavior
+            # Add rule IDs to the ignore list to suppress known issues
+            # Run `hwaro doctor --json` to see rule IDs in the output
 
-          [doctor]
-          ignore = []
+            [doctor]
+            ignore = []
 
-          TOML
+            TOML
         end
       end
 
@@ -168,27 +168,27 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Plugins
-          # =============================================================================
-          # Configure content processors and extensions
+            # =============================================================================
+            # Plugins
+            # =============================================================================
+            # Configure content processors and extensions
 
-          # [plugins]
-          # processors = ["markdown"]
+            # [plugins]
+            # processors = ["markdown"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Plugins
-          # =============================================================================
-          # Configure content processors and extensions
+            # =============================================================================
+            # Plugins
+            # =============================================================================
+            # Configure content processors and extensions
 
-          [plugins]
-          processors = ["markdown"]
+            [plugins]
+            processors = ["markdown"]
 
-          TOML
+            TOML
         end
       end
 
@@ -196,31 +196,31 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Syntax Highlighting
-          # =============================================================================
-          # Code block syntax highlighting using Highlight.js
+            # =============================================================================
+            # Syntax Highlighting
+            # =============================================================================
+            # Code block syntax highlighting using Highlight.js
 
-          # [highlight]
-          # enabled = true
-          # theme = "github"
-          # use_cdn = true
+            # [highlight]
+            # enabled = true
+            # theme = "github"
+            # use_cdn = true
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Syntax Highlighting
-          # =============================================================================
-          # Code block syntax highlighting using Highlight.js
+            # =============================================================================
+            # Syntax Highlighting
+            # =============================================================================
+            # Code block syntax highlighting using Highlight.js
 
-          [highlight]
-          enabled = true
-          theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
-          use_cdn = true            # Set to false to use local assets
+            [highlight]
+            enabled = true
+            theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
+            use_cdn = true            # Set to false to use local assets
 
-          TOML
+            TOML
         end
       end
 
@@ -228,36 +228,36 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # OpenGraph & Twitter Cards
-          # =============================================================================
-          # Default meta tags for social sharing
+            # =============================================================================
+            # OpenGraph & Twitter Cards
+            # =============================================================================
+            # Default meta tags for social sharing
 
-          # [og]
-          # default_image = "/images/og-default.png"
-          # type = "article"
-          # twitter_card = "summary_large_image"
-          # twitter_site = "@yourusername"
+            # [og]
+            # default_image = "/images/og-default.png"
+            # type = "article"
+            # twitter_card = "summary_large_image"
+            # twitter_site = "@yourusername"
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # OpenGraph & Twitter Cards
-          # =============================================================================
-          # Default meta tags for social sharing
-          # Page-level settings (front matter) override these defaults
+            # =============================================================================
+            # OpenGraph & Twitter Cards
+            # =============================================================================
+            # Default meta tags for social sharing
+            # Page-level settings (front matter) override these defaults
 
-          [og]
-          default_image = "/images/og-default.png"   # Default image for social sharing
-          type = "article"                           # OpenGraph type (website, article, etc.)
-          twitter_card = "summary_large_image"       # Twitter card type (summary, summary_large_image)
-          # twitter_site = "@yourusername"           # Twitter @username for the site
-          # twitter_creator = "@authorusername"      # Twitter @username for content creator
-          # fb_app_id = "your_fb_app_id"             # Facebook App ID (optional)
+            [og]
+            default_image = "/images/og-default.png"   # Default image for social sharing
+            type = "article"                           # OpenGraph type (website, article, etc.)
+            twitter_card = "summary_large_image"       # Twitter card type (summary, summary_large_image)
+            # twitter_site = "@yourusername"           # Twitter @username for the site
+            # twitter_creator = "@authorusername"      # Twitter @username for content creator
+            # fb_app_id = "your_fb_app_id"             # Facebook App ID (optional)
 
-          TOML
+            TOML
         end
       end
 
@@ -265,34 +265,34 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Sitemap
-          # =============================================================================
-          # Generates sitemap.xml for search engine crawlers
+            # =============================================================================
+            # Sitemap
+            # =============================================================================
+            # Generates sitemap.xml for search engine crawlers
 
-          # [sitemap]
-          # enabled = true
-          # filename = "sitemap.xml"
-          # changefreq = "weekly"
-          # priority = 0.5
+            # [sitemap]
+            # enabled = true
+            # filename = "sitemap.xml"
+            # changefreq = "weekly"
+            # priority = 0.5
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Sitemap
-          # =============================================================================
-          # Generates sitemap.xml for search engine crawlers
+            # =============================================================================
+            # Sitemap
+            # =============================================================================
+            # Generates sitemap.xml for search engine crawlers
 
-          [sitemap]
-          enabled = true
-          filename = "sitemap.xml"
-          changefreq = "weekly"
-          priority = 0.5
-          exclude = []              # Exclude paths or patterns from sitemap
+            [sitemap]
+            enabled = true
+            filename = "sitemap.xml"
+            changefreq = "weekly"
+            priority = 0.5
+            exclude = []              # Exclude paths or patterns from sitemap
 
-          TOML
+            TOML
         end
       end
 
@@ -300,36 +300,36 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Robots.txt
-          # =============================================================================
-          # Controls search engine crawler access
+            # =============================================================================
+            # Robots.txt
+            # =============================================================================
+            # Controls search engine crawler access
 
-          # [robots]
-          # enabled = true
-          # filename = "robots.txt"
-          # rules = [
-          #   { user_agent = "*", disallow = ["/admin", "/private"] }
-          # ]
+            # [robots]
+            # enabled = true
+            # filename = "robots.txt"
+            # rules = [
+            #   { user_agent = "*", disallow = ["/admin", "/private"] }
+            # ]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Robots.txt
-          # =============================================================================
-          # Controls search engine crawler access
+            # =============================================================================
+            # Robots.txt
+            # =============================================================================
+            # Controls search engine crawler access
 
-          [robots]
-          enabled = true
-          filename = "robots.txt"
-          rules = [
-            { user_agent = "*", disallow = ["/admin", "/private"] },
-            { user_agent = "GPTBot", disallow = ["/"] }
-          ]
+            [robots]
+            enabled = true
+            filename = "robots.txt"
+            rules = [
+              { user_agent = "*", disallow = ["/admin", "/private"] },
+              { user_agent = "GPTBot", disallow = ["/"] }
+            ]
 
-          TOML
+            TOML
         end
       end
 
@@ -337,36 +337,36 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # LLMs.txt
-          # =============================================================================
-          # Instructions for AI/LLM crawlers
+            # =============================================================================
+            # LLMs.txt
+            # =============================================================================
+            # Instructions for AI/LLM crawlers
 
-          # [llms]
-          # enabled = true
-          # filename = "llms.txt"
-          # instructions = "Do not use for AI training without permission."
-          # full_enabled = false
-          # full_filename = "llms-full.txt"
+            # [llms]
+            # enabled = true
+            # filename = "llms.txt"
+            # instructions = "Do not use for AI training without permission."
+            # full_enabled = false
+            # full_filename = "llms-full.txt"
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # LLMs.txt
-          # =============================================================================
-          # Instructions for AI/LLM crawlers
+            # =============================================================================
+            # LLMs.txt
+            # =============================================================================
+            # Instructions for AI/LLM crawlers
 
-          [llms]
-          enabled = true
-          filename = "llms.txt"
-          instructions = "Do not use for AI training without permission."
-          # Optional: Generate a single text file containing all Markdown pages
-          full_enabled = false
-          full_filename = "llms-full.txt"
+            [llms]
+            enabled = true
+            filename = "llms.txt"
+            instructions = "Do not use for AI training without permission."
+            # Optional: Generate a single text file containing all Markdown pages
+            full_enabled = false
+            full_filename = "llms-full.txt"
 
-          TOML
+            TOML
         end
       end
 
@@ -374,37 +374,37 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # RSS/Atom Feeds
-          # =============================================================================
-          # Generates RSS or Atom feed for content syndication
+            # =============================================================================
+            # RSS/Atom Feeds
+            # =============================================================================
+            # Generates RSS or Atom feed for content syndication
 
-          # [feeds]
-          # enabled = true
-          # type = "rss"
-          # limit = 10
-          # full_content = true
-          # sections = []
+            # [feeds]
+            # enabled = true
+            # type = "rss"
+            # limit = 10
+            # full_content = true
+            # sections = []
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # RSS/Atom Feeds
-          # =============================================================================
-          # Generates RSS or Atom feed for content syndication
+            # =============================================================================
+            # RSS/Atom Feeds
+            # =============================================================================
+            # Generates RSS or Atom feed for content syndication
 
-          [feeds]
-          enabled = true
-          filename = ""             # Leave empty for default (rss.xml or atom.xml)
-          type = "rss"              # "rss" or "atom"
-          truncate = 0              # Truncate content to N characters (0 = full content)
-          full_content = true       # true = full HTML in feed, false = description/summary only
-          limit = 10                # Maximum number of items in feed
-          sections = []             # Limit to specific sections, e.g., ["posts"]
+            [feeds]
+            enabled = true
+            filename = ""             # Leave empty for default (rss.xml or atom.xml)
+            type = "rss"              # "rss" or "atom"
+            truncate = 0              # Truncate content to N characters (0 = full content)
+            full_content = true       # true = full HTML in feed, false = description/summary only
+            limit = 10                # Maximum number of items in feed
+            sections = []             # Limit to specific sections, e.g., ["posts"]
 
-          TOML
+            TOML
         end
       end
 
@@ -412,29 +412,29 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Build Hooks (Optional)
-          # =============================================================================
-          # Run custom shell commands before/after build process
+            # =============================================================================
+            # Build Hooks (Optional)
+            # =============================================================================
+            # Run custom shell commands before/after build process
 
-          # [build]
-          # hooks.pre = ["npm install"]
-          # hooks.post = ["npm run minify"]
+            # [build]
+            # hooks.pre = ["npm install"]
+            # hooks.post = ["npm run minify"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Build Hooks (Optional)
-          # =============================================================================
-          # Run custom shell commands before/after build process
+            # =============================================================================
+            # Build Hooks (Optional)
+            # =============================================================================
+            # Run custom shell commands before/after build process
 
-          # [build]
-          # hooks.pre = ["npm install", "python scripts/preprocess.py"]
-          # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+            # [build]
+            # hooks.pre = ["npm install", "python scripts/preprocess.py"]
+            # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
 
-          TOML
+            TOML
         end
       end
 
@@ -442,30 +442,30 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Permalinks (Optional)
-          # =============================================================================
-          # Override the output path for specific sections or taxonomies
+            # =============================================================================
+            # Permalinks (Optional)
+            # =============================================================================
+            # Override the output path for specific sections or taxonomies
 
-          # [permalinks]
-          # posts = "/posts/:year/:month/:slug/"
-          # tags = "/topic/:slug/"
+            # [permalinks]
+            # posts = "/posts/:year/:month/:slug/"
+            # tags = "/topic/:slug/"
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Permalinks (Optional)
-          # =============================================================================
-          # Override the output path for specific sections or taxonomies.
-          # Placeholders: :year, :month, :day, :title, :slug, :section
+            # =============================================================================
+            # Permalinks (Optional)
+            # =============================================================================
+            # Override the output path for specific sections or taxonomies.
+            # Placeholders: :year, :month, :day, :title, :slug, :section
 
-          # [permalinks]
-          # posts = "/posts/:year/:month/:slug/"
-          # tags = "/topic/:slug/"
+            # [permalinks]
+            # posts = "/posts/:year/:month/:slug/"
+            # tags = "/topic/:slug/"
 
-          TOML
+            TOML
         end
       end
 
@@ -473,31 +473,31 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Auto Includes (Optional)
-          # =============================================================================
-          # Automatically load CSS/JS files from static directories
+            # =============================================================================
+            # Auto Includes (Optional)
+            # =============================================================================
+            # Automatically load CSS/JS files from static directories
 
-          # [auto_includes]
-          # enabled = true
-          # dirs = ["assets/css", "assets/js"]
+            # [auto_includes]
+            # enabled = true
+            # dirs = ["assets/css", "assets/js"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Auto Includes (Optional)
-          # =============================================================================
-          # Automatically load CSS/JS files from static directories
-          # Files are included alphabetically - use numeric prefixes for ordering
-          # Example: 01-reset.css, 02-typography.css, 03-layout.css
+            # =============================================================================
+            # Auto Includes (Optional)
+            # =============================================================================
+            # Automatically load CSS/JS files from static directories
+            # Files are included alphabetically - use numeric prefixes for ordering
+            # Example: 01-reset.css, 02-typography.css, 03-layout.css
 
-          # [auto_includes]
-          # enabled = true
-          # dirs = ["assets/css", "assets/js"]
+            # [auto_includes]
+            # enabled = true
+            # dirs = ["assets/css", "assets/js"]
 
-          TOML
+            TOML
         end
       end
 
@@ -534,29 +534,29 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Series (Optional)
-          # =============================================================================
-          # Group posts into ordered series
+            # =============================================================================
+            # Series (Optional)
+            # =============================================================================
+            # Group posts into ordered series
 
-          # [series]
-          # enabled = true
+            # [series]
+            # enabled = true
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Series
-          # =============================================================================
-          # Group posts into ordered series for sequential reading.
-          # Use `series = "Series Name"` in front matter to assign posts.
-          # Use `series_weight = 1` to control ordering within a series.
+            # =============================================================================
+            # Series
+            # =============================================================================
+            # Group posts into ordered series for sequential reading.
+            # Use `series = "Series Name"` in front matter to assign posts.
+            # Use `series_weight = 1` to control ordering within a series.
 
-          [series]
-          enabled = true
+            [series]
+            enabled = true
 
-          TOML
+            TOML
         end
       end
 
@@ -564,31 +564,31 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Related Posts (Optional)
-          # =============================================================================
-          # Recommend related content based on shared taxonomy terms
+            # =============================================================================
+            # Related Posts (Optional)
+            # =============================================================================
+            # Recommend related content based on shared taxonomy terms
 
-          # [related]
-          # enabled = true
-          # limit = 5
-          # taxonomies = ["tags"]
+            # [related]
+            # enabled = true
+            # limit = 5
+            # taxonomies = ["tags"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Related Posts
-          # =============================================================================
-          # Recommend related content based on shared taxonomy terms
+            # =============================================================================
+            # Related Posts
+            # =============================================================================
+            # Recommend related content based on shared taxonomy terms
 
-          [related]
-          enabled = true
-          limit = 5
-          taxonomies = ["tags"]
+            [related]
+            enabled = true
+            limit = 5
+            taxonomies = ["tags"]
 
-          TOML
+            TOML
         end
       end
 
@@ -596,33 +596,33 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Search (Optional)
-          # =============================================================================
-          # Generate search index for client-side search
+            # =============================================================================
+            # Search (Optional)
+            # =============================================================================
+            # Generate search index for client-side search
 
-          # [search]
-          # enabled = true
-          # format = "fuse_json"
-          # fields = ["title", "content"]
+            # [search]
+            # enabled = true
+            # format = "fuse_json"
+            # fields = ["title", "content"]
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Search Configuration
-          # =============================================================================
-          # Generates a search index for client-side search (e.g., Fuse.js)
+            # =============================================================================
+            # Search Configuration
+            # =============================================================================
+            # Generates a search index for client-side search (e.g., Fuse.js)
 
-          [search]
-          enabled = true
-          format = "fuse_json"
-          fields = ["title", "content"]
-          filename = "search.json"
-          exclude = []              # Exclude paths or patterns from search index
+            [search]
+            enabled = true
+            format = "fuse_json"
+            fields = ["title", "content"]
+            filename = "search.json"
+            exclude = []              # Exclude paths or patterns from search index
 
-          TOML
+            TOML
         end
       end
 
@@ -630,33 +630,33 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Pagination (Optional)
-          # =============================================================================
+            # =============================================================================
+            # Pagination (Optional)
+            # =============================================================================
 
-          # [pagination]
-          # enabled = false
-          # per_page = 10
+            # [pagination]
+            # enabled = false
+            # per_page = 10
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Pagination
-          # =============================================================================
-          # Enable pagination for section listing pages (e.g., /posts/, /blog/).
-          # You can override per section in `_index.md` with:
-          # - paginate = 10
-          # - pagination_enabled = true
-          # - sort_by = "date" | "title" | "weight"
-          # - reverse = false
+            # =============================================================================
+            # Pagination
+            # =============================================================================
+            # Enable pagination for section listing pages (e.g., /posts/, /blog/).
+            # You can override per section in `_index.md` with:
+            # - paginate = 10
+            # - pagination_enabled = true
+            # - sort_by = "date" | "title" | "weight"
+            # - reverse = false
 
-          [pagination]
-          enabled = false
-          per_page = 10
+            [pagination]
+            enabled = false
+            per_page = 10
 
-          TOML
+            TOML
         end
       end
 
@@ -664,30 +664,30 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Markdown (Optional)
-          # =============================================================================
+            # =============================================================================
+            # Markdown (Optional)
+            # =============================================================================
 
-          # [markdown]
-          # safe = false
-          # lazy_loading = false
-          # emoji = false
+            # [markdown]
+            # safe = false
+            # lazy_loading = false
+            # emoji = false
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Markdown Configuration (Optional)
-          # =============================================================================
-          # Configure markdown parser behavior
+            # =============================================================================
+            # Markdown Configuration (Optional)
+            # =============================================================================
+            # Configure markdown parser behavior
 
-          [markdown]
-          safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
-          lazy_loading = false  # If true, automatically add loading="lazy" to img tags
-          emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
+            [markdown]
+            safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
+            lazy_loading = false  # If true, automatically add loading="lazy" to img tags
+            emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
 
-          TOML
+            TOML
         end
       end
 
@@ -695,41 +695,41 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Asset Pipeline (Optional)
-          # =============================================================================
+            # =============================================================================
+            # Asset Pipeline (Optional)
+            # =============================================================================
 
-          # [assets]
-          # enabled = true
-          # minify = true
-          # fingerprint = true
+            # [assets]
+            # enabled = true
+            # minify = true
+            # fingerprint = true
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Asset Pipeline (Optional)
-          # =============================================================================
-          # Bundle, minify, and fingerprint CSS/JS files for production.
-          # Use {{ asset(name="main.css") }} in templates to resolve paths.
+            # =============================================================================
+            # Asset Pipeline (Optional)
+            # =============================================================================
+            # Bundle, minify, and fingerprint CSS/JS files for production.
+            # Use {{ asset(name="main.css") }} in templates to resolve paths.
 
-          # [assets]
-          # enabled = true
-          # minify = true
-          # fingerprint = true
-          # source_dir = "static"
-          # output_dir = "assets"
+            # [assets]
+            # enabled = true
+            # minify = true
+            # fingerprint = true
+            # source_dir = "static"
+            # output_dir = "assets"
 
-          # [[assets.bundles]]
-          # name = "main.css"
-          # files = ["css/reset.css", "css/style.css"]
+            # [[assets.bundles]]
+            # name = "main.css"
+            # files = ["css/reset.css", "css/style.css"]
 
-          # [[assets.bundles]]
-          # name = "app.js"
-          # files = ["js/util.js", "js/app.js"]
+            # [[assets.bundles]]
+            # name = "app.js"
+            # files = ["js/util.js", "js/app.js"]
 
-          TOML
+            TOML
         end
       end
 
@@ -737,50 +737,50 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Image Processing (Optional)
-          # =============================================================================
-          # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation
-          # Uses vendored stb libraries — no external tools required.
-          # Use resize_image() in templates to generate responsive variants.
+            # =============================================================================
+            # Image Processing (Optional)
+            # =============================================================================
+            # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation
+            # Uses vendored stb libraries — no external tools required.
+            # Use resize_image() in templates to generate responsive variants.
 
-          # [image_processing]
-          # enabled = true
-          # widths = [320, 640, 1024, 1280]
-          # quality = 85
-          #
-          # [image_processing.lqip]
-          # enabled = true
-          # width = 32             # Placeholder width in pixels (8-128)
-          # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
+            # [image_processing]
+            # enabled = true
+            # widths = [320, 640, 1024, 1280]
+            # quality = 85
+            #
+            # [image_processing.lqip]
+            # enabled = true
+            # width = 32             # Placeholder width in pixels (8-128)
+            # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Image Processing (Optional)
-          # =============================================================================
-          # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation.
-          # Uses vendored stb libraries — no external tools required.
-          #
-          # Use resize_image() in templates:
-          #   {% set img = resize_image(path="/images/hero.jpg", width=1024) %}
-          #   <img src="{{ img.url }}"
-          #        style="background-image: url({{ img.lqip }}); background-size: cover;"
-          #        loading="lazy">
+            # =============================================================================
+            # Image Processing (Optional)
+            # =============================================================================
+            # Automatic image resizing and LQIP (Low-Quality Image Placeholder) generation.
+            # Uses vendored stb libraries — no external tools required.
+            #
+            # Use resize_image() in templates:
+            #   {% set img = resize_image(path="/images/hero.jpg", width=1024) %}
+            #   <img src="{{ img.url }}"
+            #        style="background-image: url({{ img.lqip }}); background-size: cover;"
+            #        loading="lazy">
 
-          # [image_processing]
-          # enabled = true
-          # widths = [320, 640, 1024, 1280]
-          # quality = 85
-          #
-          # [image_processing.lqip]
-          # enabled = true
-          # width = 32             # Placeholder width in pixels (8-128)
-          # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
+            # [image_processing]
+            # enabled = true
+            # widths = [320, 640, 1024, 1280]
+            # quality = 85
+            #
+            # [image_processing.lqip]
+            # enabled = true
+            # width = 32             # Placeholder width in pixels (8-128)
+            # quality = 20           # JPEG quality for placeholder (1-100, lower = smaller)
 
-          TOML
+            TOML
         end
       end
 
@@ -805,57 +805,57 @@ module Hwaro
         if commented
           <<-TOML
 
-          # =============================================================================
-          # Deployment (Optional)
-          # =============================================================================
+            # =============================================================================
+            # Deployment (Optional)
+            # =============================================================================
 
-          # [deployment]
-          # target = "prod"
-          # source_dir = "public"
-          #
-          # [[deployment.targets]]
-          # name = "prod"
-          # url = "file://./out"
+            # [deployment]
+            # target = "prod"
+            # source_dir = "public"
+            #
+            # [[deployment.targets]]
+            # name = "prod"
+            # url = "file://./out"
 
-          TOML
+            TOML
         else
           <<-TOML
 
-          # =============================================================================
-          # Deployment (Optional)
-          # =============================================================================
-          # Configure deploy targets for `hwaro deploy`
-          #
-          # - Local filesystem sync: url = "file://./out"
-          # - Remote/object stores: set `command` and use external tools (aws/gsutil/rsync/etc)
-          #
-          # Placeholders for `command`:
-          #   {source} => source directory (default: public)
-          #   {url}    => target url
-          #   {target} => target name
+            # =============================================================================
+            # Deployment (Optional)
+            # =============================================================================
+            # Configure deploy targets for `hwaro deploy`
+            #
+            # - Local filesystem sync: url = "file://./out"
+            # - Remote/object stores: set `command` and use external tools (aws/gsutil/rsync/etc)
+            #
+            # Placeholders for `command`:
+            #   {source} => source directory (default: public)
+            #   {url}    => target url
+            #   {target} => target name
 
-          # [deployment]
-          # target = "prod"
-          # source_dir = "public"
-          # confirm = false
-          # dryRun = false
-          # maxDeletes = 256      # safety limit (-1 disables)
+            # [deployment]
+            # target = "prod"
+            # source_dir = "public"
+            # confirm = false
+            # dryRun = false
+            # maxDeletes = 256      # safety limit (-1 disables)
 
-          # [[deployment.targets]]
-          # name = "prod"
-          # url = "file://./out"
+            # [[deployment.targets]]
+            # name = "prod"
+            # url = "file://./out"
 
-          # [[deployment.targets]]
-          # name = "s3"
-          # url = "s3://my-bucket"
-          # command = "aws s3 sync {source}/ {url} --delete"
+            # [[deployment.targets]]
+            # name = "s3"
+            # url = "s3://my-bucket"
+            # command = "aws s3 sync {source}/ {url} --delete"
 
-          # [[deployment.matchers]]
-          # pattern = "^.+\\.css$"
-          # cacheControl = "max-age=31536000"
-          # gzip = true
+            # [[deployment.matchers]]
+            # pattern = "^.+\\.css$"
+            # cacheControl = "max-age=31536000"
+            # gzip = true
 
-          TOML
+            TOML
         end
       end
 
@@ -886,7 +886,6 @@ module Hwaro
         when "content.files"         then content_files
         when "og.auto_image"         then og_auto_image
         when "image_processing.lqip" then image_processing_lqip
-        else                              nil
         end
       end
     end

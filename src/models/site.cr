@@ -40,7 +40,7 @@ module Hwaro
       def taxonomy_terms(name : String) : Array(String)
         terms = @taxonomies[name]?
         return [] of String unless terms
-        terms.keys.sort
+        terms.keys.sort!
       end
 
       def taxonomy_pages(name : String, term : String) : Array(Page)

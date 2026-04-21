@@ -77,7 +77,7 @@ module Hwaro
         end
 
         # Print children
-        sorted_children = node.children.keys.sort
+        sorted_children = node.children.keys.sort!
         sorted_children.each do |key|
           print_node(node.children[key], indent, false, io)
         end

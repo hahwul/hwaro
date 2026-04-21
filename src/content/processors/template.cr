@@ -37,7 +37,7 @@ module Hwaro
         end
 
         # Add a scalar value (String, Bool, Int, Nil) to the context
-        def add(name : String, value : String | Bool | Int32 | Int64 | Nil)
+        def add(name : String, value : String | Bool | Int32 | Int64?)
           @variables[name] = Crinja::Value.new(value)
         end
 

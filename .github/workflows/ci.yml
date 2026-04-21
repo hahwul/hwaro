@@ -64,12 +64,12 @@ jobs:
           platforms: ${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
-  #lint:
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - uses: actions/checkout@v6
-  #    - name: Run Ameba linter
-  #      uses: crystal-ameba/github-action@master
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run Ameba linter
+        uses: crystal-ameba/github-action@master
   tests:
     runs-on: ubuntu-latest
     strategy:

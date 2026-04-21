@@ -318,7 +318,7 @@ describe Hwaro::Models::Page do
       page.extra["array_val"] = ["a", "b"]
 
       page.extra["string_val"].should eq("hello")
-      page.extra["bool_val"].should eq(true)
+      page.extra["bool_val"].should be_true
       page.extra["int_val"].should eq(42_i64)
       page.extra["float_val"].should eq(3.14)
       page.extra["array_val"].should eq(["a", "b"])

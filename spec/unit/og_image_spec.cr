@@ -2,11 +2,11 @@ require "../spec_helper"
 
 private def make_og_config(toml : String = "") : Hwaro::Models::Config
   config_str = <<-TOML
-  title = "Test Site"
-  description = "A test site"
-  base_url = "https://example.com"
-  #{toml}
-  TOML
+    title = "Test Site"
+    description = "A test site"
+    base_url = "https://example.com"
+    #{toml}
+    TOML
 
   File.tempfile("hwaro-og", ".toml") do |file|
     file.print(config_str)
@@ -44,15 +44,15 @@ describe Hwaro::Models::AutoImageConfig do
   describe "loading from TOML" do
     it "loads auto_image config from [og.auto_image]" do
       config = make_og_config(<<-TOML)
-      [og.auto_image]
-      enabled = true
-      background = "#000000"
-      text_color = "#ff0000"
-      accent_color = "#00ff00"
-      font_size = 64
-      logo = "static/logo.png"
-      output_dir = "social"
-      TOML
+        [og.auto_image]
+        enabled = true
+        background = "#000000"
+        text_color = "#ff0000"
+        accent_color = "#00ff00"
+        font_size = 64
+        logo = "static/logo.png"
+        output_dir = "social"
+        TOML
 
       ai = config.og.auto_image
       ai.enabled.should be_true
@@ -66,16 +66,16 @@ describe Hwaro::Models::AutoImageConfig do
 
     it "loads new properties from TOML" do
       config = make_og_config(<<-TOML)
-      [og.auto_image]
-      enabled = true
-      show_title = false
-      style = "dots"
-      pattern_opacity = 0.3
-      pattern_scale = 2.0
-      background_image = "static/bg.jpg"
-      overlay_opacity = 0.7
-      format = "png"
-      TOML
+        [og.auto_image]
+        enabled = true
+        show_title = false
+        style = "dots"
+        pattern_opacity = 0.3
+        pattern_scale = 2.0
+        background_image = "static/bg.jpg"
+        overlay_opacity = 0.7
+        format = "png"
+        TOML
 
       ai = config.og.auto_image
       ai.show_title.should be_false
@@ -94,30 +94,30 @@ describe Hwaro::Models::AutoImageConfig do
 
     it "loads logo_position from TOML" do
       config = make_og_config(<<-TOML)
-      [og.auto_image]
-      enabled = true
-      logo_position = "top-right"
-      TOML
+        [og.auto_image]
+        enabled = true
+        logo_position = "top-right"
+        TOML
 
       config.og.auto_image.logo_position.should eq("top-right")
     end
 
     it "ignores invalid logo_position values" do
       config = make_og_config(<<-TOML)
-      [og.auto_image]
-      enabled = true
-      logo_position = "center"
-      TOML
+        [og.auto_image]
+        enabled = true
+        logo_position = "center"
+        TOML
 
       config.og.auto_image.logo_position.should eq("bottom-left")
     end
 
     it "loads font_path from TOML" do
       config = make_og_config(<<-TOML)
-      [og.auto_image]
-      enabled = true
-      font_path = "fonts/Pretendard-Bold.ttf"
-      TOML
+        [og.auto_image]
+        enabled = true
+        font_path = "fonts/Pretendard-Bold.ttf"
+        TOML
 
       config.og.auto_image.font_path.should eq("fonts/Pretendard-Bold.ttf")
     end

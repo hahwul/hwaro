@@ -106,8 +106,6 @@ module Hwaro
                         eleventydata_file
                       elsif File.exists?(json_data_file)
                         json_data_file
-                      else
-                        nil
                       end
 
           if data_file
@@ -172,7 +170,7 @@ module Hwaro
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_eleventy_file(raw)
 
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
 
           # Merge directory data as defaults
           relative_dir = File.dirname(file_path).sub(base_path, "").lstrip('/')
@@ -335,8 +333,6 @@ module Hwaro
               hash[YAML::Any.new(k)] = v
             end
             YAML.dump(hash).strip
-          else
-            nil
           end
         end
       end

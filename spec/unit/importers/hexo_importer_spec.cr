@@ -9,17 +9,17 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-HEXO
-        ---
-        title: Hello Hexo
-        date: 2024-02-20 10:30:00
-        tags:
-          - hexo
-          - blog
-        categories:
-          - tech
-        ---
-        Welcome to my Hexo blog.
-        HEXO
+          ---
+          title: Hello Hexo
+          date: 2024-02-20 10:30:00
+          tags:
+            - hexo
+            - blog
+          categories:
+            - tech
+          ---
+          Welcome to my Hexo blog.
+          HEXO
 
         File.write(File.join(posts_dir, "hello-hexo.md"), post_content)
 
@@ -53,11 +53,11 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-HEXO
-        ---
-        title: "Date Prefix Post"
-        ---
-        Content.
-        HEXO
+          ---
+          title: "Date Prefix Post"
+          ---
+          Content.
+          HEXO
 
         File.write(File.join(posts_dir, "2024-03-15-date-prefix.md"), post_content)
 
@@ -82,15 +82,15 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-HEXO
-        ---
-        title: "Excerpt Post"
-        ---
-        This is the excerpt.
+          ---
+          title: "Excerpt Post"
+          ---
+          This is the excerpt.
 
-        <!-- more -->
+          <!-- more -->
 
-        This is the rest of the content.
-        HEXO
+          This is the rest of the content.
+          HEXO
 
         File.write(File.join(posts_dir, "excerpt-post.md"), post_content)
 
@@ -119,19 +119,19 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(drafts_dir)
 
         File.write(File.join(posts_dir, "published.md"), <<-HEXO
-        ---
-        title: "Published"
-        ---
-        Published content.
-        HEXO
+          ---
+          title: "Published"
+          ---
+          Published content.
+          HEXO
         )
 
         File.write(File.join(drafts_dir, "draft.md"), <<-HEXO
-        ---
-        title: "My Draft"
-        ---
-        Draft content.
-        HEXO
+          ---
+          title: "My Draft"
+          ---
+          Draft content.
+          HEXO
         )
 
         output_dir = File.join(dir, "output")
@@ -160,19 +160,19 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(drafts_dir)
 
         File.write(File.join(posts_dir, "published.md"), <<-HEXO
-        ---
-        title: "Published"
-        ---
-        Content.
-        HEXO
+          ---
+          title: "Published"
+          ---
+          Content.
+          HEXO
         )
 
         File.write(File.join(drafts_dir, "secret.md"), <<-HEXO
-        ---
-        title: "Secret"
-        ---
-        Secret.
-        HEXO
+          ---
+          title: "Secret"
+          ---
+          Secret.
+          HEXO
         )
 
         output_dir = File.join(dir, "output")
@@ -196,13 +196,13 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-HEXO
-        ---
-        title: "Updated Post"
-        date: 2024-01-01
-        updated: 2024-06-15
-        ---
-        Content.
-        HEXO
+          ---
+          title: "Updated Post"
+          date: 2024-01-01
+          updated: 2024-06-15
+          ---
+          Content.
+          HEXO
 
         File.write(File.join(posts_dir, "updated-post.md"), post_content)
 
@@ -227,17 +227,17 @@ describe Hwaro::Services::Importers::HexoImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-HEXO
-        ---
-        title: "Nested Categories"
-        categories:
-          - - tech
-            - web
-          - design
-        tags:
-          - frontend
-        ---
-        Content.
-        HEXO
+          ---
+          title: "Nested Categories"
+          categories:
+            - - tech
+              - web
+            - design
+          tags:
+            - frontend
+          ---
+          Content.
+          HEXO
 
         File.write(File.join(posts_dir, "nested-cats.md"), post_content)
 

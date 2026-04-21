@@ -195,9 +195,8 @@ module Hwaro
           return unless page.render
           return if page.raw_content.empty?
 
-          html_content, toc_headers = Processor::Markdown.render(page.raw_content, highlight: true, safe: safe, emoji: emoji, markdown_config: markdown_config)
+          html_content, _ = Processor::Markdown.render(page.raw_content, highlight: true, safe: safe, emoji: emoji, markdown_config: markdown_config)
           page.content = html_content
-          # Store TOC in metadata if needed
         end
       end
     end

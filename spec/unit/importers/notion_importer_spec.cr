@@ -6,15 +6,15 @@ describe Hwaro::Services::Importers::NotionImporter do
     it "imports a Notion markdown export with YAML frontmatter" do
       Dir.mktmpdir do |dir|
         post_content = <<-NOTION
-        ---
-        title: "My Notion Page"
-        date: 2024-03-15
-        tags:
-          - notion
-          - productivity
-        ---
-        This is exported from Notion.
-        NOTION
+          ---
+          title: "My Notion Page"
+          date: 2024-03-15
+          tags:
+            - notion
+            - productivity
+          ---
+          This is exported from Notion.
+          NOTION
 
         File.write(File.join(dir, "my-notion-page.md"), post_content)
 

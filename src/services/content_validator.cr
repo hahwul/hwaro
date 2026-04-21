@@ -17,7 +17,7 @@ module Hwaro
       TOML_FRONTMATTER_RE = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m
       YAML_FRONTMATTER_RE = /\A---\s*\n(.*?\n?)^---\s*$\n?/m
 
-      alias FrontmatterValue = String | Bool | Int64 | Float64 | Nil
+      alias FrontmatterValue = String | Bool | Int64 | Float64?
 
       @content_dir : String
 
@@ -128,7 +128,7 @@ module Hwaro
           rescue ex
             issues << Issue.new(id: "content-frontmatter-toml-error", level: :error, category: "content", file: file_path,
               message: "TOML frontmatter parse error: #{ex.message}")
-            return nil
+            return
           end
         elsif match = content.match(YAML_FRONTMATTER_RE)
           begin
@@ -158,11 +158,11 @@ module Hwaro
               end
               return result
             end
-            return nil
+            return
           rescue ex
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
-            return nil
+            return
           end
         end
 

@@ -15,42 +15,42 @@ describe Hwaro::Content::Hooks do
 
     it "includes ImageHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::ImageHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::ImageHooks).should be_true
     end
 
     it "includes OgImageHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::OgImageHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::OgImageHooks).should be_true
     end
 
     it "includes AmpHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::AmpHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::AmpHooks).should be_true
     end
 
     it "includes PwaHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::PwaHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::PwaHooks).should be_true
     end
 
     it "includes MarkdownHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::MarkdownHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::MarkdownHooks).should be_true
     end
 
     it "includes SeoHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::SeoHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::SeoHooks).should be_true
     end
 
     it "includes TaxonomyHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::TaxonomyHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::TaxonomyHooks).should be_true
     end
 
     it "includes AssetHooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.any? { |h| h.is_a?(Hwaro::Content::Hooks::AssetHooks) }.should be_true
+      hooks.any?(Hwaro::Content::Hooks::AssetHooks).should be_true
     end
 
     it "returns new instances each time" do

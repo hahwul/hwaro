@@ -8,14 +8,14 @@ require "./support/build_helper"
 # =============================================================================
 
 MULTILINGUAL_CONFIG = <<-TOML
-title = "Test Site"
-base_url = "http://localhost"
-default_language = "en"
+  title = "Test Site"
+  base_url = "http://localhost"
+  default_language = "en"
 
-[languages.ko]
-language_name = "한국어"
-weight = 1
-TOML
+  [languages.ko]
+  language_name = "한국어"
+  weight = 1
+  TOML
 
 describe "Multilingual: URL generation" do
   it "generates language-prefixed URLs for non-default language" do
@@ -117,18 +117,18 @@ end
 describe "Multilingual: Three or more languages" do
   it "supports more than two languages" do
     config = <<-TOML
-    title = "Test Site"
-    base_url = "http://localhost"
-    default_language = "en"
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
 
-    [languages.ko]
-    language_name = "한국어"
-    weight = 1
+      [languages.ko]
+      language_name = "한국어"
+      weight = 1
 
-    [languages.ja]
-    language_name = "日本語"
-    weight = 2
-    TOML
+      [languages.ja]
+      language_name = "日本語"
+      weight = 2
+      TOML
 
     build_site(
       config,
@@ -164,18 +164,18 @@ end
 describe "Multilingual: Translation links for three languages" do
   it "lists all translations including all languages" do
     config = <<-TOML
-    title = "Test Site"
-    base_url = "http://localhost"
-    default_language = "en"
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
 
-    [languages.ko]
-    language_name = "한국어"
-    weight = 1
+      [languages.ko]
+      language_name = "한국어"
+      weight = 1
 
-    [languages.ja]
-    language_name = "日本語"
-    weight = 2
-    TOML
+      [languages.ja]
+      language_name = "日本語"
+      weight = 2
+      TOML
 
     build_site(
       config,

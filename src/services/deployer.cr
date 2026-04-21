@@ -77,10 +77,10 @@ module Hwaro
         return ops unless Dir.exists?(source_dir)
 
         target_names =
-          if options.targets.any?
+          if options.targets.present?
             options.targets
-          elsif target = deployment.target
-            [target]
+          elsif default_target = deployment.target
+            [default_target]
           elsif deployment.targets.size > 0
             [deployment.targets.first.name]
           else
@@ -166,10 +166,10 @@ module Hwaro
         end
 
         target_names =
-          if options.targets.any?
+          if options.targets.present?
             options.targets
-          elsif target = deployment.target
-            [target]
+          elsif default_target = deployment.target
+            [default_target]
           elsif deployment.targets.size > 0
             [deployment.targets.first.name]
           else
@@ -180,7 +180,9 @@ module Hwaro
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
-          unless target
+          if target
+            target
+          else
             results << DeployResult.new(
               name: name,
               status: "error",
@@ -194,8 +196,6 @@ module Hwaro
               } of String => String?,
             )
             nil
-          else
-            target
           end
         end
 
@@ -329,10 +329,10 @@ module Hwaro
         end
 
         target_names =
-          if options.targets.any?
+          if options.targets.present?
             options.targets
-          elsif target = deployment.target
-            [target]
+          elsif default_target = deployment.target
+            [default_target]
           elsif deployment.targets.size > 0
             [deployment.targets.first.name]
           else
@@ -347,11 +347,11 @@ module Hwaro
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
-          unless target
+          if target
+            target
+          else
             Logger.error "Unknown deploy target: #{name}"
             nil
-          else
-            target
           end
         end
 
@@ -374,9 +374,9 @@ module Hwaro
         getter max_deletes : Int32
 
         def initialize(deployment : Models::DeploymentConfig, options : Config::Options::DeployOptions)
-          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.not_nil!
-          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.not_nil!
-          @force = options.force.nil? ? deployment.force : options.force.not_nil!
+          @confirm = options.confirm.nil? ? deployment.confirm : options.confirm.as(Bool)
+          @dry_run = options.dry_run.nil? ? deployment.dry_run : options.dry_run.as(Bool)
+          @force = options.force.nil? ? deployment.force : options.force.as(Bool)
           @max_deletes = options.max_deletes || deployment.max_deletes
         end
       end
@@ -702,7 +702,7 @@ module Hwaro
         dest_paths.each do |path|
           next if path.empty?
           prefix = "#{path}/"
-          if dest_paths.any? { |p| p.starts_with?(prefix) }
+          if dest_paths.any?(&.starts_with?(prefix))
             Logger.error "stripIndexHTML cannot be used with file:// deployments when both '#{path}' and '#{prefix}...' exist."
             Logger.info "Disable stripIndexHTML for target '#{target.name}', or deploy via an object store."
             return false
@@ -826,12 +826,12 @@ module Hwaro
       end
 
       private def log_plan(to_copy : Array({String, String}), to_delete : Array(String))
-        if to_copy.any?
+        if to_copy.present?
           Logger.info "Copy:"
           to_copy.first(50).each { |(dest_rel, _)| Logger.info "  + #{dest_rel}" }
           Logger.info "  ... (#{to_copy.size - 50} more)" if to_copy.size > 50
         end
-        if to_delete.any?
+        if to_delete.present?
           Logger.info "Delete:"
           to_delete.first(50).each { |rel| Logger.info "  - #{rel}" }
           Logger.info "  ... (#{to_delete.size - 50} more)" if to_delete.size > 50
@@ -863,7 +863,7 @@ module Hwaro
       # Auto-generate a deploy command for known cloud URL schemes.
       # Returns nil if the scheme is not recognized.
       private def auto_command_for_url(url : String, source_dir : String) : String?
-        uri = URI.parse(url) rescue return nil
+        uri = URI.parse(url) rescue return
         case uri.scheme
         when "s3"
           "aws s3 sync {source}/ {url} --delete"
@@ -872,15 +872,13 @@ module Hwaro
         when "az"
           # az://container → Azure Blob Storage
           "az storage blob sync --source {source} --container {url}"
-        else
-          nil
         end
       end
 
       private def local_directory_destination(url : String) : String?
         if url.includes?("://")
           uri = URI.parse(url)
-          return nil unless uri.scheme == "file"
+          return unless uri.scheme == "file"
           # Allow both file:///abs/path and file://relative/path forms.
           path = uri.path
           if path.empty?
@@ -888,7 +886,7 @@ module Hwaro
               path = host unless host.empty?
             end
           end
-          return nil if path.empty?
+          return if path.empty?
           return path
         end
 
