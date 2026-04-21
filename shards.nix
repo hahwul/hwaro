@@ -1,4 +1,9 @@
 {
+  "ameba" = {
+    url = "https://github.com/crystal-ameba/ameba.git";
+    rev = "77bf37bb5d3f7751bb531d2e5e67d66a28474579";
+    sha256 = "0pxak8iqc235xb6khi7s1ynq7zk9psg9hab2bg0dzxd3jy8576rq";
+  };
   "crinja" = {
     url = "https://github.com/straight-shoota/crinja.git";
     rev = "v0.9.0";
