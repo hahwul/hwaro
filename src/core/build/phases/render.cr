@@ -159,6 +159,13 @@ module Hwaro::Core::Build::Phases::Render
     classified_error : Hwaro::HwaroError? = nil
     error_mutex = Mutex.new
 
+    # Accumulate per-page failures rather than logging immediately.
+    # A broken shared template used to print the same "Parallel render
+    # failed" line once per page (7 identical 4-line blocks on a 7-page
+    # blog); deduping by normalized error signature collapses that into
+    # one summary with the list of affected pages.
+    failures = [] of NamedTuple(page_path: String, message: String)
+
     # Spawn workers, each with its own Crinja env and template cache
     worker_count.times do |worker_id|
       env = worker_envs[worker_id]
@@ -182,11 +189,13 @@ module Hwaro::Core::Build::Phases::Render
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
               classified_error ||= ex
+              failures << {page_path: page.path, message: ex.message.to_s}
             end
-            Logger.error "Parallel render failed for #{page.path}: #{ex.message}"
             results.send(false)
           rescue ex
-            Logger.error "Parallel render failed for #{page.path}: #{ex.message}"
+            error_mutex.synchronize do
+              failures << {page_path: page.path, message: ex.message.to_s}
+            end
             Logger.debug "  Template: #{determine_template(page, templates)}, Section: #{page.section}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
             results.send(false)
@@ -201,6 +210,11 @@ module Hwaro::Core::Build::Phases::Render
       count += 1 if results.receive
     end
 
+    # Emit the (deduped) failure summary before surfacing the classified
+    # error, so users see both the list of affected pages and the final
+    # `Error [HWARO_E_TEMPLATE]: …` line.
+    report_render_failures(failures, verbose) unless failures.empty?
+
     # Surface the first classified error now that all workers have drained
     # so the CLI sees the documented exit code / JSON payload instead of
     # a silent `status=ok, pages_generated=0`.
@@ -209,6 +223,44 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     count
+  end
+
+  # Collapse identical errors raised across many pages (typical of a
+  # broken shared template) into a single summary line, preserving the
+  # full page list. `--verbose` opts back into per-page detail.
+  private def report_render_failures(
+    failures : Array(NamedTuple(page_path: String, message: String)),
+    verbose : Bool,
+  )
+    if verbose
+      failures.each do |f|
+        Logger.error "Parallel render failed for #{f[:page_path]}: #{f[:message]}"
+      end
+      return
+    end
+
+    grouped = failures.group_by { |f| render_error_signature(f[:message]) }
+    grouped.each do |signature, group|
+      if group.size == 1
+        Logger.error "Render failed for #{group.first[:page_path]}: #{group.first[:message]}"
+      else
+        Logger.error "Render failed for #{group.size} pages: #{signature}"
+        group.first(5).each { |f| Logger.error "  - #{f[:page_path]}" }
+        if group.size > 5
+          Logger.error "  … and #{group.size - 5} more"
+        end
+        Logger.error "  Run with --verbose to see each failure individually."
+      end
+    end
+  end
+
+  # Strip the page-specific prefix that Crinja adds to template errors
+  # ("Template error for posts/hello-world.md: Unterminated tag …") so
+  # identical failures on different pages collapse to the same key.
+  private def render_error_signature(message : String) : String
+    normalized = message.sub(/^Template error for [^:]+:\s*/, "")
+    first_line = normalized.lines.first?.try(&.strip) || normalized.strip
+    first_line.empty? ? normalized.strip : first_line
   end
 
   private def process_files_sequential(
