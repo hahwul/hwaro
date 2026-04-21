@@ -57,6 +57,73 @@ describe Hwaro::Models::Config do
         (err.message || "").should contain(env_path)
       end
     end
+
+    it "raises HwaroError(HWARO_E_CONFIG) for an invalid base_url in config.toml" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, %(base_url = "not a valid url"))
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Models::Config.load(path)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        err.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+        (err.message || "").should contain("Invalid base_url")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) for a base_url with no scheme" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, %(base_url = "example.com"))
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Models::Config.load(path)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      end
+    end
+  end
+
+  describe ".validate_base_url!" do
+    it "accepts the empty string (default — no base URL)" do
+      Hwaro::Models::Config.validate_base_url!("")
+    end
+
+    it "accepts http(s) URLs with host" do
+      [
+        "http://example.com",
+        "https://example.com",
+        "https://example.com/subpath",
+        "https://example.com/deep/subpath/",
+        "http://localhost:3000",
+        "http://127.0.0.1:8080",
+      ].each do |value|
+        Hwaro::Models::Config.validate_base_url!(value)
+      end
+    end
+
+    it "rejects values without a scheme" do
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("example.com")
+      end
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("/subpath")
+      end
+    end
+
+    it "rejects non-http schemes" do
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("ftp://example.com")
+      end
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("file:///local/path")
+      end
+    end
+
+    it "rejects garbage strings" do
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("not a valid url")
+      end
+    end
   end
 
   describe "#initialize" do

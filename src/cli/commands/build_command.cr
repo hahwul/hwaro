@@ -188,7 +188,18 @@ module Hwaro
             # Path & URL
             CLI.register_flag(parser, INPUT_DIR_FLAG) { |v| input_dir = v }
             parser.on("-o DIR", "--output DIR", "Output directory (default: public)") { |dir| output_dir = dir; output_dir_explicit = true }
-            CLI.register_flag(parser, BASE_URL_FLAG) { |v| base_url = v }
+            CLI.register_flag(parser, BASE_URL_FLAG) do |v|
+              begin
+                Models::Config.validate_base_url!(v)
+              rescue ex : ArgumentError
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: ex.message || "Invalid --base-url",
+                  hint: "Examples: https://example.com, https://example.com/subpath, http://localhost:3000.",
+                )
+              end
+              base_url = v
+            end
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
 
             # Content filtering

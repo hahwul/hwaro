@@ -44,6 +44,23 @@ describe Hwaro::CLI::Commands::BuildCommand do
       options.base_url.should eq("https://example.com")
     end
 
+    it "rejects an invalid --base-url with HWARO_E_USAGE" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.parse_options(["--base-url", "not a valid url"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      err.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+    end
+
+    it "rejects a --base-url without a scheme" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.parse_options(["--base-url", "example.com"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    end
+
     it "parses boolean flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
       result, _ = cmd.parse_options([

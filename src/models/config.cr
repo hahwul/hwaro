@@ -1,4 +1,5 @@
 require "toml"
+require "uri"
 require "./deployment"
 require "../utils/errors"
 require "../utils/text_utils"
@@ -755,6 +756,27 @@ module Hwaro
       # File-not-found is classified as HWARO_E_CONFIG rather than HWARO_E_IO
       # because a missing `config.toml` is a config-level user error, not an
       # arbitrary IO failure.
+      # Accepts an absolute `http(s)://host[:port][/path]` URL or the empty
+      # string (which means "no absolute URL is configured"). Raises
+      # ArgumentError on anything else so callers can wrap the failure in
+      # whichever classified `HwaroError` code suits their context
+      # (`HWARO_E_CONFIG` for config.toml, `HWARO_E_USAGE` for CLI flags).
+      def self.validate_base_url!(value : String) : Nil
+        return if value.empty?
+
+        uri = begin
+          URI.parse(value)
+        rescue
+          raise ArgumentError.new("Invalid base_url: '#{value}'. Expected http(s)://host[/path].")
+        end
+
+        scheme = uri.scheme
+        host = uri.host
+        if scheme.nil? || !%w[http https].includes?(scheme.downcase) || host.nil? || host.empty?
+          raise ArgumentError.new("Invalid base_url: '#{value}'. Expected http(s)://host[/path].")
+        end
+      end
+
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config
         config = new
 
@@ -787,7 +809,18 @@ module Hwaro
 
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
-        config.base_url = config.raw["base_url"]?.try(&.as_s?) || config.base_url
+        if raw_base_url = config.raw["base_url"]?.try(&.as_s?)
+          begin
+            validate_base_url!(raw_base_url)
+          rescue ex : ArgumentError
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: ex.message || "Invalid base_url in #{config_path}",
+              hint: "Set base_url to an absolute URL such as \"https://example.com\" or \"http://localhost:3000\".",
+            )
+          end
+          config.base_url = raw_base_url
+        end
         config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
 
         load_sitemap(config)
