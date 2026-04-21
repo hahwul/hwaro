@@ -104,9 +104,14 @@ describe Hwaro::Services::Doctor do
     end
 
     describe "config — base_url format" do
-      it "warns when base_url has no protocol" do
+      # Scheme/host validity is enforced at `Config.load`, so bad URLs
+      # surface as a `config-parse-error` rather than a style advisory
+      # here. The doctor retains advisory checks for empty and
+      # trailing-slash variants only.
+
+      it "reports the load-time base_url error when scheme is missing" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "example.com"\n))
-        issues.any?(&.message.includes?("http://")).should be_true
+        issues.any? { |i| i.id == "config-parse-error" && (i.message || "").includes?("Invalid base_url") }.should be_true
       end
 
       it "warns when base_url has trailing slash" do
@@ -117,7 +122,7 @@ describe Hwaro::Services::Doctor do
       it "does not warn on proper base_url" do
         issues = run_doctor(base_config)
         issues.any?(&.message.includes?("trailing slash")).should be_false
-        issues.any? { |i| i.message.includes?("http://") && i.message.includes?("https://") }.should be_false
+        issues.any?(&.message.includes?("Invalid base_url")).should be_false
       end
     end
 

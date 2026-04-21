@@ -155,17 +155,16 @@ module Hwaro
         end
 
         # base_url check
+        #
+        # Scheme/host validity is enforced at `Models::Config.load` time via
+        # `validate_base_url!`, so any base_url reaching this point is either
+        # empty or a well-formed http(s) URL. We only cover the remaining
+        # style advisories here.
         if config.base_url.empty?
           issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path, message: "base_url is not set")
-        else
-          unless config.base_url.starts_with?("http://") || config.base_url.starts_with?("https://")
-            issues << Issue.new(id: "base-url-scheme", level: :warning, category: "config", file: @config_path,
-              message: "base_url should start with http:// or https://")
-          end
-          if config.base_url.ends_with?("/")
-            issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
-              message: "base_url should not end with a trailing slash")
-          end
+        elsif config.base_url.ends_with?("/")
+          issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
+            message: "base_url should not end with a trailing slash")
         end
 
         # title check
