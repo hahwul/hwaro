@@ -46,6 +46,86 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    describe "--clean option" do
+      it "removes all existing files before scaffolding" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "existing")
+          Dir.mkdir_p(File.join(target, "stale-subdir"))
+          File.write(File.join(target, "stale-file.txt"), "old")
+          File.write(File.join(target, "stale-subdir", "nested.txt"), "deep")
+
+          Hwaro::Services::Initializer.new.run(target, clean: true)
+
+          File.exists?(File.join(target, "stale-file.txt")).should be_false
+          Dir.exists?(File.join(target, "stale-subdir")).should be_false
+          File.exists?(File.join(target, "config.toml")).should be_true
+        end
+      end
+
+      it "wipes stale files when switching scaffolds" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+
+          # First init with blog scaffold leaves posts/, archives.md etc.
+          Hwaro::Services::Initializer.new.run(
+            target,
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
+          )
+          Dir.exists?(File.join(target, "content", "posts")).should be_true
+          File.exists?(File.join(target, "content", "archives.md")).should be_true
+
+          # Re-init with simple scaffold + --clean should leave only the
+          # simple scaffold's files behind.
+          Hwaro::Services::Initializer.new.run(
+            target,
+            clean: true,
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple,
+          )
+
+          Dir.exists?(File.join(target, "content", "posts")).should be_false
+          File.exists?(File.join(target, "content", "archives.md")).should be_false
+          File.exists?(File.join(target, "content", "index.md")).should be_true
+          File.exists?(File.join(target, "content", "about.md")).should be_true
+        end
+      end
+
+      it "refuses to clean a directory containing .git/" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "repo")
+          Dir.mkdir_p(File.join(target, ".git"))
+          File.write(File.join(target, ".git", "HEAD"), "ref: refs/heads/main")
+          File.write(File.join(target, "README.md"), "# repo")
+
+          expect_raises(Hwaro::HwaroError, /contains a \.git directory/) do
+            Hwaro::Services::Initializer.new.run(target, clean: true)
+          end
+
+          # Original files stay in place.
+          File.exists?(File.join(target, ".git", "HEAD")).should be_true
+          File.exists?(File.join(target, "README.md")).should be_true
+        end
+      end
+
+      it "is a no-op on a non-existent target" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "fresh")
+          Hwaro::Services::Initializer.new.run(target, clean: true)
+
+          File.exists?(File.join(target, "config.toml")).should be_true
+        end
+      end
+
+      it "is a no-op on an empty target" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "empty")
+          Dir.mkdir_p(target)
+          Hwaro::Services::Initializer.new.run(target, clean: true)
+
+          File.exists?(File.join(target, "config.toml")).should be_true
+        end
+      end
+    end
+
     describe "--skip-agents-md option" do
       it "does not create AGENTS.md when skip_agents_md=true" do
         Dir.mktmpdir do |dir|

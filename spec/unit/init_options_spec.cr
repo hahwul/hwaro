@@ -125,6 +125,7 @@ describe Hwaro::Config::Options::InitOptions do
       opts = Hwaro::Config::Options::InitOptions.new
       opts.path.should eq(".")
       opts.force.should be_false
+      opts.clean.should be_false
       opts.skip_agents_md.should be_false
       opts.skip_sample_content.should be_false
       opts.skip_taxonomies.should be_false

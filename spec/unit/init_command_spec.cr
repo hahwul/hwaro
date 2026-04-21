@@ -32,6 +32,15 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.force.should be_true
     end
 
+    it "parses clean flag" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options([] of String)
+      options.clean.should be_false
+
+      options = cmd.parse_options(["--clean"])
+      options.clean.should be_true
+    end
+
     it "parses scaffold flag" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
 

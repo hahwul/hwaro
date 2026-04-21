@@ -92,6 +92,7 @@ module Hwaro
 
         property path : String
         property force : Bool
+        property clean : Bool
         property skip_agents_md : Bool
         property skip_sample_content : Bool
         property skip_taxonomies : Bool
@@ -104,6 +105,7 @@ module Hwaro
         def initialize(
           @path : String = ".",
           @force : Bool = false,
+          @clean : Bool = false,
           @skip_agents_md : Bool = false,
           @skip_sample_content : Bool = false,
           @skip_taxonomies : Bool = false,

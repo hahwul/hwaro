@@ -22,6 +22,7 @@ module Hwaro
         FLAGS = [
           # Project setup
           FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
+          FlagInfo.new(short: nil, long: "--clean", description: "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)"),
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
           FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
           FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
@@ -88,6 +89,7 @@ module Hwaro
           # Project setup
           path = "."
           force = false
+          clean = false
           scaffold = Config::Options::ScaffoldType::Simple
           scaffold_remote : String? = nil
           multilingual_languages = [] of String
@@ -104,6 +106,7 @@ module Hwaro
 
             # Project setup
             parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
+            parser.on("--clean", "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)") { clean = true }
             parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
               if Services::Scaffolds::Remote.remote?(type)
                 scaffold_remote = type
@@ -188,6 +191,7 @@ module Hwaro
           Config::Options::InitOptions.new(
             path: path,
             force: force,
+            clean: clean,
             skip_agents_md: skip_agents_md,
             skip_sample_content: skip_sample_content,
             skip_taxonomies: skip_taxonomies,
