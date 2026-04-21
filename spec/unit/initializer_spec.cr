@@ -257,63 +257,82 @@ describe Hwaro::Services::Initializer do
         end
       end
 
-      it "warns when a non-default scaffold is used with multilingual" do
+      it "preserves scaffold content layout in multilingual mode (blog -> posts/)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          buffer = IO::Memory.new
-          prev_io = Hwaro::Logger.io
-          Hwaro::Logger.io = buffer
-          begin
-            Hwaro::Services::Initializer.new.run(
-              target,
-              multilingual_languages: ["en", "ko"],
-              scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
-            )
-          ensure
-            Hwaro::Logger.io = prev_io
-          end
-          buffer.to_s.should contain("sample content is not used in multilingual mode")
-        end
-      end
+          Hwaro::Services::Initializer.new.run(
+            target,
+            multilingual_languages: ["en", "ja"],
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
+          )
 
-      it "does not emit scaffold-override warning for default simple scaffold" do
-        Dir.mktmpdir do |dir|
-          target = File.join(dir, "site")
-          buffer = IO::Memory.new
-          prev_io = Hwaro::Logger.io
-          Hwaro::Logger.io = buffer
-          begin
-            Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en", "ko"])
-          ensure
-            Hwaro::Logger.io = prev_io
-          end
-          buffer.to_s.should_not contain("sample content is not used in multilingual mode")
-        end
-      end
-
-      it "creates multilingual blog content" do
-        Dir.mktmpdir do |dir|
-          target = File.join(dir, "site")
-          initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, multilingual_languages: ["en", "ja"])
-
-          # Default language blog
-          File.exists?(File.join(target, "content", "blog", "_index.md")).should be_true
-          File.exists?(File.join(target, "content", "blog", "hello-world.md")).should be_true
-          # Second language blog
-          File.exists?(File.join(target, "content", "blog", "_index.ja.md")).should be_true
-          File.exists?(File.join(target, "content", "blog", "hello-world.ja.md")).should be_true
-        end
-      end
-
-      it "skips blog content in multilingual mode with skip_taxonomies" do
-        Dir.mktmpdir do |dir|
-          target = File.join(dir, "site")
-          initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, multilingual_languages: ["en", "ko"], skip_taxonomies: true)
-
-          File.exists?(File.join(target, "content", "index.md")).should be_true
+          # Default language uses scaffold's own posts/ dir
+          File.exists?(File.join(target, "content", "posts", "_index.md")).should be_true
+          File.exists?(File.join(target, "content", "posts", "hello-world.md")).should be_true
+          # Second language mirrors the same layout with .ja suffix
+          File.exists?(File.join(target, "content", "posts", "_index.ja.md")).should be_true
+          File.exists?(File.join(target, "content", "posts", "hello-world.ja.md")).should be_true
+          # Should NOT create the generic /blog/ dir (old behavior)
           Dir.exists?(File.join(target, "content", "blog")).should be_false
+        end
+      end
+
+      it "preserves scaffold content layout in multilingual mode (docs -> guide/, reference/)" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            multilingual_languages: ["en", "ko"],
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
+          )
+
+          %w[getting-started guide reference].each do |section|
+            File.exists?(File.join(target, "content", section, "_index.md")).should be_true
+            File.exists?(File.join(target, "content", section, "_index.ko.md")).should be_true
+          end
+        end
+      end
+
+      it "preserves scaffold content layout in multilingual mode (book -> chapter-N)" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            multilingual_languages: ["en", "ko"],
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Book,
+          )
+
+          %w[chapter-1 chapter-2 chapter-3].each do |chapter|
+            File.exists?(File.join(target, "content", chapter, "_index.md")).should be_true
+            File.exists?(File.join(target, "content", chapter, "_index.ko.md")).should be_true
+          end
+        end
+      end
+
+      it "inserts a translate-me notice into non-default language files" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            multilingual_languages: ["en", "ko"],
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple,
+          )
+
+          default_page = File.read(File.join(target, "content", "index.md"))
+          translated = File.read(File.join(target, "content", "index.ko.md"))
+
+          # Default language file is unmodified
+          default_page.should_not contain("TODO: Translate")
+          # Translated file retains original front matter but gets the notice
+          translated.should contain("+++")
+          translated.should contain("title = \"Welcome to Hwaro\"")
+          translated.should contain("<!-- TODO: Translate this page to 'ko'. -->")
+          # Notice sits AFTER the front-matter close delimiter
+          fm_close = translated.index("+++\n", 4)
+          notice_at = translated.index("<!-- TODO")
+          fm_close.should_not be_nil
+          notice_at.should_not be_nil
+          (notice_at.not_nil! > fm_close.not_nil!).should be_true
         end
       end
     end

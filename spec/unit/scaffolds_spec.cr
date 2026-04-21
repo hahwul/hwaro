@@ -596,5 +596,55 @@ describe Hwaro::Services::Scaffolds::Registry do
         without_tax.should_not be_empty
       end
     end
+
+    describe "#multilingual_content_files" do
+      it "returns content_files unchanged when zero or one language is supplied" do
+        Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+          scaffold.multilingual_content_files([] of String).should eq(scaffold.content_files)
+          scaffold.multilingual_content_files(["en"]).should eq(scaffold.content_files)
+        end
+      end
+
+      it "keeps default-language files (no suffix) and adds .{lang}.md copies for each extra language" do
+        Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+          base = scaffold.content_files
+          multi = scaffold.multilingual_content_files(["en", "ko"])
+
+          # Every original path is preserved as-is.
+          base.each_key do |path|
+            multi.has_key?(path).should be_true
+          end
+
+          # Every Markdown file has a .ko.md sibling.
+          base.each_key do |path|
+            next unless path.ends_with?(".md")
+            localized = "#{path[0, path.size - 3]}.ko.md"
+            multi.has_key?(localized).should be_true
+          end
+        end
+      end
+
+      it "prepends the translate-me notice below the front matter" do
+        scaffold = Hwaro::Services::Scaffolds::Simple.new
+        multi = scaffold.multilingual_content_files(["en", "ko"])
+
+        translated = multi["index.ko.md"]
+        fm_close = translated.index!("+++\n", 4)
+        notice_at = translated.index!("<!-- TODO: Translate")
+        notice_at.should be > fm_close
+      end
+
+      it "emits one localized copy per extra language" do
+        scaffold = Hwaro::Services::Scaffolds::Simple.new
+        multi = scaffold.multilingual_content_files(["en", "ko", "ja"])
+
+        multi.has_key?("index.md").should be_true
+        multi.has_key?("index.ko.md").should be_true
+        multi.has_key?("index.ja.md").should be_true
+        multi.has_key?("about.md").should be_true
+        multi.has_key?("about.ko.md").should be_true
+        multi.has_key?("about.ja.md").should be_true
+      end
+    end
   end
 end

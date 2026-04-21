@@ -28,6 +28,78 @@ module Hwaro
         # Returns sample content files as a hash of path => content
         abstract def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
 
+        # Returns the content files to emit for a multilingual project.
+        # The first language in `languages` is the default (no filename
+        # suffix); each additional language gets a `.{lang}.md` copy of
+        # every Markdown file with a translation-TODO notice inserted.
+        #
+        # Scaffolds can override this when they want to ship real
+        # translations, but the default preserves the scaffold's own
+        # content structure (posts/, guide/, chapter-N/, …) instead of
+        # collapsing everything into a generic index/about/blog layout.
+        def multilingual_content_files(
+          languages : Array(String),
+          skip_taxonomies : Bool = false,
+        ) : Hash(String, String)
+          base = content_files(skip_taxonomies)
+          return base if languages.size <= 1
+
+          result = {} of String => String
+          base.each { |path, body| result[path] = body }
+
+          # languages[0] is the default language (no suffix); clone every
+          # Markdown file for each additional language.
+          languages[1..].each do |lang|
+            base.each do |path, body|
+              next unless path.ends_with?(".md")
+              result[localize_path(path, lang)] = prepend_translation_notice(body, lang)
+            end
+          end
+
+          result
+        end
+
+        # Insert a language code before the extension:
+        #   "index.md"              -> "index.ko.md"
+        #   "posts/hello.md"        -> "posts/hello.ko.md"
+        #   "posts/_index.md"       -> "posts/_index.ko.md"
+        protected def localize_path(path : String, lang : String) : String
+          ext = File.extname(path)
+          stem = path[0, path.size - ext.size]
+          "#{stem}.#{lang}#{ext}"
+        end
+
+        # Keep any TOML (`+++`) or YAML (`---`) front matter block at the
+        # top of the file and insert the notice after it, so users see
+        # the TODO above the body without breaking parseable metadata.
+        protected def prepend_translation_notice(body : String, lang : String) : String
+          notice = "<!-- TODO: Translate this page to '#{lang}'. -->\n\n"
+
+          delimiter = if body.starts_with?("+++\n")
+                        "+++"
+                      elsif body.starts_with?("---\n")
+                        "---"
+                      end
+
+          return notice + body unless delimiter
+
+          lines = body.split("\n")
+          close_index = nil
+          lines.each_with_index do |line, i|
+            next if i == 0
+            if line == delimiter
+              close_index = i
+              break
+            end
+          end
+
+          return notice + body unless close_index
+
+          front_matter = lines[0..close_index].join("\n")
+          rest = close_index + 1 < lines.size ? lines[(close_index + 1)..].join("\n") : ""
+          "#{front_matter}\n\n#{notice}#{rest.lstrip("\n")}"
+        end
+
         # Returns template files as a hash of path => content
         abstract def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
 
