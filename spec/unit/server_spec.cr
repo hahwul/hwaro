@@ -19,6 +19,14 @@ module Hwaro
       def test_run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
         run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
       end
+
+      def test_scan_mtimes
+        scan_mtimes
+      end
+
+      def self.test_watcher_ignored?(path : String) : Bool
+        watcher_ignored?(path)
+      end
     end
   end
 end
@@ -1883,6 +1891,66 @@ end
 # "Could not bind" error surfaced, suggesting the server was up when
 # it wasn't. The fix reorders bind to happen before any banner, and
 # spawns the watcher fiber only after bind succeeds.
+describe "watcher ignore patterns" do
+  # Regression: `sed -i.bak`, vim's default `.swp` files, emacs
+  # lock/autosave files, and `.DS_Store` used to show up as watcher
+  # events — each one counted as an added/removed file and forced a
+  # `:full` rebuild. Now the watcher drops them before scan_mtimes
+  # records anything.
+
+  {
+    ".bak backup"           => "note.md.bak",
+    "vim swap"              => ".note.md.swp",
+    "trailing-tilde backup" => "note.md~",
+    "emacs lock file"       => ".#note.md",
+    "emacs autosave"        => "#note.md#",
+    ".DS_Store"             => ".DS_Store",
+  }.each do |label, name|
+    it "ignores #{label} (#{name})" do
+      Hwaro::Services::Server.test_watcher_ignored?(name).should be_true
+      Hwaro::Services::Server.test_watcher_ignored?(File.join("content", "posts", name)).should be_true
+    end
+  end
+
+  it "does NOT ignore regular content files" do
+    [
+      "index.md",
+      "about.md",
+      "posts/hello-world.md",
+      "templates/page.html",
+      "static/css/style.css",
+    ].each do |path|
+      Hwaro::Services::Server.test_watcher_ignored?(path).should be_false
+    end
+  end
+
+  it "does NOT ignore files that merely contain a tilde or hash inside" do
+    # Bare tildes/hashes inside the basename are fine — only the
+    # specific editor-byproduct shapes (trailing ~, wrapping #…#,
+    # leading .#) should be dropped.
+    Hwaro::Services::Server.test_watcher_ignored?("notes-for-~user.md").should be_false
+    Hwaro::Services::Server.test_watcher_ignored?("tag-#python.md").should be_false
+  end
+
+  it "excludes matched files from scan_mtimes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/hello.md", "real")
+        File.write("content/posts/hello.md.bak", "backup")
+        File.write("content/posts/.hello.md.swp", "swap")
+        File.write("content/posts/.DS_Store", "apple")
+
+        mtimes = Hwaro::Services::Server.new.test_scan_mtimes
+        mtimes.keys.should contain("content/posts/hello.md")
+        mtimes.keys.should_not contain("content/posts/hello.md.bak")
+        mtimes.keys.should_not contain("content/posts/.hello.md.swp")
+        mtimes.keys.should_not contain("content/posts/.DS_Store")
+      end
+    end
+  end
+end
+
 describe "bind failure handling" do
   it "raises HwaroError(HWARO_E_IO) when the port is already in use" do
     Dir.mktmpdir do |project_dir|
