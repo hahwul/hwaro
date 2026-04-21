@@ -11,8 +11,10 @@
 
 require "http/server"
 require "json"
+require "socket"
 require "../../core/build/builder"
 require "../../content/hooks"
+require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/path_utils"
 require "../../config/options/serve_options"
@@ -267,21 +269,6 @@ module Hwaro
         watch_options = build_options.dup
         watch_options.preserve_output = true
 
-        spawn do
-          watch_for_changes(watch_options)
-        end
-
-        url = "http://#{host}:#{port}"
-        Logger.success "Serving site at #{url}"
-        Logger.info "Press Ctrl+C to stop."
-
-        if open_browser
-          spawn do
-            sleep 0.5.seconds
-            open_browser_url(url)
-          end
-        end
-
         output_dir = sanitize_output_dir(build_options.output_dir)
 
         handlers = [] of HTTP::Handler
@@ -292,7 +279,6 @@ module Hwaro
           handlers << lr_handler
           handlers << IndexRewriteHandler.new(output_dir)
           handlers << LiveReloadInjectHandler.new(output_dir)
-          Logger.info "Live reload enabled"
         else
           handlers << IndexRewriteHandler.new(output_dir)
         end
@@ -301,7 +287,40 @@ module Hwaro
 
         server = HTTP::Server.new(handlers)
 
-        server.bind_tcp host, port
+        # Bind BEFORE emitting any "Serving site at …" / "Live reload
+        # enabled" / "Watching for changes …" banners. Previously those
+        # lines printed first and the watcher fiber was already spawned,
+        # so a port-conflict error produced misleading output that looked
+        # like the server was running before the final `Error: Could not
+        # bind …` line.
+        begin
+          server.bind_tcp host, port
+        rescue ex : Socket::BindError
+          # Socket::BindError#message already includes the address, so
+          # use it verbatim rather than re-prefixing.
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: ex.message || "Could not bind to '#{host}:#{port}'",
+            hint: "Is another process already listening on this port? Try -p/--port with a different value.",
+          )
+        end
+
+        url = "http://#{host}:#{port}"
+        Logger.success "Serving site at #{url}"
+        Logger.info "Press Ctrl+C to stop."
+        Logger.info "Live reload enabled" if live_reload
+
+        if open_browser
+          spawn do
+            sleep 0.5.seconds
+            open_browser_url(url)
+          end
+        end
+
+        spawn do
+          watch_for_changes(watch_options)
+        end
+
         emit_ready_signal(host, port, json_output)
         server.listen
       end

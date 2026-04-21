@@ -15,6 +15,10 @@ module Hwaro
       def test_ready_signal_line(host : String, port : Int32) : String
         ready_signal_line(host, port)
       end
+
+      def test_run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
+        run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
+      end
     end
   end
 end
@@ -1869,6 +1873,54 @@ describe Hwaro::Services::LiveReloadInjectHandler, "path sanitization" do
       handler.call(context)
 
       dummy.called.should be_true
+    end
+  end
+end
+
+# Regression: when bind_tcp fails (port conflict), `hwaro serve` used
+# to print "Serving site at …", "Live reload enabled", and the watcher
+# fiber would emit "Watching for changes …" — all *before* the final
+# "Could not bind" error surfaced, suggesting the server was up when
+# it wasn't. The fix reorders bind to happen before any banner, and
+# spawns the watcher fiber only after bind succeeds.
+describe "bind failure handling" do
+  it "raises HwaroError(HWARO_E_IO) when the port is already in use" do
+    Dir.mktmpdir do |project_dir|
+      Dir.cd(project_dir) do
+        File.write("config.toml", "title = \"Test\"\nbase_url = \"http://localhost:3000\"\n")
+        FileUtils.mkdir_p("content")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHello")
+
+        # Grab a free port, then hold it so the Server tries to bind onto it.
+        occupied = TCPServer.new("127.0.0.1", 0)
+        port = occupied.local_address.port
+
+        build_options = Hwaro::Config::Options::BuildOptions.new
+
+        buffer = IO::Memory.new
+        previous_io = Hwaro::Logger.io
+        Hwaro::Logger.io = buffer
+
+        begin
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Server.new.test_run_with_options(
+              "127.0.0.1", port, false, false, true, build_options, false,
+            )
+          end
+
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          err.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+          (err.message || "").downcase.should contain("bind")
+
+          output = buffer.to_s
+          output.should_not contain("Serving site at")
+          output.should_not contain("Live reload enabled")
+          output.should_not contain("Watching for changes")
+        ensure
+          Hwaro::Logger.io = previous_io
+          occupied.close
+        end
+      end
     end
   end
 end
