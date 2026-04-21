@@ -98,6 +98,70 @@ describe Hwaro::Content::Hooks::MarkdownHooks do
       end
     end
 
+    it "logs a draft-skip summary when drafts are excluded" do
+      Dir.mktmpdir do |tmpdir|
+        content_dir = File.join(tmpdir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "d1.md"), "---\ntitle: D1\ndraft: true\n---\nBody")
+        File.write(File.join(content_dir, "d2.md"), "---\ntitle: D2\ndraft: true\n---\nBody")
+        File.write(File.join(content_dir, "ok.md"), "---\ntitle: Published\n---\nBody")
+
+        buffer = IO::Memory.new
+        previous_io = Hwaro::Logger.io
+        Hwaro::Logger.io = buffer
+        begin
+          Dir.cd(tmpdir) do
+            manager = Hwaro::Core::Lifecycle::Manager.new
+            hooks = Hwaro::Content::Hooks::MarkdownHooks.new
+            hooks.register_hooks(manager)
+
+            config = Hwaro::Config::Options::BuildOptions.new(drafts: false)
+            ctx = Hwaro::Core::Lifecycle::BuildContext.new(config)
+            ctx.config = Hwaro::Models::Config.new
+            ctx.pages << Hwaro::Models::Page.new("d1.md")
+            ctx.pages << Hwaro::Models::Page.new("d2.md")
+            ctx.pages << Hwaro::Models::Page.new("ok.md")
+
+            manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterReadContent, ctx)
+          end
+        ensure
+          Hwaro::Logger.io = previous_io
+        end
+
+        buffer.to_s.should contain("2 page(s) skipped (draft).")
+      end
+    end
+
+    it "does not log a draft-skip summary when no drafts are filtered" do
+      Dir.mktmpdir do |tmpdir|
+        content_dir = File.join(tmpdir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "ok.md"), "---\ntitle: Published\n---\nBody")
+
+        buffer = IO::Memory.new
+        previous_io = Hwaro::Logger.io
+        Hwaro::Logger.io = buffer
+        begin
+          Dir.cd(tmpdir) do
+            manager = Hwaro::Core::Lifecycle::Manager.new
+            hooks = Hwaro::Content::Hooks::MarkdownHooks.new
+            hooks.register_hooks(manager)
+
+            config = Hwaro::Config::Options::BuildOptions.new(drafts: false)
+            ctx = Hwaro::Core::Lifecycle::BuildContext.new(config)
+            ctx.config = Hwaro::Models::Config.new
+            ctx.pages << Hwaro::Models::Page.new("ok.md")
+
+            manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterReadContent, ctx)
+          end
+        ensure
+          Hwaro::Logger.io = previous_io
+        end
+
+        buffer.to_s.should_not contain("skipped (draft)")
+      end
+    end
+
     it "parses sections" do
       Dir.mktmpdir do |tmpdir|
         content_dir = File.join(tmpdir, "content")
