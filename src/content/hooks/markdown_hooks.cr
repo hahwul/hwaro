@@ -103,11 +103,36 @@ module Hwaro
           filter_expired = !ctx.options.include_expired
           filter_future = !ctx.options.include_future
           now = Time.utc
+          soon = now + 7.days
+
+          # Warn about pages expiring soon (before filtering them out)
+          if filter_expired
+            ctx.pages.each do |p|
+              if exp = p.expires
+                if exp > now && exp <= soon
+                  Logger.warn "Page '#{p.path}' expires on #{exp.to_s("%Y-%m-%d")} (within 7 days)"
+                end
+              end
+            end
+          end
+
+          draft_count = 0
+          expired_count = 0
+          future_count = 0
 
           filter = ->(p : Models::Page) do
-            (!include_drafts && p.draft) ||
-            (filter_expired && (p.expires.try { |e| e <= now } || false)) ||
-            (filter_future && (p.date.try { |d| d > now } || false))
+            if !include_drafts && p.draft
+              draft_count += 1
+              true
+            elsif filter_expired && (p.expires.try { |e| e <= now } || false)
+              expired_count += 1
+              true
+            elsif filter_future && (p.date.try { |d| d > now } || false)
+              future_count += 1
+              true
+            else
+              false
+            end
           end
 
           before = ctx.pages.size + ctx.sections.size
@@ -115,6 +140,10 @@ module Hwaro
           ctx.sections.reject!(&filter)
           after = ctx.pages.size + ctx.sections.size
           ctx.invalidate_all_pages_cache if before != after
+
+          Logger.info "  #{draft_count} page(s) skipped (draft)." if draft_count > 0
+          Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
+          Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
         end
 
         private def calculate_urls(ctx : Core::Lifecycle::BuildContext)

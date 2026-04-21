@@ -69,6 +69,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     pages_before = ctx.pages.size
     sections_before = ctx.sections.size
     failed_count = 0
+    draft_count = 0
     expired_count = 0
     future_count = 0
 
@@ -77,6 +78,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         failed_count += 1
         true
       elsif !include_drafts && p.draft
+        draft_count += 1
         true
       elsif filter_expired && (p.expires.try { |e| e <= now } || false)
         expired_count += 1
@@ -98,6 +100,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
 
     Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
+    Logger.info "  #{draft_count} page(s) skipped (draft)." if draft_count > 0
     Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
     Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
 
