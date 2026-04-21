@@ -3,7 +3,9 @@
 # Creates the initial project structure with sample content,
 # templates, and configuration based on the selected scaffold.
 
+require "file_utils"
 require "../config/options/init_options"
+require "../utils/errors"
 require "../utils/logger"
 require "../services/scaffolds/registry"
 require "../services/scaffolds/remote"
@@ -29,7 +31,8 @@ module Hwaro
           options.multilingual_languages,
           scaffold,
           options.agents_mode,
-          options.minimal_config
+          options.minimal_config,
+          options.clean
         )
       end
 
@@ -42,9 +45,10 @@ module Hwaro
         multilingual_languages : Array(String) = [] of String,
         scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
         agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
+        clean : Bool = false,
       )
         scaffold = Scaffolds::Registry.get(scaffold_type)
-        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode)
+        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode, false, clean)
       end
 
       private def run_with_scaffold(
@@ -57,14 +61,21 @@ module Hwaro
         scaffold : Scaffolds::Base,
         agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
         minimal_config : Bool = false,
+        clean : Bool = false,
       )
+        if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
+          clean_target(target_path)
+        end
+
         unless Dir.exists?(target_path)
           Dir.mkdir_p(target_path)
         end
 
-        unless force || Dir.empty?(target_path)
+        # --clean wipes the dir up front; --force keeps existing files in
+        # place and writes on top. Either one allows a non-empty target.
+        unless force || clean || Dir.empty?(target_path)
           Logger.error "Directory '#{target_path}' is not empty."
-          Logger.error "Use --force to overwrite."
+          Logger.error "Use --force to overwrite, or --clean to remove existing files first."
           exit(1)
         end
 
@@ -507,6 +518,30 @@ module Hwaro
         when "ar" then "العربية"
         when "hi" then "हिन्दी"
         else           code.upcase
+        end
+      end
+
+      # Remove every entry inside `target_path`, keeping the directory
+      # itself. Refuses to touch a target that contains `.git/` so a
+      # typo'd path or an accidental `--clean .` in a real repo can't
+      # wipe the user's work.
+      private def clean_target(target_path : String)
+        if Dir.exists?(File.join(target_path, ".git"))
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to --clean '#{target_path}': target contains a .git directory.",
+            hint: "Delete .git manually if you really want to wipe this directory.",
+          )
+        end
+
+        entries = Dir.children(target_path)
+        return if entries.empty?
+
+        Logger.info "Cleaning #{entries.size} existing entr#{entries.size == 1 ? "y" : "ies"} from '#{target_path}'..."
+        entries.each do |entry|
+          full = File.join(target_path, entry)
+          FileUtils.rm_rf(full)
+          Logger.action :remove, full, :yellow
         end
       end
 
