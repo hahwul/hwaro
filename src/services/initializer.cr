@@ -74,8 +74,19 @@ module Hwaro
 
         is_multilingual = multilingual_languages.size > 1
 
+        if multilingual_languages.size == 1
+          Logger.warn "  --include-multilingual needs 2+ languages; '#{multilingual_languages.first}' alone is treated as non-multilingual."
+        end
+
         if minimal_config && is_multilingual
           Logger.warn "  --minimal-config does not include multilingual settings; ignoring --include-multilingual"
+        end
+
+        # Multilingual content uses a fixed layout rather than per-scaffold
+        # sample files, so surface that as a warning when the user chose a
+        # non-default scaffold.
+        if is_multilingual && !scaffold.is_a?(Scaffolds::Remote) && scaffold.type != Config::Options::ScaffoldType::Simple
+          Logger.warn "  --scaffold '#{scaffold.type}' sample content is not used in multilingual mode; a generic index/about/blog layout is created instead."
         end
 
         # Create content structure
