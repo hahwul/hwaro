@@ -76,6 +76,20 @@ module Hwaro
       end
 
       struct InitOptions
+        # BCP 47 subset: primary subtag (2-3 letters) plus optional
+        # script/region subtags (2-8 alphanumerics each). Covers "en",
+        # "pt-BR", "zh-Hant", "zh-Hant-TW".
+        LANGUAGE_CODE_REGEX = /\A[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*\z/
+
+        def self.validate_language_code!(code : String) : Nil
+          unless LANGUAGE_CODE_REGEX.matches?(code)
+            raise ArgumentError.new(
+              "Invalid language code: '#{code}'. " \
+              "Use BCP 47 codes like 'en', 'ko', 'pt-BR', 'zh-Hant'."
+            )
+          end
+        end
+
         property path : String
         property force : Bool
         property skip_agents_md : Bool

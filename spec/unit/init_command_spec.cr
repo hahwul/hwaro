@@ -88,6 +88,21 @@ describe Hwaro::CLI::Commands::InitCommand do
       # With spaces
       options = cmd.parse_options(["--include-multilingual", "en, ko, fr"])
       options.multilingual_languages.should eq(["en", "ko", "fr"])
+
+      # Region subtags
+      options = cmd.parse_options(["--include-multilingual", "en-US,pt-BR,zh-Hant"])
+      options.multilingual_languages.should eq(["en-US", "pt-BR", "zh-Hant"])
+    end
+
+    it "rejects invalid language codes in --include-multilingual" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      expect_raises(Hwaro::HwaroError, /Invalid language code: '@@@'/) do
+        cmd.parse_options(["--include-multilingual", "en,@@@"])
+      end
+
+      expect_raises(Hwaro::HwaroError, /Invalid language code/) do
+        cmd.parse_options(["--include-multilingual", "123"])
+      end
     end
 
     it "parses mixed flags and arguments" do

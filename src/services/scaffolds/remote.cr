@@ -160,9 +160,11 @@ module Hwaro
           end
 
           if targets.empty?
-            Logger.warn "No scaffold files found in #{label}."
-            Logger.warn "Expected: config.toml, templates/, or static/ directories."
-            return
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "No scaffold files found in #{label}.",
+              hint: "Remote scaffolds must contain a config.toml, templates/, static/, or content/ directory.",
+            )
           end
 
           # Download files in parallel using fibers

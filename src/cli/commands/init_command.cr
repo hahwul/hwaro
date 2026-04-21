@@ -5,6 +5,7 @@ require "../../config/options/init_options"
 require "../../services/initializer"
 require "../../services/scaffolds/registry"
 require "../../services/scaffolds/remote"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -128,7 +129,19 @@ module Hwaro
               end
             end
             parser.on("--include-multilingual LANGS", "Enable multilingual support (e.g., en,ko)") do |langs|
-              multilingual_languages = langs.split(",").map(&.strip).reject(&.empty?)
+              parsed = langs.split(",").map(&.strip).reject(&.empty?)
+              begin
+                parsed.each { |code| Config::Options::InitOptions.validate_language_code!(code) }
+              rescue ex : ArgumentError
+                # Classify so the Runner emits `Error [HWARO_E_USAGE]: …`
+                # and exits with the documented usage code (2).
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: ex.message || "Invalid language code",
+                  hint: "Examples: 'en', 'ko', 'en,ko', 'pt-BR', 'zh-Hant'.",
+                )
+              end
+              multilingual_languages = parsed
             end
             parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
             parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|

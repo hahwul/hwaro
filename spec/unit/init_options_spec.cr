@@ -151,4 +151,48 @@ describe Hwaro::Config::Options::InitOptions do
       opts.multilingual?.should be_true
     end
   end
+
+  describe ".validate_language_code!" do
+    it "accepts ISO 639 primary subtags" do
+      %w[en ko ja fr de EN Ko].each do |code|
+        Hwaro::Config::Options::InitOptions.validate_language_code!(code)
+      end
+    end
+
+    it "accepts language-region tags" do
+      %w[en-US pt-BR zh-CN].each do |code|
+        Hwaro::Config::Options::InitOptions.validate_language_code!(code)
+      end
+    end
+
+    it "accepts language-script and language-script-region tags" do
+      %w[zh-Hant sr-Latn zh-Hant-TW].each do |code|
+        Hwaro::Config::Options::InitOptions.validate_language_code!(code)
+      end
+    end
+
+    it "rejects non-alphabetic primary subtag" do
+      expect_raises(ArgumentError, /Invalid language code/) do
+        Hwaro::Config::Options::InitOptions.validate_language_code!("@@@")
+      end
+      expect_raises(ArgumentError, /Invalid language code/) do
+        Hwaro::Config::Options::InitOptions.validate_language_code!("123")
+      end
+    end
+
+    it "rejects empty string" do
+      expect_raises(ArgumentError, /Invalid language code/) do
+        Hwaro::Config::Options::InitOptions.validate_language_code!("")
+      end
+    end
+
+    it "rejects tags with spaces or punctuation" do
+      expect_raises(ArgumentError, /Invalid language code/) do
+        Hwaro::Config::Options::InitOptions.validate_language_code!("en_US")
+      end
+      expect_raises(ArgumentError, /Invalid language code/) do
+        Hwaro::Config::Options::InitOptions.validate_language_code!("en US")
+      end
+    end
+  end
 end

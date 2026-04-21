@@ -242,6 +242,55 @@ describe Hwaro::Services::Initializer do
         end
       end
 
+      it "warns when --include-multilingual is given a single language" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          buffer = IO::Memory.new
+          prev_io = Hwaro::Logger.io
+          Hwaro::Logger.io = buffer
+          begin
+            Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en"])
+          ensure
+            Hwaro::Logger.io = prev_io
+          end
+          buffer.to_s.should contain("needs 2+ languages")
+        end
+      end
+
+      it "warns when a non-default scaffold is used with multilingual" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          buffer = IO::Memory.new
+          prev_io = Hwaro::Logger.io
+          Hwaro::Logger.io = buffer
+          begin
+            Hwaro::Services::Initializer.new.run(
+              target,
+              multilingual_languages: ["en", "ko"],
+              scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
+            )
+          ensure
+            Hwaro::Logger.io = prev_io
+          end
+          buffer.to_s.should contain("sample content is not used in multilingual mode")
+        end
+      end
+
+      it "does not emit scaffold-override warning for default simple scaffold" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          buffer = IO::Memory.new
+          prev_io = Hwaro::Logger.io
+          Hwaro::Logger.io = buffer
+          begin
+            Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en", "ko"])
+          ensure
+            Hwaro::Logger.io = prev_io
+          end
+          buffer.to_s.should_not contain("sample content is not used in multilingual mode")
+        end
+      end
+
       it "creates multilingual blog content" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
