@@ -122,5 +122,55 @@ describe Hwaro::Utils::HtmlMinifier do
     it "handles whitespace-only content" do
       Hwaro::Utils::HtmlMinifier.minify("   \n\n\n   ").should eq("")
     end
+
+    describe "trailing whitespace" do
+      it "strips trailing spaces from each line" do
+        html = "<p>A</p>   \n<p>B</p>\t\t\n<p>C</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<p>A</p>\n<p>B</p>\n<p>C</p>")
+      end
+
+      it "strips trailing whitespace even inside pre blocks (no visual effect)" do
+        html = "<pre><code>line1   \nline2\t</code></pre>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("line1\nline2")
+        result.should_not match(/line1 +\n/)
+      end
+    end
+
+    describe "conservative guarantees (things it must NOT do)" do
+      # Prior attempts to strip these broke content rendering. The flag
+      # is contractually conservative — these assertions pin that down.
+
+      it "does not collapse whitespace between tags" do
+        html = "<span>x</span> <span>y</span>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<span>x</span> <span>y</span>")
+      end
+
+      it "does not strip leading whitespace from lines (preserves indentation)" do
+        html = "<div>\n  <p>indented</p>\n</div>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<div>\n  <p>indented</p>\n</div>")
+      end
+
+      it "does not collapse whitespace runs in body text" do
+        html = "<p>two  spaces</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("two  spaces")
+      end
+
+      it "preserves inline whitespace inside pre/code blocks" do
+        html = "<pre><code>  leading\n    indented\n  outdented</code></pre>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("  leading\n    indented\n  outdented")
+      end
+
+      it "preserves single newline between block elements" do
+        html = "<p>A</p>\n<p>B</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<p>A</p>\n<p>B</p>")
+      end
+    end
   end
 end

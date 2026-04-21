@@ -230,11 +230,13 @@ The build output is identical — streaming only affects memory usage during the
 
 The minify flag performs conservative optimization on generated files:
 
-- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, and content structure.
+- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, inter-tag whitespace, and content structure.
 - **JSON**: Removes whitespace and newlines for compact output.
 - **XML**: Removes whitespace between tags for smaller file sizes.
 
 Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
+
+**HTML minification is intentionally conservative.** Prior attempts at aggressive HTML reduction (stripping indentation, collapsing whitespace between tags, etc.) caused content-rendering regressions even with `<pre>`/`<script>`/`<style>` protection. If you need aggressive HTML minification for deployment, post-process the output of `public/` with a dedicated minifier (e.g. `html-minifier-terser`, `minify-html`) rather than relying on `--minify`.
 
 **About `--cache` (Incremental Build):**
 

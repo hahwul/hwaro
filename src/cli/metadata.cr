@@ -50,7 +50,7 @@ module Hwaro
     DRAFTS_FLAG                = FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content")
     INCLUDE_EXPIRED_FLAG       = FlagInfo.new(short: nil, long: "--include-expired", description: "Include expired content")
     INCLUDE_FUTURE_FLAG        = FlagInfo.new(short: nil, long: "--include-future", description: "Include future-dated content")
-    MINIFY_FLAG                = FlagInfo.new(short: nil, long: "--minify", description: "Minify HTML output (and minified json, xml)")
+    MINIFY_FLAG                = FlagInfo.new(short: nil, long: "--minify", description: "Minify JSON/XML output and conservatively trim HTML (comments, trailing whitespace, blank lines)")
     BASE_URL_FLAG              = FlagInfo.new(short: nil, long: "--base-url", description: "Override base_url from config.toml", takes_value: true, value_hint: "URL")
     SKIP_CACHE_BUSTING_FLAG    = FlagInfo.new(short: nil, long: "--skip-cache-busting", description: "Disable cache busting query parameters on CSS/JS resources")
     SKIP_OG_IMAGE_FLAG         = FlagInfo.new(short: nil, long: "--skip-og-image", description: "Skip auto OG image generation")
