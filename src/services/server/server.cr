@@ -547,6 +547,29 @@ module Hwaro
         Logger.debug "Failed to open browser: #{ex.message}"
       end
 
+      # Paths matching these regexes are treated as editor byproducts
+      # (backups, swap files, autosaves, OS metadata) and are excluded
+      # from the watcher. Editors using `rename`-based atomic save or
+      # keep-a-backup patterns (vim's default, `sed -i.bak`, emacs,
+      # JetBrains, …) used to double-trigger rebuilds — once for the
+      # real edit and once for the byproduct — and each event forced a
+      # full rebuild (see server.cr `:full` strategy fallback).
+      WATCHER_IGNORE_PATTERNS = [
+        /\.bak$/,
+        /~$/,
+        /\.swp$/, /\.swo$/, /\.swx$/,
+        /\.DS_Store$/,
+        # emacs lock file:   .#filename
+        # emacs autosave:    #filename#
+        /(?:\A|\/)\.#[^\/]+$/,
+        /(?:\A|\/)#[^\/]+#$/,
+      ]
+
+      protected def self.watcher_ignored?(path : String) : Bool
+        basename = File.basename(path)
+        WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
+      end
+
       private def scan_mtimes : Hash(String, Time)
         mtimes = {} of String => Time
         dirs_to_watch = ["content", "templates", "static"]
@@ -555,6 +578,7 @@ module Hwaro
           next unless Dir.exists?(dir)
           Dir.glob(File.join(dir, "**", "*")) do |file|
             next if File.directory?(file)
+            next if Server.watcher_ignored?(file)
             begin
               mtimes[file] = File.info(file).modification_time
             rescue ex
