@@ -19,6 +19,14 @@ module Hwaro::Core::Build
     def test_build_pages_by_path(site : Models::Site)
       build_pages_by_path(site)
     end
+
+    def test_render_error_signature(message : String)
+      render_error_signature(message)
+    end
+
+    def test_report_render_failures(failures, verbose)
+      report_render_failures(failures, verbose)
+    end
   end
 end
 
@@ -154,6 +162,108 @@ describe Hwaro::Core::Build::Phases::Render do
       result = builder.test_build_pages_by_path(site)
       result["blog/post.md"].should eq(page)
       result["blog/_index.md"].should eq(section)
+    end
+  end
+
+  describe "#render_error_signature" do
+    it "strips the page-specific 'Template error for <path>' prefix" do
+      builder = Hwaro::Core::Build::Builder.new
+      msg = "Template error for posts/hello-world.md: Unterminated tag\ntemplate: <string>:1:20 .. 1:20"
+      builder.test_render_error_signature(msg).should eq("Unterminated tag")
+    end
+
+    it "normalizes the same underlying error across different pages" do
+      builder = Hwaro::Core::Build::Builder.new
+      a = "Template error for about.md: Unterminated tag\nmore context"
+      b = "Template error for posts/hello-world.md: Unterminated tag\nother context"
+      builder.test_render_error_signature(a).should eq(builder.test_render_error_signature(b))
+    end
+
+    it "falls back to the first line when there is no 'Template error for' prefix" do
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_render_error_signature("Missing filter 'foo'\n  at line 3").should eq("Missing filter 'foo'")
+    end
+  end
+
+  describe "#report_render_failures" do
+    it "groups identical failures into a single summary line" do
+      buffer = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = buffer
+      begin
+        builder = Hwaro::Core::Build::Builder.new
+        failures = [
+          {page_path: "index.md", message: "Template error for index.md: Unterminated tag"},
+          {page_path: "about.md", message: "Template error for about.md: Unterminated tag"},
+          {page_path: "posts/hello.md", message: "Template error for posts/hello.md: Unterminated tag"},
+        ]
+        builder.test_report_render_failures(failures, verbose: false)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      output = buffer.to_s
+      output.should contain("Render failed for 3 pages: Unterminated tag")
+      output.should contain("  - index.md")
+      output.should contain("  - about.md")
+      output.should contain("  - posts/hello.md")
+      output.should contain("--verbose")
+      output.scan("Unterminated tag").size.should eq(1)
+    end
+
+    it "shows per-page detail under --verbose" do
+      buffer = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = buffer
+      begin
+        builder = Hwaro::Core::Build::Builder.new
+        failures = [
+          {page_path: "index.md", message: "Template error for index.md: Unterminated tag"},
+          {page_path: "about.md", message: "Template error for about.md: Unterminated tag"},
+        ]
+        builder.test_report_render_failures(failures, verbose: true)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      output = buffer.to_s
+      output.scan("Parallel render failed for").size.should eq(2)
+      output.should contain("index.md")
+      output.should contain("about.md")
+    end
+
+    it "uses the single-page format when only one page fails with a given error" do
+      buffer = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = buffer
+      begin
+        builder = Hwaro::Core::Build::Builder.new
+        failures = [
+          {page_path: "index.md", message: "Template error for index.md: something unique"},
+        ]
+        builder.test_report_render_failures(failures, verbose: false)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      output = buffer.to_s
+      output.should contain("Render failed for index.md:")
+      output.should_not contain("Run with --verbose")
+    end
+
+    it "truncates large affected-page lists with an '… and N more' tail" do
+      buffer = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = buffer
+      begin
+        builder = Hwaro::Core::Build::Builder.new
+        failures = (1..8).map do |i|
+          {page_path: "posts/p#{i}.md", message: "Template error for posts/p#{i}.md: Unterminated tag"}
+        end.to_a
+        builder.test_report_render_failures(failures, verbose: false)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      output = buffer.to_s
+      output.should contain("Render failed for 8 pages: Unterminated tag")
+      output.should contain("… and 3 more")
     end
   end
 end
