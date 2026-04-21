@@ -76,8 +76,13 @@ module Hwaro
           end
 
           # 3. Direct call: {{ name(args) }}
+          # Direct calls are also valid Crinja/Jinja function-call syntax
+          # ({{ env("FOO") }}, {{ asset(name="x") }}, …), so we warn only when
+          # the name resolves to neither a shortcode template nor a registered
+          # Crinja function — that way real typos surface while legitimate
+          # template-function calls in content pass through silently.
           processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
-            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: false, crinja_env_override: crinja_env_override)
+            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override)
           end
         end
 
@@ -192,7 +197,9 @@ module Hwaro
           template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
 
           unless template
-            Logger.warn "Shortcode template '#{template_key}' not found." if warn_missing
+            if warn_missing && !crinja_function?(name, crinja_env_override)
+              warn_missing_shortcode(template_key)
+            end
             return fallback
           end
 
@@ -280,6 +287,29 @@ module Hwaro
           html.gsub(/HWARO-SHORTCODE-PLACEHOLDER-\d+/) do |match|
             shortcode_results[match]? || match
           end
+        end
+
+        # True when `name` is a registered Crinja function in the env used
+        # for template rendering. Direct shortcode calls ({{ name(args) }})
+        # and template function calls share syntax, so this check lets the
+        # shortcode processor silent-pass-through legitimate function calls
+        # like `env`, `asset`, `url_for`, `get_url`, … while still warning
+        # on names that aren't registered anywhere.
+        private def crinja_function?(name : String, crinja_env_override : Crinja?) : Bool
+          env = crinja_env_override || crinja_env
+          env.functions.has_key?(name)
+        rescue
+          false
+        end
+
+        # Emit a "shortcode template not found" warning at most once per
+        # template key per build to avoid spamming the log when the same
+        # typo appears on many pages.
+        private def warn_missing_shortcode(template_key : String) : Nil
+          seen = (@shortcode_warnings_seen ||= Set(String).new)
+          return if seen.includes?(template_key)
+          seen << template_key
+          Logger.warn "Shortcode template '#{template_key}' not found."
         end
       end
     end

@@ -91,6 +91,9 @@ module Hwaro
         @profiler : Profiler?
         @crinja_env : Crinja?
         @compiled_templates_cache : Hash(UInt64, Crinja::Template) = {} of UInt64 => Crinja::Template
+        # Tracks shortcode template keys we've already warned about, so a
+        # single typo used across many pages emits just one warning line.
+        @shortcode_warnings_seen : Set(String)? = nil
         @pages_by_path : Hash(String, Models::Page)?
         @i18n_translations : Content::I18n::TranslationData = Content::I18n::TranslationData.new
         # Per-section cache of Crinja::Value arrays, keyed by "section_name:language"

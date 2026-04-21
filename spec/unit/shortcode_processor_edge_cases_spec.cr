@@ -74,6 +74,56 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       # Block path returns the original block as fallback, byte-for-byte
       result.should eq(content)
     end
+
+    it "warns when a direct-call shortcode name is not a registered template or Crinja function" do
+      builder = Hwaro::Core::Build::Builder.new
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = sink
+      begin
+        builder.test_sc_process(%(text {{ typo_sc(arg="x") }} more), {} of String => String)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      sink.to_s.should contain("Shortcode template 'shortcodes/typo_sc' not found.")
+    end
+
+    it "does not warn when a direct call matches a registered Crinja function name" do
+      # `env`, `asset`, `url_for`, `get_url`, `resize_image`, … are
+      # registered on the shared Crinja env by the template processor.
+      # Direct-call syntax in content ({{ env(\"X\") }}) is a legitimate
+      # template-function reference, not a typo'd shortcode, so the
+      # shortcode processor must silent-pass-through.
+      builder = Hwaro::Core::Build::Builder.new
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = sink
+      begin
+        builder.test_sc_process(%({{ env("FOO") }} {{ asset(name="x.css") }}), {} of String => String)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      sink.to_s.should_not contain("Shortcode template")
+    end
+
+    it "dedupes missing-template warnings across multiple invocations" do
+      builder = Hwaro::Core::Build::Builder.new
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = sink
+      begin
+        # Same missing shortcode used three times, in two syntaxes.
+        builder.test_sc_process(
+          %({{ missing_sc(a="1") }} {{ missing_sc(a="2") }} {% missing_sc %}b{% end %}),
+          {} of String => String,
+        )
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      # Exactly one warning line per unique missing template key.
+      output = sink.to_s
+      output.scan("Shortcode template 'shortcodes/missing_sc' not found.").size.should eq(1)
+    end
   end
 
   describe "malformed shortcodes" do
