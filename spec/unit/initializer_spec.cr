@@ -90,7 +90,6 @@ describe Hwaro::Services::Initializer do
           initializer = Hwaro::Services::Initializer.new
           initializer.run(target, skip_taxonomies: true)
 
-          config_content = File.read(File.join(target, "config.toml"))
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
         end

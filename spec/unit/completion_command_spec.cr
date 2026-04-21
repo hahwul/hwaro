@@ -2,7 +2,7 @@ require "../spec_helper"
 
 # Ensure commands are registered for completion generation
 private def ensure_commands_registered
-  return if Hwaro::CLI::CommandRegistry.all_metadata.any?
+  return if Hwaro::CLI::CommandRegistry.all_metadata.present?
   Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::InitCommand.metadata) { |_| }
   Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::BuildCommand.metadata) { |_| }
   Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::ServeCommand.metadata) { |_| }

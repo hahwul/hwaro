@@ -100,7 +100,7 @@ describe Hwaro::Core::Build::Parallel do
     it "returns empty array for empty input" do
       config = Hwaro::Core::Build::ParallelConfig.new(enabled: true)
       processor = Hwaro::Core::Build::Parallel(String, String).new(config)
-      results = processor.process([] of String) { |item, idx| item.upcase }
+      results = processor.process([] of String) { |item, _| item.upcase }
       results.should be_empty
     end
 
@@ -109,18 +109,18 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Int32).new(config)
 
       items = [1, 2, 3, 4, 5]
-      results = processor.process(items) { |item, idx| item * 2 }
+      results = processor.process(items) { |item, _| item * 2 }
 
       results.size.should eq(5)
       results.all?(&.success).should be_true
-      results.map { |r| r.value.not_nil! }.should eq([2, 4, 6, 8, 10])
+      results.map(&.value.not_nil!).should eq([2, 4, 6, 8, 10])
     end
 
     it "processes items sequentially for single item" do
       config = Hwaro::Core::Build::ParallelConfig.new(enabled: true)
       processor = Hwaro::Core::Build::Parallel(String, String).new(config)
 
-      results = processor.process(["hello"]) { |item, idx| item.upcase }
+      results = processor.process(["hello"]) { |item, _| item.upcase }
       results.size.should eq(1)
       results.first.success.should be_true
       results.first.value.should eq("HELLO")
@@ -132,7 +132,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Int32).new(config)
 
       items = [1, 2, 3, 4, 5, 6, 7, 8]
-      results = processor.process(items) { |item, idx| item * 10 }
+      results = processor.process(items) { |item, _| item * 10 }
 
       results.size.should eq(8)
       results.all?(&.success).should be_true
@@ -141,7 +141,7 @@ describe Hwaro::Core::Build::Parallel do
       results.map(&.index).should eq([0, 1, 2, 3, 4, 5, 6, 7])
 
       # Values should be correct regardless of processing order
-      values = results.sort_by(&.index).map { |r| r.value.not_nil! }
+      values = results.sort_by(&.index).map(&.value.not_nil!)
       values.should eq([10, 20, 30, 40, 50, 60, 70, 80])
     end
 
@@ -150,7 +150,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Int32).new(config)
 
       items = [1, 0, 3]
-      results = processor.process(items) do |item, idx|
+      results = processor.process(items) do |item, _|
         raise "division error" if item == 0
         10 // item
       end
@@ -169,7 +169,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, String).new(config)
 
       items = [1, 2, 3, 4, 5]
-      results = processor.process(items) do |item, idx|
+      results = processor.process(items) do |item, _|
         raise "bad item" if item == 3
         "ok-#{item}"
       end
@@ -194,7 +194,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Int32).new(config)
 
       items = (0...20).to_a
-      results = processor.process(items) { |item, idx| item }
+      results = processor.process(items) { |item, _| item }
 
       results.map(&.index).should eq((0...20).to_a)
     end
@@ -236,7 +236,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Bool).new(config)
 
       items = [1, 2, 3, 4, 5]
-      count = processor.count_success(items) { |item, idx| true }
+      count = processor.count_success(items) { |_, _| true }
       count.should eq(5)
     end
 
@@ -245,7 +245,7 @@ describe Hwaro::Core::Build::Parallel do
       processor = Hwaro::Core::Build::Parallel(Int32, Bool).new(config)
 
       items = [1, 2, 3, 4, 5]
-      count = processor.count_success(items) do |item, idx|
+      count = processor.count_success(items) do |item, _|
         raise "fail" if item % 2 == 0
         true
       end
@@ -255,7 +255,7 @@ describe Hwaro::Core::Build::Parallel do
     it "returns 0 for empty input" do
       config = Hwaro::Core::Build::ParallelConfig.new(enabled: true)
       processor = Hwaro::Core::Build::Parallel(String, Bool).new(config)
-      count = processor.count_success([] of String) { |item, idx| true }
+      count = processor.count_success([] of String) { |_, _| true }
       count.should eq(0)
     end
   end
@@ -265,7 +265,7 @@ describe Hwaro::Core::Build::ParallelHelper do
   describe ".process_pages" do
     it "processes items and counts successes" do
       items = ["a", "b", "c", "d"]
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |item, idx|
+      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |_, _|
         true
       end
       count.should eq(4)
@@ -273,7 +273,7 @@ describe Hwaro::Core::Build::ParallelHelper do
 
     it "counts only successful items" do
       items = [1, 2, 3, 4, 5]
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |item, idx|
+      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |item, _|
         raise "skip even" if item % 2 == 0
         true
       end
@@ -282,7 +282,7 @@ describe Hwaro::Core::Build::ParallelHelper do
 
     it "handles empty array" do
       items = [] of String
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |item, idx|
+      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |_, _|
         true
       end
       count.should eq(0)

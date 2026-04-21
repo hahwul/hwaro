@@ -68,7 +68,7 @@ describe Hwaro::Content::Seo::OgPngRenderer do
         result.should be_true
         File.exists?(png_path).should be_true
         # PNG files start with the magic bytes
-        data = File.open(png_path, "rb") { |f| f.getb_to_end }
+        data = File.open(png_path, "rb", &.getb_to_end)
         data.size.should be > 1000 # Reasonable PNG size
         data[0].should eq(0x89_u8) # PNG magic byte
         data[1].should eq(0x50_u8) # 'P'

@@ -130,8 +130,8 @@ module Hwaro
         end
 
         # Calculate column widths
-        max_path_width = [contents.map(&.path.size).max, 40].min
-        max_title_width = [contents.map(&.title.size).max, 30].min
+        max_path_width = [contents.max_of(&.path.size), 40].min
+        max_title_width = [contents.max_of(&.title.size), 30].min
 
         # Print header
         header = String.build do |str|
@@ -146,7 +146,6 @@ module Hwaro
 
         # Print each content item
         contents.each do |info|
-          status = info.draft ? "draft" : "published"
           status_display = info.draft ? "[draft]" : "[pub]"
           date_display = info.date.try(&.to_s("%Y-%m-%d")) || "-"
           title_display = truncate(info.title, max_title_width)
@@ -238,7 +237,7 @@ module Hwaro
       end
 
       private def parse_time(time_str : String?) : Time?
-        return nil unless time_str
+        return unless time_str
 
         formats = [
           "%Y-%m-%d %H:%M:%S",
@@ -256,7 +255,7 @@ module Hwaro
 
         # Try ISO 8601 parsing as last resort
         begin
-          return Time.parse_rfc3339(time_str)
+          Time.parse_rfc3339(time_str)
         rescue
           nil
         end

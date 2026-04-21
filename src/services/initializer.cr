@@ -583,16 +583,16 @@ module Hwaro
         intro = blog_intro(lang)
 
         <<-CONTENT
-+++
-title = "#{title}"
-paginate = 10
-pagination_enabled = true
-+++
+          +++
+          title = "#{title}"
+          paginate = 10
+          pagination_enabled = true
+          +++
 
-# #{title}
+          # #{title}
 
-#{intro}
-CONTENT
+          #{intro}
+          CONTENT
       end
 
       private def multilingual_blog_post_content(lang : String, skip_taxonomies : Bool) : String
@@ -820,20 +820,20 @@ CONTENT
       end
 
       private def create_directory(path : String)
-        unless Dir.exists?(path)
+        if Dir.exists?(path)
+          Logger.action :exist, path, :blue
+        else
           Dir.mkdir_p(path)
           Logger.action :create, path
-        else
-          Logger.action :exist, path, :blue
         end
       end
 
       private def create_file(path : String, content : String)
-        unless File.exists?(path)
+        if File.exists?(path)
+          Logger.action :exist, path, :blue
+        else
           File.write(path, content)
           Logger.action :create, path
-        else
-          Logger.action :exist, path, :blue
         end
       end
     end

@@ -7,9 +7,9 @@ require "./support/build_helper"
 # =============================================================================
 
 TOC_CONFIG = <<-TOML
-title = "Test"
-base_url = "http://localhost"
-TOML
+  title = "Test"
+  base_url = "http://localhost"
+  TOML
 
 describe "TOC: toc_obj.headers exposes structured header data" do
   it "exposes title, level, and id for each header" do

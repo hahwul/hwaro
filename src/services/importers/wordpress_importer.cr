@@ -138,7 +138,7 @@ module Hwaro
           end
 
           # Build frontmatter fields
-          fields = {} of String => String | Bool | Array(String) | Nil
+          fields = {} of String => (String | Bool | Array(String))?
           fields["title"] = title unless title.empty?
           fields["date"] = date_str
           fields["description"] = excerpt unless excerpt.empty?

@@ -87,22 +87,22 @@ module Hwaro
 
         # Decode an image file and resize it to target dimensions. Returns nil on failure.
         def self.load_image(path : String, target_w : Int32, target_h : Int32) : CachedImage?
-          return nil unless File.exists?(path)
+          return unless File.exists?(path)
 
           src_w = uninitialized LibC::Int
           src_h = uninitialized LibC::Int
           channels = uninitialized LibC::Int
           src_pixels = LibStb.stbi_load(path, pointerof(src_w), pointerof(src_h), pointerof(channels), 4)
-          return nil if src_pixels.null?
+          return if src_pixels.null?
 
           begin
-            return nil if src_w <= 0 || src_h <= 0
+            return if src_w <= 0 || src_h <= 0
 
             buf_size = target_w.to_i64 * target_h.to_i64 * 4
-            return nil if buf_size > 64_000_000_i64 * 4
+            return if buf_size > 64_000_000_i64 * 4
 
             resized = LibC.malloc(buf_size).as(UInt8*)
-            return nil if resized.null?
+            return if resized.null?
 
             result = LibStb.stbir_resize_uint8_linear(
               src_pixels, src_w, src_h, 0,
@@ -110,7 +110,7 @@ module Hwaro
             )
             if result.null?
               LibC.free(resized.as(Void*))
-              return nil
+              return
             end
 
             CachedImage.new(resized, target_w, target_h)
@@ -142,7 +142,7 @@ module Hwaro
         # Initialize a single font from raw bytes. Returns {info, data} or nil.
         private def self.init_font(data : Bytes) : {LibStb::HwaroFontInfo, Bytes}?
           info = LibStb.hwaro_font_alloc
-          return nil if info.null?
+          return if info.null?
           if LibStb.hwaro_font_init(info, data, 0) != 0
             {info, data}
           else
@@ -153,8 +153,8 @@ module Hwaro
 
         # Read a font file and initialize it. Returns {info, data} or nil.
         private def self.load_font_file(path : String) : {LibStb::HwaroFontInfo, Bytes}?
-          return nil unless File.exists?(path)
-          data = File.open(path, "rb") { |f| f.getb_to_end }
+          return unless File.exists?(path)
+          data = File.open(path, "rb", &.getb_to_end)
           init_font(data)
         end
 
@@ -518,11 +518,11 @@ module Hwaro
             step = 0
             while step < WIDTH + HEIGHT
               # Draw a 1px diagonal line
-              px = 0
-              while px < WIDTH && (step - px) >= 0
-                py = step - px
-                if py < HEIGHT
-                  idx = (py * WIDTH + px) * CHANNELS
+              ix = 0
+              while ix < WIDTH && (step - ix) >= 0
+                iy = step - ix
+                if iy < HEIGHT
+                  idx = (iy * WIDTH + ix) * CHANNELS
                   r = ((accent >> 16) & 0xFF).to_u8
                   g = ((accent >> 8) & 0xFF).to_u8
                   b = (accent & 0xFF).to_u8
@@ -532,7 +532,7 @@ module Hwaro
                   pixels[idx + 1] = (dg + (g.to_f - dg) * alpha).to_u8
                   pixels[idx + 2] = (db + (b.to_f - db) * alpha).to_u8
                 end
-                px += 1
+                ix += 1
               end
               step += spacing
             end

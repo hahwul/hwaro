@@ -25,7 +25,7 @@ describe Hwaro::Content::Pagination::Paginator do
     paginator = Hwaro::Content::Pagination::Paginator.new(config)
     result = paginator.paginate(section, pages)
 
-    result.enabled.should eq(true)
+    result.enabled.should be_true
     result.per_page.should eq(2)
     result.paginated_pages.size.should eq(2)
     result.paginated_pages[0].page_number.should eq(1)
@@ -50,7 +50,7 @@ describe Hwaro::Content::Pagination::Paginator do
     paginator = Hwaro::Content::Pagination::Paginator.new(config)
     result = paginator.paginate(section, pages)
 
-    result.enabled.should eq(false)
+    result.enabled.should be_false
     result.paginated_pages.size.should eq(1)
     result.paginated_pages[0].pages.size.should eq(2)
   end
@@ -74,7 +74,7 @@ describe Hwaro::Content::Pagination::Paginator do
     paginator = Hwaro::Content::Pagination::Paginator.new(config)
     result = paginator.paginate(section, pages)
 
-    result.enabled.should eq(true)
+    result.enabled.should be_true
     result.per_page.should eq(1)
     result.paginated_pages.size.should eq(2)
   end

@@ -88,7 +88,7 @@ module Hwaro
           end
 
           # Map Hugo fields to Hwaro frontmatter
-          fields = {} of String => String | Bool | Array(String) | Nil
+          fields = {} of String => (String | Bool | Array(String))?
           slug_val : String? = nil
 
           if data = fm_data

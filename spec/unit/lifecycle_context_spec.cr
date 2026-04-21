@@ -485,7 +485,7 @@ describe Hwaro::Core::Lifecycle::BuildContext do
         Hwaro::Models::Page.new("y.md"),
       ]
       ctx.all_pages.size.should eq(2)
-      ctx.all_pages.map(&.path).sort.should eq(["x.md", "y.md"])
+      ctx.all_pages.map(&.path).sort!.should eq(["x.md", "y.md"])
     end
 
     it "swaps in the assigned array by identity, not by copy" do

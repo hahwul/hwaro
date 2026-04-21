@@ -118,7 +118,7 @@ describe Hwaro::Services::Exporters::HugoExporter do
           content_dir: content_dir,
           output_dir: output_dir,
         )
-        result = exporter.run(options)
+        exporter.run(options)
 
         File.exists?(File.join(output_dir, "content", "blog", "post.md")).should be_true
       end

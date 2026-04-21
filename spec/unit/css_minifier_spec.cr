@@ -81,9 +81,9 @@ describe Hwaro::Utils::CssMinifier do
     # Comment-like patterns inside strings (BUG FIX verification)
     # =========================================================================
     it "preserves comment-like pattern inside double-quoted string" do
-      css = %{p::before { content: "/* not a comment */"; }}
+      css = %(p::before { content: "/* not a comment */"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"/* not a comment */"})
+      result.should contain(%("/* not a comment */"))
     end
 
     it "preserves comment-like pattern inside single-quoted string" do
@@ -93,9 +93,9 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves star-slash pattern inside string" do
-      css = %{p::before { content: "a */ b /* c"; }}
+      css = %(p::before { content: "a */ b /* c"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"a */ b /* c"})
+      result.should contain(%("a */ b /* c"))
     end
 
     # =========================================================================
@@ -188,19 +188,19 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves url() with double-quoted https" do
-      css = %{body { background: url("https://cdn.example.com/bg.jpg"); }}
+      css = %(body { background: url("https://cdn.example.com/bg.jpg"); })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{url("https://cdn.example.com/bg.jpg")})
+      result.should contain(%(url("https://cdn.example.com/bg.jpg")))
     end
 
     it "preserves url() with data URI (svg)" do
-      css = %{body { background: url("data:image/svg+xml;charset=utf-8,%3Csvg%3E"); }}
+      css = %(body { background: url("data:image/svg+xml;charset=utf-8,%3Csvg%3E"); })
       result = Hwaro::Utils::CssMinifier.minify(css)
       result.should contain("data:image/svg+xml")
     end
 
     it "preserves url() with data URI (base64)" do
-      css = %{.icon { background: url(data:image/png;base64,iVBORw0KGgo=); }}
+      css = %(.icon { background: url(data:image/png;base64,iVBORw0KGgo=); })
       result = Hwaro::Utils::CssMinifier.minify(css)
       result.should contain("url(data:image/png;base64,iVBORw0KGgo=)")
     end
@@ -219,9 +219,9 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves url() in @font-face src" do
-      css = %{@font-face { font-family: "MyFont"; src: url("https://fonts.example.com/font.woff2") format("woff2"); }}
+      css = %(@font-face { font-family: "MyFont"; src: url("https://fonts.example.com/font.woff2") format("woff2"); })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{url("https://fonts.example.com/font.woff2")})
+      result.should contain(%(url("https://fonts.example.com/font.woff2")))
     end
 
     it "preserves url() with relative path" do
@@ -243,9 +243,9 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves url() in @import" do
-      css = %{@import url("https://fonts.googleapis.com/css2?family=Open+Sans");\nbody { font-family: "Open Sans"; }}
+      css = %(@import url("https://fonts.googleapis.com/css2?family=Open+Sans");\nbody { font-family: "Open Sans"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{url("https://fonts.googleapis.com/css2?family=Open+Sans")})
+      result.should contain(%(url("https://fonts.googleapis.com/css2?family=Open+Sans")))
     end
 
     it "preserves multiple url() in background shorthand" do
@@ -258,9 +258,9 @@ describe Hwaro::Utils::CssMinifier do
     # String literal preservation
     # =========================================================================
     it "preserves double-quoted strings in content property" do
-      css = %{p::before { content: "hello : world"; }}
+      css = %(p::before { content: "hello : world"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"hello : world"})
+      result.should contain(%("hello : world"))
     end
 
     it "preserves single-quoted strings in content property" do
@@ -270,25 +270,25 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves strings with semicolons" do
-      css = %{p::before { content: "a; b; c"; }}
+      css = %(p::before { content: "a; b; c"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"a; b; c"})
+      result.should contain(%("a; b; c"))
     end
 
     it "preserves strings with commas" do
-      css = %{p::before { content: "a , b , c"; }}
+      css = %(p::before { content: "a , b , c"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"a , b , c"})
+      result.should contain(%("a , b , c"))
     end
 
     it "preserves strings with braces" do
-      css = %{p::before { content: "{ some { nested } }"; }}
+      css = %(p::before { content: "{ some { nested } }"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"{ some { nested } }"})
+      result.should contain(%("{ some { nested } }"))
     end
 
     it "preserves escaped quotes in double-quoted strings" do
-      css = %{p::before { content: "say \\"hello\\""; }}
+      css = %(p::before { content: "say \\"hello\\""; })
       result = Hwaro::Utils::CssMinifier.minify(css)
       result.should contain("say \\\"hello\\\"")
     end
@@ -300,34 +300,34 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "preserves empty strings" do
-      css = %{p::before { content: ""; }}
+      css = %(p::before { content: ""; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{""})
+      result.should contain(%(""))
     end
 
     it "preserves single-char strings" do
-      css = %{p::before { content: "x"; }}
+      css = %(p::before { content: "x"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"x"})
+      result.should contain(%("x"))
     end
 
     it "preserves string with colon and space" do
-      css = %{p::before { content: "key : value"; }}
+      css = %(p::before { content: "key : value"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"key : value"})
+      result.should contain(%("key : value"))
     end
 
     it "preserves mixed quote types across declarations" do
-      css = %{.a::before { content: "double"; } .b::after { content: 'single'; }}
+      css = %(.a::before { content: "double"; } .b::after { content: 'single'; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"double"})
+      result.should contain(%("double"))
       result.should contain("'single'")
     end
 
     it "preserves string with newlines (escaped)" do
-      css = %{p::before { content: "line1\\Aline2"; }}
+      css = %(p::before { content: "line1\\Aline2"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"line1\\Aline2"})
+      result.should contain(%("line1\\Aline2"))
     end
 
     # =========================================================================
@@ -522,9 +522,9 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "handles attribute selectors with quotes" do
-      css = %{input[type="text"] { border: 1px solid #ccc; }}
+      css = %(input[type="text"] { border: 1px solid #ccc; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{input[type="text"]})
+      result.should contain(%(input[type="text"]))
     end
 
     it "handles attribute selectors with single quotes" do
@@ -564,11 +564,11 @@ describe Hwaro::Utils::CssMinifier do
     # Grid template areas (string-heavy)
     # =========================================================================
     it "preserves grid-template-areas with quoted strings" do
-      css = %{.grid { grid-template-areas: "header header" "sidebar main" "footer footer"; }}
+      css = %(.grid { grid-template-areas: "header header" "sidebar main" "footer footer"; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"header header"})
-      result.should contain(%{"sidebar main"})
-      result.should contain(%{"footer footer"})
+      result.should contain(%("header header"))
+      result.should contain(%("sidebar main"))
+      result.should contain(%("footer footer"))
     end
 
     # =========================================================================
@@ -581,9 +581,9 @@ describe Hwaro::Utils::CssMinifier do
     end
 
     it "handles unicode in values" do
-      css = %{p::before { content: "→ "; }}
+      css = %(p::before { content: "→ "; })
       result = Hwaro::Utils::CssMinifier.minify(css)
-      result.should contain(%{"→ "})
+      result.should contain(%("→ "))
     end
 
     it "handles unicode content escape sequences" do
@@ -597,15 +597,15 @@ describe Hwaro::Utils::CssMinifier do
     # =========================================================================
     it "handles multiple rules" do
       css = <<-CSS
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-      }
-      CSS
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+        CSS
       result = Hwaro::Utils::CssMinifier.minify(css)
       result.should contain("body{margin:0;padding:0}")
       result.should contain(".container{max-width:1200px;margin:0 auto}")

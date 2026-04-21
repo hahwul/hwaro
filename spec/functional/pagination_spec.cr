@@ -8,13 +8,13 @@ require "./support/build_helper"
 # =============================================================================
 
 PAGINATION_CONFIG = <<-TOML
-title = "Test"
-base_url = "http://localhost"
+  title = "Test"
+  base_url = "http://localhost"
 
-[pagination]
-enabled = true
-per_page = 2
-TOML
+  [pagination]
+  enabled = true
+  per_page = 2
+  TOML
 
 describe "Pagination: Paginator variables" do
   it "exposes paginator.current_index on each page" do
@@ -156,13 +156,13 @@ end
 describe "Pagination: Large per_page value" do
   it "does not create extra pages when per_page exceeds items" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [pagination]
-    enabled = true
-    per_page = 100
-    TOML
+      [pagination]
+      enabled = true
+      per_page = 100
+      TOML
 
     build_site(
       config,
@@ -266,13 +266,13 @@ describe "Pagination: pagination_obj exposes individual variables" do
 
   it "renders empty when pagination is disabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [pagination]
-    enabled = false
-    per_page = 1
-    TOML
+      [pagination]
+      enabled = false
+      per_page = 1
+      TOML
 
     build_site(
       config,
@@ -316,13 +316,13 @@ end
 describe "Pagination: Disabled pagination" do
   it "does not paginate when pagination is disabled" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [pagination]
-    enabled = false
-    per_page = 1
-    TOML
+      [pagination]
+      enabled = false
+      per_page = 1
+      TOML
 
     build_site(
       config,

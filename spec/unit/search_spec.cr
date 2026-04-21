@@ -378,11 +378,11 @@ end
 describe Hwaro::Models::SearchConfig do
   it "has default values" do
     config = Hwaro::Models::SearchConfig.new
-    config.enabled.should eq(false)
+    config.enabled.should be_false
     config.format.should eq("fuse_json")
     config.fields.should eq(["title", "content"])
     config.filename.should eq("search.json")
-    config.tokenize_cjk.should eq(false)
+    config.tokenize_cjk.should be_false
   end
 end
 

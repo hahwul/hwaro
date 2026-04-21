@@ -1809,9 +1809,9 @@ describe Hwaro::Content::Seo::Feeds do
 
         content = File.read(File.join(output_dir, "rss.xml"))
         # New should appear before Mid, and Mid before Old
-        new_pos = content.index("New Post").not_nil!
-        mid_pos = content.index("Mid Post").not_nil!
-        old_pos = content.index("Old Post").not_nil!
+        new_pos = content.index!("New Post")
+        mid_pos = content.index!("Mid Post")
+        old_pos = content.index!("Old Post")
         new_pos.should be < mid_pos
         mid_pos.should be < old_pos
       end

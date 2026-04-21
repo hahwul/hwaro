@@ -81,7 +81,7 @@ module Hwaro
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_markdown_file(raw)
 
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
 
           if frontmatter_yaml
             yaml = YAML.parse(frontmatter_yaml)
@@ -164,8 +164,6 @@ module Hwaro
         private def extract_title_from_body(body : String) : String?
           if match = /\A#\s+(.+)/.match(body)
             match[1].strip
-          else
-            nil
           end
         end
 

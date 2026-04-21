@@ -123,12 +123,12 @@ describe Hwaro::Services::ConfigSnippets do
                       "feeds", "build", "permalinks", "auto_includes", "series",
                       "related", "search", "pagination", "markdown", "assets",
                       "image_processing", "deployment", "pwa", "amp"] %}
-      it "{{method.id}}(commented: true) is non-empty" do
-        Hwaro::Services::ConfigSnippets.{{method.id}}(commented: true).should_not be_empty
+      it "{{ method.id }}(commented: true) is non-empty" do
+        Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: true).should_not be_empty
       end
 
-      it "{{method.id}}(commented: false) is non-empty" do
-        Hwaro::Services::ConfigSnippets.{{method.id}}(commented: false).should_not be_empty
+      it "{{ method.id }}(commented: false) is non-empty" do
+        Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: false).should_not be_empty
       end
     {% end %}
   end

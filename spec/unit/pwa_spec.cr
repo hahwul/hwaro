@@ -3,11 +3,11 @@ require "json"
 
 private def make_site(pwa_toml : String = "") : Hwaro::Models::Site
   config_str = <<-TOML
-  title = "Test Site"
-  description = "A test site"
-  base_url = "https://example.com"
-  #{pwa_toml}
-  TOML
+    title = "Test Site"
+    description = "A test site"
+    base_url = "https://example.com"
+    #{pwa_toml}
+    TOML
 
   File.tempfile("hwaro-pwa", ".toml") do |file|
     file.print(config_str)
@@ -37,15 +37,15 @@ describe Hwaro::Models::PwaConfig do
   describe "loading from TOML" do
     it "loads pwa config" do
       site = make_site(<<-TOML)
-      [pwa]
-      enabled = true
-      name = "My PWA"
-      short_name = "PWA"
-      theme_color = "#333333"
-      background_color = "#000000"
-      display = "fullscreen"
-      icons = ["static/icon-192.png", "static/icon-512.png"]
-      TOML
+        [pwa]
+        enabled = true
+        name = "My PWA"
+        short_name = "PWA"
+        theme_color = "#333333"
+        background_color = "#000000"
+        display = "fullscreen"
+        icons = ["static/icon-192.png", "static/icon-512.png"]
+        TOML
 
       site.config.pwa.enabled.should be_true
       site.config.pwa.name.should eq("My PWA")
@@ -58,11 +58,11 @@ describe Hwaro::Models::PwaConfig do
 
     it "loads precache_urls and offline_page" do
       site = make_site(<<-TOML)
-      [pwa]
-      enabled = true
-      offline_page = "/offline.html"
-      precache_urls = ["/", "/about/", "/css/main.css"]
-      TOML
+        [pwa]
+        enabled = true
+        offline_page = "/offline.html"
+        precache_urls = ["/", "/about/", "/css/main.css"]
+        TOML
 
       site.config.pwa.offline_page.should eq("/offline.html")
       site.config.pwa.precache_urls.size.should eq(3)
@@ -85,15 +85,15 @@ describe Hwaro::Content::Seo::Pwa do
     it "generates manifest.json with correct fields" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        name = "My PWA"
-        short_name = "PWA"
-        theme_color = "#ff0000"
-        background_color = "#00ff00"
-        display = "standalone"
-        icons = ["static/icon-192.png", "static/icon-512.png"]
-        TOML
+          [pwa]
+          enabled = true
+          name = "My PWA"
+          short_name = "PWA"
+          theme_color = "#ff0000"
+          background_color = "#00ff00"
+          display = "standalone"
+          icons = ["static/icon-192.png", "static/icon-512.png"]
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -114,9 +114,9 @@ describe Hwaro::Content::Seo::Pwa do
     it "falls back to site title when name is not set" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        TOML
+          [pwa]
+          enabled = true
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -129,10 +129,10 @@ describe Hwaro::Content::Seo::Pwa do
     it "generates manifest with icon entries" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        icons = ["static/icon-192.png", "static/icon-512x512.png"]
-        TOML
+          [pwa]
+          enabled = true
+          icons = ["static/icon-192.png", "static/icon-512x512.png"]
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -152,10 +152,10 @@ describe Hwaro::Content::Seo::Pwa do
     it "normalizes icon paths with and without static/ prefix" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        icons = ["static/icon.png", "/already-absolute.png", "relative.png"]
-        TOML
+          [pwa]
+          enabled = true
+          icons = ["static/icon.png", "/already-absolute.png", "relative.png"]
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -170,9 +170,9 @@ describe Hwaro::Content::Seo::Pwa do
     it "generates sw.js with build-specific cache version" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        TOML
+          [pwa]
+          enabled = true
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -185,9 +185,9 @@ describe Hwaro::Content::Seo::Pwa do
     it "generates sw.js" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        TOML
+          [pwa]
+          enabled = true
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -205,10 +205,10 @@ describe Hwaro::Content::Seo::Pwa do
     it "includes precache_urls in service worker" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        precache_urls = ["/css/main.css", "/js/app.js"]
-        TOML
+          [pwa]
+          enabled = true
+          precache_urls = ["/css/main.css", "/js/app.js"]
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
@@ -221,10 +221,10 @@ describe Hwaro::Content::Seo::Pwa do
     it "includes offline_page in service worker" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
-        [pwa]
-        enabled = true
-        offline_page = "/offline.html"
-        TOML
+          [pwa]
+          enabled = true
+          offline_page = "/offline.html"
+          TOML
 
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 

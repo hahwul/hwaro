@@ -147,7 +147,7 @@ module Hwaro
         # Reset all hit/miss counters without clearing cache contents.
         def reset_stats
           @mutex.synchronize do
-            @layers.each_value { |layer| layer.stats.reset }
+            @layers.each_value(&.stats.reset)
           end
         end
 

@@ -95,7 +95,7 @@ describe Hwaro::Content::Hooks::SeoHooks do
       json_data = JSON.parse(search_content)
       json_data.as_a.size.should eq(2)
 
-      titles = json_data.as_a.map { |item| item["title"].as_s }
+      titles = json_data.as_a.map(&.["title"].as_s)
       titles.should contain("Page 1")
       titles.should contain("Page 2")
     end

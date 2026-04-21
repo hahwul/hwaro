@@ -149,7 +149,7 @@ module Hwaro
       end
 
       def enabled? : Bool
-        @allow_extensions.any?
+        @allow_extensions.present?
       end
 
       def publish?(relative_path : String) : Bool
@@ -168,7 +168,7 @@ module Hwaro
       def self.normalize_extensions(values : Array(String)) : Array(String)
         values.compact_map do |ext|
           normalize_extension(ext)
-        end.uniq
+        end.uniq!
       end
 
       def self.normalize_paths(values : Array(String)) : Array(String)
@@ -187,7 +187,7 @@ module Hwaro
 
       private def self.normalize_extension(ext : String) : String?
         ext = ext.strip.downcase
-        return nil if ext.empty?
+        return if ext.empty?
         ext.starts_with?(".") ? ext : ".#{ext}"
       end
     end
@@ -210,9 +210,9 @@ module Hwaro
     # (`title`, `date`, `draft`, `tags`) are ignored because those have
     # dedicated handling and values.
     class ContentNewConfig
-      FORMAT_TOML = "toml"
-      FORMAT_YAML = "yaml"
-      VALID_FORMATS = {FORMAT_TOML, FORMAT_YAML}
+      FORMAT_TOML    = "toml"
+      FORMAT_YAML    = "yaml"
+      VALID_FORMATS  = {FORMAT_TOML, FORMAT_YAML}
       BUILTIN_FIELDS = {"title", "date", "draft", "tags"}
 
       property front_matter_format : String
@@ -232,7 +232,7 @@ module Hwaro
       # Extra fields, with built-ins filtered out and duplicates removed,
       # preserving configured order.
       def extra_fields : Array(String)
-        @default_fields.reject { |f| BUILTIN_FIELDS.includes?(f) }.uniq
+        @default_fields.reject { |f| BUILTIN_FIELDS.includes?(f) }.uniq!
       end
     end
 
@@ -260,7 +260,7 @@ module Hwaro
         end
       end
 
-      private def collect_tags(extension : String, base_url : String, cache_bust : String, &block : String -> String) : String
+      private def collect_tags(extension : String, base_url : String, cache_bust : String, & : String -> String) : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
@@ -408,7 +408,7 @@ module Hwaro
       # Resolve an image path to an absolute URL, falling back to default_image
       def resolve_image_url(image : String?, base_url : String) : String?
         img = image || @default_image
-        return nil unless img
+        return unless img
         img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
       end
 
@@ -743,7 +743,7 @@ module Hwaro
 
       # Get sorted languages by weight
       def sorted_languages : Array(LanguageConfig)
-        @languages.values.sort_by(&.weight)
+        @languages.values.sort_by!(&.weight)
       end
 
       # Load and parse a `config.toml` into a populated `Config`.
@@ -918,8 +918,6 @@ module Hwaro
               rule.allow = string_or_array(rule_h["allow"]?)
               rule.disallow = string_or_array(rule_h["disallow"]?)
               rule
-            else
-              nil
             end
           end
         end

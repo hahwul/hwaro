@@ -36,7 +36,7 @@ module Hwaro
           base_path = "/#{taxonomy.name}/"
           index_page = build_taxonomy_index_page(taxonomy, base_path)
 
-          render_taxonomy_index(index_page, terms.keys.sort, templates, site, output_dir, builder, verbose)
+          render_taxonomy_index(index_page, terms.keys.sort!, templates, site, output_dir, builder, verbose)
 
           terms.each do |term, pages|
             render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir, builder, verbose)

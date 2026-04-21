@@ -403,14 +403,7 @@ end
 describe Hwaro::CLI::Commands::CompletionCommand do
   describe "bash completion generation" do
     it "generates bash completion script" do
-      cmd = Hwaro::CLI::Commands::CompletionCommand.new
-      io = IO::Memory.new
-      original_io = Hwaro::Logger
-      Hwaro::Logger.io = io
-
-      # Use a pipe to capture stdout
-      reader, writer = IO.pipe
-      original_stdout = STDOUT
+      Hwaro::Logger.io = IO::Memory.new
 
       # We'll test the generate methods indirectly through metadata
       # The script generation is private, so we test the command structure

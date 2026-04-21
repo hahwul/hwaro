@@ -19,8 +19,8 @@ describe Hwaro::Content::Multilingual do
     Hwaro::Content::Multilingual.link_translations!([en, ko], config)
 
     en.translations.map(&.code).should eq(["en", "ko"])
-    en.translations.find(&.is_current).not_nil!.code.should eq("en")
-    ko.translations.find(&.is_current).not_nil!.code.should eq("ko")
+    en.translations.find!(&.is_current).code.should eq("en")
+    ko.translations.find!(&.is_current).code.should eq("ko")
     ko.translations.map(&.url).should eq(["/about/", "/ko/about/"])
   end
 
@@ -32,29 +32,29 @@ describe Hwaro::Content::Multilingual do
       Dir.cd(temp_dir) do
         Dir.mkdir_p("content/about")
         File.write("content/about/index.md", <<-MD)
-        +++
-        title = "About"
-        +++
+          +++
+          title = "About"
+          +++
 
-        # About
-        MD
+          # About
+          MD
         File.write("content/about/index.ko.md", <<-MD)
-        +++
-        title = "소개"
-        +++
+          +++
+          title = "소개"
+          +++
 
-        # 소개
-        MD
+          # 소개
+          MD
 
         File.write("config.toml", <<-TOML)
-        title = "Test"
-        base_url = "http://localhost:3000"
-        default_language = "en"
+          title = "Test"
+          base_url = "http://localhost:3000"
+          default_language = "en"
 
-        [languages.ko]
-        language_name = "한국어"
-        weight = 2
-        TOML
+          [languages.ko]
+          language_name = "한국어"
+          weight = 2
+          TOML
 
         builder = Hwaro::Core::Build::Builder.new
         builder.run(output_dir: "public", drafts: false, minify: false, parallel: false, cache: false, highlight: true, verbose: false, profile: false)

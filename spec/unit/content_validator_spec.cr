@@ -16,19 +16,19 @@ describe Hwaro::Services::ContentValidator do
         FileUtils.mkdir_p(content_dir)
 
         File.write(File.join(content_dir, "good.md"), <<-MD
-        ---
-        title: Good Post
-        description: A well-formed post
-        date: 2024-01-15
-        tags:
-          - crystal
-          - testing
-        ---
+          ---
+          title: Good Post
+          description: A well-formed post
+          date: 2024-01-15
+          tags:
+            - crystal
+            - testing
+          ---
 
-        # Good Post
+          # Good Post
 
-        This is a good post with ![alt text](image.png).
-        MD
+          This is a good post with ![alt text](image.png).
+          MD
         )
 
         validator = Hwaro::Services::ContentValidator.new(content_dir)
@@ -112,15 +112,15 @@ describe Hwaro::Services::ContentValidator do
         FileUtils.mkdir_p(content_dir)
 
         File.write(File.join(content_dir, "code.md"), <<-MD
-        ---
-        title: Post
-        description: Desc
-        ---
+          ---
+          title: Post
+          description: Desc
+          ---
 
-        ```markdown
-        ![](example.png)
-        ```
-        MD
+          ```markdown
+          ![](example.png)
+          ```
+          MD
         )
 
         validator = Hwaro::Services::ContentValidator.new(content_dir)

@@ -16,12 +16,12 @@ module Hwaro::Core::Build
 
     def test_get_internal_caches
       {
-        page_crinja:     @page_crinja_value_cache,
-        related_crinja:  @related_posts_crinja_cache,
-        series_crinja:   @series_crinja_cache,
-        ancestors:       @ancestors_crinja_cache,
-        section_pages:   @section_pages_crinja_cache,
-        section_assets:  @section_assets_crinja_cache,
+        page_crinja:    @page_crinja_value_cache,
+        related_crinja: @related_posts_crinja_cache,
+        series_crinja:  @series_crinja_cache,
+        ancestors:      @ancestors_crinja_cache,
+        section_pages:  @section_pages_crinja_cache,
+        section_assets: @section_assets_crinja_cache,
       }
     end
 

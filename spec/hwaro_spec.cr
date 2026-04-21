@@ -12,10 +12,10 @@ describe Hwaro do
     it "has default values" do
       options = Hwaro::Config::Options::BuildOptions.new
       options.output_dir.should eq("public")
-      options.drafts.should eq(false)
-      options.minify.should eq(false)
-      options.parallel.should eq(true)
-      options.cache.should eq(false)
+      options.drafts.should be_false
+      options.minify.should be_false
+      options.parallel.should be_true
+      options.cache.should be_false
     end
 
     it "accepts custom values" do
@@ -27,10 +27,10 @@ describe Hwaro do
         cache: true
       )
       options.output_dir.should eq("dist")
-      options.drafts.should eq(true)
-      options.minify.should eq(true)
-      options.parallel.should eq(false)
-      options.cache.should eq(true)
+      options.drafts.should be_true
+      options.minify.should be_true
+      options.parallel.should be_false
+      options.cache.should be_true
     end
   end
 
@@ -39,15 +39,15 @@ describe Hwaro do
       options = Hwaro::Config::Options::ServeOptions.new
       options.host.should eq("127.0.0.1")
       options.port.should eq(3000)
-      options.drafts.should eq(false)
-      options.open_browser.should eq(false)
-      options.access_log.should eq(false)
+      options.drafts.should be_false
+      options.open_browser.should be_false
+      options.access_log.should be_false
     end
 
     it "converts to build options" do
       options = Hwaro::Config::Options::ServeOptions.new(drafts: true)
       build_options = options.to_build_options
-      build_options.drafts.should eq(true)
+      build_options.drafts.should be_true
       build_options.output_dir.should eq("public")
     end
   end
@@ -56,7 +56,7 @@ describe Hwaro do
     it "has default values" do
       options = Hwaro::Config::Options::InitOptions.new
       options.path.should eq(".")
-      options.force.should eq(false)
+      options.force.should be_false
     end
   end
 
@@ -66,15 +66,15 @@ describe Hwaro do
       config.title.should eq("Hwaro Site")
       config.description.should eq("")
       config.base_url.should eq("")
-      config.sitemap.enabled.should eq(false)
-      config.feeds.enabled.should eq(false)
-      config.search.enabled.should eq(false)
+      config.sitemap.enabled.should be_false
+      config.feeds.enabled.should be_false
+      config.search.enabled.should be_false
       config.taxonomies.should eq([] of Hwaro::Models::TaxonomyConfig)
     end
 
     it "has default search configuration" do
       config = Hwaro::Models::Config.new
-      config.search.enabled.should eq(false)
+      config.search.enabled.should be_false
       config.search.format.should eq("fuse_json")
       config.search.fields.should eq(["title", "content"])
       config.search.filename.should eq("search.json")
@@ -87,7 +87,7 @@ describe Hwaro do
 
     it "has default pagination configuration" do
       config = Hwaro::Models::Config.new
-      config.pagination.enabled.should eq(false)
+      config.pagination.enabled.should be_false
       config.pagination.per_page.should eq(10)
     end
   end
@@ -104,7 +104,7 @@ describe Hwaro do
       section.paginate = 5
       section.pagination_enabled = true
       section.paginate.should eq(5)
-      section.pagination_enabled.should eq(true)
+      section.pagination_enabled.should be_true
     end
   end
 
@@ -133,7 +133,7 @@ describe Hwaro do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
-      result.enabled.should eq(true)
+      result.enabled.should be_true
       result.per_page.should eq(2)
       result.paginated_pages.size.should eq(2)
       result.paginated_pages[0].page_number.should eq(1)
@@ -158,7 +158,7 @@ describe Hwaro do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
-      result.enabled.should eq(false)
+      result.enabled.should be_false
       result.paginated_pages.size.should eq(1)
       result.paginated_pages[0].pages.size.should eq(2)
     end
@@ -182,7 +182,7 @@ describe Hwaro do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
-      result.enabled.should eq(true)
+      result.enabled.should be_true
       result.per_page.should eq(1)
       result.paginated_pages.size.should eq(2)
     end
@@ -312,14 +312,14 @@ describe Hwaro do
     describe "parse" do
       it "captures front matter keys for taxonomy detection" do
         content = <<-MARKDOWN
-        +++
-        title = "Post"
-        tags = ["a"]
-        categories = []
-        +++
+          +++
+          title = "Post"
+          tags = ["a"]
+          categories = []
+          +++
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:front_matter_keys].should contain("tags")
@@ -328,13 +328,13 @@ describe Hwaro do
 
       it "keeps empty taxonomy arrays for configured keys" do
         content = <<-MARKDOWN
-        ---
-        title: Post
-        categories: []
-        ---
+          ---
+          title: Post
+          categories: []
+          ---
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:taxonomies].has_key?("categories").should be_true
@@ -342,132 +342,132 @@ describe Hwaro do
       end
       it "parses TOML frontmatter with in_sitemap" do
         content = <<-MARKDOWN
-        +++
-        title = "Test Page"
-        draft = false
-        in_sitemap = false
-        +++
+          +++
+          title = "Test Page"
+          draft = false
+          in_sitemap = false
+          +++
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:title].should eq("Test Page")
-        result[:draft].should eq(false)
-        result[:in_sitemap].should eq(false)
+        result[:draft].should be_false
+        result[:in_sitemap].should be_false
       end
 
       it "defaults in_sitemap to true when not specified in TOML" do
         content = <<-MARKDOWN
-        +++
-        title = "Test Page"
-        +++
+          +++
+          title = "Test Page"
+          +++
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result[:in_sitemap].should eq(true)
+        result[:in_sitemap].should be_true
       end
 
       it "parses YAML frontmatter with in_sitemap" do
         content = <<-MARKDOWN
-        ---
-        title: Test Page
-        draft: false
-        in_sitemap: false
-        ---
+          ---
+          title: Test Page
+          draft: false
+          in_sitemap: false
+          ---
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:title].should eq("Test Page")
-        result[:draft].should eq(false)
-        result[:in_sitemap].should eq(false)
+        result[:draft].should be_false
+        result[:in_sitemap].should be_false
       end
 
       it "defaults in_sitemap to true when not specified in YAML" do
         content = <<-MARKDOWN
-        ---
-        title: Test Page
-        ---
+          ---
+          title: Test Page
+          ---
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result[:in_sitemap].should eq(true)
+        result[:in_sitemap].should be_true
       end
 
       it "handles in_sitemap explicitly set to true in TOML" do
         content = <<-MARKDOWN
-        +++
-        title = "Test Page"
-        in_sitemap = true
-        +++
+          +++
+          title = "Test Page"
+          in_sitemap = true
+          +++
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result[:in_sitemap].should eq(true)
+        result[:in_sitemap].should be_true
       end
 
       it "handles in_sitemap explicitly set to true in YAML" do
         content = <<-MARKDOWN
-        ---
-        title: Test Page
-        in_sitemap: true
-        ---
+          ---
+          title: Test Page
+          in_sitemap: true
+          ---
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
-        result[:in_sitemap].should eq(true)
+        result[:in_sitemap].should be_true
       end
 
       it "parses pagination settings from TOML frontmatter" do
         content = <<-MARKDOWN
-        +++
-        title = "Wiki"
-        paginate = 5
-        pagination_enabled = true
-        +++
+          +++
+          title = "Wiki"
+          paginate = 5
+          pagination_enabled = true
+          +++
 
-        # Wiki Section
-        MARKDOWN
+          # Wiki Section
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:paginate].should eq(5)
-        result[:pagination_enabled].should eq(true)
+        result[:pagination_enabled].should be_true
       end
 
       it "parses pagination settings from YAML frontmatter" do
         content = <<-MARKDOWN
-        ---
-        title: Wiki
-        paginate: 10
-        pagination_enabled: false
-        ---
+          ---
+          title: Wiki
+          paginate: 10
+          pagination_enabled: false
+          ---
 
-        # Wiki Section
-        MARKDOWN
+          # Wiki Section
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:paginate].should eq(10)
-        result[:pagination_enabled].should eq(false)
+        result[:pagination_enabled].should be_false
       end
 
       it "defaults pagination settings to nil when not specified" do
         content = <<-MARKDOWN
-        +++
-        title = "Test Page"
-        +++
+          +++
+          title = "Test Page"
+          +++
 
-        # Content
-        MARKDOWN
+          # Content
+          MARKDOWN
 
         result = Hwaro::Processor::Markdown.parse(content)
         result[:paginate].should be_nil

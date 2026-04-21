@@ -141,7 +141,7 @@ module Hwaro
           result_html, toc = post_process_html(html, has_headers, has_images)
           result_html = apply_emoji(result_html) if emoji
           {result_html, toc}
-        rescue ex
+        rescue
           # Fallback in case of XML parsing error
           {(html || ""), [] of Models::TocHeader}
         end
@@ -248,7 +248,7 @@ module Hwaro
             # previous graceful-nil behaviour.
             if file_path.empty?
               Logger.warn "Invalid TOML: #{ex.message}"
-              return nil
+              return
             end
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONTENT,
@@ -273,7 +273,7 @@ module Hwaro
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
           tags = fm_string_array(toml_fm, "tags")
-          taxonomies["tags"] = tags if tags.any?
+          taxonomies["tags"] = tags if tags.present?
 
           result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
@@ -295,7 +295,7 @@ module Hwaro
             # previous graceful-nil behaviour.
             if file_path.empty?
               Logger.warn "Invalid YAML: #{ex.message}"
-              return nil
+              return
             end
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONTENT,
@@ -303,7 +303,7 @@ module Hwaro
               hint: "Check YAML frontmatter between `---` fences",
             )
           end
-          return nil unless yaml_fm.as_h?
+          return unless yaml_fm.as_h?
 
           date = parse_time(yaml_fm["date"]?.try(&.as_s?))
           updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
@@ -325,7 +325,7 @@ module Hwaro
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
           tags = fm_string_array(yaml_fm, "tags")
-          taxonomies["tags"] = tags if tags.any?
+          taxonomies["tags"] = tags if tags.present?
 
           result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
           result.merge({expires: expires})
@@ -447,7 +447,7 @@ module Hwaro
           result = html
 
           # Match h1-h6 tags with id attributes and insert anchor links
-          result = result.gsub(ANCHOR_LINK_REGEX) do |match|
+          result = result.gsub(ANCHOR_LINK_REGEX) do |_|
             tag = $1
             attrs = $2
             id = $3
@@ -478,7 +478,7 @@ module Hwaro
 
           # 1. Lazy-load images: add loading="lazy" to <img> tags missing it
           if process_images
-            result = result.gsub(IMG_LAZY_REGEX) do |match|
+            result = result.gsub(IMG_LAZY_REGEX) do |_|
               attrs = $1
               # Insert loading="lazy" before the closing /> or >
               "<img loading=\"lazy\"#{attrs} />"
@@ -516,8 +516,6 @@ module Hwaro
               # Use existing id or generate one
               existing_id = if id_match = attrs.match(ID_ATTR_REGEX)
                               id_match[1]
-                            else
-                              nil
                             end
 
               slug = Utils::TextUtils.slugify(title)
@@ -546,7 +544,7 @@ module Hwaro
               )
 
               # Build tree structure
-              while stack.any? && stack.last.level >= level
+              while stack.present? && stack.last.level >= level
                 stack.pop
               end
 
@@ -621,7 +619,7 @@ module Hwaro
 
         # Parse a TOML value that may be a native Time or a String
         private def parse_toml_time(val : TOML::Any?) : Time?
-          return nil unless val
+          return unless val
           raw = val.raw
           if raw.is_a?(Time)
             raw
@@ -631,9 +629,9 @@ module Hwaro
         end
 
         private def parse_time(time_str : String?) : Time?
-          return nil unless time_str
+          return unless time_str
           str = time_str.strip
-          return nil if str.empty?
+          return if str.empty?
 
           # Select format based on string pattern to avoid exception-based control flow
           fmt = if str.includes?('T')

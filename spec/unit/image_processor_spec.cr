@@ -616,7 +616,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
     end
 
     it "returns empty results for non-existent source" do
-      result_map, lqip_uri, dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
+      result_map, lqip_uri, _dom_color = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(
         "/nonexistent.png", "/tmp", [100], 85, 16, 20
       )
       result_map.should be_empty

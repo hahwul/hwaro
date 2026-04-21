@@ -186,7 +186,7 @@ module Hwaro
           # Collapse matched issues to the most severe level.
           # Returns nil when nothing matched → check passed.
           private def worst_level(matched : Array(Services::Issue)) : Symbol?
-            return nil if matched.empty?
+            return if matched.empty?
             return :error if matched.any? { |i| i.level == :error }
             return :warning if matched.any? { |i| i.level == :warning }
             return :info if matched.any? { |i| i.level == :info }

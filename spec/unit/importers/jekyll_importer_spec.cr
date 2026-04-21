@@ -10,18 +10,18 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "Hello World"
-        date: 2024-01-15
-        layout: post
-        categories:
-          - ruby
-          - web
-        tags:
-          - tutorial
-        ---
-        This is my first post.
-        JEKYLL
+          ---
+          title: "Hello World"
+          date: 2024-01-15
+          layout: post
+          categories:
+            - ruby
+            - web
+          tags:
+            - tutorial
+          ---
+          This is my first post.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-01-15-hello-world.md"), post_content)
 
@@ -58,11 +58,11 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "My Great Post"
-        ---
-        Content here.
-        JEKYLL
+          ---
+          title: "My Great Post"
+          ---
+          Content here.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2023-06-10-my-great-post.md"), post_content)
 
@@ -86,11 +86,11 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "No Date Post"
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "No Date Post"
+          ---
+          Content.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2023-12-25-no-date-post.md"), post_content)
 
@@ -115,12 +115,12 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "Unpublished Post"
-        published: false
-        ---
-        Draft content.
-        JEKYLL
+          ---
+          title: "Unpublished Post"
+          published: false
+          ---
+          Draft content.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-02-01-unpublished.md"), post_content)
 
@@ -147,19 +147,19 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(drafts_dir)
 
         File.write(File.join(posts_dir, "2024-01-01-published.md"), <<-JEKYLL
-        ---
-        title: "Published"
-        ---
-        Published content.
-        JEKYLL
+          ---
+          title: "Published"
+          ---
+          Published content.
+          JEKYLL
         )
 
         File.write(File.join(drafts_dir, "my-draft.md"), <<-JEKYLL
-        ---
-        title: "My Draft"
-        ---
-        Draft content.
-        JEKYLL
+          ---
+          title: "My Draft"
+          ---
+          Draft content.
+          JEKYLL
         )
 
         output_dir = File.join(dir, "output")
@@ -189,19 +189,19 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(drafts_dir)
 
         File.write(File.join(posts_dir, "2024-01-01-published.md"), <<-JEKYLL
-        ---
-        title: "Published"
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "Published"
+          ---
+          Content.
+          JEKYLL
         )
 
         File.write(File.join(drafts_dir, "secret-draft.md"), <<-JEKYLL
-        ---
-        title: "Secret Draft"
-        ---
-        Secret.
-        JEKYLL
+          ---
+          title: "Secret Draft"
+          ---
+          Secret.
+          JEKYLL
         )
 
         output_dir = File.join(dir, "output")
@@ -226,12 +226,12 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "With Excerpt"
-        excerpt: "A short summary of the post"
-        ---
-        Full content here.
-        JEKYLL
+          ---
+          title: "With Excerpt"
+          excerpt: "A short summary of the post"
+          ---
+          Full content here.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-03-01-with-excerpt.md"), post_content)
 
@@ -256,13 +256,13 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "With Header Image"
-        header:
-          image: /assets/images/hero.jpg
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "With Header Image"
+          header:
+            image: /assets/images/hero.jpg
+          ---
+          Content.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-04-01-with-image.md"), post_content)
 
@@ -287,15 +287,15 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "Merged Tags"
-        category: programming
-        tags:
-          - crystal
-          - programming
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "Merged Tags"
+          category: programming
+          tags:
+            - crystal
+            - programming
+          ---
+          Content.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-05-01-merged-tags.md"), post_content)
 
@@ -321,11 +321,11 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
-        ---
-        title: "Markdown Extension"
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "Markdown Extension"
+          ---
+          Content.
+          JEKYLL
 
         File.write(File.join(posts_dir, "2024-06-01-markdown-ext.markdown"), post_content)
 
@@ -382,11 +382,11 @@ describe Hwaro::Services::Importers::JekyllImporter do
         FileUtils.mkdir_p(posts_dir)
 
         File.write(File.join(posts_dir, "2024-01-01-existing.md"), <<-JEKYLL
-        ---
-        title: "Existing"
-        ---
-        Content.
-        JEKYLL
+          ---
+          title: "Existing"
+          ---
+          Content.
+          JEKYLL
         )
 
         output_dir = File.join(dir, "output")
@@ -415,11 +415,11 @@ describe Hwaro::Services::Importers::JekyllImporter do
 
         3.times do |i|
           File.write(File.join(posts_dir, "2024-01-0#{i + 1}-post-#{i + 1}.md"), <<-JEKYLL
-          ---
-          title: "Post #{i + 1}"
-          ---
-          Content #{i + 1}.
-          JEKYLL
+            ---
+            title: "Post #{i + 1}"
+            ---
+            Content #{i + 1}.
+            JEKYLL
           )
         end
 

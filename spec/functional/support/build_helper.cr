@@ -78,6 +78,6 @@ end
 
 # Minimal config used by most tests
 BASIC_CONFIG = <<-TOML
-title = "Test Site"
-base_url = "http://localhost"
-TOML
+  title = "Test Site"
+  base_url = "http://localhost"
+  TOML

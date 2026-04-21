@@ -176,10 +176,6 @@ module Hwaro
 
           private def find_internal_links(dir : String) : Array(Link)
             links = [] of Link
-            # Match standard markdown links [text](url) — skip external and mailto
-            link_regex = /\[([^\]]*)\]\(([^\)]+)\)/
-            # Match image links ![alt](url) — skip external
-            img_regex = /!\[([^\]]*)\]\(([^\)]+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
               content = File.read(file)
@@ -232,34 +228,32 @@ module Hwaro
             max_concurrency.times do
               spawn do
                 while link = work_channel.receive?
-                  status = 0
-                  error_message = nil
-                  begin
+                  error_message : String? = nil
+                  status = begin
                     uri = URI.parse(link.url)
                     host = uri.host
                     if host && private_host?(host)
-                      status = -1
                       error_message = "Skipped: private/internal address"
-                      results_channel.send(Result.new(link: link, status: status, error: error_message))
+                      results_channel.send(Result.new(link: link, status: -1, error: error_message))
                       next
                     end
                     client = HTTP::Client.new(uri)
                     client.connect_timeout = timeout_seconds.seconds
                     client.read_timeout = timeout_seconds.seconds
                     response = client.head(uri.request_target)
-                    status = response.status_code
+                    response.status_code
                   rescue ex : Socket::ConnectError
-                    status = -1
                     error_message = "Connection failed: #{ex.message}"
-                  rescue ex : IO::TimeoutError
-                    status = -1
+                    -1
+                  rescue IO::TimeoutError
                     error_message = "Request timed out (#{timeout_seconds}s)"
+                    -1
                   rescue ex : Socket::Addrinfo::Error
-                    status = -1
                     error_message = "DNS resolution failed: #{ex.message}"
+                    -1
                   rescue ex
-                    status = -1
                     error_message = ex.message
+                    -1
                   end
                   results_channel.send(Result.new(link: link, status: status, error: error_message))
                 end
@@ -271,7 +265,7 @@ module Hwaro
             max_concurrency.times { work_channel.send(nil) }
 
             # Collect all results
-            links.size.times.map { results_channel.receive }.to_a
+            Array.new(links.size) { results_channel.receive }
           end
 
           # Check if a hostname resolves to a private/internal IP address (SSRF protection).

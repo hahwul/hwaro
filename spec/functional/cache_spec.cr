@@ -49,7 +49,6 @@ describe "Cache: Rebuild with no changes" do
         builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
 
         File.exists?(".hwaro_cache.json").should be_true
-        cache_after_first = File.read(".hwaro_cache.json")
 
         # Second build (no changes)
         builder2 = Hwaro::Core::Build::Builder.new

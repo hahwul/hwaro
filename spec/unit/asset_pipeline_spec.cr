@@ -89,9 +89,9 @@ describe Hwaro::Assets::Pipeline do
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "all.css"))
-        idx_a = content.index("FILE A").not_nil!
-        idx_b = content.index("FILE B").not_nil!
-        idx_c = content.index("FILE C").not_nil!
+        idx_a = content.index!("FILE A")
+        idx_b = content.index!("FILE B")
+        idx_c = content.index!("FILE C")
         (idx_a < idx_b).should be_true
         (idx_b < idx_c).should be_true
       end
@@ -537,8 +537,8 @@ describe Hwaro::Assets::Pipeline do
         pipeline.process(output_dir)
 
         # Both should have same hash since content is identical
-        hash_a = pipeline.manifest["a.css"].match(/\.([a-f0-9]{8})\./).not_nil![1]
-        hash_b = pipeline.manifest["b.css"].match(/\.([a-f0-9]{8})\./).not_nil![1]
+        hash_a = pipeline.manifest["a.css"].match!(/\.([a-f0-9]{8})\./)[1]
+        hash_b = pipeline.manifest["b.css"].match!(/\.([a-f0-9]{8})\./)[1]
         hash_a.should eq(hash_b)
       end
     end

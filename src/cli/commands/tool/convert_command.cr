@@ -50,7 +50,7 @@ module Hwaro
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
               parser.unknown_args do |unknown|
-                format = unknown.first? if unknown.any?
+                format = unknown.first? if unknown.present?
               end
             end
 

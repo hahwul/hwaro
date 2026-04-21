@@ -144,14 +144,14 @@ module Hwaro
       private def check_config(issues : Array(Issue)) : Models::Config?
         unless File.exists?(@config_path)
           issues << Issue.new(id: "config-not-found", level: :warning, category: "config", file: @config_path, message: "Config file not found")
-          return nil
+          return
         end
 
         begin
           config = Models::Config.load(@config_path)
         rescue ex
           issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
-          return nil
+          return
         end
 
         # base_url check

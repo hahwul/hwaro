@@ -42,8 +42,8 @@ module Hwaro
         # Only removes whitespace-only text nodes between tags (preserves mixed content)
         private def minify_xml(xml : String) : String
           xml
-            .gsub(/>\s*\n\s*</, "><")                          # Remove whitespace-only text between tags (cross-line only)
-            .gsub(/<[^>]+>/) { |tag| tag.gsub(/\s{2,}/, " ") } # Collapse multiple spaces only within tags
+            .gsub(/>\s*\n\s*</, "><")               # Remove whitespace-only text between tags (cross-line only)
+            .gsub(/<[^>]+>/, &.gsub(/\s{2,}/, " ")) # Collapse multiple spaces only within tags
             .strip
         end
       end

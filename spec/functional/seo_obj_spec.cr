@@ -8,22 +8,22 @@ require "./support/build_helper"
 # =============================================================================
 
 SEO_CONFIG = <<-TOML
-title = "Test"
-base_url = "http://localhost"
+  title = "Test"
+  base_url = "http://localhost"
 
-[og]
-type = "website"
-twitter_card = "summary"
-twitter_site = "@testsite"
-twitter_creator = "@testauthor"
-fb_app_id = "123456"
-default_image = "/img/default.png"
-TOML
+  [og]
+  type = "website"
+  twitter_card = "summary"
+  twitter_site = "@testsite"
+  twitter_creator = "@testauthor"
+  fb_app_id = "123456"
+  default_image = "/img/default.png"
+  TOML
 
 SEO_BASIC_CONFIG = <<-TOML
-title = "Test"
-base_url = "http://localhost"
-TOML
+  title = "Test"
+  base_url = "http://localhost"
+  TOML
 
 describe "SEO: seo object exposes structured SEO data" do
   it "exposes canonical_url with base_url" do

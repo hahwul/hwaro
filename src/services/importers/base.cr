@@ -27,7 +27,7 @@ module Hwaro
         abstract def run(options : Config::Options::ImportOptions) : ImportResult
 
         # Generate TOML frontmatter string from fields hash
-        protected def generate_frontmatter(fields : Hash(String, String | Bool | Array(String) | Nil)) : String
+        protected def generate_frontmatter(fields : Hash(String, (String | Bool | Array(String))?)) : String
           lines = [] of String
           lines << "+++"
 

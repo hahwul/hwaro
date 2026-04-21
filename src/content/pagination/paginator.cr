@@ -119,7 +119,6 @@ module Hwaro
             has_next = page_num < total_pages
 
             # Generate URLs using section's paginate_path
-            current_url = page_url(base_url, page_num, paginate_path)
             prev_url = has_prev ? page_url(base_url, page_num - 1, paginate_path) : nil
             next_url = has_next ? page_url(base_url, page_num + 1, paginate_path) : nil
             first_url = page_url(base_url, 1, paginate_path)

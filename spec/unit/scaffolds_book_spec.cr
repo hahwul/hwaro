@@ -149,14 +149,14 @@ describe Hwaro::Services::Scaffolds::BookDark do
       dark = Hwaro::Services::Scaffolds::BookDark.new.content_files
       # Guard against the both-empty trivial case before comparing key sets.
       dark.size.should be > 0
-      dark.keys.sort.should eq(light.keys.sort)
+      dark.keys.sort!.should eq(light.keys.sort!)
     end
 
     it "reuses Book's template files structure" do
       light = Hwaro::Services::Scaffolds::Book.new.template_files
       dark = Hwaro::Services::Scaffolds::BookDark.new.template_files
       dark.size.should be > 0
-      dark.keys.sort.should eq(light.keys.sort)
+      dark.keys.sort!.should eq(light.keys.sort!)
     end
 
     it "ships its own static assets via the inherited static_files" do

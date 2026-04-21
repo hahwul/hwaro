@@ -2,125 +2,125 @@ require "../../spec_helper"
 require "../../../src/services/importers/wordpress_importer"
 
 BASIC_WXR = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:wp="http://wordpress.org/export/1.2/"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
-<channel>
-  <item>
-    <title>Hello World</title>
-    <wp:post_date>2024-01-15 10:30:00</wp:post_date>
-    <wp:post_name>hello-world</wp:post_name>
-    <wp:status>publish</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <category domain="post_tag" nicename="crystal"><![CDATA[Crystal]]></category>
-    <category domain="post_tag" nicename="web"><![CDATA[Web]]></category>
-    <category domain="category" nicename="tutorial"><![CDATA[Tutorial]]></category>
-    <content:encoded><![CDATA[<p>This is my first post.</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[A short excerpt]]></excerpt:encoded>
-  </item>
-</channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>Hello World</title>
+      <wp:post_date>2024-01-15 10:30:00</wp:post_date>
+      <wp:post_name>hello-world</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <category domain="post_tag" nicename="crystal"><![CDATA[Crystal]]></category>
+      <category domain="post_tag" nicename="web"><![CDATA[Web]]></category>
+      <category domain="category" nicename="tutorial"><![CDATA[Tutorial]]></category>
+      <content:encoded><![CDATA[<p>This is my first post.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[A short excerpt]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
 
 DRAFT_WXR = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:wp="http://wordpress.org/export/1.2/"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
-<channel>
-  <item>
-    <title>Draft Post</title>
-    <wp:post_date>2024-02-01 08:00:00</wp:post_date>
-    <wp:post_name>draft-post</wp:post_name>
-    <wp:status>draft</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <content:encoded><![CDATA[<p>Draft content.</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
-  </item>
-</channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>Draft Post</title>
+      <wp:post_date>2024-02-01 08:00:00</wp:post_date>
+      <wp:post_name>draft-post</wp:post_name>
+      <wp:status>draft</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Draft content.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
 
 PAGE_WXR = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:wp="http://wordpress.org/export/1.2/"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
-<channel>
-  <item>
-    <title>About Me</title>
-    <wp:post_date>2024-03-10 12:00:00</wp:post_date>
-    <wp:post_name>about-me</wp:post_name>
-    <wp:status>publish</wp:status>
-    <wp:post_type>page</wp:post_type>
-    <content:encoded><![CDATA[<h2>About</h2><p>Some info about me.</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[About page]]></excerpt:encoded>
-  </item>
-</channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>About Me</title>
+      <wp:post_date>2024-03-10 12:00:00</wp:post_date>
+      <wp:post_name>about-me</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>page</wp:post_type>
+      <content:encoded><![CDATA[<h2>About</h2><p>Some info about me.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[About page]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
 
 MULTI_WXR = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:wp="http://wordpress.org/export/1.2/"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
-<channel>
-  <item>
-    <title>First Post</title>
-    <wp:post_date>2024-01-01 00:00:00</wp:post_date>
-    <wp:post_name>first-post</wp:post_name>
-    <wp:status>publish</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <content:encoded><![CDATA[<p>First</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
-  </item>
-  <item>
-    <title>Second Post</title>
-    <wp:post_date>2024-02-01 00:00:00</wp:post_date>
-    <wp:post_name>second-post</wp:post_name>
-    <wp:status>publish</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <content:encoded><![CDATA[<p>Second</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
-  </item>
-  <item>
-    <title>A Draft</title>
-    <wp:post_date>2024-03-01 00:00:00</wp:post_date>
-    <wp:post_name>a-draft</wp:post_name>
-    <wp:status>draft</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <content:encoded><![CDATA[<p>Not published yet.</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
-  </item>
-</channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>First Post</title>
+      <wp:post_date>2024-01-01 00:00:00</wp:post_date>
+      <wp:post_name>first-post</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>First</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+    <item>
+      <title>Second Post</title>
+      <wp:post_date>2024-02-01 00:00:00</wp:post_date>
+      <wp:post_name>second-post</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Second</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+    <item>
+      <title>A Draft</title>
+      <wp:post_date>2024-03-01 00:00:00</wp:post_date>
+      <wp:post_name>a-draft</wp:post_name>
+      <wp:status>draft</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Not published yet.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
 
 NO_SLUG_WXR = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:wp="http://wordpress.org/export/1.2/"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
-<channel>
-  <item>
-    <title>My Fancy Title!</title>
-    <wp:post_date>2024-05-20 09:00:00</wp:post_date>
-    <wp:post_name></wp:post_name>
-    <wp:status>publish</wp:status>
-    <wp:post_type>post</wp:post_type>
-    <content:encoded><![CDATA[<p>Content here.</p>]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
-  </item>
-</channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>My Fancy Title!</title>
+      <wp:post_date>2024-05-20 09:00:00</wp:post_date>
+      <wp:post_name></wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Content here.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
 
 private def write_wxr(dir : String, content : String) : String
   path = File.join(dir, "export.xml")

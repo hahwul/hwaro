@@ -201,11 +201,11 @@ describe Hwaro::Content::Pagination::Renderer do
       html.should contain("rel=\"next\"")
       # No disabled class on prev or next
       lines = html.split("\n")
-      prev_line = lines.find { |l| l.includes?("pagination-prev") }
+      prev_line = lines.find(&.includes?("pagination-prev"))
       prev_line.should_not be_nil
       prev_line.not_nil!.should_not contain("pagination-disabled")
 
-      next_line = lines.find { |l| l.includes?("pagination-next") }
+      next_line = lines.find(&.includes?("pagination-next"))
       next_line.should_not be_nil
       next_line.not_nil!.should_not contain("pagination-disabled")
     end

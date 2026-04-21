@@ -94,7 +94,7 @@ module Hwaro::Core::Build::Phases::Render
       total_count += count
 
       # Release rendered HTML and per-section/page caches to free memory
-      batch.each { |page| page.content = "" }
+      batch.each(&.content=(""))
       @cache_manager.clear(
         "page_crinja_value",
         "section_pages_crinja",
@@ -513,18 +513,18 @@ module Hwaro::Core::Build::Phases::Render
     }.join("\n")
 
     overlay = <<-OVERLAY
-    <div id="hwaro-error-overlay" style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
-      <div style="background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:24px;max-width:720px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h2 style="margin:0;color:#f38ba8;font-size:18px;">Build Warning</h2>
-          <button onclick="document.getElementById('hwaro-error-overlay').remove()" style="background:none;border:none;color:#cdd6f4;font-size:24px;cursor:pointer;padding:0 4px;">&times;</button>
+      <div id="hwaro-error-overlay" style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+        <div style="background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:24px;max-width:720px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;color:#f38ba8;font-size:18px;">Build Warning</h2>
+            <button onclick="document.getElementById('hwaro-error-overlay').remove()" style="background:none;border:none;color:#cdd6f4;font-size:24px;cursor:pointer;padding:0 4px;">&times;</button>
+          </div>
+          <ul style="margin:0;padding:0 0 0 20px;">
+            #{list_items}
+          </ul>
         </div>
-        <ul style="margin:0;padding:0 0 0 20px;">
-          #{list_items}
-        </ul>
       </div>
-    </div>
-    OVERLAY
+      OVERLAY
 
     # Inject before </body> if present, otherwise append
     if idx = html.rindex("</body>")
@@ -856,7 +856,7 @@ module Hwaro::Core::Build::Phases::Render
   # Returns an 8-character hex digest, or "" if no local files exist.
   private def compute_cache_bust(config : Models::Config) : String
     has_local_highlight = config.highlight.enabled && !config.highlight.use_cdn
-    has_auto_includes = config.auto_includes.enabled && config.auto_includes.dirs.any?
+    has_auto_includes = config.auto_includes.enabled && config.auto_includes.dirs.present?
 
     return "" unless has_local_highlight || has_auto_includes
 

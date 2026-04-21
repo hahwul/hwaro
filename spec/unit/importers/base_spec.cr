@@ -33,8 +33,8 @@ describe Hwaro::Services::Importers::Base do
     it "generates TOML frontmatter with string values" do
       importer = TestImporter.new
       result = importer.test_generate_frontmatter({
-        "title" => "My Post".as(String | Bool | Array(String) | Nil),
-        "date"  => "2024-01-15".as(String | Bool | Array(String) | Nil),
+        "title" => "My Post".as((String | Bool | Array(String))?),
+        "date"  => "2024-01-15".as((String | Bool | Array(String))?),
       })
       result.should contain("+++")
       result.should contain(%(title = "My Post"))
@@ -44,7 +44,7 @@ describe Hwaro::Services::Importers::Base do
     it "generates TOML frontmatter with bool values" do
       importer = TestImporter.new
       result = importer.test_generate_frontmatter({
-        "draft" => true.as(String | Bool | Array(String) | Nil),
+        "draft" => true.as((String | Bool | Array(String))?),
       })
       result.should contain("draft = true")
     end
@@ -52,7 +52,7 @@ describe Hwaro::Services::Importers::Base do
     it "generates TOML frontmatter with array values" do
       importer = TestImporter.new
       result = importer.test_generate_frontmatter({
-        "tags" => ["crystal", "web"].as(String | Bool | Array(String) | Nil),
+        "tags" => ["crystal", "web"].as((String | Bool | Array(String))?),
       })
       result.should contain(%(tags = ["crystal", "web"]))
     end
@@ -60,9 +60,9 @@ describe Hwaro::Services::Importers::Base do
     it "skips nil and empty values" do
       importer = TestImporter.new
       result = importer.test_generate_frontmatter({
-        "title" => "Valid".as(String | Bool | Array(String) | Nil),
-        "desc"  => nil.as(String | Bool | Array(String) | Nil),
-        "empty" => "".as(String | Bool | Array(String) | Nil),
+        "title" => "Valid".as((String | Bool | Array(String))?),
+        "desc"  => nil.as((String | Bool | Array(String))?),
+        "empty" => "".as((String | Bool | Array(String))?),
       })
       result.should contain("title")
       result.should_not contain("desc")

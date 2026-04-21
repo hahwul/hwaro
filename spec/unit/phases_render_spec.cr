@@ -97,7 +97,7 @@ describe Hwaro::Core::Build::Phases::Render do
       page.template = "missing"
       templates = {"page" => "p"}
       builder.test_determine_template(page, templates).should eq("page")
-      page.build_warnings.any? { |w| w.includes?("missing") }.should be_true
+      page.build_warnings.any?(&.includes?("missing")).should be_true
     end
   end
 

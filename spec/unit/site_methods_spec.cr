@@ -706,7 +706,7 @@ describe Hwaro::Models::Site do
       result2 = site.pages_for_section("blog", nil)
 
       result1.size.should eq(result2.size)
-      result1.map(&.title).sort.should eq(result2.map(&.title).sort)
+      result1.map(&.title).sort!.should eq(result2.map(&.title).sort!)
     end
   end
 

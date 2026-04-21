@@ -120,7 +120,7 @@ module Hwaro
     end
 
     # Performance timing helper
-    def self.timed(message : String, &block)
+    def self.timed(message : String, &)
       start = Time.instant
       result = yield
       elapsed = Time.instant - start

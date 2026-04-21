@@ -122,37 +122,37 @@ describe Hwaro::Utils::JsMinifier do
     # Double-quoted string preservation
     # =========================================================================
     it "preserves strings with // inside" do
-      js = %{var url = "http://example.com";}
+      js = %(var url = "http://example.com";)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("http://example.com")
     end
 
     it "preserves strings with /* inside" do
-      js = %{var s = "/* not a comment */";}
+      js = %(var s = "/* not a comment */";)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("/* not a comment */")
     end
 
     it "preserves strings with escaped double quotes" do
-      js = %{var s = "he said \\"hello\\"";}
+      js = %(var s = "he said \\"hello\\"";)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("he said \\\"hello\\\"")
     end
 
     it "preserves empty double-quoted strings" do
-      js = %{var s = "";}
+      js = %(var s = "";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{""})
+      result.should contain(%(""))
     end
 
     it "preserves strings with backslashes" do
-      js = %{var s = "path\\\\to\\\\file";}
+      js = %(var s = "path\\\\to\\\\file";)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("path\\\\to\\\\file")
     end
 
     it "preserves string with backslash-n" do
-      js = %{var s = "line1\\nline2";}
+      js = %(var s = "line1\\nline2";)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("line1\\nline2")
     end
@@ -228,11 +228,11 @@ describe Hwaro::Utils::JsMinifier do
     # Consecutive string and comment
     # =========================================================================
     it "handles string followed by comment on same line" do
-      js = %{var s = "value"; // comment\nvar t = "other";}
+      js = %(var s = "value"; // comment\nvar t = "other";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{var s = "value";})
+      result.should contain(%(var s = "value";))
       result.should_not contain("comment")
-      result.should contain(%{var t = "other";})
+      result.should contain(%(var t = "other";))
     end
 
     it "handles comment followed by string" do
@@ -243,10 +243,10 @@ describe Hwaro::Utils::JsMinifier do
     end
 
     it "handles adjacent strings" do
-      js = %{var a = "one" + "two";}
+      js = %(var a = "one" + "two";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{"one"})
-      result.should contain(%{"two"})
+      result.should contain(%("one"))
+      result.should contain(%("two"))
     end
 
     # =========================================================================
@@ -261,7 +261,7 @@ describe Hwaro::Utils::JsMinifier do
     it "removes trailing whitespace from lines" do
       js = "var x = 1;   \nvar y = 2;  "
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.lines.each do |line|
+      result.each_line do |line|
         line.should eq(line.rstrip)
       end
     end
@@ -296,9 +296,9 @@ describe Hwaro::Utils::JsMinifier do
     end
 
     it "handles input that is just a string" do
-      js = %{"hello"}
+      js = %("hello")
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should eq(%{"hello"})
+      result.should eq(%("hello"))
     end
 
     it "handles input that is just a number" do
@@ -382,16 +382,16 @@ describe Hwaro::Utils::JsMinifier do
     end
 
     it "preserves JSON-like content" do
-      js = %{var config = {"url": "http://api.example.com", "timeout": 5000};}
+      js = %(var config = {"url": "http://api.example.com", "timeout": 5000};)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{"url": "http://api.example.com"})
-      result.should contain(%{"timeout": 5000})
+      result.should contain(%("url": "http://api.example.com"))
+      result.should contain(%("timeout": 5000))
     end
 
     it "handles regex-like pattern in string" do
-      js = %{var pattern = "/test/gi";}
+      js = %(var pattern = "/test/gi";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{"/test/gi"})
+      result.should contain(%("/test/gi"))
     end
 
     it "handles switch statement" do
@@ -412,9 +412,9 @@ describe Hwaro::Utils::JsMinifier do
     # Unicode
     # =========================================================================
     it "preserves unicode in strings" do
-      js = %{var name = "한글 이름";}
+      js = %(var name = "한글 이름";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{"한글 이름"})
+      result.should contain(%("한글 이름"))
     end
 
     it "preserves unicode in identifiers" do
@@ -424,9 +424,9 @@ describe Hwaro::Utils::JsMinifier do
     end
 
     it "preserves emoji in strings" do
-      js = %{var msg = "Hello 👋 World";}
+      js = %(var msg = "Hello 👋 World";)
       result = Hwaro::Utils::JsMinifier.minify(js)
-      result.should contain(%{"Hello 👋 World"})
+      result.should contain(%("Hello 👋 World"))
     end
 
     # =========================================================================
@@ -466,7 +466,7 @@ describe Hwaro::Utils::JsMinifier do
     # Unterminated constructs
     # =========================================================================
     it "handles unterminated string at end of input" do
-      js = %{var s = "unterminated}
+      js = %(var s = "unterminated)
       result = Hwaro::Utils::JsMinifier.minify(js)
       # Should not crash, output something reasonable
       result.should contain("var s = ")
@@ -520,7 +520,7 @@ describe Hwaro::Utils::JsMinifier do
     end
 
     it "handles string with backslash at end" do
-      js = %{var s = "end\\\\"; var x = 1;}
+      js = %(var s = "end\\\\"; var x = 1;)
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("var x = 1;")
     end

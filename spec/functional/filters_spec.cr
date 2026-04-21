@@ -302,9 +302,9 @@ describe "Filters: sort_by with reverse" do
       },
     ) do
       html = File.read("public/blog/index.html")
-      ccc_pos = html.index("CCC,").not_nil!
-      bbb_pos = html.index("BBB,").not_nil!
-      aaa_pos = html.index("AAA,").not_nil!
+      ccc_pos = html.index!("CCC,")
+      bbb_pos = html.index!("BBB,")
+      aaa_pos = html.index!("AAA,")
       (ccc_pos < bbb_pos).should be_true
       (bbb_pos < aaa_pos).should be_true
     end

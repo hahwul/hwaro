@@ -97,7 +97,7 @@ module Hwaro
         end
 
         # Execute a phase with before/after hooks
-        def run_phase(phase : Phase, context : BuildContext, &action) : HookResult
+        def run_phase(phase : Phase, context : BuildContext, &) : HookResult
           before_point, after_point = Lifecycle.hook_points_for(phase)
 
           Logger.debug "Phase: #{phase}" if @debug
@@ -143,7 +143,7 @@ module Hwaro
         end
 
         def has_hooks?(point : HookPoint) : Bool
-          @hooks[point].any?
+          @hooks[point].present?
         end
 
         def hook_count : Int32

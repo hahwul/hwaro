@@ -9,17 +9,17 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-ELEVENTY
-        ---
-        title: "My 11ty Post"
-        date: 2024-05-01
-        tags:
-          - post
-          - eleventy
-          - ssg
-        description: "A post about 11ty"
-        ---
-        Welcome to Eleventy.
-        ELEVENTY
+          ---
+          title: "My 11ty Post"
+          date: 2024-05-01
+          tags:
+            - post
+            - eleventy
+            - ssg
+          description: "A post about 11ty"
+          ---
+          Welcome to Eleventy.
+          ELEVENTY
 
         File.write(File.join(posts_dir, "my-11ty-post.md"), post_content)
 
@@ -55,15 +55,15 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-ELEVENTY
-        ---
-        title: "Tag Filter Test"
-        tags:
-          - posts
-          - all
-          - javascript
-        ---
-        Content.
-        ELEVENTY
+          ---
+          title: "Tag Filter Test"
+          tags:
+            - posts
+            - all
+            - javascript
+          ---
+          Content.
+          ELEVENTY
 
         File.write(File.join(posts_dir, "tag-filter.md"), post_content)
 
@@ -90,12 +90,12 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-ELEVENTY
-        ---
-        title: "Draft Post"
-        draft: true
-        ---
-        Draft content.
-        ELEVENTY
+          ---
+          title: "Draft Post"
+          draft: true
+          ---
+          Draft content.
+          ELEVENTY
 
         File.write(File.join(posts_dir, "draft.md"), post_content)
 
@@ -121,12 +121,12 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-ELEVENTY
-        ---
-        title: "Excluded Post"
-        eleventyExcludeFromCollections: true
-        ---
-        Hidden content.
-        ELEVENTY
+          ---
+          title: "Excluded Post"
+          eleventyExcludeFromCollections: true
+          ---
+          Hidden content.
+          ELEVENTY
 
         File.write(File.join(posts_dir, "excluded.md"), post_content)
 
@@ -152,12 +152,12 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-ELEVENTY
-        ---
-        title: "Layout Test"
-        layout: post.njk
-        ---
-        Content.
-        ELEVENTY
+          ---
+          title: "Layout Test"
+          layout: post.njk
+          ---
+          Content.
+          ELEVENTY
 
         File.write(File.join(posts_dir, "layout-test.md"), post_content)
 
@@ -186,11 +186,11 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(site_dir)
 
         File.write(File.join(posts_dir, "real-post.md"), <<-ELEVENTY
-        ---
-        title: "Real Post"
-        ---
-        Content.
-        ELEVENTY
+          ---
+          title: "Real Post"
+          ---
+          Content.
+          ELEVENTY
         )
 
         File.write(File.join(node_modules, "readme.md"), "# Package readme")
@@ -220,11 +220,11 @@ describe Hwaro::Services::Importers::EleventyImporter do
 
         # Create post without layout
         File.write(File.join(posts_dir, "data-merge.md"), <<-ELEVENTY
-        ---
-        title: "Data Merge Test"
-        ---
-        Content.
-        ELEVENTY
+          ---
+          title: "Data Merge Test"
+          ---
+          Content.
+          ELEVENTY
         )
 
         output_dir = File.join(dir, "output")

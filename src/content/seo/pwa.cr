@@ -89,29 +89,29 @@ module Hwaro
                           end
 
           sw_content = <<-JS
-          const CACHE_NAME = 'hwaro-#{cache_version}';
-          const PRECACHE_URLS = [
-            #{precache_json}
-          ];
+            const CACHE_NAME = 'hwaro-#{cache_version}';
+            const PRECACHE_URLS = [
+              #{precache_json}
+            ];
 
-          self.addEventListener('install', event => {
-            event.waitUntil(
-              caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
-            );
-          });
+            self.addEventListener('install', event => {
+              event.waitUntil(
+                caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
+              );
+            });
 
-          self.addEventListener('activate', event => {
-            event.waitUntil(
-              caches.keys().then(names =>
-                Promise.all(
-                  names.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+            self.addEventListener('activate', event => {
+              event.waitUntil(
+                caches.keys().then(names =>
+                  Promise.all(
+                    names.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+                  )
                 )
-              )
-            );
-          });
+              );
+            });
 
-          #{fetch_handler}
-          JS
+            #{fetch_handler}
+            JS
 
           path = File.join(output_dir, "sw.js")
           File.write(path, sw_content)
@@ -123,74 +123,74 @@ module Hwaro
 
         private def self.cache_first_handler(offline_url : String) : String
           <<-JS
-          self.addEventListener('fetch', event => {
-            if (event.request.mode === 'navigate') {
+            self.addEventListener('fetch', event => {
+              if (event.request.mode === 'navigate') {
+                event.respondWith(
+                  fetch(event.request).catch(() =>
+                    caches.match(#{offline_url}) || caches.match('/')
+                  )
+                );
+                return;
+              }
               event.respondWith(
-                fetch(event.request).catch(() =>
-                  caches.match(#{offline_url}) || caches.match('/')
+                caches.match(event.request).then(cached =>
+                  cached || fetch(event.request).then(response => {
+                    if (response.ok && response.type === 'basic') {
+                      const clone = response.clone();
+                      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    }
+                    return response;
+                  }).catch(() => caches.match(#{offline_url}))
                 )
               );
-              return;
-            }
-            event.respondWith(
-              caches.match(event.request).then(cached =>
-                cached || fetch(event.request).then(response => {
-                  if (response.ok && response.type === 'basic') {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                  }
-                  return response;
-                }).catch(() => caches.match(#{offline_url}))
-              )
-            );
-          });
-          JS
+            });
+            JS
         end
 
         private def self.network_first_handler(offline_url : String) : String
           <<-JS
-          self.addEventListener('fetch', event => {
-            event.respondWith(
-              fetch(event.request).then(response => {
-                if (response.ok && response.type === 'basic') {
-                  const clone = response.clone();
-                  caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                }
-                return response;
-              }).catch(() =>
-                caches.match(event.request).then(cached =>
-                  cached || (event.request.mode === 'navigate'
-                    ? caches.match(#{offline_url}) || caches.match('/')
-                    : undefined)
-                )
-              )
-            );
-          });
-          JS
-        end
-
-        private def self.stale_while_revalidate_handler(offline_url : String) : String
-          <<-JS
-          self.addEventListener('fetch', event => {
-            event.respondWith(
-              caches.match(event.request).then(cached => {
-                const fetchPromise = fetch(event.request).then(response => {
+            self.addEventListener('fetch', event => {
+              event.respondWith(
+                fetch(event.request).then(response => {
                   if (response.ok && response.type === 'basic') {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                   }
                   return response;
-                }).catch(() => {
-                  if (event.request.mode === 'navigate') {
-                    return caches.match(#{offline_url}) || caches.match('/');
-                  }
-                  return undefined;
-                });
-                return cached || fetchPromise;
-              })
-            );
-          });
-          JS
+                }).catch(() =>
+                  caches.match(event.request).then(cached =>
+                    cached || (event.request.mode === 'navigate'
+                      ? caches.match(#{offline_url}) || caches.match('/')
+                      : undefined)
+                  )
+                )
+              );
+            });
+            JS
+        end
+
+        private def self.stale_while_revalidate_handler(offline_url : String) : String
+          <<-JS
+            self.addEventListener('fetch', event => {
+              event.respondWith(
+                caches.match(event.request).then(cached => {
+                  const fetchPromise = fetch(event.request).then(response => {
+                    if (response.ok && response.type === 'basic') {
+                      const clone = response.clone();
+                      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    }
+                    return response;
+                  }).catch(() => {
+                    if (event.request.mode === 'navigate') {
+                      return caches.match(#{offline_url}) || caches.match('/');
+                    }
+                    return undefined;
+                  });
+                  return cached || fetchPromise;
+                })
+              );
+            });
+            JS
         end
 
         # Normalize icon path to a URL path.

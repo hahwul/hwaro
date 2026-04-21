@@ -68,7 +68,7 @@ module Hwaro
                 exit
               end
               parser.unknown_args do |unknown|
-                provider = unknown.first? if unknown.any?
+                provider = unknown.first? if unknown.present?
               end
             end
 

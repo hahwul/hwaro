@@ -226,7 +226,7 @@ describe Hwaro::Models::Section do
       section.paginate = 5
       section.pagination_enabled = true
       section.paginate.should eq(5)
-      section.pagination_enabled.should eq(true)
+      section.pagination_enabled.should be_true
     end
 
     it "can set transparent" do

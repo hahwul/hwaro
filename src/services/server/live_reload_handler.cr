@@ -64,28 +64,28 @@ module Hwaro
       include HTTP::Handler
 
       LIVE_RELOAD_SCRIPT = <<-JS
-      <script>
-      (function() {
-        var reconnectDelay = 1000;
-        var maxDelay = 30000;
-        function connect() {
-          var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-          var ws = new WebSocket(protocol + '//' + location.host + '/__hwaro_livereload');
-          ws.onopen = function() { reconnectDelay = 1000; };
-          ws.onmessage = function(event) {
-            if (event.data === 'reload') { location.reload(); }
-          };
-          ws.onclose = function() {
-            setTimeout(function() {
-              reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
-              connect();
-            }, reconnectDelay);
-          };
-        }
-        connect();
-      })();
-      </script>
-      JS
+        <script>
+        (function() {
+          var reconnectDelay = 1000;
+          var maxDelay = 30000;
+          function connect() {
+            var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var ws = new WebSocket(protocol + '//' + location.host + '/__hwaro_livereload');
+            ws.onopen = function() { reconnectDelay = 1000; };
+            ws.onmessage = function(event) {
+              if (event.data === 'reload') { location.reload(); }
+            };
+            ws.onclose = function() {
+              setTimeout(function() {
+                reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
+                connect();
+              }, reconnectDelay);
+            };
+          }
+          connect();
+        })();
+        </script>
+        JS
 
       def initialize(@public_dir : String)
       end

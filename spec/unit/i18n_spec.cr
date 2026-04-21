@@ -10,16 +10,16 @@ describe Hwaro::Content::I18n do
         FileUtils.mkdir_p(i18n_dir)
 
         File.write(File.join(i18n_dir, "en.toml"), <<-TOML)
-        [nav]
-        home = "Home"
-        about = "About"
-        TOML
+          [nav]
+          home = "Home"
+          about = "About"
+          TOML
 
         File.write(File.join(i18n_dir, "ko.toml"), <<-TOML)
-        [nav]
-        home = "홈"
-        about = "소개"
-        TOML
+          [nav]
+          home = "홈"
+          about = "소개"
+          TOML
 
         config = Hwaro::Models::Config.new
         config.default_language = "en"
@@ -47,12 +47,12 @@ describe Hwaro::Content::I18n do
         FileUtils.mkdir_p(i18n_dir)
 
         File.write(File.join(i18n_dir, "en.toml"), <<-TOML)
-        [messages]
-        [messages.errors]
-        not_found = "Not Found"
-        [messages.success]
-        saved = "Saved"
-        TOML
+          [messages]
+          [messages.errors]
+          not_found = "Not Found"
+          [messages.success]
+          saved = "Saved"
+          TOML
 
         config = Hwaro::Models::Config.new
         config.default_language = "en"
@@ -70,8 +70,8 @@ describe Hwaro::Content::I18n do
         FileUtils.mkdir_p(i18n_dir)
 
         File.write(File.join(i18n_dir, "en.toml"), <<-TOML)
-        greeting = "Hello"
-        TOML
+          greeting = "Hello"
+          TOML
 
         config = Hwaro::Models::Config.new
         config.default_language = "en"

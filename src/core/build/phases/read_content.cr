@@ -77,8 +77,8 @@ module Hwaro::Core::Build::Phases::ReadContent
 
   # Extract language code from filename if it matches configured languages
   private def extract_language_from_filename(basename : String, config : Models::Config?) : String?
-    return nil unless config
-    return nil unless config.multilingual?
+    return unless config
+    return unless config.multilingual?
 
     # Match pattern: filename.lang.md (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
     if match = basename.match(LANGUAGE_FILENAME_PATTERN)

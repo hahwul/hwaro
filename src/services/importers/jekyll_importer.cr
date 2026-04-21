@@ -94,7 +94,7 @@ module Hwaro
           filename_date = extract_date_from_filename(filename)
 
           # Parse YAML frontmatter
-          fields = Hash(String, String | Bool | Array(String) | Nil).new
+          fields = Hash(String, (String | Bool | Array(String))?).new
 
           if frontmatter_yaml
             yaml = YAML.parse(frontmatter_yaml)
@@ -240,8 +240,6 @@ module Hwaro
         private def extract_date_from_filename(filename : String) : Time?
           if match = FILENAME_PATTERN.match(filename)
             parse_date(match[1])
-          else
-            nil
           end
         end
       end

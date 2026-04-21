@@ -47,10 +47,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "converts a simple two-column table to HTML" do
       content = <<-MD
-      | Header 1 | Header 2 |
-      |----------|----------|
-      | Cell 1   | Cell 2   |
-      MD
+        | Header 1 | Header 2 |
+        |----------|----------|
+        | Cell 1   | Cell 2   |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -65,10 +65,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "converts a three-column table with alignment" do
       content = <<-MD
-      | Left | Center | Right |
-      |:-----|:------:|------:|
-      | L    | C      | R     |
-      MD
+        | Left | Center | Right |
+        |:-----|:------:|------:|
+        | L    | C      | R     |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<th>Left</th>")
@@ -81,10 +81,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles table without leading/trailing pipes" do
       content = <<-MD
-      Header 1 | Header 2
-      ---------|--------
-      Cell 1   | Cell 2
-      MD
+        Header 1 | Header 2
+        ---------|--------
+        Cell 1   | Cell 2
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -94,12 +94,12 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles table with multiple body rows" do
       content = <<-MD
-      | Name  | Age |
-      |-------|-----|
-      | Alice | 30  |
-      | Bob   | 25  |
-      | Carol | 35  |
-      MD
+        | Name  | Age |
+        |-------|-----|
+        | Alice | 30  |
+        | Bob   | 25  |
+        | Carol | 35  |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td>Alice</td>")
@@ -112,9 +112,9 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles table with no body rows (header only)" do
       content = <<-MD
-      | Header 1 | Header 2 |
-      |----------|----------|
-      MD
+        | Header 1 | Header 2 |
+        |----------|----------|
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -125,10 +125,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles left alignment with colon prefix" do
       content = <<-MD
-      | Col |
-      |:----|
-      | Val |
-      MD
+        | Col |
+        |:----|
+        | Val |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       # Left alignment is default, so no style attribute
@@ -139,10 +139,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles center alignment" do
       content = <<-MD
-      | Col |
-      |:---:|
-      | Val |
-      MD
+        | Col |
+        |:---:|
+        | Val |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("style=\"text-align: center;\"")
@@ -150,10 +150,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles right alignment" do
       content = <<-MD
-      | Col |
-      |----:|
-      | Val |
-      MD
+        | Col |
+        |----:|
+        | Val |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("style=\"text-align: right;\"")
@@ -161,10 +161,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "escapes HTML characters in cell content" do
       content = <<-MD
-      | Header |
-      |--------|
-      | <script>alert("xss")</script> |
-      MD
+        | Header |
+        |--------|
+        | <script>alert("xss")</script> |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<script>")
@@ -174,10 +174,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "escapes ampersands in cell content" do
       content = <<-MD
-      | Header |
-      |--------|
-      | Tom & Jerry |
-      MD
+        | Header |
+        |--------|
+        | Tom & Jerry |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("Tom &amp; Jerry")
@@ -185,16 +185,16 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "preserves content before and after the table" do
       content = <<-MD
-      # Title
+        # Title
 
-      Some text before.
+        Some text before.
 
-      | A | B |
-      |---|---|
-      | 1 | 2 |
+        | A | B |
+        |---|---|
+        | 1 | 2 |
 
-      Some text after.
-      MD
+        Some text after.
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("# Title")
@@ -205,10 +205,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles rows with fewer columns than headers" do
       content = <<-MD
-      | A | B | C |
-      |---|---|---|
-      | 1 |
-      MD
+        | A | B | C |
+        |---|---|---|
+        | 1 |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -219,10 +219,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles escaped pipes within cells" do
       content = <<-MD
-      | Command |
-      |---------|
-      | echo \\| grep |
-      MD
+        | Command |
+        |---------|
+        | echo \\| grep |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -232,10 +232,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles a single-column table" do
       content = <<-MD
-      | Single |
-      |--------|
-      | Value  |
-      MD
+        | Single |
+        |--------|
+        | Value  |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -245,16 +245,16 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles mixed content with multiple tables" do
       content = <<-MD
-      | A | B |
-      |---|---|
-      | 1 | 2 |
+        | A | B |
+        |---|---|
+        | 1 | 2 |
 
-      Some middle text.
+        Some middle text.
 
-      | X | Y |
-      |---|---|
-      | 3 | 4 |
-      MD
+        | X | Y |
+        |---|---|
+        | 3 | 4 |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.scan(/<table>/).size.should eq(2)
@@ -273,10 +273,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "handles cells with only whitespace" do
       content = <<-MD
-      | A | B |
-      |---|---|
-      |   |   |
-      MD
+        | A | B |
+        |---|---|
+        |   |   |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
@@ -285,10 +285,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "strips leading and trailing whitespace from cell content" do
       content = <<-MD
-      |  Spaced  |
-      |----------|
-      |  Value   |
-      MD
+        |  Spaced  |
+        |----------|
+        |  Value   |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<th>Spaced</th>")
@@ -297,10 +297,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders bold text in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | **bold** text |
-      MD
+        | Header |
+        |--------|
+        | **bold** text |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td><strong>bold</strong> text</td>")
@@ -308,10 +308,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders italic text in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | *italic* text |
-      MD
+        | Header |
+        |--------|
+        | *italic* text |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td><em>italic</em> text</td>")
@@ -319,10 +319,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders code spans in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | `code` text |
-      MD
+        | Header |
+        |--------|
+        | `code` text |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td><code>code</code> text</td>")
@@ -330,10 +330,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders links in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [link](https://example.com) |
-      MD
+        | Header |
+        |--------|
+        | [link](https://example.com) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<a href=\"https://example.com\">link</a>")
@@ -341,10 +341,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders images in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | ![alt](https://example.com/img.png) |
-      MD
+        | Header |
+        |--------|
+        | ![alt](https://example.com/img.png) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<img src=\"https://example.com/img.png\" alt=\"alt\">")
@@ -352,10 +352,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders strikethrough in table cells" do
       content = <<-MD
-      | Header |
-      |--------|
-      | ~~deleted~~ text |
-      MD
+        | Header |
+        |--------|
+        | ~~deleted~~ text |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td><del>deleted</del> text</td>")
@@ -363,10 +363,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders inline markdown in header cells" do
       content = <<-MD
-      | **Bold Header** | *Italic Header* |
-      |-----------------|-----------------|
-      | cell1           | cell2           |
-      MD
+        | **Bold Header** | *Italic Header* |
+        |-----------------|-----------------|
+        | cell1           | cell2           |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<th><strong>Bold Header</strong></th>")
@@ -375,10 +375,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks javascript: URLs in links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [click](javascript:alert(1)) |
-      MD
+        | Header |
+        |--------|
+        | [click](javascript:alert(1)) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<a href=\"javascript:")
@@ -387,10 +387,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "does not process markdown inside code spans" do
       content = <<-MD
-      | Header |
-      |--------|
-      | `**not bold**` |
-      MD
+        | Header |
+        |--------|
+        | `**not bold**` |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<code>**not bold**</code>")
@@ -399,10 +399,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders underscore bold and italic" do
       content = <<-MD
-      | Header |
-      |--------|
-      | __bold__ and _italic_ |
-      MD
+        | Header |
+        |--------|
+        | __bold__ and _italic_ |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<strong>bold</strong>")
@@ -411,10 +411,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders multiple inline elements in one cell" do
       content = <<-MD
-      | Header |
-      |--------|
-      | **bold** and *italic* and `code` |
-      MD
+        | Header |
+        |--------|
+        | **bold** and *italic* and `code` |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<strong>bold</strong>")
@@ -424,10 +424,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks data: URLs in links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [click](data:text/html,test) |
-      MD
+        | Header |
+        |--------|
+        | [click](data:text/html,test) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<a href=\"data:")
@@ -435,10 +435,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks vbscript: URLs in links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [click](vbscript:msgbox) |
-      MD
+        | Header |
+        |--------|
+        | [click](vbscript:msgbox) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<a href=\"vbscript:")
@@ -446,10 +446,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks case-variant dangerous URLs" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [click](JavaScript:alert(1)) |
-      MD
+        | Header |
+        |--------|
+        | [click](JavaScript:alert(1)) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<a href=")
@@ -457,10 +457,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks percent-encoded javascript URLs" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [click](javascript%3Aalert(1)) |
-      MD
+        | Header |
+        |--------|
+        | [click](javascript%3Aalert(1)) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<a href=")
@@ -468,10 +468,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks javascript: URLs in image src" do
       content = <<-MD
-      | Header |
-      |--------|
-      | ![img](javascript:alert(1)) |
-      MD
+        | Header |
+        |--------|
+        | ![img](javascript:alert(1)) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<img")
@@ -479,10 +479,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "does not italicize underscores inside words" do
       content = <<-MD
-      | Header |
-      |--------|
-      | some_var_name |
-      MD
+        | Header |
+        |--------|
+        | some_var_name |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<td>some_var_name</td>")
@@ -491,10 +491,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "allows mailto: links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [email](mailto:test@example.com) |
-      MD
+        | Header |
+        |--------|
+        | [email](mailto:test@example.com) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<a href=\"mailto:test@example.com\">email</a>")
@@ -502,10 +502,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "allows fragment anchor links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [section](#heading) |
-      MD
+        | Header |
+        |--------|
+        | [section](#heading) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<a href=\"#heading\">section</a>")
@@ -513,10 +513,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "allows relative path links" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [page](./page.html) |
-      MD
+        | Header |
+        |--------|
+        | [page](./page.html) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<a href=\"./page.html\">page</a>")
@@ -524,10 +524,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders bold inside link text" do
       content = <<-MD
-      | Header |
-      |--------|
-      | [**bold link**](https://example.com) |
-      MD
+        | Header |
+        |--------|
+        | [**bold link**](https://example.com) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<a href=\"https://example.com\"><strong>bold link</strong></a>")
@@ -535,10 +535,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders image with empty alt text" do
       content = <<-MD
-      | Header |
-      |--------|
-      | ![](https://example.com/img.png) |
-      MD
+        | Header |
+        |--------|
+        | ![](https://example.com/img.png) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<img src=\"https://example.com/img.png\" alt=\"\">")
@@ -546,10 +546,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "renders multiple code spans in one cell" do
       content = <<-MD
-      | Header |
-      |--------|
-      | `foo` and `bar` |
-      MD
+        | Header |
+        |--------|
+        | `foo` and `bar` |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<code>foo</code> and <code>bar</code>")
@@ -557,10 +557,10 @@ describe Hwaro::Content::Processors::TableParser do
 
     it "blocks data: URLs in images" do
       content = <<-MD
-      | Header |
-      |--------|
-      | ![photo](data:image/png;base64,abc) |
-      MD
+        | Header |
+        |--------|
+        | ![photo](data:image/png;base64,abc) |
+        MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<img")

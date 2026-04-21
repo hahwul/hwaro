@@ -5,13 +5,13 @@ describe Hwaro::Config::Options::BuildOptions do
     options = Hwaro::Config::Options::BuildOptions.new
     options.output_dir.should eq("public")
     options.base_url.should be_nil
-    options.drafts.should eq(false)
-    options.minify.should eq(false)
-    options.parallel.should eq(true)
-    options.cache.should eq(false)
-    options.profile.should eq(false)
-    options.cache_busting.should eq(true)
-    options.stream.should eq(false)
+    options.drafts.should be_false
+    options.minify.should be_false
+    options.parallel.should be_true
+    options.cache.should be_false
+    options.profile.should be_false
+    options.cache_busting.should be_true
+    options.stream.should be_false
     options.memory_limit.should be_nil
   end
 
@@ -28,12 +28,12 @@ describe Hwaro::Config::Options::BuildOptions do
     )
     options.output_dir.should eq("dist")
     options.base_url.should eq("https://example.com")
-    options.drafts.should eq(true)
-    options.minify.should eq(true)
-    options.parallel.should eq(false)
-    options.cache.should eq(true)
-    options.profile.should eq(true)
-    options.cache_busting.should eq(false)
+    options.drafts.should be_true
+    options.minify.should be_true
+    options.parallel.should be_false
+    options.cache.should be_true
+    options.profile.should be_true
+    options.cache_busting.should be_false
   end
 
   describe "#streaming?" do
@@ -113,26 +113,26 @@ describe Hwaro::Config::Options::ServeOptions do
     options.host.should eq("127.0.0.1")
     options.port.should eq(3000)
     options.base_url.should be_nil
-    options.drafts.should eq(false)
-    options.open_browser.should eq(false)
-    options.cache_busting.should eq(true)
+    options.drafts.should be_false
+    options.open_browser.should be_false
+    options.cache_busting.should be_true
   end
 
   it "converts to build options" do
     options = Hwaro::Config::Options::ServeOptions.new(drafts: true, base_url: "https://example.com")
     build_options = options.to_build_options
-    build_options.drafts.should eq(true)
+    build_options.drafts.should be_true
     build_options.output_dir.should eq("public")
     build_options.base_url.should eq("https://example.com")
-    build_options.cache_busting.should eq(true)
-    build_options.stream.should eq(false)
+    build_options.cache_busting.should be_true
+    build_options.stream.should be_false
     build_options.memory_limit.should be_nil
   end
 
   it "passes cache_busting to build options" do
     options = Hwaro::Config::Options::ServeOptions.new(cache_busting: false)
     build_options = options.to_build_options
-    build_options.cache_busting.should eq(false)
+    build_options.cache_busting.should be_false
   end
 end
 
@@ -181,10 +181,10 @@ describe Hwaro::Config::Options::InitOptions do
   it "has default values" do
     options = Hwaro::Config::Options::InitOptions.new
     options.path.should eq(".")
-    options.force.should eq(false)
-    options.skip_agents_md.should eq(false)
-    options.skip_sample_content.should eq(false)
-    options.skip_taxonomies.should eq(false)
+    options.force.should be_false
+    options.skip_agents_md.should be_false
+    options.skip_sample_content.should be_false
+    options.skip_taxonomies.should be_false
     options.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
     options.scaffold_remote.should be_nil
   end
@@ -213,8 +213,8 @@ describe Hwaro::Config::Options::ImportOptions do
     options.source_type.should eq("")
     options.path.should eq("")
     options.output_dir.should eq("content")
-    options.drafts.should eq(false)
-    options.verbose.should eq(false)
+    options.drafts.should be_false
+    options.verbose.should be_false
   end
 
   it "accepts all parameters" do
@@ -228,8 +228,8 @@ describe Hwaro::Config::Options::ImportOptions do
     options.source_type.should eq("jekyll")
     options.path.should eq("/tmp/jekyll-site")
     options.output_dir.should eq("imported")
-    options.drafts.should eq(true)
-    options.verbose.should eq(true)
+    options.drafts.should be_true
+    options.verbose.should be_true
   end
 
   it "accepts partial parameters" do
@@ -237,7 +237,7 @@ describe Hwaro::Config::Options::ImportOptions do
     options.source_type.should eq("hugo")
     options.path.should eq("/tmp/hugo")
     options.output_dir.should eq("content")
-    options.drafts.should eq(false)
+    options.drafts.should be_false
   end
 end
 
@@ -265,9 +265,9 @@ describe Hwaro::Config::Options::DeployOptions do
     )
     options.source_dir.should eq("dist")
     options.targets.should eq(["production", "staging"])
-    options.dry_run.should eq(true)
-    options.confirm.should eq(false)
-    options.force.should eq(true)
+    options.dry_run.should be_true
+    options.confirm.should be_false
+    options.force.should be_true
     options.max_deletes.should eq(100)
     options.env.should eq("production")
   end
@@ -279,7 +279,7 @@ describe Hwaro::Config::Options::DeployOptions do
     )
     options.source_dir.should be_nil
     options.targets.should eq(["staging"])
-    options.dry_run.should eq(true)
+    options.dry_run.should be_true
     options.force.should be_nil
   end
 end

@@ -168,7 +168,7 @@ module Hwaro
               exit
             end
             parser.unknown_args do |unknown|
-              path = unknown.first if unknown.any?
+              path = unknown.first if unknown.present?
             end
           end
 

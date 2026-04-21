@@ -2,55 +2,45 @@ require "yaml"
 
 # Extract version from shard.yml
 def get_shard_version : String?
-  begin
-    shard = YAML.parse(File.read("shard.yml"))
-    shard["version"].as_s
-  rescue
-    nil
-  end
+  shard = YAML.parse(File.read("shard.yml"))
+  shard["version"].as_s
+rescue
+  nil
 end
 
 # Extract VERSION from src/hwaro.cr
 def get_hwaro_version : String?
-  begin
-    content = File.read("src/hwaro.cr")
-    match = content.match(/VERSION\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read("src/hwaro.cr")
+  match = content.match(/VERSION\s*=\s*"([^"]+)"/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Extract version from snapcraft.yaml
 def get_snapcraft_version : String?
-  begin
-    snapcraft = YAML.parse(File.read("snap/snapcraft.yaml"))
-    snapcraft["version"].as_s
-  rescue
-    nil
-  end
+  snapcraft = YAML.parse(File.read("snap/snapcraft.yaml"))
+  snapcraft["version"].as_s
+rescue
+  nil
 end
 
 # Extract version from spec/hwaro_spec.cr
 def get_spec_version : String?
-  begin
-    content = File.read("spec/hwaro_spec.cr")
-    match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read("spec/hwaro_spec.cr")
+  match = content.match(/VERSION\.should eq\("([^"]+)"\)/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Extract version from flake.nix
 def get_flake_version : String?
-  begin
-    content = File.read("flake.nix")
-    match = content.match(/version\s*=\s*"([^"]+)"/)
-    match ? match[1] : nil
-  rescue
-    nil
-  end
+  content = File.read("flake.nix")
+  match = content.match(/version\s*=\s*"([^"]+)"/)
+  match ? match[1] : nil
+rescue
+  nil
 end
 
 # Main logic

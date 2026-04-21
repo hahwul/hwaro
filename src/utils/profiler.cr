@@ -94,7 +94,7 @@ module Hwaro
       io.puts "─" * 50
 
       total = @phases.sum(&.duration_ms)
-      max_name_len = @phases.map(&.phase.size).max? || 0
+      max_name_len = @phases.max_of?(&.phase.size) || 0
 
       @phases.each do |phase|
         percent = if total > 0
@@ -136,10 +136,10 @@ module Hwaro
       return unless @enabled
       return if @template_profiles.empty?
 
-      sorted = @template_profiles.values.sort_by { |tp| -tp.total_time_ms }
+      sorted = @template_profiles.values.sort_by! { |tp| -tp.total_time_ms }
 
       # Calculate column widths
-      max_name_len = sorted.map { |tp| tp.template.size }.max
+      max_name_len = sorted.max_of(&.template.size)
       max_name_len = {max_name_len, 8}.max # minimum "Template" header width
       header_width = max_name_len
 

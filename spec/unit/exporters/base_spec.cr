@@ -75,10 +75,10 @@ describe Hwaro::Services::Exporters::Base do
         files = TestExporter.new.test_scan_content_files(dir)
         files.size.should eq(3)
         files.should eq(files.sort)
-        files.any? { |f| f.ends_with?("post.md") }.should be_true
-        files.any? { |f| f.ends_with?("alpha.markdown") }.should be_true
-        files.any? { |f| f.ends_with?("about.md") }.should be_true
-        files.any? { |f| f.ends_with?(".png") }.should be_false
+        files.any?(&.ends_with?("post.md")).should be_true
+        files.any?(&.ends_with?("alpha.markdown")).should be_true
+        files.any?(&.ends_with?("about.md")).should be_true
+        files.any?(&.ends_with?(".png")).should be_false
       end
     end
   end
@@ -89,7 +89,7 @@ describe Hwaro::Services::Exporters::Base do
       fields, body = TestExporter.new.test_parse_content(raw)
 
       fields["title"].should eq("Hello")
-      fields["draft"].should eq(false)
+      fields["draft"].should be_false
       fields["tags"].as(Array(String)).sort.should eq(["a", "b"])
       fields["weight"].should eq("5")
       body.should eq("body text")
@@ -100,7 +100,7 @@ describe Hwaro::Services::Exporters::Base do
       fields, body = TestExporter.new.test_parse_content(raw)
 
       fields["title"].should eq("Hello")
-      fields["draft"].should eq(true)
+      fields["draft"].should be_true
       fields["tags"].as(Array(String)).sort.should eq(["a", "b"])
       fields["weight"].should eq("7")
       body.should eq("body text")

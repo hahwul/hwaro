@@ -6,15 +6,15 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "imports a basic Obsidian note with YAML frontmatter" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "My Note"
-        date: 2024-06-01
-        tags:
-          - pkm
-          - notes
-        ---
-        This is my Obsidian note.
-        OBSIDIAN
+          ---
+          title: "My Note"
+          date: 2024-06-01
+          tags:
+            - pkm
+            - notes
+          ---
+          This is my Obsidian note.
+          OBSIDIAN
 
         File.write(File.join(dir, "my-note.md"), post_content)
 
@@ -44,12 +44,12 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "converts wiki-links to standard markdown links" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Wiki Links"
-        ---
-        See [[Other Page]] for details.
-        Also check [[Long Page Name|short name]].
-        OBSIDIAN
+          ---
+          title: "Wiki Links"
+          ---
+          See [[Other Page]] for details.
+          Also check [[Long Page Name|short name]].
+          OBSIDIAN
 
         File.write(File.join(dir, "wiki-links.md"), post_content)
 
@@ -72,11 +72,11 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "converts image embeds to standard markdown" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Embeds"
-        ---
-        Here is an image: ![[photo.png]]
-        OBSIDIAN
+          ---
+          title: "Embeds"
+          ---
+          Here is an image: ![[photo.png]]
+          OBSIDIAN
 
         File.write(File.join(dir, "embeds.md"), post_content)
 
@@ -120,12 +120,12 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "skips drafts when options.drafts is false" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Draft Note"
-        draft: true
-        ---
-        Draft content.
-        OBSIDIAN
+          ---
+          title: "Draft Note"
+          draft: true
+          ---
+          Draft content.
+          OBSIDIAN
 
         File.write(File.join(dir, "draft-note.md"), post_content)
 
@@ -148,12 +148,12 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "imports drafts when options.drafts is true" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Draft Note"
-        draft: true
-        ---
-        Draft content.
-        OBSIDIAN
+          ---
+          title: "Draft Note"
+          draft: true
+          ---
+          Draft content.
+          OBSIDIAN
 
         File.write(File.join(dir, "draft-note.md"), post_content)
 
@@ -181,11 +181,11 @@ describe Hwaro::Services::Importers::ObsidianImporter do
         FileUtils.mkdir_p(subdir)
 
         File.write(File.join(subdir, "my-project.md"), <<-OBSIDIAN
-        ---
-        title: "My Project"
-        ---
-        Project notes.
-        OBSIDIAN
+          ---
+          title: "My Project"
+          ---
+          Project notes.
+          OBSIDIAN
         )
 
         output_dir = File.join(dir, "output")
@@ -205,11 +205,11 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "extracts inline tags from body into frontmatter" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Tagged Note"
-        ---
-        Some content with #crystal and #programming tags.
-        OBSIDIAN
+          ---
+          title: "Tagged Note"
+          ---
+          Some content with #crystal and #programming tags.
+          OBSIDIAN
 
         File.write(File.join(dir, "tagged-note.md"), post_content)
 
@@ -231,17 +231,17 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     it "preserves markdown headings when removing inline tags" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
-        ---
-        title: "Headings"
-        ---
-        ## Section One
+          ---
+          title: "Headings"
+          ---
+          ## Section One
 
-        Content with #tag here.
+          Content with #tag here.
 
-        ### Sub Section
+          ### Sub Section
 
-        More content.
-        OBSIDIAN
+          More content.
+          OBSIDIAN
 
         File.write(File.join(dir, "headings.md"), post_content)
 

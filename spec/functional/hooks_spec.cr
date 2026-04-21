@@ -9,12 +9,12 @@ require "./support/build_helper"
 describe "Hooks: Pre-build hook execution" do
   it "executes pre-build hooks before building" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    pre = ["touch pre_hook_ran.txt"]
-    TOML
+      [build.hooks]
+      pre = ["touch pre_hook_ran.txt"]
+      TOML
 
     build_site(
       config,
@@ -31,12 +31,12 @@ end
 describe "Hooks: Post-build hook execution" do
   it "executes post-build hooks after building" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    post = ["touch post_hook_ran.txt"]
-    TOML
+      [build.hooks]
+      post = ["touch post_hook_ran.txt"]
+      TOML
 
     build_site(
       config,
@@ -52,13 +52,13 @@ end
 describe "Hooks: Multiple hooks" do
   it "executes multiple hooks in sequence" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    pre = ["echo 'first' > hook_order.txt", "echo 'second' >> hook_order.txt"]
-    post = ["echo 'third' >> hook_order.txt"]
-    TOML
+      [build.hooks]
+      pre = ["echo 'first' > hook_order.txt", "echo 'second' >> hook_order.txt"]
+      post = ["echo 'third' >> hook_order.txt"]
+      TOML
 
     build_site(
       config,
@@ -77,12 +77,12 @@ end
 describe "Hooks: External command execution" do
   it "runs shell commands with environment access" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    post = ["echo $PWD > pwd_output.txt"]
-    TOML
+      [build.hooks]
+      post = ["echo $PWD > pwd_output.txt"]
+      TOML
 
     build_site(
       config,
@@ -112,13 +112,13 @@ end
 describe "Hooks: Pre and post hooks combined" do
   it "executes pre hooks before build and post hooks after" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    pre = ["date +%s > pre_timestamp.txt"]
-    post = ["date +%s > post_timestamp.txt"]
-    TOML
+      [build.hooks]
+      pre = ["date +%s > pre_timestamp.txt"]
+      post = ["date +%s > post_timestamp.txt"]
+      TOML
 
     build_site(
       config,
@@ -135,12 +135,12 @@ end
 describe "Hooks: Hook creates files used by build" do
   it "pre hook can create files before build runs" do
     config = <<-TOML
-    title = "Test"
-    base_url = "http://localhost"
+      title = "Test"
+      base_url = "http://localhost"
 
-    [build.hooks]
-    pre = ["mkdir -p static && echo 'generated' > static/generated.txt"]
-    TOML
+      [build.hooks]
+      pre = ["mkdir -p static && echo 'generated' > static/generated.txt"]
+      TOML
 
     build_site(
       config,

@@ -9,17 +9,17 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(blog_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "My Astro Post"
-        pubDate: 2024-04-10
-        description: "An Astro blog post"
-        tags:
-          - astro
-          - web
-        heroImage: "/images/hero.jpg"
-        ---
-        Welcome to my Astro blog.
-        ASTRO
+          ---
+          title: "My Astro Post"
+          pubDate: 2024-04-10
+          description: "An Astro blog post"
+          tags:
+            - astro
+            - web
+          heroImage: "/images/hero.jpg"
+          ---
+          Welcome to my Astro blog.
+          ASTRO
 
         File.write(File.join(blog_dir, "my-astro-post.md"), post_content)
 
@@ -55,12 +55,12 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(blog_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "Date Test"
-        pubDate: 2024-05-20
-        ---
-        Content.
-        ASTRO
+          ---
+          title: "Date Test"
+          pubDate: 2024-05-20
+          ---
+          Content.
+          ASTRO
 
         File.write(File.join(blog_dir, "date-test.md"), post_content)
 
@@ -85,13 +85,13 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(blog_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "Updated Test"
-        pubDate: 2024-01-01
-        updatedDate: 2024-06-01
-        ---
-        Content.
-        ASTRO
+          ---
+          title: "Updated Test"
+          pubDate: 2024-01-01
+          updatedDate: 2024-06-01
+          ---
+          Content.
+          ASTRO
 
         File.write(File.join(blog_dir, "updated-test.md"), post_content)
 
@@ -116,12 +116,12 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(blog_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "Draft Post"
-        draft: true
-        ---
-        Draft content.
-        ASTRO
+          ---
+          title: "Draft Post"
+          draft: true
+          ---
+          Draft content.
+          ASTRO
 
         File.write(File.join(blog_dir, "draft-post.md"), post_content)
 
@@ -147,12 +147,12 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(blog_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "MDX Post"
-        pubDate: 2024-07-01
-        ---
-        Some content with standard markdown.
-        ASTRO
+          ---
+          title: "MDX Post"
+          pubDate: 2024-07-01
+          ---
+          Some content with standard markdown.
+          ASTRO
 
         File.write(File.join(blog_dir, "mdx-post.mdx"), post_content)
 
@@ -176,11 +176,11 @@ describe Hwaro::Services::Importers::AstroImporter do
         FileUtils.mkdir_p(docs_dir)
 
         post_content = <<-ASTRO
-        ---
-        title: "Documentation Page"
-        ---
-        Doc content.
-        ASTRO
+          ---
+          title: "Documentation Page"
+          ---
+          Doc content.
+          ASTRO
 
         File.write(File.join(docs_dir, "getting-started.md"), post_content)
 

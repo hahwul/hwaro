@@ -122,9 +122,9 @@ describe Hwaro::Profiler do
       profiler.template_report(output)
       result = output.to_s
 
-      listing_pos = result.index("listing").not_nil!
-      archive_pos = result.index("archive").not_nil!
-      single_pos = result.index("single").not_nil!
+      listing_pos = result.index!("listing")
+      archive_pos = result.index!("archive")
+      single_pos = result.index!("single")
 
       listing_pos.should be < archive_pos
       archive_pos.should be < single_pos

@@ -29,28 +29,28 @@ module Hwaro::Core::Build
             jane-smith:
               name: "Jane Smith"
               role: "Designer"
-          YAML
+            YAML
           )
 
           # Create content directory and pages
           FileUtils.mkdir_p("content")
           File.write("content/post1.md", <<-MARKDOWN
-          ---
-          title: "Post 1"
-          date: 2023-01-01
-          authors: ["john-doe"]
-          ---
-          Content 1
-          MARKDOWN
+            ---
+            title: "Post 1"
+            date: 2023-01-01
+            authors: ["john-doe"]
+            ---
+            Content 1
+            MARKDOWN
           )
           File.write("content/post2.md", <<-MARKDOWN
-          ---
-          title: "Post 2"
-          date: 2023-01-02
-          authors: ["john-doe", "jane-smith"]
-          ---
-          Content 2
-          MARKDOWN
+            ---
+            title: "Post 2"
+            date: 2023-01-02
+            authors: ["john-doe", "jane-smith"]
+            ---
+            Content 2
+            MARKDOWN
           )
 
           # Helper config/options

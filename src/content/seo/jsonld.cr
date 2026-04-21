@@ -85,16 +85,16 @@ module Hwaro
             "name"     => page.title,
           }
 
-          json = JSON.build do |json|
-            json.object do
-              json.field "@context", "https://schema.org"
-              json.field "@type", "BreadcrumbList"
-              json.field "itemListElement" do
-                json.array do
+          json = JSON.build do |j|
+            j.object do
+              j.field "@context", "https://schema.org"
+              j.field "@type", "BreadcrumbList"
+              j.field "itemListElement" do
+                j.array do
                   items.each do |item|
-                    json.object do
+                    j.object do
                       item.each do |k, v|
-                        json.field k, v
+                        j.field k, v
                       end
                     end
                   end

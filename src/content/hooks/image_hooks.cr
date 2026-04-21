@@ -69,7 +69,7 @@ module Hwaro
         def self.find_closest(url : String, width : Int32) : String?
           @@resize_map_mutex.synchronize do
             widths_map = @@resize_map[url]?
-            return nil unless widths_map
+            return unless widths_map
             return widths_map[width] if widths_map.has_key?(width)
 
             # Find the smallest width that is >= requested
@@ -126,7 +126,6 @@ module Hwaro
           # so watch-triggered rebuilds don't re-decode unchanged images.
           # Without this, adding one image to a serve session re-processes
           # every image in the project (see issue #389).
-          previous_resize_map = @@resize_map_mutex.synchronize { @@resize_map.dup }
           previous_lqip_map = @@lqip_map_mutex.synchronize { @@lqip_map.dup }
 
           new_map = {} of String => Hash(Int32, String)
@@ -211,7 +210,7 @@ module Hwaro
           dest_dir : String,
           widths : Array(Int32),
         ) : Hash(Int32, String)?
-          return nil unless File.exists?(source_path)
+          return unless File.exists?(source_path)
           source_info = File.info(source_path)
           source_mtime = source_info.modification_time
 
@@ -221,10 +220,10 @@ module Hwaro
           widths.each do |width|
             filename = "#{basename}_#{width}w#{ext}"
             dest = File.join(dest_dir, filename)
-            return nil unless File.exists?(dest)
+            return unless File.exists?(dest)
             dest_info = File.info(dest)
-            return nil if dest_info.modification_time < source_mtime
-            return nil if dest_info.size == 0
+            return if dest_info.modification_time < source_mtime
+            return if dest_info.size == 0
             result[width] = filename
           end
           result
@@ -245,8 +244,6 @@ module Hwaro
 
           lqip_data = if lqip_uri
                         {"lqip" => lqip_uri, "dominant_color" => dom_color}
-                      else
-                        nil
                       end
 
           {width_url_map, lqip_data}

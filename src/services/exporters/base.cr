@@ -40,8 +40,8 @@ module Hwaro
         end
 
         # Parse frontmatter from content, returns {fields_hash, body}
-        protected def parse_content(content : String) : {Hash(String, String | Bool | Array(String) | Nil), String}
-          fields = {} of String => String | Bool | Array(String) | Nil
+        protected def parse_content(content : String) : {Hash(String, (String | Bool | Array(String))?), String}
+          fields = {} of String => (String | Bool | Array(String))?
 
           if match = content.match(TOML_FRONTMATTER_RE)
             body = content.sub(TOML_FRONTMATTER_RE, "").lstrip('\n')

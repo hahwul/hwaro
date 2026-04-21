@@ -28,12 +28,12 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "title": "Hello",
-        "count": 42,
-        "active": true
-      }
-      JSON
+        {
+          "title": "Hello",
+          "count": 42,
+          "active": true
+        }
+        JSON
 
       result = processor.process(input, context)
       result.content.should eq(%q({"title":"Hello","count":42,"active":true}))
@@ -45,13 +45,13 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "person": {
-          "name": "Alice",
-          "age": 30
+        {
+          "person": {
+            "name": "Alice",
+            "age": 30
+          }
         }
-      }
-      JSON
+        JSON
 
       result = processor.process(input, context)
       result.content.should eq(%q({"person":{"name":"Alice","age":30}}))
@@ -62,14 +62,14 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "tags": [
-          "crystal",
-          "programming",
-          "test"
-        ]
-      }
-      JSON
+        {
+          "tags": [
+            "crystal",
+            "programming",
+            "test"
+          ]
+        }
+        JSON
 
       result = processor.process(input, context)
       result.content.should eq(%q({"tags":["crystal","programming","test"]}))
@@ -80,11 +80,11 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      [
-        { "id": 1, "name": "first" },
-        { "id": 2, "name": "second" }
-      ]
-      JSON
+        [
+          { "id": 1, "name": "first" },
+          { "id": 2, "name": "second" }
+        ]
+        JSON
 
       result = processor.process(input, context)
       result.content.should eq(%q([{"id":1,"name":"first"},{"id":2,"name":"second"}]))
@@ -131,11 +131,11 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "message": "He said \\"hello\\"",
-        "path": "C:\\\\Users\\\\test"
-      }
-      JSON
+        {
+          "message": "He said \\"hello\\"",
+          "path": "C:\\\\Users\\\\test"
+        }
+        JSON
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -147,11 +147,11 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "name": "Test",
-        "value": null
-      }
-      JSON
+        {
+          "name": "Test",
+          "value": null
+        }
+        JSON
 
       result = processor.process(input, context)
       result.content.should eq(%q({"name":"Test","value":null}))
@@ -162,13 +162,13 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "integer": 42,
-        "float": 3.14,
-        "negative": -10,
-        "zero": 0
-      }
-      JSON
+        {
+          "integer": 42,
+          "float": 3.14,
+          "negative": -10,
+          "zero": 0
+        }
+        JSON
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -182,16 +182,16 @@ describe Hwaro::Content::Processors::Json do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-JSON
-      {
-        "level1": {
-          "level2": {
-            "level3": {
-              "value": "deep"
+        {
+          "level1": {
+            "level2": {
+              "level3": {
+                "value": "deep"
+              }
             }
           }
         }
-      }
-      JSON
+        JSON
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -252,13 +252,13 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <root>
-        <item>
-          <title>Hello</title>
-        </item>
-      </root>
-      XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <root>
+          <item>
+            <title>Hello</title>
+          </item>
+        </root>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -310,12 +310,12 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        <url>
-          <loc>https://example.com/</loc>
-        </url>
-      </urlset>
-      XML
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://example.com/</loc>
+          </url>
+        </urlset>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -328,11 +328,11 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <root>
-        <empty/>
-        <also-empty />
-      </root>
-      XML
+        <root>
+          <empty/>
+          <also-empty />
+        </root>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -354,18 +354,18 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <rss version="2.0">
-        <channel>
-          <title>Test Feed</title>
-          <link>https://example.com</link>
-          <item>
-            <title>Post 1</title>
-            <link>https://example.com/post1/</link>
-          </item>
-        </channel>
-      </rss>
-      XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <title>Test Feed</title>
+            <link>https://example.com</link>
+            <item>
+              <title>Post 1</title>
+              <link>https://example.com/post1/</link>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -379,21 +379,21 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        <url>
-          <loc>https://example.com/</loc>
-          <lastmod>2024-01-01</lastmod>
-          <changefreq>weekly</changefreq>
-          <priority>1.0</priority>
-        </url>
-        <url>
-          <loc>https://example.com/about/</loc>
-          <changefreq>monthly</changefreq>
-          <priority>0.8</priority>
-        </url>
-      </urlset>
-      XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://example.com/</loc>
+            <lastmod>2024-01-01</lastmod>
+            <changefreq>weekly</changefreq>
+            <priority>1.0</priority>
+          </url>
+          <url>
+            <loc>https://example.com/about/</loc>
+            <changefreq>monthly</changefreq>
+            <priority>0.8</priority>
+          </url>
+        </urlset>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil
@@ -425,17 +425,17 @@ describe Hwaro::Content::Processors::Xml do
       context = Hwaro::Content::Processors::ProcessorContext.new
 
       input = <<-XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test Feed</title>
-        <link href="https://example.com" />
-        <entry>
-          <title>Entry 1</title>
-          <link href="https://example.com/entry1/" />
-          <content type="html">Some content</content>
-        </entry>
-      </feed>
-      XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Test Feed</title>
+          <link href="https://example.com" />
+          <entry>
+            <title>Entry 1</title>
+            <link href="https://example.com/entry1/" />
+            <content type="html">Some content</content>
+          </entry>
+        </feed>
+        XML
 
       result = processor.process(input, context)
       result.error.should be_nil

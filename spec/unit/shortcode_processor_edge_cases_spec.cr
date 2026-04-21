@@ -217,7 +217,7 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       )
 
       results.size.should eq(2)
-      results.keys.uniq.size.should eq(2)
+      results.keys.uniq!.size.should eq(2)
     end
   end
 end

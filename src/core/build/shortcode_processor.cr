@@ -76,7 +76,7 @@ module Hwaro
           end
 
           # 3. Direct call: {{ name(args) }}
-          processed = processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
+          processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
             render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: false, crinja_env_override: crinja_env_override)
           end
         end
@@ -103,11 +103,11 @@ module Hwaro
               break
             end
 
-            open_start = open_match.begin.not_nil!
+            open_start = open_match.begin
 
             # If a close tag appears before the next open tag, it's unmatched — emit as-is
             if close_match
-              close_start = close_match.begin.not_nil!
+              close_start = close_match.begin
               if close_start < open_start
                 result << content[pos..close_start + close_match[0].size - 1]
                 pos = close_start + close_match[0].size
@@ -132,10 +132,10 @@ module Hwaro
               next_close = close_re.match(content, scan_pos)
 
               break unless next_close
-              next_close_start = next_close.begin.not_nil!
+              next_close_start = next_close.begin
 
               if next_open
-                next_open_start = next_open.begin.not_nil!
+                next_open_start = next_open.begin
                 if next_open_start < next_close_start
                   nesting += 1
                   scan_pos = next_open_start + next_open[0].size

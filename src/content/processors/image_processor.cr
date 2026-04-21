@@ -52,7 +52,7 @@ module Hwaro
         # Resize a single image to the given width, preserving aspect ratio.
         # Returns the output path on success, nil on failure.
         def resize(source : String, dest : String, width : Int32, height : Int32 = 0, quality : Int32 = 85) : String?
-          return nil unless File.exists?(source)
+          return unless File.exists?(source)
 
           # Clamp quality to valid range for stb_image_write (1-100)
           quality = quality.clamp(1, 100)
@@ -66,21 +66,21 @@ module Hwaro
           if pixels.null?
             reason = String.new(LibStb.stbi_failure_reason)
             Logger.debug "Image load failed '#{source}': #{reason}"
-            return nil
+            return
           end
 
           begin
             # Guard against degenerate images (0 or negative dimensions)
             if src_w <= 0 || src_h <= 0 || channels <= 0
               Logger.debug "Image has invalid dimensions '#{source}': #{src_w}x#{src_h}x#{channels}"
-              return nil
+              return
             end
 
             # Calculate output dimensions (preserve aspect ratio)
             out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width, height)
             if out_w <= 0 || out_h <= 0
               Logger.debug "Calculated invalid output dimensions for '#{source}': #{out_w}x#{out_h}"
-              return nil
+              return
             end
 
             # Skip resize if output would be larger than source
@@ -95,7 +95,7 @@ module Hwaro
             pixel_count = out_w.to_i64 * out_h.to_i64
             if pixel_count > MAX_PIXELS
               Logger.debug "Output image too large '#{source}': #{out_w}x#{out_h} = #{pixel_count} pixels"
-              return nil
+              return
             end
             buf_size = pixel_count * channels.to_i64
 
@@ -103,7 +103,7 @@ module Hwaro
             out_pixels = LibC.malloc(buf_size).as(UInt8*)
             if out_pixels.null?
               Logger.debug "Failed to allocate #{buf_size} bytes for resize of '#{source}'"
-              return nil
+              return
             end
 
             begin
@@ -115,7 +115,7 @@ module Hwaro
 
               if result.null?
                 Logger.debug "Resize failed for '#{source}'"
-                return nil
+                return
               end
 
               # Write output
@@ -182,20 +182,20 @@ module Hwaro
         # Returns {data_uri, dominant_color_hex} or nil on failure.
         def generate_lqip_with_color(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
                                      lqip_width : Int32 = 32, quality : Int32 = 20) : {String, String}?
-          return nil if lqip_width <= 0
-          return nil if src_w <= 0 || src_h <= 0 || channels <= 0
+          return if lqip_width <= 0
+          return if src_w <= 0 || src_h <= 0 || channels <= 0
 
           # Don't upscale — cap thumbnail width to source width
           effective_width = Math.min(lqip_width, src_w)
           out_w, out_h = calculate_dimensions(src_w, src_h, effective_width, 0)
-          return nil if out_w <= 0 || out_h <= 0
+          return if out_w <= 0 || out_h <= 0
 
           pixel_count = out_w.to_i64 * out_h.to_i64
-          return nil if pixel_count > MAX_PIXELS
+          return if pixel_count > MAX_PIXELS
           buf_size = pixel_count * channels.to_i64
 
           thumb_pixels = LibC.malloc(buf_size).as(UInt8*)
-          return nil if thumb_pixels.null?
+          return if thumb_pixels.null?
 
           begin
             resized = LibStb.stbir_resize_uint8_linear(
@@ -203,7 +203,7 @@ module Hwaro
               thumb_pixels, out_w, out_h, 0,
               channels
             )
-            return nil if resized.null?
+            return if resized.null?
 
             # Compute dominant color from the tiny thumbnail (cheap)
             dom_color = dominant_color(thumb_pixels, out_w, out_h, channels)
@@ -214,7 +214,7 @@ module Hwaro
               thumb_pixels, out_w, out_h, channels,
               quality, pointerof(jpg_buf), pointerof(jpg_len)
             )
-            return nil if ok == 0 || jpg_buf.null? || jpg_len <= 0
+            return if ok == 0 || jpg_buf.null? || jpg_len <= 0
 
             begin
               bytes = Bytes.new(jpg_buf, jpg_len)
@@ -355,7 +355,6 @@ module Hwaro
                 dom_color = lqip_result[1]
               end
             end
-
           ensure
             LibC.free(smallest_pixels.as(Void*)) unless smallest_pixels.null?
             LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
