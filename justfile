@@ -1,38 +1,59 @@
-# Default: just --list
+alias b := build
+alias d := dev
+alias vc := version-check
+alias vu := version-update
+
+# List available tasks.
 default:
-    @echo "Listing available tasks..."
     @just --list
 
-# Serve documents page with builded binary
-dev:
-    @[ -f bin/hwaro ] || just build
-    bin/hwaro serve -i docs
-
-# Build binary
+# Build hwaro binary.
+[group('build')]
 build:
     shards install
     shards build
 
-# Run all tests
-test:
-    crystal spec
+# Update shards.nix.
+[group('build')]
+nix-update:
+    nix-shell -p crystal2nix --run crystal2nix
 
-# Fix lint
-fix:
-    crystal tool format
-
-# Clean build artifacts
+# Clean build artifacts.
+[group('build')]
 clean:
     rm -f src/ext/stb_impl.o
     rm -rf bin/
     rm -rf lib/
 
-# Check version consistency
-alias vc := version-check
+# Serve docs site with the built binary.
+[group('documents')]
+dev:
+    @[ -f bin/hwaro ] || just build
+    bin/hwaro serve -i docs
+
+# Auto-format code and fix lint issues.
+[group('development')]
+fix:
+    crystal tool format
+    lib/ameba/bin/ameba.cr --fix
+
+# Check code format and lint without changes.
+[group('development')]
+check:
+    crystal tool format --check
+    lib/ameba/bin/ameba.cr
+
+# Run all tests.
+[group('development')]
+test:
+    crystal spec
+
+# Check version consistency across all files.
+[group('development')]
 version-check:
     crystal run scripts/version_check.cr
 
-# Update version
-alias vu := version-update
+# Update version across all files.
+[group('development')]
 version-update:
     crystal run scripts/version_update.cr
