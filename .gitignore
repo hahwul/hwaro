@@ -24,3 +24,4 @@ src/ext/stb_impl.o
 
 # macOS
 .DS_Store
+.claude/settings.local.json
