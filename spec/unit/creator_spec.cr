@@ -205,7 +205,7 @@ describe Hwaro::Services::Creator do
       end
     end
 
-    it "raises an error if file already exists" do
+    it "raises HwaroError(HWARO_E_IO) when the file already exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("content/drafts")
@@ -214,14 +214,17 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "existing.md", title: "Existing Post")
           creator = Hwaro::Services::Creator.new
 
-          expect_raises(Exception, "File already exists: content/drafts/existing.md") do
+          err = expect_raises(Hwaro::HwaroError) do
             creator.run(options)
           end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          err.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+          (err.message || "").should contain("File already exists: content/drafts/existing.md")
         end
       end
     end
 
-    it "raises an error if explicit archetype is missing" do
+    it "raises HwaroError(HWARO_E_USAGE) when an explicit archetype is missing" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("content/drafts")
@@ -230,14 +233,17 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Post", archetype: "missing")
           creator = Hwaro::Services::Creator.new
 
-          expect_raises(Exception, "Archetype not found: archetypes/missing.md") do
+          err = expect_raises(Hwaro::HwaroError) do
             creator.run(options)
           end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          err.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+          (err.message || "").should contain("Archetype not found: archetypes/missing.md")
         end
       end
     end
 
-    it "fails fast when title cannot be inferred (flag-only, no prompt)" do
+    it "fails fast with HwaroError(HWARO_E_USAGE) when title cannot be inferred (flag-only, no prompt)" do
       # `hwaro new` is flag-only: the Creator must raise a clear usage error
       # rather than falling back to an interactive `gets` prompt. This holds
       # in both TTY and non-TTY environments.
@@ -248,14 +254,16 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new
           creator = Hwaro::Services::Creator.new
 
-          expect_raises(Exception, /missing --title/) do
+          err = expect_raises(Hwaro::HwaroError) do
             creator.run(options)
           end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should match(/missing --title/)
         end
       end
     end
 
-    it "fails fast when path is a directory and title is missing" do
+    it "fails fast with HwaroError(HWARO_E_USAGE) when path is a directory and title is missing" do
       # Regression: `hwaro new posts/` (directory, no --title) should raise
       # the same usage error since no title can be inferred from a directory.
       Dir.mktmpdir do |dir|
@@ -265,9 +273,10 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "blog")
           creator = Hwaro::Services::Creator.new
 
-          expect_raises(Exception, /missing --title/) do
+          err = expect_raises(Hwaro::HwaroError) do
             creator.run(options)
           end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
         end
       end
     end
@@ -501,7 +510,7 @@ describe Hwaro::Services::Creator do
         end
       end
 
-      it "refuses bundle creation when a single-file sibling already exists" do
+      it "refuses bundle creation with HwaroError(HWARO_E_IO) when a single-file sibling already exists" do
         # Both `posts/hello.md` (sibling) and `posts/hello/index.md`
         # (bundle) would render to the same URL — we'd rather fail loudly
         # than silently duplicate the page.
@@ -512,9 +521,11 @@ describe Hwaro::Services::Creator do
 
             options = Hwaro::Config::Options::NewOptions.new(
               path: "posts/hello.md", title: "Hello", bundle: true)
-            expect_raises(Exception, /sibling already exists/) do
+            err = expect_raises(Hwaro::HwaroError) do
               Hwaro::Services::Creator.new.run(options)
             end
+            err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            (err.message || "").should contain("single-file sibling")
 
             # Existing file left untouched, bundle not created.
             File.read("content/posts/hello.md").should contain("Existing")

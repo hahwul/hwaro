@@ -2,6 +2,7 @@ require "file_utils"
 require "time"
 require "../config/options/new_options"
 require "../models/config"
+require "../utils/errors"
 require "../utils/logger"
 
 module Hwaro
@@ -120,12 +121,20 @@ module Hwaro
         # cannot be inferred. The `new` command is flag-only: no interactive
         # prompts, so behavior is predictable in TTY, CI, and agent runs.
         if !full_path && title.empty?
-          raise "missing --title (or <path>.md) argument\nUsage: hwaro new <path> [options]\nRun 'hwaro new --help' for details."
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "missing --title (or <path>.md) argument",
+            hint: "Pass --title, or give a path ending in .md (e.g. 'posts/my-post.md').",
+          )
         end
 
         if !full_path
           if title.empty?
-            raise "Title cannot be empty."
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Title cannot be empty.",
+              hint: "Pass a non-empty --title.",
+            )
           end
           filename = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-") + ".md"
           full_path = File.join(base_dir, filename)
@@ -165,7 +174,12 @@ module Hwaro
         if bundle_mode && !bundle_path?(full_path)
           candidate = bundle_path_for(full_path)
           if bundle_collides_with_sibling?(candidate)
-            raise "Cannot create bundle at #{candidate}: single-file sibling already exists. Remove the existing file or omit --bundle."
+            sibling = candidate.rchop("/index.md") + ".md"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create bundle at #{candidate}: single-file sibling already exists.",
+              hint: "Remove #{sibling}, or omit --bundle to append to the existing file location.",
+            )
           end
           full_path = candidate
           base_dir = File.dirname(full_path)
@@ -179,7 +193,11 @@ module Hwaro
                   end
 
         if File.exists?(full_path)
-          raise "File already exists: #{full_path}"
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "File already exists: #{full_path}",
+            hint: "Pass a different <path>, or edit the existing file directly.",
+          )
         end
 
         File.write(full_path, content)
@@ -242,7 +260,11 @@ module Hwaro
             Logger.debug "Using archetype: #{archetype_path}"
             return File.read(archetype_path)
           else
-            raise "Archetype not found: #{archetype_path}"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Archetype not found: #{archetype_path}",
+              hint: "Run 'hwaro new --list-archetypes' to see archetypes available in this project.",
+            )
           end
         end
 
