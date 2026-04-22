@@ -25,6 +25,7 @@ module Hwaro
           imported = 0
           skipped = 0
           errors = 0
+          wrapped = 0
 
           scan_markdown_files(content_dir).each do |file_path|
             begin
@@ -32,6 +33,9 @@ module Hwaro
               case result
               when :imported
                 imported += 1
+              when :imported_wrapped
+                imported += 1
+                wrapped += 1
               when :skipped
                 skipped += 1
               end
@@ -39,6 +43,10 @@ module Hwaro
               errors += 1
               Logger.warn "Error processing #{file_path}: #{ex.message}"
             end
+          end
+
+          if wrapped > 0
+            Logger.warn "#{wrapped} file(s) contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
           ImportResult.new(
@@ -84,9 +92,12 @@ module Hwaro
             return :skipped
           end
 
-          # Warn about Hugo shortcodes in body
-          if body.includes?("{{<") || body.includes?("{{%")
-            Logger.warn "Hugo shortcodes detected in #{file_path} — manual conversion may be needed"
+          # Track files with Hugo shortcodes so the `run` method can
+          # emit a single summary telling the user how many files need
+          # manual conversion.
+          has_shortcodes = body.includes?("{{<") || body.includes?("{{%")
+          if has_shortcodes
+            Logger.warn "Hugo shortcodes detected in #{file_path} — manual conversion needed."
           end
 
           # Map Hugo fields to Hwaro frontmatter
@@ -183,7 +194,8 @@ module Hwaro
           end
 
           written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
-          written ? :imported : :skipped
+          return :skipped unless written
+          has_shortcodes ? :imported_wrapped : :imported
         end
 
         # Regex for TOML frontmatter: +++ on first line, +++ on its own line

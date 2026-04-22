@@ -282,6 +282,53 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
+    it "reports how many files contain unconverted Liquid constructs" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        File.write(File.join(posts_dir, "2024-01-01-liquid.md"), <<-JEKYLL
+          ---
+          title: "Liquid"
+          ---
+          Body with {% include header.html %}.
+          JEKYLL
+        )
+        File.write(File.join(posts_dir, "2024-01-02-clean.md"), <<-JEKYLL
+          ---
+          title: "Clean"
+          ---
+          Plain body.
+          JEKYLL
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        # Capture the warning stream so the spec sees the summary log.
+        err = IO::Memory.new
+        original = Hwaro::Logger.err_io
+        Hwaro::Logger.err_io = err
+        begin
+          importer = Hwaro::Services::Importers::JekyllImporter.new
+          result = importer.run(options)
+          result.imported_count.should eq(2)
+        ensure
+          Hwaro::Logger.err_io = original
+        end
+
+        # Summary must include the count and the platform name so a user
+        # skimming the log knows how many files need manual cleanup.
+        err.to_s.should contain("1 file(s) contained unconverted Liquid")
+        # The clean file must not trip the per-file warning.
+        err.to_s.scan(/Liquid tags detected/).size.should eq(1)
+      end
+    end
+
     it "keeps categories and tags as separate taxonomy fields" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")
