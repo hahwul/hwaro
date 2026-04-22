@@ -7,6 +7,7 @@ require "../utils/logger"
 module Hwaro
   module Services
     class Creator
+      CONTENT_DIR    = "content"
       ARCHETYPES_DIR = "archetypes"
 
       # `<!-- hwaro: KEY[=VALUE], KEY[=VALUE] -->` directive that an
@@ -20,6 +21,45 @@ module Hwaro
       # logged as a warning so typos (`bundlr=true`) surface instead of
       # silently becoming no-ops.
       KNOWN_DIRECTIVES = {"bundle"}
+
+      # Validate a user-supplied `<path>` argument to `hwaro new` and
+      # return a normalized form relative to `content/` (no prefix),
+      # with `./`, `..`, and double-slash segments already collapsed.
+      # The result is safe to pass straight into the existing Creator
+      # resolution logic, which re-adds the `content/` prefix as needed.
+      #
+      # Raises `ArgumentError` when the input is empty, absolute, or
+      # would resolve outside `content/`. Callers (the CLI) wrap the
+      # failure in `HwaroError(HWARO_E_USAGE)` so the classified exit
+      # code and `--json` payload match the rest of the tool.
+      def self.validate_and_normalize_path!(raw : String) : String
+        stripped = raw.strip
+        if stripped.empty?
+          raise ArgumentError.new("missing <path> argument")
+        end
+
+        if Path[stripped].absolute?
+          raise ArgumentError.new(
+            "Absolute path '#{raw}' is not allowed. " \
+            "Paths are relative to #{CONTENT_DIR}/, e.g. 'posts/my-article.md'."
+          )
+        end
+
+        full = Path[File.join(CONTENT_DIR, stripped)].normalize.to_s
+        root_prefix = "#{CONTENT_DIR}#{File::SEPARATOR}"
+
+        # The normalized path must sit strictly below content/ — equal
+        # to the root is also a reject (no filename) and anything that
+        # doesn't start with "content/" means `..` escaped the tree.
+        unless full.starts_with?(root_prefix)
+          raise ArgumentError.new(
+            "Path '#{raw}' escapes the #{CONTENT_DIR}/ directory. " \
+            "Use a path inside #{CONTENT_DIR}/, e.g. 'posts/my-article.md'."
+          )
+        end
+
+        full[root_prefix.size..]
+      end
 
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
         path = options.path

@@ -561,4 +561,64 @@ describe Hwaro::Services::Creator do
       end
     end
   end
+
+  describe ".validate_and_normalize_path!" do
+    it "accepts a plain relative path unchanged" do
+      Hwaro::Services::Creator.validate_and_normalize_path!("posts/hello.md").should eq("posts/hello.md")
+      Hwaro::Services::Creator.validate_and_normalize_path!("index.md").should eq("index.md")
+    end
+
+    it "collapses double slashes" do
+      Hwaro::Services::Creator.validate_and_normalize_path!("posts//foo.md").should eq("posts/foo.md")
+      Hwaro::Services::Creator.validate_and_normalize_path!("a//b///c.md").should eq("a/b/c.md")
+    end
+
+    it "strips leading ./ segments" do
+      Hwaro::Services::Creator.validate_and_normalize_path!("./posts/foo.md").should eq("posts/foo.md")
+    end
+
+    it "accepts non-markdown-extension paths" do
+      # The validator is about path shape, not extension — Creator decides
+      # bundle vs single-file downstream.
+      Hwaro::Services::Creator.validate_and_normalize_path!("posts/foo").should eq("posts/foo")
+    end
+
+    it "rejects an empty or whitespace-only path" do
+      expect_raises(ArgumentError, /missing <path>/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("")
+      end
+      expect_raises(ArgumentError, /missing <path>/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("   ")
+      end
+    end
+
+    it "rejects an absolute path" do
+      expect_raises(ArgumentError, /Absolute path/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("/tmp/evil.md")
+      end
+      expect_raises(ArgumentError, /Absolute path/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("/etc/passwd")
+      end
+    end
+
+    it "rejects paths that escape content/ via ..;" do
+      expect_raises(ArgumentError, /escapes the content\/ directory/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("../escaped.md")
+      end
+      expect_raises(ArgumentError, /escapes the content\/ directory/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("../../../etc/passwd")
+      end
+    end
+
+    it "rejects paths that reduce to content/ itself (no filename)" do
+      expect_raises(ArgumentError, /escapes/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!(".")
+      end
+    end
+
+    it "accepts paths that reference .. internally but stay under content/" do
+      # foo/../bar.md resolves to bar.md which is still inside content/.
+      Hwaro::Services::Creator.validate_and_normalize_path!("foo/../bar.md").should eq("bar.md")
+    end
+  end
 end
