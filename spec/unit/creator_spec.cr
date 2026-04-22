@@ -666,6 +666,127 @@ describe Hwaro::Services::Creator do
         end
       end
     end
+
+    describe "--section vs path directory conflict" do
+      # Regression: `hwaro new posts/foo.md -s docs` used to silently drop
+      # the path's leading directory and create the file under the section
+      # instead. The path is authoritative now (the user wrote the dir),
+      # and --section is ignored after a one-line warning.
+
+      it "prefers the path and warns when the leading directory and --section disagree" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+
+            buffer = IO::Memory.new
+            previous_io = Hwaro::Logger.io
+            Hwaro::Logger.io = buffer
+            begin
+              options = Hwaro::Config::Options::NewOptions.new(
+                path: "posts/conflict.md", title: "C", section: "docs")
+              Hwaro::Services::Creator.new.run(options)
+            ensure
+              Hwaro::Logger.io = previous_io
+            end
+
+            # Path wins.
+            File.exists?("content/posts/conflict.md").should be_true
+            File.exists?("content/docs/conflict.md").should be_false
+
+            log = buffer.to_s
+            log.should contain("--section 'docs'")
+            log.should contain("posts/")
+            log.should contain("ignoring --section")
+          end
+        end
+      end
+
+      it "warns when the path is dir-ish and leading-segment differs from --section" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+
+            buffer = IO::Memory.new
+            previous_io = Hwaro::Logger.io
+            Hwaro::Logger.io = buffer
+            begin
+              options = Hwaro::Config::Options::NewOptions.new(
+                path: "posts/nope", title: "Nope", section: "docs")
+              Hwaro::Services::Creator.new.run(options)
+            ensure
+              Hwaro::Logger.io = previous_io
+            end
+
+            # Section branch discarded; directory fallback takes over and
+            # produces <path>/<slug>.md under the path's own leading dir.
+            File.exists?("content/posts/nope/nope.md").should be_true
+            File.exists?("content/docs/posts/nope.md").should be_false
+            File.exists?("content/docs/nope.md").should be_false
+
+            buffer.to_s.should contain("ignoring --section")
+          end
+        end
+      end
+
+      it "preserves deeper nesting in the path when dropping --section" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "tools/deep/note.md", title: "Note", section: "docs")
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/tools/deep/note.md").should be_true
+            File.exists?("content/docs/tools/deep/note.md").should be_false
+            File.exists?("content/docs/note.md").should be_false
+          end
+        end
+      end
+
+      it "does not warn when --section matches the path's leading directory" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+
+            buffer = IO::Memory.new
+            previous_io = Hwaro::Logger.io
+            Hwaro::Logger.io = buffer
+            begin
+              options = Hwaro::Config::Options::NewOptions.new(
+                path: "posts/post.md", title: "P", section: "posts")
+              Hwaro::Services::Creator.new.run(options)
+            ensure
+              Hwaro::Logger.io = previous_io
+            end
+
+            File.exists?("content/posts/post.md").should be_true
+            buffer.to_s.should_not contain("--section")
+          end
+        end
+      end
+
+      it "does not warn when the path has no leading directory (section provides it)" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+
+            buffer = IO::Memory.new
+            previous_io = Hwaro::Logger.io
+            Hwaro::Logger.io = buffer
+            begin
+              options = Hwaro::Config::Options::NewOptions.new(
+                path: "intro.md", title: "Intro", section: "docs")
+              Hwaro::Services::Creator.new.run(options)
+            ensure
+              Hwaro::Logger.io = previous_io
+            end
+
+            File.exists?("content/docs/intro.md").should be_true
+            buffer.to_s.should_not contain("--section")
+          end
+        end
+      end
+    end
   end
 
   describe ".validate_and_normalize_path!" do

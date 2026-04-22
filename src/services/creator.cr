@@ -67,7 +67,7 @@ module Hwaro
         title = options.title || ""
 
         # --section overrides the base directory
-        if section = options.section
+        if section = resolve_section(options.section, path)
           if path && path.ends_with?(".md")
             filename = File.basename(path)
             full_path = File.join("content", section, filename)
@@ -267,6 +267,28 @@ module Hwaro
       private def bundle_collides_with_sibling?(full_path : String) : Bool
         sibling_md = full_path.rchop("/index.md") + ".md"
         File.exists?(sibling_md) && File.file?(sibling_md)
+      end
+
+      # Reconcile `-s section` with a path argument that already carries
+      # a directory. Prior behaviour silently dropped the path's leading
+      # directory and used the section — so `hwaro new posts/foo.md -s
+      # docs` landed the file at `content/docs/foo.md` with no warning,
+      # which made scripted flows and shell-completion surprise users.
+      #
+      # New behaviour: if the path's leading segment and the section
+      # disagree, the path is authoritative (the user wrote the dir, so
+      # respect it) and `--section` is dropped with a one-line warning.
+      # When they match, or when the path lacks a directory entirely
+      # (`-s docs foo.md`), the section is returned as-is.
+      private def resolve_section(section : String?, path : String?) : String?
+        return unless section
+        return section unless path && path.includes?("/")
+
+        first_segment = path.split("/").first
+        return section if first_segment == section
+
+        Logger.warn "  --section '#{section}' conflicts with directory '#{first_segment}/' in path '#{path}'; using the path and ignoring --section."
+        nil
       end
 
       private def find_archetype(explicit_archetype : String?, path : String) : String?
