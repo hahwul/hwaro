@@ -153,26 +153,33 @@ module Hwaro
               end
             end
 
-            # Categories (merge into tags)
+            tags = tags.uniq
+            fields["tags"] = tags unless tags.empty?
+
+            # Categories — preserve as their own taxonomy key. Hexo supports
+            # nested arrays (`[[tech, rust], [life]]`) for hierarchical
+            # categories; we flatten the hierarchy since hwaro's taxonomy
+            # is currently flat. The values stay distinct from tags.
+            categories = [] of String
+
             if cats = yaml["categories"]?
               case cats.raw
               when Array
                 cats.as_a.each do |c|
                   case c.raw
                   when Array
-                    # Hexo supports nested categories as arrays
-                    c.as_a.each { |sub| tags << (sub.as_s? || sub.raw.to_s) }
+                    c.as_a.each { |sub| categories << (sub.as_s? || sub.raw.to_s) }
                   else
-                    tags << (c.as_s? || c.raw.to_s)
+                    categories << (c.as_s? || c.raw.to_s)
                   end
                 end
               when String
-                cats.as_s.split(/[\s,]+/).each { |c| tags << c.strip unless c.strip.empty? }
+                cats.as_s.split(/[\s,]+/).each { |c| categories << c.strip unless c.strip.empty? }
               end
             end
 
-            tags = tags.uniq
-            fields["tags"] = tags unless tags.empty?
+            categories = categories.uniq
+            fields["categories"] = categories unless categories.empty?
 
             # Description
             if desc = yaml["description"]?

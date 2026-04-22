@@ -120,13 +120,13 @@ module Hwaro
 
             # tags
             tags = array_string_value(data, "tags")
-
-            # categories — merge into tags
-            categories = array_string_value(data, "categories")
-            unless categories.empty?
-              tags = tags + categories
-            end
             fields["tags"] = tags unless tags.empty?
+
+            # categories — preserve as its own taxonomy key; hwaro's
+            # scaffold `[[taxonomies]]` defines tags and categories as
+            # separate classifications.
+            categories = array_string_value(data, "categories")
+            fields["categories"] = categories unless categories.empty?
 
             # series
             if series = string_value(data, "series")

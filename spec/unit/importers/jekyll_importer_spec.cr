@@ -47,7 +47,8 @@ describe Hwaro::Services::Importers::JekyllImporter do
         content.should contain("+++")
         content.should contain("title = \"Hello World\"")
         content.should contain("template = \"post\"")
-        content.should contain("tags = [\"ruby\", \"web\", \"tutorial\"]")
+        content.should contain(%(categories = ["ruby", "web"]))
+        content.should contain(%(tags = ["tutorial"]))
         content.should contain("This is my first post.")
       end
     end
@@ -281,23 +282,23 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
-    it "merges categories and tags into a single tags field" do
+    it "keeps categories and tags as separate taxonomy fields" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")
         FileUtils.mkdir_p(posts_dir)
 
         post_content = <<-JEKYLL
           ---
-          title: "Merged Tags"
+          title: "Split Taxonomies"
           category: programming
           tags:
             - crystal
-            - programming
+            - tutorial
           ---
           Content.
           JEKYLL
 
-        File.write(File.join(posts_dir, "2024-05-01-merged-tags.md"), post_content)
+        File.write(File.join(posts_dir, "2024-05-01-split-taxonomies.md"), post_content)
 
         output_dir = File.join(dir, "output")
         options = Hwaro::Config::Options::ImportOptions.new(
@@ -309,9 +310,9 @@ describe Hwaro::Services::Importers::JekyllImporter do
         importer = Hwaro::Services::Importers::JekyllImporter.new
         importer.run(options)
 
-        content = File.read(File.join(output_dir, "posts", "merged-tags.md"))
-        # "programming" should appear only once (deduplication)
-        content.should contain("tags = [\"programming\", \"crystal\"]")
+        content = File.read(File.join(output_dir, "posts", "split-taxonomies.md"))
+        content.should contain(%(categories = ["programming"]))
+        content.should contain(%(tags = ["crystal", "tutorial"]))
       end
     end
 

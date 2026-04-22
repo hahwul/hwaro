@@ -193,10 +193,8 @@ describe Hwaro::Services::Importers::HugoImporter do
         content.should contain("title = \"YAML Post\"")
         content.should contain("updated =")
         content.should contain("description = \"Written in YAML\"")
-        # categories merged into tags
-        content.should contain("\"yaml\"")
-        content.should contain("\"hugo\"")
-        content.should contain("\"tutorials\"")
+        content.should contain(%(tags = ["yaml", "hugo"]))
+        content.should contain(%(categories = ["tutorials"]))
         content.should contain("YAML content goes here.")
       end
     end

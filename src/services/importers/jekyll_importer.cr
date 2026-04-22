@@ -123,24 +123,30 @@ module Hwaro
               fields["template"] = layout.as_s? || layout.raw.to_s
             end
 
-            # Tags: merge categories and tags
-            tags = [] of String
+            # Categories and tags are kept as separate taxonomies so the
+            # imported content matches hwaro's scaffold taxonomy shape
+            # (`[[taxonomies]]` defines both keys distinctly).
+            categories = [] of String
 
             if cats = yaml["categories"]?
               case cats.raw
               when Array
-                cats.as_a.each { |c| tags << (c.as_s? || c.raw.to_s) }
+                cats.as_a.each { |c| categories << (c.as_s? || c.raw.to_s) }
               when String
-                cats.as_s.split(/[\s,]+/).each { |c| tags << c.strip unless c.strip.empty? }
+                cats.as_s.split(/[\s,]+/).each { |c| categories << c.strip unless c.strip.empty? }
               end
             end
 
             if cat = yaml["category"]?
               if cat_s = cat.as_s?
-                cat_s.split(/[\s,]+/).each { |c| tags << c.strip unless c.strip.empty? }
+                cat_s.split(/[\s,]+/).each { |c| categories << c.strip unless c.strip.empty? }
               end
             end
 
+            categories = categories.uniq
+            fields["categories"] = categories unless categories.empty?
+
+            tags = [] of String
             if tag_val = yaml["tags"]?
               case tag_val.raw
               when Array
