@@ -135,4 +135,71 @@ describe Hwaro::CLI::Commands::NewCommand do
       end
     end
   end
+
+  # Path-shape validation happens at the CLI boundary so each bad path
+  # surfaces as a classified usage error (exit 2, JSON payload if --json).
+  # The Creator class itself is tested more thoroughly in creator_spec.cr.
+  describe "#run path validation" do
+    it "rejects `..`-escaping paths with HWARO_E_USAGE" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["../escaped.md", "-t", "X"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          err.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+          (err.message || "").should contain("escapes the content/ directory")
+
+          # Nothing should have been written anywhere.
+          File.exists?(File.join(dir, "escaped.md")).should be_false
+          File.exists?("escaped.md").should be_false
+        end
+      end
+    end
+
+    it "rejects absolute paths with HWARO_E_USAGE" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["/tmp/hwaro-evil.md", "-t", "X"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should contain("Absolute path")
+
+          File.exists?("/tmp/hwaro-evil.md").should be_false
+          File.exists?("content/tmp/hwaro-evil.md").should be_false
+        end
+      end
+    end
+
+    it "rejects empty path with HWARO_E_USAGE" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["", "-t", "X"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should contain("missing <path>")
+        end
+      end
+    end
+
+    it "normalizes double slashes in the input path" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          Hwaro::CLI::Commands::NewCommand.new.run(["posts//slashy.md", "-t", "Slashy"])
+
+          # Canonical path on disk.
+          File.exists?("content/posts/slashy.md").should be_true
+          # No phantom dir from the stray slash.
+          Dir.exists?("content/posts/").should be_true
+          Dir.children("content/posts").includes?("").should be_false
+        end
+      end
+    end
+  end
 end

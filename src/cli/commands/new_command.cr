@@ -67,13 +67,35 @@ module Hwaro
           # missing <path> always fails fast with a classified usage error.
           # Keeping this a HwaroError lets both text and --json consumers see
           # the same taxonomy (code/category/exit).
-          if options.path.nil?
+          raw_path = options.path
+          if raw_path.nil?
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
               message: "missing <path> argument",
               hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
             )
           end
+
+          # Canonicalize early so the rest of the pipeline (and the
+          # `Created new content: …` log line) works with a path that
+          # has no `..`, no absolute-root leak, and no double slashes.
+          # Empty / absolute / content-escaping paths fail here with a
+          # classified usage error instead of silently landing at an
+          # unexpected filesystem location.
+          begin
+            normalized = Services::Creator.validate_and_normalize_path!(raw_path)
+          rescue ex : ArgumentError
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: ex.message || "Invalid <path> argument",
+              hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
+            )
+          end
+          # Feed the normalized path back into the Creator. The stored
+          # path keeps the `content/` prefix so downstream branches that
+          # check `starts_with?("content/")` take the already-rooted
+          # path as-is (see Creator#run).
+          options.path = normalized
 
           Services::Creator.new.run(options, load_config_if_present)
         end
