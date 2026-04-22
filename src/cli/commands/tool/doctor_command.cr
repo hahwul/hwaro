@@ -2,6 +2,7 @@ require "json"
 require "colorize"
 require "option_parser"
 require "../../metadata"
+require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../services/doctor"
 
@@ -103,10 +104,40 @@ module Hwaro
                 },
               }
               puts result.to_json
-              return
+              exit(exit_code_for(issues))
             end
 
             render_human(issues, config_path)
+            exit(exit_code_for(issues))
+          end
+
+          # Map any `:error`-level issues to an appropriate exit code so
+          # CI pipelines can gate on `hwaro doctor` directly. Warnings
+          # and infos don't change the exit code — only real errors do.
+          # Picks the highest-numeric exit across reported errors so
+          # mixed categories surface the most severe failure class
+          # (mirrors `deploy_command.cr#worst_exit_for`).
+          private def exit_code_for(issues : Array(Services::Issue)) : Int32
+            worst = Hwaro::Errors::EXIT_SUCCESS
+            issues.each do |issue|
+              next unless issue.level == :error
+              code = exit_code_for_category(issue.category)
+              worst = code if code > worst
+            end
+            worst
+          end
+
+          private def exit_code_for_category(category : String) : Int32
+            case category
+            when "config", "config_missing"
+              Hwaro::Errors::EXIT_CONFIG
+            when "template"
+              Hwaro::Errors::EXIT_TEMPLATE
+            when "content"
+              Hwaro::Errors::EXIT_CONTENT
+            else
+              Hwaro::Errors::EXIT_GENERIC
+            end
           end
 
           # Render human-readable diagnostics with inline status glyphs per check.

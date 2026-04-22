@@ -32,9 +32,13 @@ end
 describe Hwaro::Services::Doctor do
   describe "#run" do
     describe "config diagnostics" do
-      it "warns when config file is missing" do
+      it "reports missing config file as an error (build-blocking)" do
         issues = run_doctor_no_config
-        issues.any? { |i| i.category == "config" && i.message.includes?("not found") }.should be_true
+        issues.any? do |i|
+          i.category == "config" &&
+            i.message.includes?("not found") &&
+            i.level == :error
+        end.should be_true
       end
 
       it "warns when base_url is empty" do
@@ -127,7 +131,7 @@ describe Hwaro::Services::Doctor do
     end
 
     describe "template diagnostics" do
-      it "warns when templates directory is missing" do
+      it "reports missing templates directory as an error (build-blocking)" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, base_config)
@@ -135,11 +139,13 @@ describe Hwaro::Services::Doctor do
 
           doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
           issues = doctor.run
-          issues.any? { |i| i.category == "template" && i.message.includes?("not found") }.should be_true
+          issues.any? do |i|
+            i.category == "template" && i.message.includes?("not found") && i.level == :error
+          end.should be_true
         end
       end
 
-      it "warns when required template files are missing" do
+      it "reports missing required template files as errors (build-blocking)" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, base_config)
@@ -151,12 +157,12 @@ describe Hwaro::Services::Doctor do
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
           issues = doctor.run
           tpl_issues = issues.select { |i| i.category == "template" }
-          tpl_issues.any?(&.message.includes?("section.html")).should be_true
+          tpl_issues.any? { |i| i.message.includes?("section.html") && i.level == :error }.should be_true
           tpl_issues.any?(&.message.includes?("page.html")).should be_false
         end
       end
 
-      it "warns on unclosed template block tags" do
+      it "reports unclosed template block tags as errors (build-blocking)" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, base_config)
@@ -167,7 +173,9 @@ describe Hwaro::Services::Doctor do
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
           issues = doctor.run
-          issues.any? { |i| i.message.includes?("unclosed template block") }.should be_true
+          issues.any? do |i|
+            i.message.includes?("unclosed template block") && i.level == :error
+          end.should be_true
         end
       end
 

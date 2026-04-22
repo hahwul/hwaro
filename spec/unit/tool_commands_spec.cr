@@ -221,6 +221,66 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
       flag.not_nil!.value_hint.should eq("DIR")
     end
   end
+
+  # Pin the exit-code contract so CI pipelines can rely on
+  # `hwaro doctor` failing non-zero when it reports errors.
+  describe "#exit_code_for (classified exit)" do
+    it "returns EXIT_SUCCESS when no issues are reported" do
+      doctor_exit_code_for([] of Hwaro::Services::Issue).should eq(Hwaro::Errors::EXIT_SUCCESS)
+    end
+
+    it "returns EXIT_SUCCESS when only warnings and infos are reported" do
+      issues = [
+        Hwaro::Services::Issue.new(id: "base-url-missing", level: :warning, category: "config", file: nil, message: "w"),
+        Hwaro::Services::Issue.new(id: "missing-config-pwa", level: :info, category: "config_missing", file: nil, message: "i"),
+      ]
+      doctor_exit_code_for(issues).should eq(Hwaro::Errors::EXIT_SUCCESS)
+    end
+
+    it "returns EXIT_CONFIG on a config-category error" do
+      issues = [
+        Hwaro::Services::Issue.new(id: "config-not-found", level: :error, category: "config", file: nil, message: "missing"),
+      ]
+      doctor_exit_code_for(issues).should eq(Hwaro::Errors::EXIT_CONFIG)
+    end
+
+    it "returns EXIT_TEMPLATE on a template-category error" do
+      issues = [
+        Hwaro::Services::Issue.new(id: "template-unclosed-block", level: :error, category: "template", file: nil, message: "unclosed"),
+      ]
+      doctor_exit_code_for(issues).should eq(Hwaro::Errors::EXIT_TEMPLATE)
+    end
+
+    it "picks the worst (numerically highest) exit when multiple categories error out" do
+      # EXIT_TEMPLATE (4) beats EXIT_CONFIG (3); both of those beat
+      # EXIT_GENERIC (1). Mirrors deploy_command.cr#worst_exit_for.
+      issues = [
+        Hwaro::Services::Issue.new(id: "config-not-found", level: :error, category: "config", file: nil, message: "c"),
+        Hwaro::Services::Issue.new(id: "template-unclosed-block", level: :error, category: "template", file: nil, message: "t"),
+      ]
+      doctor_exit_code_for(issues).should eq(Hwaro::Errors::EXIT_TEMPLATE)
+    end
+
+    it "ignores warnings when any error is present" do
+      issues = [
+        Hwaro::Services::Issue.new(id: "base-url-missing", level: :warning, category: "config", file: nil, message: "w"),
+        Hwaro::Services::Issue.new(id: "template-unclosed-block", level: :error, category: "template", file: nil, message: "t"),
+      ]
+      doctor_exit_code_for(issues).should eq(Hwaro::Errors::EXIT_TEMPLATE)
+    end
+  end
+end
+
+# Reopen the command to expose the private exit-code helper for the
+# spec above without actually invoking `exit(n)` via `run`.
+class Hwaro::CLI::Commands::Tool::DoctorCommand
+  def test_exit_code_for(issues)
+    exit_code_for(issues)
+  end
+end
+
+private def doctor_exit_code_for(issues : Array(Hwaro::Services::Issue)) : Int32
+  Hwaro::CLI::Commands::Tool::DoctorCommand.new.test_exit_code_for(issues)
 end
 
 describe Hwaro::CLI::Commands::Tool::PlatformCommand do
