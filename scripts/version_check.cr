@@ -43,20 +43,31 @@ rescue
   nil
 end
 
+# Extract pkgver from aur/PKGBUILD
+def get_pkgbuild_version : String?
+  content = File.read("aur/PKGBUILD")
+  match = content.match(/^pkgver=([\d.]+)/m)
+  match ? match[1] : nil
+rescue
+  nil
+end
+
 # Main logic
 shard_v = get_shard_version
 hwaro_v = get_hwaro_version
 snapcraft_v = get_snapcraft_version
 spec_v = get_spec_version
 flake_v = get_flake_version
+pkgbuild_v = get_pkgbuild_version
 
 puts "Shard version: #{shard_v || "Not found"}"
 puts "Hwaro version: #{hwaro_v || "Not found"}"
 puts "Snapcraft version: #{snapcraft_v || "Not found"}"
 puts "Spec version: #{spec_v || "Not found"}"
 puts "Flake version: #{flake_v || "Not found"}"
+puts "PKGBUILD version: #{pkgbuild_v || "Not found"}"
 
-versions = [shard_v, hwaro_v, snapcraft_v, spec_v, flake_v].compact
+versions = [shard_v, hwaro_v, snapcraft_v, spec_v, flake_v, pkgbuild_v].compact
 
 if versions.empty?
   puts "No versions found!"

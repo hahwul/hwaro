@@ -6,6 +6,7 @@ HWARO_FILE     = "src/hwaro.cr"
 SNAPCRAFT_FILE = "snap/snapcraft.yaml"
 SPEC_FILE      = "spec/hwaro_spec.cr"
 FLAKE_FILE     = "flake.nix"
+PKGBUILD_FILE  = "aur/PKGBUILD"
 
 # Extract version from shard.yml
 def get_shard_version : String?
@@ -45,6 +46,15 @@ end
 def get_flake_version : String?
   content = File.read(FLAKE_FILE)
   match = content.match(/version\s*=\s*"([^"]+)"/)
+  match ? match[1] : nil
+rescue
+  nil
+end
+
+# Extract pkgver from aur/PKGBUILD
+def get_pkgbuild_version : String?
+  content = File.read(PKGBUILD_FILE)
+  match = content.match(/^pkgver=([\d.]+)/m)
   match ? match[1] : nil
 rescue
   nil
@@ -105,6 +115,18 @@ rescue ex
   false
 end
 
+# Update aur/PKGBUILD pkgver (and reset pkgrel to 1)
+def update_pkgbuild_version(new_version : String) : Bool
+  content = File.read(PKGBUILD_FILE)
+  updated = content.gsub(/^pkgver=[\d.]+/m, "pkgver=#{new_version}")
+  updated = updated.gsub(/^pkgrel=\d+/m, "pkgrel=1")
+  File.write(PKGBUILD_FILE, updated)
+  true
+rescue ex
+  puts "  Error updating #{PKGBUILD_FILE}: #{ex.message}"
+  false
+end
+
 # Validate version format (semver-like: X.Y.Z)
 def valid_version?(version : String) : Bool
   !!(version =~ /^\d+\.\d+\.\d+$/)
@@ -122,6 +144,7 @@ hwaro_v = get_hwaro_version
 snapcraft_v = get_snapcraft_version
 spec_v = get_spec_version
 flake_v = get_flake_version
+pkgbuild_v = get_pkgbuild_version
 
 puts "Current versions:"
 puts "  #{SHARD_FILE.ljust(25)} #{shard_v || "Not found"}"
@@ -129,10 +152,11 @@ puts "  #{HWARO_FILE.ljust(25)} #{hwaro_v || "Not found"}"
 puts "  #{SNAPCRAFT_FILE.ljust(25)} #{snapcraft_v || "Not found"}"
 puts "  #{SPEC_FILE.ljust(25)} #{spec_v || "Not found"}"
 puts "  #{FLAKE_FILE.ljust(25)} #{flake_v || "Not found"}"
+puts "  #{PKGBUILD_FILE.ljust(25)} #{pkgbuild_v || "Not found"}"
 puts
 
 # Check if versions match
-versions = [shard_v, hwaro_v, snapcraft_v, spec_v, flake_v].compact
+versions = [shard_v, hwaro_v, snapcraft_v, spec_v, flake_v, pkgbuild_v].compact
 unique_versions = versions.uniq
 
 if unique_versions.size > 1
@@ -221,6 +245,17 @@ if flake_v
   total_count += 1
   print "  Updating #{FLAKE_FILE}... "
   if update_flake_version(new_version)
+    puts "✓"
+    success_count += 1
+  else
+    puts "✗"
+  end
+end
+
+if pkgbuild_v
+  total_count += 1
+  print "  Updating #{PKGBUILD_FILE}... "
+  if update_pkgbuild_version(new_version)
     puts "✓"
     success_count += 1
   else
