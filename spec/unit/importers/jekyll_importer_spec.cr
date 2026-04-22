@@ -408,6 +408,42 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
+    it "overwrites existing output file when force is true" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        File.write(File.join(posts_dir, "2024-01-01-existing.md"), <<-JEKYLL
+          ---
+          title: "Existing"
+          ---
+          Fresh content.
+          JEKYLL
+        )
+
+        output_dir = File.join(dir, "output")
+        FileUtils.mkdir_p(File.join(output_dir, "posts"))
+        File.write(File.join(output_dir, "posts", "existing.md"), "stale")
+
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+          force: true,
+        )
+
+        importer = Hwaro::Services::Importers::JekyllImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        result.skipped_count.should eq(0)
+
+        content = File.read(File.join(output_dir, "posts", "existing.md"))
+        content.should contain("Fresh content.")
+        content.should_not contain("stale")
+      end
+    end
+
     it "imports multiple posts" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")

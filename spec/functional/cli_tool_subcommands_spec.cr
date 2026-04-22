@@ -283,29 +283,47 @@ describe "hwaro tool agents-md" do
 end
 
 describe "hwaro tool import" do
-  it "exits 1 and reports missing source-type" do
+  it "exits with HWARO_E_USAGE when source-type is missing" do
     with_initialized_project do |project_dir|
       status, _, err = run_hwaro(["tool", "import"], chdir: project_dir)
-      status.success?.should be_false
-      err.should contain("Missing source")
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("<source-type>")
     end
   end
 
-  it "exits 1 and reports missing path when only source-type is given" do
+  it "exits with HWARO_E_USAGE when path is missing" do
     with_initialized_project do |project_dir|
       status, _, err = run_hwaro(["tool", "import", "hugo"], chdir: project_dir)
-      status.success?.should be_false
-      err.should contain("Missing path")
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("<path>")
     end
   end
 
-  it "exits 1 and reports an unknown source-type" do
+  it "exits with HWARO_E_USAGE on unknown source-type" do
     with_initialized_project do |project_dir|
       status, _, err = run_hwaro(
         ["tool", "import", "definitely-not-real", "/tmp"], chdir: project_dir
       )
-      status.success?.should be_false
-      err.should contain("Unknown source type")
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("unknown source type")
+    end
+  end
+
+  it "exits with HWARO_E_USAGE when source directory yields no importable content" do
+    with_initialized_project do |project_dir|
+      Dir.mktmpdir do |empty|
+        FileUtils.mkdir_p(File.join(empty, "content"))
+        status, _, err = run_hwaro(
+          ["tool", "import", "hugo", empty, "-o", File.join(project_dir, "out")],
+          chdir: project_dir
+        )
+        status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+        err.should contain("HWARO_E_USAGE")
+        err.should contain("no importable content")
+      end
     end
   end
 end

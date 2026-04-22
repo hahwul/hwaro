@@ -11,6 +11,7 @@ module Hwaro
           output_dir = options.output_dir
           include_drafts = options.drafts
           verbose = options.verbose
+          force = options.force
 
           unless File.exists?(wxr_path)
             return ImportResult.new(
@@ -30,7 +31,7 @@ module Hwaro
 
           items.each do |item|
             begin
-              result = process_item(item, output_dir, include_drafts, verbose)
+              result = process_item(item, output_dir, include_drafts, verbose, force)
               case result
               when :imported
                 imported += 1
@@ -73,6 +74,7 @@ module Hwaro
           output_dir : String,
           include_drafts : Bool,
           verbose : Bool,
+          force : Bool,
         ) : Symbol
           title = ""
           post_date = ""
@@ -150,7 +152,7 @@ module Hwaro
           # Convert HTML content to Markdown
           body = HtmlToMarkdown.convert(content_html)
 
-          written = write_content_file(output_dir, section, slug, frontmatter, body, verbose)
+          written = write_content_file(output_dir, section, slug, frontmatter, body, verbose, force)
           written ? :imported : :skipped
         end
       end

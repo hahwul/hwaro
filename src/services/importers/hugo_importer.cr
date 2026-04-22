@@ -11,6 +11,7 @@ module Hwaro
           output_dir = options.output_dir
           include_drafts = options.drafts
           verbose = options.verbose
+          force = options.force
 
           content_dir = File.join(hugo_path, "content")
 
@@ -27,7 +28,7 @@ module Hwaro
 
           scan_markdown_files(content_dir).each do |file_path|
             begin
-              result = process_file(file_path, content_dir, output_dir, include_drafts, verbose)
+              result = process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
               case result
               when :imported
                 imported += 1
@@ -72,6 +73,7 @@ module Hwaro
           output_dir : String,
           include_drafts : Bool,
           verbose : Bool,
+          force : Bool,
         ) : Symbol
           raw = File.read(file_path)
           fm_data, body = extract_frontmatter(raw)
@@ -180,7 +182,7 @@ module Hwaro
             file_slug = filename.sub(/\.(md|markdown)$/, "")
           end
 
-          written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose)
+          written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
         end
 

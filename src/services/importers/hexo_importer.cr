@@ -36,7 +36,7 @@ module Hwaro
 
           files.each do |file_info|
             begin
-              result = import_file(file_info, output_dir, options.verbose)
+              result = import_file(file_info, output_dir, options.verbose, options.force)
               case result
               when :imported
                 imported += 1
@@ -98,6 +98,7 @@ module Hwaro
           file_info : NamedTuple(path: String, draft: Bool),
           output_dir : String,
           verbose : Bool,
+          force : Bool,
         ) : Symbol
           raw = File.read(file_info[:path])
           frontmatter_yaml, body = parse_hexo_file(raw)
@@ -226,7 +227,7 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
-          written = write_content_file(output_dir, "posts", slug, frontmatter, body.strip, verbose)
+          written = write_content_file(output_dir, "posts", slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
         end
 

@@ -33,7 +33,7 @@ module Hwaro
 
           files.each do |file_path|
             begin
-              result = import_file(file_path, path, output_dir, options.verbose)
+              result = import_file(file_path, path, output_dir, options.verbose, options.force)
               case result
               when :imported
                 imported += 1
@@ -77,6 +77,7 @@ module Hwaro
           base_path : String,
           output_dir : String,
           verbose : Bool,
+          force : Bool,
         ) : Symbol
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_markdown_file(raw)
@@ -145,7 +146,7 @@ module Hwaro
           section = "posts"
 
           frontmatter = generate_frontmatter(fields)
-          written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose)
+          written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
         end
 

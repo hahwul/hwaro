@@ -7,6 +7,7 @@ module Hwaro
         property output_dir : String
         property drafts : Bool
         property verbose : Bool
+        property force : Bool
 
         def initialize(
           @source_type : String = "",
@@ -14,6 +15,7 @@ module Hwaro
           @output_dir : String = "content",
           @drafts : Bool = false,
           @verbose : Bool = false,
+          @force : Bool = false,
         )
         end
       end
