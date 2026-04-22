@@ -17,6 +17,7 @@ module Hwaro
           imported = 0
           skipped = 0
           errors = 0
+          wrapped = 0
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -40,6 +41,9 @@ module Hwaro
               case result
               when :imported
                 imported += 1
+              when :imported_wrapped
+                imported += 1
+                wrapped += 1
               when :skipped
                 skipped += 1
               end
@@ -47,6 +51,10 @@ module Hwaro
               errors += 1
               Logger.warn "Error importing #{file_info[:path]}: #{ex.message}"
             end
+          end
+
+          if wrapped > 0
+            Logger.warn "#{wrapped} file(s) contained unconverted Liquid constructs. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
           ImportResult.new(
@@ -200,9 +208,14 @@ module Hwaro
             fields["draft"] = true
           end
 
-          # Warn about Liquid tags in body
-          if body.matches?(LIQUID_TAG_PATTERN)
-            Logger.warn "Liquid tags detected in #{file_info[:path]} - manual conversion may be needed"
+          # Track files that contain unconverted Liquid constructs. The
+          # per-file warning stays for verbose consumers; the `run`
+          # method emits a single summary warning with the total so
+          # users know how many files need manual conversion even when
+          # the per-file lines scroll off.
+          has_liquid = body.matches?(LIQUID_TAG_PATTERN)
+          if has_liquid
+            Logger.warn "Liquid tags detected in #{file_info[:path]} — manual conversion needed."
           end
 
           # Use slug from filename, or slugify the title
@@ -217,7 +230,8 @@ module Hwaro
           frontmatter = generate_frontmatter(fields)
           written = write_content_file(output_dir, "posts", slug, frontmatter, body, verbose, force)
 
-          written ? :imported : :skipped
+          return :skipped unless written
+          has_liquid ? :imported_wrapped : :imported
         end
 
         # Regex to match YAML frontmatter: opening --- on first line,

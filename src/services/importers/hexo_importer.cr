@@ -17,6 +17,7 @@ module Hwaro
           imported = 0
           skipped = 0
           errors = 0
+          wrapped = 0
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -40,6 +41,9 @@ module Hwaro
               case result
               when :imported
                 imported += 1
+              when :imported_wrapped
+                imported += 1
+                wrapped += 1
               when :skipped
                 skipped += 1
               end
@@ -47,6 +51,10 @@ module Hwaro
               errors += 1
               Logger.warn "Error importing #{file_info[:path]}: #{ex.message}"
             end
+          end
+
+          if wrapped > 0
+            Logger.warn "#{wrapped} file(s) contained Hexo tag plugins. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
           ImportResult.new(
@@ -217,13 +225,16 @@ module Hwaro
             fields["draft"] = true
           end
 
-          # Warn about Hexo tag plugins
-          if body.matches?(HEXO_TAG_PATTERN)
-            Logger.warn "Hexo tag plugins detected in #{file_info[:path]} — manual conversion may be needed"
-          end
-
-          # Handle Hexo's <!-- more --> excerpt separator
+          # Handle Hexo's <!-- more --> excerpt separator.
           body = body.gsub(/<!--\s*more\s*-->/, "")
+
+          # Track files with Hexo tag plugins; the `run` method emits a
+          # single summary so the user knows how many files need manual
+          # conversion even when per-file warnings scroll off.
+          has_hexo_tags = body.matches?(HEXO_TAG_PATTERN)
+          if has_hexo_tags
+            Logger.warn "Hexo tag plugins detected in #{file_info[:path]} — manual conversion needed."
+          end
 
           if slug.empty?
             if title = fields["title"]?.as?(String)
@@ -235,7 +246,8 @@ module Hwaro
 
           frontmatter = generate_frontmatter(fields)
           written = write_content_file(output_dir, "posts", slug, frontmatter, body.strip, verbose, force)
-          written ? :imported : :skipped
+          return :skipped unless written
+          has_hexo_tags ? :imported_wrapped : :imported
         end
 
         YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m

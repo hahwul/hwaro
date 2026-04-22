@@ -14,6 +14,7 @@ module Hwaro
           imported = 0
           skipped = 0
           errors = 0
+          wrapped = 0
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -46,6 +47,9 @@ module Hwaro
               case result
               when :imported
                 imported += 1
+              when :imported_wrapped
+                imported += 1
+                wrapped += 1
               when :skipped
                 skipped += 1
               end
@@ -53,6 +57,10 @@ module Hwaro
               errors += 1
               Logger.warn "Error importing #{file_path}: #{ex.message}"
             end
+          end
+
+          if wrapped > 0
+            Logger.warn "#{wrapped} file(s) contained MDX components. Imports kept the raw markup — each will render as literal text until you hand-convert them."
           end
 
           ImportResult.new(
@@ -186,13 +194,16 @@ module Hwaro
             fields["title"] = name.gsub(/[-_]/, " ").split.map(&.capitalize).join(" ")
           end
 
-          # Warn about MDX components in .mdx files
+          # MDX handling: strip import statements (no Crinja equivalent).
+          # Track remaining JSX-ish component markup so the `run` method
+          # can emit a single summary warning.
+          has_mdx_components = false
           if file_path.ends_with?(".mdx")
-            if body.includes?("import ") || body.matches?(/<[A-Z]/)
-              Logger.warn "MDX components detected in #{file_path} — manual conversion may be needed"
-            end
-            # Strip import statements
             body = body.gsub(/^import\s+.+$\n?/m, "")
+            if body.matches?(/<[A-Z]/)
+              Logger.warn "MDX components detected in #{file_path} — manual conversion needed."
+              has_mdx_components = true
+            end
           end
 
           # Determine section from content collection name
@@ -208,7 +219,8 @@ module Hwaro
 
           frontmatter = generate_frontmatter(fields)
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
-          written ? :imported : :skipped
+          return :skipped unless written
+          has_mdx_components ? :imported_wrapped : :imported
         end
 
         YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m

@@ -17,6 +17,7 @@ module Hwaro
           imported = 0
           skipped = 0
           errors = 0
+          wrapped = 0
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -45,6 +46,9 @@ module Hwaro
               case result
               when :imported
                 imported += 1
+              when :imported_wrapped
+                imported += 1
+                wrapped += 1
               when :skipped
                 skipped += 1
               end
@@ -52,6 +56,10 @@ module Hwaro
               errors += 1
               Logger.warn "Error importing #{file_path}: #{ex.message}"
             end
+          end
+
+          if wrapped > 0
+            Logger.warn "#{wrapped} file(s) contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
           ImportResult.new(
@@ -267,9 +275,12 @@ module Hwaro
             end
           end
 
-          # Warn about template tags
-          if body.matches?(TEMPLATE_TAG_PATTERN)
-            Logger.warn "Template tags detected in #{file_path} — manual conversion may be needed"
+          # Track files with Nunjucks/Liquid tags; the `run` method
+          # emits a single summary with the count so users know how
+          # many files need manual conversion.
+          has_template_tags = body.matches?(TEMPLATE_TAG_PATTERN)
+          if has_template_tags
+            Logger.warn "Template tags detected in #{file_path} — manual conversion needed."
           end
 
           # Determine section
@@ -285,7 +296,8 @@ module Hwaro
 
           frontmatter = generate_frontmatter(fields)
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
-          written ? :imported : :skipped
+          return :skipped unless written
+          has_template_tags ? :imported_wrapped : :imported
         end
 
         YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
