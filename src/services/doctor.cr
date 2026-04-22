@@ -57,22 +57,18 @@ module Hwaro
         issues.reject { |i| ignore.includes?(i.id) }
       end
 
-      # Returns the list of config section keys missing from the user's config.toml
+      # Returns the list of config section keys missing from the user's config.toml.
+      # On I/O or TOML parse failure, returns an empty array — those paths are
+      # already reported by `check_config` as classified issues, so silent-empty
+      # here lets the main run loop carry on without double-reporting. Callers
+      # that need a clearer signal (e.g. `fix_config`) should probe the file
+      # directly via `readable_config_toml` / `parse_config_toml`.
       def missing_config_sections : Array(String)
-        return [] of String unless File.exists?(@config_path)
+        raw_text = readable_config_toml
+        return [] of String unless raw_text
 
-        raw_text = begin
-          File.read(@config_path)
-        rescue ex : IO::Error | File::Error
-          Logger.debug "Doctor: cannot read #{@config_path}: #{ex.message}"
-          return [] of String
-        end
-
-        begin
-          raw = TOML.parse(raw_text)
-        rescue
-          return [] of String
-        end
+        raw = parse_config_toml(raw_text)
+        return [] of String unless raw
 
         # Collect commented section headers (e.g. "# [pwa]", "# [og.auto_image]")
         commented_sections = Set(String).new
@@ -110,8 +106,37 @@ module Hwaro
       # Append missing config sections to config.toml.
       # When minimal is true, skip advanced optional sections (pwa, amp, assets, etc.)
       # Returns the list of sections that were added.
+      #
+      # Raises `HwaroError` when the config cannot be read or parsed so
+      # `--fix` refuses to append to a broken file (prior behaviour was
+      # to silently say "Config is up to date"), and when the atomic
+      # write fails (temp file + rename; see below).
       def fix_config(minimal : Bool = false) : Array(String)
-        return [] of String unless File.exists?(@config_path)
+        unless File.exists?(@config_path)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Config file not found: #{@config_path}",
+            hint: "Run 'hwaro init' to scaffold a project, or cd into a directory containing config.toml.",
+          )
+        end
+
+        raw_text = readable_config_toml
+        unless raw_text
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Cannot read #{@config_path}",
+            hint: "Check file permissions and retry.",
+          )
+        end
+
+        raw = parse_config_toml(raw_text)
+        unless raw
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "#{@config_path} has TOML parse errors; refusing to --fix.",
+            hint: "Fix the TOML syntax first (run 'hwaro doctor' to see the parse error), then re-run 'hwaro doctor --fix'.",
+          )
+        end
 
         missing = missing_config_sections
         return [] of String if missing.empty?
@@ -127,16 +152,54 @@ module Hwaro
           end
         end
 
-        unless snippets.empty?
-          # Ensure existing file ends with a newline before appending
-          existing = File.read(@config_path)
-          File.open(@config_path, "a") do |f|
-            f.print("\n") unless existing.ends_with?("\n")
+        return added if snippets.empty?
+
+        # Write atomically: compose the final file contents in a temp
+        # file beside `config.toml`, then `File.rename` into place so a
+        # mid-write interruption (SIGINT, disk full) can't leave a
+        # partially-appended config behind.
+        tmp_path = "#{@config_path}.hwaro-tmp"
+        begin
+          File.open(tmp_path, "w") do |f|
+            f.print(raw_text)
+            f.print("\n") unless raw_text.ends_with?("\n")
             snippets.each { |s| f.print(s) }
           end
+          File.rename(tmp_path, @config_path)
+        rescue ex : IO::Error | File::Error
+          # Clean the half-written temp file so re-running isn't blocked.
+          File.delete(tmp_path) if File.exists?(tmp_path)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Failed to update #{@config_path}: #{ex.message}",
+            hint: "Check file permissions and available disk space, then retry.",
+          )
         end
 
         added
+      end
+
+      # Read `config.toml` as text. Returns nil on I/O failure
+      # (permission denied, missing file, etc.) so callers can branch
+      # without nesting another begin/rescue.
+      private def readable_config_toml : String?
+        return unless File.exists?(@config_path)
+        File.read(@config_path)
+      rescue ex : IO::Error | File::Error
+        Logger.debug "Doctor: cannot read #{@config_path}: #{ex.message}"
+        nil
+      end
+
+      # Parse the raw `config.toml` text. Returns nil on TOML parse
+      # failure; callers already downstream of `check_config` have seen
+      # the classified error so silent-nil here avoids double-reporting.
+      # The rescue is narrowed to `TOML::ParseException` so any other
+      # unexpected error propagates rather than being silently swallowed.
+      private def parse_config_toml(raw_text : String) : TOML::Table?
+        TOML.parse(raw_text)
+      rescue ex : TOML::ParseException
+        Logger.debug "Doctor: TOML parse error in #{@config_path}: #{ex.message}"
+        nil
       end
 
       # Get the TOML snippet for a missing config section
