@@ -176,23 +176,31 @@ module Hwaro
             [] of String
           end
 
-        return results if target_names.empty?
+        if target_names.empty?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "No deployment targets configured.",
+            hint: "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>",
+          )
+        end
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
           if target
             target
           else
+            available = deployment.targets.map(&.name).join(", ")
+            hint = available.empty? ? nil.as(String?) : "Configured targets: #{available}."
             results << DeployResult.new(
               name: name,
               status: "error",
               created: 0, updated: 0, deleted: 0,
               duration_ms: 0.0,
               error: {
-                "code"     => Hwaro::Errors::HWARO_E_CONFIG,
-                "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_CONFIG).to_s,
+                "code"     => Hwaro::Errors::HWARO_E_USAGE,
+                "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_USAGE).to_s,
                 "message"  => "Unknown deploy target: #{name}",
-                "hint"     => nil.as(String?),
+                "hint"     => hint,
               } of String => String?,
             )
             nil
@@ -227,9 +235,14 @@ module Hwaro
         rescue ex : Hwaro::HwaroError
           error = ex
         rescue ex
+          # Any non-`HwaroError` reaching here is an unexpected defect,
+          # not a network problem. Classifying as HWARO_E_INTERNAL avoids
+          # the older blanket-`HWARO_E_NETWORK` that made bugs masquerade
+          # as connectivity issues and hid the original message behind a
+          # generic "Deploy target 'X' failed" line.
           error = Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_NETWORK,
-            message: ex.message || "Deploy target '#{target.name}' failed",
+            code: Hwaro::Errors::HWARO_E_INTERNAL,
+            message: ex.message || "Deploy target '#{target.name}' failed with #{ex.class}",
           )
         end
 
@@ -297,8 +310,11 @@ module Hwaro
 
         url = target.url
         if url.empty?
-          Logger.error "Target '#{target.name}' is missing 'url' (or 'command')."
-          return {false, TargetCounts.new}
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Target '#{target.name}' is missing 'url' (or 'command').",
+            hint: "Set either 'url' or 'command' in [[deployment.targets]].",
+          )
         end
 
         if directory_destination = local_directory_destination(url)
@@ -311,8 +327,12 @@ module Hwaro
           return {ok, TargetCounts.new}
         end
 
-        Logger.error "Unsupported deploy target URL scheme for '#{target.name}': #{url}"
-        {false, TargetCounts.new}
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Unsupported deploy target URL scheme for '#{target.name}': #{url}",
+          hint: "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc). " \
+                "Example: command = \"aws s3 sync {source}/ {url} --delete\"",
+        )
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
@@ -323,9 +343,11 @@ module Hwaro
         source_dir = File.expand_path(source_dir)
 
         unless Dir.exists?(source_dir)
-          Logger.error "Source directory not found: #{source_dir}"
-          Logger.info "Run 'hwaro build' first, or pass '--source DIR'."
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Source directory not found: #{source_dir}",
+            hint: "Run 'hwaro build' first, or pass '--source DIR'.",
+          )
         end
 
         target_names =
@@ -340,28 +362,40 @@ module Hwaro
           end
 
         if target_names.empty?
-          Logger.error "No deployment targets configured."
-          Logger.info "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>"
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "No deployment targets configured.",
+            hint: "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>",
+          )
         end
 
-        targets = target_names.compact_map do |name|
+        targets = target_names.map do |name|
           target = deployment.target_named(name)
-          if target
-            target
-          else
-            Logger.error "Unknown deploy target: #{name}"
-            nil
+          unless target
+            available = deployment.targets.map(&.name).join(", ")
+            hint = if available.empty?
+                     "No targets are configured. Add '[[deployment.targets]]' to config.toml."
+                   else
+                     "Configured targets: #{available}."
+                   end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Unknown deploy target: #{name}",
+              hint: hint,
+            )
           end
+          target
         end
-
-        return false if targets.empty?
 
         effective = EffectiveOptions.new(deployment, options)
 
+        # All failure paths inside deploy_target now raise HwaroError, so
+        # the loop body either completes or the error propagates up to
+        # the Runner which renders the classified error + exit code. The
+        # Bool return is kept for backwards compatibility with callers
+        # that only care about success/skip.
         targets.each do |target|
-          ok = deploy_target(target, source_dir, effective, deployment)
-          return false unless ok
+          deploy_target(target, source_dir, effective, deployment)
         end
 
         true
@@ -395,8 +429,11 @@ module Hwaro
 
         url = target.url
         if url.empty?
-          Logger.error "Target '#{target.name}' is missing 'url' (or 'command')."
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Target '#{target.name}' is missing 'url' (or 'command').",
+            hint: "Set either 'url' or 'command' in [[deployment.targets]].",
+          )
         end
 
         if directory_destination = local_directory_destination(url)
@@ -408,14 +445,12 @@ module Hwaro
           return deploy_via_command(target, source_dir, auto_command, effective)
         end
 
-        Logger.error "Unsupported deploy target URL scheme for '#{target.name}': #{url}"
-        Logger.info "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc)."
-        Logger.info "Example:"
-        Logger.info "  [[deployment.targets]]"
-        Logger.info "  name = \"prod\""
-        Logger.info "  url = \"s3://my-bucket\""
-        Logger.info "  command = \"aws s3 sync {source}/ {url} --delete\""
-        false
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Unsupported deploy target URL scheme for '#{target.name}': #{url}",
+          hint: "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc). " \
+                "Example: command = \"aws s3 sync {source}/ {url} --delete\"",
+        )
       end
 
       # Shell metacharacters that indicate potentially dangerous commands.
@@ -462,11 +497,17 @@ module Hwaro
           result.output.each_line { |line| Logger.info "  #{line}" }
         end
         unless result.success
-          Logger.error "Deploy command failed (exit #{result.exit_code})."
+          # Surface stderr from the subprocess before raising so the user
+          # sees the tool-specific failure detail; the classified error
+          # itself carries only the summary exit-code info.
           unless result.error.empty?
             result.error.each_line { |line| Logger.error "  #{line}" }
           end
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Deploy command failed (exit #{result.exit_code}): #{expanded}",
+            hint: "Inspect the stderr above for details from the deploy tool.",
+          )
         end
 
         Logger.success "Deploy command completed."
@@ -485,8 +526,11 @@ module Hwaro
         dest_dir_expanded = File.expand_path(dest_dir)
 
         if nested_path?(source_dir, dest_dir_expanded) || nested_path?(dest_dir_expanded, source_dir)
-          Logger.error "Refusing to deploy: source and destination overlap."
-          return {false, counts}
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to deploy: source and destination overlap.",
+            hint: "source: #{source_dir} / dest: #{dest_dir_expanded}",
+          )
         end
 
         FileUtils.mkdir_p(dest_dir_expanded)
@@ -494,13 +538,16 @@ module Hwaro
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir_expanded)
 
-        return {false, counts} unless validate_strip_index_html_for_filesystem(target, desired.keys)
-        return {false, counts} unless validate_destination_paths(dest_dir_expanded, desired.keys)
+        validate_strip_index_html_for_filesystem(target, desired.keys)
+        validate_destination_paths(dest_dir_expanded, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
         if effective.max_deletes != -1 && to_delete.size > effective.max_deletes
-          Logger.error "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes})."
-          return {false, counts}
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes}).",
+            hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
+          )
         end
 
         to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force)
@@ -547,10 +594,11 @@ module Hwaro
         dest_dir = File.expand_path(dest_dir)
 
         if nested_path?(source_dir, dest_dir) || nested_path?(dest_dir, source_dir)
-          Logger.error "Refusing to deploy: source and destination overlap."
-          Logger.info "source: #{source_dir}"
-          Logger.info "dest:   #{dest_dir}"
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to deploy: source and destination overlap.",
+            hint: "source: #{source_dir} / dest: #{dest_dir}",
+          )
         end
 
         FileUtils.mkdir_p(dest_dir)
@@ -558,14 +606,16 @@ module Hwaro
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir)
 
-        return false unless validate_strip_index_html_for_filesystem(target, desired.keys)
-        return false unless validate_destination_paths(dest_dir, desired.keys)
+        validate_strip_index_html_for_filesystem(target, desired.keys)
+        validate_destination_paths(dest_dir, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
         if effective.max_deletes != -1 && to_delete.size > effective.max_deletes
-          Logger.error "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes})."
-          Logger.info "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit."
-          return false
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes}).",
+            hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
+          )
         end
 
         to_copy, skipped = compute_copies(desired, dest_dir, effective.force)
@@ -697,21 +747,22 @@ module Hwaro
         normalized
       end
 
-      private def validate_strip_index_html_for_filesystem(target : Models::DeploymentTarget, dest_paths : Array(String)) : Bool
-        return true unless target.strip_index_html
+      private def validate_strip_index_html_for_filesystem(target : Models::DeploymentTarget, dest_paths : Array(String)) : Nil
+        return unless target.strip_index_html
         dest_paths.each do |path|
           next if path.empty?
           prefix = "#{path}/"
           if dest_paths.any?(&.starts_with?(prefix))
-            Logger.error "stripIndexHTML cannot be used with file:// deployments when both '#{path}' and '#{prefix}...' exist."
-            Logger.info "Disable stripIndexHTML for target '#{target.name}', or deploy via an object store."
-            return false
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "stripIndexHTML cannot be used with file:// deployments when both '#{path}' and '#{prefix}...' exist.",
+              hint: "Disable stripIndexHTML for target '#{target.name}', or deploy via an object store.",
+            )
           end
         end
-        true
       end
 
-      private def validate_destination_paths(dest_dir : String, dest_paths : Array(String)) : Bool
+      private def validate_destination_paths(dest_dir : String, dest_paths : Array(String)) : Nil
         dest_set = dest_paths.to_set
 
         dest_paths.each do |rel|
@@ -722,29 +773,36 @@ module Hwaro
             parts[0...-1].each do |part|
               prefix = prefix.empty? ? part : "#{prefix}/#{part}"
               if dest_set.includes?(prefix)
-                Logger.error "Filesystem deploy conflict: both file '#{prefix}' and path '#{rel}' exist."
-                return false
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "Filesystem deploy conflict: both file '#{prefix}' and path '#{rel}' exist.",
+                  hint: "Remove one or the other before deploying.",
+                )
               end
             end
           end
 
           full_path = File.join(dest_dir, rel)
           if Dir.exists?(full_path)
-            Logger.error "Destination path is a directory but needs a file: #{rel}"
-            return false
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Destination path is a directory but needs a file: #{rel}",
+              hint: "Remove the existing directory at #{full_path} or rename the source file.",
+            )
           end
 
           current = dest_dir
           parts[0...-1].each do |part|
             current = File.join(current, part)
             if File.file?(current)
-              Logger.error "Destination path is a file but needs a directory: #{current}"
-              return false
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Destination path is a file but needs a directory: #{current}",
+                hint: "Remove the existing file at #{current} or rename the source.",
+              )
             end
           end
         end
-
-        true
       end
 
       # Compare two files for identical content. Uses size check first,
@@ -839,7 +897,13 @@ module Hwaro
       end
 
       private def confirm?(prompt : String) : Bool
-        raise "Cannot prompt for confirmation (stdin is not a TTY)." unless STDIN.tty?
+        unless STDIN.tty?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Cannot prompt for confirmation: stdin is not a TTY.",
+            hint: "Pass --force to skip confirmation prompts in non-interactive environments.",
+          )
+        end
         Logger.warn "#{prompt} [y/N]"
         input = STDIN.gets
         (input.try(&.strip.downcase) == "y")
