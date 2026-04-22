@@ -126,7 +126,7 @@ module Hwaro
             if tags_val = yaml["tags"]?
               case tags_val.raw
               when Array
-                tags_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
+                flatten_yaml_strings(tags_val).each { |t| tags << t }
               when String
                 tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
               end
@@ -151,7 +151,7 @@ module Hwaro
               aliases = [] of String
               case aliases_val.raw
               when Array
-                aliases_val.as_a.each { |a| aliases << (a.as_s? || a.raw.to_s) }
+                flatten_yaml_strings(aliases_val).each { |a| aliases << a }
               when String
                 aliases << aliases_val.as_s
               end
@@ -205,6 +205,28 @@ module Hwaro
             return {yaml_str, body}
           end
           {nil, content.strip}
+        end
+
+        # Recursively flatten a YAML array value into a flat list of strings.
+        # Obsidian users write nested arrays for tags (e.g. `tags: [[a, b]]`)
+        # and the naive per-element `t.raw.to_s` on an Array element yielded
+        # a JSON-literal tag like `["a", "b"]`. Skips nested hashes since
+        # they don't map to a scalar tag — the caller can warn separately
+        # if needed.
+        private def flatten_yaml_strings(value : YAML::Any) : Array(String)
+          result = [] of String
+          case value.raw
+          when Array
+            value.as_a.each do |item|
+              flatten_yaml_strings(item).each { |s| result << s }
+            end
+          when Hash
+            # Nested object: skip silently; tags/aliases don't carry objects.
+          else
+            s = value.as_s? || value.raw.to_s
+            result << s unless s.empty?
+          end
+          result
         end
 
         private def extract_inline_tags(body : String) : Array(String)
