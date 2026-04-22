@@ -5,30 +5,43 @@ require "../../src/config/options/deploy_options"
 
 describe Hwaro::Services::Deployer do
   describe "#run" do
-    it "fails if no targets configured" do
-      config = Hwaro::Models::Config.new
-      deployer = Hwaro::Services::Deployer.new
-      options = Hwaro::Config::Options::DeployOptions.new(targets: [] of String)
+    it "raises HwaroError(HWARO_E_CONFIG) if no targets configured" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir,
+          targets: [] of String,
+        )
 
-      result = deployer.run(options, config)
-      result.should be_false
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("No deployment targets")
+      end
     end
 
-    it "fails if unknown target specified" do
-      config = Hwaro::Models::Config.new
-      target = Hwaro::Models::DeploymentTarget.new
-      target.name = "production"
-      target.url = "file:///tmp/prod"
-      config.deployment.targets << target
+    it "raises HwaroError(HWARO_E_USAGE) if an unknown target is specified" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "production"
+        target.url = "file:///tmp/prod"
+        config.deployment.targets << target
 
-      deployer = Hwaro::Services::Deployer.new
-      options = Hwaro::Config::Options::DeployOptions.new(targets: ["staging"])
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir,
+          targets: ["staging"],
+        )
 
-      result = deployer.run(options, config)
-      result.should be_false
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("Unknown deploy target: staging")
+        (err.hint || "").should contain("production")
+      end
     end
 
-    it "fails if source directory missing" do
+    it "raises HwaroError(HWARO_E_CONFIG) if the source directory is missing" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         target = Hwaro::Models::DeploymentTarget.new
@@ -42,8 +55,9 @@ describe Hwaro::Services::Deployer do
           targets: ["production"]
         )
 
-        result = deployer.run(options, config)
-        result.should be_false
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Source directory not found")
       end
     end
 
@@ -528,6 +542,120 @@ describe "Deployer private helpers" do
       # After normalization, "assets\style.css" becomes "assets/style.css"
       # which should NOT match the exclude (exclude is also a literal pattern)
       deployer.test_included_by_target?("assets\\style.css", target).should be_true
+    end
+  end
+
+  describe "classified error surface" do
+    it "raises HwaroError(HWARO_E_CONFIG) when target has neither url nor command" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "bare"
+        target.url = ""
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["bare"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("missing 'url'")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) on an unsupported URL scheme with no command override" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "unknown"
+        target.url = "gopher://example.com"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["unknown"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unsupported deploy target URL scheme")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when --max-deletes limit is exceeded" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "keep.html"), "x")
+        FileUtils.mkdir_p(dest_dir)
+        # Seed the destination with more files than the limit.
+        10.times { |i| File.write(File.join(dest_dir, "extra-#{i}.html"), "y") }
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir, targets: ["local"], max_deletes: 5,
+        )
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("Refusing to delete")
+        (err.message || "").should contain("max_deletes: 5")
+        # The existing "extra-*" files must remain on disk — the safety
+        # limit aborted the plan before any deletion happened.
+        Dir.children(dest_dir).count(&.starts_with?("extra-")).should eq(10)
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when source and destination overlap" do
+      Dir.mktmpdir do |dir|
+        # Deploy INTO a subdirectory of the source — classic overlap that
+        # could wipe the source files during a delete pass.
+        src_dir = dir
+        dest_dir = File.join(dir, "nested")
+        File.write(File.join(src_dir, "keep.html"), "x")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "nested"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["nested"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("source and destination overlap")
+      end
+    end
+
+    it "propagates HwaroError from deploy_structured as per-target payload with the correct code" do
+      # Regression: a `--max-deletes` refusal used to surface in --json as
+      # HWARO_E_NETWORK with the generic "Deploy target '<name>' failed"
+      # message; now it carries the classified HWARO_E_USAGE code and the
+      # real "Refusing to delete N files" text.
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "keep.html"), "x")
+        FileUtils.mkdir_p(dest_dir)
+        10.times { |i| File.write(File.join(dest_dir, "extra-#{i}.html"), "y") }
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir, targets: ["local"], max_deletes: 5,
+        )
+        results = Hwaro::Services::Deployer.new.deploy_structured(options, config)
+        results.size.should eq(1)
+        result = results.first
+        result.status.should eq("error")
+        err = result.error.not_nil!
+        err["code"].should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err["message"] || "").should contain("Refusing to delete")
+      end
     end
   end
 end

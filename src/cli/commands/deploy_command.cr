@@ -98,8 +98,11 @@ module Hwaro
             exit(overall == "ok" ? 0 : worst_exit_for(results))
           end
 
-          ok = Services::Deployer.new.run(options)
-          exit(1) unless ok
+          # Deployer#run raises Hwaro::HwaroError on failure; the Runner
+          # catches it and emits the classified `Error [HWARO_E_XXX]: …`
+          # line with the right exit code. A successful return is a
+          # no-op — the Runner exits 0 at the end of `run` automatically.
+          Services::Deployer.new.run(options)
         end
 
         # Pick the most severe exit code across failing targets so CI can
