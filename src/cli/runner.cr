@@ -242,19 +242,21 @@ module Hwaro
         return if Logger.quiet?
 
         art = [
-          "                             ",
-          "    █████████████████████    ",
-          "    ██                 ██    ",
-          "    ██ ███████████████ ██    ",
-          "    ██ ███████████████ ██    ",
-          "    ██ █ █ █ █ █ █ █ █ ██    ",
-          "                             ",
-          "    █████████████████████    ",
+          "          █         ",
+          " ███████ ██ ███████ ",
+          " ██     ███      ██ ",
+          " ██      ███     ██ ",
+          " ██   █  ████    ██ ",
+          " ██ █ ██████ ██  ██ ",
+          " ██ ████████████ ██ ",
+          " ██████████████████ ",
+          "                    ",
         ]
 
         use_color = Logger.color_enabled?
         brand = use_color ? "Hwaro".colorize(:cyan).bold.to_s : "Hwaro"
         info = [
+          "",
           "",
           "",
           "",
@@ -264,8 +266,6 @@ module Hwaro
           "  generator written in Crystal.",
           "",
           "  Usage: hwaro <command> [options]",
-          "",
-          "",
           "",
         ]
 
