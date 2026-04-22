@@ -447,6 +447,90 @@ describe Hwaro::Services::Doctor do
         end
       end
     end
+
+    describe "content front matter diagnostics" do
+      # Scans each `.md` / `.markdown` file with the same parser the
+      # builder uses so doctor catches `HWARO_E_CONTENT`-class issues
+      # before `hwaro build` runs.
+
+      it "reports malformed TOML front matter as a content error" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(content_dir)
+          File.write(File.join(content_dir, "bad.md"), "+++\ntitle = \"Unclosed\n+++\nbody\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          matching = issues.select do |i|
+            i.category == "content" &&
+              i.id == "content-frontmatter-invalid" &&
+              i.level == :error
+          end
+          matching.should_not be_empty
+          (matching.first.file || "").should contain("bad.md")
+        end
+      end
+
+      it "reports malformed YAML front matter as a content error" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(content_dir)
+          File.write(File.join(content_dir, "bad-yaml.md"), "---\ntitle: \"Unclosed\n---\nbody\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? do |i|
+            i.category == "content" && i.level == :error && (i.file || "").includes?("bad-yaml.md")
+          end.should be_true
+        end
+      end
+
+      it "does not report anything for a clean scaffold" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(content_dir)
+          File.write(File.join(content_dir, "index.md"), "+++\ntitle = \"Home\"\n+++\nbody\n")
+          File.write(File.join(content_dir, "about.md"), "---\ntitle: About\n---\nbody\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.category == "content" }.should be_false
+        end
+      end
+
+      it "skips silently when the content directory doesn't exist" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          # No content dir at all.
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.category == "content" }.should be_false
+        end
+      end
+
+      it "also scans nested directories and .markdown extension" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "posts", "deep"))
+          File.write(File.join(content_dir, "posts", "deep", "bad.markdown"), "+++\ntitle = \"Broken\n+++\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? do |i|
+            i.category == "content" && (i.file || "").ends_with?("bad.markdown")
+          end.should be_true
+        end
+      end
+    end
   end
 
   describe "ConfigSnippets drift guard" do
