@@ -23,8 +23,8 @@ class TestImporter < Hwaro::Services::Importers::Base
     format_date(time)
   end
 
-  def test_write_content_file(output_dir, section, slug, frontmatter, body, verbose = false)
-    write_content_file(output_dir, section, slug, frontmatter, body, verbose)
+  def test_write_content_file(output_dir, section, slug, frontmatter, body, verbose = false, force = false)
+    write_content_file(output_dir, section, slug, frontmatter, body, verbose, force)
   end
 end
 
@@ -125,6 +125,19 @@ describe Hwaro::Services::Importers::Base do
         content = File.read(File.join(dir, "existing.md"))
         content.should contain("First")
         content.should_not contain("Second")
+      end
+    end
+
+    it "overwrites existing files when force is true" do
+      Dir.mktmpdir do |dir|
+        importer = TestImporter.new
+        importer.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
+        result = importer.test_write_content_file(dir, "", "existing", "+++\n+++", "Second", false, true)
+        result.should be_true
+
+        content = File.read(File.join(dir, "existing.md"))
+        content.should contain("Second")
+        content.should_not contain("First")
       end
     end
   end

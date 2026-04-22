@@ -56,7 +56,9 @@ module Hwaro
           Utils::TextUtils.slugify(title)
         end
 
-        # Write a content file, skipping if it already exists
+        # Write a content file. Skips if it already exists unless `force`
+        # is true, in which case the existing file is overwritten. Returns
+        # true when a file was written, false when it was skipped.
         protected def write_content_file(
           output_dir : String,
           section : String,
@@ -64,6 +66,7 @@ module Hwaro
           frontmatter : String,
           body : String,
           verbose : Bool = false,
+          force : Bool = false,
         ) : Bool
           dir = section.empty? ? output_dir : File.join(output_dir, section)
           FileUtils.mkdir_p(dir) unless Dir.exists?(dir)
@@ -71,14 +74,16 @@ module Hwaro
           filename = slug.ends_with?(".md") ? slug : "#{slug}.md"
           path = File.join(dir, filename)
 
-          if File.exists?(path)
+          if File.exists?(path) && !force
             Logger.warn "Skipped (already exists): #{path}" if verbose
             return false
           end
 
           content = "#{frontmatter}\n\n#{body}\n"
           File.write(path, content)
-          Logger.debug "Imported: #{path}" if verbose
+          if verbose
+            Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}")
+          end
           true
         end
 
