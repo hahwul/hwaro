@@ -78,6 +78,7 @@ module Hwaro
         ) : Symbol
           title = ""
           post_date = ""
+          pub_date = ""
           status = ""
           post_type = ""
           post_name = ""
@@ -96,6 +97,10 @@ module Hwaro
               title = child.content.strip
             when "post_date"
               post_date = child.content.strip
+            when "pubDate"
+              # RFC 822. Fallback when <wp:post_date> is missing (some
+              # exporters omit it and only populate the RSS pubDate).
+              pub_date = child.content.strip
             when "status"
               status = child.content.strip
             when "post_type"
@@ -143,11 +148,13 @@ module Hwaro
           # Determine section
           section = post_type == "post" ? "posts" : ""
 
-          # Parse and format date
+          # Parse and format date — prefer the precise `<wp:post_date>`
+          # (local time, no TZ noise) and fall back to RFC 822 `<pubDate>`.
           date_str : String? = nil
-          unless post_date.empty?
-            parsed = parse_date(post_date)
-            date_str = format_date(parsed) if parsed
+          if !post_date.empty? && (parsed = parse_date(post_date))
+            date_str = format_date(parsed)
+          elsif !pub_date.empty? && (parsed = parse_date(pub_date))
+            date_str = format_date(parsed)
           end
 
           # Build frontmatter fields
