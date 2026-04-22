@@ -626,6 +626,68 @@ describe "Deployer private helpers" do
       end
     end
 
+    it "raises HwaroError(HWARO_E_CONFIG) on unknown command placeholders" do
+      # Typos like `{srouce}` and forward-looking tokens like `{bucket}`
+      # used to reach the shell as literals and cause confusing
+      # downstream errors. The validator now rejects anything that still
+      # matches `\{name\}` after expansion.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "typo"
+        target.url = "custom://"
+        target.command = "echo src={srouce} bucket={bucket}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["typo"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unknown placeholder(s)")
+        (err.message || "").should contain("{srouce}")
+        (err.message || "").should contain("{bucket}")
+        # Supported-placeholder list in the hint for discoverability.
+        (err.hint || "").should contain("{source}")
+        (err.hint || "").should contain("{url}")
+        (err.hint || "").should contain("{target}")
+      end
+    end
+
+    it "leaves commands with only supported placeholders alone" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "good"
+        target.url = "custom://"
+        # {target} inside a comment-style literal string should also pass
+        target.command = "true # {source} {url} {target}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["good"])
+        # Does not raise — `true` exits 0, no HwaroError surfaces.
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+      end
+    end
+
+    it "catches unknown placeholders even during --dry-run" do
+      # Dry-run still needs to expand + validate the template so typos
+      # are caught without waiting for the user to trigger a real deploy.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "typo"
+        target.url = "custom://"
+        target.command = "echo {unknown}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir, targets: ["typo"], dry_run: true,
+        )
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("{unknown}")
+      end
+    end
+
     it "propagates HwaroError from deploy_structured as per-target payload with the correct code" do
       # Regression: a `--max-deletes` refusal used to surface in --json as
       # HWARO_E_NETWORK with the generic "Deploy target '<name>' failed"
