@@ -510,6 +510,101 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "treats a multi-segment dir-ish path as the bundle directory itself" do
+        # Regression for the double-wrap: `posts/bundled --bundle` used to
+        # produce `posts/bundled/bundled/index.md` because the directory
+        # fallback appended a `<title-slug>.md` to the path first, then
+        # bundle-wrapped the result. The path IS the bundle dir when
+        # --bundle is active, so land at `<path>/index.md` directly.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/bundled", title: "Bundled", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/bundled/index.md").should be_true
+            File.exists?("content/posts/bundled/bundled/index.md").should be_false
+            File.exists?("content/posts/bundled/bundled.md").should be_false
+          end
+        end
+      end
+
+      it "keeps the custom title in front matter without leaking it into the bundle path" do
+        # The title slug must not become a directory layer when the user
+        # explicitly picked the bundle dir via the path argument.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/deep", title: "Something Else", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/deep/index.md").should be_true
+            File.exists?("content/posts/deep/something-else/index.md").should be_false
+
+            content = File.read("content/posts/deep/index.md")
+            content.should contain("title = \"Something Else\"")
+          end
+        end
+      end
+
+      it "leaves `-s section` + dir-ish path behavior unchanged" do
+        # The -s branch handles path-without-.md differently (appends .md
+        # to the path rather than using it as a directory), so the double-
+        # wrap collapse must not apply here. `foo -s docs --bundle` should
+        # still produce `docs/foo/index.md`, not `docs/index.md`.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "foo", title: "Foo", section: "docs", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/docs/foo/index.md").should be_true
+            File.exists?("content/docs/index.md").should be_false
+          end
+        end
+      end
+
+      it "leaves single-segment dir-ish paths with bundle unchanged (conservative scope)" do
+        # `hwaro new posts --bundle --title X` is ambiguous between "the
+        # 'posts' dir IS the bundle" (→ posts/index.md) and "create a
+        # bundle inside posts/" (→ posts/<slug>/index.md). We only apply
+        # the double-wrap fix when the path includes a `/` so the caller
+        # has clearly picked the bundle directory. Single-segment keeps
+        # the slug-inside-dir layout as before.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "mysection", title: "Intro", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/mysection/intro/index.md").should be_true
+            File.exists?("content/mysection/index.md").should be_false
+          end
+        end
+      end
+
+      it "leaves --no-bundle dir-ish paths unchanged" do
+        # The --no-bundle + no-.md combination still produces <path>/<slug>.md
+        # (pre-existing behavior; tracked separately if the community wants
+        # it tightened). This spec pins the fact that the bundle-collapse
+        # patch does NOT accidentally alter it.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/nobund", title: "NoBund", bundle: false)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/nobund/nobund.md").should be_true
+            File.exists?("content/posts/nobund/index.md").should be_false
+          end
+        end
+      end
+
       it "refuses bundle creation with HwaroError(HWARO_E_IO) when a single-file sibling already exists" do
         # Both `posts/hello.md` (sibling) and `posts/hello/index.md`
         # (bundle) would render to the same URL — we'd rather fail loudly

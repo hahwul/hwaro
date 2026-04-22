@@ -171,8 +171,25 @@ module Hwaro
         # mode is active. Skipped if the path is already an `index.md`
         # or `_index.md` so repeated invocations (and accidental bundle
         # mode on section indices) don't create `foo/index/index.md`.
+        #
+        # Special case: when the user gave a dir-ish multi-segment path
+        # like `posts/bundled` (no .md, no --section), the earlier
+        # directory-fallback already appended a `<title-slug>.md` to it,
+        # producing `content/posts/bundled/<slug>.md`. Treating that as a
+        # regular `.md` and then bundle-wrapping would stack an extra
+        # directory (`content/posts/bundled/<slug>/index.md`). The user's
+        # intent with `--bundle` is "the path IS the bundle directory",
+        # so collapse the slug layer and land at `<path>/index.md`.
+        path_is_dir_bundle = bundle_mode &&
+                             options.section.nil? &&
+                             options.path.try { |p| !p.ends_with?(".md") && p.includes?("/") } == true
+
         if bundle_mode && !bundle_path?(full_path)
-          candidate = bundle_path_for(full_path)
+          candidate = if path_is_dir_bundle
+                        File.join(File.dirname(full_path), "index.md")
+                      else
+                        bundle_path_for(full_path)
+                      end
           if bundle_collides_with_sibling?(candidate)
             sibling = candidate.rchop("/index.md") + ".md"
             raise Hwaro::HwaroError.new(
