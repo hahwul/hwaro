@@ -41,6 +41,43 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    it "flattens nested YAML array tags (tags: [[a, b]])" do
+      Dir.mktmpdir do |dir|
+        # Obsidian users (via plugins or shorthand) can write nested arrays
+        # for tags. Previously the inner array was stringified to a JSON
+        # literal ('["a", "b"]') and landed as a single bogus tag.
+        post_content = <<-OBSIDIAN
+          ---
+          title: "Nested Tags"
+          tags: [[misc, research], [project/alpha]]
+          aliases: [[alt-name, other-name]]
+          ---
+          Body.
+          OBSIDIAN
+
+        File.write(File.join(dir, "nested.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+
+        content = File.read(File.join(output_dir, "posts", "nested-tags.md"))
+        content.should contain(%(tags = ["misc", "research", "project/alpha"]))
+        content.should contain(%(aliases = ["alt-name", "other-name"]))
+        # Guard against the previous bug form: a tag value of `["misc"]`
+        # (stringified JSON), which serializes to the escaped quote below.
+        content.should_not contain(%q(\"misc))
+      end
+    end
+
     it "converts wiki-links to standard markdown links" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
