@@ -348,6 +348,20 @@ hwaro doctor               # Diagnose config, template, and structure issues
 hwaro doctor --fix         # Add missing config sections to config.toml
 ```
 
+**Exit codes.** `doctor` returns a classified exit code based on the most
+severe issue reported, so CI pipelines can gate on it directly:
+
+| Outcome | Exit |
+|---|---|
+| No issues, warnings only, or info-level findings | `0` |
+| Config errors (missing/broken `config.toml`) | `3` (`HWARO_E_CONFIG`) |
+| Template errors (missing required file, unclosed tags) | `4` (`HWARO_E_TEMPLATE`) |
+| Content errors (malformed front matter, when the check lands) | `5` (`HWARO_E_CONTENT`) |
+| Other error-level issues | `1` |
+
+Warnings (empty `base_url`, trailing slash, duplicate taxonomy names, etc.)
+are advisory and never change the exit code.
+
 For content validation, use `hwaro tool validate`. See [doctor](/start/tools/doctor/) for details.
 
 ### tool

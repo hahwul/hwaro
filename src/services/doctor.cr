@@ -143,7 +143,10 @@ module Hwaro
 
       private def check_config(issues : Array(Issue)) : Models::Config?
         unless File.exists?(@config_path)
-          issues << Issue.new(id: "config-not-found", level: :warning, category: "config", file: @config_path, message: "Config file not found")
+          # Missing config.toml blocks every build path (`Config.load`
+          # raises `HWARO_E_CONFIG`), so surface it as an error — not an
+          # advisory — so CI can gate on `doctor`'s exit code.
+          issues << Issue.new(id: "config-not-found", level: :error, category: "config", file: @config_path, message: "Config file not found")
           return
         end
 
@@ -223,10 +226,15 @@ module Hwaro
         end
       end
 
-      # Check templates directory for required files
+      # Check templates directory for required files.
+      #
+      # All template-level problems here are build-blocking — Crinja
+      # refuses to render if templates are missing or have syntax
+      # errors — so they're emitted at `:error` level so CI gates on
+      # `doctor`'s exit code catch them before `hwaro build` runs.
       private def check_templates(issues : Array(Issue))
         unless Dir.exists?(@templates_dir)
-          issues << Issue.new(id: "template-dir-missing", level: :warning, category: "template", file: nil,
+          issues << Issue.new(id: "template-dir-missing", level: :error, category: "template", file: nil,
             message: "Templates directory not found: #{@templates_dir}")
           return
         end
@@ -234,7 +242,7 @@ module Hwaro
         %w[page.html section.html].each do |required|
           path = File.join(@templates_dir, required)
           unless File.exists?(path)
-            issues << Issue.new(id: "template-required-missing", level: :warning, category: "template", file: path,
+            issues << Issue.new(id: "template-required-missing", level: :error, category: "template", file: path,
               message: "Required template file missing: #{required}")
           end
         end
@@ -245,7 +253,9 @@ module Hwaro
         end
       end
 
-      # Basic template syntax check — unclosed tags
+      # Basic template syntax check — unclosed tags.
+      # Unclosed tags raise `HWARO_E_TEMPLATE` during render, so flag
+      # them at :error level rather than :warning.
       private def check_template_syntax(file_path : String, issues : Array(Issue))
         content = File.read(file_path)
 
@@ -257,7 +267,7 @@ module Hwaro
         opens = stripped.scan(/\{%[-\s]*\b(if|for|block|macro)\b/).size
         closes = stripped.scan(/\{%[-\s]*\bend(if|for|block|macro)\b/).size
         if opens != closes
-          issues << Issue.new(id: "template-unclosed-block", level: :warning, category: "template", file: file_path,
+          issues << Issue.new(id: "template-unclosed-block", level: :error, category: "template", file: file_path,
             message: "Possible unclosed template block tag (#{opens} opened, #{closes} closed)")
         end
 
@@ -265,7 +275,7 @@ module Hwaro
         open_vars = stripped.scan(/\{\{/).size
         close_vars = stripped.scan(/\}\}/).size
         if open_vars != close_vars
-          issues << Issue.new(id: "template-mismatched-vars", level: :warning, category: "template", file: file_path,
+          issues << Issue.new(id: "template-mismatched-vars", level: :error, category: "template", file: file_path,
             message: "Mismatched {{ }} variable tags (#{open_vars} opened, #{close_vars} closed)")
         end
       rescue ex
