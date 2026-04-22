@@ -376,14 +376,81 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      it "raises HwaroError(HWARO_E_CONFIG) when config.toml is missing" do
+        Dir.mktmpdir do |dir|
+          # No config.toml at all.
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: File.join(dir, "config.toml"))
+          err = expect_raises(Hwaro::HwaroError) { doctor.fix_config }
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").should contain("not found")
+        end
+      end
+
+      it "raises HwaroError(HWARO_E_CONFIG) when config.toml has TOML parse errors" do
+        # Refuses to --fix a broken config rather than silently saying
+        # "up to date" (the old behaviour from the bare-rescue return).
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "Ok"\nbroken = = \n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          err = expect_raises(Hwaro::HwaroError) { doctor.fix_config }
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").downcase.should contain("parse error")
+          (err.hint || "").should contain("'hwaro doctor'")
+
+          # And the broken input is NOT modified — no half-append.
+          File.read(config_path).should eq(%(title = "Ok"\nbroken = = \n))
+        end
+      end
+
+      it "writes atomically via a temp file so a concurrent reader never sees a partial config" do
+        # End-to-end sanity for the temp-file + rename approach: the
+        # temp file lives at `<config>.hwaro-tmp` during the write and
+        # is renamed into place in one step, so there is no leftover
+        # temp file after a successful fix.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          added = doctor.fix_config
+          added.should_not be_empty
+
+          File.exists?("#{config_path}.hwaro-tmp").should be_false
+          # Config now contains the original pre-existing content plus
+          # at least one appended section, end-to-end.
+          text = File.read(config_path)
+          text.should contain(%(title = "My Site"))
+          text.should contain("[pwa]")
+        end
+      end
+
       it "returns empty when nothing is missing" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
-          # Write a config with all known sections
-          sections = Hwaro::Services::Doctor::KNOWN_CONFIG_SECTIONS.keys.map { |k|
-            "[#{k}]"
-          }.join("\n")
-          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n#{sections}\n[og]\ndefault_image = "/img.png"\n[og.auto_image]\nenabled = false\n[image_processing.lqip]\nenabled = false\n))
+          # Synthesize a config that lists every known top-level section
+          # and each known sub-section exactly once, in an order that's
+          # valid TOML (sub-sections right after their parents). Previous
+          # versions of this spec duplicated `[og]` which happened to
+          # parse under a bare `rescue` that swallowed errors — now
+          # `fix_config` surfaces parse errors as HwaroError.
+          sub_children_by_parent = Hash(String, Array(String)).new { |h, k| h[k] = [] of String }
+          Hwaro::Services::Doctor::KNOWN_SUB_SECTIONS.each_key do |parent, child|
+            sub_children_by_parent[parent] << child
+          end
+
+          body = String.build do |str|
+            str << %(title = "My Site"\n)
+            str << %(base_url = "https://example.com"\n)
+            Hwaro::Services::Doctor::KNOWN_CONFIG_SECTIONS.each_key do |key|
+              str << "[#{key}]\n"
+              sub_children_by_parent[key]?.try &.each do |child|
+                str << "[#{key}.#{child}]\n"
+              end
+            end
+          end
+          File.write(config_path, body)
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
           added = doctor.fix_config
