@@ -88,5 +88,36 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
       result.should contain("**bold *and italic***")
     end
+
+    it "converts a table with <thead> and <tbody> into a Markdown pipe-table" do
+      html = <<-HTML
+        <table>
+          <thead><tr><th>A</th><th>B</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>2</td></tr>
+            <tr><td>3</td><td>4</td></tr>
+          </tbody>
+        </table>
+        HTML
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should contain("| A | B |")
+      result.should contain("| --- | --- |")
+      result.should contain("| 1 | 2 |")
+      result.should contain("| 3 | 4 |")
+    end
+
+    it "promotes the first row to a header when no <th> is present" do
+      html = "<table><tr><td>x</td><td>y</td></tr><tr><td>1</td><td>2</td></tr></table>"
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should contain("| x | y |")
+      result.should contain("| --- | --- |")
+      result.should contain("| 1 | 2 |")
+    end
+
+    it "escapes pipe characters inside table cells" do
+      html = "<table><tr><th>k</th><th>v</th></tr><tr><td>a</td><td>x | y</td></tr></table>"
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should contain(%q(| a | x \| y |))
+    end
   end
 end

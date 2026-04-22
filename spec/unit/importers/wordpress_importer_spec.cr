@@ -124,6 +124,46 @@ UNCATEGORIZED_WXR = <<-XML
   </rss>
   XML
 
+PUBDATE_ONLY_WXR = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>PubDate Only</title>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
+      <wp:post_name>pubdate-only</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Body.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
+
+TABLE_WXR = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>Table Post</title>
+      <wp:post_date>2024-01-15 10:30:00</wp:post_date>
+      <wp:post_name>table-post</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
+
 NO_SLUG_WXR = <<-XML
   <?xml version="1.0" encoding="UTF-8"?>
   <rss version="2.0"
@@ -185,6 +225,39 @@ describe Hwaro::Services::Importers::WordPressImporter do
         content.should contain(%(categories = ["Tutorial"]))
         content.should contain("This is my first post.")
         content.should_not contain("draft")
+      end
+    end
+
+    it "falls back to <pubDate> when <wp:post_date> is missing" do
+      Dir.mktmpdir do |tmpdir|
+        wxr_path = write_wxr(tmpdir, PUBDATE_ONLY_WXR)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+        result.imported_count.should eq(1)
+
+        content = File.read(File.join(output_dir, "posts", "pubdate-only.md"))
+        # RFC 822 → canonical frontmatter date format. Some exporters
+        # omit <wp:post_date> and only populate the RSS <pubDate>; we
+        # don't want those posts to arrive dateless.
+        content.should contain(%(date = "2024-01-01 00:00:00"))
+      end
+    end
+
+    it "converts <table> in content to a Markdown pipe-table" do
+      Dir.mktmpdir do |tmpdir|
+        wxr_path = write_wxr(tmpdir, TABLE_WXR)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+        result.imported_count.should eq(1)
+
+        content = File.read(File.join(output_dir, "posts", "table-post.md"))
+        content.should contain("| A | B |")
+        content.should contain("| --- | --- |")
+        content.should contain("| 1 | 2 |")
       end
     end
 

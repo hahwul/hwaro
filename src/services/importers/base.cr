@@ -96,6 +96,8 @@ module Hwaro
             "%Y-%m-%dT%H:%M:%S%:z",
             "%Y-%m-%d",
             "%B %d, %Y",
+            # RFC 822 (WordPress <pubDate>, RSS feeds)
+            "%a, %d %b %Y %H:%M:%S %z",
           ]
 
           formats.each do |fmt|

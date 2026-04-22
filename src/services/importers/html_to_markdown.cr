@@ -53,6 +53,37 @@ module Hwaro
             items.map { |m| "- #{strip_tags(m[1]).strip}" }.join("\n") + "\n\n"
           end
 
+          # Tables — convert <table> into Markdown pipe-tables. Uses the
+          # first row as the header (typical for WXR exports, which wrap
+          # headers in <thead><tr><th>). If no <th> is present the first
+          # row is still promoted to a header so the table is legal
+          # Markdown. Nested tables fall through strip_tags (the inner
+          # table text is flattened) — WP blog posts rarely nest tables.
+          result = result.gsub(/<table[^>]*>(.*?)<\/table>/mi) do
+            inner = $1
+            rows = inner.scan(/<tr[^>]*>(.*?)<\/tr>/mi).map do |m|
+              m[1].scan(/<(?:th|td)[^>]*>(.*?)<\/(?:th|td)>/mi).map do |cell|
+                strip_tags(cell[1]).strip.gsub(/\s+/, " ").gsub("|", "\\|")
+              end
+            end
+            rows.reject!(&.empty?)
+            if rows.empty?
+              ""
+            else
+              width = rows.max_of(&.size)
+              header = rows.shift
+              header += [""] * (width - header.size)
+              lines = [] of String
+              lines << "| #{header.join(" | ")} |"
+              lines << "| #{(["---"] * width).join(" | ")} |"
+              rows.each do |row|
+                padded = row + [""] * (width - row.size)
+                lines << "| #{padded.join(" | ")} |"
+              end
+              lines.join("\n") + "\n\n"
+            end
+          end
+
           # Horizontal rules
           result = result.gsub(/<hr\s*\/?>/, "\n---\n\n")
 
