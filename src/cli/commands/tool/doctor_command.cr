@@ -53,6 +53,11 @@ module Hwaro
               ["template-unclosed-block", "template-mismatched-vars", "template-read-error"]),
           ]
 
+          CONTENT_CHECKS = [
+            CheckSpec.new("front matter (TOML/YAML parse)",
+              ["content-frontmatter-invalid", "content-read-error"]),
+          ]
+
           def self.metadata : CommandInfo
             CommandInfo.new(
               name: NAME,
@@ -156,6 +161,11 @@ module Hwaro
               Logger.info "    #{render_check_line(spec, issues, plain)}"
             end
             Logger.info ""
+            Logger.info "  content/"
+            CONTENT_CHECKS.each do |spec|
+              Logger.info "    #{render_check_line(spec, issues, plain)}"
+            end
+            Logger.info ""
 
             if issues.empty?
               Logger.info "#{ok_glyph(plain)} No issues found. Your site looks great!"
@@ -166,6 +176,7 @@ module Hwaro
             config_issues = issues.select { |i| i.category == "config" }
             config_missing = issues.select { |i| i.category == "config_missing" }
             template_issues = issues.select { |i| i.category == "template" }
+            content_issues = issues.select { |i| i.category == "content" }
             structure_issues = issues.select { |i| i.category == "structure" }
 
             unless config_issues.empty?
@@ -183,6 +194,12 @@ module Hwaro
             unless template_issues.empty?
               Logger.info "Templates:"
               template_issues.each { |issue| print_issue(issue, plain) }
+              Logger.info ""
+            end
+
+            unless content_issues.empty?
+              Logger.info "Content:"
+              content_issues.each { |issue| print_issue(issue, plain) }
               Logger.info ""
             end
 

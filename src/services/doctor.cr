@@ -7,7 +7,9 @@ require "json"
 require "yaml"
 require "toml"
 require "../models/config"
+require "../utils/errors"
 require "../utils/logger"
+require "../content/processors/markdown"
 require "./config_snippets"
 
 module Hwaro
@@ -50,6 +52,7 @@ module Hwaro
         config = check_config(issues)
         check_templates(issues)
         check_directory_structure(issues)
+        check_content_frontmatter(issues)
         ignore = config.try(&.doctor.ignore) || [] of String
         issues.reject { |i| ignore.includes?(i.id) }
       end
@@ -298,6 +301,38 @@ module Hwaro
           unless has_index
             issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
               message: "Section directory missing _index.md: #{entry}/")
+          end
+        end
+      end
+
+      # Parse every markdown file's front matter so doctor flags what
+      # would otherwise only surface at `hwaro build` time. Reuses the
+      # canonical `Processor::Markdown.parse` so the check stays in
+      # sync with the parser used by the build pipeline — any
+      # front-matter shape the builder rejects as `HWARO_E_CONTENT`
+      # appears here as an `:error` issue.
+      private def check_content_frontmatter(issues : Array(Issue))
+        return unless Dir.exists?(@content_dir)
+
+        Dir.glob(File.join(@content_dir, "**", "*.{md,markdown}")) do |path|
+          # Skip things that aren't regular files (symlink to nowhere,
+          # directory matching the glob, etc.).
+          next unless File.file?(path)
+
+          raw = begin
+            File.read(path)
+          rescue ex : IO::Error | File::Error
+            issues << Issue.new(id: "content-read-error", level: :error, category: "content", file: path,
+              message: "Failed to read content file: #{ex.message}")
+            next
+          end
+
+          begin
+            Processor::Markdown.parse(raw, path)
+          rescue ex : Hwaro::HwaroError
+            first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
+            issues << Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
+              message: first_line.empty? ? "Invalid front matter" : first_line)
           end
         end
       end
