@@ -84,6 +84,7 @@ module Hwaro
           content_html = ""
           excerpt = ""
           tags = [] of String
+          categories = [] of String
 
           item.children.each do |child|
             next unless child.element?
@@ -108,10 +109,20 @@ module Hwaro
                 excerpt = child.content.strip
               end
             when "category"
+              # WXR encodes both tags and categories as <category> elements
+              # distinguished by the `domain` attribute. Keep them as
+              # separate taxonomies so the import matches hwaro's scaffold
+              # shape (tags + categories distinct). Default WordPress
+              # category "Uncategorized" is skipped — it's a placeholder
+              # rather than a real classification.
               domain = child["domain"]?
-              if domain == "post_tag"
-                tag_value = child.content.strip
-                tags << tag_value unless tag_value.empty?
+              value = child.content.strip
+              next if value.empty?
+              case domain
+              when "post_tag"
+                tags << value
+              when "category"
+                categories << value unless value == "Uncategorized"
               end
             end
           end
@@ -145,7 +156,8 @@ module Hwaro
           fields["date"] = date_str
           fields["description"] = excerpt unless excerpt.empty?
           fields["draft"] = true if is_draft
-          fields["tags"] = tags unless tags.empty?
+          fields["tags"] = tags.uniq unless tags.empty?
+          fields["categories"] = categories.uniq unless categories.empty?
 
           frontmatter = generate_frontmatter(fields)
 

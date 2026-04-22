@@ -42,7 +42,8 @@ describe Hwaro::Services::Importers::HexoImporter do
         content = File.read(output_file)
         content.should contain("+++")
         content.should contain("title = \"Hello Hexo\"")
-        content.should contain("tags = [\"hexo\", \"blog\", \"tech\"]")
+        content.should contain(%(tags = ["hexo", "blog"]))
+        content.should contain(%(categories = ["tech"]))
         content.should contain("Welcome to my Hexo blog.")
       end
     end
@@ -252,10 +253,10 @@ describe Hwaro::Services::Importers::HexoImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "posts", "nested-cats.md"))
-        content.should contain("\"frontend\"")
-        content.should contain("\"tech\"")
-        content.should contain("\"web\"")
-        content.should contain("\"design\"")
+        content.should contain(%(tags = ["frontend"]))
+        # Nested hierarchy flattens into the categories taxonomy while
+        # tags stay distinct.
+        content.should contain(%(categories = ["tech", "web", "design"]))
       end
     end
 

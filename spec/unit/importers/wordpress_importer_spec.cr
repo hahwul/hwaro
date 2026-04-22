@@ -102,6 +102,28 @@ MULTI_WXR = <<-XML
   </rss>
   XML
 
+UNCATEGORIZED_WXR = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>Default Category</title>
+      <wp:post_date>2024-04-01 00:00:00</wp:post_date>
+      <wp:post_name>default-category</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <category domain="category" nicename="uncategorized"><![CDATA[Uncategorized]]></category>
+      <category domain="post_tag" nicename="news"><![CDATA[News]]></category>
+      <content:encoded><![CDATA[<p>Body.</p>]]></content:encoded>
+      <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
+
 NO_SLUG_WXR = <<-XML
   <?xml version="1.0" encoding="UTF-8"?>
   <rss version="2.0"
@@ -159,9 +181,29 @@ describe Hwaro::Services::Importers::WordPressImporter do
         content.should contain("title = \"Hello World\"")
         content.should contain("date = \"2024-01-15 10:30:00\"")
         content.should contain("description = \"A short excerpt\"")
-        content.should contain("tags = [\"Crystal\", \"Web\"]")
+        content.should contain(%(tags = ["Crystal", "Web"]))
+        content.should contain(%(categories = ["Tutorial"]))
         content.should contain("This is my first post.")
         content.should_not contain("draft")
+      end
+    end
+
+    it "skips the default WordPress 'Uncategorized' category" do
+      Dir.mktmpdir do |tmpdir|
+        wxr_path = write_wxr(tmpdir, UNCATEGORIZED_WXR)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+        result.imported_count.should eq(1)
+
+        content = File.read(File.join(output_dir, "posts", "default-category.md"))
+        content.should contain(%(tags = ["News"]))
+        # Uncategorized is the placeholder default category — omit it
+        # rather than importing every WP post with a bogus "Uncategorized"
+        # classification.
+        content.should_not contain("Uncategorized")
+        content.should_not contain("categories =")
       end
     end
 
