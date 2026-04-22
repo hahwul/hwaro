@@ -909,11 +909,49 @@ module Hwaro
         (input.try(&.strip.downcase) == "y")
       end
 
+      # Supported placeholders in `command = "..."` templates. Listed
+      # here so `expand_placeholders` can produce a helpful error message
+      # when an unknown `{foo}` slips through (typo, forward-looking
+      # name, etc.) instead of sending the literal to the shell.
+      COMMAND_PLACEHOLDERS = {"source", "url", "target"}
+
+      # Pattern used to detect *remaining* placeholders after expansion.
+      # Anything that still matches is unknown and rejected.
+      private COMMAND_PLACEHOLDER_RE = /\{([a-zA-Z_][\w-]*)\}/
+
       private def expand_placeholders(command : String, source_dir : String, target : Models::DeploymentTarget) : String
-        command
+        expanded = command
           .gsub("{source}", shell_escape(source_dir))
           .gsub("{url}", shell_escape(target.url))
           .gsub("{target}", shell_escape(target.name))
+
+        validate_no_unexpanded_placeholders!(command, expanded, target)
+        expanded
+      end
+
+      # Raise HWARO_E_CONFIG if the expanded command still contains any
+      # `{name}` tokens — catches typos like `{srouce}` and forward-
+      # looking placeholders (`{bucket}`, `{region}`) before the literal
+      # reaches the underlying deploy tool and produces a confusing
+      # downstream error.
+      private def validate_no_unexpanded_placeholders!(
+        original : String,
+        expanded : String,
+        target : Models::DeploymentTarget,
+      ) : Nil
+        unresolved = expanded.scan(COMMAND_PLACEHOLDER_RE)
+          .map { |m| m[1] }
+          .uniq!
+          .reject { |name| COMMAND_PLACEHOLDERS.includes?(name) }
+
+        return if unresolved.empty?
+
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Unknown placeholder(s) in 'command' for target '#{target.name}': " \
+                   "#{unresolved.map { |n| "{#{n}}" }.join(", ")}",
+          hint: "Supported placeholders: #{COMMAND_PLACEHOLDERS.to_a.sort.map { |n| "{#{n}}" }.join(", ")}.",
+        )
       end
 
       # Escape a string for safe interpolation into a shell command.
