@@ -240,7 +240,7 @@ module Hwaro
           changed_content_files.each do |file|
             relative_path = begin
               Path[file].relative_to("content").to_s
-            rescue
+            rescue ArgumentError
               file.lchop("content/")
             end
 
@@ -424,7 +424,7 @@ module Hwaro
           changed_content_files.each do |file|
             relative_path = begin
               Path[file].relative_to("content").to_s
-            rescue
+            rescue ArgumentError
               file.lchop("content/")
             end
 
@@ -518,7 +518,7 @@ module Hwaro
 
             relative = begin
               Path[src_path].relative_to("static").to_s
-            rescue
+            rescue ArgumentError
               src_path.lchop("static/")
             end
             dest_path = File.join(output_dir, relative)

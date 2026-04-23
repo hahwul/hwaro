@@ -148,8 +148,8 @@ module Hwaro
           result_html, toc = post_process_html(html, has_headers, has_images)
           result_html = apply_emoji(result_html) if emoji
           {result_html, toc}
-        rescue
-          # Fallback in case of XML parsing error
+        rescue ex : XML::Error
+          Logger.debug "Markdown post-process: XML error, returning raw html: #{ex.message}"
           {(html || ""), [] of Models::TocHeader}
         end
 
@@ -707,7 +707,7 @@ module Hwaro
                   if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
                     begin
                       return Time.parse_rfc3339(str)
-                    rescue
+                    rescue Time::Format::Error
                       "%Y-%m-%dT%H:%M:%S"
                     end
                   else
@@ -721,7 +721,7 @@ module Hwaro
 
           begin
             Time.parse(str, fmt, Time::Location.local)
-          rescue
+          rescue Time::Format::Error
             nil
           end
         end

@@ -263,13 +263,13 @@ module Hwaro
             data = CacheData.from_json(content)
             @metadata = data.metadata
             data.entries.each { |e| @entries[e.path] = e }
-          rescue
+          rescue JSON::ParseException | JSON::SerializableError
             # Fall back to legacy format (plain array of entries)
             begin
               entries = Array(CacheEntry).from_json(content)
               entries.each { |e| @entries[e.path] = e }
               @metadata = CacheMetadata.new
-            rescue ex
+            rescue ex : JSON::ParseException | JSON::SerializableError
               Logger.warn "Cache: corrupt cache file, rebuilding from scratch: #{ex.message}"
               @entries.clear
               @metadata = CacheMetadata.new
@@ -281,8 +281,9 @@ module Hwaro
         # Remove corrupt cache file so the next build starts clean
         private def delete_corrupt_cache
           File.delete(@cache_path) if File.exists?(@cache_path)
-        rescue
-          # Ignore deletion failure — the cache will be overwritten on save
+        rescue ex : File::Error | IO::Error
+          # Cache will be overwritten on save; log at debug for diagnostics
+          Logger.debug "Cache: failed to delete corrupt cache file: #{ex.message}"
         end
 
         # Get cache statistics
