@@ -15,7 +15,7 @@ module Hwaro
       # inside quoted strings are ignored.
       def find_json_end(content : String) : Int32?
         bytes = content.to_slice
-        return nil if bytes.size == 0 || bytes[0] != '{'.ord.to_u8
+        return if bytes.size == 0 || bytes[0] != '{'.ord.to_u8
 
         depth = 0
         in_string = false

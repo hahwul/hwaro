@@ -200,7 +200,6 @@ module Hwaro
         nil
       end
 
-
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
         formats = [
           "%Y-%m-%d %H:%M:%S",

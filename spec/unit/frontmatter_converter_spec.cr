@@ -384,7 +384,7 @@ describe Hwaro::Services::FrontmatterConverter do
 
         converted = File.read(file_path)
         converted.should start_with("{")
-        parsed = JSON.parse(converted[0, converted.index("}\n").not_nil! + 1])
+        parsed = JSON.parse(converted[0, converted.index!("}\n") + 1])
         parsed["title"].as_s.should eq("Hello")
         parsed["draft"].as_bool.should be_false
         parsed["tags"].as_a.map(&.as_s).should eq(["a", "b"])
@@ -401,7 +401,7 @@ describe Hwaro::Services::FrontmatterConverter do
         converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
 
         converted = File.read(file_path)
-        parsed = JSON.parse(converted[0, converted.index("}\n").not_nil! + 1])
+        parsed = JSON.parse(converted[0, converted.index!("}\n") + 1])
         parsed["title"].as_s.should eq("Hello")
         parsed["weight"].as_i.should eq(5)
       end

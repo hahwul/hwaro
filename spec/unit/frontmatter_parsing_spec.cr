@@ -746,14 +746,13 @@ describe Hwaro::Content::Processors::Markdown do
     end
 
     it "leaves content untouched when file does not start with {" do
-      raw = <<-MD
-         {"not": "frontmatter"}
-
-         Body
-         MD
+      # Leading whitespace means the { is not at byte 0, so this is not a JSON
+      # frontmatter block — parser should fall through to the no-frontmatter path.
+      raw = " {\"not\": \"frontmatter\"}\n\nBody\n"
 
       result = processor.parse(raw)
       result[:title].should eq("Untitled")
+      result[:content].should contain("Body")
     end
 
     it "extracts non-taxonomy-keyword arrays into taxonomies" do

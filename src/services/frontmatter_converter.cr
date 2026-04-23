@@ -209,7 +209,7 @@ module Hwaro
       # the file does not start with a balanced JSON object.
       private def split_json_frontmatter(content : String) : {String, String}?
         end_idx = Hwaro::Utils::FrontmatterScanner.find_json_end(content)
-        return nil unless end_idx
+        return unless end_idx
 
         json_str = content[0, end_idx]
         body = content[end_idx..].lchop("\r\n").lchop("\n")

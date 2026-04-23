@@ -353,7 +353,7 @@ describe Hwaro::Services::Creator do
           content = File.read("content/drafts/post.md")
           content.should start_with("{")
           # The JSON block must be parseable and contain the expected fields.
-          end_idx = content.index("}\n").not_nil! + 1
+          end_idx = content.index!("}\n") + 1
           parsed = JSON.parse(content[0, end_idx])
           parsed["title"].as_s.should eq("Hello")
           parsed["description"].as_s.should eq("")
