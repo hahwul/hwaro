@@ -196,6 +196,33 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "works with JSON frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "json.md"), %({"title": "JSON Post", "description": "A JSON post", "date": "2024-01-15"}\n\n# Content\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        errors_and_warnings = issues.select { |i| i.level == :error || i.level == :warning }
+        errors_and_warnings.should be_empty
+      end
+    end
+
+    it "detects JSON frontmatter parse errors" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad-json.md"), %({"title": "P", "bad": }\n\n# Content\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-frontmatter-json-error" }.should be_true
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

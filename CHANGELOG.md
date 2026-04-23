@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- JSON front matter support for content files (Hugo-style, starts with `{`, balanced braces delimit the block)
+- `hwaro tool convert to-json` subcommand plus TOML↔JSON and YAML↔JSON conversions
+- `front_matter_format = "json"` under `[content.new]` for JSON scaffolds from `hwaro new`
+- `content-frontmatter-json-error` validator rule
+
 ## v0.12.1
 
 ### Fixed

@@ -1,10 +1,10 @@
 +++
 title = "convert"
-description = "Convert frontmatter between YAML and TOML formats"
+description = "Convert frontmatter between TOML, YAML, and JSON formats"
 weight = 1
 +++
 
-Convert frontmatter between YAML and TOML formats across your content files.
+Convert frontmatter between TOML, YAML, and JSON formats across your content files.
 
 ```bash
 # Convert all frontmatter to YAML
@@ -12,6 +12,9 @@ hwaro tool convert to-yaml
 
 # Convert all frontmatter to TOML
 hwaro tool convert to-toml
+
+# Convert all frontmatter to JSON
+hwaro tool convert to-json
 
 # Convert only in a specific directory
 hwaro tool convert to-yaml -c posts
@@ -64,6 +67,21 @@ tags:
   - crystal
   - tutorial
 ---
+
+Content here.
+```
+
+After `hwaro tool convert to-json`:
+
+```markdown
+{
+  "title": "My Post",
+  "date": "2024-01-15",
+  "tags": [
+    "crystal",
+    "tutorial"
+  ]
+}
 
 Content here.
 ```

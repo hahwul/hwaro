@@ -42,6 +42,26 @@ describe Hwaro::Services::FrontmatterConverter do
       content = "Some text\n---\ntitle: Test\n---\n"
       converter.detect_format(content).should eq(Hwaro::Services::FrontmatterFormat::Unknown)
     end
+
+    it "detects JSON frontmatter" do
+      content = %({"title": "Test"}\n\n# Content)
+      converter.detect_format(content).should eq(Hwaro::Services::FrontmatterFormat::JSON)
+    end
+
+    it "detects multiline JSON frontmatter" do
+      content = "{\n  \"title\": \"Test\",\n  \"draft\": false\n}\n\n# Content"
+      converter.detect_format(content).should eq(Hwaro::Services::FrontmatterFormat::JSON)
+    end
+
+    it "does not detect JSON when braces never balance" do
+      content = %({"title": "Test")
+      converter.detect_format(content).should eq(Hwaro::Services::FrontmatterFormat::Unknown)
+    end
+
+    it "does not detect JSON when { is not at start" do
+      content = %( {"title": "Test"}\n\n# Content)
+      converter.detect_format(content).should eq(Hwaro::Services::FrontmatterFormat::Unknown)
+    end
   end
 
   describe "#convert_file" do
@@ -353,6 +373,102 @@ describe Hwaro::Services::FrontmatterConverter do
     end
   end
 
+  describe "JSON conversions" do
+    it "converts YAML file to JSON" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+        File.write(file_path, "---\ntitle: Hello\ndraft: false\ntags:\n  - a\n  - b\n---\n\n# Body")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+
+        converted = File.read(file_path)
+        converted.should start_with("{")
+        parsed = JSON.parse(converted[0, converted.index("}\n").not_nil! + 1])
+        parsed["title"].as_s.should eq("Hello")
+        parsed["draft"].as_bool.should be_false
+        parsed["tags"].as_a.map(&.as_s).should eq(["a", "b"])
+        converted.should contain("# Body")
+      end
+    end
+
+    it "converts TOML file to JSON" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+        File.write(file_path, "+++\ntitle = \"Hello\"\nweight = 5\n+++\n\n# Body")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+
+        converted = File.read(file_path)
+        parsed = JSON.parse(converted[0, converted.index("}\n").not_nil! + 1])
+        parsed["title"].as_s.should eq("Hello")
+        parsed["weight"].as_i.should eq(5)
+      end
+    end
+
+    it "converts JSON file to TOML" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+        File.write(file_path, %({"title": "Hi", "draft": true}\n\n# Body))
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        converted.should start_with("+++\n")
+        converted.should contain(%(title = "Hi"))
+        converted.should contain("draft = true")
+        converted.should contain("# Body")
+      end
+    end
+
+    it "converts JSON file to YAML" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+        File.write(file_path, %({"title": "Hi", "tags": ["x", "y"]}\n\n# Body))
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+
+        converted = File.read(file_path)
+        converted.should start_with("---\n")
+        converted.should contain("title:")
+        converted.should contain("Hi")
+        converted.should contain("# Body")
+      end
+    end
+
+    it "skips JSON files already in target JSON format" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+        original = %({"title": "Hi"}\n\n# Body)
+        File.write(file_path, original)
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_false
+        File.read(file_path).should eq(original)
+      end
+    end
+
+    it "convert_to_json converts a mixed directory" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\n+++\n\n# A")
+        File.write(File.join(content_dir, "b.md"), "---\ntitle: B\n---\n\n# B")
+        File.write(File.join(content_dir, "c.md"), %({"title": "C"}\n\n# C))
+
+        converter = Hwaro::Services::FrontmatterConverter.new(content_dir)
+        result = converter.convert_to_json
+
+        result.success.should be_true
+        result.converted_count.should eq(2)
+        result.skipped_count.should eq(1)
+      end
+    end
+  end
+
   describe "round-trip conversion" do
     it "preserves data through YAML -> TOML -> YAML" do
       Dir.mktmpdir do |dir|
@@ -515,6 +631,10 @@ describe Hwaro::Services::FrontmatterFormat do
 
   it "has TOML variant" do
     Hwaro::Services::FrontmatterFormat::TOML.should_not be_nil
+  end
+
+  it "has JSON variant" do
+    Hwaro::Services::FrontmatterFormat::JSON.should_not be_nil
   end
 
   it "has Unknown variant" do

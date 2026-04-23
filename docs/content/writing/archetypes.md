@@ -7,7 +7,7 @@ toc = true
 
 Archetypes are content templates that define default front matter and content structure for new pages. When you create content with `hwaro new`, archetypes provide consistent starting points.
 
-`hwaro init` ships a starter `archetypes/default.md` (and scaffold-specific archetypes like `posts.md` for the blog scaffold) so `hwaro new` picks up front matter (TOML by default, YAML is also supported) with a `description` field out of the box. Edit or extend them to match your site's conventions.
+`hwaro init` ships a starter `archetypes/default.md` (and scaffold-specific archetypes like `posts.md` for the blog scaffold) so `hwaro new` picks up front matter (TOML by default, with YAML and JSON also supported) with a `description` field out of the box. Edit or extend them to match your site's conventions.
 
 ## Overview
 
@@ -103,7 +103,7 @@ default fields of that template are controlled by `[content.new]` in
 
 ```toml
 [content.new]
-front_matter_format = "toml"         # "toml" (default) or "yaml"
+front_matter_format = "toml"         # "toml" (default), "yaml", or "json"
 default_fields = ["description"]      # extra keys to scaffold with empty values
 bundle = false                        # true: scaffold foo/index.md instead of foo.md
 ```

@@ -339,6 +339,32 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "emits JSON front matter when config selects json" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "json"
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/drafts/post.md")
+          content.should start_with("{")
+          # The JSON block must be parseable and contain the expected fields.
+          end_idx = content.index("}\n").not_nil! + 1
+          parsed = JSON.parse(content[0, end_idx])
+          parsed["title"].as_s.should eq("Hello")
+          parsed["description"].as_s.should eq("")
+          # Since the draft was placed in content/drafts, draft should be true
+          parsed["draft"].as_bool.should be_true
+          content.should_not contain("+++\n")
+          content.should_not contain("---\n")
+        end
+      end
+    end
+
     it "honours custom default_fields from config" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

@@ -18,7 +18,7 @@ date = "2024-01-15"
 Your content in **Markdown**.
 ```
 
-The `+++` block is TOML front matter. YAML is also supported using `---` delimiters. Content below becomes HTML.
+The `+++` block is TOML front matter. YAML (`---` delimiters) and JSON (a top-level `{...}` object at the start of the file) are also supported. Content below becomes HTML.
 
 ```markdown
 ---
@@ -28,6 +28,17 @@ date: "2024-01-15"
 
 Your content in **Markdown**.
 ```
+
+```markdown
+{
+  "title": "My Page",
+  "date": "2024-01-15"
+}
+
+Your content in **Markdown**.
+```
+
+For JSON, the first balanced `{...}` at the very start of the file is the front matter — no fence is needed. The file must begin with `{` (no leading whitespace).
 
 ## Front Matter
 

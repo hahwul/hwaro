@@ -374,6 +374,7 @@ hwaro tool list all             # List all content files
 hwaro tool list drafts          # List draft files
 hwaro tool convert to-yaml      # Convert frontmatter to YAML
 hwaro tool convert to-toml      # Convert frontmatter to TOML
+hwaro tool convert to-json      # Convert frontmatter to JSON
 hwaro tool check-links          # Check for dead external links
 hwaro tool stats                # Show content statistics
 hwaro tool validate             # Validate content frontmatter and markup
@@ -406,7 +407,7 @@ hwaro tool check-links --json
 | Category | Subcommand | Description |
 |----------|------------|-------------|
 | Content | [list](/start/tools/list/) | List content files by status (all, drafts, published) |
-| Content | [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
+| Content | [convert](/start/tools/convert/) | Convert frontmatter between TOML, YAML, and JSON formats |
 | Content | [check-links](/start/tools/check-links/) | Check for dead links in content files |
 | Content | [stats](/start/tools/stats/) | Show content statistics |
 | Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |

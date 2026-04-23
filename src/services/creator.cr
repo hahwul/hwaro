@@ -1,4 +1,5 @@
 require "file_utils"
+require "json"
 require "time"
 require "../config/options/new_options"
 require "../models/config"
@@ -366,10 +367,12 @@ module Hwaro
         tags : Array(String),
         content_new : Models::ContentNewConfig,
       ) : String
-        if content_new.toml?
-          build_toml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
-        else
+        if content_new.json?
+          build_json_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+        elsif content_new.yaml?
           build_yaml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+        else
+          build_toml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
         end
       end
 
@@ -403,6 +406,22 @@ module Hwaro
             tags.each { |tag| str << "  - \"#{escape_string(tag)}\"\n" }
           end
           str << "---\n\n"
+          str << "# #{title}\n"
+        end
+      end
+
+      private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+        fields = {} of String => JSON::Any
+        fields["title"] = JSON::Any.new(title)
+        fields["date"] = JSON::Any.new(date)
+        extra_fields.each { |f| fields[f] = JSON::Any.new("") }
+        fields["draft"] = JSON::Any.new(true) if is_draft
+        unless tags.empty?
+          fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
+        end
+        String.build do |str|
+          str << JSON::Any.new(fields).to_pretty_json
+          str << "\n\n"
           str << "# #{title}\n"
         end
       end

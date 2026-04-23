@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "../utils/frontmatter_scanner"
 require "../utils/logger"
 
 module Hwaro
@@ -222,6 +223,20 @@ module Hwaro
             end
           rescue ex
             Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
+          end
+          # Try JSON Front Matter (balanced {...} at file start)
+        elsif content.starts_with?('{') && (end_idx = Hwaro::Utils::FrontmatterScanner.find_json_end(content))
+          begin
+            json_fm = JSON.parse(content[0, end_idx])
+            if json_fm.as_h?
+              title = json_fm["title"]?.try(&.as_s?) || title
+              draft = json_fm["draft"]?.try(&.as_bool?) || false
+              if str_val = json_fm["date"]?.try(&.as_s?)
+                date = parse_time(str_val)
+              end
+            end
+          rescue ex
+            Logger.debug "JSON front matter parsing failed for #{file_path}: #{ex.message}"
           end
         end
 

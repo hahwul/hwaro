@@ -45,11 +45,11 @@ module Hwaro
 
             ## Notes for AI Agents
 
-            1. **Front matter** can be TOML (`+++`) or YAML (`---`). Pick one per file and keep delimiters matched.
+            1. **Front matter** can be TOML (`+++`), YAML (`---`), or JSON (`{...}` at file start). Pick one per file and keep delimiters matched.
             2. **Rendered content** is `{{ content | safe }}`, not `{{ page.content }}`.
             3. **Custom metadata** is `page.extra.field`, not `page.params.field`.
             4. **Always preview** with `hwaro serve` before committing.
-            5. **Validate front matter syntax** (TOML or YAML) and `config.toml` after edits.
+            5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
             7. **Escape user content** with `{{ value | escape }}` in templates.
 
@@ -120,7 +120,7 @@ module Hwaro
 
             ### Pages
 
-            Create `.md` files in `content/`. Front matter can use either TOML (`+++`) or YAML (`---`) — TOML is the default.
+            Create `.md` files in `content/`. Front matter can use TOML (`+++`), YAML (`---`), or JSON (`{...}` at file start) — TOML is the default.
 
             ```toml
             +++
@@ -320,11 +320,11 @@ module Hwaro
 
             ## Notes for AI Agents
 
-            1. **Front matter** can be TOML (`+++`) or YAML (`---`). Pick one per file and keep delimiters matched.
+            1. **Front matter** can be TOML (`+++`), YAML (`---`), or JSON (`{...}` at file start). Pick one per file and keep delimiters matched.
             2. **Rendered content** is `{{ content | safe }}`, not `{{ page.content }}`.
             3. **Custom metadata** is `page.extra.field`, not `page.params.field`.
             4. **Always preview** with `hwaro serve` before committing.
-            5. **Validate front matter syntax** (TOML or YAML) and `config.toml` after edits.
+            5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
             7. **Escape user content** with `{{ value | escape }}` in templates.
 
