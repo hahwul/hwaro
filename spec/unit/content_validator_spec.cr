@@ -223,6 +223,23 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "reports unbalanced JSON braces as a parse error" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        # File starts with `{` but never closes — we want a loud error, not a
+        # silent fall-through to "no frontmatter".
+        File.write(File.join(content_dir, "unbalanced.md"), %({"title": "Never closes\n\nbody\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issue = issues.find { |i| i.id == "content-frontmatter-json-error" }
+        issue.should_not be_nil
+        issue.not_nil!.message.should contain("unbalanced braces")
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

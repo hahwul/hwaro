@@ -766,6 +766,24 @@ describe Hwaro::Content::Processors::Markdown do
       result[:taxonomies]["tags"].should eq(["a"])
       result[:taxonomies]["categories"].should eq(["tech"])
     end
+
+    it "raises HwaroError for unbalanced JSON when a file_path is provided" do
+      raw = %({"title": "Never closes\n\nbody\n)
+
+      expect_raises(Hwaro::HwaroError, /unbalanced braces/) do
+        processor.parse(raw, "content/broken.md")
+      end
+    end
+
+    it "silently ignores unbalanced JSON when no file_path is provided (library use)" do
+      # Without a file_path the parser has no caller context to raise against,
+      # so we keep the historic graceful-nil behaviour and treat the file as
+      # having no front matter.
+      raw = %({"title": "Never closes\n\nbody\n)
+
+      result = processor.parse(raw)
+      result[:title].should eq("Untitled")
+    end
   end
 
   # ---------------------------------------------------------------------------

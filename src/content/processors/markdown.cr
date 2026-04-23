@@ -47,7 +47,7 @@ module Hwaro
         # JSON front matter is delimited by balanced braces. The file must begin
         # with `{` (no leading whitespace) and the first balanced `{...}` is the
         # front matter; the remainder is the markdown body.
-        # See `find_json_front_matter_end` for the brace scanner.
+        # See `Utils::FrontmatterScanner.find_json_end` for the brace scanner.
 
         # Known front-matter keys (shared between TOML, YAML, and JSON parsers).
         # Using a Set for O(1) lookup instead of Array#includes? O(n).
@@ -164,10 +164,22 @@ module Hwaro
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
             result = extract_from_yaml(match[1], file_path)
             markdown_content = match[2]
-          elsif raw_content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(raw_content))
-            result = extract_from_json(raw_content[0, end_idx], file_path)
-            body = raw_content[end_idx..]
-            markdown_content = body.lchop("\r\n").lchop("\n")
+          elsif raw_content.starts_with?('{')
+            # A leading `{` signals JSON frontmatter intent. If the scanner can
+            # locate a balanced object we parse it; if not, the file is almost
+            # certainly a truncated/mistyped JSON header — surface it as a
+            # content error rather than silently treating it as body text.
+            if end_idx = Utils::FrontmatterScanner.find_json_end(raw_content)
+              result = extract_from_json(raw_content[0, end_idx], file_path)
+              body = raw_content[end_idx..]
+              markdown_content = body.lchop("\r\n").lchop("\n")
+            elsif !file_path.empty?
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONTENT,
+                message: "Invalid JSON frontmatter in #{file_path}: unbalanced braces",
+                hint: "The file starts with `{` so hwaro treated it as JSON frontmatter. Close the object with a matching `}` or remove the leading `{`.",
+              )
+            end
           end
 
           if result

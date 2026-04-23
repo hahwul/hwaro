@@ -78,7 +78,7 @@ module Hwaro
           FrontmatterFormat::TOML
         elsif content.starts_with?("#{YAML_DELIMITER}\n") || content.starts_with?("#{YAML_DELIMITER}\r\n")
           FrontmatterFormat::YAML
-        elsif content.starts_with?('{') && Hwaro::Utils::FrontmatterScanner.find_json_end(content)
+        elsif content.starts_with?('{') && Utils::FrontmatterScanner.find_json_end(content)
           FrontmatterFormat::JSON
         else
           FrontmatterFormat::Unknown
@@ -208,7 +208,7 @@ module Hwaro
       # Split JSON-frontmatter content into (json_string, body). Returns nil if
       # the file does not start with a balanced JSON object.
       private def split_json_frontmatter(content : String) : {String, String}?
-        end_idx = Hwaro::Utils::FrontmatterScanner.find_json_end(content)
+        end_idx = Utils::FrontmatterScanner.find_json_end(content)
         return unless end_idx
 
         json_str = content[0, end_idx]

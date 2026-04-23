@@ -494,6 +494,37 @@ describe Hwaro::Services::FrontmatterConverter do
         final.should contain(original_body)
       end
     end
+
+    it "preserves data through JSON -> TOML -> YAML -> JSON" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "test.md")
+
+        original_body = "\n# Trip\n\nBody paragraph.\n"
+        File.write(file_path, %({"title": "Round Trip", "draft": true, "weight": 5, "tags": ["a", "b"]}\n#{original_body}))
+
+        # JSON -> TOML
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        File.read(file_path).should start_with("+++\n")
+
+        # TOML -> YAML
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        File.read(file_path).should start_with("---\n")
+
+        # YAML -> JSON
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+        final = File.read(file_path)
+        final.should start_with("{")
+
+        end_idx = final.index!("}\n") + 1
+        parsed = JSON.parse(final[0, end_idx])
+        parsed["title"].as_s.should eq("Round Trip")
+        parsed["draft"].as_bool.should be_true
+        parsed["weight"].as_i.should eq(5)
+        parsed["tags"].as_a.map(&.as_s).should eq(["a", "b"])
+        final.should contain(original_body)
+      end
+    end
   end
 
   describe "error handling" do

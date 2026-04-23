@@ -419,11 +419,7 @@ module Hwaro
         unless tags.empty?
           fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
         end
-        String.build do |str|
-          str << JSON::Any.new(fields).to_pretty_json
-          str << "\n\n"
-          str << "# #{title}\n"
-        end
+        "#{JSON::Any.new(fields).to_pretty_json}\n\n# #{title}\n"
       end
 
       private def escape_string(value : String) : String

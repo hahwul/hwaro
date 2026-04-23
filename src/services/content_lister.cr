@@ -225,7 +225,7 @@ module Hwaro
             Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
           end
           # Try JSON Front Matter (balanced {...} at file start)
-        elsif content.starts_with?('{') && (end_idx = Hwaro::Utils::FrontmatterScanner.find_json_end(content))
+        elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
           begin
             json_fm = JSON.parse(content[0, end_idx])
             if json_fm.as_h?

@@ -165,7 +165,13 @@ module Hwaro
               message: "YAML frontmatter parse error: #{ex.message}")
             return
           end
-        elsif content.starts_with?('{') && (end_idx = Hwaro::Utils::FrontmatterScanner.find_json_end(content))
+        elsif content.starts_with?('{')
+          end_idx = Utils::FrontmatterScanner.find_json_end(content)
+          unless end_idx
+            issues << Issue.new(id: "content-frontmatter-json-error", level: :error, category: "content", file: file_path,
+              message: "JSON frontmatter parse error: unbalanced braces")
+            return
+          end
           begin
             json_data = JSON.parse(content[0, end_idx])
             if h = json_data.as_h?
