@@ -1,13 +1,17 @@
 ##= BUILDER =##
 FROM crystallang/crystal:1.20.0 AS builder
 WORKDIR /hwaro
-COPY . .
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends zlib1g-dev pkg-config && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    shards install --production && \
-    shards build --release --no-debug --production
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY shard.yml shard.lock ./
+RUN shards install --production
+
+COPY . .
+RUN shards build --release --no-debug --production && \
+    strip /hwaro/bin/hwaro
 
 ##= RUNNER =##
 FROM debian:13-slim
@@ -16,9 +20,9 @@ FROM debian:13-slim
 LABEL org.opencontainers.image.title="Hwaro"
 LABEL org.opencontainers.image.description="Hwaro (화로) is a lightweight and fast static site generator written in Crystal."
 LABEL org.opencontainers.image.authors="HAHWUL <hahwul@gmail.com>"
-LABEL org.opencontainers.image.source=https://github.com/hahwul/hwaro
+LABEL org.opencontainers.image.source="https://github.com/hahwul/hwaro"
 LABEL org.opencontainers.image.documentation="https://github.com/hahwul/hwaro"
-LABEL org.opencontainers.image.licenses=MIT
+LABEL org.opencontainers.image.licenses="MIT"
 
 # GitHub Action labels
 LABEL "com.github.actions.name"="Hwaro Deploy to Pages"
@@ -36,8 +40,6 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /hwaro/bin/hwaro /usr/local/bin/hwaro
-COPY docker/entrypoint.sh /entrypoint.sh
-
-RUN chmod +x /entrypoint.sh
+COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

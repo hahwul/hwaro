@@ -1,0 +1,39 @@
+# Build artifacts
+bin/
+lib/
+**/*.o
+**/*.dwarf
+
+# Git & VCS
+.git/
+.gitignore
+
+# Dev tooling
+.github/
+.claude/
+.ameba.yml
+.editorconfig
+AGENTS.md
+CONTRIBUTING.md
+CHANGELOG.md
+justfile
+
+# Nix
+flake.nix
+flake.lock
+shards.nix
+result
+
+# Packaging
+aur/
+snap/
+
+# Tests & docs
+spec/
+docs/
+
+# Docker itself (keep entrypoint.sh — it's COPY'd into the runner stage)
+docker/*
+!docker/entrypoint.sh
+Dockerfile
+.dockerignore
