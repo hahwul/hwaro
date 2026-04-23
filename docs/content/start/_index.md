@@ -5,7 +5,7 @@ description = "Get up and running with Hwaro"
 
 ## What is Hwaro?
 
-Hwaro is a lightweight and fast static site generator (SSG) written in [Crystal](https://crystal-lang.org). It processes Markdown content with TOML front matter and Jinja2-compatible templates (Crinja) to build high-performance static sites.
+Hwaro is a lightweight and fast static site generator (SSG) written in [Crystal](https://crystal-lang.org). It processes Markdown content with TOML or YAML front matter and Jinja2-compatible templates (Crinja) to build high-performance static sites.
 
 Hwaro is designed to help you **build your own website without relying on pre-made themes**. Instead of picking a theme and tweaking it, you craft your templates and styles from scratch, giving you full control over every aspect of your site. With parallel builds, incremental caching, and a dev server with live reload, Hwaro keeps the development experience fast and smooth.
 

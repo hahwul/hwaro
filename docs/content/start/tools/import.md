@@ -53,7 +53,7 @@ hwaro tool import hugo path/to/site --verbose
 
 ## Behavior
 
-- Front matter is converted to hwaro's TOML format (`+++`).
+- Front matter is converted to hwaro's default TOML format (`+++`). Hwaro also supports YAML front matter (`---`); switch the default with `[content.new].front_matter_format = "yaml"` in `config.toml` or run `hwaro tool convert to-yaml` afterwards.
 - HTML content (e.g. WordPress) is converted to Markdown.
 - Existing files at the destination path are **skipped**, not overwritten. Remove or rename them first if you want to re-import.
 - Only known post types are imported (e.g. WordPress `post` and `page`).

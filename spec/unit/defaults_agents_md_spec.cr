@@ -21,7 +21,8 @@ describe Hwaro::Services::Defaults::AgentsMd do
       content = Hwaro::Services::Defaults::AgentsMd.content
       content.should contain "## Content"
       content.should contain "Pages"
-      content.should contain "Front matter uses TOML"
+      content.should contain "Front matter can use either TOML"
+      content.should contain "YAML"
     end
 
     it "includes Templates section" do
@@ -67,7 +68,7 @@ describe Hwaro::Services::Defaults::AgentsMd do
     it "includes Notes for AI Agents" do
       content = Hwaro::Services::Defaults::AgentsMd.remote_content
       content.should contain "Notes for AI Agents"
-      content.should contain "Front matter is TOML"
+      content.should contain "Front matter** can be TOML"
     end
 
     it "includes Site-Specific Instructions section" do

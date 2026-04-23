@@ -100,7 +100,7 @@ Update **all** of the following:
 ### Security
 - **HTML/XML output**: `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
 - **Inline JS**: Escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
-- **TOML front matter**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`), never unchecked `.as_s`.
+- **Front matter (TOML/YAML)**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`) on `TOML::Any` / `YAML::Any` values, never unchecked `.as_s`.
 - **Crinja filter args**: Use `.to_s` instead of `.as_s`.
 - **Paths**: Always use `PathUtils.sanitize_path` for user-provided or content-derived paths.
 
@@ -129,4 +129,4 @@ Build: `bin/hwaro build -i docs` → `docs/public/`. Always build after changes 
 - `docs/data/sidebar.yml` — Navigation (link items + nested groups).
 - `docs/templates/` — Jinja2 templates. Landing page (`index.html`) uses separate template; `index.md` content is not rendered.
 - `docs/static/assets/css/` — Numbered by load order (`01-variables` → `08-shortcodes`).
-- Front matter: TOML (`+++`), `weight` for ordering, `toc = true` for long pages.
+- Front matter: the docs site uses TOML (`+++`) by convention (YAML `---` is also supported by hwaro), `weight` for ordering, `toc = true` for long pages.

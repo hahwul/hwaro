@@ -22,7 +22,7 @@
 
 ---
 
-Hwaro processes Markdown content with TOML front matter and Jinja2-compatible templates (Crinja) to build high-performance static sites. It features parallel builds, incremental caching, and a built-in dev server with live reload.
+Hwaro processes Markdown content with TOML or YAML front matter and Jinja2-compatible templates (Crinja) to build high-performance static sites. It features parallel builds, incremental caching, and a built-in dev server with live reload.
 
 <details>
 <summary><strong>Features</strong></summary>

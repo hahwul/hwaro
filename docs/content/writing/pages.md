@@ -18,7 +18,16 @@ date = "2024-01-15"
 Your content in **Markdown**.
 ```
 
-The `+++` block is TOML front matter. Content below becomes HTML.
+The `+++` block is TOML front matter. YAML is also supported using `---` delimiters. Content below becomes HTML.
+
+```markdown
+---
+title: "My Page"
+date: "2024-01-15"
+---
+
+Your content in **Markdown**.
+```
 
 ## Front Matter
 
