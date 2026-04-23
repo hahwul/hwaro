@@ -915,5 +915,29 @@ describe Hwaro::Content::Processors::Template do
       err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
       err.exit_code.should eq(4)
     end
+
+    it "includes the page path in the error message for context-based render" do
+      page = Hwaro::Models::Page.new("posts/broken.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Content::Processors::Template.process("{{ unclosed", context)
+      end
+
+      (err.message || "").should contain("posts/broken.md")
+    end
+
+    it "preserves the original Crinja exception as cause" do
+      page = Hwaro::Models::Page.new("posts/broken.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Content::Processors::Template.process("{{ unclosed", context)
+      end
+
+      err.cause.should be_a(Crinja::Error)
+    end
   end
 end

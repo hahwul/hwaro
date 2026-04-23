@@ -205,7 +205,7 @@ module Hwaro
 
           args = parse_shortcode_args_jinja(args_str)
           extra_args.try &.each { |k, v| args[k] = v }
-          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override)
+          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name)
 
           if results = shortcode_results
             placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
@@ -254,7 +254,7 @@ module Hwaro
         end
 
         # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil) : String
+        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, shortcode_name : String? = nil) : String
           env = crinja_env_override || crinja_env
 
           # Use a local copy of context with args merged to avoid mutating
@@ -276,7 +276,8 @@ module Hwaro
             end
             crinja_template.render(local_context)
           rescue ex : Crinja::TemplateError
-            Logger.warn "Shortcode template error: #{ex.message}"
+            label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
+            Logger.warn "Template error in #{label}: #{ex.message}"
             ""
           end
         end

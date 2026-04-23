@@ -175,7 +175,8 @@ module Hwaro
         rescue ex : Crinja::Error
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error: #{ex.message}",
+            message: "Template error for #{context.page.path}: #{ex.message}",
+            cause: ex,
           )
         end
 
@@ -187,6 +188,7 @@ module Hwaro
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_TEMPLATE,
             message: "Template error: #{ex.message}",
+            cause: ex,
           )
         end
 
@@ -197,7 +199,8 @@ module Hwaro
         rescue ex : Crinja::Error
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error in '#{template_name}': #{ex.message}",
+            message: "Template error in '#{template_name}' for #{context.page.path}: #{ex.message}",
+            cause: ex,
           )
         end
 
@@ -209,6 +212,7 @@ module Hwaro
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_TEMPLATE,
             message: "Template error in '#{template_name}': #{ex.message}",
+            cause: ex,
           )
         end
 

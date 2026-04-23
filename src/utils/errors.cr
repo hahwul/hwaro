@@ -80,8 +80,8 @@ module Hwaro
     getter category : Symbol
     getter hint : String?
 
-    def initialize(code : String, message : String, hint : String? = nil)
-      super(message)
+    def initialize(code : String, message : String, hint : String? = nil, cause : Exception? = nil)
+      super(message, cause)
       @code = code
       @category = Errors.category_for(code)
       @hint = hint

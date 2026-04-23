@@ -644,6 +644,7 @@ module Hwaro::Core::Build::Phases::Render
       raise Hwaro::HwaroError.new(
         code: Hwaro::Errors::HWARO_E_TEMPLATE,
         message: "Template error for #{page.path}: #{ex.message}",
+        cause: ex,
       )
     end
   end
