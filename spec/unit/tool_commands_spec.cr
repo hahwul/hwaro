@@ -114,9 +114,9 @@ describe Hwaro::CLI::Commands::Tool::ConvertCommand do
       meta.positional_args.should eq(["format"])
     end
 
-    it "has to-yaml and to-toml as positional choices" do
+    it "has to-yaml, to-toml, and to-json as positional choices" do
       meta = Hwaro::CLI::Commands::Tool::ConvertCommand.metadata
-      meta.positional_choices.should eq(["to-yaml", "to-toml"])
+      meta.positional_choices.should eq(["to-yaml", "to-toml", "to-json"])
     end
 
     it "content-dir flag takes a value" do

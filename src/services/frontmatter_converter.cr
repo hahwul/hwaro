@@ -1,11 +1,12 @@
 # Frontmatter Converter Service
 #
 # This service provides functionality to convert frontmatter between
-# YAML and TOML formats in content files.
+# YAML, TOML, and JSON formats in content files.
 
 require "json"
 require "yaml"
 require "toml"
+require "../utils/frontmatter_scanner"
 require "../utils/logger"
 
 module Hwaro
@@ -14,6 +15,7 @@ module Hwaro
     enum FrontmatterFormat
       YAML
       TOML
+      JSON
       Unknown
     end
 
@@ -65,12 +67,19 @@ module Hwaro
         convert_files(FrontmatterFormat::TOML)
       end
 
+      # Convert all content files to JSON format
+      def convert_to_json : ConversionResult
+        convert_files(FrontmatterFormat::JSON)
+      end
+
       # Detect the frontmatter format of a file
       def detect_format(content : String) : FrontmatterFormat
         if content.starts_with?("#{TOML_DELIMITER}\n") || content.starts_with?("#{TOML_DELIMITER}\r\n")
           FrontmatterFormat::TOML
         elsif content.starts_with?("#{YAML_DELIMITER}\n") || content.starts_with?("#{YAML_DELIMITER}\r\n")
           FrontmatterFormat::YAML
+        elsif content.starts_with?('{') && Utils::FrontmatterScanner.find_json_end(content)
+          FrontmatterFormat::JSON
         else
           FrontmatterFormat::Unknown
         end
@@ -124,7 +133,7 @@ module Hwaro
         skipped = 0
         errors = 0
 
-        format_name = target_format == FrontmatterFormat::YAML ? "YAML" : "TOML"
+        format_name = format_label(target_format)
         Logger.info "Converting frontmatter to #{format_name} format..."
         Logger.info ""
 
@@ -176,7 +185,35 @@ module Hwaro
           yaml_to_toml(content)
         when {FrontmatterFormat::TOML, FrontmatterFormat::YAML}
           toml_to_yaml(content)
+        when {FrontmatterFormat::YAML, FrontmatterFormat::JSON}
+          yaml_to_json(content)
+        when {FrontmatterFormat::JSON, FrontmatterFormat::YAML}
+          json_to_yaml(content)
+        when {FrontmatterFormat::TOML, FrontmatterFormat::JSON}
+          toml_to_json(content)
+        when {FrontmatterFormat::JSON, FrontmatterFormat::TOML}
+          json_to_toml(content)
         end
+      end
+
+      private def format_label(fmt : FrontmatterFormat) : String
+        case fmt
+        when FrontmatterFormat::YAML then "YAML"
+        when FrontmatterFormat::TOML then "TOML"
+        when FrontmatterFormat::JSON then "JSON"
+        else                              "Unknown"
+        end
+      end
+
+      # Split JSON-frontmatter content into (json_string, body). Returns nil if
+      # the file does not start with a balanced JSON object.
+      private def split_json_frontmatter(content : String) : {String, String}?
+        end_idx = Utils::FrontmatterScanner.find_json_end(content)
+        return unless end_idx
+
+        json_str = content[0, end_idx]
+        body = content[end_idx..].lchop("\r\n").lchop("\n")
+        {json_str, body}
       end
 
       private def yaml_to_toml(content : String) : String?
@@ -213,6 +250,172 @@ module Hwaro
             nil
           end
         end
+      end
+
+      private def yaml_to_json(content : String) : String?
+        if match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+          yaml_str = match[1]
+          body = match[2]
+          begin
+            yaml_data = YAML.parse(yaml_str)
+            json_str = yaml_to_json_string(yaml_data)
+            "#{json_str}\n#{body}"
+          rescue ex
+            Logger.debug "YAML parse error: #{ex.message}"
+            nil
+          end
+        end
+      end
+
+      private def toml_to_json(content : String) : String?
+        if match = content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
+          toml_str = match[1]
+          body = match[2]
+          begin
+            toml_data = TOML.parse(toml_str)
+            json_str = toml_to_json_string(toml_data)
+            "#{json_str}\n#{body}"
+          rescue ex
+            Logger.debug "TOML parse error: #{ex.message}"
+            nil
+          end
+        end
+      end
+
+      private def json_to_yaml(content : String) : String?
+        return unless parts = split_json_frontmatter(content)
+        json_str, body = parts
+        begin
+          json_data = JSON.parse(json_str)
+          yaml_body = convert_json_to_yaml_string(json_data)
+          "#{YAML_DELIMITER}\n#{yaml_body}#{YAML_DELIMITER}\n#{body}"
+        rescue ex
+          Logger.debug "JSON parse error: #{ex.message}"
+          nil
+        end
+      end
+
+      private def json_to_toml(content : String) : String?
+        return unless parts = split_json_frontmatter(content)
+        json_str, body = parts
+        begin
+          json_data = JSON.parse(json_str)
+          # Reuse the YAML→TOML builder by going through YAML::Any.
+          yaml_any = json_to_yaml_any(json_data)
+          toml_body = TomlBuilder.new.build(yaml_any)
+          "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
+        rescue ex
+          Logger.debug "JSON parse error: #{ex.message}"
+          nil
+        end
+      end
+
+      # Pretty-print a YAML::Any tree as a JSON object (2-space indent).
+      private def yaml_to_json_string(yaml : YAML::Any) : String
+        return "{}" unless yaml.as_h?
+        yaml_any_to_json_any(yaml).to_pretty_json
+      end
+
+      # Pretty-print a TOML::Table as a JSON object (2-space indent).
+      private def toml_to_json_string(toml : TOML::Table) : String
+        root = JSON::Any.new({} of String => JSON::Any)
+        hash = root.as_h
+        toml.each do |key, value|
+          hash[key] = toml_any_to_json_any(value)
+        end
+        root.to_pretty_json
+      end
+
+      private def yaml_any_to_json_any(yaml : YAML::Any) : JSON::Any
+        raw = yaml.raw
+        case raw
+        when Bool    then JSON::Any.new(raw)
+        when Int32   then JSON::Any.new(raw.to_i64)
+        when Int64   then JSON::Any.new(raw)
+        when Float32 then JSON::Any.new(raw.to_f64)
+        when Float64 then JSON::Any.new(raw)
+        when String  then JSON::Any.new(raw)
+        when Time    then JSON::Any.new(raw.to_rfc3339)
+        when Nil     then JSON::Any.new(nil)
+        when Array
+          arr = yaml.as_a.map { |v| yaml_any_to_json_any(v) }
+          JSON::Any.new(arr)
+        when Hash
+          hash = {} of String => JSON::Any
+          yaml.as_h.each do |k, v|
+            key_str = k.as_s? || k.to_s
+            hash[key_str] = yaml_any_to_json_any(v)
+          end
+          JSON::Any.new(hash)
+        else
+          JSON::Any.new(yaml.to_s)
+        end
+      end
+
+      private def toml_any_to_json_any(value : TOML::Any) : JSON::Any
+        raw = value.raw
+        case raw
+        when Bool    then JSON::Any.new(raw)
+        when Int64   then JSON::Any.new(raw)
+        when Float64 then JSON::Any.new(raw)
+        when String  then JSON::Any.new(raw)
+        when Time    then JSON::Any.new(raw.to_rfc3339)
+        when Array
+          arr = raw.map do |item|
+            item.is_a?(TOML::Any) ? toml_any_to_json_any(item) : JSON::Any.new(item.to_s)
+          end
+          JSON::Any.new(arr)
+        when Hash
+          if raw.is_a?(Hash(String, TOML::Any))
+            hash = {} of String => JSON::Any
+            raw.each do |k, v|
+              hash[k] = toml_any_to_json_any(v)
+            end
+            JSON::Any.new(hash)
+          else
+            JSON::Any.new(raw.to_s)
+          end
+        else
+          JSON::Any.new(value.to_s)
+        end
+      end
+
+      # Convert JSON::Any to YAML::Any so the existing TomlBuilder can consume it.
+      private def json_to_yaml_any(json : JSON::Any) : YAML::Any
+        raw = json.raw
+        case raw
+        when Bool    then YAML::Any.new(raw)
+        when Int64   then YAML::Any.new(raw)
+        when Float64 then YAML::Any.new(raw)
+        when String  then YAML::Any.new(raw)
+        when Nil     then YAML::Any.new(nil)
+        when Array
+          arr = json.as_a.map { |v| json_to_yaml_any(v) }
+          YAML::Any.new(arr)
+        when Hash
+          hash = {} of YAML::Any => YAML::Any
+          json.as_h.each do |k, v|
+            hash[YAML::Any.new(k)] = json_to_yaml_any(v)
+          end
+          YAML::Any.new(hash)
+        else
+          YAML::Any.new(json.to_s)
+        end
+      end
+
+      # Produce the body of a YAML block (without the `---` fences) for a JSON
+      # document by routing through the existing YAML converter.
+      private def convert_json_to_yaml_string(json : JSON::Any) : String
+        yaml_any = json_to_yaml_any(json)
+        # Build a hash like the TOML path does so we get identical formatting.
+        hash = {} of String => YAML::Any
+        if h = yaml_any.as_h?
+          h.each do |k, v|
+            key_str = k.as_s? || k.to_s
+            hash[key_str] = v
+          end
+        end
+        hash.to_yaml.lchop("---\n")
       end
 
       private def convert_yaml_to_toml_string(yaml : YAML::Any, indent : Int32 = 0) : String

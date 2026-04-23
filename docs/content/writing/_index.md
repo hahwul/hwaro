@@ -3,7 +3,7 @@ title = "Writing"
 description = "Create content with Markdown and front matter"
 +++
 
-Content lives in the `content/` directory. Write Markdown with TOML (`+++`) or YAML (`---`) front matter.
+Content lives in the `content/` directory. Write Markdown with TOML (`+++`), YAML (`---`), or JSON (`{...}`) front matter. TOML is the default; YAML is widely recommended; JSON is supported for users who prefer it.
 
 ## Content Types
 

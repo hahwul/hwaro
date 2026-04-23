@@ -31,7 +31,7 @@ hwaro tool validate --json
 - Missing `description` in frontmatter
 - Images without alt text (`![](url)`)
 - Broken internal links (`@/` prefixed paths that don't resolve)
-- Frontmatter parse errors (TOML/YAML)
+- Frontmatter parse errors (TOML/YAML/JSON)
 - Invalid date formats
 - Mixed-case tags (e.g., `Crystal` instead of `crystal`)
 - Draft files (reported as info)
@@ -63,6 +63,7 @@ Found 0 error(s), 2 warning(s), 2 info(s)
 | `content-date-invalid` | warning | Unrecognized date format |
 | `content-frontmatter-toml-error` | error | TOML frontmatter parse error |
 | `content-frontmatter-yaml-error` | error | YAML frontmatter parse error |
+| `content-frontmatter-json-error` | error | JSON frontmatter parse error |
 | `content-read-error` | error | Failed to read content file |
 | `content-tag-mixed-case` | info | Tag has mixed case |
 | `content-draft` | info | File marked as draft |

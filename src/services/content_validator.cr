@@ -9,6 +9,7 @@ require "yaml"
 require "toml"
 require "./doctor"
 require "../utils/errors"
+require "../utils/frontmatter_scanner"
 require "../utils/logger"
 
 module Hwaro
@@ -162,6 +163,42 @@ module Hwaro
           rescue ex
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
+            return
+          end
+        elsif content.starts_with?('{')
+          end_idx = Utils::FrontmatterScanner.find_json_end(content)
+          unless end_idx
+            issues << Issue.new(id: "content-frontmatter-json-error", level: :error, category: "content", file: file_path,
+              message: "JSON frontmatter parse error: unbalanced braces")
+            return
+          end
+          begin
+            json_data = JSON.parse(content[0, end_idx])
+            if h = json_data.as_h?
+              result = {} of String => FrontmatterValue
+              h.each do |k, value|
+                if s = value.as_s?
+                  result[k] = s
+                elsif b = value.as_bool?
+                  result[k] = b
+                elsif i = value.as_i?
+                  result[k] = i.to_i64
+                elsif f = value.as_f?
+                  result[k] = f
+                end
+              end
+              if tags_node = h["tags"]?
+                if arr = tags_node.as_a?
+                  tag_strs = arr.compact_map(&.as_s?)
+                  result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
+                end
+              end
+              return result
+            end
+            return
+          rescue ex
+            issues << Issue.new(id: "content-frontmatter-json-error", level: :error, category: "content", file: file_path,
+              message: "JSON frontmatter parse error: #{ex.message}")
             return
           end
         end

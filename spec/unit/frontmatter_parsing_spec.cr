@@ -645,6 +645,148 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   # ---------------------------------------------------------------------------
+  # JSON front matter ({...} balanced at file start)
+  # ---------------------------------------------------------------------------
+  describe "JSON front matter parsing" do
+    it "parses basic JSON fields" do
+      raw = <<-MD
+        {
+          "title": "My JSON Post",
+          "draft": false
+        }
+
+        Content here
+        MD
+
+      result = processor.parse(raw)
+      result[:title].should eq("My JSON Post")
+      result[:draft].should be_false
+      result[:content].should contain("Content here")
+    end
+
+    it "parses description and image" do
+      raw = <<-MD
+        {"title": "Post", "description": "A brief summary", "image": "/images/hero.jpg"}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:description].should eq("A brief summary")
+      result[:image].should eq("/images/hero.jpg")
+    end
+
+    it "parses tags array" do
+      raw = <<-MD
+        {"title": "Tagged", "tags": ["crystal", "web"]}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:tags].should eq(["crystal", "web"])
+      result[:taxonomies].has_key?("tags").should be_true
+      result[:taxonomies]["tags"].should eq(["crystal", "web"])
+    end
+
+    it "parses integer and boolean fields" do
+      raw = <<-MD
+        {"title": "P", "weight": 5, "toc": true, "draft": true}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:weight].should eq(5)
+      result[:toc].should be_true
+      result[:draft].should be_true
+    end
+
+    it "parses date as ISO string" do
+      raw = <<-MD
+        {"title": "Dated", "date": "2024-01-15"}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:date].should_not be_nil
+      result[:date].not_nil!.year.should eq(2024)
+    end
+
+    it "captures unknown keys into extra" do
+      raw = <<-MD
+        {"title": "P", "custom_field": "hello", "rating": 4}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:extra]["custom_field"].should eq("hello")
+      result[:extra]["rating"].should eq(4_i64)
+    end
+
+    it "handles nested braces inside string values" do
+      raw = <<-MD
+        {"title": "Tricky {nested}", "description": "a } b { c"}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:title].should eq("Tricky {nested}")
+      result[:description].should eq("a } b { c")
+    end
+
+    it "handles escaped quotes inside strings" do
+      raw = %({"title": "She said \\"hi\\"", "description": "x"}\n\nBody\n)
+
+      result = processor.parse(raw)
+      result[:title].should eq(%(She said "hi"))
+    end
+
+    it "leaves content untouched when file does not start with {" do
+      # Leading whitespace means the { is not at byte 0, so this is not a JSON
+      # frontmatter block — parser should fall through to the no-frontmatter path.
+      raw = " {\"not\": \"frontmatter\"}\n\nBody\n"
+
+      result = processor.parse(raw)
+      result[:title].should eq("Untitled")
+      result[:content].should contain("Body")
+    end
+
+    it "extracts non-taxonomy-keyword arrays into taxonomies" do
+      raw = <<-MD
+        {"title": "P", "tags": ["a"], "categories": ["tech"]}
+
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:taxonomies]["tags"].should eq(["a"])
+      result[:taxonomies]["categories"].should eq(["tech"])
+    end
+
+    it "raises HwaroError for unbalanced JSON when a file_path is provided" do
+      raw = %({"title": "Never closes\n\nbody\n)
+
+      expect_raises(Hwaro::HwaroError, /unbalanced braces/) do
+        processor.parse(raw, "content/broken.md")
+      end
+    end
+
+    it "silently ignores unbalanced JSON when no file_path is provided (library use)" do
+      # Without a file_path the parser has no caller context to raise against,
+      # so we keep the historic graceful-nil behaviour and treat the file as
+      # having no front matter.
+      raw = %({"title": "Never closes\n\nbody\n)
+
+      result = processor.parse(raw)
+      result[:title].should eq("Untitled")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Default values (no front matter or missing fields)
   # ---------------------------------------------------------------------------
   describe "default values" do

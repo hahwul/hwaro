@@ -213,7 +213,8 @@ module Hwaro
     class ContentNewConfig
       FORMAT_TOML    = "toml"
       FORMAT_YAML    = "yaml"
-      VALID_FORMATS  = {FORMAT_TOML, FORMAT_YAML}
+      FORMAT_JSON    = "json"
+      VALID_FORMATS  = {FORMAT_TOML, FORMAT_YAML, FORMAT_JSON}
       BUILTIN_FIELDS = {"title", "date", "draft", "tags"}
 
       property front_matter_format : String
@@ -228,6 +229,14 @@ module Hwaro
 
       def toml? : Bool
         @front_matter_format == FORMAT_TOML
+      end
+
+      def yaml? : Bool
+        @front_matter_format == FORMAT_YAML
+      end
+
+      def json? : Bool
+        @front_matter_format == FORMAT_JSON
       end
 
       # Extra fields, with built-ins filtered out and duplicates removed,

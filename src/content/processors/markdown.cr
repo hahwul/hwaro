@@ -1,7 +1,7 @@
 # Markdown processor for converting Markdown to HTML
 #
 # This processor handles:
-# - TOML and YAML front matter parsing
+# - TOML, YAML, and JSON front matter parsing
 # - Markdown to HTML conversion using Markd
 # - Table of Contents generation with header IDs
 # - Syntax highlighting support via HighlightingRenderer
@@ -9,12 +9,14 @@
 require "markd"
 require "yaml"
 require "toml"
+require "json"
 require "xml"
 require "./base"
 require "./syntax_highlighter"
 require "./markdown_extensions"
 require "../../models/toc"
 require "../../utils/errors"
+require "../../utils/frontmatter_scanner"
 require "../../utils/logger"
 require "../../utils/text_utils"
 
@@ -42,7 +44,12 @@ module Hwaro
         # Regex for YAML front matter
         YAML_FRONT_MATTER_REGEX = /\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m
 
-        # Known front-matter keys (shared between TOML and YAML parsers).
+        # JSON front matter is delimited by balanced braces. The file must begin
+        # with `{` (no leading whitespace) and the first balanced `{...}` is the
+        # front matter; the remainder is the markdown body.
+        # See `Utils::FrontmatterScanner.find_json_end` for the brace scanner.
+
+        # Known front-matter keys (shared between TOML, YAML, and JSON parsers).
         # Using a Set for O(1) lookup instead of Array#includes? O(n).
         KNOWN_FRONT_MATTER_KEYS = Set{
           "title", "description", "image", "draft", "template", "in_sitemap",
@@ -150,13 +157,29 @@ module Hwaro
         def parse(raw_content : String, file_path : String = "")
           markdown_content = raw_content
 
-          # Try TOML Front Matter (+++) then YAML Front Matter (---)
+          # Try TOML (+++), YAML (---), then JSON ({...}) front matter
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
             result = extract_from_toml(match[1], file_path)
             markdown_content = match[2]
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
             result = extract_from_yaml(match[1], file_path)
             markdown_content = match[2]
+          elsif raw_content.starts_with?('{')
+            # A leading `{` signals JSON frontmatter intent. If the scanner can
+            # locate a balanced object we parse it; if not, the file is almost
+            # certainly a truncated/mistyped JSON header — surface it as a
+            # content error rather than silently treating it as body text.
+            if end_idx = Utils::FrontmatterScanner.find_json_end(raw_content)
+              result = extract_from_json(raw_content[0, end_idx], file_path)
+              body = raw_content[end_idx..]
+              markdown_content = body.lchop("\r\n").lchop("\n")
+            elsif !file_path.empty?
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONTENT,
+                message: "Invalid JSON frontmatter in #{file_path}: unbalanced braces",
+                hint: "The file starts with `{` so hwaro treated it as JSON frontmatter. Close the object with a matching `}` or remove the leading `{`.",
+              )
+            end
           end
 
           if result
@@ -336,9 +359,53 @@ module Hwaro
           nil
         end
 
+        # Extract front matter fields from JSON content
+        private def extract_from_json(raw : String, file_path : String)
+          json_fm = begin
+            JSON.parse(raw)
+          rescue ex
+            if file_path.empty?
+              Logger.warn "Invalid JSON: #{ex.message}"
+              return
+            end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "Invalid JSON frontmatter in #{file_path}: #{ex.message}",
+              hint: "Check JSON frontmatter object at start of file",
+            )
+          end
+          return unless json_fm.as_h?
+
+          date = parse_time(json_fm["date"]?.try(&.as_s?))
+          updated = parse_time(json_fm["updated"]?.try(&.as_s?))
+          expires = parse_time(json_fm["expires"]?.try(&.as_s?))
+
+          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          unknown_keys = [] of String
+          json_fm.as_h.each do |key, value|
+            next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+            unknown_keys << key
+            extra[key] = extract_extra_value(value)
+          end
+          warn_typo_keys(unknown_keys, file_path)
+
+          front_matter_keys = json_fm.as_h.keys
+          taxonomies = extract_taxonomies(json_fm, front_matter_keys)
+          tags = fm_string_array(json_fm, "tags")
+          taxonomies["tags"] = tags if tags.present?
+
+          result = build_front_matter_result(json_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
+          result.merge({expires: expires})
+        rescue ex : Hwaro::HwaroError
+          raise ex
+        rescue ex
+          Logger.warn "Invalid JSON in #{file_path}: #{ex.message}" unless file_path.empty?
+          nil
+        end
+
         # Shared helper: extract a Bool from a front matter value, returning the
         # given default when the key is absent or not a boolean.
-        private def fm_bool(fm : TOML::Table | YAML::Any, key : String, default : Bool) : Bool
+        private def fm_bool(fm : TOML::Table | YAML::Any | JSON::Any, key : String, default : Bool) : Bool
           val = fm[key]?
           return default unless val
           bool_val = val.as_bool?
@@ -346,31 +413,32 @@ module Hwaro
         end
 
         # Shared helper: extract a nilable Bool from a front matter value.
-        private def fm_bool?(fm : TOML::Table | YAML::Any, key : String) : Bool?
+        private def fm_bool?(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Bool?
           fm[key]?.try(&.as_bool?)
         end
 
         # Shared helper: extract a nilable Int32 from a front matter value.
-        private def fm_int?(fm : TOML::Table | YAML::Any, key : String) : Int32?
+        private def fm_int?(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Int32?
           fm[key]?.try(&.as_i?)
         end
 
         # Shared helper: extract a String with a default from a front matter value.
-        private def fm_string(fm : TOML::Table | YAML::Any, key : String, default : String) : String
+        private def fm_string(fm : TOML::Table | YAML::Any | JSON::Any, key : String, default : String) : String
           fm[key]?.try(&.as_s?) || default
         end
 
         # Shared helper: extract a string array from a front matter value.
         # Uses compact_map(&.as_s?) instead of map(&.as_s) to safely skip
         # non-string elements rather than raising at runtime.
-        private def fm_string_array(fm : TOML::Table | YAML::Any, key : String) : Array(String)
+        private def fm_string_array(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Array(String)
           fm[key]?.try(&.as_a?.try { |a| a.compact_map(&.as_s?) }) || [] of String
         end
 
         # Build the front matter result NamedTuple from any front matter source.
-        # This eliminates duplication between extract_from_toml and extract_from_yaml.
+        # This eliminates duplication between extract_from_toml, extract_from_yaml,
+        # and extract_from_json.
         private def build_front_matter_result(
-          fm : TOML::Table | YAML::Any,
+          fm : TOML::Table | YAML::Any | JSON::Any,
           date : Time?,
           updated : Time?,
           extra : Hash(String, String | Bool | Int64 | Float64 | Array(String)),
@@ -415,8 +483,8 @@ module Hwaro
           }
         end
 
-        # Extract extra value from TOML::Any or YAML::Any
-        private def extract_extra_value(value : TOML::Any | YAML::Any) : String | Bool | Int64 | Float64 | Array(String)
+        # Extract extra value from TOML::Any, YAML::Any, or JSON::Any
+        private def extract_extra_value(value : TOML::Any | YAML::Any | JSON::Any) : String | Bool | Int64 | Float64 | Array(String)
           if str = value.as_s?
             str
           elsif (bool_val = value.as_bool?) != nil
@@ -662,7 +730,7 @@ module Hwaro
         # These are excluded from automatic taxonomy extraction.
         NON_TAXONOMY_ARRAY_KEYS = Set{"tags", "aliases", "authors"}
 
-        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any, keys : Array(String)) : Hash(String, Array(String))
+        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any | JSON::Any, keys : Array(String)) : Hash(String, Array(String))
           taxonomies = {} of String => Array(String)
 
           # Iterate all keys: TOML::Table yields {String, TOML::Any},

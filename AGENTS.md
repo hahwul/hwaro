@@ -100,7 +100,7 @@ Update **all** of the following:
 ### Security
 - **HTML/XML output**: `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
 - **Inline JS**: Escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
-- **Front matter (TOML/YAML)**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`) on `TOML::Any` / `YAML::Any` values, never unchecked `.as_s`.
+- **Front matter (TOML/YAML/JSON)**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`) on `TOML::Any` / `YAML::Any` / `JSON::Any` values, never unchecked `.as_s`.
 - **Crinja filter args**: Use `.to_s` instead of `.as_s`.
 - **Paths**: Always use `PathUtils.sanitize_path` for user-provided or content-derived paths.
 

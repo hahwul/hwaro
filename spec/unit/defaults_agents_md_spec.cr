@@ -21,8 +21,9 @@ describe Hwaro::Services::Defaults::AgentsMd do
       content = Hwaro::Services::Defaults::AgentsMd.content
       content.should contain "## Content"
       content.should contain "Pages"
-      content.should contain "Front matter can use either TOML"
+      content.should contain "Front matter can use TOML"
       content.should contain "YAML"
+      content.should contain "JSON"
     end
 
     it "includes Templates section" do

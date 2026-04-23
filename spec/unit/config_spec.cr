@@ -806,10 +806,21 @@ describe Hwaro::Models::Config do
       config.content_new.front_matter_format.should eq("yaml")
     end
 
-    it "keeps the default format when the configured value is unknown" do
+    it "accepts 'json' as a front_matter_format value" do
       config = load_config(<<-TOML)
         [content.new]
         front_matter_format = "json"
+        TOML
+
+      config.content_new.front_matter_format.should eq("json")
+      config.content_new.json?.should be_true
+      config.content_new.toml?.should be_false
+    end
+
+    it "keeps the default format when the configured value is unknown" do
+      config = load_config(<<-TOML)
+        [content.new]
+        front_matter_format = "xml"
         TOML
 
       config.content_new.front_matter_format.should eq("toml")

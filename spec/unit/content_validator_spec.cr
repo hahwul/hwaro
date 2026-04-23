@@ -196,6 +196,50 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "works with JSON frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "json.md"), %({"title": "JSON Post", "description": "A JSON post", "date": "2024-01-15"}\n\n# Content\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        errors_and_warnings = issues.select { |i| i.level == :error || i.level == :warning }
+        errors_and_warnings.should be_empty
+      end
+    end
+
+    it "detects JSON frontmatter parse errors" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad-json.md"), %({"title": "P", "bad": }\n\n# Content\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-frontmatter-json-error" }.should be_true
+      end
+    end
+
+    it "reports unbalanced JSON braces as a parse error" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        # File starts with `{` but never closes — we want a loud error, not a
+        # silent fall-through to "no frontmatter".
+        File.write(File.join(content_dir, "unbalanced.md"), %({"title": "Never closes\n\nbody\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issue = issues.find { |i| i.id == "content-frontmatter-json-error" }
+        issue.should_not be_nil
+        issue.not_nil!.message.should contain("unbalanced braces")
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
