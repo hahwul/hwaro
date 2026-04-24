@@ -92,6 +92,12 @@ module Hwaro
         else
           # Determine if path is a file path or directory
           is_file_path = path && path.ends_with?(".md")
+          # With explicit --no-bundle, a bare `<path>` (no .md) is treated as
+          # a flat file slug (→ `content/<path>.md`) rather than as a section
+          # directory that gets a `<title-slug>.md` appended. This avoids
+          # `--no-bundle` producing a directory wrapper, which defeats the
+          # whole point of the flag.
+          is_no_bundle_flat = path && options.bundle == false && !path.not_nil!.ends_with?(".md")
 
           if is_file_path && path
             # Extract directory and filename from path
@@ -111,6 +117,14 @@ module Hwaro
               full_path = path.starts_with?("content/") ? path : File.join("content", path)
             end
             base_dir = File.dirname(full_path)
+          elsif is_no_bundle_flat && path
+            normalized = path.starts_with?("content/") ? path : File.join("content", path)
+            full_path = "#{normalized}.md"
+            base_dir = File.dirname(full_path)
+            if title.empty?
+              filename_without_ext = File.basename(full_path, ".md")
+              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+            end
           else
             base_dir = path || "content/drafts"
             base_dir = "content/#{base_dir}" unless base_dir.starts_with?("content/")

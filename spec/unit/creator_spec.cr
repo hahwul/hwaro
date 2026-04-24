@@ -633,11 +633,11 @@ describe Hwaro::Services::Creator do
         end
       end
 
-      it "leaves --no-bundle dir-ish paths unchanged" do
-        # The --no-bundle + no-.md combination still produces <path>/<slug>.md
-        # (pre-existing behavior; tracked separately if the community wants
-        # it tightened). This spec pins the fact that the bundle-collapse
-        # patch does NOT accidentally alter it.
+      it "treats --no-bundle dir-ish paths as a flat file slug (issue #459)" do
+        # `--no-bundle` must produce a single flat file. The earlier
+        # directory-fallback used to append the title slug as a filename
+        # inside `<path>/`, defeating the flag. With --no-bundle the path
+        # is authoritative and becomes `<path>.md` directly.
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
             FileUtils.mkdir_p("content/posts")
@@ -645,8 +645,31 @@ describe Hwaro::Services::Creator do
               path: "posts/nobund", title: "NoBund", bundle: false)
             Hwaro::Services::Creator.new.run(options)
 
-            File.exists?("content/posts/nobund/nobund.md").should be_true
-            File.exists?("content/posts/nobund/index.md").should be_false
+            File.exists?("content/posts/nobund.md").should be_true
+            Dir.exists?("content/posts/nobund").should be_false
+
+            content = File.read("content/posts/nobund.md")
+            content.should contain("title = \"NoBund\"")
+          end
+        end
+      end
+
+      it "treats --no-bundle single-segment paths as a top-level flat file (issue #459)" do
+        # Regression guard for the reported case: `no-bundle-post` as path
+        # with --no-bundle must produce `content/no-bundle-post.md`, not
+        # `content/no-bundle-post/<title-slug>.md`.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "no-bundle-post", title: "No Bundle", bundle: false)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/no-bundle-post.md").should be_true
+            Dir.exists?("content/no-bundle-post").should be_false
+
+            content = File.read("content/no-bundle-post.md")
+            content.should contain("title = \"No Bundle\"")
           end
         end
       end
