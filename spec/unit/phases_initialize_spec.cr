@@ -287,6 +287,94 @@ describe Hwaro::Core::Build::Phases::Initialize do
         end
       end
     end
+
+    it "exposes subdirectory files as a nested iterable map" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data/users")
+          File.write("data/users/alice.yml", "age: 30\n")
+          File.write("data/users/bob.yml", "age: 25\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          builder.test_load_data_files(site)
+
+          users = site.data["users"]?
+          users.should_not be_nil
+          dict = users.not_nil!.raw.as(Crinja::Dictionary)
+          dict.keys.map { |k| k.raw.as(String) }.sort!.should eq(["alice", "bob"])
+          users.not_nil!["alice"]["age"].raw.should eq(30_i64)
+        end
+      end
+    end
+
+    it "nests arbitrarily deep subdirectories" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data/users/admins")
+          File.write("data/users/admins/root.yml", "level: 99\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          builder.test_load_data_files(site)
+
+          site.data["users"]["admins"]["root"]["level"].raw.should eq(99_i64)
+        end
+      end
+    end
+
+    it "lets directory shadow a same-stem sibling file and warns" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data/users")
+          File.write("data/users.yml", "shadowed: true\n")
+          File.write("data/users/alice.yml", "age: 30\n")
+
+          previous_io = Hwaro::Logger.io
+          sink = IO::Memory.new
+          Hwaro::Logger.io = sink
+
+          begin
+            builder = Hwaro::Core::Build::Builder.new
+            site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+            builder.test_load_data_files(site)
+
+            users = site.data["users"]
+            users["alice"]["age"].raw.should eq(30_i64)
+            users["shadowed"].raw.should be_a(Crinja::Undefined)
+
+            sink.to_s.should contain("data/users.yml")
+            sink.to_s.should contain("directory takes precedence")
+          ensure
+            Hwaro::Logger.io = previous_io
+          end
+        end
+      end
+    end
+
+    it "warns when duplicate stems (e.g. .yml and .yaml) collide" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/config.yml", "theme: light\n")
+          File.write("data/config.yaml", "theme: dark\n")
+
+          previous_io = Hwaro::Logger.io
+          sink = IO::Memory.new
+          Hwaro::Logger.io = sink
+
+          begin
+            builder = Hwaro::Core::Build::Builder.new
+            site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+            builder.test_load_data_files(site)
+
+            sink.to_s.should contain("Duplicate data key")
+          ensure
+            Hwaro::Logger.io = previous_io
+          end
+        end
+      end
+    end
   end
 
   describe "#create_fresh_crinja_env" do

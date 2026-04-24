@@ -65,7 +65,11 @@ Hwaro allows you to store auxiliary data in the `data/` directory. Files ending 
 data/
 ├── authors.yml
 ├── products.json
-└── config.toml
+├── config.toml
+└── users/
+    ├── alice.yml
+    ├── bob.yml
+    └── cho.yml
 ```
 
 #### Accessing Data
@@ -89,6 +93,26 @@ Can be accessed in templates:
   <p>{{ product.price }}</p>
 {% endfor %}
 ```
+
+#### Subdirectories
+
+Subdirectories under `data/` become nested maps. Each file becomes a child keyed by its filename (without extension), and the parent directory itself is iterable.
+
+Given the layout above, `data/users/alice.yml`, `data/users/bob.yml`, and `data/users/cho.yml` are exposed as:
+
+- `site.data.users.alice`, `site.data.users.bob`, `site.data.users.cho` — individual file contents
+- `site.data.users` — a map you can iterate to list every user
+
+```jinja
+{% for name, user in site.data.users %}
+  <h3>{{ name }}</h3>
+  <p>{{ user.bio }}</p>
+{% endfor %}
+```
+
+Directories nest arbitrarily: `data/users/admins/root.yml` → `site.data.users.admins.root`.
+
+**Conflicts.** If a directory and a file share the same stem (e.g. `data/users.yml` alongside `data/users/`), the **directory wins** and the file is ignored. Hwaro emits a warning during the build so the shadowed file is not silently dropped.
 
 ### Site Authors
 
