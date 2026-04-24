@@ -968,5 +968,21 @@ describe Hwaro::Services::Creator do
     it "handles mixed CJK and unsafe characters" do
       Hwaro::Services::Creator.sanitize_url_path("한글 테스트/포스트").should eq("한글-테스트/포스트")
     end
+
+    it "drops segments that sanitize to empty so no leading slash appears" do
+      # "!!!" sanitizes to an empty segment — the overall path must not
+      # turn into "/foo.md" (which would look absolute to File.join).
+      Hwaro::Services::Creator.sanitize_url_path("!!!/foo.md").should eq("foo.md")
+      Hwaro::Services::Creator.sanitize_url_path("posts/!!!/bar").should eq("posts/bar")
+    end
+
+    it "raises ArgumentError when every segment sanitizes away" do
+      expect_raises(ArgumentError, /no URL-safe characters/) do
+        Hwaro::Services::Creator.sanitize_url_path("!!!")
+      end
+      expect_raises(ArgumentError, /no URL-safe characters/) do
+        Hwaro::Services::Creator.sanitize_url_path("!!!/???")
+      end
+    end
   end
 end
