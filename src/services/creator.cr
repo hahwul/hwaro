@@ -97,7 +97,7 @@ module Hwaro
           # directory that gets a `<title-slug>.md` appended. This avoids
           # `--no-bundle` producing a directory wrapper, which defeats the
           # whole point of the flag.
-          is_no_bundle_flat = path && options.bundle == false && !path.not_nil!.ends_with?(".md")
+          is_no_bundle_flat = !path.nil? && options.bundle == false && !path.ends_with?(".md")
 
           if is_file_path && path
             # Extract directory and filename from path
