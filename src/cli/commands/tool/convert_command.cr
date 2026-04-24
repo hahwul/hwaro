@@ -10,6 +10,7 @@ require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/frontmatter_converter"
+require "../../../utils/errors"
 require "../../../utils/logger"
 
 module Hwaro
@@ -55,17 +56,17 @@ module Hwaro
               end
             end
 
+            Logger.quiet = true if json_output
+            Runner.json_mode = true if json_output
+
+            supported = POSITIONAL_CHOICES.join(", ")
+
             unless format
-              Logger.error "Missing format argument. Use 'to-yaml', 'to-toml', or 'to-json'"
-              Logger.info ""
-              Logger.info "Usage: hwaro tool convert <to-yaml|to-toml|to-json> [options]"
-              Logger.info ""
-              Logger.info "Examples:"
-              Logger.info "  hwaro tool convert to-yaml"
-              Logger.info "  hwaro tool convert to-toml"
-              Logger.info "  hwaro tool convert to-json"
-              Logger.info "  hwaro tool convert to-yaml --content-dir=posts"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <format> argument",
+                hint: "Usage: hwaro tool convert <to-yaml|to-toml|to-json> — supported: #{supported}.",
+              )
             end
 
             converter = Services::FrontmatterConverter.new(content_dir)
@@ -84,9 +85,11 @@ module Hwaro
               puts result.to_json if json_output
               exit(1) unless result.success
             else
-              Logger.error "Unknown format: #{format}"
-              Logger.info "Use 'to-yaml', 'to-toml', or 'to-json'"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unknown format: #{format}",
+                hint: "Supported: #{supported}.",
+              )
             end
           end
         end

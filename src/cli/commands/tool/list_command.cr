@@ -59,29 +59,14 @@ module Hwaro
             Logger.quiet = true if json_output
             Runner.json_mode = true if json_output
 
+            supported = POSITIONAL_CHOICES.join(", ")
+
             unless filter
-              if json_output
-                err = Hwaro::HwaroError.new(
-                  code: Hwaro::Errors::HWARO_E_USAGE,
-                  message: "Missing filter argument. Use 'all', 'drafts', or 'published'",
-                )
-                puts err.to_error_payload.to_json
-                exit(err.exit_code)
-              end
-              Logger.error "Missing filter argument. Use 'all', 'drafts', or 'published'"
-              Logger.info ""
-              Logger.info "Usage: hwaro tool list <all|drafts|published> [options]"
-              Logger.info ""
-              Logger.info "Filters:"
-              Logger.info "  all        List all content files"
-              Logger.info "  drafts     List only draft content files"
-              Logger.info "  published  List only published content files"
-              Logger.info ""
-              Logger.info "Examples:"
-              Logger.info "  hwaro tool list all"
-              Logger.info "  hwaro tool list drafts"
-              Logger.info "  hwaro tool list published --content-dir=posts"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <filter> argument",
+                hint: "Usage: hwaro tool list <all|drafts|published> — supported: #{supported}.",
+              )
             end
 
             lister = Services::ContentLister.new(content_dir)
@@ -94,17 +79,11 @@ module Hwaro
                              when "published", "pub"
                                Services::ContentFilter::Published
                              else
-                               if json_output
-                                 err = Hwaro::HwaroError.new(
-                                   code: Hwaro::Errors::HWARO_E_USAGE,
-                                   message: "Unknown filter: #{filter}",
-                                 )
-                                 puts err.to_error_payload.to_json
-                                 exit(err.exit_code)
-                               end
-                               Logger.error "Unknown filter: #{filter}"
-                               Logger.info "Use 'all', 'drafts', or 'published'"
-                               exit(1)
+                               raise Hwaro::HwaroError.new(
+                                 code: Hwaro::Errors::HWARO_E_USAGE,
+                                 message: "unknown filter: #{filter}",
+                                 hint: "Supported: #{supported}.",
+                               )
                              end
 
             if json_output
