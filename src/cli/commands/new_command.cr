@@ -95,11 +95,50 @@ module Hwaro
               hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
             )
           end
-          # Feed the normalized path back into the Creator. The stored
+
+          # Auto-sanitize URL-unsafe characters (spaces, `!@#$%…`) in each
+          # path segment so the on-disk directory also works as a clean URL
+          # path once the site is built. CJK / Unicode letters, digits, and
+          # the RFC 3986 unreserved ASCII set pass through untouched. We
+          # surface the rewrite via `Logger.info` so the author sees what
+          # landed on disk — silent transformation would be confusing.
+          begin
+            sanitized = Services::Creator.sanitize_url_path(normalized)
+          rescue ex : ArgumentError
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: ex.message || "Invalid <path> argument",
+              hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
+            )
+          end
+          if sanitized != normalized
+            Logger.info "Sanitized path: '#{normalized}' → '#{sanitized}' (URL-unsafe characters replaced)"
+          end
+
+          # --section is joined to the on-disk path just like <path>, so it
+          # has to go through the same sanitizer or a space-laden --section
+          # reintroduces the exact problem we just fixed for <path>.
+          if section = options.section
+            begin
+              sanitized_section = Services::Creator.sanitize_url_path(section)
+            rescue ex : ArgumentError
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: ex.message || "Invalid --section argument",
+                hint: "Sections become directory names; use ASCII letters/digits, CJK, or `- . _ ~`.",
+              )
+            end
+            if sanitized_section != section
+              Logger.info "Sanitized section: '#{section}' → '#{sanitized_section}' (URL-unsafe characters replaced)"
+              options.section = sanitized_section
+            end
+          end
+
+          # Feed the sanitized path back into the Creator. The stored
           # path keeps the `content/` prefix so downstream branches that
           # check `starts_with?("content/")` take the already-rooted
           # path as-is (see Creator#run).
-          options.path = normalized
+          options.path = sanitized
 
           created_path = Services::Creator.new.run(options, load_config_if_present)
 

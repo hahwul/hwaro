@@ -53,6 +53,131 @@ describe "CLI Tool Commands" do
         FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
       end
     end
+
+    it "sanitizes URL-unsafe characters in the path and surfaces the rewrite" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__),
+          ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        new_output = IO::Memory.new
+        new_error = IO::Memory.new
+        status = Process.run(
+          File.expand_path("../../bin/hwaro", __DIR__),
+          ["new", "special chars!@#", "-t", "Special Chars"],
+          chdir: project_dir, output: new_output, error: new_error)
+
+        status.success?.should be_true
+        # The sanitized directory lands on disk; the raw one does not.
+        Dir.exists?(File.join(project_dir, "content", "special-chars")).should be_true
+        Dir.exists?(File.join(project_dir, "content", "special chars!@#")).should be_false
+        new_output.to_s.should contain("Sanitized path")
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
+
+    it "emits clean JSON under --json (no sanitize notice mixed in)" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__),
+          ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        new_output = IO::Memory.new
+        new_error = IO::Memory.new
+        status = Process.run(
+          File.expand_path("../../bin/hwaro", __DIR__),
+          ["new", "bad path!", "-t", "BP", "--json"],
+          chdir: project_dir, output: new_output, error: new_error)
+
+        status.success?.should be_true
+        parsed = JSON.parse(new_output.to_s.strip)
+        parsed["status"].as_s.should eq("ok")
+        parsed["path"].as_s.should contain("bad-path")
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
+
+    it "does not emit a sanitize notice for already-safe paths" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__),
+          ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        new_output = IO::Memory.new
+        new_error = IO::Memory.new
+        status = Process.run(
+          File.expand_path("../../bin/hwaro", __DIR__),
+          ["new", "posts/clean-path.md"],
+          chdir: project_dir, output: new_output, error: new_error)
+
+        status.success?.should be_true
+        new_output.to_s.should_not contain("Sanitized")
+        new_error.to_s.should_not contain("Sanitized")
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
+
+    it "sanitizes --section the same way as <path>" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__),
+          ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        status = Process.run(
+          File.expand_path("../../bin/hwaro", __DIR__),
+          ["new", "post", "-s", "my section", "-t", "Post"],
+          chdir: project_dir, output: IO::Memory.new, error: IO::Memory.new)
+
+        status.success?.should be_true
+        Dir.exists?(File.join(project_dir, "content", "my-section")).should be_true
+        Dir.exists?(File.join(project_dir, "content", "my section")).should be_false
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
+
+    it "rejects a path that sanitizes to nothing with HWARO_E_USAGE" do
+      temp_dir = File.tempname("hwaro_test")
+      Dir.mkdir(temp_dir)
+      begin
+        project_dir = File.join(temp_dir, "test_site")
+        Dir.mkdir(project_dir)
+
+        Process.run(File.expand_path("../../bin/hwaro", __DIR__),
+          ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
+
+        new_error = IO::Memory.new
+        status = Process.run(
+          File.expand_path("../../bin/hwaro", __DIR__),
+          ["new", "!!!", "-t", "T"],
+          chdir: project_dir, output: IO::Memory.new, error: new_error)
+
+        status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+        new_error.to_s.should contain("HWARO_E_USAGE")
+        new_error.to_s.should contain("no URL-safe characters")
+      ensure
+        FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
+      end
+    end
   end
 
   describe "hwaro completion" do

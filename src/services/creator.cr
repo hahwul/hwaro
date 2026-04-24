@@ -5,6 +5,7 @@ require "../config/options/new_options"
 require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Services
@@ -61,6 +62,78 @@ module Hwaro
         end
 
         full[root_prefix.size..]
+      end
+
+      # Path separator used by hwaro-managed content paths. Hwaro stores
+      # and emits POSIX-style paths internally (the normalizer canonicalizes
+      # to this), so URL-safety checks compare against '/' rather than
+      # `File::SEPARATOR` to stay consistent on Windows hosts too.
+      PATH_SEP = '/'
+
+      # Return true when every segment of `path` is already URL-safe and
+      # does not need auto-sanitization. "URL-safe" here means the segment
+      # uses only the RFC 3986 unreserved ASCII set (`A-Z a-z 0-9 - . _ ~`)
+      # plus CJK / Unicode letters, which static hosts serve without
+      # percent-encoding surprises.
+      def self.url_safe_path?(path : String) : Bool
+        path.each_char do |char|
+          next if char == PATH_SEP
+          next if url_safe_char?(char)
+          return false
+        end
+        true
+      end
+
+      # Rewrite a path so every segment is URL-safe (see `url_safe_path?`).
+      # Unsafe characters (spaces, `!@#$%^&*()`, etc.) are collapsed to a
+      # single `-`; leading/trailing hyphens per segment are trimmed.
+      # Segments that reduce to the empty string after sanitization are
+      # dropped so the result never grows spurious `//` or leading-slash
+      # artifacts.
+      #
+      # Preserves original casing — filesystems differ on case sensitivity,
+      # and silently lowercasing could clobber existing content. Authors
+      # who want an all-lowercase slug can pass one explicitly.
+      #
+      # Raises `ArgumentError` when every segment sanitizes away — the
+      # caller (the CLI) wraps that into a classified usage error.
+      def self.sanitize_url_path(path : String) : String
+        return path if url_safe_path?(path)
+
+        sanitized_segments = path.split(PATH_SEP).map { |seg| sanitize_url_segment(seg) }.reject(&.empty?)
+        if sanitized_segments.empty?
+          raise ArgumentError.new(
+            "Path '#{path}' contains no URL-safe characters after sanitization. " \
+            "Use ASCII letters/digits, CJK, or one of `- . _ ~` in at least one segment."
+          )
+        end
+        sanitized_segments.join(PATH_SEP)
+      end
+
+      private def self.sanitize_url_segment(segment : String) : String
+        return segment if segment.empty?
+        String.build(segment.bytesize) do |io|
+          last_was_hyphen = false
+          segment.each_char do |char|
+            if url_safe_char?(char)
+              io << char
+              last_was_hyphen = false
+            else
+              unless last_was_hyphen
+                io << '-'
+                last_was_hyphen = true
+              end
+            end
+          end
+        end.strip('-')
+      end
+
+      private def self.url_safe_char?(char : Char) : Bool
+        return true if char.ascii_letter? || char.ascii_number?
+        return true if char == '-' || char == '_' || char == '.' || char == '~'
+        return true if Utils::TextUtils.cjk_char?(char)
+        return true if !char.ascii? && char.letter?
+        false
       end
 
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
