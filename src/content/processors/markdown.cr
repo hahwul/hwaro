@@ -288,6 +288,12 @@ module Hwaro
           unknown_keys = [] of String
           toml_fm.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+            if key == "extra" && (inner = value.as_h?)
+              inner.each do |inner_key, inner_value|
+                extra[inner_key] = extract_extra_value(inner_value)
+              end
+              next
+            end
             unknown_keys << key
             extra[key] = extract_extra_value(value)
           end
@@ -339,6 +345,14 @@ module Hwaro
               key = key_any.as_s?
               next unless key
               next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+              if key == "extra" && (inner = value.as_h?)
+                inner.each do |inner_key_any, inner_value|
+                  inner_key = inner_key_any.as_s?
+                  next unless inner_key
+                  extra[inner_key] = extract_extra_value(inner_value)
+                end
+                next
+              end
               unknown_keys << key
               extra[key] = extract_extra_value(value)
             end
@@ -384,6 +398,12 @@ module Hwaro
           unknown_keys = [] of String
           json_fm.as_h.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
+            if key == "extra" && (inner = value.as_h?)
+              inner.each do |inner_key, inner_value|
+                extra[inner_key] = extract_extra_value(inner_value)
+              end
+              next
+            end
             unknown_keys << key
             extra[key] = extract_extra_value(value)
           end

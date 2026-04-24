@@ -338,9 +338,10 @@ describe Hwaro::Content::Processors::Markdown do
         MD
 
       result = processor.parse(raw)
-      result[:extra].has_key?("extra").should be_true
-      # The extra should contain "custom_field" within the nested structure
-      # Since [extra] is parsed as a TOML subtable, it becomes extra["extra"]
+      result[:extra].has_key?("extra").should be_false
+      result[:extra]["custom_field"].should eq("hello")
+      result[:extra]["custom_bool"].should be_true
+      result[:extra]["custom_int"].should eq(99_i64)
     end
 
     it "extracts top-level extra fields not in known keys" do
