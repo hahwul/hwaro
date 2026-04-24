@@ -593,13 +593,12 @@ describe Hwaro::Services::Creator do
         end
       end
 
-      it "leaves single-segment dir-ish paths with bundle unchanged (conservative scope)" do
-        # `hwaro new posts --bundle --title X` is ambiguous between "the
-        # 'posts' dir IS the bundle" (→ posts/index.md) and "create a
-        # bundle inside posts/" (→ posts/<slug>/index.md). We only apply
-        # the double-wrap fix when the path includes a `/` so the caller
-        # has clearly picked the bundle directory. Single-segment keeps
-        # the slug-inside-dir layout as before.
+      it "treats a single-segment dir-ish path as the bundle directory itself" do
+        # `hwaro new mysection --bundle --title Intro` — the path IS the
+        # bundle directory when --bundle is active, even for a bare slug.
+        # Previously this produced `mysection/intro/index.md` because the
+        # double-wrap fix required a `/` in the path; issue #458 tightens
+        # the behavior so single-segment paths collapse the slug layer too.
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
             FileUtils.mkdir_p("content")
@@ -607,8 +606,29 @@ describe Hwaro::Services::Creator do
               path: "mysection", title: "Intro", bundle: true)
             Hwaro::Services::Creator.new.run(options)
 
-            File.exists?("content/mysection/intro/index.md").should be_true
-            File.exists?("content/mysection/index.md").should be_false
+            File.exists?("content/mysection/index.md").should be_true
+            File.exists?("content/mysection/intro/index.md").should be_false
+
+            content = File.read("content/mysection/index.md")
+            content.should contain("title = \"Intro\"")
+          end
+        end
+      end
+
+      it "collapses the slug layer when path slug and title slug collide (issue #458)" do
+        # Regression guard for the reported case: `bundle-post` as path +
+        # title "Bundle Post" (same slug) must not produce
+        # `bundle-post/bundle-post/index.md`.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "bundle-post", title: "Bundle Post", bundle: true)
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/bundle-post/index.md").should be_true
+            File.exists?("content/bundle-post/bundle-post/index.md").should be_false
+            File.exists?("content/bundle-post/bundle-post.md").should be_false
           end
         end
       end
