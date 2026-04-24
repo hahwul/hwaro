@@ -23,6 +23,17 @@ module Hwaro
         BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
         BLOCK_CLOSE_RE        = /\{\%\s*end\s*\%\}/
 
+        # Placeholder left in the content stream for each rendered shortcode
+        # before Markdown runs. HTML-comment form so CommonMark treats it as
+        # an HTML block (type 2) when on its own line — otherwise block-level
+        # shortcode output ends up wrapped in a stray <p>. Inline usage still
+        # works because comments are preserved verbatim inside paragraphs.
+        # The %d is substituted with the placeholder index at emit time, and
+        # the regex is used by `replace_shortcode_placeholders` after Markdown.
+        SHORTCODE_PLACEHOLDER_PREFIX = "<!--HWARO-SHORTCODE-PLACEHOLDER-"
+        SHORTCODE_PLACEHOLDER_SUFFIX = "-->"
+        SHORTCODE_PLACEHOLDER_RE     = /#{Regex.escape(SHORTCODE_PLACEHOLDER_PREFIX)}\d+#{Regex.escape(SHORTCODE_PLACEHOLDER_SUFFIX)}/
+
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
@@ -208,12 +219,7 @@ module Hwaro
           html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name)
 
           if results = shortcode_results
-            # HTML-comment form so CommonMark treats the placeholder as an
-            # HTML block (type 2) when it sits on its own line — otherwise
-            # block-level shortcode output ends up wrapped in a stray <p>.
-            # Inline usage still works: comments inside a paragraph are
-            # preserved verbatim and replaced in-place after Markdown runs.
-            placeholder = "<!--HWARO-SHORTCODE-PLACEHOLDER-#{results.size}-->"
+            placeholder = "#{SHORTCODE_PLACEHOLDER_PREFIX}#{results.size}#{SHORTCODE_PLACEHOLDER_SUFFIX}"
             results[placeholder] = html
             placeholder
           else
@@ -290,7 +296,7 @@ module Hwaro
         # Replace shortcode placeholders with their rendered HTML content
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
-          html.gsub(/<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/) do |match|
+          html.gsub(SHORTCODE_PLACEHOLDER_RE) do |match|
             shortcode_results[match]? || match
           end
         end
