@@ -208,50 +208,99 @@ module Hwaro::Core::Build::Phases::Initialize
     env
   end
 
-  # Load data files from data/ directory
+  # Tree node used while assembling `site.data` from the `data/` directory.
+  # Each node can hold a leaf value (a parsed data file) and/or a map of
+  # children (subdirectory entries). When both are present the children
+  # win — see `load_data_files`.
+  private class DataTreeNode
+    getter children : Hash(String, DataTreeNode) = {} of String => DataTreeNode
+    property value : Crinja::Value? = nil
+    property source_path : String? = nil
+  end
+
+  # Load data files from `data/`, preserving directory structure.
+  #
+  # A file at `data/users/alice.yml` is exposed as `site.data.users.alice`,
+  # and the parent map `site.data.users` is iterable in templates
+  # (`{% for name, user in site.data.users %}`). When a directory and a
+  # sibling file share the same stem (e.g. `data/users.yml` alongside
+  # `data/users/`), the directory wins and a warning is emitted for the
+  # shadowed file.
   private def load_data_files(site : Models::Site)
     site.data.clear
 
     return unless Dir.exists?("data")
 
+    root = DataTreeNode.new
+
+    # Process deeper paths first so directory namespaces are established
+    # before any same-stem root-level file can claim the key.
+    entries = [] of {Array(String), String, String}
     Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
       next if File.directory?(path)
-
-      relative_path = Path[path].relative_to("data")
-      key = relative_path.stem
-      ext = relative_path.extension.downcase
-
-      content = File.read(path)
-
-      begin
-        value = case ext
-                when ".yml", ".yaml"
-                  if parsed = YAML.parse(content)
-                    Utils::CrinjaUtils.from_yaml(parsed)
-                  else
-                    Crinja::Value.new(nil)
-                  end
-                when ".json"
-                  if parsed = JSON.parse(content)
-                    Utils::CrinjaUtils.from_json(parsed)
-                  else
-                    Crinja::Value.new(nil)
-                  end
-                when ".toml"
-                  if parsed = TOML.parse(content)
-                    Utils::CrinjaUtils.from_toml(parsed)
-                  else
-                    Crinja::Value.new(nil)
-                  end
-                else
-                  Crinja::Value.new(nil)
-                end
-
-        site.data[key] = value
-        Logger.debug "Loaded data file: #{path} as site.data.#{key}"
-      rescue ex
-        Logger.warn "Failed to parse data file #{path}: #{ex.message}"
-      end
+      rel = Path[path].relative_to("data")
+      parts = rel.parts
+      stem = Path[parts.last].stem
+      dir_parts = parts[0...-1]
+      entries << {dir_parts, stem, path}
     end
+    entries.sort_by! { |(dir_parts, _, _)| -dir_parts.size }
+
+    entries.each do |(dir_parts, stem, path)|
+      value = parse_data_file(path)
+      next unless value
+
+      node = root
+      dir_parts.each do |segment|
+        node = node.children[segment] ||= DataTreeNode.new
+      end
+
+      existing = node.children[stem]?
+      if existing && !existing.children.empty?
+        Logger.warn "Data file '#{path}' is shadowed by directory 'data/#{(dir_parts + [stem]).join('/')}/'; directory takes precedence."
+        next
+      end
+
+      leaf = existing || DataTreeNode.new
+      if prior = leaf.source_path
+        Logger.warn "Duplicate data key for 'site.data.#{(dir_parts + [stem]).join('.')}': '#{path}' overwrites '#{prior}'."
+      end
+      leaf.value = value
+      leaf.source_path = path
+      node.children[stem] = leaf
+      Logger.debug "Loaded data file: #{path} as site.data.#{(dir_parts + [stem]).join('.')}"
+    end
+
+    root.children.each do |key, child|
+      site.data[key] = data_tree_to_crinja(child)
+    end
+  end
+
+  private def data_tree_to_crinja(node : DataTreeNode) : Crinja::Value
+    if node.children.empty?
+      node.value || Crinja::Value.new(nil)
+    else
+      converted = {} of String => Crinja::Value
+      node.children.each do |k, child|
+        converted[k] = data_tree_to_crinja(child)
+      end
+      Crinja::Value.new(converted)
+    end
+  end
+
+  private def parse_data_file(path : String) : Crinja::Value?
+    ext = File.extname(path).downcase
+    content = File.read(path)
+    case ext
+    when ".yml", ".yaml"
+      Utils::CrinjaUtils.from_yaml(YAML.parse(content))
+    when ".json"
+      Utils::CrinjaUtils.from_json(JSON.parse(content))
+    when ".toml"
+      Utils::CrinjaUtils.from_toml(TOML.parse(content))
+    end
+  rescue ex
+    Logger.warn "Failed to parse data file #{path}: #{ex.message}"
+    nil
   end
 end

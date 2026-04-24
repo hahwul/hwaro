@@ -104,6 +104,43 @@ describe "Data Files: Nested YAML data" do
   end
 end
 
+describe "Data Files: Subdirectory data loading" do
+  it "exposes files under data/<dir>/ as an iterable map and per-file keys" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "{% for name, u in site.data.users %}{{ name }}:{{ u.age }},{% endfor %}|alice_age={{ site.data.users.alice.age }}",
+      },
+      data_files: {
+        "users/alice.yml" => "age: 30",
+        "users/bob.yml"   => "age: 25",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("alice:30,")
+      html.should contain("bob:25,")
+      html.should contain("alice_age=30")
+    end
+  end
+
+  it "supports deeply nested subdirectories" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "LEVEL={{ site.data.users.admins.root.level }}",
+      },
+      data_files: {
+        "users/admins/root.yml" => "level: 99",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("LEVEL=99")
+    end
+  end
+end
+
 describe "Data Files: No data directory" do
   it "builds successfully without data directory" do
     build_site(
