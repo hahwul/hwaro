@@ -1069,8 +1069,9 @@ module Hwaro
 
             ## Links and Images
 
-            - [Link text](https://example.com) using `[text](url)`
-            - Image syntax: `![Alt text](path/to/image.jpg)`
+            Create a link with square brackets around the text and parentheses
+            around the URL — for example, [Hwaro on GitHub](https://github.com/hahwul/hwaro).
+            Prefix the same form with `!` to embed an image instead.
 
             ## Blockquotes
 

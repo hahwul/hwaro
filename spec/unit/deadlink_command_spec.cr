@@ -252,6 +252,46 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
         results[0].error.not_nil!.should contain("Image not found")
       end
     end
+
+    it "accepts taxonomy listing URLs that Hwaro generates at build time (issue #466)" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        tag_link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/tags/", kind: :internal
+        )
+        tag_term_link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/categories/hello/", kind: :internal
+        )
+        unknown_link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/not-a-taxonomy/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test(
+          [tag_link, tag_term_link, unknown_link], dir, ["tags", "categories", "authors"])
+
+        # Known taxonomy listing/term URLs resolve; unknown ones still fail.
+        results.size.should eq(1)
+        results[0].link.url.should eq("/not-a-taxonomy/")
+      end
+    end
+
+    it "does not treat taxonomy names as valid image paths" do
+      # Images shouldn't fall through the taxonomy shortcut — an image
+      # reference under `/tags/header.png` still has to exist on disk.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/tags/header.png", kind: :image
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir, ["tags"])
+
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("Image not found")
+      end
+    end
   end
 end
 
@@ -265,8 +305,8 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     find_internal_links(dir)
   end
 
-  def check_internal_links_for_test(links : Array(Link), content_dir : String) : Array(Result)
-    check_internal_links(links, content_dir)
+  def check_internal_links_for_test(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String) : Array(Result)
+    check_internal_links(links, content_dir, taxonomy_names)
   end
 
   def private_host_for_test?(host : String) : Bool
