@@ -10,6 +10,7 @@ require "../../../config/options/export_options"
 require "../../../services/exporters/base"
 require "../../../services/exporters/hugo_exporter"
 require "../../../services/exporters/jekyll_exporter"
+require "../../../utils/errors"
 require "../../../utils/logger"
 
 module Hwaro
@@ -46,9 +47,11 @@ module Hwaro
             supported = POSITIONAL_CHOICES.join(", ")
 
             if options.target_type.empty?
-              Logger.error "Missing target type. Usage: hwaro tool export <target-type> [options]"
-              Logger.info "Supported: #{supported}"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <target-type> argument",
+                hint: "Usage: hwaro tool export <target-type> — supported: #{supported}.",
+              )
             end
 
             exporter = case options.target_type
@@ -57,9 +60,11 @@ module Hwaro
                        when "jekyll"
                          Services::Exporters::JekyllExporter.new
                        else
-                         Logger.error "Unknown target type: #{options.target_type}"
-                         Logger.info "Supported: #{supported}"
-                         exit(1)
+                         raise Hwaro::HwaroError.new(
+                           code: Hwaro::Errors::HWARO_E_USAGE,
+                           message: "unknown target type: #{options.target_type}",
+                           hint: "Supported: #{supported}.",
+                         )
                        end
 
             Logger.info "Exporting to #{options.target_type}: #{options.output_dir}"

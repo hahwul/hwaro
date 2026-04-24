@@ -32,6 +32,7 @@ require "./tool/stats_command"
 require "./tool/validate_command"
 require "./tool/unused_assets_command"
 require "./tool/agents_md_command"
+require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/command_suggester"
 
@@ -103,22 +104,29 @@ module Hwaro
             if handler = @@sub_handlers[subcommand]?
               handler.call(args)
             else
-              ToolCommand.report_unknown_subcommand(subcommand)
-              exit(2)
+              ToolCommand.report_unknown_subcommand(subcommand, args)
             end
           end
         end
 
-        # Concise unknown-subcommand error emitted to stderr, mirroring the
-        # top-level Runner behavior. No full help dump here — users can run
-        # `hwaro tool --help` to see every subcommand.
-        def self.report_unknown_subcommand(subcommand : String, io : IO = STDERR)
-          io.puts "Error: unknown command 'tool #{subcommand}'"
-          candidates = ToolCommand.subcommands.map(&.name)
-          if suggestion = Utils::CommandSuggester.suggest(subcommand, candidates)
-            io.puts "Did you mean '#{suggestion}'?"
+        # Raise a classified usage error for an unknown `tool <subcommand>`,
+        # mirroring the top-level Runner behavior. The `Did you mean …`
+        # suggestion is printed to stderr in text mode only; the final
+        # `Error [HWARO_E_USAGE]: …` line (and the help hint) come from the
+        # Runner's shared `emit_hwaro_error` path.
+        def self.report_unknown_subcommand(subcommand : String, args : Array(String) = [] of String)
+          json_mode = args.includes?("--json")
+          unless json_mode
+            candidates = ToolCommand.subcommands.map(&.name)
+            if suggestion = Utils::CommandSuggester.suggest(subcommand, candidates)
+              STDERR.puts "Did you mean '#{suggestion}'?"
+            end
           end
-          io.puts "Run 'hwaro tool --help' to see all subcommands."
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "unknown command 'tool #{subcommand}'",
+            hint: "Run 'hwaro tool --help' to see all subcommands.",
+          )
         end
 
         # Category display order and membership for help output

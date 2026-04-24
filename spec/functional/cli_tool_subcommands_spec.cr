@@ -65,12 +65,13 @@ describe "hwaro tool (router)" do
     output.should contain("subcommand")
   end
 
-  it "exits 2 and prints a concise unknown-command error to stderr" do
+  it "exits with HWARO_E_USAGE on an unknown subcommand" do
     status, output, error = run_hwaro_no_chdir(["tool", "nonexistent-subcommand"])
     status.success?.should be_false
-    status.exit_code.should eq(2)
-    # Concise error goes to stderr, not stdout — the full help/banner
-    # must NOT be dumped on a typo.
+    status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+    # Structured classified error on stderr; help banner must not be
+    # dumped to stdout on a typo.
+    error.should contain("HWARO_E_USAGE")
     error.should contain("unknown command 'tool nonexistent-subcommand'")
     error.should contain("hwaro tool --help")
     output.should_not contain("Available subcommands")
@@ -78,15 +79,24 @@ describe "hwaro tool (router)" do
 
   it "suggests the closest subcommand for near-miss typos" do
     status, _, error = run_hwaro_no_chdir(["tool", "stts"])
-    status.exit_code.should eq(2)
+    status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
     error.should contain("Did you mean 'stats'?")
   end
 
   it "omits the suggestion when no candidate is close" do
     status, _, error = run_hwaro_no_chdir(["tool", "xyzabc"])
-    status.exit_code.should eq(2)
+    status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
     error.should_not contain("Did you mean")
     error.should contain("hwaro tool --help")
+  end
+
+  it "emits a JSON error payload under --json for an unknown subcommand" do
+    status, output, _ = run_hwaro_no_chdir(["tool", "nonexistent-subcommand", "--json"])
+    status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+    parsed = JSON.parse(output.strip)
+    parsed["status"].as_s.should eq("error")
+    parsed["error"]["code"].as_s.should eq("HWARO_E_USAGE")
+    parsed["error"]["message"].as_s.should contain("unknown command")
   end
 
   it "prints help and exits 0 when invoked with help" do
@@ -329,11 +339,67 @@ describe "hwaro tool import" do
 end
 
 describe "hwaro tool export" do
-  it "exits 1 and prints an error when no target-type is given" do
+  it "exits with HWARO_E_USAGE when target-type is missing" do
     with_initialized_project do |project_dir|
-      status, output, _ = run_hwaro(["tool", "export"], chdir: project_dir)
-      status.success?.should be_false
-      output.size.should be > 0
+      status, _, err = run_hwaro(["tool", "export"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("<target-type>")
+    end
+  end
+
+  it "exits with HWARO_E_USAGE on unknown target-type" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(
+        ["tool", "export", "definitely-not-real"], chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("unknown target type")
+    end
+  end
+end
+
+describe "hwaro tool convert" do
+  it "exits with HWARO_E_USAGE when format is missing" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "convert"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("<format>")
+    end
+  end
+
+  it "exits with HWARO_E_USAGE on unknown format" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(
+        ["tool", "convert", "to-xml"], chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("unknown format")
+    end
+  end
+end
+
+describe "hwaro tool list" do
+  it "exits with HWARO_E_USAGE when filter is missing" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "list"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("<filter>")
+    end
+  end
+
+  it "emits a JSON error payload under --json when filter is missing" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(
+        ["tool", "list", "--json"], chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      parsed = JSON.parse(output.strip)
+      parsed["error"]["code"].as_s.should eq("HWARO_E_USAGE")
     end
   end
 end
