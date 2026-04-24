@@ -249,7 +249,7 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         results,
       )
 
-      output.should contain("HWARO-SHORTCODE-PLACEHOLDER-")
+      output.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-")
       results.size.should eq(1)
       results.first_value.should contain("<span>placeheld</span>")
     end
