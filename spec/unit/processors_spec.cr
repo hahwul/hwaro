@@ -751,5 +751,127 @@ describe Hwaro::Processor::Markdown do
       extra["tags_inner"].should eq(["a", "b"])
       extra.has_key?("extra").should be_false
     end
+
+    it "preserves nested TOML [extra.author] as a hash on page.extra" do
+      content = <<-MARKDOWN
+        +++
+        title = "Nested extra test"
+
+        [extra.author]
+        name = "Bob"
+        email = "b@example.com"
+
+        [extra.seo]
+        og_image = "/a.png"
+        +++
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      author = extra["author"].as(Hash(String, Hwaro::Models::ExtraValue))
+      author["name"].should eq("Bob")
+      author["email"].should eq("b@example.com")
+
+      seo = extra["seo"].as(Hash(String, Hwaro::Models::ExtraValue))
+      seo["og_image"].should eq("/a.png")
+    end
+
+    it "preserves a nested YAML extra mapping as a hash on page.extra" do
+      content = <<-MARKDOWN
+        ---
+        title: Nested extra test
+        extra:
+          author:
+            name: Bob
+            email: b@example.com
+          seo:
+            og_image: /a.png
+        ---
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      author = extra["author"].as(Hash(String, Hwaro::Models::ExtraValue))
+      author["name"].should eq("Bob")
+      author["email"].should eq("b@example.com")
+
+      seo = extra["seo"].as(Hash(String, Hwaro::Models::ExtraValue))
+      seo["og_image"].should eq("/a.png")
+    end
+
+    it "preserves a nested JSON extra object as a hash on page.extra" do
+      content = <<-MARKDOWN
+        {
+          "title": "Nested extra test",
+          "extra": {
+            "author": { "name": "Bob", "email": "b@example.com" },
+            "seo":    { "og_image": "/a.png" }
+          }
+        }
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      author = extra["author"].as(Hash(String, Hwaro::Models::ExtraValue))
+      author["name"].should eq("Bob")
+      author["email"].should eq("b@example.com")
+    end
+
+    it "preserves TOML arrays-of-tables inside extra" do
+      content = <<-MARKDOWN
+        +++
+        title = "Array-of-tables"
+
+        [[extra.authors]]
+        name = "Alice"
+
+        [[extra.authors]]
+        name = "Bob"
+        +++
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      authors = result[:extra]["authors"].as(Array(Hwaro::Models::ExtraValue))
+      authors.size.should eq(2)
+      authors[0].as(Hash(String, Hwaro::Models::ExtraValue))["name"].should eq("Alice")
+      authors[1].as(Hash(String, Hwaro::Models::ExtraValue))["name"].should eq("Bob")
+    end
+
+    it "exposes nested extra as traversable Crinja value via from_extra" do
+      content = <<-MARKDOWN
+        +++
+        title = "Nested extra"
+        [extra.author]
+        name = "Bob"
+        +++
+
+        body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      # Mirror `render.cr`'s template exposure path.
+      crinja_extra = {} of String => Crinja::Value
+      extra.each { |k, v| crinja_extra[k] = Hwaro::Utils::CrinjaUtils.from_extra(v) }
+
+      env = Crinja.new
+      env.context["page"] = Crinja::Value.new({
+        "extra" => Crinja::Value.new(crinja_extra),
+      })
+      rendered = env.from_string("{{ page.extra.author.name }}").render
+      rendered.should eq("Bob")
+    end
   end
 end

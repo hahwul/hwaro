@@ -295,26 +295,35 @@ module Hwaro
           %(<script type="application/ld+json">#{json.gsub("</", "<\\/")}</script>)
         end
 
+        # Coerce a `page.extra[key]` value to `Array(String)` regardless of whether
+        # the parser produced `Array(String)` (all-strings case) or `Array(ExtraValue)`
+        # (mixed case). Non-string elements are filtered out.
+        private def extra_string_array(page : Models::Page, key : String) : Array(String)?
+          case raw = page.extra[key]?
+          when Array(String)
+            raw
+          when Array
+            raw.compact_map { |v| v.as?(String) }
+          end
+        end
+
         private def extract_faq_items(page : Models::Page) : Array(NamedTuple(question: String, answer: String))
           items = [] of NamedTuple(question: String, answer: String)
 
           # Parse from page content: look for ## Q: ... / A: ... pattern
           # or from extra["faq"] if available as string pairs
-          if faq_raw = page.extra["faq"]?
-            case faq_raw
-            when Array(String)
-              # Pairs: ["Q1", "A1", "Q2", "A2"]
-              faq_raw.each_slice(2) do |pair|
-                if pair.size == 2
-                  items << {question: pair[0], answer: pair[1]}
-                end
+          if faq_pairs = extra_string_array(page, "faq")
+            # Pairs: ["Q1", "A1", "Q2", "A2"]
+            faq_pairs.each_slice(2) do |pair|
+              if pair.size == 2
+                items << {question: pair[0], answer: pair[1]}
               end
             end
           end
 
           # Also check faq_questions / faq_answers parallel arrays
-          if questions = page.extra["faq_questions"]?.try(&.as?(Array(String)))
-            if answers = page.extra["faq_answers"]?.try(&.as?(Array(String)))
+          if questions = extra_string_array(page, "faq_questions")
+            if answers = extra_string_array(page, "faq_answers")
               questions.zip(answers).each do |q, a|
                 items << {question: q, answer: a}
               end
@@ -327,21 +336,18 @@ module Hwaro
         private def extract_howto_steps(page : Models::Page) : Array(NamedTuple(name: String, text: String))
           steps = [] of NamedTuple(name: String, text: String)
 
-          if steps_raw = page.extra["howto_steps"]?
-            case steps_raw
-            when Array(String)
-              # Pairs: ["Step Name", "Step Text", ...]
-              steps_raw.each_slice(2) do |pair|
-                if pair.size == 2
-                  steps << {name: pair[0], text: pair[1]}
-                end
+          if steps_pairs = extra_string_array(page, "howto_steps")
+            # Pairs: ["Step Name", "Step Text", ...]
+            steps_pairs.each_slice(2) do |pair|
+              if pair.size == 2
+                steps << {name: pair[0], text: pair[1]}
               end
             end
           end
 
           # Also check howto_names / howto_texts parallel arrays
-          if names = page.extra["howto_names"]?.try(&.as?(Array(String)))
-            if texts = page.extra["howto_texts"]?.try(&.as?(Array(String)))
+          if names = extra_string_array(page, "howto_names")
+            if texts = extra_string_array(page, "howto_texts")
               names.zip(texts).each do |n, t|
                 steps << {name: n, text: t}
               end

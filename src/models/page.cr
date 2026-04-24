@@ -1,5 +1,11 @@
 module Hwaro
   module Models
+    # Recursive value type for `page.extra`. Keeps `Array(String)` in the union
+    # so existing call sites that assign a plain string literal array
+    # (`page.extra["x"] = ["a", "b"]`) continue to compile — Crystal arrays are
+    # invariant so `Array(String)` is not assignable to `Array(ExtraValue)`.
+    alias ExtraValue = String | Bool | Int64 | Float64 | Array(String) | Array(ExtraValue) | Hash(String, ExtraValue)
+
     struct TranslationLink
       property code : String
       property url : String
@@ -47,8 +53,10 @@ module Hwaro
       # New: Authors field (array of author names)
       property authors : Array(String)
 
-      # New: Extra field for arbitrary custom metadata from front matter
-      property extra : Hash(String, String | Bool | Int64 | Float64 | Array(String))
+      # New: Extra field for arbitrary custom metadata from front matter.
+      # Values are recursive (`ExtraValue`) so nested `[extra.*]` subtables
+      # and arrays-of-tables round-trip into `{{ page.extra.a.b }}` in templates.
+      property extra : Hash(String, ExtraValue)
 
       # New: Summary - content before <!-- more --> marker or auto-generated
       property summary : String?
@@ -127,7 +135,7 @@ module Hwaro
 
         # New field defaults
         @authors = [] of String
-        @extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+        @extra = {} of String => ExtraValue
         @summary = nil
         @in_search_index = true
         @insert_anchor_links = false
