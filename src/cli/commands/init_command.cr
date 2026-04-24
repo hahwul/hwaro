@@ -78,10 +78,20 @@ module Hwaro
           if json
             STDOUT.puts entries.to_json
           else
-            Logger.info "Available scaffolds:"
-            entries.each do |e|
-              Logger.info "  #{e[:name].ljust(10)} - #{e[:description]}"
-            end
+            log_scaffold_list
+          end
+        end
+
+        # Emit the built-in scaffold list to the standard info logger.
+        # Shared by `--help`, `--list-scaffolds`, and the invalid-scaffold
+        # error path so the three outputs stay in sync with the Registry.
+        private def log_scaffold_list
+          default_type = Config::Options::ScaffoldType::Simple
+          Logger.info "Available scaffolds:"
+          Services::Scaffolds::Registry.all.each do |scaffold|
+            name = scaffold.type.to_s
+            suffix = scaffold.type == default_type ? " (default)" : ""
+            Logger.info "  #{name.ljust(10)} - #{scaffold.description}#{suffix}"
           end
         end
 
@@ -115,14 +125,7 @@ module Hwaro
                   scaffold = Config::Options::ScaffoldType.from_string(type)
                 rescue ex : ArgumentError
                   Logger.error(ex.message || "Unknown error")
-                  Logger.info "Available scaffolds:"
-                  Logger.info "  simple    - Basic pages structure with homepage and about page"
-                  Logger.info "  blog      - Blog-focused structure with posts, archives, and taxonomies"
-                  Logger.info "  blog-dark - Blog-focused structure with dark theme"
-                  Logger.info "  docs      - Documentation-focused structure with organized sections and sidebar"
-                  Logger.info "  docs-dark - Documentation-focused structure with dark theme"
-                  Logger.info "  book      - Book-style structure with chapters and prev/next navigation"
-                  Logger.info "  book-dark - Book-style structure with dark theme"
+                  log_scaffold_list
                   Logger.info ""
                   Logger.info "Remote scaffolds:"
                   Logger.info "  github:owner/repo[/path] - GitHub repository shorthand"
@@ -164,19 +167,17 @@ module Hwaro
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
 
+            # Introspection (handled in #run before parsing; registered here so
+            # they appear in --help output).
+            parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { }
+            parser.on("--json", "Emit machine-readable JSON output (with --list-scaffolds)") { }
+
             # Debug & output
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             parser.on("-h", "--help", "Show this help") do
               Logger.info parser.to_s
               Logger.info ""
-              Logger.info "Available scaffolds:"
-              Logger.info "  simple    - Basic pages structure with homepage and about page (default)"
-              Logger.info "  blog      - Blog-focused structure with posts, archives, and taxonomies"
-              Logger.info "  blog-dark - Blog-focused structure with dark theme"
-              Logger.info "  docs      - Documentation-focused structure with organized sections and sidebar"
-              Logger.info "  docs-dark - Documentation-focused structure with dark theme"
-              Logger.info "  book      - Book-style structure with chapters and prev/next navigation"
-              Logger.info "  book-dark - Book-style structure with dark theme"
+              log_scaffold_list
               Logger.info ""
               Logger.info "Remote scaffolds:"
               Logger.info "  github:owner/repo        - GitHub repository shorthand"
