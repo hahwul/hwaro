@@ -208,7 +208,12 @@ module Hwaro
           html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name)
 
           if results = shortcode_results
-            placeholder = "HWARO-SHORTCODE-PLACEHOLDER-#{results.size}"
+            # HTML-comment form so CommonMark treats the placeholder as an
+            # HTML block (type 2) when it sits on its own line — otherwise
+            # block-level shortcode output ends up wrapped in a stray <p>.
+            # Inline usage still works: comments inside a paragraph are
+            # preserved verbatim and replaced in-place after Markdown runs.
+            placeholder = "<!--HWARO-SHORTCODE-PLACEHOLDER-#{results.size}-->"
             results[placeholder] = html
             placeholder
           else
@@ -285,7 +290,7 @@ module Hwaro
         # Replace shortcode placeholders with their rendered HTML content
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
-          html.gsub(/HWARO-SHORTCODE-PLACEHOLDER-\d+/) do |match|
+          html.gsub(/<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/) do |match|
             shortcode_results[match]? || match
           end
         end

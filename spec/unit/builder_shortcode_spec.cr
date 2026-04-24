@@ -136,7 +136,7 @@ describe Hwaro::Core::Build::Builder do
 
       content = "{{ test(val=\"hello\") }}"
       result = builder.test_process_shortcodes_jinja(content, templates, context, shortcode_results, crinja_env_override: env)
-      result.should contain("HWARO-SHORTCODE-PLACEHOLDER-")
+      result.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-")
       shortcode_results.size.should eq(1)
       shortcode_results.values.first.should eq("<b>hello</b>")
     end
@@ -165,8 +165,8 @@ describe Hwaro::Core::Build::Builder do
       result = builder.test_render_shortcode_result(
         "box", "text=\"hi\"", templates, context, shortcode_results, "fallback", crinja_env_override: env
       )
-      result.should eq("HWARO-SHORTCODE-PLACEHOLDER-0")
-      shortcode_results["HWARO-SHORTCODE-PLACEHOLDER-0"].should eq("<div>hi</div>")
+      result.should eq("<!--HWARO-SHORTCODE-PLACEHOLDER-0-->")
+      shortcode_results["<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"].should eq("<div>hi</div>")
     end
 
     it "returns fallback when template not found" do
@@ -199,11 +199,11 @@ describe Hwaro::Core::Build::Builder do
     it "replaces placeholders with rendered HTML" do
       builder = Hwaro::Core::Build::Builder.new
       results = {
-        "HWARO-SHORTCODE-PLACEHOLDER-0" => "<b>bold</b>",
-        "HWARO-SHORTCODE-PLACEHOLDER-1" => "<i>italic</i>",
+        "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->" => "<b>bold</b>",
+        "<!--HWARO-SHORTCODE-PLACEHOLDER-1-->" => "<i>italic</i>",
       }
 
-      html = "<p>HWARO-SHORTCODE-PLACEHOLDER-0 and HWARO-SHORTCODE-PLACEHOLDER-1</p>"
+      html = "<p><!--HWARO-SHORTCODE-PLACEHOLDER-0--> and <!--HWARO-SHORTCODE-PLACEHOLDER-1--></p>"
       output = builder.test_replace_shortcode_placeholders(html, results)
       output.should eq("<p><b>bold</b> and <i>italic</i></p>")
     end
@@ -220,12 +220,31 @@ describe Hwaro::Core::Build::Builder do
     it "keeps unmatched placeholders as-is" do
       builder = Hwaro::Core::Build::Builder.new
       results = {
-        "HWARO-SHORTCODE-PLACEHOLDER-0" => "<b>found</b>",
+        "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->" => "<b>found</b>",
       }
 
-      html = "HWARO-SHORTCODE-PLACEHOLDER-0 HWARO-SHORTCODE-PLACEHOLDER-99"
+      html = "<!--HWARO-SHORTCODE-PLACEHOLDER-0--> <!--HWARO-SHORTCODE-PLACEHOLDER-99-->"
       output = builder.test_replace_shortcode_placeholders(html, results)
-      output.should eq("<b>found</b> HWARO-SHORTCODE-PLACEHOLDER-99")
+      output.should eq("<b>found</b> <!--HWARO-SHORTCODE-PLACEHOLDER-99-->")
+    end
+
+    it "does not wrap block-level shortcode output in <p> when on its own line" do
+      # End-to-end pipe: shortcode substitution → Markdown → placeholder replace.
+      # Regression test for https://github.com/hahwul/hwaro/issues/473.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/block" => "<div class=\"my-block\">Block</div>"}
+      context = {} of String => Crinja::Value
+      results = {} of String => String
+
+      content = "Some paragraph.\n\n{{ block() }}\n\nAnother paragraph.\n"
+      substituted = builder.test_process_shortcodes_jinja(content, templates, context, results, crinja_env_override: env)
+      rendered, _ = Hwaro::Processor::Markdown.render(substituted)
+      output = builder.test_replace_shortcode_placeholders(rendered, results)
+
+      output.should contain("<div class=\"my-block\">Block</div>")
+      output.should_not contain("<p><div")
+      output.should_not contain("</div></p>")
     end
   end
 
