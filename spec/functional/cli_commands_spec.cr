@@ -87,6 +87,48 @@ describe "CLI Tool Commands" do
     end
   end
 
+  describe "hwaro help" do
+    it "delegates `help <command>` to the command's --help output" do
+      output_io = IO::Memory.new
+      error_io = IO::Memory.new
+      status = Process.run(
+        File.expand_path("../../bin/hwaro", __DIR__),
+        ["help", "build"],
+        output: output_io, error: error_io)
+
+      status.success?.should be_true
+      output = output_io.to_s + error_io.to_s
+      # `build --help` prints its OptionParser banner which starts with "Usage: hwaro build".
+      output.should contain("Usage: hwaro build")
+      # And should not be the generic top-level help (which lists other commands).
+      output.should_not contain("Available commands")
+    end
+
+    it "falls back to generic help when no command is given" do
+      output_io = IO::Memory.new
+      error_io = IO::Memory.new
+      status = Process.run(
+        File.expand_path("../../bin/hwaro", __DIR__),
+        ["help"],
+        output: output_io, error: error_io)
+
+      status.success?.should be_true
+      (output_io.to_s + error_io.to_s).should contain("Commands:")
+    end
+
+    it "reports an unknown command with a non-zero exit" do
+      output_io = IO::Memory.new
+      error_io = IO::Memory.new
+      status = Process.run(
+        File.expand_path("../../bin/hwaro", __DIR__),
+        ["help", "nosuchcommand"],
+        output: output_io, error: error_io)
+
+      status.success?.should be_false
+      error_io.to_s.should contain("unknown command")
+    end
+  end
+
   describe "hwaro doctor (top-level)" do
     it "runs diagnostics on a valid project" do
       temp_dir = File.tempname("hwaro_test")

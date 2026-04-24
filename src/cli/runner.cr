@@ -219,9 +219,20 @@ module Hwaro
           Logger.info "#{Hwaro::VERSION}"
         end
 
-        # Register help command
-        CommandRegistry.register(CommandInfo.new(name: "help", description: "Show help")) do |_|
-          Runner.print_help
+        # Register help command. `hwaro help <command>` delegates to the
+        # command's own `--help` so it matches `hwaro <command> --help`.
+        # Without this, `help <command>` silently falls back to the generic
+        # top-level help, which is confusing for users probing the CLI.
+        CommandRegistry.register(CommandInfo.new(name: "help", description: "Show help")) do |args|
+          target = args.find { |a| !a.starts_with?("-") }
+          if target && (handler = CommandRegistry.get(target))
+            handler.call(["--help"])
+          elsif target
+            Runner.report_unknown_command(target)
+            exit Hwaro::Errors::EXIT_USAGE
+          else
+            Runner.print_help
+          end
         end
       end
 
