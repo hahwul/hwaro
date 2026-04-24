@@ -681,5 +681,75 @@ describe Hwaro::Processor::Markdown do
       extra["extra_bool"].should be_true
       extra["extra_array"].should eq(["a", "b"])
     end
+
+    it "flattens the TOML [extra] subtable into page.extra" do
+      content = <<-MARKDOWN
+        +++
+        title = "Extra subtable test"
+
+        [extra]
+        color = "red"
+        rating = 5
+        tags_inner = ["a", "b"]
+        +++
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      extra["color"].should eq("red")
+      extra["rating"].should eq(5_i64)
+      extra["tags_inner"].should eq(["a", "b"])
+      extra.has_key?("extra").should be_false
+    end
+
+    it "flattens a nested YAML extra mapping into page.extra" do
+      content = <<-MARKDOWN
+        ---
+        title: Extra subtable test
+        extra:
+          color: red
+          rating: 5
+          tags_inner:
+            - a
+            - b
+        ---
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      extra["color"].should eq("red")
+      extra["rating"].should eq(5_i64)
+      extra["tags_inner"].should eq(["a", "b"])
+      extra.has_key?("extra").should be_false
+    end
+
+    it "flattens a nested JSON extra object into page.extra" do
+      content = <<-MARKDOWN
+        {
+          "title": "Extra subtable test",
+          "extra": {
+            "color": "red",
+            "rating": 5,
+            "tags_inner": ["a", "b"]
+          }
+        }
+
+        # Content
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      extra = result[:extra]
+
+      extra["color"].should eq("red")
+      extra["rating"].should eq(5_i64)
+      extra["tags_inner"].should eq(["a", "b"])
+      extra.has_key?("extra").should be_false
+    end
   end
 end
