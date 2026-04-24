@@ -616,4 +616,33 @@ describe Hwaro::Services::Doctor do
       end
     end
   end
+
+  describe "Issue JSON serialization" do
+    it "serializes level (Symbol) as a plain string in JSON" do
+      issue = Hwaro::Services::Issue.new(
+        id: "test-rule",
+        level: :warning,
+        category: "config",
+        file: "config.toml",
+        message: "something",
+      )
+      json = issue.to_json
+      json.should contain(%("level":"warning"))
+      json.should contain(%("id":"test-rule"))
+      json.should contain(%("category":"config"))
+    end
+
+    it "omits file from JSON when nil" do
+      issue = Hwaro::Services::Issue.new(
+        id: "x",
+        level: :error,
+        category: "structure",
+        file: nil,
+        message: "m",
+      )
+      json = issue.to_json
+      json.should_not contain(%("file":))
+      json.should contain(%("level":"error"))
+    end
+  end
 end

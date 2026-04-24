@@ -450,4 +450,34 @@ describe Hwaro::Services::ContentInfo do
     info.draft.should be_true
     info.date.should eq(date)
   end
+
+  describe "JSON serialization" do
+    it "emits ISO-8601 date and preserves it on round-trip" do
+      date = Time.utc(2024, 3, 14, 9, 26, 53)
+      info = Hwaro::Services::ContentInfo.new(
+        path: "post.md",
+        title: "Pi Day",
+        draft: false,
+        date: date,
+      )
+
+      json = info.to_json
+      json.should contain(%("date":"2024-03-14T09:26:53))
+
+      parsed = Hwaro::Services::ContentInfo.from_json(json)
+      parsed.path.should eq("post.md")
+      parsed.title.should eq("Pi Day")
+      parsed.draft.should be_false
+      parsed.date.should eq(date)
+    end
+
+    it "emits null date when unset and round-trips to nil" do
+      info = Hwaro::Services::ContentInfo.new(path: "no-date.md", title: "t")
+      json = info.to_json
+      json.should contain(%("date":null))
+
+      parsed = Hwaro::Services::ContentInfo.from_json(json)
+      parsed.date.should be_nil
+    end
+  end
 end

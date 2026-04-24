@@ -96,6 +96,19 @@ describe Hwaro::Services::ConfigSnippets do
       commented.should contain("AMP")
       uncommented.should contain("AMP")
     end
+
+    it "doctor: commented version leaves [doctor] table commented" do
+      commented = Hwaro::Services::ConfigSnippets.doctor(commented: true)
+      commented.should contain("# [doctor]")
+      commented.should contain("# ignore")
+      commented.should_not contain("\n[doctor]\n")
+    end
+
+    it "doctor: uncommented version has active [doctor] table" do
+      uncommented = Hwaro::Services::ConfigSnippets.doctor(commented: false)
+      uncommented.should contain("[doctor]")
+      uncommented.should contain("ignore = []")
+    end
   end
 
   describe "non-commented-only snippets" do
@@ -122,7 +135,7 @@ describe Hwaro::Services::ConfigSnippets do
     {% for method in ["plugins", "highlight", "og", "sitemap", "robots", "llms",
                       "feeds", "build", "permalinks", "auto_includes", "series",
                       "related", "search", "pagination", "markdown", "assets",
-                      "image_processing", "deployment", "pwa", "amp"] %}
+                      "image_processing", "deployment", "pwa", "amp", "doctor"] %}
       it "{{ method.id }}(commented: true) is non-empty" do
         Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: true).should_not be_empty
       end
