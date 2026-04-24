@@ -82,13 +82,20 @@ module Hwaro
             verbose = false
             positional = [] of String
 
+            supported_targets = POSITIONAL_CHOICES.join("|")
+
             OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: hwaro tool export <target-type> [options]"
+              parser.banner = "Usage: hwaro tool export <#{supported_targets}> [options]"
               parser.on("-o DIR", "--output DIR", "Output directory (default: export)") { |dir| output_dir = dir }
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               CLI.register_flag(parser, DRAFTS_FLAG) { |_| drafts = true }
               CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, HELP_FLAG) do |_|
+                Logger.info parser.to_s
+                Logger.info ""
+                Logger.info "Supported targets: #{POSITIONAL_CHOICES.join(", ")}"
+                exit
+              end
               parser.unknown_args do |remaining|
                 positional = remaining
               end
