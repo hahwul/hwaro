@@ -31,7 +31,7 @@ module Hwaro
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
-          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-archetypes)"),
+          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output"),
 
           QUIET_FLAG,
           HELP_FLAG,
@@ -60,8 +60,12 @@ module Hwaro
 
           # Signal json mode to the Runner so any HwaroError we raise is
           # rendered as the structured payload on stdout instead of the
-          # human "Error [CODE]: …" line on stderr.
-          Runner.json_mode = true if json_output
+          # human "Error [CODE]: …" line on stderr. Also silence the
+          # `Created new content: …` info line so stdout stays pure JSON.
+          if json_output
+            Runner.json_mode = true
+            Logger.quiet = true
+          end
 
           # `hwaro new` is flag-only: there is no interactive prompt, so a
           # missing <path> always fails fast with a classified usage error.
@@ -97,7 +101,15 @@ module Hwaro
           # path as-is (see Creator#run).
           options.path = normalized
 
-          Services::Creator.new.run(options, load_config_if_present)
+          created_path = Services::Creator.new.run(options, load_config_if_present)
+
+          if json_output
+            payload = {
+              "status" => "ok",
+              "path"   => created_path,
+            }
+            STDOUT.puts payload.to_json
+          end
         end
 
         # Try to load `config.toml` so `hwaro new` can honour site-level

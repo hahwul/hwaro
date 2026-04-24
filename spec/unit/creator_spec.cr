@@ -13,10 +13,12 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "my-first-post.md")
           creator = Hwaro::Services::Creator.new
 
-          creator.run(options)
+          result = creator.run(options)
 
           expected_path = "content/drafts/my-first-post.md"
           File.exists?(expected_path).should be_true
+          # run returns the final path so callers (e.g. --json) can report it.
+          result.should eq(expected_path)
 
           content = File.read(expected_path)
           content.should contain("title = \"My First Post\"")

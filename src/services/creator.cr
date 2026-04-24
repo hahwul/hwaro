@@ -234,6 +234,7 @@ module Hwaro
 
         File.write(full_path, content)
         Logger.info "Created new content: #{full_path}"
+        full_path
       end
 
       # Returns `{stripped_content, directives}`. When the archetype's first

@@ -115,6 +115,15 @@ describe Hwaro::CLI::Commands::NewCommand do
       options, _ = cmd.parse_options(["post.md", "--no-bundle"])
       options.bundle.should be_false
     end
+
+    it "parses --json flag" do
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      _, json_output = cmd.parse_options(["post.md", "--json"])
+      json_output.should be_true
+
+      _, json_output = cmd.parse_options(["post.md"])
+      json_output.should be_false
+    end
   end
 
   # A malformed `config.toml` must surface as the same classified
