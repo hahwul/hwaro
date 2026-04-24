@@ -59,13 +59,11 @@ module Hwaro
             Logger.quiet = true if json_output
             Runner.json_mode = true if json_output
 
-            supported = POSITIONAL_CHOICES.join(", ")
-
             unless format
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,
                 message: "missing <format> argument",
-                hint: "Usage: hwaro tool convert <to-yaml|to-toml|to-json> — supported: #{supported}.",
+                hint: "Usage: hwaro tool convert <to-yaml|to-toml|to-json> — supported: #{POSITIONAL_CHOICES.join(", ")}.",
               )
             end
 
@@ -88,7 +86,7 @@ module Hwaro
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,
                 message: "unknown format: #{format}",
-                hint: "Supported: #{supported}.",
+                hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
               )
             end
           end
