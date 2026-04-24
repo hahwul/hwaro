@@ -919,4 +919,54 @@ describe Hwaro::Services::Creator do
       Hwaro::Services::Creator.validate_and_normalize_path!("foo/../bar.md").should eq("bar.md")
     end
   end
+
+  describe ".url_safe_path?" do
+    it "returns true for plain ASCII paths" do
+      Hwaro::Services::Creator.url_safe_path?("posts/hello-world.md").should be_true
+      Hwaro::Services::Creator.url_safe_path?("my_post.md").should be_true
+      Hwaro::Services::Creator.url_safe_path?("docs/v1.2/intro.md").should be_true
+    end
+
+    it "returns true for CJK / Unicode letter paths" do
+      Hwaro::Services::Creator.url_safe_path?("한글/포스트.md").should be_true
+      Hwaro::Services::Creator.url_safe_path?("café/résumé.md").should be_true
+    end
+
+    it "returns false for paths with spaces or reserved punctuation" do
+      Hwaro::Services::Creator.url_safe_path?("special chars!@#").should be_false
+      Hwaro::Services::Creator.url_safe_path?("posts/hello world.md").should be_false
+      Hwaro::Services::Creator.url_safe_path?("a?b.md").should be_false
+    end
+  end
+
+  describe ".sanitize_url_path" do
+    it "is a no-op for already-safe paths" do
+      Hwaro::Services::Creator.sanitize_url_path("posts/hello.md").should eq("posts/hello.md")
+      Hwaro::Services::Creator.sanitize_url_path("한글/포스트.md").should eq("한글/포스트.md")
+    end
+
+    it "collapses unsafe characters to a single hyphen per run" do
+      Hwaro::Services::Creator.sanitize_url_path("special chars!@#").should eq("special-chars")
+      Hwaro::Services::Creator.sanitize_url_path("a!!!b").should eq("a-b")
+    end
+
+    it "trims leading and trailing hyphens per segment" do
+      Hwaro::Services::Creator.sanitize_url_path("!foo!/!bar!").should eq("foo/bar")
+    end
+
+    it "preserves path separators and the RFC 3986 unreserved set" do
+      Hwaro::Services::Creator.sanitize_url_path("posts/my_post.v2.md").should eq("posts/my_post.v2.md")
+      Hwaro::Services::Creator.sanitize_url_path("a/b/c~d.md").should eq("a/b/c~d.md")
+    end
+
+    it "preserves original casing" do
+      # Filesystem case-sensitivity varies; silently lowercasing could
+      # clobber an existing sibling file.
+      Hwaro::Services::Creator.sanitize_url_path("Posts/MyPost.md").should eq("Posts/MyPost.md")
+    end
+
+    it "handles mixed CJK and unsafe characters" do
+      Hwaro::Services::Creator.sanitize_url_path("한글 테스트/포스트").should eq("한글-테스트/포스트")
+    end
+  end
 end

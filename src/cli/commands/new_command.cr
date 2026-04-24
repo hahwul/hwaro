@@ -95,11 +95,23 @@ module Hwaro
               hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
             )
           end
-          # Feed the normalized path back into the Creator. The stored
+
+          # Auto-sanitize URL-unsafe characters (spaces, `!@#$%…`) in each
+          # path segment so the on-disk directory also works as a clean URL
+          # path once the site is built. CJK / Unicode letters, digits, and
+          # the RFC 3986 unreserved ASCII set pass through untouched. We
+          # surface the rewrite via `Logger.info` so the author sees what
+          # landed on disk — silent transformation would be confusing.
+          sanitized = Services::Creator.sanitize_url_path(normalized)
+          if sanitized != normalized
+            Logger.info "Sanitized path: '#{normalized}' → '#{sanitized}' (URL-unsafe characters replaced)"
+          end
+
+          # Feed the sanitized path back into the Creator. The stored
           # path keeps the `content/` prefix so downstream branches that
           # check `starts_with?("content/")` take the already-rooted
           # path as-is (see Creator#run).
-          options.path = normalized
+          options.path = sanitized
 
           created_path = Services::Creator.new.run(options, load_config_if_present)
 
