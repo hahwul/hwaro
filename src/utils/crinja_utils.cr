@@ -74,11 +74,19 @@ module Hwaro
         end
       end
 
-      # Convert an extra field value (from front matter) to Crinja::Value
-      def from_extra(value : String | Bool | Int64 | Float64 | Array(String)) : Crinja::Value
+      # Convert an extra field value (from front matter) to Crinja::Value.
+      # Recursive so nested `[extra.*]` hashes and arrays-of-hashes
+      # traverse via `{{ page.extra.a.b }}` in templates.
+      def from_extra(value : Hwaro::Models::ExtraValue) : Crinja::Value
         case value
+        when Hash
+          converted = {} of String => Crinja::Value
+          value.each { |k, v| converted[k] = from_extra(v) }
+          Crinja::Value.new(converted)
         when Array(String)
           Crinja::Value.new(value.map { |s| Crinja::Value.new(s) })
+        when Array
+          Crinja::Value.new(value.map { |v| from_extra(v) })
         else
           Crinja::Value.new(value)
         end

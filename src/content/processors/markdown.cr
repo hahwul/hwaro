@@ -246,7 +246,7 @@ module Hwaro
               sort_by:             nil.as(String?),
               reverse:             nil.as(Bool?),
               authors:             [] of String,
-              extra:               {} of String => String | Bool | Int64 | Float64 | Array(String),
+              extra:               {} of String => Models::ExtraValue,
               in_search_index:     true,
               insert_anchor_links: false,
               page_template:       nil.as(String?),
@@ -284,7 +284,7 @@ module Hwaro
           updated = parse_toml_time(toml_fm["updated"]?)
           expires = parse_toml_time(toml_fm["expires"]?)
 
-          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
           toml_fm.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
@@ -338,7 +338,7 @@ module Hwaro
           updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
           expires = parse_time(yaml_fm["expires"]?.try(&.as_s?))
 
-          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
           if fm_hash = yaml_fm.as_h?
             fm_hash.each do |key_any, value|
@@ -394,7 +394,7 @@ module Hwaro
           updated = parse_time(json_fm["updated"]?.try(&.as_s?))
           expires = parse_time(json_fm["expires"]?.try(&.as_s?))
 
-          extra = {} of String => String | Bool | Int64 | Float64 | Array(String)
+          extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
           json_fm.as_h.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
@@ -461,7 +461,7 @@ module Hwaro
           fm : TOML::Table | YAML::Any | JSON::Any,
           date : Time?,
           updated : Time?,
-          extra : Hash(String, String | Bool | Int64 | Float64 | Array(String)),
+          extra : Hash(String, Models::ExtraValue),
           front_matter_keys : Array(String),
           taxonomies : Hash(String, Array(String)),
           tags : Array(String),
@@ -503,9 +503,17 @@ module Hwaro
           }
         end
 
-        # Extract extra value from TOML::Any, YAML::Any, or JSON::Any
-        private def extract_extra_value(value : TOML::Any | YAML::Any | JSON::Any) : String | Bool | Int64 | Float64 | Array(String)
-          if str = value.as_s?
+        # Recursively convert a front-matter value to `Models::ExtraValue`.
+        # Preserves nested tables/maps as `Hash(String, ExtraValue)` so
+        # `[extra.author] name = "x"` round-trips to `{{ page.extra.author.name }}`.
+        # Arrays of all-strings stay as `Array(String)` so existing
+        # `page.extra["x"]?.as?(Array(String))` consumers keep working.
+        private def extract_extra_value(value : TOML::Any) : Models::ExtraValue
+          if h = value.as_h?
+            extract_extra_hash(h)
+          elsif arr = value.as_a?
+            extract_extra_array(arr)
+          elsif str = value.as_s?
             str
           elsif (bool_val = value.as_bool?) != nil
             bool_val.as(Bool)
@@ -513,10 +521,68 @@ module Hwaro
             int.to_i64
           elsif float = value.as_f?
             float
-          elsif arr = value.as_a?
-            arr.compact_map(&.as_s?)
           else
             value.to_s
+          end
+        end
+
+        private def extract_extra_value(value : YAML::Any) : Models::ExtraValue
+          if h = value.as_h?
+            out = {} of String => Models::ExtraValue
+            h.each do |k_any, v|
+              key = k_any.as_s? || k_any.to_s
+              out[key] = extract_extra_value(v)
+            end
+            out
+          elsif arr = value.as_a?
+            extract_extra_array(arr)
+          elsif str = value.as_s?
+            str
+          elsif (bool_val = value.as_bool?) != nil
+            bool_val.as(Bool)
+          elsif int = value.as_i64?
+            int
+          elsif float = value.as_f?
+            float
+          else
+            value.to_s
+          end
+        end
+
+        private def extract_extra_value(value : JSON::Any) : Models::ExtraValue
+          if h = value.as_h?
+            out = {} of String => Models::ExtraValue
+            h.each { |k, v| out[k] = extract_extra_value(v) }
+            out
+          elsif arr = value.as_a?
+            extract_extra_array(arr)
+          elsif str = value.as_s?
+            str
+          elsif (bool_val = value.as_bool?) != nil
+            bool_val.as(Bool)
+          elsif int = value.as_i64?
+            int
+          elsif float = value.as_f?
+            float
+          else
+            value.to_s
+          end
+        end
+
+        private def extract_extra_hash(h : Hash(String, TOML::Any)) : Hash(String, Models::ExtraValue)
+          out = {} of String => Models::ExtraValue
+          h.each { |k, v| out[k] = extract_extra_value(v) }
+          out
+        end
+
+        # If every element is a plain string, preserve the `Array(String)` type
+        # so downstream `.as?(Array(String))` calls (e.g. `jsonld.cr`) keep
+        # matching. Mixed arrays widen to `Array(ExtraValue)`.
+        private def extract_extra_array(arr : Array(TOML::Any) | Array(YAML::Any) | Array(JSON::Any)) : Array(String) | Array(Models::ExtraValue)
+          if arr.all? { |v| !v.as_s?.nil? }
+            arr.compact_map(&.as_s?)
+          else
+            arr.map { |v| extract_extra_value(v).as(Models::ExtraValue) }
           end
         end
 

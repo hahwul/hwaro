@@ -300,7 +300,7 @@ describe Hwaro::Models::Page do
 
     it "initializes extra as empty hash" do
       page = Hwaro::Models::Page.new("test.md")
-      page.extra.should eq({} of String => String | Bool | Int64 | Float64 | Array(String))
+      page.extra.should eq({} of String => Hwaro::Models::ExtraValue)
     end
 
     it "can set extra metadata" do
