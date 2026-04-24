@@ -280,6 +280,14 @@ module Hwaro::Core::Build::Phases::Initialize
     if node.children.empty?
       node.value || Crinja::Value.new(nil)
     else
+      # Invariant: depth-first processing + directory-wins collision
+      # handling means a node with children must never also carry a
+      # leaf value — the leaf would have been rejected with a warning.
+      # Guard here so a future change to the sort or conflict rules
+      # fails loudly instead of silently dropping data.
+      if source = node.source_path
+        raise "load_data_files invariant broken: node at '#{source}' has both leaf value and children"
+      end
       converted = {} of String => Crinja::Value
       node.children.each do |k, child|
         converted[k] = data_tree_to_crinja(child)

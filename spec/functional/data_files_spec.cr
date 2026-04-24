@@ -139,6 +139,42 @@ describe "Data Files: Subdirectory data loading" do
       html.should contain("LEVEL=99")
     end
   end
+
+  it "loads subdirectory files across formats" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "J={{ site.data.api.v1.version }}|T={{ site.data.api.v2.version }}",
+      },
+      data_files: {
+        "api/v1.json" => %({"version": "1.0"}),
+        "api/v2.toml" => %(version = "2.0"),
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("J=1.0")
+      html.should contain("T=2.0")
+    end
+  end
+
+  it "keeps root-level and subdirectory data independent" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "THEME={{ site.data.settings.theme }}|USER={{ site.data.users.alice.age }}",
+      },
+      data_files: {
+        "settings.yml"    => "theme: dark",
+        "users/alice.yml" => "age: 30",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("THEME=dark")
+      html.should contain("USER=30")
+    end
+  end
 end
 
 describe "Data Files: No data directory" do
