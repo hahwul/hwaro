@@ -210,4 +210,25 @@ describe Hwaro::CLI::Commands::InitCommand do
       config.should contain("theme = \"github-dark\"")
     end
   end
+
+  describe "--list-scaffolds" do
+    it "prints every built-in scaffold registered in the Registry" do
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = sink
+      begin
+        Hwaro::CLI::Commands::InitCommand.new.run(["--list-scaffolds"])
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+
+      output = sink.to_s
+      output.should contain("Available scaffolds:")
+      Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+        output.should contain(scaffold.type.to_s)
+        output.should contain(scaffold.description)
+      end
+      output.should contain("(default)")
+    end
+  end
 end

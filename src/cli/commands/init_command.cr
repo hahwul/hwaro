@@ -71,11 +71,10 @@ module Hwaro
         # cannot be enumerated without additional input, so only built-ins
         # are listed here.
         private def print_scaffolds(json : Bool)
-          entries = Services::Scaffolds::Registry.all.map do |scaffold|
-            {name: scaffold.type.to_s, description: scaffold.description, kind: "builtin"}
-          end
-
           if json
+            entries = Services::Scaffolds::Registry.all.map do |scaffold|
+              {name: scaffold.type.to_s, description: scaffold.description, kind: "builtin"}
+            end
             STDOUT.puts entries.to_json
           else
             log_scaffold_list
@@ -87,11 +86,13 @@ module Hwaro
         # error path so the three outputs stay in sync with the Registry.
         private def log_scaffold_list
           default_type = Config::Options::ScaffoldType::Simple
+          scaffolds = Services::Scaffolds::Registry.all
+          name_width = scaffolds.max_of(&.type.to_s.size)
           Logger.info "Available scaffolds:"
-          Services::Scaffolds::Registry.all.each do |scaffold|
+          scaffolds.each do |scaffold|
             name = scaffold.type.to_s
             suffix = scaffold.type == default_type ? " (default)" : ""
-            Logger.info "  #{name.ljust(10)} - #{scaffold.description}#{suffix}"
+            Logger.info "  #{name.ljust(name_width)} - #{scaffold.description}#{suffix}"
           end
         end
 
