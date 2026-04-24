@@ -299,14 +299,11 @@ module Hwaro
         # the parser produced `Array(String)` (all-strings case) or `Array(ExtraValue)`
         # (mixed case). Non-string elements are filtered out.
         private def extra_string_array(page : Models::Page, key : String) : Array(String)?
-          raw = page.extra[key]?
-          case raw
+          case raw = page.extra[key]?
           when Array(String)
             raw
           when Array
             raw.compact_map { |v| v.as?(String) }
-          else
-            nil
           end
         end
 
