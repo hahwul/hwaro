@@ -1,5 +1,8 @@
-# Monkey-patch Crinja's variable resolution order.
-#
+# Monkey-patches for Crinja's runtime — kept here so we don't fork the
+# vendored library. Each patch carries an issue link so we can remove it
+# once Crinja ships an equivalent fix upstream.
+
+# === 1. Resolution-order fix ============================================
 # Upstream Crinja resolves global functions *before* context variables,
 # which means a loop variable whose name collides with a registered
 # function (e.g. `asset`) is shadowed by the function instead of the
@@ -22,5 +25,66 @@ class Crinja
     else
       value # return the original Undefined
     end
+  end
+end
+
+# === 2. Safer attribute resolution on indexable values ==================
+# Upstream `Resolver.resolve_attribute` calls `name.to_i` (which raises
+# `ArgumentError("Invalid Int32: \"<name>\"")` on non-numeric names) for
+# any indexable value, including Strings. The most common way to hit
+# this is iterating a hash with a single loop variable —
+#
+#   {% for k in site.taxonomies.tags %}{{ k.name }}{% endfor %}
+#
+# yields hash keys (Strings), and `k.name` then runs `"<key>".to_i`.
+# The user sees a Crystal-internal stack trace with no template
+# file:line:col, which makes the typo (`for k, v in …`) impossible to
+# locate.
+#
+# Two changes here:
+#
+# 1. Use `to_i?` so non-numeric attribute names cleanly fall through
+#    instead of crashing the resolver.
+# 2. When attribute access is non-numeric *and* the underlying value is
+#    a String, raise `UndefinedError`. Crinja's `MemberExpression`
+#    evaluator catches and re-raises it labeled with the full
+#    expression (`k.name`), which our `Error [HWARO_E_TEMPLATE]`
+#    formatter prints with template file:line:col. Default `Undefined`
+#    renders as empty, which is the correct behavior for hashes /
+#    objects (`{% if page.optional %}`-style guards rely on it), but
+#    on a primitive String the access is almost always a typo, so a
+#    loud error is more helpful than silent empty output.
+#
+# See: https://github.com/hahwul/hwaro/issues/482
+module Crinja::Resolver
+  def self.resolve_attribute(name, object : Crinja::Value) : Crinja::Value
+    raise Crinja::UndefinedError.new(name.to_s) if object.undefined?
+
+    value = self.resolve_getattr(name, object)
+
+    if value.undefined?
+      if object.indexable? && (idx = name.to_s.to_i?)
+        if v = object[idx]?
+          return Crinja::Value.new v
+        end
+      end
+
+      # Strings, SafeStrings, and Tuples don't have hash-style attribute
+      # access — `.attr` on these is almost always a typo. The most
+      # common case is iterating a hash with a single loop variable,
+      # which yields `Tuple(key, value)` per iteration:
+      #
+      #   {% for tag in site.taxonomies.tags %}{{ tag.name }}{% endfor %}
+      #                                            ^~~~~~~~~ — `tag` is a Tuple
+      #
+      # Raise so the evaluator can label the expression and the
+      # template error formatter shows file:line:col.
+      raw = object.raw
+      if raw.is_a?(String) || raw.is_a?(Crinja::SafeString) || raw.is_a?(Crinja::Tuple)
+        raise Crinja::UndefinedError.new(name.to_s)
+      end
+    end
+
+    value
   end
 end
