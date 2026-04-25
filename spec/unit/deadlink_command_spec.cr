@@ -238,6 +238,41 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    # Regression for https://github.com/hahwul/hwaro/issues/488
+    # The previous resolver computed `target + ".md"` AFTER joining the
+    # URL, so for a trailing-slash URL like `/about/` the candidate
+    # became `content/about/.md` (note the stray slash). A leaf page
+    # whose URL ends with `/` was therefore reported as a dead link
+    # even though `content/about.md` clearly existed.
+    it "resolves trailing-slash URLs to a sibling .md file (leaf page)" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "about.md"), "leaf page")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/about/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.should be_empty
+      end
+    end
+
+    it "resolves trailing-slash URLs nested under a section" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "posts"))
+        File.write(File.join(dir, "posts", "hello.md"), "leaf page")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/posts/hello/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.should be_empty
+      end
+    end
+
     it "detects broken image paths" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "content")

@@ -229,5 +229,79 @@ describe Hwaro::Services::UnusedAssets do
         result.referenced_count.should eq(1)
       end
     end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/488
+    # Files declared in `[[assets.bundles]] files = [...]` are consumed
+    # by the asset pipeline at build time, not referenced from
+    # content/templates — so the previous scan flagged them as "Unused"
+    # even though the build actively reads them.
+    it "treats files declared in [[assets.bundles]] as referenced" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p(File.join("static", "css"))
+          FileUtils.mkdir_p("templates")
+
+          File.write(File.join("static", "css", "reset.css"), "*{margin:0}")
+          File.write(File.join("static", "css", "style.css"), "body{color:#333}")
+
+          File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://x"
+
+          [assets]
+          enabled = true
+
+          [[assets.bundles]]
+          name = "main.css"
+          files = ["css/reset.css", "css/style.css"]
+          TOML
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates",
+          )
+          result = service.run
+          result.total_assets.should eq(2)
+          result.unused_files.should be_empty
+        end
+      end
+    end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/488
+    # Files inside `[auto_includes] dirs = [...]` are also consumed by
+    # the build (the auto-include tags glob those directories at render
+    # time), so they shouldn't be flagged either.
+    it "treats files under [auto_includes] dirs as referenced" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p(File.join("static", "assets", "css"))
+          FileUtils.mkdir_p("templates")
+
+          File.write(File.join("static", "assets", "css", "01-reset.css"), "*{}")
+          File.write(File.join("static", "assets", "css", "02-typography.css"), "p{}")
+
+          File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://x"
+
+          [auto_includes]
+          enabled = true
+          dirs = ["assets/css"]
+          TOML
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates",
+          )
+          result = service.run
+          result.total_assets.should eq(2)
+          result.unused_files.should be_empty
+        end
+      end
+    end
   end
 end
