@@ -246,16 +246,16 @@ describe Hwaro::Services::UnusedAssets do
           File.write(File.join("static", "css", "style.css"), "body{color:#333}")
 
           File.write("config.toml", <<-TOML)
-          title = "T"
-          base_url = "http://x"
+            title = "T"
+            base_url = "http://x"
 
-          [assets]
-          enabled = true
+            [assets]
+            enabled = true
 
-          [[assets.bundles]]
-          name = "main.css"
-          files = ["css/reset.css", "css/style.css"]
-          TOML
+            [[assets.bundles]]
+            name = "main.css"
+            files = ["css/reset.css", "css/style.css"]
+            TOML
 
           service = Hwaro::Services::UnusedAssets.new(
             content_dir: "content",
@@ -284,13 +284,13 @@ describe Hwaro::Services::UnusedAssets do
           File.write(File.join("static", "assets", "css", "02-typography.css"), "p{}")
 
           File.write("config.toml", <<-TOML)
-          title = "T"
-          base_url = "http://x"
+            title = "T"
+            base_url = "http://x"
 
-          [auto_includes]
-          enabled = true
-          dirs = ["assets/css"]
-          TOML
+            [auto_includes]
+            enabled = true
+            dirs = ["assets/css"]
+            TOML
 
           service = Hwaro::Services::UnusedAssets.new(
             content_dir: "content",
