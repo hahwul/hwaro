@@ -378,6 +378,52 @@ describe Hwaro::Core::Build::Builder do
     end
   end
 
+  describe "nested block shortcodes" do
+    # Regression for https://github.com/hahwul/hwaro/issues/478
+    # Inner block shortcodes were rendered into `shortcode_results` under
+    # their own placeholder, then embedded literally in the outer's body.
+    # The single-pass `replace_shortcode_placeholders` only resolved the
+    # outer placeholder, leaving the inner one as
+    # `<!--HWARO-SHORTCODE-PLACEHOLDER-N-->` in the final HTML.
+    it "resolves inner-block placeholders inside outer-block bodies" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {
+        "shortcodes/alert"   => %(<div class="alert">{{ body }}</div>),
+        "shortcodes/callout" => %(<span class="cb">{{ body }}</span>),
+      }
+      shortcode_results = {} of String => String
+      content = "{% alert %}outer with {% callout %}inner{% end %}{% end %}"
+
+      processed = builder.test_process_shortcodes_jinja(
+        content, templates, {} of String => Crinja::Value, shortcode_results, env
+      )
+      final = builder.test_replace_shortcode_placeholders(processed, shortcode_results)
+
+      final.should contain(%(<div class="alert">))
+      final.should contain(%(<span class="cb">inner</span>))
+      final.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+
+    it "resolves nesting up to MAX_SHORTCODE_NESTING levels" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {
+        "shortcodes/wrap" => %(<x>{{ body }}</x>),
+      }
+      shortcode_results = {} of String => String
+      content = "{% wrap %}1{% wrap %}2{% wrap %}3{% wrap %}4{% end %}{% end %}{% end %}{% end %}"
+
+      processed = builder.test_process_shortcodes_jinja(
+        content, templates, {} of String => Crinja::Value, shortcode_results, env
+      )
+      final = builder.test_replace_shortcode_placeholders(processed, shortcode_results)
+
+      final.should eq("<x>1<x>2<x>3<x>4</x></x></x></x>")
+      final.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+  end
+
   describe "nested shortcodes" do
     it "processes shortcodes nested inside block body" do
       builder = Hwaro::Core::Build::Builder.new

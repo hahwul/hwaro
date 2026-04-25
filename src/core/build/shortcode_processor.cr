@@ -371,12 +371,27 @@ module Hwaro
           end
         end
 
-        # Replace shortcode placeholders with their rendered HTML content
+        # Replace shortcode placeholders with their rendered HTML content.
+        #
+        # Block shortcodes can nest, and the inner placeholder gets baked
+        # into the outer template's `{{ body }}` before either of them
+        # actually lands in the rendered HTML. A single gsub pass would
+        # only resolve the outermost placeholder, leaving an
+        # `<!--HWARO-SHORTCODE-PLACEHOLDER-N-->` artifact one level
+        # inwards. Loop until the result stops changing (or until we hit
+        # the same depth limit the recursive renderer uses) so every
+        # nested level resolves.
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
-          html.gsub(SHORTCODE_PLACEHOLDER_RE) do |match|
-            shortcode_results[match]? || match
+          result = html
+          (MAX_SHORTCODE_NESTING + 1).times do
+            replaced = result.gsub(SHORTCODE_PLACEHOLDER_RE) do |match|
+              shortcode_results[match]? || match
+            end
+            return replaced if replaced == result
+            result = replaced
           end
+          result
         end
 
         # True when `name` is a registered Crinja function in the env used
