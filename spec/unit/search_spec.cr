@@ -346,6 +346,33 @@ describe Hwaro::Content::Search do
       end
     end
 
+    # Regression for https://github.com/hahwul/hwaro/issues/491
+    # `strip_html` removed tags but left HTML entities (`&quot;`, `&amp;`, …)
+    # encoded, so `print("hi")` ended up as `print(&quot;hi&quot;)` in the
+    # JSON content field. Client-side fuzzy-search libraries match on the
+    # raw stored string, so a query for the literal source never hit.
+    it "decodes HTML entities to plain text in the content field" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["content"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      # Markdown renders fenced code with HTML-escaped quotes inside
+      # `<pre><code>` — strip_html leaves those entities encoded.
+      page.raw_content = %(```python\nprint("hi")\n```)
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain(%(print(\\"hi\\")))
+        content.should_not contain("&quot;")
+      end
+    end
+
     it "handles multiple pages" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true

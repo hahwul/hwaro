@@ -705,7 +705,7 @@ module Hwaro::Core::Build::Phases::Render
           "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
           "language"     => Crinja::Value.new(p.language || default_language),
           "weight"       => Crinja::Value.new(p.weight),
-          "summary"      => Crinja::Value.new(p.effective_summary || ""),
+          "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
           "word_count"   => Crinja::Value.new(p.word_count),
           "reading_time" => Crinja::Value.new(p.reading_time),
           "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
@@ -1085,7 +1085,7 @@ module Hwaro::Core::Build::Phases::Render
       "tags"            => tags_crinja,
       "assets"          => assets_crinja,
       "extra"           => extra_crinja,
-      "summary"         => Crinja::Value.new(page.effective_summary || ""),
+      "summary"         => Crinja::Value.new(page.summary_html || page.effective_summary || ""),
       "word_count"      => Crinja::Value.new(page.word_count),
       "reading_time"    => Crinja::Value.new(page.reading_time),
       "permalink"       => Crinja::Value.new(page.permalink || ""),
@@ -1129,7 +1129,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["page"] = Crinja::Value.new(page_obj)
 
     # Flat variables for new properties
-    vars["page_summary"] = Crinja::Value.new(page.effective_summary || "")
+    vars["page_summary"] = Crinja::Value.new(page.summary_html || page.effective_summary || "")
     vars["page_word_count"] = Crinja::Value.new(page.word_count)
     vars["page_reading_time"] = Crinja::Value.new(page.reading_time)
     vars["page_permalink"] = Crinja::Value.new(page.permalink || "")

@@ -3,6 +3,7 @@ require "../models/config"
 require "../utils/logger"
 require "../utils/text_utils"
 require "./processors/markdown"
+require "html"
 require "json"
 require "uri"
 
@@ -100,8 +101,11 @@ module Hwaro
                 html_content, _ = Processor::Markdown.render(page.raw_content)
               end
 
-              # Strip HTML tags to get plain text
-              text_content = Utils::TextUtils.strip_html(html_content)
+              # Strip HTML tags AND decode entities so the index stores
+              # actual characters (`print("hi")`) rather than the HTML-
+              # escaped form (`print(&quot;hi&quot;)`). Client-side
+              # search libraries match on the raw stored string.
+              text_content = HTML.unescape(Utils::TextUtils.strip_html(html_content))
               data["content"] = cjk ? Utils::TextUtils.tokenize_cjk(text_content) : text_content
             when "tags"
               data["tags"] = page.tags

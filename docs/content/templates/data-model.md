@@ -297,7 +297,7 @@ Rendered HTML content is available as the top-level `content` variable.
 |----------|------|-------------|
 | page.word_count | Int | Word count |
 | page.reading_time | Int | Reading time (minutes) |
-| page.summary | String? | Content before <!-- more --> |
+| page.summary | String? | Rendered HTML for the chunk before `<!-- more -->`, falling back to `page.description` when no marker is present. Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.assets | Array<String> | Static files in page bundle |
 
 ### Boolean Flags

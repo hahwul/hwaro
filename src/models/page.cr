@@ -40,6 +40,12 @@ module Hwaro
       property taxonomies : Hash(String, Array(String))
       property front_matter_keys : Array(String)
       property weight : Int32
+      # Rendered HTML for the chunk before `<!-- more -->`. Populated by
+      # the build pipeline after `extract_summary` runs and the markdown
+      # processor is available; nil for pages without a `<!-- more -->`
+      # marker (in which case `page.summary` falls back to `description`).
+      # See https://github.com/hahwul/hwaro/issues/491.
+      property summary_html : String?
       property taxonomy_name : String?
       property taxonomy_term : String?
       property in_sitemap : Bool
@@ -137,6 +143,7 @@ module Hwaro
         @authors = [] of String
         @extra = {} of String => ExtraValue
         @summary = nil
+        @summary_html = nil
         @in_search_index = true
         @insert_anchor_links = false
         @word_count = 0
