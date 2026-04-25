@@ -187,9 +187,14 @@ module Hwaro
           end
 
           # Inline math: $...$ (single line, no space after opening or before closing $)
+          # NOTE: Inline `<span>` content participates in CommonMark inline parsing,
+          # so the KaTeX delimiters need an extra backslash to survive — `\\(` in
+          # the markdown source renders to `\(` in HTML, which KaTeX auto-render
+          # expects. Display math uses `<div>` (HTML block, opaque to Markd) and
+          # therefore keeps a single backslash.
           result = result.gsub(/(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/) do |_|
             escaped = Utils::TextUtils.escape_xml($~[1])
-            "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
+            "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
           end
 
           result

@@ -120,7 +120,9 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       content = "The formula $x^2$ is simple."
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
       result.should contain("math-inline")
-      result.should contain("\\(x^2\\)")
+      # Doubled backslashes so Markd's inline parser yields `\(...\)` after rendering;
+      # see "math (extended) keeps KaTeX delimiters" below.
+      result.should contain("\\\\(x^2\\\\)")
     end
 
     it "does not match dollar signs with spaces" do
@@ -327,6 +329,30 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       content = "$$$$"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
       result.should contain("math-display")
+    end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/484
+    # Markd's inline parser interprets `\(` as a backslash-escape of `(`, so the
+    # backslash needs to survive into the rendered HTML for KaTeX auto-render to
+    # match the expression.
+    it "keeps KaTeX delimiters in the rendered HTML for inline math" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Inline $x^2 + y^2$ here.",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<span class="math math-inline">\\(x^2 + y^2\\)</span>))
+      html.should_not contain(">(x^2 + y^2)<")
+    end
+
+    it "keeps KaTeX delimiters in the rendered HTML for display math" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "$$\nE = mc^2\n$$",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[))
+      html.should contain(%(\\]</div>))
     end
   end
 
