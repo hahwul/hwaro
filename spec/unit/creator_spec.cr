@@ -172,6 +172,27 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression for https://github.com/hahwul/hwaro/issues/487
+    # The default date should be a TOML datetime literal (unquoted, ISO 8601
+    # with offset) so it round-trips back through the parser as a real `Time`,
+    # matching the form authors use for hand-written front matter.
+    it "writes the default date as an unquoted TOML datetime literal" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Date Form")
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/drafts/post.md")
+          # No quoted form anywhere on the date line.
+          content.should_not match(/^date = "[^"]*"$/m)
+          # ISO 8601 with explicit offset (e.g. `2026-04-25T16:26:10+09:00` or `…Z`).
+          content.should match(/^date = \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/m)
+        end
+      end
+    end
+
     it "creates a file when path starts with content/" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
