@@ -138,6 +138,16 @@ module Hwaro
             args_str = open_match[2]? || open_match[3]?
             body_start = open_start + open_match[0].size
 
+            # `{% end %}` is the closing-tag literal; BLOCK_OPEN_RE happens to
+            # match it too (since `end` is a valid identifier), but treating
+            # it as an opening tag would silently consume a stray close. Emit
+            # it as-is so unmatched `{% end %}` reads as plain text.
+            if name == "end"
+              result << open_match[0]
+              pos = body_start
+              next
+            end
+
             # Find the matching {% end %} by tracking nesting depth
             nesting = 1
             scan_pos = body_start
@@ -208,10 +218,25 @@ module Hwaro
           template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
 
           unless template
-            if warn_missing && !crinja_function?(name, crinja_env_override)
-              warn_missing_shortcode(template_key)
+            # Direct-call syntax (`{{ name(args) }}`) doubles as Crinja's
+            # function-call syntax — `env`, `asset`, `url_for`, …, are
+            # legitimate references that the page-template engine will
+            # resolve later. Pass those through untouched.
+            return fallback if crinja_function?(name, crinja_env_override)
+
+            warn_missing_shortcode(template_key) if warn_missing
+
+            # Drop the call instead of leaking `{{ name(args) }}` into the
+            # rendered HTML and search index. Use the placeholder pipeline
+            # so block-level missing calls don't get wrapped in a stray
+            # `<p>`, mirroring how rendered shortcodes are handled.
+            placeholder_html = "<!-- hwaro: missing shortcode '#{name}' -->"
+            if results = shortcode_results
+              placeholder = "#{SHORTCODE_PLACEHOLDER_PREFIX}#{results.size}#{SHORTCODE_PLACEHOLDER_SUFFIX}"
+              results[placeholder] = placeholder_html
+              return placeholder
             end
-            return fallback
+            return placeholder_html
           end
 
           args = parse_shortcode_args_jinja(args_str)
