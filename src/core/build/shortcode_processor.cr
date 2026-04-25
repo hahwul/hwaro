@@ -34,6 +34,13 @@ module Hwaro
         SHORTCODE_PLACEHOLDER_SUFFIX = "-->"
         SHORTCODE_PLACEHOLDER_RE     = /#{Regex.escape(SHORTCODE_PLACEHOLDER_PREFIX)}\d+#{Regex.escape(SHORTCODE_PLACEHOLDER_SUFFIX)}/
 
+        # Matches CommonMark-style inline code spans on a single line
+        # (1 to 3 leading backticks; the same count must close the span).
+        # Multi-line inline spans are rare and intentionally not handled —
+        # those are usually fenced blocks, which the line-based outer
+        # loop in `process_shortcodes_jinja` already skips.
+        INLINE_CODE_RE = /(`{1,3})((?:(?!\1)[^\n])+?)\1/
+
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
@@ -76,6 +83,19 @@ module Hwaro
         end
 
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, depth : Int32 = 0) : String
+          # Inline code spans (`…`, ``…``) are opaque to the shortcode
+          # processor — running shortcodes inside `<code>` would both
+          # change the visible source the author meant to display and
+          # leak placeholder comments into the rendered HTML / search
+          # index after Markdown HTML-escapes them inside `<code>`.
+          # Mirror the protection that fenced code blocks already get
+          # in `process_shortcodes_jinja`.
+          process_outside_inline_code(content) do |chunk|
+            process_shortcodes_in_chunk(chunk, templates, context, shortcode_results, crinja_env_override, depth)
+          end
+        end
+
+        private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, depth : Int32) : String
           # 1. Block shortcodes: {% name(args) %}body{% end %}
           # Use stack-based parsing to correctly handle nested block shortcodes
           # of the same type, instead of a single regex that matches the first {% end %}.
@@ -95,6 +115,23 @@ module Hwaro
           processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
             render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override)
           end
+        end
+
+        # Yield each contiguous run of non-inline-code text to `block`,
+        # passing inline code spans (`…`, ``…``) through verbatim. The
+        # caller reassembles the result; only non-code chunks are subject
+        # to shortcode substitution.
+        private def process_outside_inline_code(content : String, & : String -> String) : String
+          result = String::Builder.new
+          pos = 0
+          while match = INLINE_CODE_RE.match(content, pos)
+            match_start = match.begin
+            result << yield content[pos...match_start]
+            result << match[0]
+            pos = match_start + match[0].size
+          end
+          result << yield content[pos..]
+          result.to_s
         end
 
         # Stack-based block shortcode parser that correctly handles nested
