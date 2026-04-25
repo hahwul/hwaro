@@ -314,6 +314,48 @@ describe Hwaro::Core::Build::Builder do
       result = builder.test_render_shortcode_jinja(template, args, context, crinja_env_override: env)
       result.should eq("alert: message")
     end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/479
+    # docs/writing/shortcodes.md advertises `{{ youtube("ID") }}` as the
+    # positional form for built-in shortcodes, but the templates only read
+    # named slots (`{{ id }}`), so the positional value never reached them.
+    # The dispatcher should alias each `_N` to the corresponding named slot
+    # for built-in shortcodes that declare a positional parameter list.
+    it "aliases _0 to the primary named arg for built-in youtube" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      context = {} of String => Crinja::Value
+
+      content = %({{ youtube("dQw4w9WgXcQ") }})
+      result = builder.test_process_shortcodes_jinja(content, {} of String => String, context, crinja_env_override: env)
+      result.should contain("youtube.com/embed/dQw4w9WgXcQ")
+      result.should_not contain("youtube.com/embed/\"")
+      result.should_not contain("youtube.com/embed/ ")
+    end
+
+    it "aliases _0 and _1 for built-in shortcodes with two-arg signatures" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      context = {} of String => Crinja::Value
+
+      # gist signature: user, id, [file]
+      result = builder.test_process_shortcodes_jinja(
+        %({{ gist("octocat", "abc123") }}),
+        {} of String => String, context, crinja_env_override: env)
+      result.should contain("gist.github.com/octocat/abc123.js")
+    end
+
+    it "still uses named args when the user mixes them" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      context = {} of String => Crinja::Value
+
+      # Named takes precedence; no positional should leak in.
+      result = builder.test_process_shortcodes_jinja(
+        %({{ youtube(id="named-id") }}),
+        {} of String => String, context, crinja_env_override: env)
+      result.should contain("youtube.com/embed/named-id")
+    end
   end
 
   describe "nested shortcodes" do

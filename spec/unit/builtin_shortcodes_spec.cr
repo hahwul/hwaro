@@ -84,4 +84,21 @@ describe Hwaro::Core::Build::BuiltinShortcodes do
       t1.object_id.should eq(t2.object_id)
     end
   end
+
+  # Backs the dispatcher-level alias from `_N` to the corresponding named
+  # parameter — see https://github.com/hahwul/hwaro/issues/479.
+  describe ".positional_params" do
+    it "exposes positional names for every built-in template that has a documented positional form" do
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/youtube").should eq(["id"])
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/vimeo").should eq(["id"])
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/gist").should eq(["user", "id", "file"])
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/tweet").should eq(["user", "id"])
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/codepen").should eq(["user", "id"])
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/figure").should eq(["src", "alt", "caption"])
+    end
+
+    it "returns nil for unknown templates so user shortcodes keep using `_N` directly" do
+      Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/custom-thing").should be_nil
+    end
+  end
 end

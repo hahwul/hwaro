@@ -10,10 +10,34 @@ module Hwaro
       module BuiltinShortcodes
         @@templates : Hash(String, String)? = nil
 
+        # Per-shortcode positional argument names — `_N` maps to `POSITIONAL_PARAMS[N]`
+        # at dispatch time so the documented `{{ youtube("ID") }}` form (and the
+        # multi-arg `{{ gist("user", "id") }}` form) actually reach the named
+        # slots that the built-in templates read.
+        #
+        # Order matches the templates' "Usage:" comments below. Named arguments
+        # always win — aliases only fill slots the caller did not provide.
+        POSITIONAL_PARAMS = {
+          "shortcodes/youtube" => ["id"],
+          "shortcodes/vimeo"   => ["id"],
+          "shortcodes/gist"    => ["user", "id", "file"],
+          "shortcodes/tweet"   => ["user", "id"],
+          "shortcodes/codepen" => ["user", "id"],
+          "shortcodes/figure"  => ["src", "alt", "caption"],
+          "shortcodes/alert"   => ["type", "title"],
+          "shortcodes/callout" => ["type", "title"],
+        }
+
         # Returns the full set of built-in shortcode templates keyed by
         # their template path (e.g. "shortcodes/youtube").
         def self.templates : Hash(String, String)
           @@templates ||= build_templates
+        end
+
+        # Returns the positional parameter list for a built-in shortcode,
+        # or nil if the template has no documented positional form.
+        def self.positional_params(template_key : String) : Array(String)?
+          POSITIONAL_PARAMS[template_key]?
         end
 
         private def self.build_templates : Hash(String, String)
