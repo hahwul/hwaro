@@ -340,9 +340,10 @@ describe Hwaro::Content::Multilingual do
       about_en.translations.size.should eq(2)
       about_ko.translations.size.should eq(2)
 
-      # contact page should not have translations (only one variant)
-      contact_en.translations.size.should eq(1)
-      contact_en.translations.first.code.should eq("en")
+      # Contact only exists in one language — `page.translations` is
+      # empty so the canonical `{% if page.translations %}` guard hides
+      # the language switcher entirely (#486).
+      contact_en.translations.should be_empty
     end
 
     it "sets is_default flag for default language translation" do

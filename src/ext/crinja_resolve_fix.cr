@@ -56,6 +56,35 @@ end
 #    loud error is more helpful than silent empty output.
 #
 # See: https://github.com/hahwul/hwaro/issues/482
+# === 3. Empty-collection falsiness (Jinja2 alignment) ==================
+# Upstream `Value#truthy?` only treats `false`, `0`, `nil`, and
+# `Undefined` as falsy. Python Jinja2 also treats empty collections —
+# `[]`, `{}`, `""` — as falsy, which is what `{% if items %}` and
+# `{% if page.translations %}` rely on across hwaro's docs and
+# scaffolds. Without this patch, the canonical lang-switcher idiom
+#
+#   {% if page.translations %}<nav>…</nav>{% endif %}
+#
+# always rendered an empty `<nav>` for pages with no translations,
+# because Crinja saw `[]` as truthy.
+#
+# See: https://github.com/hahwul/hwaro/issues/486
+struct Crinja::Value
+  def truthy?
+    raw = @raw
+    return false if raw == false
+    return false if raw.is_a?(Number) && raw == 0
+    return false if raw.nil?
+    return false if undefined?
+    return false if raw.is_a?(String) && raw.empty?
+    return false if raw.is_a?(Crinja::SafeString) && raw.to_s.empty?
+    return false if raw.is_a?(Indexable) && raw.empty?
+    return false if raw.is_a?(Hash) && raw.empty?
+    return false if raw.is_a?(Crinja::Tuple) && raw.empty?
+    true
+  end
+end
+
 module Crinja::Resolver
   def self.resolve_attribute(name, object : Crinja::Value) : Crinja::Value
     raise Crinja::UndefinedError.new(name.to_s) if object.undefined?

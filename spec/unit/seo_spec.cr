@@ -184,6 +184,66 @@ describe Hwaro::Content::Seo::Sitemap do
         content.should_not contain("/secret/")
       end
     end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/486
+    # Multilingual sites need `<xhtml:link rel="alternate" hreflang="..."
+    # href="...">` entries on every URL with a translation so search
+    # engines can pick the right language variant. The HTML `<head>`
+    # already exposes the same data via `hreflang_tags`, but Google's
+    # recommendation is to surface it in the sitemap too.
+    it "emits xhtml:link hreflang alternates for translated pages" do
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+
+      site = Hwaro::Models::Site.new(config)
+
+      en = Hwaro::Models::Page.new("about.md")
+      en.url = "/about/"
+      en.render = true
+      en.in_sitemap = true
+      en.language = "en"
+
+      ko = Hwaro::Models::Page.new("about.ko.md")
+      ko.url = "/ko/about/"
+      ko.render = true
+      ko.in_sitemap = true
+      ko.language = "ko"
+
+      Hwaro::Content::Multilingual.link_translations!([en, ko], config)
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Sitemap.generate([en, ko], site, output_dir)
+
+        content = File.read(File.join(output_dir, "sitemap.xml"))
+        content.should contain(%(xmlns:xhtml="http://www.w3.org/1999/xhtml"))
+        content.should contain(%(<xhtml:link rel="alternate" hreflang="en" href="https://example.com/about/" />))
+        content.should contain(%(<xhtml:link rel="alternate" hreflang="ko" href="https://example.com/ko/about/" />))
+      end
+    end
+
+    it "omits the xhtml namespace when no page has translations" do
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.base_url = "https://example.com"
+
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("solo.md")
+      page.url = "/solo/"
+      page.render = true
+      page.in_sitemap = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Sitemap.generate([page], site, output_dir)
+
+        content = File.read(File.join(output_dir, "sitemap.xml"))
+        content.should_not contain("xmlns:xhtml")
+        content.should_not contain("<xhtml:link")
+      end
+    end
   end
 end
 

@@ -48,6 +48,38 @@ describe "Crinja resolver patches" do
     end
   end
 
+  describe "empty-collection truthiness (issue #486)" do
+    # Jinja2 treats empty collections as falsy so `{% if items %}` is
+    # the canonical guard for "render this block only if there's
+    # something to show". Crinja's default `truthy?` only saw `false`,
+    # `0`, `nil`, and `Undefined` as falsy — empty `[]` / `{}` / `""`
+    # rendered the block anyway, breaking the canonical lang-switcher
+    # idiom from `docs/templates/data-model.md`.
+    it "treats empty Array as falsy" do
+      env = Crinja.new
+      tpl = env.from_string("{% if items %}YES{% else %}NO{% endif %}")
+      tpl.render({"items" => [] of Crinja::Value}).should eq("NO")
+    end
+
+    it "treats non-empty Array as truthy" do
+      env = Crinja.new
+      tpl = env.from_string("{% if items %}YES{% else %}NO{% endif %}")
+      tpl.render({"items" => [Crinja::Value.new("x")]}).should eq("YES")
+    end
+
+    it "treats empty Hash as falsy" do
+      env = Crinja.new
+      tpl = env.from_string("{% if h %}YES{% else %}NO{% endif %}")
+      tpl.render({"h" => {} of String => Crinja::Value}).should eq("NO")
+    end
+
+    it "treats empty String as falsy" do
+      env = Crinja.new
+      tpl = env.from_string("{% if s %}YES{% else %}NO{% endif %}")
+      tpl.render({"s" => ""}).should eq("NO")
+    end
+  end
+
   describe "scope-vs-function priority (issue #224)" do
     it "prefers a context variable over a registered function with the same name" do
       env = Crinja.new

@@ -51,9 +51,19 @@ module Hwaro
           priority = site.config.sitemap.priority
           priority_str = "    <priority>#{priority}</priority>\n"
 
+          # Multilingual sites benefit from `<xhtml:link rel="alternate"
+          # hreflang="...">` entries on every translated URL — Google's
+          # recommended way to expose hreflang in sitemaps. Only declare
+          # the namespace when we'll actually use it (#486).
+          has_translations = sitemap_pages.any? { |p| !p.translations.empty? }
+
           xml_content = String.build(sitemap_pages.size * 256) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+            if has_translations
+              str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n"
+            else
+              str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+            end
 
             sitemap_pages.each do |page|
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
@@ -63,6 +73,19 @@ module Hwaro
 
               str << "  <url>\n"
               str << "    <loc>#{escaped_url}</loc>\n"
+
+              # Hreflang alternates — emit one per translation (including
+              # the current page itself; Google's spec asks for a self-
+              # referencing entry).
+              page.translations.each do |t|
+                t_path = t.url.starts_with?('/') ? t.url : "/#{t.url}"
+                t_full = base.empty? ? t_path : base + t_path
+                str << "    <xhtml:link rel=\"alternate\" hreflang=\""
+                str << Utils::TextUtils.escape_xml(t.code)
+                str << "\" href=\""
+                str << Utils::TextUtils.escape_xml(t_full)
+                str << "\" />\n"
+              end
 
               # Add lastmod if available
               if date = (page.updated || page.date)

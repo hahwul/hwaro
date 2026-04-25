@@ -62,6 +62,15 @@ module Hwaro
         default = config.default_language
 
         groups.each_value do |group_pages|
+          # A group of size 1 has no cross-language variants, just the
+          # page itself; leaving `page.translations` empty matches the
+          # canonical `{% if page.translations %}` guard from the
+          # docs (#486).
+          if group_pages.size <= 1
+            group_pages.each { |p| p.translations = [] of Models::TranslationLink }
+            next
+          end
+
           by_code = {} of String => Models::Page
           group_pages.each do |p|
             by_code[language_code(p, config)] = p
