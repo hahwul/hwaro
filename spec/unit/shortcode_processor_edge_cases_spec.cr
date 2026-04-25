@@ -53,26 +53,33 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
   end
 
   describe "unknown shortcodes" do
-    it "leaves direct-call references untouched when no template matches" do
+    # Regression for https://github.com/hahwul/hwaro/issues/480
+    # The old behavior left `{{ unknown(...) }}` literally in the output
+    # and the search index. Now we replace the call with an HTML comment
+    # so readers don't see broken text and `strip_html` drops it from
+    # `search.json`. The warning still fires (see "warns when ..." below).
+    it "replaces direct-call references with an HTML comment when no template matches" do
       builder = Hwaro::Core::Build::Builder.new
       content = %(text {{ unknown(arg="x") }} more)
       result = builder.test_sc_process(content, {} of String => String)
-      result.should eq(content)
+      result.should_not contain("{{ unknown")
+      result.should contain("<!-- hwaro: missing shortcode 'unknown' -->")
     end
 
-    it "leaves explicit shortcode() calls untouched when template missing" do
+    it "replaces explicit shortcode() calls with an HTML comment when template missing" do
       builder = Hwaro::Core::Build::Builder.new
       content = %({{ shortcode("missing", arg="x") }})
       result = builder.test_sc_process(content, {} of String => String)
-      result.should eq(content)
+      result.should_not contain("{{ shortcode")
+      result.should contain("<!-- hwaro: missing shortcode 'missing' -->")
     end
 
-    it "leaves block shortcodes untouched when template missing" do
+    it "replaces block shortcodes with an HTML comment when template missing" do
       builder = Hwaro::Core::Build::Builder.new
       content = %({% missing %}body{% end %})
       result = builder.test_sc_process(content, {} of String => String)
-      # Block path returns the original block as fallback, byte-for-byte
-      result.should eq(content)
+      result.should_not contain("{% missing %}")
+      result.should contain("<!-- hwaro: missing shortcode 'missing' -->")
     end
 
     it "warns when a direct-call shortcode name is not a registered template or Crinja function" do

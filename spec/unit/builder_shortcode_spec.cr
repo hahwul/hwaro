@@ -169,16 +169,36 @@ describe Hwaro::Core::Build::Builder do
       shortcode_results["<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"].should eq("<div>hi</div>")
     end
 
-    it "returns fallback when template not found" do
+    it "drops the call as an HTML comment when template not found" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
       templates = {} of String => String
       context = {} of String => Crinja::Value
 
+      # Regression for https://github.com/hahwul/hwaro/issues/480 — the
+      # original `{{ missing() }}` text used to leak through as the
+      # fallback; replace it with a source-only HTML comment so readers
+      # don't see broken text and search.json doesn't index it.
       result = builder.test_render_shortcode_result(
         "missing", nil, templates, context, nil, "{{ missing() }}", warn_missing: false, crinja_env_override: env
       )
-      result.should eq("{{ missing() }}")
+      result.should eq("<!-- hwaro: missing shortcode 'missing' -->")
+    end
+
+    it "passes Crinja-function names through verbatim so the page template can resolve them" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      env.functions["env"] = Crinja.function { |_| Crinja::Value.new("") }
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      # `env(...)`, `asset(...)`, `url_for(...)`, … aren't shortcodes —
+      # they're template-engine functions that the page template
+      # evaluates later. The shortcode processor must leave them alone.
+      result = builder.test_render_shortcode_result(
+        "env", "name=\"FOO\"", templates, context, nil, %({{ env(name="FOO") }}), crinja_env_override: env
+      )
+      result.should eq(%({{ env(name="FOO") }}))
     end
 
     it "passes extra_args to the template" do
