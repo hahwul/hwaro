@@ -237,7 +237,10 @@ module Hwaro
                      options.draft == true
                    end
 
-        date = options.date || Time.local.to_s("%Y-%m-%d %H:%M:%S")
+        # ISO 8601 with explicit offset — round-trips back through TOML/YAML
+        # parsers as a real datetime (TOML offset-datetime / YAML timestamp)
+        # rather than a string fallback.
+        date = options.date || Time.local.to_s("%Y-%m-%dT%H:%M:%S%:z")
         tags = options.tags
 
         # Find archetype, extracting any hwaro directives (e.g. bundle=true)
@@ -464,12 +467,19 @@ module Hwaro
         end
       end
 
+      # TOML datetime literal pattern (local-date / local-datetime /
+      # offset-datetime per the spec). When the value matches, emit unquoted
+      # so the parser returns a real `Time`; otherwise fall back to a quoted
+      # string so unusual `--date` inputs still produce valid TOML.
+      TOML_DATETIME_RE = /\A\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?\z/
+
       private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
         safe_title = escape_string(title)
+        date_literal = date.matches?(TOML_DATETIME_RE) ? date : "\"#{escape_string(date)}\""
         String.build do |str|
           str << "+++\n"
           str << "title = \"#{safe_title}\"\n"
-          str << "date = \"#{date}\"\n"
+          str << "date = #{date_literal}\n"
           extra_fields.each { |f| str << "#{f} = \"\"\n" }
           str << "draft = true\n" if is_draft
           unless tags.empty?

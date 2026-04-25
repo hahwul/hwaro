@@ -182,6 +182,30 @@ module Hwaro
           base_url.empty? ? path : base_url + path
         end
 
+        # Format a Time as an RFC 822/2822 datetime suitable for RSS `<pubDate>`.
+        # `Time#to_rfc2822` omits the leading zero on day-of-month, which some
+        # readers reject; force `two_digit_day: true`.
+        #
+        # Date-only TOML/YAML values (e.g. `date = 2026-03-05`) are anchored to
+        # the build host's local zone by the parsers. Naively converting those
+        # to UTC pushes the calendar date back by the host's offset, so a
+        # `+09:00` host would emit `Wed, 04 Mar 2026 15:00:00 +0000` for a date
+        # the author wrote as 5 Mar. Detect "midnight in a non-UTC zone" and
+        # re-anchor to UTC of the same wall-clock date instead.
+        private def self.format_rfc822(time : Time) : String
+          normalized = if time.location != Time::Location::UTC &&
+                          time.hour == 0 && time.minute == 0 &&
+                          time.second == 0 && time.nanosecond == 0
+                         Time.utc(time.year, time.month, time.day)
+                       else
+                         time.to_utc
+                       end
+          String.build do |io|
+            formatter = Time::Format::Formatter.new(normalized, io)
+            formatter.rfc_2822(time_zone_gmt: false, two_digit_day: true)
+          end
+        end
+
         def self.generate_rss(
           pages : Array(Models::Page),
           config : Models::Config,
@@ -220,7 +244,7 @@ module Hwaro
               str << "      <description>#{Utils::TextUtils.escape_xml(content)}</description>\n"
 
               if pub_date = page.date
-                str << "      <pubDate>#{pub_date.to_rfc2822}</pubDate>\n"
+                str << "      <pubDate>#{format_rfc822(pub_date)}</pubDate>\n"
               end
 
               str << "    </item>\n"

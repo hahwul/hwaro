@@ -1447,6 +1447,50 @@ describe Hwaro::Content::Seo::Feeds do
       rss.should_not contain("<pubDate>")
     end
 
+    # Regression for https://github.com/hahwul/hwaro/issues/487
+    # Per RFC 822/2822, day-of-month must be two digits; some readers reject
+    # single-digit days.
+    it "uses two-digit day-of-month in pubDate (RFC 822)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Single-digit Day"
+      page.url = "/post/"
+      page.date = Time.utc(2026, 3, 4, 12, 0, 0)
+      page.raw_content = "Content"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<pubDate>Wed, 04 Mar 2026 12:00:00 +0000</pubDate>")
+    end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/487
+    # Date-only TOML/YAML values are anchored to the build host's local TZ by
+    # the parser; converting them to UTC at output time used to push the
+    # calendar date back by one day on `+09:00` hosts.
+    it "preserves the calendar date for TZ-less midnight values" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Date Only"
+      page.url = "/post/"
+      # Mimic what a TOML local-date (`date = 2026-03-05`) becomes after
+      # parsing on a `+09:00` host: midnight in `Asia/Seoul`.
+      seoul = Time::Location.fixed("Asia/Seoul", 9 * 3600)
+      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: seoul)
+      page.raw_content = "Content"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<pubDate>Thu, 05 Mar 2026 00:00:00 +0000</pubDate>")
+    end
+
     it "includes description with content" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"
