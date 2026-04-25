@@ -160,6 +160,22 @@ module Hwaro
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)
       end
 
+      # Resolve the term list for a configured taxonomy `name`. Most
+      # taxonomies live in `@taxonomies`, but a few — `tags` and `authors`
+      # — are stored on dedicated `Page` properties so other features
+      # (the `tags` shortcut, the `site.authors` aggregation) can reach
+      # them without a hash lookup. Centralizing the fallback here keeps
+      # call sites (Taxonomies generator, related-posts scoring, …) from
+      # forgetting any of the special cases.
+      def taxonomy_values(name : String) : Array(String)
+        return @taxonomies[name] if @taxonomies.has_key?(name)
+        case name
+        when "tags"    then @tags
+        when "authors" then @authors
+        else                [] of String
+        end
+      end
+
       # Collect assets from page directory
       def collect_assets(content_dir : String) : Array(String)
         # Assets are only collected for page bundles (directories)

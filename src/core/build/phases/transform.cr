@@ -365,7 +365,7 @@ module Hwaro::Core::Build::Phases::Transform
     all_pages.each do |page|
       page_lookup[page.path] = page
       taxonomy_names.each do |tax_name|
-        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values = page.taxonomy_values(tax_name)
         values.each do |term|
           inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
           arr = inv_tax[term]? || (inv_tax[term] = [] of String)
@@ -390,7 +390,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Include pages sharing taxonomy terms with changed pages
     changed_pages.each do |page|
       taxonomy_names.each do |tax_name|
-        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values = page.taxonomy_values(tax_name)
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|
@@ -408,7 +408,7 @@ module Hwaro::Core::Build::Phases::Transform
 
       scores = Hash(String, Int32).new(0)
       taxonomy_names.each do |tax_name|
-        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values = page.taxonomy_values(tax_name)
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|
@@ -560,7 +560,7 @@ module Hwaro::Core::Build::Phases::Transform
     pages.each do |page|
       page_lookup[page.path] = page
       taxonomy_names.each do |tax_name|
-        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values = page.taxonomy_values(tax_name)
         values.each do |term|
           inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
           arr = inv_tax[term]? || (inv_tax[term] = [] of String)
@@ -577,7 +577,7 @@ module Hwaro::Core::Build::Phases::Transform
       scores = Hash(String, Int32).new(0)
       page_lang = page.language
       taxonomy_names.each do |tax_name|
-        values = page.taxonomies[tax_name]? || (tax_name == "tags" ? page.tags : [] of String)
+        values = page.taxonomy_values(tax_name)
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|

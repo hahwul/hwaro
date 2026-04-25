@@ -227,6 +227,49 @@ describe Hwaro::Content::Taxonomies do
         File.exists?(File.join(output_dir, "tags", "crystal-programming", "index.html")).should be_true
       end
     end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/485
+    # `authors` is stored on a dedicated `page.authors` property (so the
+    # `site.authors` aggregation can use it) rather than in `page.taxonomies`.
+    # The taxonomy generator used to special-case only `tags`, so configuring
+    # `[[taxonomies]] name = "authors"` silently produced no listing pages.
+    it "generates index and term pages for the `authors` taxonomy" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("authors")]
+
+      site = Hwaro::Models::Site.new(config)
+
+      page1 = Hwaro::Models::Page.new("post1.md")
+      page1.title = "Post 1"
+      page1.url = "/post1/"
+      page1.authors = ["alice", "bob"]
+      page1.draft = false
+      page1.generated = false
+      page1.front_matter_keys = ["title", "authors"]
+
+      page2 = Hwaro::Models::Page.new("post2.md")
+      page2.title = "Post 2"
+      page2.url = "/post2/"
+      page2.authors = ["alice"]
+      page2.draft = false
+      page2.generated = false
+      page2.front_matter_keys = ["title", "authors"]
+
+      site.pages = [page1, page2]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        File.exists?(File.join(output_dir, "authors", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "authors", "alice", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "authors", "bob", "index.html")).should be_true
+      end
+    end
   end
 end
 
