@@ -167,8 +167,14 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.calculate_word_count
     page.calculate_reading_time
 
-    # Extract summary from <!-- more --> marker
-    page.extract_summary
+    # Extract summary from <!-- more --> marker. Stores the raw markdown
+    # chunk on the model; render it to HTML now so `page.summary` can
+    # expose proper HTML (not raw `# Heading` text) at template time —
+    # see https://github.com/hahwul/hwaro/issues/491.
+    if summary_md = page.extract_summary
+      summary_html, _ = Processor::Markdown.render(summary_md)
+      page.summary_html = summary_html
+    end
 
     if page.is_a?(Models::Section)
       page.transparent = data[:transparent]

@@ -83,11 +83,38 @@ describe "Edge Cases: Summary via page_summary variable" do
         "post.md" => "---\ntitle: My Post\n---\nThis is the intro.\n\n<!-- more -->\n\nThis is the rest.",
       },
       template_files: {
-        "page.html" => "SUMMARY={{ page_summary }}|{{ content }}",
+        "page.html" => "SUMMARY={{ page_summary | safe }}|{{ content }}",
       },
     ) do
       html = File.read("public/post/index.html")
-      html.should contain("SUMMARY=This is the intro.")
+      # `page_summary` exposes rendered HTML for the chunk before the
+      # `<!-- more -->` marker (#491) — wrap markdown in `<p>` matches
+      # how full content renders.
+      html.should contain("SUMMARY=<p>This is the intro.</p>")
+    end
+  end
+
+  it "page_summary renders inline markdown to HTML rather than leaking raw markers" do
+    # Regression for https://github.com/hahwul/hwaro/issues/491 — the
+    # raw chunk before `<!-- more -->` previously came through verbatim
+    # (with `# Heading`, `**bold**`, etc.), so `{{ page.summary | safe }}`
+    # produced un-rendered markdown in the page.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "post.md" => "---\ntitle: My Post\n---\n# Heading\n\nWith **bold** and a [link](/about/).\n\n<!-- more -->\n\nRest.",
+      },
+      template_files: {
+        "page.html" => "SUMMARY={{ page_summary | safe }}",
+      },
+    ) do
+      html = File.read("public/post/index.html")
+      html.should contain("<h1")
+      html.should contain("Heading</h1>")
+      html.should contain("<strong>bold</strong>")
+      html.should contain(%(<a href="/about/">link</a>))
+      html.should_not contain("# Heading")
+      html.should_not contain("**bold**")
     end
   end
 

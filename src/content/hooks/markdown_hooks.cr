@@ -95,7 +95,10 @@ module Hwaro
           # Calculate derived fields
           page.calculate_word_count
           page.calculate_reading_time
-          page.extract_summary
+          if summary_md = page.extract_summary
+            summary_html, _ = Processor::Markdown.render(summary_md)
+            page.summary_html = summary_html
+          end
         end
 
         private def filter_drafts(ctx : Core::Lifecycle::BuildContext)
