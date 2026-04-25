@@ -60,7 +60,7 @@ module Crinja::Resolver
   def self.resolve_attribute(name, object : Crinja::Value) : Crinja::Value
     raise Crinja::UndefinedError.new(name.to_s) if object.undefined?
 
-    value = self.resolve_getattr(name, object)
+    value = resolve_getattr(name, object)
 
     if value.undefined?
       if object.indexable? && (idx = name.to_s.to_i?)
