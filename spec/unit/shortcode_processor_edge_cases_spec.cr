@@ -186,6 +186,43 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("fenced1")
       result.should contain("fenced2")
     end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/477
+    # Single-backtick inline code spans should be opaque to the shortcode
+    # processor, the same way fenced code blocks already are. The bug was
+    # that the call WAS substituted with a placeholder, then Markdown
+    # wrapped that placeholder in `<code>` and the post-processor never
+    # restored it (because of HTML-escaping inside `<code>`), leaving
+    # `<code>&lt;!--HWARO-SHORTCODE-PLACEHOLDER-N--&gt;</code>` in the
+    # rendered HTML and the search index.
+    it "leaves shortcodes inside single-backtick inline code spans untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe src="https://yt/embed/{{ id }}"></iframe>)}
+      content = %(Inline `{{ youtube(id="x") }}` should be literal.)
+      result = builder.test_sc_process(content, templates)
+      result.should contain(%(`{{ youtube(id="x") }}`))
+      result.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+      result.should_not contain("<iframe")
+    end
+
+    it "still processes shortcodes outside the inline code span on the same line" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe src="https://yt/embed/{{ id }}"></iframe>)}
+      content = %(Live: {{ youtube(id="real") }} and literal: `{{ youtube(id="x") }}`.)
+      result = builder.test_sc_process(content, templates)
+      result.should contain("https://yt/embed/real")
+      result.should contain(%(`{{ youtube(id="x") }}`))
+    end
+
+    it "honors longer backtick fences (`` ` `` inside a double-backtick span)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      # Double-backtick span lets the user include literal backticks inside.
+      content = %(Doc: ``a `b` {{ youtube(id="x") }}`` end.)
+      result = builder.test_sc_process(content, templates)
+      result.should contain(%(``a `b` {{ youtube(id="x") }}``))
+      result.should_not contain("<iframe")
+    end
   end
 
   describe "nested shortcodes" do
