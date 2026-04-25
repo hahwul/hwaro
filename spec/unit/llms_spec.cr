@@ -51,25 +51,29 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
-    it "generates empty file when instructions are empty" do
+    it "always writes the title heading even when instructions are empty" do
+      # Updated for #492 — llms.txt now follows the llmstxt.org spec
+      # (title heading + optional description blockquote + preamble +
+      # page index). The "instructions string only" output it produced
+      # before could be empty, but the new format always emits at least
+      # a `# Title` line.
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
+      config.title = "Site"
       config.llms.instructions = ""
 
       Dir.mktmpdir do |output_dir|
         Hwaro::Content::Seo::Llms.generate(config, output_dir)
 
-        file_path = File.join(output_dir, "llms.txt")
-        File.exists?(file_path).should be_true
-
-        content = File.read(file_path)
-        content.should eq("")
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should start_with("# Site\n")
       end
     end
 
-    it "appends newline at end when content does not end with one" do
+    it "ends with a trailing newline" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
+      config.title = "Site"
       config.llms.instructions = "No trailing newline"
 
       Dir.mktmpdir do |output_dir|
@@ -77,19 +81,6 @@ describe Hwaro::Content::Seo::Llms do
 
         content = File.read(File.join(output_dir, "llms.txt"))
         content.should end_with("\n")
-      end
-    end
-
-    it "does not double-add newline when content already ends with one" do
-      config = Hwaro::Models::Config.new
-      config.llms.enabled = true
-      config.llms.instructions = "Already has newline\n"
-
-      Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
-
-        content = File.read(File.join(output_dir, "llms.txt"))
-        content.should eq("Already has newline\n")
       end
     end
 
@@ -105,6 +96,95 @@ describe Hwaro::Content::Seo::Llms do
         content.should contain("Line 1")
         content.should contain("Line 2")
         content.should contain("Line 3")
+      end
+    end
+  end
+
+  # Regression group for https://github.com/hahwul/hwaro/issues/492
+  # `llms.txt` previously contained only the configured `instructions`
+  # string. Now it follows the llmstxt.org format: a `# Title` heading,
+  # an optional `> description` blockquote, the preamble, and a grouped
+  # page index (`## Section\n- [Title](url): desc`).
+  describe ".generate page index (#492)" do
+    it "emits site title, description, instructions, and a per-section page index" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "Demo"
+      config.description = "A short site."
+      config.base_url = "https://example.com"
+      config.llms.instructions = "Be kind to crawlers."
+
+      home = Hwaro::Models::Page.new("index.md")
+      home.title = "Home"
+      home.url = "/"
+      home.section = ""
+
+      hello = Hwaro::Models::Page.new("posts/hello.md")
+      hello.title = "Hello"
+      hello.url = "/posts/hello/"
+      hello.section = "posts"
+      hello.description = "First post"
+
+      second = Hwaro::Models::Page.new("posts/second.md")
+      second.title = "Second"
+      second.url = "/posts/second/"
+      second.section = "posts"
+
+      posts_idx = Hwaro::Models::Section.new("posts/_index.md")
+      posts_idx.title = "Posts"
+      posts_idx.url = "/posts/"
+      posts_idx.section = "posts"
+      posts_idx.is_index = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [home, hello, second, posts_idx], output_dir)
+
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should start_with("# Demo\n\n")
+        content.should contain("> A short site.")
+        content.should contain("Be kind to crawlers.")
+        # Pages section uses the section's _index title when available.
+        content.should contain("## Posts\n")
+        content.should contain("- [Hello](https://example.com/posts/hello/): First post")
+        content.should contain("- [Second](https://example.com/posts/second/)\n")
+        # Standalone pages (no section) land under "Pages".
+        content.should contain("## Pages\n")
+        content.should contain("- [Home](https://example.com/)")
+      end
+    end
+
+    it "skips drafts, hidden, and generated pages from the index" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "T"
+
+      visible = Hwaro::Models::Page.new("a.md")
+      visible.title = "Visible"
+      visible.url = "/a/"
+
+      drafted = Hwaro::Models::Page.new("draft.md")
+      drafted.title = "Drafted"
+      drafted.url = "/drafted/"
+      drafted.draft = true
+
+      hidden = Hwaro::Models::Page.new("hidden.md")
+      hidden.title = "Hidden"
+      hidden.url = "/hidden/"
+      hidden.in_search_index = false
+
+      auto = Hwaro::Models::Page.new("tags/foo.md")
+      auto.title = "Tag: foo"
+      auto.url = "/tags/foo/"
+      auto.generated = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [visible, drafted, hidden, auto], output_dir)
+
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should contain("- [Visible]")
+        content.should_not contain("Drafted")
+        content.should_not contain("Hidden")
+        content.should_not contain("Tag: foo")
       end
     end
   end

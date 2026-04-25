@@ -302,16 +302,20 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
-    it "adds newline at end if not present" do
+    it "ends with a trailing newline" do
+      # Updated for #492 — the body now also includes the title and a
+      # page index, but it should still end with a newline.
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
+      config.title = "T"
       config.llms.instructions = "No newline"
 
       Dir.mktmpdir do |output_dir|
         Hwaro::Content::Seo::Llms.generate(config, output_dir)
 
         content = File.read(File.join(output_dir, "llms.txt"))
-        content.should eq("No newline\n")
+        content.should contain("No newline")
+        content.should end_with("\n")
       end
     end
 
