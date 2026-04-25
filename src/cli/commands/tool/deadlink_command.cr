@@ -211,10 +211,19 @@ module Hwaro
                          File.join(base_dir, link.url)
                        end
 
+              # Most internal URLs are written with a trailing slash
+              # (`/about/`, `/posts/hello/`) — strip it before computing
+              # the leaf-file candidate so `target_no_slash + ".md"`
+              # resolves to `content/about.md` instead of the broken
+              # `content/about/.md` the old code produced. The directory
+              # candidates (`_index.md` / `index.md`) work either way.
+              target_no_slash = target.rstrip("/")
+
               exists = File.exists?(target) ||
-                       File.exists?(target + ".md") ||
-                       File.exists?(File.join(target, "_index.md")) ||
-                       File.exists?(File.join(target, "index.md")) ||
+                       File.exists?(target_no_slash + ".md") ||
+                       File.exists?(target_no_slash + ".markdown") ||
+                       File.exists?(File.join(target_no_slash, "_index.md")) ||
+                       File.exists?(File.join(target_no_slash, "index.md")) ||
                        (link.kind != :image && taxonomy_url?(link.url, taxonomy_names))
 
               unless exists

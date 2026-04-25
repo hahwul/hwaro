@@ -5,6 +5,7 @@
 # Reports unreferenced files that may be candidates for removal.
 
 require "json"
+require "../models/config"
 require "../utils/logger"
 
 module Hwaro
@@ -132,7 +133,38 @@ module Hwaro
           end
         end
 
+        # Files declared in `config.toml` (`[[assets.bundles]] files`,
+        # `[auto_includes] dirs`, …) are consumed by the build pipeline
+        # itself, not referenced from content/templates — without this
+        # the scan reported them as "Unused" even though the build
+        # actively reads them. See #488.
+        add_config_references(refs)
+
         refs
+      end
+
+      private def add_config_references(refs : Set(String)) : Nil
+        return unless File.exists?("config.toml")
+        config = Models::Config.load
+        config.assets.bundles.each do |bundle|
+          bundle.files.each { |path| refs << File.basename(path) }
+          # The compiled bundle name (e.g. `main.css`) is referenced
+          # from templates via `{{ asset(name=...) }}`; that already
+          # gets picked up by the regex scan above, so no extra work
+          # needed here.
+        end
+        config.auto_includes.dirs.each do |rel_dir|
+          dir = File.join(@static_dir, rel_dir)
+          next unless Dir.exists?(dir)
+          Dir.glob(File.join(dir, "**", "*")) do |path|
+            next if File.directory?(path)
+            refs << File.basename(path)
+          end
+        end
+      rescue
+        # Treat config-load failures as "no extra references" so the
+        # tool stays best-effort rather than crashing on a partial
+        # site.
       end
     end
   end
