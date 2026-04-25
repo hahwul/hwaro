@@ -27,6 +27,10 @@ module Hwaro::Core::Build
     def test_report_render_failures(failures, verbose)
       report_render_failures(failures, verbose)
     end
+
+    def test_build_global_vars(site : Models::Site)
+      build_global_vars(site)
+    end
   end
 end
 
@@ -264,6 +268,100 @@ describe Hwaro::Core::Build::Phases::Render do
       output = buffer.to_s
       output.should contain("Render failed for 8 pages: Unterminated tag")
       output.should contain("… and 3 more")
+    end
+  end
+
+  # Regression for https://github.com/hahwul/hwaro/issues/481
+  # `get_section()` reads its data from the `__sections_by_key__` map that
+  # `build_global_vars` builds. The section value used to be populated from
+  # `Section#pages` (an unfilled array on the model) and dropped subsections
+  # entirely, so every `get_section(...).pages_count` came back as 0.
+  describe "#build_global_vars / get_section data" do
+    it "fills section.pages from the live page list (not the empty Section#pages property)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "http://example.com"
+      site = Hwaro::Models::Site.new(config)
+
+      posts = Hwaro::Models::Section.new("posts/_index.md")
+      posts.title = "Posts"
+      posts.section = "posts"
+      posts.url = "/posts/"
+      posts.language = "en"
+
+      hello = Hwaro::Models::Page.new("posts/hello.md")
+      hello.title = "Hello"
+      hello.section = "posts"
+      hello.url = "/posts/hello/"
+      hello.language = "en"
+
+      second = Hwaro::Models::Page.new("posts/second.md")
+      second.title = "Second"
+      second.section = "posts"
+      second.url = "/posts/second/"
+      second.language = "en"
+
+      # `_index.md` files become `Section` objects in `site.sections`;
+      # only regular pages go into `site.pages`. `pages_for_section`
+      # bucketing reads from `site.pages`, so adding the Section to
+      # both lists would double-count.
+      site.sections << posts
+      site.pages << hello << second
+      site.build_lookup_index
+
+      builder = Hwaro::Core::Build::Builder.new
+      vars = builder.test_build_global_vars(site)
+      sections_by_key = vars["__sections_by_key__"].raw.as(Hash)
+      posts_val = sections_by_key["posts"].raw.as(Hash)
+
+      posts_val["pages_count"].raw.should eq(2)
+      posts_val["pages"].raw.as(Array).size.should eq(2)
+    end
+
+    it "exposes subsections so {{ section.subsections }} works inside get_section()" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "http://example.com"
+      site = Hwaro::Models::Site.new(config)
+
+      posts = Hwaro::Models::Section.new("posts/_index.md")
+      posts.title = "Posts"
+      posts.section = "posts"
+      posts.url = "/posts/"
+      posts.language = "en"
+
+      cli_series = Hwaro::Models::Section.new("posts/cli-series/_index.md")
+      cli_series.title = "CLI Series"
+      cli_series.section = "posts/cli-series"
+      cli_series.url = "/posts/cli-series/"
+      cli_series.language = "en"
+
+      posts.subsections << cli_series
+
+      hello = Hwaro::Models::Page.new("posts/hello.md")
+      hello.title = "Hello"
+      hello.section = "posts"
+      hello.url = "/posts/hello/"
+      hello.language = "en"
+
+      part1 = Hwaro::Models::Page.new("posts/cli-series/part1.md")
+      part1.title = "Part 1"
+      part1.section = "posts/cli-series"
+      part1.url = "/posts/cli-series/part1/"
+      part1.language = "en"
+
+      site.sections << posts << cli_series
+      site.pages << hello << part1
+      site.build_lookup_index
+
+      builder = Hwaro::Core::Build::Builder.new
+      vars = builder.test_build_global_vars(site)
+      sections_by_key = vars["__sections_by_key__"].raw.as(Hash)
+      posts_val = sections_by_key["posts"].raw.as(Hash)
+
+      subsections = posts_val["subsections"].raw.as(Array)
+      subsections.size.should eq(1)
+      first_sub = subsections.first.raw.as(Hash)
+      first_sub["name"].raw.should eq("posts/cli-series")
+      first_sub["pages_count"].raw.should eq(1)
     end
   end
 end

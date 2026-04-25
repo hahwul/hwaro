@@ -800,21 +800,33 @@ module Hwaro::Core::Build::Phases::Render
     all_sections_array = [] of Crinja::Value
     sections_by_key = {} of String => Crinja::Value
 
+    # `Section#pages` is the model property and is *not* populated by the
+    # build pipeline — it stays `[]`. The live page list lives in
+    # `site.pages_for_section(name, language)`. Compute the page array
+    # once per section so `get_section(...).pages` and `.pages_count`
+    # match what `section.html` would render. Also stash the live result
+    # so the second pass can copy `pages_count` into each parent's
+    # subsection entry.
+    section_data_by_path = {} of String => {pages: Array(Crinja::Value), hash: Hash(String, Crinja::Value)}
+
     site.sections.each do |s|
-      section_pages = s.pages.map do |sp|
-        # Reuse cached page values (contains title/url/date and more)
+      live_pages = site.pages_for_section(s.section, s.language)
+      section_pages = live_pages.map do |sp|
         cached_page_crinja_value(sp, default_lang)
       end
-      section_val = Crinja::Value.new({
+      hash = {
         "path"        => Crinja::Value.new(s.path),
         "name"        => Crinja::Value.new(s.section),
         "title"       => Crinja::Value.new(s.title),
         "description" => Crinja::Value.new(s.description || ""),
         "url"         => Crinja::Value.new(s.url),
         "pages"       => Crinja::Value.new(section_pages),
-        "pages_count" => Crinja::Value.new(s.pages.size),
+        "pages_count" => Crinja::Value.new(section_pages.size),
         "assets"      => Crinja::Value.new(s.assets.map { |a| Crinja::Value.new(a) }),
-      })
+        "subsections" => Crinja::Value.new([] of Crinja::Value),
+      } of String => Crinja::Value
+      section_val = Crinja::Value.new(hash)
+      section_data_by_path[s.path] = {pages: section_pages, hash: hash}
       all_sections_array << section_val
 
       # Build O(1) lookup map for get_section() — match by path, name, and URL
@@ -822,6 +834,23 @@ module Hwaro::Core::Build::Phases::Render
       sections_by_key[s.section] ||= section_val unless s.section.empty?
       sections_by_key[s.url] ||= section_val
     end
+
+    # Second pass: link each section's `subsections` to its children so
+    # `get_section("posts").subsections` returns the same data shape as
+    # the parent. Iterates `site.sections` (not `site.pages`) because
+    # only Section objects carry the `subsections` chain.
+    site.sections.each do |s|
+      next if s.subsections.empty?
+      data = section_data_by_path[s.path]?
+      next unless data
+      subs_array = data[:hash]["subsections"].raw.as(Array)
+      s.subsections.each do |child|
+        if child_data = section_data_by_path[child.path]?
+          subs_array << Crinja::Value.new(child_data[:hash])
+        end
+      end
+    end
+
     vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
     vars["__sections_by_key__"] = Crinja::Value.new(sections_by_key)
 
