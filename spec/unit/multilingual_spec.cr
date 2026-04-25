@@ -24,6 +24,27 @@ describe Hwaro::Content::Multilingual do
     ko.translations.map(&.url).should eq(["/about/", "/ko/about/"])
   end
 
+  # Regression for https://github.com/hahwul/hwaro/issues/486
+  # `link_translations!` used to populate `page.translations` with a
+  # single self-entry for pages that have no actual cross-language
+  # variants. The canonical guard from docs/templates/data-model.md —
+  # `{% if page.translations %}<nav class="lang-switcher">…</nav>{% endif %}` —
+  # therefore always rendered an empty (or current-only) switcher on
+  # single-language pages.
+  it "leaves page.translations empty when no cross-language variant exists" do
+    config = Hwaro::Models::Config.new
+    config.default_language = "en"
+    config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+
+    only_en = Hwaro::Models::Page.new("solo.md")
+    only_en.title = "Solo"
+    only_en.url = "/solo/"
+
+    Hwaro::Content::Multilingual.link_translations!([only_en], config)
+
+    only_en.translations.should be_empty
+  end
+
   it "builds /<lang>/ prefixed URLs for nested index.<lang>.md files" do
     temp_dir = File.tempname("hwaro_multilingual")
     Dir.mkdir(temp_dir)
