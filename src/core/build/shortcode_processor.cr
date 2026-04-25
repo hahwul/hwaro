@@ -216,6 +216,22 @@ module Hwaro
 
           args = parse_shortcode_args_jinja(args_str)
           extra_args.try &.each { |k, v| args[k] = v }
+
+          # Built-in shortcodes read named slots (`{{ id }}`, `{{ src }}`, ...),
+          # so the documented positional form (`{{ youtube("ID") }}`) only
+          # reaches them after we alias each `_N` to the corresponding named
+          # parameter declared in `BuiltinShortcodes::POSITIONAL_PARAMS`.
+          # Named arguments always win — we only fill slots the caller did
+          # not already provide.
+          if positional = BuiltinShortcodes.positional_params(template_key)
+            positional.each_with_index do |param_name, idx|
+              next if args.has_key?(param_name)
+              if value = args["_#{idx}"]?
+                args[param_name] = value
+              end
+            end
+          end
+
           html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name)
 
           if results = shortcode_results
