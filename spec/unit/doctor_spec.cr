@@ -571,6 +571,80 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      it "warns when [og] default_image path does not exist under static/" do
+        # Regression for https://github.com/hahwul/hwaro/issues/489
+        # The path-shaped fields in `config.toml` (`[og] default_image`,
+        # `[og.auto_image] logo`, `[pwa] icons`, `[pwa] offline_page`)
+        # used to slip past doctor unchecked. A typoed image path would
+        # only surface when the build emitted a 404 in production.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[og]\ndefault_image = "/images/og-default.png"\n))
+          # No `static/images/og-default.png` exists.
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? do |i|
+              i.id == "config-path-missing" &&
+                i.message.includes?("default_image") &&
+                i.message.includes?("/images/og-default.png")
+            end.should be_true
+          end
+        end
+      end
+
+      it "does not warn when [og] default_image points to a real file" do
+        Dir.mktmpdir do |dir|
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(File.join(static_dir, "images"))
+          File.write(File.join(static_dir, "images", "og.png"), "fake png")
+
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[og]\ndefault_image = "/images/og.png"\n))
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: static_dir,
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" }.should be_false
+          end
+        end
+      end
+
+      it "warns for missing [pwa] icons paths" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, <<-TOML)
+            title = "T"
+            base_url = "http://x"
+            [pwa]
+            enabled = true
+            icons = ["static/icon-192.png", "static/icon-512.png"]
+            TOML
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            missing = issues.select { |i| i.id == "config-path-missing" && i.message.includes?("[pwa] icons") }
+            missing.size.should eq(2)
+          end
+        end
+      end
+
       it "skips silently when the content directory doesn't exist" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
