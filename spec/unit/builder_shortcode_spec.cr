@@ -341,8 +341,7 @@ describe Hwaro::Core::Build::Builder do
       # gist signature: user, id, [file]
       result = builder.test_process_shortcodes_jinja(
         %({{ gist("octocat", "abc123") }}),
-        {} of String => String, context, crinja_env_override: env,
-      )
+        {} of String => String, context, crinja_env_override: env)
       result.should contain("gist.github.com/octocat/abc123.js")
     end
 
@@ -354,8 +353,7 @@ describe Hwaro::Core::Build::Builder do
       # Named takes precedence; no positional should leak in.
       result = builder.test_process_shortcodes_jinja(
         %({{ youtube(id="named-id") }}),
-        {} of String => String, context, crinja_env_override: env,
-      )
+        {} of String => String, context, crinja_env_override: env)
       result.should contain("youtube.com/embed/named-id")
     end
   end
