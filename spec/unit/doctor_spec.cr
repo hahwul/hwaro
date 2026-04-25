@@ -624,12 +624,12 @@ describe Hwaro::Services::Doctor do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, <<-TOML)
-          title = "T"
-          base_url = "http://x"
-          [pwa]
-          enabled = true
-          icons = ["static/icon-192.png", "static/icon-512.png"]
-          TOML
+            title = "T"
+            base_url = "http://x"
+            [pwa]
+            enabled = true
+            icons = ["static/icon-192.png", "static/icon-512.png"]
+            TOML
 
           doctor = Hwaro::Services::Doctor.new(
             content_dir: File.join(dir, "content"),
