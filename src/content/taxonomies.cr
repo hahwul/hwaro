@@ -222,18 +222,7 @@ module Hwaro
       end
 
       private def self.extract_terms_for(page : Models::Page, taxonomy : Models::TaxonomyConfig) : Array(String)
-        name = taxonomy.name
-        if page.taxonomies.has_key?(name)
-          return page.taxonomies[name]
-        end
-
-        if page.front_matter_keys.includes?(name)
-          return [] of String
-        end
-
-        return page.tags if name == "tags"
-
-        [] of String
+        page.taxonomy_values(taxonomy.name)
       end
 
       private def self.apply_template(
