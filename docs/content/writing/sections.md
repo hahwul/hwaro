@@ -39,8 +39,8 @@ Welcome to my blog.
 | description | string | — | Section description |
 | template | string | "section" | Template to use |
 | page_template | string | — | Default template for pages |
-| sort_by | string | "date" | Sort by: date, weight, title |
-| reverse | bool | false | Reverse sort order |
+| sort_by | string | "date" | Sort by: date, weight, title (see [Sort direction](#sort-direction)) |
+| reverse | bool | false | Flip the natural sort order (see [Sort direction](#sort-direction)) |
 | paginate | int | — | Pages per page |
 | paginate_path | string | "page" | Pagination URL pattern |
 | transparent | bool | false | Pass pages to parent |
@@ -48,6 +48,27 @@ Welcome to my blog.
 | redirect_to | string | — | Redirect URL |
 | draft | bool | false | Exclude from production |
 | weight | int | 0 | Section sort order |
+
+## Sort direction
+
+Each `sort_by` value has a different natural direction, chosen to match what authors usually want:
+
+| `sort_by` | Default order | With `reverse = true` |
+|-----------|---------------|------------------------|
+| `date`    | Newest first (descending) | Oldest first |
+| `weight`  | Lowest weight first (ascending) | Highest weight first |
+| `title`   | A → Z (ascending) | Z → A |
+
+`reverse` flips whichever direction is natural for the chosen `sort_by`. For example, a blog index sorted by `date` is newest-first by default; setting `reverse = true` switches it to oldest-first.
+
+```toml
++++
+title = "Blog"
+sort_by = "date"
+# reverse = false (default) → newest first
+# reverse = true            → oldest first
++++
+```
 
 ## Examples
 
