@@ -110,6 +110,7 @@ module Hwaro
         property pages_read : Int32
         property pages_rendered : Int32
         property pages_skipped : Int32
+        property pages_failed : Int32
         property files_written : Int32
         property cache_hits : Int32
         property raw_files_processed : Int32
@@ -120,6 +121,7 @@ module Hwaro
           @pages_read = 0
           @pages_rendered = 0
           @pages_skipped = 0
+          @pages_failed = 0
           @files_written = 0
           @cache_hits = 0
           @raw_files_processed = 0

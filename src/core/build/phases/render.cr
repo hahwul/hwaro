@@ -222,6 +222,20 @@ module Hwaro::Core::Build::Phases::Render
       raise err
     end
 
+    # Generic exceptions (Crystal-level bugs, non-Crinja crashes) used to
+    # slip through here — workers logged them to `failures`, but with no
+    # classified error to raise the build returned its success count and
+    # the CLI happily printed `Build complete! Generated 2 pages` even
+    # when 9 pages crashed. Promote the first such failure to a
+    # `HWARO_E_TEMPLATE` so the build fails loud (#490).
+    unless failures.empty?
+      first = failures.first
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_TEMPLATE,
+        message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{first[:message]}",
+      )
+    end
+
     count
   end
 
