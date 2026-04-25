@@ -43,8 +43,9 @@ module Hwaro
       @content_dir : String
       @config_path : String
       @templates_dir : String
+      @static_dir : String
 
-      def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates")
+      def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates", @static_dir : String = "static")
       end
 
       def run : Array(Issue)
@@ -53,6 +54,7 @@ module Hwaro
         check_templates(issues)
         check_directory_structure(issues)
         check_content_frontmatter(issues)
+        check_referenced_paths(issues, config) if config
         ignore = config.try(&.doctor.ignore) || [] of String
         issues.reject { |i| ignore.includes?(i.id) }
       end
@@ -398,6 +400,50 @@ module Hwaro
               message: first_line.empty? ? "Invalid front matter" : first_line)
           end
         end
+      end
+
+      # Validate that path-shaped fields in `config.toml` actually point at
+      # files that exist on disk. The build pipeline doesn't fail when a
+      # referenced asset is missing — it just emits a 404 in production —
+      # so a typoed `[og] default_image` would otherwise only surface in
+      # the wild. Each missing path becomes a `[warn]` issue under the
+      # `config-path-missing` id (suppressible via `[doctor] ignore = [...]`).
+      # See https://github.com/hahwul/hwaro/issues/489.
+      private def check_referenced_paths(issues : Array(Issue), config : Models::Config)
+        emit = ->(label : String, value : String) do
+          return if value.empty?
+          return if path_resolves?(value)
+          issues << Issue.new(
+            id: "config-path-missing",
+            level: :warning,
+            category: "config",
+            file: @config_path,
+            message: "#{label}: #{value} — file not found",
+          )
+        end
+
+        config.og.default_image.try { |v| emit.call("[og] default_image", v) }
+        config.og.auto_image.logo.try { |v| emit.call("[og.auto_image] logo", v) }
+        config.og.auto_image.background_image.try { |v| emit.call("[og.auto_image] background_image", v) }
+        config.pwa.offline_page.try { |v| emit.call("[pwa] offline_page", v) }
+        config.pwa.icons.each_with_index do |icon, idx|
+          emit.call("[pwa] icons[#{idx}]", icon)
+        end
+      end
+
+      # Decide whether a config-shaped path string points at an existing
+      # file. Authors write these in three flavors:
+      # - URL-style (`/images/og.png`) → resolved against `static/`
+      # - `static/foo.png` → already rooted under static/ (use as-is)
+      # - `content/foo.md` or any other repo-relative path → use as-is
+      private def path_resolves?(path : String) : Bool
+        candidates = [path]
+        if path.starts_with?("/")
+          candidates << File.join(@static_dir, path.lchop("/"))
+        elsif !path.starts_with?("#{@static_dir}#{File::SEPARATOR}") && !path.starts_with?("#{@content_dir}#{File::SEPARATOR}")
+          candidates << File.join(@static_dir, path)
+        end
+        candidates.any? { |c| File.exists?(c) }
       end
     end
   end
