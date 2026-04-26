@@ -781,8 +781,9 @@ module Hwaro
 
               function loadSearchData(cb) {
                 if (searchData) return cb(searchData);
-                var base = document.querySelector('link[rel="stylesheet"]').href;
-                var searchUrl = base.substring(0, base.indexOf('/css/')) + '/search.json';
+                var link = document.querySelector('link[rel="stylesheet"][href*="/css/"]');
+                var path = link ? new URL(link.href, document.baseURI).pathname : '/css/';
+                var searchUrl = path.substring(0, path.indexOf('/css/')) + '/search.json';
                 fetch(searchUrl)
                   .then(function (r) { return r.json(); })
                   .then(function (data) { searchData = data; cb(data); })
