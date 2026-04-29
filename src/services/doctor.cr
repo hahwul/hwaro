@@ -527,23 +527,44 @@ module Hwaro
         loc ? "Template syntax error at line #{loc.line}, column #{loc.column}: #{msg}" : "Template syntax error: #{msg}"
       end
 
-      # Check directory structure — sections should have _index.md
+      # Recursively flag content directories that look like sections
+      # but lack an `_index.md`. A directory is treated as a section
+      # candidate when it contains at least one markdown file (anywhere
+      # underneath it); directories that are pure attachment folders —
+      # `images/`, `assets/`, etc. — are skipped automatically. Hidden
+      # (`.`) and underscore-prefixed (`_`) directories are also skipped
+      # so private/draft trees stay quiet. Issued at `:info` level so
+      # CI doesn't gate on it.
       private def check_directory_structure(issues : Array(Issue))
         return unless Dir.exists?(@content_dir)
+        walk_section_dirs(@content_dir, issues)
+      end
 
-        Dir.each_child(@content_dir) do |entry|
-          child = File.join(@content_dir, entry)
+      private def walk_section_dirs(root : String, issues : Array(Issue))
+        Dir.each_child(root) do |entry|
+          next if entry.starts_with?(".") || entry.starts_with?("_")
+          child = File.join(root, entry)
           next unless File.directory?(child)
-          # Skip hidden directories
-          next if entry.starts_with?(".")
+          next unless dir_contains_markdown?(child)
 
           has_index = File.exists?(File.join(child, "_index.md")) ||
                       File.exists?(File.join(child, "_index.markdown"))
           unless has_index
+            relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
             issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
-              message: "Section directory missing _index.md: #{entry}/")
+              message: "Section directory missing _index.md: #{relative}/")
           end
+
+          walk_section_dirs(child, issues)
         end
+      end
+
+      # Quick "is there content under here?" check used to filter out
+      # plain attachment directories. Returns on the first hit so we
+      # don't enumerate the entire subtree.
+      private def dir_contains_markdown?(dir : String) : Bool
+        Dir.glob(File.join(dir, "**", "*.{md,markdown}")) { |_| return true }
+        false
       end
 
       # Parse every markdown file's front matter so doctor flags what

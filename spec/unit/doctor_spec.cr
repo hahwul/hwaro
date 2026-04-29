@@ -580,6 +580,40 @@ describe Hwaro::Services::Doctor do
       end
     end
 
+    describe "directory structure (recursive)" do
+      it "flags nested section directories that are missing _index.md" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          # blog/ has _index, blog/2024/ does not but does contain content
+          FileUtils.mkdir_p(File.join(content_dir, "blog", "2024"))
+          File.write(File.join(content_dir, "blog", "_index.md"), "+++\ntitle = \"Blog\"\n+++\n")
+          File.write(File.join(content_dir, "blog", "2024", "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ndescription = \"\"\n+++\n")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          issues.any? { |i| i.id == "structure-missing-index" && i.message.includes?("blog/2024/") }.should be_true
+        end
+      end
+
+      it "does not flag asset-only directories (no markdown underneath)" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "blog", "images"))
+          File.write(File.join(content_dir, "blog", "_index.md"), "+++\ntitle = \"Blog\"\n+++\n")
+          File.write(File.join(content_dir, "blog", "images", "hero.png"), "fake png")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          # no warning for blog/images even though it has no _index.md
+          issues.any? { |i| i.id == "structure-missing-index" && i.message.includes?("images") }.should be_false
+        end
+      end
+    end
+
     describe "directory structure" do
       it "reports info when section dir missing _index.md" do
         Dir.mktmpdir do |dir|

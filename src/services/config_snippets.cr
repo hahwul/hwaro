@@ -9,38 +9,50 @@
 module Hwaro
   module Services
     module ConfigSnippets
-      # Known config sections that can be auto-added by doctor --fix.
-      # Each key maps to a human-readable description.
-      # doctor_snippet_for(key) must return non-nil for every key listed here.
-      KNOWN_SECTIONS = {
-        "plugins"          => "Content processors and extensions",
-        "highlight"        => "Syntax highlighting (Highlight.js)",
-        "og"               => "OpenGraph & Twitter Cards",
-        "search"           => "Client-side search index",
-        "pagination"       => "Pagination settings",
-        "series"           => "Series grouping",
-        "related"          => "Related posts",
-        "markdown"         => "Markdown parser options",
-        "sitemap"          => "Sitemap generation",
-        "robots"           => "Robots.txt generation",
-        "llms"             => "LLM crawler instructions (llms.txt)",
-        "feeds"            => "RSS/Atom feed generation",
-        "build"            => "Build hooks (pre/post commands)",
-        "permalinks"       => "URL path overrides",
-        "auto_includes"    => "Automatic CSS/JS loading",
-        "assets"           => "Asset pipeline (bundling, minification)",
-        "deployment"       => "Deployment targets",
-        "image_processing" => "Image resizing and LQIP placeholder generation",
-        "pwa"              => "Progressive Web App (manifest.json, service worker)",
-        "amp"              => "AMP page generation",
-      }
+      # Single source of truth for "what can `doctor --fix` add and what
+      # is each section called?". A SECTION_REGISTRY entry pairs the
+      # human description with a proc that produces the commented TOML
+      # snippet. Adding a new auto-fixable section requires touching
+      # exactly one entry (instead of updating both KNOWN_SECTIONS and
+      # the dispatch case in `doctor_snippet_for` and risking drift).
+      alias SectionEntry = NamedTuple(description: String, snippet: -> String)
 
-      # Sub-sections that doctor checks when the parent section exists
-      KNOWN_SUB_SECTIONS = {
-        {"content", "files"}         => "Non-Markdown file publishing from content/",
-        {"og", "auto_image"}         => "Auto-generated OG images",
-        {"image_processing", "lqip"} => "Low-Quality Image Placeholder (LQIP) generation",
-      }
+      SECTION_REGISTRY = {
+        "plugins"          => {description: "Content processors and extensions", snippet: ->{ plugins(commented: true) }},
+        "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: ->{ highlight(commented: true) }},
+        "og"               => {description: "OpenGraph & Twitter Cards", snippet: ->{ og(commented: true) }},
+        "search"           => {description: "Client-side search index", snippet: ->{ search(commented: true) }},
+        "pagination"       => {description: "Pagination settings", snippet: ->{ pagination(commented: true) }},
+        "series"           => {description: "Series grouping", snippet: ->{ series(commented: true) }},
+        "related"          => {description: "Related posts", snippet: ->{ related(commented: true) }},
+        "markdown"         => {description: "Markdown parser options", snippet: ->{ markdown(commented: true) }},
+        "sitemap"          => {description: "Sitemap generation", snippet: ->{ sitemap(commented: true) }},
+        "robots"           => {description: "Robots.txt generation", snippet: ->{ robots(commented: true) }},
+        "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: ->{ llms(commented: true) }},
+        "feeds"            => {description: "RSS/Atom feed generation", snippet: ->{ feeds(commented: true) }},
+        "build"            => {description: "Build hooks (pre/post commands)", snippet: ->{ build(commented: true) }},
+        "permalinks"       => {description: "URL path overrides", snippet: ->{ permalinks(commented: true) }},
+        "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: ->{ auto_includes(commented: true) }},
+        "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: ->{ assets(commented: true) }},
+        "deployment"       => {description: "Deployment targets", snippet: ->{ deployment(commented: true) }},
+        "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: ->{ image_processing(commented: true) }},
+        "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: ->{ pwa(commented: true) }},
+        "amp"              => {description: "AMP page generation", snippet: ->{ amp(commented: true) }},
+      } of String => SectionEntry
+
+      # Same idea for sub-sections (parent table must already exist
+      # before doctor offers to add the child).
+      SUB_SECTION_REGISTRY = {
+        {"content", "files"}         => {description: "Non-Markdown file publishing from content/", snippet: ->{ content_files }},
+        {"og", "auto_image"}         => {description: "Auto-generated OG images", snippet: ->{ og_auto_image }},
+        {"image_processing", "lqip"} => {description: "Low-Quality Image Placeholder (LQIP) generation", snippet: ->{ image_processing_lqip }},
+      } of Tuple(String, String) => SectionEntry
+
+      # Backward-compatible aliases. The registries above are the only
+      # place to edit; these dictionaries are derived for callers (and
+      # specs) that walk descriptions only.
+      KNOWN_SECTIONS     = SECTION_REGISTRY.transform_values(&.[:description])
+      KNOWN_SUB_SECTIONS = SUB_SECTION_REGISTRY.transform_values(&.[:description])
 
       def self.content_files : String
         <<-TOML
@@ -859,34 +871,24 @@ module Hwaro
         end
       end
 
-      # Convenience method for doctor --fix (all commented)
+      # Resolve a snippet for the given section key, looking up the
+      # SECTION_REGISTRY (top-level keys like "pwa") or SUB_SECTION_REGISTRY
+      # (dotted keys like "og.auto_image"). The top-level `[doctor]` key
+      # is special-cased because it documents diagnostics behaviour and
+      # isn't surfaced via KNOWN_SECTIONS (no need to advertise it as a
+      # missing-section advisory).
       def self.doctor_snippet_for(key : String) : String?
-        case key
-        when "plugins"               then plugins(commented: true)
-        when "highlight"             then highlight(commented: true)
-        when "og"                    then og(commented: true)
-        when "search"                then search(commented: true)
-        when "pagination"            then pagination(commented: true)
-        when "series"                then series(commented: true)
-        when "related"               then related(commented: true)
-        when "markdown"              then markdown(commented: true)
-        when "sitemap"               then sitemap(commented: true)
-        when "robots"                then robots(commented: true)
-        when "llms"                  then llms(commented: true)
-        when "feeds"                 then feeds(commented: true)
-        when "build"                 then build(commented: true)
-        when "permalinks"            then permalinks(commented: true)
-        when "auto_includes"         then auto_includes(commented: true)
-        when "assets"                then assets(commented: true)
-        when "deployment"            then deployment(commented: true)
-        when "image_processing"      then image_processing(commented: true)
-        when "pwa"                   then pwa(commented: true)
-        when "amp"                   then amp(commented: true)
-        when "doctor"                then doctor(commented: true)
-        when "content.files"         then content_files
-        when "og.auto_image"         then og_auto_image
-        when "image_processing.lqip" then image_processing_lqip
+        if entry = SECTION_REGISTRY[key]?
+          return entry[:snippet].call
         end
+        if key.includes?(".")
+          parent, _, child = key.partition('.')
+          if entry = SUB_SECTION_REGISTRY[{parent, child}]?
+            return entry[:snippet].call
+          end
+        end
+        return doctor(commented: true) if key == "doctor"
+        nil
       end
     end
   end
