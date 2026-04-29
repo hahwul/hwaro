@@ -663,6 +663,117 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      it "strips query string and fragment before resolving referenced paths" do
+        # `/images/og.png?v=2` should resolve to /images/og.png on disk.
+        # Without stripping, doctor would emit a spurious config-path-missing.
+        Dir.mktmpdir do |dir|
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(File.join(static_dir, "images"))
+          File.write(File.join(static_dir, "images", "og.png"), "fake png")
+
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[og]\ndefault_image = "/images/og.png?v=2"\n))
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: static_dir,
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" }.should be_false
+          end
+        end
+      end
+
+      it "warns for missing [auto_includes] dirs (when enabled)" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, <<-TOML)
+            title = "T"
+            base_url = "http://x"
+            [auto_includes]
+            enabled = true
+            dirs = ["assets/css", "assets/js"]
+            TOML
+
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(File.join(static_dir, "assets", "css")) # only css exists
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: static_dir,
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            missing = issues.select { |i| i.id == "config-dir-missing" && i.message.includes?("auto_includes") }
+            missing.size.should eq(1)
+            missing.first.message.should contain("assets/js")
+          end
+        end
+      end
+
+      it "does not check [auto_includes] when disabled" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, <<-TOML)
+            title = "T"
+            base_url = "http://x"
+            [auto_includes]
+            enabled = false
+            dirs = ["does/not/exist"]
+            TOML
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-dir-missing" }.should be_false
+          end
+        end
+      end
+
+      it "warns for missing [[assets.bundles]] files relative to assets.source_dir" do
+        Dir.mktmpdir do |dir|
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(File.join(static_dir, "css"))
+          File.write(File.join(static_dir, "css", "reset.css"), "")
+          # css/style.css missing on purpose
+
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, <<-TOML)
+            title = "T"
+            base_url = "http://x"
+            [assets]
+            enabled = true
+            source_dir = "static"
+            [[assets.bundles]]
+            name = "main.css"
+            files = ["css/reset.css", "css/style.css"]
+            TOML
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: static_dir,
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            missing = issues.select { |i| i.id == "config-path-missing" && i.message.includes?("assets.bundles") }
+            missing.size.should eq(1)
+            missing.first.message.should contain("css/style.css")
+          end
+        end
+      end
+
       it "skips silently when the content directory doesn't exist" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")

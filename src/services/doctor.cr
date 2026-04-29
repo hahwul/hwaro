@@ -74,6 +74,8 @@ module Hwaro
             ["taxonomy-duplicate", "language-duplicate"]),
           CheckSpec.new("search (format)",
             ["search-format-invalid"]),
+          CheckSpec.new("referenced files & dirs",
+            ["config-path-missing", "config-dir-missing"]),
         ],
       ),
       CheckGroup.new(
@@ -471,16 +473,19 @@ module Hwaro
       end
 
       # Validate that path-shaped fields in `config.toml` actually point at
-      # files that exist on disk. The build pipeline doesn't fail when a
-      # referenced asset is missing — it just emits a 404 in production —
-      # so a typoed `[og] default_image` would otherwise only surface in
-      # the wild. Each missing path becomes a `[warn]` issue under the
-      # `config-path-missing` id (suppressible via `[doctor] ignore = [...]`).
-      # See https://github.com/hahwul/hwaro/issues/489.
+      # files (or directories) that exist on disk. The build pipeline
+      # doesn't fail when a referenced asset is missing — it just emits a
+      # 404 in production — so a typoed `[og] default_image` would
+      # otherwise only surface in the wild. Each missing path becomes a
+      # `[warn]` issue under `config-path-missing` (file) or
+      # `config-dir-missing` (directory), both suppressible via
+      # `[doctor] ignore = [...]`. See
+      # https://github.com/hahwul/hwaro/issues/489.
       private def check_referenced_paths(issues : Array(Issue), config : Models::Config)
-        emit = ->(label : String, value : String) do
-          return if value.empty?
-          return if path_resolves?(value)
+        emit_file = ->(label : String, value : String) do
+          stripped = strip_query_hash(value)
+          return if stripped.empty?
+          return if path_resolves?(stripped)
           issues << Issue.new(
             id: "config-path-missing",
             level: :warning,
@@ -490,13 +495,67 @@ module Hwaro
           )
         end
 
-        config.og.default_image.try { |v| emit.call("[og] default_image", v) }
-        config.og.auto_image.logo.try { |v| emit.call("[og.auto_image] logo", v) }
-        config.og.auto_image.background_image.try { |v| emit.call("[og.auto_image] background_image", v) }
-        config.pwa.offline_page.try { |v| emit.call("[pwa] offline_page", v) }
-        config.pwa.icons.each_with_index do |icon, idx|
-          emit.call("[pwa] icons[#{idx}]", icon)
+        emit_dir = ->(label : String, value : String) do
+          stripped = strip_query_hash(value)
+          return if stripped.empty?
+          return if dir_resolves?(stripped)
+          issues << Issue.new(
+            id: "config-dir-missing",
+            level: :warning,
+            category: "config",
+            file: @config_path,
+            message: "#{label}: #{value} — directory not found",
+          )
         end
+
+        config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }
+        config.og.auto_image.logo.try { |v| emit_file.call("[og.auto_image] logo", v) }
+        config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
+        config.pwa.offline_page.try { |v| emit_file.call("[pwa] offline_page", v) }
+        config.pwa.icons.each_with_index do |icon, idx|
+          emit_file.call("[pwa] icons[#{idx}]", icon)
+        end
+
+        # auto_includes.dirs are directory paths the build globs at runtime;
+        # a missing entry produces no link tags and silently ships an
+        # incomplete page.
+        if config.auto_includes.enabled
+          config.auto_includes.dirs.each_with_index do |dir, idx|
+            emit_dir.call("[auto_includes] dirs[#{idx}]", dir)
+          end
+        end
+
+        # assets pipeline only matters when enabled; bundle inputs live
+        # under assets.source_dir.
+        if config.assets.enabled
+          source_dir = config.assets.source_dir
+          emit_dir.call("[assets] source_dir", source_dir) unless source_dir.empty?
+
+          config.assets.bundles.each_with_index do |bundle, b_idx|
+            label_prefix = bundle.name.empty? ? "[[assets.bundles]][#{b_idx}]" : "[[assets.bundles]] #{bundle.name}"
+            bundle.files.each_with_index do |file, f_idx|
+              # Bundle file paths are resolved against assets.source_dir
+              # at build time, so check there directly rather than going
+              # through path_resolves?'s static/ heuristic.
+              candidate = source_dir.empty? ? file : File.join(source_dir, file)
+              next if File.exists?(candidate)
+              issues << Issue.new(
+                id: "config-path-missing",
+                level: :warning,
+                category: "config",
+                file: @config_path,
+                message: "#{label_prefix} files[#{f_idx}]: #{file} — file not found under #{source_dir.empty? ? "(repo root)" : source_dir}/",
+              )
+            end
+          end
+        end
+      end
+
+      # Strip query string and fragment off a config-style path so values
+      # like `/images/og.png?v=2` or `/og.png#anchor` resolve against the
+      # underlying file rather than failing.
+      private def strip_query_hash(path : String) : String
+        path.split('?', 2).first.split('#', 2).first
       end
 
       # Decide whether a config-shaped path string points at an existing
@@ -505,13 +564,22 @@ module Hwaro
       # - `static/foo.png` → already rooted under static/ (use as-is)
       # - `content/foo.md` or any other repo-relative path → use as-is
       private def path_resolves?(path : String) : Bool
-        candidates = [path]
+        candidates(path).any? { |c| File.exists?(c) }
+      end
+
+      # Same lookup strategy as `path_resolves?`, but for directories.
+      private def dir_resolves?(path : String) : Bool
+        candidates(path).any? { |c| Dir.exists?(c) }
+      end
+
+      private def candidates(path : String) : Array(String)
+        result = [path]
         if path.starts_with?("/")
-          candidates << File.join(@static_dir, path.lchop("/"))
+          result << File.join(@static_dir, path.lchop("/"))
         elsif !path.starts_with?("#{@static_dir}#{File::SEPARATOR}") && !path.starts_with?("#{@content_dir}#{File::SEPARATOR}")
-          candidates << File.join(@static_dir, path)
+          result << File.join(@static_dir, path)
         end
-        candidates.any? { |c| File.exists?(c) }
+        result
       end
     end
   end
