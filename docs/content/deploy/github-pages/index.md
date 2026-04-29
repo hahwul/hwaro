@@ -252,4 +252,4 @@ my-site/
 
 - [Deploy Configuration](/deploy/config/) — Target setup and matchers
 - [CLI Reference](/start/cli/) — All deploy command options
-- Other platforms: [GitLab CI](/deploy/gitlab-ci/) | [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/)
+- Other platforms: [GitLab CI](/deploy/gitlab-ci/) | [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [Codeberg Pages](/deploy/codeberg-pages/)

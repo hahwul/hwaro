@@ -322,7 +322,7 @@ describe Hwaro::CLI::Commands::Tool::PlatformCommand do
 
     it "has all supported platforms as positional choices" do
       meta = Hwaro::CLI::Commands::Tool::PlatformCommand.metadata
-      meta.positional_choices.should eq(["netlify", "vercel", "cloudflare", "github-pages", "gitlab-ci"])
+      meta.positional_choices.should eq(["netlify", "vercel", "cloudflare", "github-pages", "gitlab-ci", "codeberg-pages"])
     end
 
     it "output flag takes a value" do

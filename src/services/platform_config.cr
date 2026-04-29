@@ -7,7 +7,7 @@ require "../utils/logger"
 module Hwaro
   module Services
     class PlatformConfig
-      SUPPORTED_PLATFORMS = ["netlify", "vercel", "cloudflare", "github-pages", "gitlab-ci"]
+      SUPPORTED_PLATFORMS = ["netlify", "vercel", "cloudflare", "github-pages", "gitlab-ci", "codeberg-pages"]
 
       @config : Models::Config
 
@@ -26,6 +26,8 @@ module Hwaro
           generate_github_pages
         when "gitlab-ci"
           generate_gitlab_ci
+        when "codeberg-pages"
+          generate_codeberg_pages
         else
           raise "Unsupported platform: #{platform}. Supported: #{SUPPORTED_PLATFORMS.join(", ")}"
         end
@@ -33,12 +35,13 @@ module Hwaro
 
       def output_filename(platform : String) : String
         case platform
-        when "netlify"      then "netlify.toml"
-        when "vercel"       then "vercel.json"
-        when "cloudflare"   then "wrangler.toml"
-        when "github-pages" then ".github/workflows/deploy.yml"
-        when "gitlab-ci"    then ".gitlab-ci.yml"
-        else                     raise "Unsupported platform: #{platform}"
+        when "netlify"        then "netlify.toml"
+        when "vercel"         then "vercel.json"
+        when "cloudflare"     then "wrangler.toml"
+        when "github-pages"   then ".github/workflows/deploy.yml"
+        when "gitlab-ci"      then ".gitlab-ci.yml"
+        when "codeberg-pages" then ".forgejo/workflows/deploy.yml"
+        else                       raise "Unsupported platform: #{platform}"
         end
       end
 
@@ -207,6 +210,65 @@ module Hwaro
         lines << "      - public"
         lines << "  only:"
         lines << "    - main"
+        lines << ""
+
+        lines.join("\n")
+      end
+
+      # Forgejo Actions workflow that builds the site and force-pushes the
+      # generated `public/` directory to the configured pages branch.
+      #
+      # Codeberg Pages publishes:
+      #   - Project site: a branch named `pages` in any repo →
+      #     https://USER.codeberg.page/REPO/  (default of this workflow).
+      #   - User/org site: the *default* branch of a repo named `pages` →
+      #     https://USER.codeberg.page/. Override `PAGES_BRANCH` to e.g.
+      #     `main` to target a user site without forking the workflow.
+      #
+      # Each run starts with a fresh `git init`, so commit history on the
+      # pages branch is intentionally not preserved — the branch is treated
+      # as a publish-only artifact. Auth uses the token-form remote URL so
+      # no SSH keys need to be preconfigured on the runner; the token must
+      # be supplied via the `CODEBERG_TOKEN` repository secret.
+      private def generate_codeberg_pages : String
+        lines = [] of String
+        lines << "---"
+        lines << "name: Hwaro Deploy"
+        lines << ""
+        lines << "on:"
+        lines << "  push:"
+        lines << "    branches: [main]"
+        lines << "  workflow_dispatch:"
+        lines << ""
+        lines << "jobs:"
+        lines << "  deploy:"
+        lines << "    runs-on: docker"
+        lines << "    container:"
+        lines << "      image: ghcr.io/hahwul/hwaro:latest"
+        lines << "    env:"
+        lines << "      # Project site: \"pages\" (default). User/org site (repo named"
+        lines << "      # \"pages\"): override to your default branch, e.g. \"main\"."
+        lines << "      PAGES_BRANCH: pages"
+        lines << "    steps:"
+        lines << "      - name: Checkout"
+        lines << "        uses: actions/checkout@v4"
+        lines << ""
+        lines << "      - name: Build site"
+        lines << "        run: #{build_command}"
+        lines << ""
+        lines << "      - name: Deploy to Codeberg Pages"
+        lines << "        env:"
+        lines << "          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}"
+        lines << "        run: |"
+        lines << "          cd #{output_dir}"
+        lines << "          git init -b \"$PAGES_BRANCH\""
+        lines << "          git config user.name  \"${{ github.actor }}\""
+        lines << "          git config user.email \"${{ github.actor }}@noreply.codeberg.org\""
+        lines << "          git add -A"
+        lines << "          git commit -m \"Deploy: $(date -u +'%Y-%m-%dT%H:%M:%SZ')\""
+        lines << "          git push --force \\"
+        lines << "            \"https://${{ github.actor }}:$CODEBERG_TOKEN@codeberg.org/${{ github.repository }}.git\" \\"
+        lines << "            \"$PAGES_BRANCH\""
         lines << ""
 
         lines.join("\n")

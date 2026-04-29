@@ -386,6 +386,7 @@ hwaro tool platform vercel        # Generate Vercel config
 hwaro tool platform cloudflare    # Generate Cloudflare Pages config
 hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
 hwaro tool platform gitlab-ci     # Generate GitLab CI config
+hwaro tool platform codeberg-pages # Generate Codeberg Pages (Forgejo Actions) workflow
 hwaro tool doctor                 # Diagnose config/template/structure issues
 hwaro tool import hugo /path      # Import from Hugo
 hwaro tool import jekyll /path    # Import from Jekyll
