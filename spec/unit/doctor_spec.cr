@@ -483,6 +483,24 @@ describe Hwaro::Services::Doctor do
         issues = run_doctor(config)
         issues.any? { |i| i.id == "title-default" }.should be_false
       end
+
+      it "refuses to suppress :error-level issues even if listed" do
+        # template-required-missing is :error and would fail `hwaro build`;
+        # adding it to the ignore list must NOT make it disappear from doctor.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config("\n[doctor]\nignore = [\"template-required-missing\"]\n"))
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir) # exists but empty
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: templates_dir,
+          )
+          issues = doctor.run
+          issues.any? { |i| i.id == "template-required-missing" && i.level == :error }.should be_true
+        end
+      end
     end
 
     describe "directory structure" do
@@ -717,6 +735,30 @@ describe Hwaro::Services::Doctor do
       json = issue.to_json
       json.should_not contain(%("file":))
       json.should contain(%("level":"error"))
+    end
+
+    it "round-trips level through SymbolConverter.from_json" do
+      # Regression: previously returned a String from a Symbol-typed method.
+      # Validate every level the doctor service can emit.
+      [:error, :warning, :info].each do |level|
+        original = Hwaro::Services::Issue.new(
+          id: "rt-#{level}",
+          level: level,
+          category: "config",
+          file: nil,
+          message: "round-trip",
+        )
+        decoded = Hwaro::Services::Issue.from_json(original.to_json)
+        decoded.level.should eq(level)
+        decoded.id.should eq(original.id)
+      end
+    end
+
+    it "raises a parse error on unknown level strings" do
+      bogus = %({"id":"x","level":"fatal","category":"config","message":"m"})
+      expect_raises(JSON::ParseException, /Unknown issue level/) do
+        Hwaro::Services::Issue.from_json(bogus)
+      end
     end
   end
 end

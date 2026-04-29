@@ -37,7 +37,7 @@ module Hwaro
             CheckSpec.new("file present & parseable",
               ["config-not-found", "config-parse-error"]),
             CheckSpec.new("base_url, title",
-              ["base-url-missing", "base-url-scheme", "base-url-trailing-slash", "title-default"]),
+              ["base-url-missing", "base-url-trailing-slash", "title-default"]),
             CheckSpec.new("sitemap (changefreq, priority)",
               ["sitemap-changefreq-invalid", "sitemap-priority-range"]),
             CheckSpec.new("taxonomies (duplicates)",

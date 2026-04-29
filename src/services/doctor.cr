@@ -21,13 +21,24 @@ module Hwaro
       @[JSON::Field(converter: Hwaro::Services::Issue::SymbolConverter)]
       getter level : Symbol
 
+      # Issue is JSON-serialized for `hwaro doctor --json`. We don't currently
+      # consume that JSON back into Issue values, but the converter still needs
+      # a correct `from_json` so a future round-trip (or third-party tooling
+      # that reuses the schema) doesn't blow up. The previous implementation
+      # returned `String` from a `Symbol`-typed method.
       module SymbolConverter
         def self.to_json(value : Symbol, json : JSON::Builder)
           json.string(value.to_s)
         end
 
         def self.from_json(pull : JSON::PullParser) : Symbol
-          pull.read_string.to_s
+          case raw = pull.read_string
+          when "error"   then :error
+          when "warning" then :warning
+          when "info"    then :info
+          else
+            raise JSON::ParseException.new("Unknown issue level: #{raw.inspect}", *pull.location)
+          end
         end
       end
     end
@@ -56,7 +67,11 @@ module Hwaro
         check_content_frontmatter(issues)
         check_referenced_paths(issues, config) if config
         ignore = config.try(&.doctor.ignore) || [] of String
-        issues.reject { |i| ignore.includes?(i.id) }
+        # `[doctor].ignore` exists to silence advisory noise. We refuse to
+        # silence build-blocking errors here so a stray entry can't disable
+        # CI gating — the `:error` level is reserved for issues that will
+        # later fail `hwaro build` regardless.
+        issues.reject { |i| i.level != :error && ignore.includes?(i.id) }
       end
 
       # Returns the list of config section keys missing from the user's config.toml.
