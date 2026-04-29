@@ -20,8 +20,9 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
-            FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing config sections)"),
+            FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing sections, normalize safe values)"),
             FlagInfo.new(short: nil, long: "--minimal", description: "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)"),
+            FlagInfo.new(short: nil, long: "--dry-run", description: "With --fix, preview changes without writing config.toml"),
             JSON_FLAG,
             QUIET_FLAG,
             HELP_FLAG,
@@ -48,12 +49,14 @@ module Hwaro
             json_output = false
             fix_mode = false
             minimal_mode = false
+            dry_run_mode = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro doctor [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
-              parser.on("--fix", "Auto-fix issues (add missing config sections)") { fix_mode = true }
+              parser.on("--fix", "Auto-fix issues (add missing sections, normalize safe values)") { fix_mode = true }
               parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }
+              parser.on("--dry-run", "With --fix, preview changes without writing config.toml") { dry_run_mode = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
@@ -65,8 +68,12 @@ module Hwaro
               Logger.warn "--minimal has no effect without --fix"
             end
 
+            if dry_run_mode && !fix_mode
+              Logger.warn "--dry-run has no effect without --fix"
+            end
+
             if fix_mode
-              run_fix(doctor, minimal_mode)
+              run_fix(doctor, minimal_mode, dry_run_mode, json_output)
               return
             end
 
@@ -232,21 +239,47 @@ module Hwaro
             plain ? "[ok]" : "✓".colorize(:green).to_s
           end
 
-          private def run_fix(doctor : Services::Doctor, minimal : Bool = false)
-            added = doctor.fix_config(minimal: minimal)
+          private def run_fix(doctor : Services::Doctor, minimal : Bool, dry_run : Bool, json_output : Bool)
+            summary = doctor.fix_config(minimal: minimal, dry_run: dry_run)
+
+            if json_output
+              puts summary.to_json
+              return
+            end
+
             plain = plain_output?
 
-            if added.empty?
-              Logger.info "#{ok_glyph(plain)} Config is up to date — no missing sections."
-            else
-              Logger.success "Added #{added.size} missing config section(s) to config.toml:"
+            if summary.empty?
+              Logger.info "#{ok_glyph(plain)} Config is up to date — no fixable issues."
+              return
+            end
+
+            verb_added = dry_run ? "Would add" : "Added"
+            verb_updated = dry_run ? "Would update" : "Updated"
+
+            unless summary.value_fixes.empty?
+              Logger.success "#{verb_updated} #{summary.value_fixes.size} value(s) in config.toml:"
+              summary.value_fixes.each do |fix|
+                arrow = plain ? "->" : "→".colorize(:green).to_s
+                Logger.info "  #{fix.field}: #{fix.before} #{arrow} #{fix.after}"
+              end
+              Logger.info ""
+            end
+
+            unless summary.sections_added.empty?
+              Logger.success "#{verb_added} #{summary.sections_added.size} missing config section(s) to config.toml:"
               plus = plain ? "+" : "＋".colorize(:green).to_s
-              added.each do |key|
+              summary.sections_added.each do |key|
                 Logger.info "  #{plus} [#{key}]"
               end
               Logger.info ""
               Logger.info "All new sections are commented out by default."
               Logger.info "Edit config.toml to enable the features you need."
+            end
+
+            if dry_run
+              Logger.info ""
+              Logger.info "Dry run — no changes were written. Re-run without --dry-run to apply."
             end
           end
 

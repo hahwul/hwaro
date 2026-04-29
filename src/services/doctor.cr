@@ -176,15 +176,38 @@ module Hwaro
       # Sections that are advanced/niche — skipped when minimal: true
       OPTIONAL_SECTIONS = Set{"pwa", "amp", "assets", "deployment", "image_processing", "og.auto_image", "image_processing.lqip", "build", "permalinks", "auto_includes"}
 
-      # Append missing config sections to config.toml.
-      # When minimal is true, skip advanced optional sections (pwa, amp, assets, etc.)
-      # Returns the list of sections that were added.
+      # A surgical edit `--fix` applied to an existing config value.
+      # Distinct from "section appends" because it modifies the user's
+      # real configuration rather than adding commented documentation.
+      record ValueFix, field : String, before : String, after : String do
+        include JSON::Serializable
+      end
+
+      # Outcome of `fix_config`. `dry_run = true` populates the same
+      # fields without writing, so the CLI can show a preview.
+      record FixSummary,
+        sections_added : Array(String) = [] of String,
+        value_fixes : Array(ValueFix) = [] of ValueFix,
+        dry_run : Bool = false do
+        include JSON::Serializable
+
+        def empty? : Bool
+          sections_added.empty? && value_fixes.empty?
+        end
+      end
+
+      # Append missing config sections to config.toml AND apply safe
+      # surgical value edits (trailing slash on `base_url`, out-of-range
+      # `sitemap.priority`). When `dry_run` is true, the same plan is
+      # produced but nothing is written — the CLI shows a preview.
+      # When `minimal` is true, advanced optional sections (pwa, amp, …)
+      # are skipped.
       #
       # Raises `HwaroError` when the config cannot be read or parsed so
       # `--fix` refuses to append to a broken file (prior behaviour was
       # to silently say "Config is up to date"), and when the atomic
       # write fails (temp file + rename; see below).
-      def fix_config(minimal : Bool = false) : Array(String)
+      def fix_config(minimal : Bool = false, dry_run : Bool = false) : FixSummary
         unless File.exists?(@config_path)
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
@@ -211,9 +234,24 @@ module Hwaro
           )
         end
 
-        missing = missing_config_sections
-        return [] of String if missing.empty?
+        # Phase 1: surgical value edits. Operate on the raw text so we
+        # preserve formatting, comments, and ordering — the parsed TOML
+        # tree has no high-fidelity round-trip writer in stdlib.
+        current_text = raw_text
+        value_fixes = [] of ValueFix
 
+        if applied = trim_base_url_trailing_slash(current_text)
+          current_text = applied[:text]
+          value_fixes << applied[:fix]
+        end
+
+        if applied = clamp_sitemap_priority(current_text)
+          current_text = applied[:text]
+          value_fixes << applied[:fix]
+        end
+
+        # Phase 2: section appends.
+        missing = missing_config_sections
         snippets = [] of String
         added = [] of String
 
@@ -225,7 +263,9 @@ module Hwaro
           end
         end
 
-        return added if snippets.empty?
+        summary = FixSummary.new(sections_added: added, value_fixes: value_fixes, dry_run: dry_run)
+        return summary if summary.empty?
+        return summary if dry_run
 
         # Write atomically: compose the final file contents in a temp
         # file beside `config.toml`, then `File.rename` into place so a
@@ -234,8 +274,8 @@ module Hwaro
         tmp_path = "#{@config_path}.hwaro-tmp"
         begin
           File.open(tmp_path, "w") do |f|
-            f.print(raw_text)
-            f.print("\n") unless raw_text.ends_with?("\n")
+            f.print(current_text)
+            f.print("\n") unless current_text.ends_with?("\n")
             snippets.each { |s| f.print(s) }
           end
           File.rename(tmp_path, @config_path)
@@ -249,7 +289,56 @@ module Hwaro
           )
         end
 
-        added
+        summary
+      end
+
+      # Strip trailing slashes from a top-level `base_url = "..."` line.
+      # Top-level only — anything past the first `[section]` header is
+      # left alone. Returns nil when no edit is needed (no match, empty
+      # value, or already slash-free) so the caller can skip emitting a
+      # spurious ValueFix.
+      private def trim_base_url_trailing_slash(text : String) : NamedTuple(text: String, fix: ValueFix)?
+        lines = text.split('\n', remove_empty: false)
+        lines.each_with_index do |line, idx|
+          break if line =~ /^\s*\[/ # entered a section table; base_url is top-level only
+          next unless m = line.match(/^([ \t]*)base_url([ \t]*=[ \t]*)"([^"]*)"(.*)$/)
+          url = m[3]
+          next if url.empty?
+          next unless url.ends_with?("/")
+          trimmed = url.rstrip('/')
+          next if trimmed.empty? # avoid mangling oddities like base_url = "/"
+          lines[idx] = "#{m[1]}base_url#{m[2]}\"#{trimmed}\"#{m[4]}"
+          return {text: lines.join('\n'), fix: ValueFix.new("base_url", url, trimmed)}
+        end
+        nil
+      end
+
+      # Clamp `priority = N` under `[sitemap]` to [0.0, 1.0]. Walks the
+      # file line-by-line so we only ever rewrite the priority that
+      # belongs to the [sitemap] table — a top-level `priority = …` or
+      # `[other_section] priority = …` is left intact.
+      private def clamp_sitemap_priority(text : String) : NamedTuple(text: String, fix: ValueFix)?
+        lines = text.split('\n', remove_empty: false)
+        in_sitemap = false
+        lines.each_with_index do |line, idx|
+          if header = line.match(/^\s*\[([^\[\]]+)\]\s*$/)
+            in_sitemap = (header[1] == "sitemap")
+            next
+          end
+          next unless in_sitemap
+          next unless m = line.match(/^([ \t]*)priority([ \t]*=[ \t]*)([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(.*)$/)
+          val = m[3].to_f?
+          next unless val
+          next if 0.0 <= val <= 1.0
+          clamped = val.clamp(0.0, 1.0)
+          # Render the clamped value with at least one fractional digit
+          # so it stays a TOML float (mirrors how the scaffolded snippet
+          # writes it: `priority = 0.5`).
+          after = clamped == clamped.to_i ? "#{clamped.to_i}.0" : clamped.to_s
+          lines[idx] = "#{m[1]}priority#{m[2]}#{after}#{m[4]}"
+          return {text: lines.join('\n'), fix: ValueFix.new("sitemap.priority", m[3], after)}
+        end
+        nil
       end
 
       # Read `config.toml` as text. Returns nil on I/O failure

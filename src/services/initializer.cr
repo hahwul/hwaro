@@ -147,9 +147,9 @@ module Hwaro
             content_dir: File.join(target_path, "content"),
             config_path: config_path
           )
-          added = doctor.fix_config(minimal: true)
-          unless added.empty?
-            Logger.info "Added #{added.size} optional config section(s) (commented out)."
+          summary = doctor.fix_config(minimal: true)
+          unless summary.sections_added.empty?
+            Logger.info "Added #{summary.sections_added.size} optional config section(s) (commented out)."
           end
         end
 

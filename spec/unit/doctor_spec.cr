@@ -335,7 +335,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config
+          added = doctor.fix_config.sections_added
 
           added.should_not be_empty
           added.should contain("pwa")
@@ -353,7 +353,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n[og]\ndefault_image = "/img.png"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config
+          added = doctor.fix_config.sections_added
 
           added.should contain("og.auto_image")
 
@@ -368,7 +368,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n[pwa]\nenabled = false\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config
+          added = doctor.fix_config.sections_added
 
           added.should_not contain("pwa")
         end
@@ -380,7 +380,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config(minimal: true)
+          added = doctor.fix_config(minimal: true).sections_added
 
           # Should add common sections (search, pagination, etc.)
           added.should contain("search")
@@ -401,7 +401,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config(minimal: false)
+          added = doctor.fix_config(minimal: false).sections_added
 
           added.should contain("pwa")
           added.should contain("amp")
@@ -448,7 +448,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config
+          added = doctor.fix_config.sections_added
           added.should_not be_empty
 
           File.exists?("#{config_path}.hwaro-tmp").should be_false
@@ -457,6 +457,49 @@ describe Hwaro::Services::Doctor do
           text = File.read(config_path)
           text.should contain(%(title = "My Site"))
           text.should contain("[pwa]")
+        end
+      end
+
+      it "trims trailing slash from base_url as a value fix" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com/"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "base_url" && f.before.ends_with?("/") && !f.after.ends_with?("/") }.should be_true
+
+          File.read(config_path).should contain(%(base_url = "https://example.com"))
+          File.read(config_path).should_not contain(%(base_url = "https://example.com/"))
+        end
+      end
+
+      it "clamps out-of-range sitemap.priority as a value fix" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com"\n[sitemap]\npriority = 1.5\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "sitemap.priority" && f.after == "1.0" }.should be_true
+
+          File.read(config_path).should contain("priority = 1.0")
+        end
+      end
+
+      it "leaves files untouched in dry-run and reports the planned fix" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          original = %(title = "S"\nbase_url = "https://example.com/"\n)
+          File.write(config_path, original)
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config(dry_run: true)
+          summary.dry_run.should be_true
+          summary.value_fixes.any? { |f| f.field == "base_url" }.should be_true
+
+          # File contents must be byte-identical when dry-running.
+          File.read(config_path).should eq(original)
         end
       end
 
@@ -487,7 +530,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, body)
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config
+          added = doctor.fix_config.sections_added
           added.should be_empty
         end
       end
