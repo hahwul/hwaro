@@ -27,36 +27,10 @@ module Hwaro
             HELP_FLAG,
           ]
 
-          # A named check that is evaluated from the Doctor-generated issue list.
-          # `issue_ids` matches issues by exact id; `id_prefixes` matches by prefix.
-          private record CheckSpec, label : String, issue_ids : Array(String), id_prefixes : Array(String) = [] of String
-
-          # Groups of checks shown inline in the human-readable output.
-          # IMPORTANT: keep in sync with ids emitted by Services::Doctor.
-          CONFIG_CHECKS = [
-            CheckSpec.new("file present & parseable",
-              ["config-not-found", "config-parse-error"]),
-            CheckSpec.new("base_url, title",
-              ["base-url-missing", "base-url-trailing-slash", "title-default"]),
-            CheckSpec.new("sitemap (changefreq, priority)",
-              ["sitemap-changefreq-invalid", "sitemap-priority-range"]),
-            CheckSpec.new("taxonomies (duplicates)",
-              ["taxonomy-duplicate", "language-duplicate"]),
-            CheckSpec.new("search (format)",
-              ["search-format-invalid"]),
-          ]
-
-          TEMPLATE_CHECKS = [
-            CheckSpec.new("required files (page.html, section.html)",
-              ["template-dir-missing", "template-required-missing"]),
-            CheckSpec.new("template syntax",
-              ["template-unclosed-block", "template-mismatched-vars", "template-read-error"]),
-          ]
-
-          CONTENT_CHECKS = [
-            CheckSpec.new("front matter (TOML/YAML parse)",
-              ["content-frontmatter-invalid", "content-read-error"]),
-          ]
+          # Inline check groups now live on the Doctor service so this
+          # command renders whatever the service declares — adding a new
+          # diagnostic only touches one file. See
+          # `Services::CHECK_GROUPS`.
 
           def self.metadata : CommandInfo
             CommandInfo.new(
@@ -151,21 +125,14 @@ module Hwaro
 
             Logger.info "Running diagnostics..."
             Logger.info ""
-            Logger.info "  #{config_path}"
-            CONFIG_CHECKS.each do |spec|
-              Logger.info "    #{render_check_line(spec, issues, plain)}"
+            Services::CHECK_GROUPS.each do |group|
+              heading = group.key == :config ? config_path : group.default_heading
+              Logger.info "  #{heading}"
+              group.checks.each do |spec|
+                Logger.info "    #{render_check_line(spec, issues, plain)}"
+              end
+              Logger.info ""
             end
-            Logger.info ""
-            Logger.info "  templates/"
-            TEMPLATE_CHECKS.each do |spec|
-              Logger.info "    #{render_check_line(spec, issues, plain)}"
-            end
-            Logger.info ""
-            Logger.info "  content/"
-            CONTENT_CHECKS.each do |spec|
-              Logger.info "    #{render_check_line(spec, issues, plain)}"
-            end
-            Logger.info ""
 
             if issues.empty?
               Logger.info "#{ok_glyph(plain)} No issues found. Your site looks great!"
@@ -220,15 +187,10 @@ module Hwaro
           end
 
           # Format a single named check line with an inline status glyph.
-          private def render_check_line(spec : CheckSpec, issues : Array(Services::Issue), plain : Bool) : String
-            matched = issues.select { |i| check_matches?(spec, i) }
+          private def render_check_line(spec : Services::CheckSpec, issues : Array(Services::Issue), plain : Bool) : String
+            matched = issues.select { |i| spec.issue_ids.includes?(i.id) }
             level = worst_level(matched)
             "#{status_glyph(level, plain)} #{spec.label}"
-          end
-
-          private def check_matches?(spec : CheckSpec, issue : Services::Issue) : Bool
-            return true if spec.issue_ids.includes?(issue.id)
-            spec.id_prefixes.any? { |p| issue.id.starts_with?(p) }
           end
 
           # Collapse matched issues to the most severe level.

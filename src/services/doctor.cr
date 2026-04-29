@@ -43,6 +43,59 @@ module Hwaro
       end
     end
 
+    # A named diagnostic check: a human label paired with the set of
+    # issue IDs that, when present, count against this check. The CLI
+    # uses this to render inline ✓/⚠/✗ lines in human output.
+    record CheckSpec, label : String, issue_ids : Array(String)
+
+    # A logical group of checks, surfaced under one heading in the CLI.
+    # `:config` is rendered with the runtime config_path; other keys use
+    # `default_heading` verbatim.
+    record CheckGroup, key : Symbol, default_heading : String, checks : Array(CheckSpec)
+
+    # Single source of truth for the inline status lines emitted by
+    # `hwaro doctor`. Anything that adds a new diagnostic to
+    # `Services::Doctor` should also list its issue id(s) here so the
+    # check shows up in human output. The previous duplication —
+    # one list in this service and another in the CLI command — is
+    # gone, so updating one place is enough.
+    CHECK_GROUPS = [
+      CheckGroup.new(
+        key: :config,
+        default_heading: "config.toml",
+        checks: [
+          CheckSpec.new("file present & parseable",
+            ["config-not-found", "config-parse-error"]),
+          CheckSpec.new("base_url, title",
+            ["base-url-missing", "base-url-trailing-slash", "title-default"]),
+          CheckSpec.new("sitemap (changefreq, priority)",
+            ["sitemap-changefreq-invalid", "sitemap-priority-range"]),
+          CheckSpec.new("taxonomies (duplicates)",
+            ["taxonomy-duplicate", "language-duplicate"]),
+          CheckSpec.new("search (format)",
+            ["search-format-invalid"]),
+        ],
+      ),
+      CheckGroup.new(
+        key: :templates,
+        default_heading: "templates/",
+        checks: [
+          CheckSpec.new("required files (page.html, section.html)",
+            ["template-dir-missing", "template-required-missing"]),
+          CheckSpec.new("template syntax",
+            ["template-unclosed-block", "template-mismatched-vars", "template-read-error"]),
+        ],
+      ),
+      CheckGroup.new(
+        key: :content,
+        default_heading: "content/",
+        checks: [
+          CheckSpec.new("front matter (TOML/YAML parse)",
+            ["content-frontmatter-invalid", "content-read-error"]),
+        ],
+      ),
+    ]
+
     class Doctor
       VALID_CHANGEFREQS    = %w[always hourly daily weekly monthly yearly never]
       VALID_SEARCH_FORMATS = %w[fuse_json fuse_javascript elasticlunr_json elasticlunr_javascript]
