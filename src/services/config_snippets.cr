@@ -18,34 +18,34 @@ module Hwaro
       alias SectionEntry = NamedTuple(description: String, snippet: -> String)
 
       SECTION_REGISTRY = {
-        "plugins"          => {description: "Content processors and extensions", snippet: ->{ plugins(commented: true) }},
-        "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: ->{ highlight(commented: true) }},
-        "og"               => {description: "OpenGraph & Twitter Cards", snippet: ->{ og(commented: true) }},
-        "search"           => {description: "Client-side search index", snippet: ->{ search(commented: true) }},
-        "pagination"       => {description: "Pagination settings", snippet: ->{ pagination(commented: true) }},
-        "series"           => {description: "Series grouping", snippet: ->{ series(commented: true) }},
-        "related"          => {description: "Related posts", snippet: ->{ related(commented: true) }},
-        "markdown"         => {description: "Markdown parser options", snippet: ->{ markdown(commented: true) }},
-        "sitemap"          => {description: "Sitemap generation", snippet: ->{ sitemap(commented: true) }},
-        "robots"           => {description: "Robots.txt generation", snippet: ->{ robots(commented: true) }},
-        "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: ->{ llms(commented: true) }},
-        "feeds"            => {description: "RSS/Atom feed generation", snippet: ->{ feeds(commented: true) }},
-        "build"            => {description: "Build hooks (pre/post commands)", snippet: ->{ build(commented: true) }},
-        "permalinks"       => {description: "URL path overrides", snippet: ->{ permalinks(commented: true) }},
-        "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: ->{ auto_includes(commented: true) }},
-        "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: ->{ assets(commented: true) }},
-        "deployment"       => {description: "Deployment targets", snippet: ->{ deployment(commented: true) }},
-        "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: ->{ image_processing(commented: true) }},
-        "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: ->{ pwa(commented: true) }},
-        "amp"              => {description: "AMP page generation", snippet: ->{ amp(commented: true) }},
+        "plugins"          => {description: "Content processors and extensions", snippet: -> { plugins(commented: true) }},
+        "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: -> { highlight(commented: true) }},
+        "og"               => {description: "OpenGraph & Twitter Cards", snippet: -> { og(commented: true) }},
+        "search"           => {description: "Client-side search index", snippet: -> { search(commented: true) }},
+        "pagination"       => {description: "Pagination settings", snippet: -> { pagination(commented: true) }},
+        "series"           => {description: "Series grouping", snippet: -> { series(commented: true) }},
+        "related"          => {description: "Related posts", snippet: -> { related(commented: true) }},
+        "markdown"         => {description: "Markdown parser options", snippet: -> { markdown(commented: true) }},
+        "sitemap"          => {description: "Sitemap generation", snippet: -> { sitemap(commented: true) }},
+        "robots"           => {description: "Robots.txt generation", snippet: -> { robots(commented: true) }},
+        "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: -> { llms(commented: true) }},
+        "feeds"            => {description: "RSS/Atom feed generation", snippet: -> { feeds(commented: true) }},
+        "build"            => {description: "Build hooks (pre/post commands)", snippet: -> { build(commented: true) }},
+        "permalinks"       => {description: "URL path overrides", snippet: -> { permalinks(commented: true) }},
+        "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: -> { auto_includes(commented: true) }},
+        "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: -> { assets(commented: true) }},
+        "deployment"       => {description: "Deployment targets", snippet: -> { deployment(commented: true) }},
+        "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: -> { image_processing(commented: true) }},
+        "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: -> { pwa(commented: true) }},
+        "amp"              => {description: "AMP page generation", snippet: -> { amp(commented: true) }},
       } of String => SectionEntry
 
       # Same idea for sub-sections (parent table must already exist
       # before doctor offers to add the child).
       SUB_SECTION_REGISTRY = {
-        {"content", "files"}         => {description: "Non-Markdown file publishing from content/", snippet: ->{ content_files }},
-        {"og", "auto_image"}         => {description: "Auto-generated OG images", snippet: ->{ og_auto_image }},
-        {"image_processing", "lqip"} => {description: "Low-Quality Image Placeholder (LQIP) generation", snippet: ->{ image_processing_lqip }},
+        {"content", "files"}         => {description: "Non-Markdown file publishing from content/", snippet: -> { content_files }},
+        {"og", "auto_image"}         => {description: "Auto-generated OG images", snippet: -> { og_auto_image }},
+        {"image_processing", "lqip"} => {description: "Low-Quality Image Placeholder (LQIP) generation", snippet: -> { image_processing_lqip }},
       } of Tuple(String, String) => SectionEntry
 
       # Backward-compatible aliases. The registries above are the only
