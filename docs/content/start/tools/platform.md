@@ -15,6 +15,7 @@ hwaro tool platform cloudflare
 # CI/CD workflows
 hwaro tool platform github-pages
 hwaro tool platform gitlab-ci
+hwaro tool platform codeberg-pages
 
 # Output to custom path
 hwaro tool platform netlify -o deploy/netlify.toml
@@ -34,6 +35,7 @@ hwaro tool platform vercel --stdout
 | cloudflare | `wrangler.toml` | Workers/Pages site config |
 | github-pages | `.github/workflows/deploy.yml` | GitHub Actions build + deploy workflow |
 | gitlab-ci | `.gitlab-ci.yml` | GitLab CI/CD pipeline |
+| codeberg-pages | `.forgejo/workflows/deploy.yml` | Codeberg Pages (Forgejo Actions) deploy workflow |
 
 ## Options
 
@@ -105,5 +107,5 @@ Each config includes:
 
 ## See Also
 
-- [GitHub Pages](/deploy/github-pages/) | [GitLab CI](/deploy/gitlab-ci/) | [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) — Platform deploy guides
+- [GitHub Pages](/deploy/github-pages/) | [GitLab CI](/deploy/gitlab-ci/) | [Netlify](/deploy/netlify/) | [Vercel](/deploy/vercel/) | [Cloudflare Pages](/deploy/cloudflare-pages/) | [Codeberg Pages](/deploy/codeberg-pages/) — Platform deploy guides
 - [CLI Reference](/start/cli/#tool) — All tool commands

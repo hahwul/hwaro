@@ -116,5 +116,7 @@
       url: /deploy/vercel/
     - title: Cloudflare Pages
       url: /deploy/cloudflare-pages/
+    - title: Codeberg Pages
+      url: /deploy/codeberg-pages/
     - title: Docker
       url: /deploy/docker/
