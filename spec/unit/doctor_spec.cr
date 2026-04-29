@@ -942,6 +942,17 @@ describe Hwaro::Services::Doctor do
       end
     end
 
+    it "round-trips through JSON when an Issue list is decoded" do
+      issues = [
+        Hwaro::Services::Issue.new(id: "a", level: :error, category: "config", file: "config.toml", message: "boom"),
+        Hwaro::Services::Issue.new(id: "b", level: :warning, category: "content", file: nil, message: "soft"),
+      ]
+      decoded = Array(Hwaro::Services::Issue).from_json(issues.to_json)
+      decoded.size.should eq(2)
+      decoded.first.level.should eq(:error)
+      decoded.last.level.should eq(:warning)
+    end
+
     it "raises a parse error on unknown level strings" do
       bogus = %({"id":"x","level":"fatal","category":"config","message":"m"})
       expect_raises(JSON::ParseException, /Unknown issue level/) do

@@ -17,12 +17,18 @@ module Hwaro
           POSITIONAL_ARGS    = [] of String
           POSITIONAL_CHOICES = [] of String
 
+          # Schema version for `--json` output. Bump when adding fields
+          # that machine consumers may rely on.
+          JSON_SCHEMA_VERSION = 1
+
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
             FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing sections, normalize safe values)"),
             FlagInfo.new(short: nil, long: "--minimal", description: "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)"),
             FlagInfo.new(short: nil, long: "--dry-run", description: "With --fix, preview changes without writing config.toml"),
+            FlagInfo.new(short: nil, long: "--strict", description: "Treat warnings as errors when computing the exit code"),
+            FlagInfo.new(short: nil, long: "--max-warnings=N", description: "Exit non-zero when warning count exceeds N (default: unlimited)"),
             JSON_FLAG,
             QUIET_FLAG,
             HELP_FLAG,
@@ -50,6 +56,8 @@ module Hwaro
             fix_mode = false
             minimal_mode = false
             dry_run_mode = false
+            strict_mode = false
+            max_warnings = -1 # < 0 means "unlimited"
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro doctor [options]"
@@ -57,6 +65,15 @@ module Hwaro
               parser.on("--fix", "Auto-fix issues (add missing sections, normalize safe values)") { fix_mode = true }
               parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }
               parser.on("--dry-run", "With --fix, preview changes without writing config.toml") { dry_run_mode = true }
+              parser.on("--strict", "Treat warnings as errors when computing the exit code") { strict_mode = true }
+              parser.on("--max-warnings=N", "Exit non-zero when warning count exceeds N") do |v|
+                parsed = v.to_i?
+                unless parsed && parsed >= 0
+                  Logger.error "--max-warnings expects a non-negative integer (got: #{v.inspect})"
+                  exit(Hwaro::Errors::EXIT_GENERIC)
+                end
+                max_warnings = parsed
+              end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
@@ -78,39 +95,54 @@ module Hwaro
             end
 
             issues = doctor.run
+            code = exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings)
 
             if json_output
               result = {
-                "issues"  => issues,
-                "summary" => {
+                "schema_version" => JSON_SCHEMA_VERSION,
+                "issues"         => issues,
+                "summary"        => {
                   "errors"   => issues.count { |i| i.level == :error },
                   "warnings" => issues.count { |i| i.level == :warning },
                   "infos"    => issues.count { |i| i.level == :info },
                   "total"    => issues.size,
                 },
+                "exit_code" => code,
               }
               puts result.to_json
-              exit(exit_code_for(issues))
+              exit(code)
             end
 
-            render_human(issues, config_path)
-            exit(exit_code_for(issues))
+            if Logger.quiet?
+              render_quiet(issues, code)
+            else
+              render_human(issues, config_path)
+            end
+            exit(code)
           end
 
           # Map any `:error`-level issues to an appropriate exit code so
           # CI pipelines can gate on `hwaro doctor` directly. Warnings
-          # and infos don't change the exit code — only real errors do.
+          # don't change the exit code by default — only real errors do.
+          # `strict` promotes any warning to an error for exit-code
+          # purposes; `max_warnings` triggers a generic failure when the
+          # warning count exceeds the threshold (negative = unlimited).
           # Picks the highest-numeric exit across reported errors so
           # mixed categories surface the most severe failure class
           # (mirrors `deploy_command.cr#worst_exit_for`).
-          private def exit_code_for(issues : Array(Services::Issue)) : Int32
+          private def exit_code_for(issues : Array(Services::Issue), strict : Bool = false, max_warnings : Int32 = -1) : Int32
             worst = Hwaro::Errors::EXIT_SUCCESS
+            warnings = 0
             issues.each do |issue|
+              warnings += 1 if issue.level == :warning
               next unless issue.level == :error
               code = exit_code_for_category(issue.category)
               worst = code if code > worst
             end
-            worst
+            return worst unless worst == Hwaro::Errors::EXIT_SUCCESS
+            return Hwaro::Errors::EXIT_GENERIC if strict && warnings > 0
+            return Hwaro::Errors::EXIT_GENERIC if max_warnings >= 0 && warnings > max_warnings
+            Hwaro::Errors::EXIT_SUCCESS
           end
 
           private def exit_code_for_category(category : String) : Int32
@@ -123,6 +155,25 @@ module Hwaro
               Hwaro::Errors::EXIT_CONTENT
             else
               Hwaro::Errors::EXIT_GENERIC
+            end
+          end
+
+          # Terse rendering for `--quiet`. The previous behaviour (rely
+          # on `Logger.quiet = true` to silence `.info`) blackholed the
+          # full error summary too, so a CI run that failed produced no
+          # output and the user had to re-run without `--quiet` to see
+          # what was wrong. Now `--quiet` skips the inline check headers
+          # and prints one line per non-info issue, exit-code only on
+          # success.
+          private def render_quiet(issues : Array(Services::Issue), exit_code : Int32)
+            # Logger.quiet silences `Logger.info`, but a CI run that fails
+            # still needs *something* on stdout. Use direct STDOUT.puts so
+            # the output bypasses the Logger gate and surfaces the
+            # actionable issues only — no inline check headers, no banner.
+            issues.each do |issue|
+              next if issue.level == :info
+              file_part = issue.file ? "#{issue.file}: " : ""
+              STDOUT.puts "[#{issue.level}] #{file_part}#{issue.message}"
             end
           end
 
