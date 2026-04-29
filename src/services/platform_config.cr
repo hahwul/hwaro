@@ -216,11 +216,20 @@ module Hwaro
       end
 
       # Forgejo Actions workflow that builds the site and force-pushes the
-      # generated `public/` directory to a `pages` branch — Codeberg Pages
-      # serves whichever branch is named `pages` (or any branch in a repo
-      # called `pages`). The workflow assumes a `CODEBERG_TOKEN` secret
-      # with write access; the deploy push uses the actor + token form so
-      # it works without preconfiguring SSH keys on the runner.
+      # generated `public/` directory to the configured pages branch.
+      #
+      # Codeberg Pages publishes:
+      #   - Project site: a branch named `pages` in any repo →
+      #     https://USER.codeberg.page/REPO/  (default of this workflow).
+      #   - User/org site: the *default* branch of a repo named `pages` →
+      #     https://USER.codeberg.page/. Override `PAGES_BRANCH` to e.g.
+      #     `main` to target a user site without forking the workflow.
+      #
+      # Each run starts with a fresh `git init`, so commit history on the
+      # pages branch is intentionally not preserved — the branch is treated
+      # as a publish-only artifact. Auth uses the token-form remote URL so
+      # no SSH keys need to be preconfigured on the runner; the token must
+      # be supplied via the `CODEBERG_TOKEN` repository secret.
       private def generate_codeberg_pages : String
         lines = [] of String
         lines << "---"
@@ -236,6 +245,10 @@ module Hwaro
         lines << "    runs-on: docker"
         lines << "    container:"
         lines << "      image: ghcr.io/hahwul/hwaro:latest"
+        lines << "    env:"
+        lines << "      # Project site: \"pages\" (default). User/org site (repo named"
+        lines << "      # \"pages\"): override to your default branch, e.g. \"main\"."
+        lines << "      PAGES_BRANCH: pages"
         lines << "    steps:"
         lines << "      - name: Checkout"
         lines << "        uses: actions/checkout@v4"
@@ -248,14 +261,14 @@ module Hwaro
         lines << "          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}"
         lines << "        run: |"
         lines << "          cd #{output_dir}"
-        lines << "          git init -b pages"
+        lines << "          git init -b \"$PAGES_BRANCH\""
         lines << "          git config user.name  \"${{ github.actor }}\""
-        lines << "          git config user.email \"${{ github.actor }}@users.noreply.codeberg.org\""
+        lines << "          git config user.email \"${{ github.actor }}@noreply.codeberg.org\""
         lines << "          git add -A"
         lines << "          git commit -m \"Deploy: $(date -u +'%Y-%m-%dT%H:%M:%SZ')\""
         lines << "          git push --force \\"
         lines << "            \"https://${{ github.actor }}:$CODEBERG_TOKEN@codeberg.org/${{ github.repository }}.git\" \\"
-        lines << "            pages"
+        lines << "            \"$PAGES_BRANCH\""
         lines << ""
 
         lines.join("\n")

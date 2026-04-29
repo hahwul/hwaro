@@ -207,9 +207,26 @@ describe Hwaro::Services::PlatformConfig do
         result.should contain("runs-on: docker")
         result.should contain("ghcr.io/hahwul/hwaro:latest")
         result.should contain("hwaro build")
-        result.should contain("git init -b pages")
         result.should contain("CODEBERG_TOKEN")
         result.should contain("codeberg.org/${{ github.repository }}.git")
+      end
+
+      it "exposes the pages branch as a configurable env var defaulting to 'pages'" do
+        config = Hwaro::Models::Config.new
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("codeberg-pages")
+
+        result.should contain("PAGES_BRANCH: pages")
+        result.should contain("git init -b \"$PAGES_BRANCH\"")
+      end
+
+      it "uses Codeberg's noreply email domain" do
+        config = Hwaro::Models::Config.new
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("codeberg-pages")
+
+        result.should contain("@noreply.codeberg.org")
+        result.should_not contain("users.noreply.codeberg.org")
       end
     end
 
