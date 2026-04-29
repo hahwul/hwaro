@@ -174,8 +174,42 @@ describe Hwaro::Services::Doctor do
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
           issues = doctor.run
           issues.any? do |i|
-            i.message.includes?("unclosed template block") && i.level == :error
+            i.id == "template-syntax-error" && i.level == :error && (i.file || "").ends_with?("page.html")
           end.should be_true
+        end
+      end
+
+      it "catches reordered end-before-start (no longer fooled by balanced counts)" do
+        # Previously the regex check counted opens vs closes; a swapped
+        # `{% endif %}{% if true %}` pair had matching counts but is
+        # still a syntax error — which Crinja's parser rejects.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          File.write(File.join(templates_dir, "page.html"), "{% endif %}hello{% if true %}")
+          File.write(File.join(templates_dir, "section.html"), "<html></html>")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          issues = doctor.run
+          issues.any? { |i| i.id == "template-syntax-error" && i.level == :error }.should be_true
+        end
+      end
+
+      it "catches paired tags beyond if/for/block/macro (e.g. raw)" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          # `{% raw %}` is a Jinja paired tag; the regex check ignored it.
+          File.write(File.join(templates_dir, "page.html"), "{% raw %}{{ literal }}")
+          File.write(File.join(templates_dir, "section.html"), "<html></html>")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          issues = doctor.run
+          issues.any? { |i| i.id == "template-syntax-error" && i.level == :error }.should be_true
         end
       end
 

@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "crinja"
 require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
@@ -85,7 +86,7 @@ module Hwaro
           CheckSpec.new("required files (page.html, section.html)",
             ["template-dir-missing", "template-required-missing"]),
           CheckSpec.new("template syntax",
-            ["template-unclosed-block", "template-mismatched-vars", "template-read-error"]),
+            ["template-syntax-error", "template-read-error"]),
         ],
       ),
       CheckGroup.new(
@@ -391,34 +392,49 @@ module Hwaro
         end
       end
 
-      # Basic template syntax check — unclosed tags.
-      # Unclosed tags raise `HWARO_E_TEMPLATE` during render, so flag
-      # them at :error level rather than :warning.
+      # Template syntax check, delegated to the actual Crinja parser used
+      # by the build pipeline. The previous regex-based approach
+      # (counting `{% if %}` vs `{% endif %}` etc.) couldn't catch:
+      #  - paired tags it didn't enumerate (autoescape/raw/with/filter/…)
+      #  - reordered close-before-open mistakes that still balanced
+      #  - end tags whose name didn't match the opener
+      # By instantiating `Crinja::Template` with `run_parser: true` we
+      # surface every syntax error the build itself will hit, with line
+      # and column numbers when Crinja attaches them. We do NOT render —
+      # parse errors are the only failure class we want to gate on here.
       private def check_template_syntax(file_path : String, issues : Array(Issue))
         content = File.read(file_path)
 
-        # Strip Jinja comments {# ... #} and HTML comments before counting,
-        # to avoid false positives from commented-out template code
-        stripped = content.gsub(/\{#.*?#\}/m, "").gsub(/<!--.*?-->/m, "")
-
-        # Check for unclosed block tags
-        opens = stripped.scan(/\{%[-\s]*\b(if|for|block|macro)\b/).size
-        closes = stripped.scan(/\{%[-\s]*\bend(if|for|block|macro)\b/).size
-        if opens != closes
-          issues << Issue.new(id: "template-unclosed-block", level: :error, category: "template", file: file_path,
-            message: "Possible unclosed template block tag (#{opens} opened, #{closes} closed)")
-        end
-
-        # Check for unclosed variable tags
-        open_vars = stripped.scan(/\{\{/).size
-        close_vars = stripped.scan(/\}\}/).size
-        if open_vars != close_vars
-          issues << Issue.new(id: "template-mismatched-vars", level: :error, category: "template", file: file_path,
-            message: "Mismatched {{ }} variable tags (#{open_vars} opened, #{close_vars} closed)")
+        begin
+          Crinja::Template.new(content, env: template_parse_env, filename: file_path, run_parser: true)
+        rescue ex : Crinja::TemplateSyntaxError | Crinja::TemplateError
+          issues << Issue.new(
+            id: "template-syntax-error",
+            level: :error,
+            category: "template",
+            file: file_path,
+            message: format_crinja_error(ex),
+          )
         end
       rescue ex
         issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
           message: "Failed to read template: #{ex.message}")
+      end
+
+      # Reusable Crinja env for parse-only checks. We never render, so
+      # the env can be a default instance — loaders/extensions that the
+      # production builder configures aren't needed to detect tag/syntax
+      # mistakes.
+      @template_parse_env : Crinja?
+
+      private def template_parse_env : Crinja
+        @template_parse_env ||= Crinja.new
+      end
+
+      private def format_crinja_error(ex : Crinja::Error) : String
+        msg = (ex.message || ex.class.name).lines.first?.try(&.strip) || ex.class.name
+        loc = ex.location_start
+        loc ? "Template syntax error at line #{loc.line}, column #{loc.column}: #{msg}" : "Template syntax error: #{msg}"
       end
 
       # Check directory structure — sections should have _index.md
