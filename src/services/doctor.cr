@@ -11,6 +11,7 @@ require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
 require "../content/processors/markdown"
+require "../core/build/parallel"
 require "./config_snippets"
 
 module Hwaro
@@ -551,30 +552,51 @@ module Hwaro
       # sync with the parser used by the build pipeline — any
       # front-matter shape the builder rejects as `HWARO_E_CONTENT`
       # appears here as an `:error` issue.
+      #
+      # Sites in the wild can have thousands of markdown files; this
+      # used to scan them serially with a fresh `File.read` +
+      # `Processor::Markdown.parse` per entry. Routed through the
+      # existing `ParallelHelper.map` which already powers the build
+      # pipeline so I/O overlaps and (on `-Dpreview_mt`) parsing
+      # actually runs concurrently across cores. Each worker returns
+      # the file's issue list (size 0 or 1) so we never share a
+      # mutable issues array across fibers.
       private def check_content_frontmatter(issues : Array(Issue))
         return unless Dir.exists?(@content_dir)
 
+        files = [] of String
         Dir.glob(File.join(@content_dir, "**", "*.{md,markdown}")) do |path|
           # Skip things that aren't regular files (symlink to nowhere,
           # directory matching the glob, etc.).
-          next unless File.file?(path)
-
-          raw = begin
-            File.read(path)
-          rescue ex : IO::Error | File::Error
-            issues << Issue.new(id: "content-read-error", level: :error, category: "content", file: path,
-              message: "Failed to read content file: #{ex.message}")
-            next
-          end
-
-          begin
-            Processor::Markdown.parse(raw, path)
-          rescue ex : Hwaro::HwaroError
-            first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
-            issues << Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
-              message: first_line.empty? ? "Invalid front matter" : first_line)
-          end
+          files << path if File.file?(path)
         end
+        return if files.empty?
+
+        per_file = Hwaro::Core::Build::ParallelHelper.map(files) do |path|
+          scan_content_file_for_frontmatter(path)
+        end
+        per_file.each { |arr| arr.each { |i| issues << i } }
+      end
+
+      # Pure function: read + parse one markdown file, return any issue
+      # produced as a small array. Fiber-safe because it touches no
+      # shared state.
+      private def scan_content_file_for_frontmatter(path : String) : Array(Issue)
+        raw = begin
+          File.read(path)
+        rescue ex : IO::Error | File::Error
+          return [Issue.new(id: "content-read-error", level: :error, category: "content", file: path,
+            message: "Failed to read content file: #{ex.message}")]
+        end
+
+        begin
+          Processor::Markdown.parse(raw, path)
+        rescue ex : Hwaro::HwaroError
+          first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
+          return [Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
+            message: first_line.empty? ? "Invalid front matter" : first_line)]
+        end
+        [] of Issue
       end
 
       # Validate that path-shaped fields in `config.toml` actually point at
