@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.1
+
+### Fixed
+- Homebrew tap name in install docs (#517)
+- Ruby interpolation in published formula's `test` block (#518)
+
 ## v0.13.0
 
 ### Added
