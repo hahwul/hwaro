@@ -13,7 +13,7 @@ Hwaro is designed to help you **build your own website without relying on pre-ma
 
 ```bash
 # Install (see Installation for all methods)
-brew tap hwaro/hwaro && brew install hwaro
+brew tap hahwul/hwaro && brew install hwaro
 
 # Create a new site
 hwaro init my-site --scaffold blog

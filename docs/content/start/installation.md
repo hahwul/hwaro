@@ -10,7 +10,7 @@ Hwaro is written in Crystal. You can install it from source or use a pre-built b
 ## Homebrew
 
 ```bash
-brew tap hwaro/hwaro
+brew tap hahwul/hwaro
 brew install hwaro
 ```
 
