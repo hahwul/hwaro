@@ -335,6 +335,50 @@ This is useful because you don't need to know the final URL — Hwaro calculates
 > Quote text
 ```
 
+### Admonitions
+
+GitHub-style alert blocks render as styled callouts. Recognised types: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`.
+
+```markdown
+> [!NOTE]
+> Pay attention to this paragraph.
+
+> [!WARNING]
+>
+> Body can also live in its own paragraph.
+```
+
+The output is a `<div class="admonition admonition-{type}">` with a title paragraph (`<p class="admonition-title">`) followed by the body. Style it from your CSS — Hwaro emits semantic markup only.
+
+Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
+
+### Custom Heading IDs
+
+Append `{#custom-id}` to a heading line to override the auto-generated slug. Useful when you want stable anchor URLs that don't break on title edits.
+
+```markdown
+## Installation Guide {#install}
+```
+
+Renders as `<h2 id="install">Installation Guide</h2>`. The TOC and any `[link](#install)` will use the custom id.
+
+Allowed id characters: letters, digits, `_`, `-`, `:`. The id must start with a letter.
+
+Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
+
+### Definition Lists
+
+```markdown
+Term
+: Definition body
+
+Another term
+: Definition with **bold**, *italic*, `code`, [a link](https://example.com), and ~~strikethrough~~
+: A second definition for the same term
+```
+
+Inline Markdown works inside both terms and definitions. Raw HTML is escaped for safety.
+
 ## Asset Colocation
 
 You can keep related assets (images, PDFs, etc.) in the same directory as your content file. This is known as a **Page Bundle**.

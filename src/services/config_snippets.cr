@@ -684,6 +684,8 @@ module Hwaro
             # safe = false
             # lazy_loading = false
             # emoji = false
+            # admonitions = true
+            # heading_ids = true
 
             TOML
         else
@@ -698,6 +700,8 @@ module Hwaro
             safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
             lazy_loading = false  # If true, automatically add loading="lazy" to img tags
             emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
+            admonitions = true    # If true, GitHub-style `> [!NOTE]` blockquotes render as admonitions
+            heading_ids = true    # If true, `## Heading {#custom-id}` sets an explicit id
 
             TOML
         end

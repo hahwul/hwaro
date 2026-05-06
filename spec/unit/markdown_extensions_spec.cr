@@ -8,6 +8,8 @@ private def make_config(**opts) : Hwaro::Models::MarkdownConfig
   config.definition_lists = opts[:definition_lists]? || false
   config.mermaid = opts[:mermaid]? || false
   config.math = opts[:math]? || false
+  config.admonitions = opts[:admonitions]? || false
+  config.heading_ids = opts[:heading_ids]? || false
   config
 end
 
@@ -413,6 +415,186 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       content = "Term1\n: Def1\n\n\n\nTerm2\n: Def2"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
       result.scan(/<dl>/).size.should eq(1)
+    end
+  end
+
+  describe "definition list inline markdown" do
+    it "renders bold markdown inside terms" do
+      content = "**Bold term**\n: Plain definition"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dt><strong>Bold term</strong></dt>")
+    end
+
+    it "renders links inside definitions" do
+      content = "Term\n: See [docs](https://example.com)"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain(%(<a href="https://example.com">docs</a>))
+    end
+
+    it "renders italic and code spans inside definitions" do
+      content = "Term\n: *emphasis* and `inline code`"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<em>emphasis</em>")
+      result.should contain("<code>inline code</code>")
+    end
+
+    it "renders strikethrough inside definitions" do
+      content = "Term\n: ~~deprecated~~ feature"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<del>deprecated</del>")
+    end
+
+    it "still escapes raw HTML alongside inline markdown" do
+      content = "Term\n: <b>raw</b> and **md bold**"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("&lt;b&gt;raw&lt;/b&gt;")
+      result.should contain("<strong>md bold</strong>")
+    end
+
+    it "rejects unsafe link schemes" do
+      content = "Term\n: [click](javascript:alert(1))"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should_not contain("<a href")
+      result.should contain("[click]")
+    end
+  end
+
+  describe "admonitions" do
+    it "rewrites a single-line GitHub-style note" do
+      html = "<blockquote>\n<p>[!NOTE]\nUseful info here</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<div class="admonition admonition-note">))
+      result.should contain(%(<p class="admonition-title">Note</p>))
+      result.should contain("<p>Useful info here</p>")
+      result.should_not contain("<blockquote>")
+    end
+
+    it "handles separate-paragraph body for warning" do
+      html = "<blockquote>\n<p>[!WARNING]</p>\n<p>Body paragraph</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(admonition-warning))
+      result.should contain(%(<p class="admonition-title">Warning</p>))
+      result.should contain("<p>Body paragraph</p>")
+    end
+
+    it "supports title-only admonition with no body" do
+      html = "<blockquote>\n<p>[!TIP]</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(admonition-tip))
+      result.should contain(%(<p class="admonition-title">Tip</p>))
+      result.should_not contain("<blockquote>")
+    end
+
+    it "recognises all five GitHub admonition types" do
+      %w[NOTE TIP IMPORTANT WARNING CAUTION].each do |type|
+        html = "<blockquote>\n<p>[!#{type}]\nbody</p>\n</blockquote>"
+        result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+        result.should contain("admonition-#{type.downcase}")
+      end
+    end
+
+    it "leaves regular blockquotes untouched" do
+      html = "<blockquote>\n<p>Just a quote</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should eq(html)
+    end
+
+    it "ignores unknown admonition types" do
+      html = "<blockquote>\n<p>[!UNKNOWN]\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should eq(html)
+    end
+
+    it "is case-sensitive on the type token" do
+      html = "<blockquote>\n<p>[!note]\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should eq(html)
+    end
+  end
+
+  describe "heading ids" do
+    it "extracts id from `## Heading {#custom-id}`" do
+      content = "## My Heading {#custom-id}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq("## My Heading <!--HID:custom-id-->")
+    end
+
+    it "preserves headings without an id marker" do
+      content = "## Plain heading"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq(content)
+    end
+
+    it "applies the marker to a rendered heading tag" do
+      html = "<h2>My Heading <!--HID:custom-->\n</h2>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(<h2 id="custom">))
+      result.should_not contain("HID:")
+    end
+
+    it "replaces an existing id attribute" do
+      html = %(<h3 class="foo" id="auto-slug">Heading <!--HID:wanted--></h3>)
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(id="wanted"))
+      result.should_not contain("auto-slug")
+      result.should contain(%(class="foo"))
+    end
+
+    it "handles each heading level h1-h6" do
+      (1..6).each do |level|
+        content = "#{"#" * level} Heading {#h#{level}}"
+        result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+        result.should contain("<!--HID:h#{level}-->")
+      end
+    end
+
+    it "renders end-to-end through Markdown.render" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "## Section {#intro}\n\nBody text.",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="intro">))
+      html.should_not contain("HID:")
+    end
+
+    it "leaves heading-id syntax inside fenced code blocks alone" do
+      content = "```markdown\n## Example {#example}\n```\n\n## Real heading {#real}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      # Inside the code fence: untouched
+      result.should contain("## Example {#example}")
+      # Outside the code fence: marker injected
+      result.should contain("## Real heading <!--HID:real-->")
+    end
+
+    it "supports tilde-fenced code blocks" do
+      content = "~~~\n## Example {#x}\n~~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should contain("## Example {#x}")
+      result.should_not contain("HID:")
+    end
+  end
+
+  describe "admonitions end-to-end" do
+    it "renders `> [!NOTE]` blockquotes via Markdown.render" do
+      cfg = make_config(admonitions: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> [!NOTE]\n> Pay attention.",
+        markdown_config: cfg,
+      )
+      html.should contain(%(class="admonition admonition-note"))
+      html.should contain("Pay attention.")
+      html.should_not contain("<blockquote>")
+    end
+
+    it "leaves admonitions disabled when config flag is off" do
+      cfg = make_config
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> [!NOTE]\n> body",
+        markdown_config: cfg,
+      )
+      html.should contain("<blockquote>")
+      html.should contain("[!NOTE]")
     end
   end
 end
