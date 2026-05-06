@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Commands for creating, building, and serving your site">
+  <title>CLI - Hwaro</title>
+  <meta property="og:title" content="CLI">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/start/cli/">
+<meta property="og:description" content="Commands for creating, building, and serving your site">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/start-cli.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CLI">
+<meta name="twitter:description" content="Commands for creating, building, and serving your site">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/start-cli.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/" class="active">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/" class="active">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>CLI</h1>
+    <p>Hwaro provides commands for creating, building, and serving your site.</p>
+<h2 id="global-flags">Global flags</h2>
+<p>These flags work with every top-level command and control how the CLI
+writes to the terminal. They are especially useful for scripts, CI logs,
+and AI agents that want clean output.</p>
+<table>
+<thead>
+<tr>
+<th>Flag / Env var</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-q</code>, <code>--quiet</code></td>
+<td>Suppress informational output and the startup banner. Warnings and errors still appear on stderr.</td>
+</tr>
+<tr>
+<td><code>NO_COLOR</code> (env)</td>
+<td>When set to any non-empty value, suppresses ANSI color codes from every command&#39;s output. Follows the <a href="https://no-color.org">no-color.org</a> cross-tool convention.</td>
+</tr>
+</tbody>
+</table>
+<p>Colors are also disabled automatically when stdout is not a TTY (for
+example when piping to <code>cat</code>, redirecting to a file, or running inside
+most CI systems). Set <code>NO_COLOR=1</code> to force-disable color everywhere;
+no extra flag is needed.</p>
+<pre><code class="language-bash hljs"># Silent build for scripts and CI — only warnings/errors surface.
+hwaro build --quiet
+
+# Plain ASCII (no ANSI escapes) even when stdout is a TTY.
+NO_COLOR=1 hwaro doctor
+</code></pre>
+<h3 id="error-taxonomy">Error taxonomy</h3>
+<p>Classified failure paths emit a stable error code plus a matching
+process exit code so scripts, CI, and agents can branch reliably
+without parsing human messages.</p>
+<p>In text mode the error line is prefixed with the code:</p>
+<pre><code>Error [HWARO_E_USAGE]: missing &lt;path&gt; argument
+</code></pre>
+<p>Under <code>--json</code> (or <code>--quiet</code>) the classified error is emitted as a
+structured payload on stdout:</p>
+<pre><code class="language-json hljs">{
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;HWARO_E_USAGE&quot;,
+    &quot;category&quot;: &quot;usage&quot;,
+    &quot;message&quot;: &quot;missing &lt;path&gt; argument&quot;,
+    &quot;hint&quot;: &quot;Usage: hwaro new &lt;path&gt; [options] — run 'hwaro new --help' for details.&quot;
+  }
+}
+</code></pre>
+<p>Unclassified failures keep the legacy <code>Error: &lt;message&gt;</code> format and
+exit code <code>1</code>, so this is a strictly additive contract.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Category</th>
+<th>Exit</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HWARO_E_USAGE</code></td>
+<td>usage</td>
+<td>2</td>
+<td>Bad/missing flag, missing required argument, unknown command</td>
+</tr>
+<tr>
+<td><code>HWARO_E_CONFIG</code></td>
+<td>config</td>
+<td>3</td>
+<td><code>config.toml</code> missing, unparseable, or invalid</td>
+</tr>
+<tr>
+<td><code>HWARO_E_TEMPLATE</code></td>
+<td>template</td>
+<td>4</td>
+<td>Crinja template render error</td>
+</tr>
+<tr>
+<td><code>HWARO_E_CONTENT</code></td>
+<td>content</td>
+<td>5</td>
+<td>Content file parse error, invalid frontmatter</td>
+</tr>
+<tr>
+<td><code>HWARO_E_IO</code></td>
+<td>io</td>
+<td>6</td>
+<td>Filesystem access error (missing dir, permission denied)</td>
+</tr>
+<tr>
+<td><code>HWARO_E_NETWORK</code></td>
+<td>network</td>
+<td>7</td>
+<td>Deploy upload, remote scaffold fetch failure</td>
+</tr>
+<tr>
+<td><code>HWARO_E_INTERNAL</code></td>
+<td>internal</td>
+<td>70</td>
+<td>Unrecoverable bug or unexpected state</td>
+</tr>
+<tr>
+<td><em>(unclassified)</em></td>
+<td>—</td>
+<td>1</td>
+<td>Legacy/generic failure path</td>
+</tr>
+<tr>
+<td><em>(success)</em></td>
+<td>—</td>
+<td>0</td>
+<td>Command completed normally</td>
+</tr>
+</tbody>
+</table>
+<h2 id="commands">Commands</h2>
+<h3 id="init">init</h3>
+<p>Create a new site:</p>
+<pre><code class="language-bash hljs">hwaro init my-site
+hwaro init my-site --scaffold blog
+hwaro init my-site --scaffold docs
+hwaro init my-site --scaffold book
+</code></pre>
+<p>You can also use a remote scaffold from a GitHub repository:</p>
+<pre><code class="language-bash hljs"># GitHub shorthand
+hwaro init my-site --scaffold github:user/repo
+hwaro init my-site --scaffold github:user/repo/docs
+
+# Full URL
+hwaro init my-site --scaffold https://github.com/user/repo
+hwaro init my-site --scaffold https://github.com/user/repo/tree/main/docs
+</code></pre>
+<p>Remote scaffolds fetch <code>config.toml</code>, <code>templates/</code>, <code>static/</code>, and content structure from the repository. Content files keep only front matter (metadata) so you can see the expected page structure without the original body text. Set <code>GITHUB_TOKEN</code> environment variable to avoid API rate limits.</p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>--scaffold TYPE</td>
+<td>Built-in (<code>simple</code>, <code>bare</code>, <code>blog</code>, <code>blog-dark</code>, <code>docs</code>, <code>docs-dark</code>, <code>book</code>, <code>book-dark</code>) or remote source (<code>github:user/repo[/path]</code>, URL)</td>
+</tr>
+<tr>
+<td>--agents MODE</td>
+<td>AGENTS.md content mode: <code>remote</code> (lightweight, default) or <code>local</code> (full embedded reference)</td>
+</tr>
+<tr>
+<td>-f, --force</td>
+<td>Force creation even if directory is not empty</td>
+</tr>
+<tr>
+<td>--skip-agents-md</td>
+<td>Skip creating AGENTS.md file</td>
+</tr>
+<tr>
+<td>--skip-sample-content</td>
+<td>Skip creating sample content files</td>
+</tr>
+<tr>
+<td>--skip-taxonomies</td>
+<td>Skip taxonomies configuration and templates</td>
+</tr>
+<tr>
+<td>--include-multilingual LANGS</td>
+<td>Enable multilingual support (e.g., <code>en,ko,ja</code>)</td>
+</tr>
+<tr>
+<td>--minimal-config</td>
+<td>Generate minimal <code>config.toml</code> without comments or optional sections</td>
+</tr>
+<tr>
+<td>--list-scaffolds</td>
+<td>List available built-in scaffolds and exit</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>Emit machine-readable JSON output (with --list-scaffolds)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="new">new</h3>
+<p>Create a new content file:</p>
+<pre><code class="language-bash hljs">hwaro new content/about.md
+hwaro new content/blog/my-post.md
+hwaro new -t &quot;My Post Title&quot;
+hwaro new posts/my-post.md -a posts
+hwaro new my-post.md --section blog --draft --tags &quot;go,web&quot; --date 2026-03-22
+</code></pre>
+<p>Creates a Markdown file with front matter template. Supports <strong>archetypes</strong> for customizable templates.</p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-t, --title TITLE</td>
+<td>Content title</td>
+</tr>
+<tr>
+<td>--date DATE</td>
+<td>Content date (default: now, e.g. <code>2026-03-22</code>)</td>
+</tr>
+<tr>
+<td>--draft</td>
+<td>Mark as draft</td>
+</tr>
+<tr>
+<td>--tags TAGS</td>
+<td>Comma-separated tags</td>
+</tr>
+<tr>
+<td>-s, --section NAME</td>
+<td>Section directory (e.g. <code>blog</code>, <code>docs</code>)</td>
+</tr>
+<tr>
+<td>-a, --archetype NAME</td>
+<td>Archetype to use</td>
+</tr>
+<tr>
+<td>--bundle</td>
+<td>Create a leaf-bundle directory (<code>foo/index.md</code>) instead of a single file</td>
+</tr>
+<tr>
+<td>--no-bundle</td>
+<td>Force a single file (<code>foo.md</code>); overrides <code>[content.new].bundle = true</code></td>
+</tr>
+<tr>
+<td>--list-archetypes</td>
+<td>List archetypes in the current project and exit</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>Emit machine-readable JSON output (archetypes listing and classified errors)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Archetypes:</strong></p>
+<p>Archetypes are template files in <code>archetypes/</code> directory that define default front matter for new content:</p>
+<ul>
+<li><code>archetypes/default.md</code> - Default template for all content</li>
+<li><code>archetypes/posts.md</code> - Used for <code>hwaro new posts/...</code></li>
+<li><code>archetypes/tools/develop.md</code> - Used for <code>hwaro new tools/develop/...</code></li>
+</ul>
+<p>Archetype files support placeholders: <code>{{ title }}</code>, <code>{{ date }}</code>, <code>{{ draft }}</code>, <code>{{ tags }}</code></p>
+<p>Example archetype (<code>archetypes/posts.md</code>):</p>
+<pre><code>---
+title: &quot;{{ title }}&quot;
+date: {{ date }}
+draft: false
+tags: []
+---
+
+# {{ title }}
+</code></pre>
+<p>Archetype matching priority:</p>
+<ol>
+<li>Explicit <code>-a</code> flag (e.g., <code>-a posts</code> uses <code>archetypes/posts.md</code>)</li>
+<li>Path-based matching (e.g., <code>posts/hello.md</code> checks <code>archetypes/posts.md</code>)</li>
+<li>Nested paths try parent archetypes (e.g., <code>tools/dev/x.md</code> tries <code>tools/dev.md</code>, then <code>tools.md</code>)</li>
+<li>Falls back to <code>archetypes/default.md</code></li>
+<li>Uses built-in template if no archetype found</li>
+</ol>
+<h3 id="build">build</h3>
+<p>Build the site to <code>public/</code>:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro build --drafts
+hwaro build --minify
+hwaro build -i /path/to/my-site
+hwaro build -i /path/to/my-site -o ./dist
+</code></pre>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-i, --input DIR</td>
+<td>Project directory to build (default: current directory)</td>
+</tr>
+<tr>
+<td>-o, --output DIR</td>
+<td>Output directory (default: public)</td>
+</tr>
+<tr>
+<td>--base-url URL</td>
+<td>Temporarily override <code>base_url</code> from <code>config.toml</code></td>
+</tr>
+<tr>
+<td>-d, --drafts</td>
+<td>Include draft content</td>
+</tr>
+<tr>
+<td>--include-expired</td>
+<td>Include expired content</td>
+</tr>
+<tr>
+<td>--include-future</td>
+<td>Include future-dated content</td>
+</tr>
+<tr>
+<td>--minify</td>
+<td>Minify output files (see below)</td>
+</tr>
+<tr>
+<td>--no-parallel</td>
+<td>Disable parallel processing</td>
+</tr>
+<tr>
+<td>--cache</td>
+<td>Enable incremental build caching (see below)</td>
+</tr>
+<tr>
+<td>--full</td>
+<td>Force a complete rebuild, clearing the cache</td>
+</tr>
+<tr>
+<td>--skip-highlighting</td>
+<td>Disable syntax highlighting</td>
+</tr>
+<tr>
+<td>--skip-cache-busting</td>
+<td>Disable cache busting query parameters on CSS/JS resources</td>
+</tr>
+<tr>
+<td>--stream</td>
+<td>Enable streaming build to reduce memory usage</td>
+</tr>
+<tr>
+<td>--memory-limit SIZE</td>
+<td>Memory limit for streaming build (e.g. <code>2G</code>, <code>512M</code>)</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>Show detailed output</td>
+</tr>
+<tr>
+<td>--profile</td>
+<td>Print phase-by-phase and per-template build timing</td>
+</tr>
+<tr>
+<td>--debug</td>
+<td>Print debug information after build</td>
+</tr>
+</tbody>
+</table>
+<p><strong>About <code>--stream</code> / <code>--memory-limit</code> (Streaming Build):</strong></p>
+<p>For sites with thousands of pages, loading all rendered HTML into memory at once can cause high memory usage. Streaming build processes pages in batches during the Render phase, releasing rendered HTML after each batch is written to disk.</p>
+<ul>
+<li><code>--stream</code> enables streaming with a default batch size of 50 pages.</li>
+<li><code>--memory-limit SIZE</code> enables streaming and calculates the batch size automatically based on the given limit (heuristic: ~50KB per page). Accepts <code>G</code>, <code>M</code>, <code>K</code> suffixes (e.g. <code>2G</code>, <code>512M</code>, <code>256K</code>).</li>
+<li>You can also set the <code>HWARO_MEMORYLIMIT</code> environment variable as a fallback. The CLI flag overrides the env var.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th><code>--stream</code></th>
+<th><code>--memory-limit</code></th>
+<th><code>HWARO_MEMORYLIMIT</code></th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>Normal build</td>
+</tr>
+<tr>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+<td>Streaming, batch=50</td>
+</tr>
+<tr>
+<td>-</td>
+<td>2G</td>
+<td>-</td>
+<td>Streaming, batch≈20000</td>
+</tr>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>1G</td>
+<td>Streaming, batch≈10000</td>
+</tr>
+<tr>
+<td>yes</td>
+<td>512M</td>
+<td>-</td>
+<td>Streaming, batch≈5000</td>
+</tr>
+<tr>
+<td>-</td>
+<td>2G</td>
+<td>1G</td>
+<td>CLI wins (2G)</td>
+</tr>
+</tbody>
+</table>
+<p>The build output is identical — streaming only affects memory usage during the build.</p>
+<p><strong>About <code>--minify</code>:</strong></p>
+<p>The minify flag performs conservative optimization on generated files:</p>
+<ul>
+<li><strong>HTML</strong>: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, inter-tag whitespace, and content structure.</li>
+<li><strong>JSON</strong>: Removes whitespace and newlines for compact output.</li>
+<li><strong>XML</strong>: Removes whitespace between tags for smaller file sizes.</li>
+</ul>
+<p>Code blocks (<code>&lt;pre&gt;</code>, <code>&lt;code&gt;</code>) and script/style content are always preserved intact.</p>
+<p><strong>HTML minification is intentionally conservative.</strong> Prior attempts at aggressive HTML reduction (stripping indentation, collapsing whitespace between tags, etc.) caused content-rendering regressions even with <code>&lt;pre&gt;</code>/<code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> protection. If you need aggressive HTML minification for deployment, post-process the output of <code>public/</code> with a dedicated minifier (e.g. <code>html-minifier-terser</code>, <code>minify-html</code>) rather than relying on <code>--minify</code>.</p>
+<p><strong>About <code>--cache</code> (Incremental Build):</strong></p>
+<p>When enabled, Hwaro tracks file modification times and content checksums in a <code>.hwaro_cache.json</code> file at the project root. On subsequent builds, only files that have changed since the last build are re-rendered. The cache also tracks template and config checksums — if templates or <code>config.toml</code> change, all entries are automatically invalidated and every page is rebuilt.</p>
+<p>Use <code>--full</code> together with <code>--cache</code> to force a clean rebuild while still saving the cache for the next run:</p>
+<pre><code class="language-bash hljs">hwaro build --cache --full
+</code></pre>
+<p>See <a href="/features/incremental-build/">Incremental Build</a> for details.</p>
+<p><strong>About <code>-i, --input</code>:</strong></p>
+<p>When specified, Hwaro changes its working directory to the given path before building. This lets you build a site located in another directory without <code>cd</code>-ing into it first.</p>
+<ul>
+<li>All site sources (<code>config.toml</code>, <code>content/</code>, <code>templates/</code>, <code>static/</code>) are read from the input directory.</li>
+<li><strong>Without <code>-o</code>:</strong> The default output directory <code>public/</code> is created inside the input directory (i.e., the site's own <code>public/</code> folder). This is the natural behavior — <code>hwaro build -i ../my-site</code> produces <code>../my-site/public/</code>.</li>
+<li><strong>With <code>-o</code>:</strong> The output path is resolved relative to <strong>your current directory</strong> (not the input directory), so <code>hwaro build -i ../my-site -o ./dist</code> writes output to <code>./dist</code> in your shell's CWD.</li>
+<li>If <code>-i</code> is omitted, behavior is unchanged — the current directory is used.</li>
+</ul>
+<h3 id="serve">serve</h3>
+<p>Start a development server with live reload (enabled by default):</p>
+<pre><code class="language-bash hljs">hwaro serve
+hwaro serve --port 8080
+hwaro serve --open
+hwaro serve --access-log
+hwaro serve --no-live-reload
+hwaro serve -i /path/to/my-site
+hwaro serve -i /path/to/my-site -p 8080
+</code></pre>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-i, --input DIR</td>
+<td>Project directory to serve (default: current directory)</td>
+</tr>
+<tr>
+<td>-b, --bind HOST</td>
+<td>Bind address (default: 0.0.0.0)</td>
+</tr>
+<tr>
+<td>-p, --port PORT</td>
+<td>Port number (default: 3000)</td>
+</tr>
+<tr>
+<td>--base-url URL</td>
+<td>Temporarily override <code>base_url</code> from <code>config.toml</code></td>
+</tr>
+<tr>
+<td>--minify</td>
+<td>Serve minified output</td>
+</tr>
+<tr>
+<td>--open</td>
+<td>Open browser after starting</td>
+</tr>
+<tr>
+<td>-d, --drafts</td>
+<td>Include draft content</td>
+</tr>
+<tr>
+<td>--include-expired</td>
+<td>Include expired content</td>
+</tr>
+<tr>
+<td>--include-future</td>
+<td>Include future-dated content</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>Show detailed output</td>
+</tr>
+<tr>
+<td>--debug</td>
+<td>Print debug information after each rebuild</td>
+</tr>
+<tr>
+<td>--access-log</td>
+<td>Show HTTP access log (e.g. GET requests)</td>
+</tr>
+<tr>
+<td>--no-error-overlay</td>
+<td>Disable in-browser error overlay (default: enabled)</td>
+</tr>
+<tr>
+<td>--live-reload</td>
+<td>Enable browser live reload on file changes (default: enabled; kept for backwards compatibility)</td>
+</tr>
+<tr>
+<td>--no-live-reload</td>
+<td>Disable browser live reload on file changes</td>
+</tr>
+<tr>
+<td>--cache</td>
+<td>Enable build caching (skip unchanged files)</td>
+</tr>
+<tr>
+<td>--stream</td>
+<td>Enable streaming build to reduce memory usage</td>
+</tr>
+<tr>
+<td>--memory-limit SIZE</td>
+<td>Memory limit for streaming build (e.g. <code>2G</code>, <code>512M</code>)</td>
+</tr>
+<tr>
+<td>--skip-cache-busting</td>
+<td>Disable cache busting query parameters on CSS/JS resources</td>
+</tr>
+<tr>
+<td>--skip-og-image</td>
+<td>Skip auto OG image generation</td>
+</tr>
+<tr>
+<td>--skip-image-processing</td>
+<td>Skip image resizing and LQIP generation</td>
+</tr>
+<tr>
+<td>--profile</td>
+<td>Print phase-by-phase and per-template build timing</td>
+</tr>
+</tbody>
+</table>
+<p>The server watches for file changes and rebuilds automatically. It uses <strong>smart rebuild strategies</strong> based on what changed:</p>
+<table>
+<thead>
+<tr>
+<th>Change Type</th>
+<th>Strategy</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config.toml</code></td>
+<td>Full rebuild</td>
+<td>Rebuilds entire site</td>
+</tr>
+<tr>
+<td><code>content/</code> only</td>
+<td>Incremental</td>
+<td>Rebuilds only affected content pages</td>
+</tr>
+<tr>
+<td><code>templates/</code> only</td>
+<td>Template re-render</td>
+<td>Re-renders all pages with existing content</td>
+</tr>
+<tr>
+<td><code>static/</code> only</td>
+<td>Static copy</td>
+<td>Copies only changed static files</td>
+</tr>
+<tr>
+<td>Mixed / new / deleted files</td>
+<td>Full rebuild</td>
+<td>Rebuilds entire site</td>
+</tr>
+</tbody>
+</table>
+<p><strong>About live reload:</strong></p>
+<p>Live reload is <strong>enabled by default</strong>. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.</p>
+<p>Pass <code>--no-live-reload</code> to disable this behaviour (useful for testing production-like delivery locally). The <code>--live-reload</code> flag is kept as a no-op alias for backwards compatibility with existing invocations.</p>
+<p>When <code>-i</code> is specified, the server operates as if you had <code>cd</code>-ed into the given directory — watching and serving from that project root.</p>
+<h3 id="deploy">deploy</h3>
+<p>Deploy the generated site to configured targets.</p>
+<pre><code class="language-bash hljs">hwaro deploy [target ...]
+hwaro deploy --dry-run
+</code></pre>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-s, --source DIR</td>
+<td>Source directory to deploy (default: deployment.source_dir or public)</td>
+</tr>
+<tr>
+<td>--dry-run</td>
+<td>Show planned changes without writing</td>
+</tr>
+<tr>
+<td>--confirm</td>
+<td>Ask for confirmation before deploying</td>
+</tr>
+<tr>
+<td>--force</td>
+<td>Force upload/copy (ignore file comparisons)</td>
+</tr>
+<tr>
+<td>--max-deletes N</td>
+<td>Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)</td>
+</tr>
+<tr>
+<td>--list-targets</td>
+<td>List configured deployment targets and exit</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>Emit machine-readable JSON output (with --list-targets)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="doctor">doctor</h3>
+<p>Diagnose config, template, and structure issues (top-level shortcut):</p>
+<pre><code class="language-bash hljs">hwaro doctor               # Diagnose config, template, and structure issues
+hwaro doctor --fix         # Add missing config sections to config.toml
+</code></pre>
+<p><strong>Exit codes.</strong> <code>doctor</code> returns a classified exit code based on the most
+severe issue reported, so CI pipelines can gate on it directly:</p>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No issues, warnings only, or info-level findings</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Config errors (missing/broken <code>config.toml</code>)</td>
+<td><code>3</code> (<code>HWARO_E_CONFIG</code>)</td>
+</tr>
+<tr>
+<td>Template errors (missing required file, unclosed tags)</td>
+<td><code>4</code> (<code>HWARO_E_TEMPLATE</code>)</td>
+</tr>
+<tr>
+<td>Content errors (malformed front matter, when the check lands)</td>
+<td><code>5</code> (<code>HWARO_E_CONTENT</code>)</td>
+</tr>
+<tr>
+<td>Other error-level issues</td>
+<td><code>1</code></td>
+</tr>
+</tbody>
+</table>
+<p>Warnings (empty <code>base_url</code>, trailing slash, duplicate taxonomy names, etc.)
+are advisory and never change the exit code.</p>
+<p>For content validation, use <code>hwaro tool validate</code>. See <a href="/start/tools/doctor/">doctor</a> for details.</p>
+<h3 id="tool">tool</h3>
+<p>Utility tools for content management:</p>
+<pre><code class="language-bash hljs"># Content tools
+hwaro tool list all             # List all content files
+hwaro tool list drafts          # List draft files
+hwaro tool convert to-yaml      # Convert frontmatter to YAML
+hwaro tool convert to-toml      # Convert frontmatter to TOML
+hwaro tool convert to-json      # Convert frontmatter to JSON
+hwaro tool check-links          # Check for dead external links
+hwaro tool stats                # Show content statistics
+hwaro tool validate             # Validate content frontmatter and markup
+hwaro tool unused-assets        # Find unreferenced static files
+
+# Site tools
+hwaro tool platform netlify       # Generate Netlify config
+hwaro tool platform vercel        # Generate Vercel config
+hwaro tool platform cloudflare    # Generate Cloudflare Pages config
+hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
+hwaro tool platform gitlab-ci     # Generate GitLab CI config
+hwaro tool platform codeberg-pages # Generate Codeberg Pages (Forgejo Actions) workflow
+hwaro tool doctor                 # Diagnose config/template/structure issues
+hwaro tool import hugo /path      # Import from Hugo
+hwaro tool import jekyll /path    # Import from Jekyll
+hwaro tool export hugo            # Export to Hugo format
+hwaro tool export jekyll          # Export to Jekyll format
+hwaro tool agents-md --write      # Write AGENTS.md to file
+
+# JSON output
+hwaro tool list all --json
+hwaro tool stats --json
+hwaro tool validate --json
+hwaro tool unused-assets --json
+hwaro tool doctor --json
+hwaro tool check-links --json
+</code></pre>
+<p><strong>Subcommands:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Subcommand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/list/">list</a></td>
+<td>List content files by status (all, drafts, published)</td>
+</tr>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/convert/">convert</a></td>
+<td>Convert frontmatter between TOML, YAML, and JSON formats</td>
+</tr>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/check-links/">check-links</a></td>
+<td>Check for dead links in content files</td>
+</tr>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/stats/">stats</a></td>
+<td>Show content statistics</td>
+</tr>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/validate/">validate</a></td>
+<td>Validate content frontmatter and markup</td>
+</tr>
+<tr>
+<td>Content</td>
+<td><a href="/start/tools/unused-assets/">unused-assets</a></td>
+<td>Find unreferenced static files</td>
+</tr>
+<tr>
+<td>Site</td>
+<td><a href="/start/tools/platform/">platform</a></td>
+<td>Generate platform config and CI/CD workflow files</td>
+</tr>
+<tr>
+<td>Site</td>
+<td><a href="/start/tools/doctor/">doctor</a></td>
+<td>Diagnose config, template, and structure issues</td>
+</tr>
+<tr>
+<td>Site</td>
+<td>import</td>
+<td>Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy</td>
+</tr>
+<tr>
+<td>Site</td>
+<td><a href="/start/tools/export/">export</a></td>
+<td>Export content to Hugo or Jekyll</td>
+</tr>
+<tr>
+<td>Site</td>
+<td><a href="/start/tools/agents-md/">agents-md</a></td>
+<td>Generate or update AGENTS.md file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Common Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-c, --content DIR</td>
+<td>Limit to specific content directory</td>
+</tr>
+<tr>
+<td>-j, --json</td>
+<td>Output result as JSON</td>
+</tr>
+<tr>
+<td>-h, --help</td>
+<td>Show help</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/start/tools/">Tools &amp; Completion</a> for detailed usage.</p>
+<h3 id="completion">completion</h3>
+<p>Generate shell completion scripts:</p>
+<pre><code class="language-bash hljs">hwaro completion bash    # Bash completion script
+hwaro completion zsh     # Zsh completion script
+hwaro completion fish    # Fish completion script
+</code></pre>
+<p><strong>Installation:</strong></p>
+<pre><code class="language-bash hljs"># Bash (add to ~/.bashrc)
+eval &quot;$(hwaro completion bash)&quot;
+
+# Zsh (add to ~/.zshrc)
+eval &quot;$(hwaro completion zsh)&quot;
+
+# Fish (add to ~/.config/fish/config.fish)
+hwaro completion fish | source
+</code></pre>
+<p>See <a href="/start/tools/">Tools &amp; Completion</a> for detailed installation instructions.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-bash hljs"># Development workflow
+hwaro serve --drafts --verbose
+
+# Development with HTTP access log
+hwaro serve --access-log
+
+# Development without live reload (production-like serving)
+hwaro serve --no-live-reload
+
+# Production build
+hwaro build
+
+# Custom output directory
+hwaro build -o dist
+
+# Preview on specific port
+hwaro serve -p 8000 --open
+
+# Build a site in another directory
+hwaro build -i ~/projects/my-blog
+
+# Build a remote project and output to current directory
+hwaro build -i ~/projects/my-blog -o ./output
+
+# Incremental build (skip unchanged files)
+hwaro build --cache
+
+# Force full rebuild and repopulate cache
+hwaro build --cache --full
+
+# Streaming build for large sites
+hwaro build --stream
+hwaro build --memory-limit 512M
+
+# Streaming build with env var
+HWARO_MEMORYLIMIT=1G hwaro build
+
+# Serve a site from another directory
+hwaro serve -i ~/projects/my-blog --open
+</code></pre>
+<h2 id="global-options">Global Options</h2>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-h, --help</td>
+<td>Show help</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>Verbose output</td>
+</tr>
+</tbody>
+</table>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/config/">Configuration</a> — Config options that CLI flags override</li>
+<li><a href="/features/build-hooks/">Build Hooks</a> — Pre/post build commands</li>
+<li><a href="/start/tools/">Tools &amp; Completion</a> — Utility subcommands</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#global-flags">Global flags</a><ul><li><a href="#error-taxonomy">Error taxonomy</a></li></ul></li><li><a href="#commands">Commands</a><ul><li><a href="#init">init</a></li><li><a href="#new">new</a></li><li><a href="#build">build</a></li><li><a href="#serve">serve</a></li><li><a href="#deploy">deploy</a></li><li><a href="#doctor">doctor</a></li><li><a href="#tool">tool</a></li><li><a href="#completion">completion</a></li></ul></li><li><a href="#examples">Examples</a></li><li><a href="#global-options">Global Options</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>

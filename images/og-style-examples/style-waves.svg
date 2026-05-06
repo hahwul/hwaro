@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#1a1a2e" />
+<path d="M 0 210 Q 300 190 600 210 T 1200 210" fill="none" stroke="#e94560" stroke-width="2" opacity="0.15" />
+<path d="M 0 290 Q 300 270 600 290 T 1200 290" fill="none" stroke="#e94560" stroke-width="2" opacity="0.15" />
+<path d="M 0 370 Q 300 350 600 370 T 1200 370" fill="none" stroke="#e94560" stroke-width="2" opacity="0.15" />
+<rect width="1200" height="6" fill="#e94560" />
+<text x="80" y="311" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="48" font-weight="700" fill="#ffffff">Example Blog Post Title</text>
+<text x="80" y="383" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="21" font-weight="400" fill="#ffffff" opacity="0.75">This is a sample description for the style preview</text>
+<text x="80" y="565" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" font-weight="600" fill="#e94560">My Site</text>
+<rect y="624" width="1200" height="6" fill="#e94560" />
+</svg>

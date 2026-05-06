@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Hwaro is a fast static site generator built with Crystal" />
+        <title>
+            Hwaro - Fast & Lightweight Static Site Generator
+        </title>
+        <meta property="og:title" content="Hwaro Documentation">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/">
+<meta property="og:description" content="Hwaro is a fast static site generator built with Crystal">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/hwaro-documentation.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hwaro Documentation">
+<meta name="twitter:description" content="Hwaro is a fast static site generator built with Crystal">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/hwaro-documentation.png">
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+
+        <style>
+            /* Shared SVG animation keyframes */
+            .fire-pulse {
+                transform-origin: center 144px;
+                animation: pulse 1.5s infinite alternate ease-in-out;
+            }
+            @keyframes pulse {
+                0% {
+                    transform: scaleY(1);
+                    opacity: 0.92;
+                }
+                100% {
+                    transform: scaleY(1.03);
+                    opacity: 1;
+                }
+            }
+            .spark {
+                animation-timing-function: ease-in;
+                animation-iteration-count: infinite;
+            }
+            .spark-1 {
+                animation-name: flyUp1;
+                animation-duration: 2s;
+            }
+            .spark-2 {
+                animation-name: flyUp2;
+                animation-duration: 2.5s;
+                animation-delay: 0.5s;
+            }
+            .spark-3 {
+                animation-name: flyUp3;
+                animation-duration: 1.8s;
+                animation-delay: 1.2s;
+            }
+            @keyframes flyUp1 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 0.8;
+                }
+                100% {
+                    transform: translateY(-40px);
+                    opacity: 0;
+                }
+            }
+            @keyframes flyUp2 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(-50px);
+                    opacity: 0;
+                }
+            }
+            @keyframes flyUp3 {
+                0% {
+                    transform: translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 0.9;
+                }
+                100% {
+                    transform: translateY(-45px);
+                    opacity: 0;
+                }
+            }
+        </style>
+    </head>
+    <body class="landing-body">
+        <header class="landing-header">
+            <a href="https://hwaro.hahwul.com/" class="logo">
+                <img src="/hwaro-wide.webp" style="height: 40px" />
+            </a>
+            <nav>
+                <a href="https://hwaro.hahwul.com/start/">Docs</a>
+                <a
+                    href="https://examples.hwaro.hahwul.com"
+                    target="_blank"
+                    rel="noopener"
+                    >Examples</a
+                >
+                <a
+                    href="https://github.com/hahwul/hwaro"
+                    class="github-link"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="18"
+                        height="18"
+                    >
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                        />
+                    </svg>
+                </a>
+            </nav>
+        </header>
+
+        <main>
+            <!-- ============================================================
+                 HERO — SVG as full background, text overlaid
+                 ============================================================ -->
+            <section class="hero">
+                <div class="hero-bg">
+                    <canvas id="ember-canvas"></canvas>
+                </div>
+                <div class="hero-content">
+                    <h1>
+                        Fast by default.<br /><span class="highlight"
+                            >Yours by design.</span
+                        >
+                    </h1>
+                    <p class="hero-sub">
+                        A static site generator built with Crystal.<br />
+                        No themes, no lock-in. Your content, your structure,
+                        your speed.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="https://hwaro.hahwul.com/start/" class="btn btn-primary"
+                            >Get Started</a
+                        >
+                        <a
+                            href="https://github.com/hahwul/hwaro"
+                            class="btn btn-ghost"
+                            target="_blank"
+                            rel="noopener"
+                            >GitHub</a
+                        >
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 FEATURES
+                 ============================================================ -->
+            <section class="features">
+                <div class="features-header">
+                    <h2>Everything built in.</h2>
+                    <p>No plugins needed. Enable in config.toml and go.</p>
+                </div>
+                <div class="features-list">
+                    <div class="feature-row">
+                        <h3>blazing_fast</h3>
+                        <p>
+                            Parallel processing, incremental builds, and
+                            streaming mode. Build thousands of pages in seconds.
+                        </p>
+                    </div>
+                    <div class="feature-row">
+                        <h3>markdown_first</h3>
+                        <p>
+                            Write in Markdown with TOML front matter. Footnotes,
+                            task lists, math, and Mermaid diagrams built in.
+                        </p>
+                    </div>
+                    <div class="feature-row">
+                        <h3>flexible_templates</h3>
+                        <p>
+                            Jinja2 templating with inheritance, filters,
+                            functions, and shortcodes. No theme lock-in — build
+                            your own.
+                        </p>
+                    </div>
+                    <div class="feature-row">
+                        <h3>built_in_seo</h3>
+                        <p>
+                            Sitemaps, RSS/Atom feeds, OpenGraph, Twitter Cards,
+                            JSON-LD structured data, auto OG images, and
+                            LLMs.txt.
+                        </p>
+                    </div>
+                    <div class="feature-row">
+                        <h3>taxonomies</h3>
+                        <p>
+                            Tags, categories, and custom taxonomies with
+                            automatic index pages, feeds, and pagination.
+                        </p>
+                    </div>
+                    <div class="feature-row">
+                        <h3>extensible</h3>
+                        <p>
+                            Build hooks, asset pipeline, image processing,
+                            multilingual support, PWA, and AMP — all built in.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 BENCHMARK
+                 ============================================================ -->
+            <section class="benchmark">
+                <div class="benchmark-header">
+                    <h2>1,000 pages. Under 7 seconds.</h2>
+                    <p>Benchmarked against popular static site generators.</p>
+                </div>
+                <div class="benchmark-bars">
+                    <div class="bench-row">
+                        <span class="bench-name">Zola</span>
+                        <div class="bench-track">
+                            <div class="bench-bar" style="width: 63%"></div>
+                        </div>
+                        <span class="bench-time">5.2s</span>
+                    </div>
+                    <div class="bench-row bench-highlight">
+                        <span class="bench-name">Hwaro</span>
+                        <div class="bench-track">
+                            <div class="bench-bar" style="width: 75%"></div>
+                        </div>
+                        <span class="bench-time">6.2s</span>
+                    </div>
+                    <div class="bench-row">
+                        <span class="bench-name">Hugo</span>
+                        <div class="bench-track">
+                            <div class="bench-bar" style="width: 100%"></div>
+                        </div>
+                        <span class="bench-time">8.2s</span>
+                    </div>
+                    <div class="bench-row">
+                        <span class="bench-name">Eleventy</span>
+                        <div class="bench-track">
+                            <div class="bench-bar" style="width: 109%"></div>
+                        </div>
+                        <span class="bench-time">9.0s</span>
+                    </div>
+                    <div class="bench-row">
+                        <span class="bench-name">Jekyll</span>
+                        <div class="bench-track">
+                            <div class="bench-bar" style="width: 141%"></div>
+                        </div>
+                        <span class="bench-time">11.6s</span>
+                    </div>
+                </div>
+                <p class="benchmark-link">
+                    <a
+                        href="https://hahwul.github.io/ssg-benchmark/"
+                        target="_blank"
+                        rel="noopener"
+                        >Full benchmark results →</a
+                    >
+                </p>
+            </section>
+
+            <!-- ============================================================
+                 SHOWCASE
+                 ============================================================ -->
+            <section class="showcase">
+                <div class="showcase-header">
+                    <h2>Built with Hwaro</h2>
+                    <p>
+                        From docs to blogs to landing pages — all from
+                        <code>hwaro init</code>.
+                    </p>
+                </div>
+                <div class="showcase-grid">
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/neon-tokyo/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/neon-tokyo.png"
+                                alt="neon-tokyo"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">neon-tokyo</span>
+                            <span class="showcase-tag">landing</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/clean-seoul/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/clean-seoul.png"
+                                alt="clean-seoul"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">clean-seoul</span>
+                            <span class="showcase-tag">blog</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/dojo/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/dojo.png"
+                                alt="dojo"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">dojo</span>
+                            <span class="showcase-tag">docs</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/terraform/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/terraform.png"
+                                alt="terraform"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">terraform</span>
+                            <span class="showcase-tag">dashboard</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/neobrutal/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/neobrutal.png"
+                                alt="neobrutal"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">neobrutal</span>
+                            <span class="showcase-tag">landing</span>
+                        </div>
+                    </a>
+                    <a
+                        href="https://hahwul.github.io/hwaro-examples/kinetic-typography/"
+                        class="showcase-card"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <div class="showcase-preview">
+                            <img
+                                src="https://examples.hwaro.hahwul.com/screenshots/kinetic-typography.png"
+                                alt="kinetic-typography"
+                                loading="lazy"
+                            />
+                        </div>
+                        <div class="showcase-info">
+                            <span class="showcase-name">kinetic-typography</span>
+                            <span class="showcase-tag">landing</span>
+                        </div>
+                    </a>
+                </div>
+                <p class="showcase-link">
+                    <a
+                        href="https://examples.hwaro.hahwul.com"
+                        target="_blank"
+                        rel="noopener"
+                        >View all examples →</a
+                    >
+                </p>
+            </section>
+
+            <!-- ============================================================
+                 CTA
+                 ============================================================ -->
+            <section class="landing-cta">
+                <p class="cta-heading">Start building.</p>
+                <p class="cta-sub">
+                    One command to install. Three lines to deploy.
+                </p>
+                <div class="cta-install">
+                    <code>brew install hwaro/hwaro/hwaro</code>
+                </div>
+                <div class="cta-buttons">
+                    <a href="https://hwaro.hahwul.com/start/" class="btn btn-primary"
+                        >Read the Docs</a
+                    >
+                    <a
+                        href="https://hwaro.hahwul.com/start/installation/"
+                        class="btn btn-ghost"
+                        >Installation Guide</a
+                    >
+                </div>
+            </section>
+        </main>
+
+        <footer class="landing-footer">
+            <p>
+                <a href="https://www.hahwul.com" target="_blank" rel="noopener"
+                    ><img src="/images/hahwul.webp" class="hahwul-img"
+                /></a>
+            </p>
+            <p style="margin-top: 1rem; color: gray; font-family: 'Bradley Hand', cursive;">Built with Love</p>
+        </footer>
+        <script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+        <script>
+        (function() {
+            var canvas = document.getElementById('ember-canvas');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            var hero = canvas.closest('.hero');
+            var embers = [];
+            var MAX = 40;
+
+            function resize() {
+                canvas.width = hero.offsetWidth;
+                canvas.height = hero.offsetHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            function Ember() {
+                this.reset();
+                this.y = Math.random() * canvas.height;
+            }
+
+            Ember.prototype.reset = function() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + 4;
+                this.r = Math.random() * 2.2 + 0.8;
+                this.vx = (Math.random() - 0.5) * 0.6;
+                this.vy = -(Math.random() * 1.2 + 0.4);
+                this.life = 1;
+                this.decay = Math.random() * 0.008 + 0.003;
+                this.drift = Math.random() * 0.3 + 0.1;
+                this.wobble = Math.random() * Math.PI * 2;
+                var hue = Math.random();
+                if (hue < 0.5) {
+                    this.color = [255, 160 + Math.random() * 60 | 0, 30 + Math.random() * 30 | 0];
+                } else if (hue < 0.8) {
+                    this.color = [255, 80 + Math.random() * 60 | 0, 20 + Math.random() * 20 | 0];
+                } else {
+                    this.color = [255, 220 + Math.random() * 35 | 0, 80 + Math.random() * 60 | 0];
+                }
+            };
+
+            Ember.prototype.update = function() {
+                this.wobble += 0.04;
+                this.x += this.vx + Math.sin(this.wobble) * this.drift;
+                this.y += this.vy;
+                this.life -= this.decay;
+                if (this.life <= 0 || this.y < -10 || this.x < -10 || this.x > canvas.width + 10) {
+                    this.reset();
+                }
+            };
+
+            Ember.prototype.draw = function(ctx) {
+                var a = this.life * 0.7;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + a + ')';
+                ctx.shadowColor = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + (a * 0.5) + ')';
+                ctx.shadowBlur = this.r * 6;
+                ctx.fill();
+            };
+
+            for (var i = 0; i < MAX; i++) {
+                embers.push(new Ember());
+            }
+
+            function loop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                for (var i = 0; i < embers.length; i++) {
+                    embers[i].update();
+                    embers[i].draw(ctx);
+                }
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                requestAnimationFrame(loop);
+            }
+            loop();
+        })();
+        </script>
+    </body>
+</html>

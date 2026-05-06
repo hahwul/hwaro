@@ -1,0 +1,395 @@
+/* =============================================================================
+   Header — matches landing nav style
+   ============================================================================= */
+
+.docs-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-h);
+    background: rgba(8, 8, 10, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    z-index: 100;
+}
+
+.docs-header .logo {
+    text-decoration: none;
+    margin-right: 2.5rem;
+    display: flex;
+    align-items: center;
+    border-bottom: none;
+}
+
+.docs-header .logo:hover {
+    opacity: 0.8;
+    border-bottom: none;
+}
+
+.docs-header .logo img {
+    border-radius: 0;
+    border: none;
+}
+
+.docs-header nav {
+    display: flex;
+    gap: 0.125rem;
+}
+
+.docs-header nav a {
+    font-family: var(--font-sans);
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.docs-header nav a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.docs-header nav a.active {
+    color: #fff;
+}
+
+.header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.header-link {
+    font-family: var(--font-sans);
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.header-link:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.github-link {
+    color: #888;
+    text-decoration: none;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.github-link:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.github-link svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* =============================================================================
+   Layout container
+   ============================================================================= */
+
+.docs-container {
+    display: flex;
+    padding-top: var(--header-h);
+    min-height: 100vh;
+}
+
+/* =============================================================================
+   Sidebar - fixed left navigation
+   ============================================================================= */
+
+.docs-sidebar {
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    width: var(--sidebar-w);
+    height: calc(100vh - var(--header-h));
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    padding: 1.25rem 0.75rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--border-light);
+}
+
+.sidebar-section {
+    margin-bottom: 1.5rem;
+}
+
+.sidebar-title {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.08em;
+    padding-left: 0.75rem;
+}
+
+.sidebar-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-links li {
+    margin-bottom: 1px;
+}
+
+.sidebar-links a {
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.4rem 0.75rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.835rem;
+    font-weight: 400;
+    transition: all 0.12s ease;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+    border-bottom: none;
+    margin-left: 0;
+}
+
+.sidebar-links a:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+    border-bottom: none;
+}
+
+.sidebar-links a.active {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 500;
+    border-bottom: none;
+}
+
+/* Nested groups (e.g., Features sub-categories) */
+.sidebar-group {
+    margin-top: 0.5rem;
+}
+
+.sidebar-group-title {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 0.35rem 0.75rem 0.15rem;
+    letter-spacing: 0.03em;
+}
+
+.sidebar-sublinks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-sublinks li {
+    margin-bottom: 1px;
+}
+
+.sidebar-sublinks a {
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.3rem 0.75rem 0.3rem 1.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 400;
+    transition: all 0.12s ease;
+    border-radius: 6px;
+    border-bottom: none;
+}
+
+.sidebar-sublinks a:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+    border-bottom: none;
+}
+
+.sidebar-sublinks a.active {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 500;
+    border-bottom: none;
+}
+
+/* =============================================================================
+   TOC Sidebar - fixed right
+   ============================================================================= */
+
+.docs-toc {
+    position: fixed;
+    top: var(--header-h);
+    right: 0;
+    width: var(--toc-w);
+    height: calc(100vh - var(--header-h));
+    padding: 1.5rem 1rem 4rem 1rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.docs-toc::-webkit-scrollbar {
+    width: 5px;
+}
+
+.docs-toc::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.docs-toc::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.toc-title {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.08em;
+}
+
+.docs-toc > ul,
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--border);
+}
+
+.docs-toc ul ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: none;
+}
+
+.docs-toc li,
+.toc-list li {
+    margin-bottom: 0;
+}
+
+.docs-toc a,
+.toc-list a {
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.3rem 0.75rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    transition: all 0.12s ease;
+    border-left: 1px solid transparent;
+    margin-left: -1px;
+    border-bottom: none;
+}
+
+.docs-toc a:hover,
+.toc-list a:hover {
+    color: var(--text-muted);
+    border-left-color: var(--border-light);
+    border-bottom: none;
+}
+
+.docs-toc a.active,
+.toc-list a.active {
+    color: var(--text);
+    border-left-color: var(--primary);
+    border-bottom: none;
+}
+
+/* Nested TOC levels - indentation */
+.docs-toc ul ul a {
+    padding-left: 1.25rem;
+    font-size: 0.74rem;
+}
+
+.docs-toc ul ul ul a {
+    padding-left: 1.75rem;
+    font-size: 0.74rem;
+}
+
+.toc-list .toc-h3 {
+    padding-left: 1.25rem;
+    font-size: 0.74rem;
+}
+
+.toc-list .toc-h4 {
+    padding-left: 1.75rem;
+    font-size: 0.74rem;
+}
+
+/* =============================================================================
+   Main content area
+   ============================================================================= */
+
+.docs-main {
+    flex: 1;
+    margin-left: var(--sidebar-w);
+    margin-right: var(--toc-w);
+    padding: 2.5rem 3.5rem;
+    max-width: calc(100% - var(--sidebar-w) - var(--toc-w));
+    min-width: 0;
+}
+
+.docs-main > *:not(.docs-footer) {
+    max-width: 800px;
+}
+
+/* When TOC is hidden, expand main content */
+.docs-main.no-toc {
+    margin-right: 0;
+    max-width: calc(100% - var(--sidebar-w));
+}

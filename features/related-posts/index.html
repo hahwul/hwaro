@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Recommend related content based on shared taxonomy terms">
+  <title>Related Posts - Hwaro</title>
+  <meta property="og:title" content="Related Posts">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/features/related-posts/">
+<meta property="og:description" content="Recommend related content based on shared taxonomy terms">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-related-posts.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Related Posts">
+<meta name="twitter:description" content="Recommend related content based on shared taxonomy terms">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-related-posts.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/" class="active">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main no-toc">
+    <h1>Related Posts</h1>
+    <p>Automatically recommend related content based on shared taxonomy terms (tags, categories, etc.).</p>
+<h2 id="configuration">Configuration</h2>
+<p>Enable in <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs">[related]
+enabled = true
+limit = 5
+taxonomies = [&quot;tags&quot;]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable related posts computation</td>
+</tr>
+<tr>
+<td>limit</td>
+<td>int</td>
+<td>5</td>
+<td>Maximum number of related posts per page</td>
+</tr>
+<tr>
+<td>taxonomies</td>
+<td>array</td>
+<td>[&quot;tags&quot;]</td>
+<td>Taxonomy names used to compute similarity</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-it-works">How It Works</h2>
+<ol>
+<li>Hwaro builds an inverted index of taxonomy terms to pages</li>
+<li>For each page, it counts how many taxonomy terms are shared with other pages</li>
+<li>Pages with more shared terms rank higher</li>
+<li>Results are filtered by language (multilingual sites only show same-language posts)</li>
+<li>The top N results (up to <code>limit</code>) are assigned as related posts</li>
+</ol>
+<p>Draft pages, index pages, and generated pages are excluded from related post computation.</p>
+<h2 id="template-variable">Template Variable</h2>
+<p>Each page has a <code>related_posts</code> array containing the related pages sorted by relevance:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>related_posts</td>
+<td>array</td>
+<td>Pages related to the current page, sorted by shared term count</td>
+</tr>
+</tbody>
+</table>
+<p>Each item in <code>related_posts</code> is a full page object with access to all page variables (<code>title</code>, <code>url</code>, <code>description</code>, <code>date</code>, <code>tags</code>, etc.).</p>
+<h2 id="usage-in-templates">Usage in Templates</h2>
+<h3 id="basic-related-posts">Basic Related Posts</h3>
+<pre><code class="language-jinja hljs">{% if related_posts | length &gt; 0 %}
+&lt;section class=&quot;related-posts&quot;&gt;
+  &lt;h2&gt;Related Posts&lt;/h2&gt;
+  &lt;ul&gt;
+    {% for post in related_posts %}
+    &lt;li&gt;
+      &lt;a href=&quot;{{ post.url }}&quot;&gt;{{ post.title }}&lt;/a&gt;
+      {% if post.description %}
+        &lt;p&gt;{{ post.description }}&lt;/p&gt;
+      {% endif %}
+    &lt;/li&gt;
+    {% endfor %}
+  &lt;/ul&gt;
+&lt;/section&gt;
+{% endif %}
+</code></pre>
+<h3 id="with-tags-display">With Tags Display</h3>
+<pre><code class="language-jinja hljs">{% if related_posts | length &gt; 0 %}
+&lt;aside class=&quot;related&quot;&gt;
+  &lt;h3&gt;You might also like&lt;/h3&gt;
+  {% for post in related_posts %}
+  &lt;article&gt;
+    &lt;a href=&quot;{{ post.url }}&quot;&gt;{{ post.title }}&lt;/a&gt;
+    &lt;div class=&quot;tags&quot;&gt;
+      {% for tag in post.tags %}
+        &lt;span class=&quot;tag&quot;&gt;{{ tag }}&lt;/span&gt;
+      {% endfor %}
+    &lt;/div&gt;
+  &lt;/article&gt;
+  {% endfor %}
+&lt;/aside&gt;
+{% endif %}
+</code></pre>
+<h2 id="using-multiple-taxonomies">Using Multiple Taxonomies</h2>
+<p>You can base related posts on multiple taxonomies for better relevance:</p>
+<pre><code class="language-toml hljs">[related]
+enabled = true
+limit = 5
+taxonomies = [&quot;tags&quot;, &quot;categories&quot;]
+</code></pre>
+<p>Posts sharing terms in multiple taxonomies will rank higher. For example, a post sharing 2 tags and 1 category with another post scores 3, while a post sharing only 1 tag scores 1.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/writing/taxonomies/">Taxonomies</a> — Tags and categories used for scoring</li>
+<li><a href="/features/series/">Series</a> — Ordered content grouping</li>
+<li><a href="/start/config/">Configuration</a> — Related posts config reference</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>

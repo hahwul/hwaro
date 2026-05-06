@@ -1,0 +1,752 @@
+/* =============================================================================
+   Landing Page — x.ai-inspired minimal dark
+   ============================================================================= */
+
+.landing-body {
+    background: #000;
+    color: #e8e8e8;
+}
+
+/* =============================================================================
+   Header — transparent, ultra-minimal
+   ============================================================================= */
+
+.landing-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 3rem;
+    z-index: 100;
+}
+
+.landing-header .logo {
+    text-decoration: none;
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+}
+
+.landing-header .logo:hover {
+    border-bottom: none;
+    opacity: 0.8;
+}
+
+.landing-header .logo img {
+    border-radius: 0;
+    border: none;
+}
+
+.landing-header nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.landing-header nav a {
+    font-family: var(--font-sans);
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.landing-header nav a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.landing-header .github-link {
+    display: flex;
+    align-items: center;
+    border-bottom: none;
+}
+
+.landing-header .github-link:hover {
+    border-bottom: none;
+}
+
+.landing-header .github-link svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* =============================================================================
+   Hero — SVG as immersive background, text overlaid
+   ============================================================================= */
+
+.hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+
+.hero-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 0;
+}
+
+#ember-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.hero-bg svg {
+    width: 70vw;
+    max-width: 700px;
+    height: auto;
+    opacity: 0.12;
+    filter: blur(2px);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 0 2rem;
+    max-width: 960px;
+    width: 100%;
+}
+
+.hero-content h1 {
+    font-family: var(--font-sans);
+    font-size: 4.5rem;
+    font-weight: 800;
+    margin: 0 0 1.5rem 0;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    color: #fff;
+}
+
+.hero-content h1 .highlight {
+    color: var(--primary);
+    -webkit-text-fill-color: var(--primary);
+    background: none;
+}
+
+.hero-sub {
+    font-family: var(--font-sans);
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: #999;
+    margin: 0 0 3rem 0;
+    line-height: 1.8;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+
+.btn {
+    font-family: var(--font-sans);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 2rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    border: none;
+    border-bottom: none;
+}
+
+.btn:hover {
+    border-bottom: none;
+}
+
+.btn-primary {
+    background: #fff;
+    color: #000;
+}
+
+.btn-primary:hover {
+    background: #e0e0e0;
+    color: #000;
+    transform: translateY(-1px);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #888;
+    border: 1px solid #333;
+}
+
+.btn-ghost:hover {
+    color: #fff;
+    border-color: #555;
+}
+
+/* =============================================================================
+   Features — horizontal rows
+   ============================================================================= */
+
+.features {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 6rem 2rem;
+    border-top: 1px solid #181818;
+}
+
+.features-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.features-header h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.features-header h2::before {
+    display: none;
+}
+
+.features-header p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0;
+}
+
+.features-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2rem;
+    align-items: baseline;
+    padding: 1.4rem 0;
+    border-bottom: 1px solid #141414;
+}
+
+.feature-row:last-child {
+    border-bottom: none;
+}
+
+.feature-row h3 {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.feature-row h3::before {
+    display: none;
+}
+
+.feature-row p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: #999;
+    margin: 0;
+    line-height: 1.7;
+}
+
+/* =============================================================================
+   Benchmark
+   ============================================================================= */
+
+.benchmark {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 6rem 2rem;
+    border-top: 1px solid #181818;
+}
+
+.benchmark-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.benchmark-header h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.benchmark-header h2::before {
+    display: none;
+}
+
+.benchmark-header p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0;
+}
+
+.benchmark-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.bench-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 50px;
+    gap: 1rem;
+    align-items: center;
+}
+
+.bench-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #666;
+    text-align: right;
+}
+
+.bench-track {
+    height: 6px;
+    background: #111;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bench-bar {
+    height: 100%;
+    background: #333;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.bench-time {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: #555;
+}
+
+/* Highlight Hwaro row */
+.bench-highlight .bench-name {
+    color: #fff;
+    font-weight: 600;
+}
+
+.bench-highlight .bench-bar {
+    background: var(--primary);
+}
+
+.bench-highlight .bench-time {
+    color: #fff;
+}
+
+.benchmark-link {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.benchmark-link a {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: #555;
+    text-decoration: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.benchmark-link a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+/* =============================================================================
+   Code Section
+   ============================================================================= */
+
+.code-section {
+    padding: 6rem 2rem;
+    max-width: 680px;
+    margin: 0 auto;
+    border-top: 1px solid #181818;
+}
+
+.code-header-text {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.code-header-text h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.03em;
+}
+
+.code-header-text h2::before {
+    display: none;
+}
+
+.code-block {
+    background: #050506;
+    border: 1px solid #1a1a1e;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.code-block::before {
+    display: none;
+}
+
+.code-header {
+    font-family: var(--font-mono);
+    background: #0a0a0c;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #1a1a1e;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #444;
+}
+
+.code-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.code-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.code-dot.red { background: #ec6a5e; }
+.code-dot.yellow { background: #f5bf4f; }
+.code-dot.green { background: #61c554; }
+
+.code-content {
+    padding: 1.5rem;
+    overflow-x: auto;
+}
+
+.code-content pre {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.8;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.code-content pre::before {
+    display: none;
+}
+
+.code-content .comment { color: #555; }
+.code-content .command { color: var(--primary); }
+.code-content .prompt { color: #666; }
+
+/* =============================================================================
+   Showcase
+   ============================================================================= */
+
+.showcase {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 6rem 2rem;
+    border-top: 1px solid #181818;
+}
+
+.showcase-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.showcase-header h2 {
+    font-family: var(--font-sans);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.showcase-header h2::before {
+    display: none;
+}
+
+.showcase-header p {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0;
+}
+
+.showcase-header code {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #999;
+    background: #111;
+    border: 1px solid #1a1a1e;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+}
+
+.showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.showcase-card {
+    display: block;
+    background: #0a0a0c;
+    border: 1px solid #1a1a1e;
+    border-radius: 10px;
+    overflow: hidden;
+    text-decoration: none;
+    border-bottom: none;
+    transition: border-color 0.2s ease;
+}
+
+.showcase-card:hover {
+    border-color: #333;
+    border-bottom: none;
+}
+
+.showcase-preview {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #050506;
+}
+
+.showcase-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+    border-radius: 0;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
+.showcase-card:hover .showcase-preview img {
+    opacity: 1;
+}
+
+.showcase-info {
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.showcase-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.showcase-tag {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #141416;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.showcase-link {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.showcase-link a {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: #555;
+    text-decoration: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.showcase-link a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+/* =============================================================================
+   CTA
+   ============================================================================= */
+
+.landing-cta {
+    text-align: center;
+    padding: 8rem 2rem;
+    border-top: 1px solid #181818;
+}
+
+.cta-heading {
+    font-family: var(--font-sans);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.03em;
+}
+
+.cta-sub {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 300;
+    color: #666;
+    margin: 0 0 2.5rem 0;
+}
+
+.cta-install {
+    margin-bottom: 2.5rem;
+}
+
+.cta-install code {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: #999;
+    background: #0a0a0c;
+    border: 1px solid #1a1a1e;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+/* =============================================================================
+   Footer
+   ============================================================================= */
+
+.landing-footer {
+    padding: 3rem 2rem;
+    text-align: center;
+    border-top: 1px solid #111;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: #444;
+}
+
+.landing-footer::before {
+    display: none;
+}
+
+.landing-footer p {
+    margin: 0;
+}
+
+.landing-footer a {
+    color: #666;
+    text-decoration: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.landing-footer a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.hahwul-img {
+    width: 80px;
+    filter: grayscale(100%) brightness(0.4);
+    transition: filter 0.3s ease;
+}
+
+.hahwul-img:hover {
+    filter: grayscale(0%) brightness(1.2);
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .landing-header {
+        padding: 0 1.5rem;
+    }
+
+    .hero-content h1 {
+        font-size: 2.8rem;
+    }
+
+    .hero-sub {
+        font-size: 1rem;
+    }
+
+    .hero-bg svg {
+        width: 90vw;
+        opacity: 0.08;
+    }
+
+    .feature-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .code-content pre {
+        font-size: 0.75rem;
+    }
+
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .landing-cta p {
+        font-size: 1.2rem;
+    }
+}

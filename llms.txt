@@ -1,0 +1,78 @@
+# Hwaro
+
+> Fast and lightweight static site generator built with Crystal
+
+This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license.
+
+## Pages
+
+- [Hwaro Documentation](https://hwaro.hahwul.com/): Hwaro is a fast static site generator built with Crystal
+
+## Deploy
+
+- [Deploy Configuration](https://hwaro.hahwul.com/deploy/config/): Configure deployment targets, matchers, and options
+
+## Features
+
+- [AMP](https://hwaro.hahwul.com/features/amp/): Generate AMP-compliant versions of content pages
+- [Asset Pipeline](https://hwaro.hahwul.com/features/asset-pipeline/): Built-in CSS/JS bundling, minification, and fingerprinting
+- [Auto Includes](https://hwaro.hahwul.com/features/auto-includes/): Automatically load CSS and JS files into all pages
+- [Build Hooks](https://hwaro.hahwul.com/features/build-hooks/): Run custom shell commands before and after the build process
+- [Cache Busting](https://hwaro.hahwul.com/features/cache-busting/): Append content hashes to asset URLs for cache invalidation
+- [Content Files](https://hwaro.hahwul.com/features/content-files/): Publish non-Markdown files from the content directory
+- [Deployment](https://hwaro.hahwul.com/features/deployment/): Configure deploy targets for hwaro deploy
+- [Environment-Specific Configuration](https://hwaro.hahwul.com/features/env-config/): Override config settings per deployment environment
+- [Environment Variables](https://hwaro.hahwul.com/features/env-variables/): Reference environment variables in configuration files and templates
+- [Image Processing](https://hwaro.hahwul.com/features/image-processing/): Automatic image resizing, LQIP placeholders, and dominant color extraction during build
+- [Incremental Build](https://hwaro.hahwul.com/features/incremental-build/): Only rebuild changed files for faster builds on large sites
+- [LLMs.txt](https://hwaro.hahwul.com/features/llms-txt/): Generate llms.txt files for AI and LLM crawlers
+- [Markdown Extensions](https://hwaro.hahwul.com/features/markdown-extensions/): Optional markdown extensions beyond standard CommonMark
+- [Multilingual](https://hwaro.hahwul.com/features/multilingual/): Build multilingual sites with translation linking and hreflang tags
+- [Auto OG Images](https://hwaro.hahwul.com/features/og-images/): Auto-generate Open Graph preview images from page titles
+- [Pagination](https://hwaro.hahwul.com/features/pagination/): Split large content lists into multiple pages
+- [PWA](https://hwaro.hahwul.com/features/pwa/): Progressive Web App support with manifest.json and service worker
+- [Related Posts](https://hwaro.hahwul.com/features/related-posts/): Recommend related content based on shared taxonomy terms
+- [Search](https://hwaro.hahwul.com/features/search/): Generate a client-side search index with Fuse.js
+- [SEO](https://hwaro.hahwul.com/features/seo/): Built-in sitemaps, RSS feeds, robots.txt, and social sharing meta tags
+- [Series](https://hwaro.hahwul.com/features/series/): Group posts into ordered series for sequential reading
+- [Streaming Build](https://hwaro.hahwul.com/features/streaming-build/): Reduce memory usage by processing pages in batches
+- [Structured Data](https://hwaro.hahwul.com/features/structured-data/): Extended Schema.org JSON-LD support for rich search results
+- [Syntax Highlighting](https://hwaro.hahwul.com/features/syntax-highlighting/): Automatic syntax highlighting for code blocks
+
+## Start
+
+- [CLI](https://hwaro.hahwul.com/start/cli/): Commands for creating, building, and serving your site
+- [Configuration](https://hwaro.hahwul.com/start/config/): Site configuration reference for config.toml
+- [First Site](https://hwaro.hahwul.com/start/first-site/): Create your first Hwaro site in 5 minutes
+- [Installation](https://hwaro.hahwul.com/start/installation/): Install Hwaro from source or pre-built binary
+
+## Tools & Completion
+
+- [agents-md](https://hwaro.hahwul.com/start/tools/agents-md/): Generate or update AGENTS.md file
+- [check-links](https://hwaro.hahwul.com/start/tools/check-links/): Check for dead links in content files
+- [ci (deprecated)](https://hwaro.hahwul.com/start/tools/ci/): Generate CI/CD workflow files (deprecated — use tool platform)
+- [convert](https://hwaro.hahwul.com/start/tools/convert/): Convert frontmatter between TOML, YAML, and JSON formats
+- [doctor](https://hwaro.hahwul.com/start/tools/doctor/): Diagnose config, template, and structure issues
+- [export](https://hwaro.hahwul.com/start/tools/export/): Export content to other platforms
+- [import](https://hwaro.hahwul.com/start/tools/import/): Import content from various platforms
+- [list](https://hwaro.hahwul.com/start/tools/list/): List content files by status
+- [platform](https://hwaro.hahwul.com/start/tools/platform/): Generate platform config and CI/CD workflow files
+- [stats](https://hwaro.hahwul.com/start/tools/stats/): Show content statistics
+- [unused-assets](https://hwaro.hahwul.com/start/tools/unused-assets/): Find unreferenced static files
+- [validate](https://hwaro.hahwul.com/start/tools/validate/): Validate content frontmatter and markup
+
+## Templates
+
+- [Data Model](https://hwaro.hahwul.com/templates/data-model/): Site, Section, and Page data types available in templates
+- [Filters](https://hwaro.hahwul.com/templates/filters/): Transform values in templates with the pipe operator
+- [Functions](https://hwaro.hahwul.com/templates/functions/): Built-in functions for data retrieval and URL generation
+- [Syntax](https://hwaro.hahwul.com/templates/syntax/): Jinja2-compatible template syntax reference
+
+## Writing
+
+- [Archetypes](https://hwaro.hahwul.com/writing/archetypes/): Content templates for consistent front matter and structure
+- [Pages](https://hwaro.hahwul.com/writing/pages/): Create pages from Markdown with front matter metadata
+- [Sections](https://hwaro.hahwul.com/writing/sections/): Group related content with directory sections
+- [Shortcodes](https://hwaro.hahwul.com/writing/shortcodes/): Reusable template snippets for Markdown content
+- [Taxonomies](https://hwaro.hahwul.com/writing/taxonomies/): Organize content with tags, categories, and custom groups
+

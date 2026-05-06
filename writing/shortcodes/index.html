@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Reusable template snippets for Markdown content">
+  <title>Shortcodes - Hwaro</title>
+  <meta property="og:title" content="Shortcodes">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/writing/shortcodes/">
+<meta property="og:description" content="Reusable template snippets for Markdown content">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/writing-shortcodes.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Shortcodes">
+<meta name="twitter:description" content="Reusable template snippets for Markdown content">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/writing-shortcodes.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="writing">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/" class="active">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/" class="active">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Shortcodes</h1>
+    <p>Shortcodes are reusable template snippets you can use in Markdown content. Custom shortcodes are Jinja2 templates placed in <code>templates/shortcodes/</code> — see <a href="/templates/syntax/">Template Syntax</a> for the templating language reference.</p>
+<h2 id="using-shortcodes">Using Shortcodes</h2>
+<p>Two syntax patterns work in content files:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ shortcode_name(arg1=&quot;value&quot;, arg2=&quot;value&quot;) }}{%endraw%}
+</code></pre>
+<p>Or explicitly:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ shortcode(&quot;shortcode_name&quot;, arg1=&quot;value&quot;) }}{%endraw%}
+</code></pre>
+<h2 id="built-in-shortcodes">Built-in Shortcodes</h2>
+<p>Hwaro ships with built-in shortcodes that work out of the box — no template files needed.</p>
+<h3 id="youtube">youtube</h3>
+<p>Embed a YouTube video.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ youtube(id=&quot;dQw4w9WgXcQ&quot;) }}
+{{ youtube(id=&quot;dQw4w9WgXcQ&quot;, width=&quot;800&quot;, height=&quot;450&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>(required)</td>
+<td>YouTube video ID</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td><code>560</code></td>
+<td>Player width</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td><code>315</code></td>
+<td>Player height</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>YouTube Video</code></td>
+<td>Accessible title</td>
+</tr>
+</tbody>
+</table>
+<h3 id="vimeo">vimeo</h3>
+<p>Embed a Vimeo video.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ vimeo(id=&quot;123456789&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>(required)</td>
+<td>Vimeo video ID</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td><code>560</code></td>
+<td>Player width</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td><code>315</code></td>
+<td>Player height</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>Vimeo Video</code></td>
+<td>Accessible title</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gist">gist</h3>
+<p>Embed a GitHub Gist.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ gist(user=&quot;octocat&quot;, id=&quot;abc123&quot;) }}
+{{ gist(user=&quot;octocat&quot;, id=&quot;abc123&quot;, file=&quot;hello.rb&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>(required)</td>
+<td>GitHub username</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>(required)</td>
+<td>Gist ID</td>
+</tr>
+<tr>
+<td><code>file</code></td>
+<td>(none)</td>
+<td>Specific file to show</td>
+</tr>
+</tbody>
+</table>
+<h3 id="alert-callout">alert / callout</h3>
+<p>Display an alert box. Use as a block shortcode to wrap content.</p>
+<pre><code class="language-markdown hljs">{%raw%}{% alert(type=&quot;warning&quot;, title=&quot;Caution&quot;) %}Be careful with this!{% end %}
+{% callout(type=&quot;tip&quot;) %}Here is a helpful tip.{% end %}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>info</code></td>
+<td><code>info</code>, <code>warning</code>, <code>danger</code>, <code>tip</code>, <code>success</code></td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>(none)</td>
+<td>Optional title</td>
+</tr>
+</tbody>
+</table>
+<h3 id="figure">figure</h3>
+<p>Image with optional caption.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ figure(src=&quot;/img/photo.jpg&quot;, alt=&quot;A photo&quot;, caption=&quot;My caption&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src</code></td>
+<td>(required)</td>
+<td>Image URL</td>
+</tr>
+<tr>
+<td><code>alt</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>Alt text</td>
+</tr>
+<tr>
+<td><code>caption</code></td>
+<td>(none)</td>
+<td>Caption below image</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>(none)</td>
+<td>Image width</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td>(none)</td>
+<td>Image height</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tweet">tweet</h3>
+<p>Embed a tweet.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ tweet(user=&quot;jack&quot;, id=&quot;20&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>(required)</td>
+<td>Twitter username</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>(required)</td>
+<td>Tweet ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="codepen">codepen</h3>
+<p>Embed a CodePen.</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ codepen(user=&quot;chriscoyier&quot;, id=&quot;gfdDu&quot;) }}
+{{ codepen(user=&quot;chriscoyier&quot;, id=&quot;gfdDu&quot;, tab=&quot;css,result&quot;, height=&quot;400&quot;) }}{%endraw%}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>(required)</td>
+<td>CodePen username</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>(required)</td>
+<td>Pen ID</td>
+</tr>
+<tr>
+<td><code>tab</code></td>
+<td><code>result</code></td>
+<td>Default tab(s)</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td><code>300</code></td>
+<td>Embed height</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>CodePen Embed</code></td>
+<td>Accessible title</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>To override any built-in shortcode, create a file with the same name in <code>templates/shortcodes/</code> (e.g., <code>templates/shortcodes/youtube.html</code>). User templates always take priority.</p>
+</blockquote>
+<h2 id="creating-custom-shortcodes">Creating Custom Shortcodes</h2>
+<p>Shortcode templates live in <code>templates/shortcodes/</code>.</p>
+<h3 id="example-alert-box">Example: Alert Box</h3>
+<p>Create <code>templates/shortcodes/alert.html</code>:</p>
+<pre><code class="language-jinja hljs">{% if type and message %}
+&lt;div class=&quot;alert alert-{{ type }}&quot;&gt;
+  {{ message | safe }}
+&lt;/div&gt;
+{% endif %}
+</code></pre>
+<p>Use in content:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ alert(type=&quot;warning&quot;, message=&quot;This is important!&quot;) }}{%endraw%}
+</code></pre>
+<p>Output:</p>
+<pre><code class="language-html hljs">&lt;div class=&quot;alert alert-warning&quot;&gt;
+  This is important!
+&lt;/div&gt;
+</code></pre>
+<h3 id="example-youtube-embed">Example: YouTube Embed</h3>
+<p>Create <code>templates/shortcodes/youtube.html</code>:</p>
+<pre><code class="language-jinja hljs">{% if id %}
+&lt;div class=&quot;video-container&quot;&gt;
+  &lt;iframe 
+    src=&quot;https://www.youtube.com/embed/{{ id }}&quot;
+    frameborder=&quot;0&quot;
+    allowfullscreen&gt;
+  &lt;/iframe&gt;
+&lt;/div&gt;
+{% endif %}
+</code></pre>
+<p>Use in content:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ youtube(id=&quot;dQw4w9WgXcQ&quot;) }}{%endraw%}
+</code></pre>
+<h3 id="example-figure-with-caption">Example: Figure with Caption</h3>
+<p>Create <code>templates/shortcodes/figure.html</code>:</p>
+<pre><code class="language-jinja hljs">&lt;figure&gt;
+  &lt;img src=&quot;{{ src }}&quot; alt=&quot;{{ alt | default(value='') }}&quot;&gt;
+  {% if caption %}
+  &lt;figcaption&gt;{{ caption }}&lt;/figcaption&gt;
+  {% endif %}
+&lt;/figure&gt;
+</code></pre>
+<p>Use in content:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ figure(src=&quot;/images/photo.jpg&quot;, alt=&quot;A photo&quot;, caption=&quot;My caption&quot;) }}{%endraw%}
+</code></pre>
+<h3 id="example-image-gallery-asset-colocation">Example: Image Gallery (Asset Colocation)</h3>
+<p>You can create a gallery that automatically lists images found in the same directory as the page (Page Bundle).</p>
+<p>Create <code>templates/shortcodes/gallery.html</code>:</p>
+<pre><code class="language-jinja hljs">&lt;div class=&quot;gallery&quot;&gt;
+{% for asset in page.assets -%}
+  {%- if asset is matching(&quot;[.](jpg|png)$&quot;) -%}
+    {% set image = resize_image(path=asset, width=240, height=180) %}
+    &lt;a href=&quot;{{ get_url(path=asset) }}&quot; target=&quot;_blank&quot;&gt;
+      &lt;img src=&quot;{{ image.url }}&quot; alt=&quot;{{ asset }}&quot; /&gt;
+    &lt;/a&gt;
+  {%- endif %}
+{%- endfor %}
+&lt;/div&gt;
+</code></pre>
+<p>Use in content (inside a Page Bundle directory):</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ gallery() }}{%endraw%}
+</code></pre>
+<p>This will render a grid of all JPG and PNG images found alongside the Markdown file.</p>
+<h2 id="block-shortcodes">Block Shortcodes</h2>
+<p>Block shortcodes wrap content between opening and closing tags:</p>
+<pre><code class="language-markdown hljs">{%raw%}{% note() %}
+This is the **body** content of the shortcode.
+{% end %}{%endraw%}
+</code></pre>
+<p>The body is passed to the shortcode template as the <code>body</code> variable. Markdown conversion is <strong>not</strong> applied automatically — use the <code>markdownify</code> filter in your template if needed:</p>
+<pre><code class="language-jinja hljs">&lt;div class=&quot;note&quot;&gt;
+  {{ body | markdownify | safe }}
+&lt;/div&gt;
+</code></pre>
+<p>Or use the body as-is for raw content:</p>
+<pre><code class="language-jinja hljs">&lt;div class=&quot;note&quot;&gt;{{ body }}&lt;/div&gt;
+</code></pre>
+<h3 id="nested-shortcodes">Nested Shortcodes</h3>
+<p>Block shortcodes can be nested up to 5 levels deep:</p>
+<pre><code class="language-markdown hljs">{%raw%}{% outer() %}
+  Some text with {{ inner(type=&quot;info&quot;) }} inside.
+{% end %}{%endraw%}
+</code></pre>
+<h2 id="argument-syntax">Argument Syntax</h2>
+<h3 id="named-arguments">Named Arguments</h3>
+<p>Arguments support multiple quote styles:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ alert(type=&quot;warning&quot;, message=&quot;Double quotes&quot;) }}
+{{ alert(type='info', message='Single quotes') }}
+{{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+</code></pre>
+<h3 id="positional-arguments">Positional Arguments</h3>
+<p>When no <code>key=value</code> syntax is used, arguments are assigned as <code>_0</code>, <code>_1</code>, etc.:</p>
+<pre><code class="language-markdown hljs">{%raw%}{{ youtube(&quot;dQw4w9WgXcQ&quot;) }}{%endraw%}
+</code></pre>
+<p>In the shortcode template, access via <code>{{ _0 }}</code>:</p>
+<pre><code class="language-jinja hljs">&lt;iframe src=&quot;https://www.youtube.com/embed/{{ _0 }}&quot;&gt;&lt;/iframe&gt;
+</code></pre>
+<h2 id="built-in-variables">Built-in Variables</h2>
+<p>Shortcodes have access to:</p>
+<ul>
+<li>All passed arguments</li>
+<li><code>site</code> object</li>
+<li><code>page</code> object</li>
+<li>Standard filters and functions</li>
+</ul>
+<pre><code class="language-jinja hljs">{# In shortcode template #}
+&lt;a href=&quot;{{ site.base_url }}/{{ url }}&quot;&gt;{{ text }}&lt;/a&gt;
+</code></pre>
+<h2 id="tips">Tips</h2>
+<h3 id="validate-arguments">Validate Arguments</h3>
+<p>Always check for required arguments:</p>
+<pre><code class="language-jinja hljs">{% if not url %}
+&lt;p class=&quot;error&quot;&gt;Missing url parameter&lt;/p&gt;
+{% else %}
+&lt;a href=&quot;{{ url }}&quot;&gt;{{ text | default(value=&quot;Link&quot;) }}&lt;/a&gt;
+{% endif %}
+</code></pre>
+<h3 id="use-safe-filter-for-html">Use Safe Filter for HTML</h3>
+<p>When passing HTML content:</p>
+<pre><code class="language-jinja hljs">{{ content | safe }}
+</code></pre>
+<h3 id="organize-shortcodes">Organize Shortcodes</h3>
+<p>Group related shortcodes:</p>
+<pre><code>templates/shortcodes/
+├── alert.html
+├── youtube.html
+├── figure.html
+├── code/
+│   ├── tabs.html
+│   └── snippet.html
+└── social/
+    ├── twitter.html
+    └── github.html
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/syntax/">Template Syntax</a> — Jinja2 reference for custom shortcodes</li>
+<li><a href="/templates/functions/">Functions</a> — Built-in template functions</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#using-shortcodes">Using Shortcodes</a></li><li><a href="#built-in-shortcodes">Built-in Shortcodes</a><ul><li><a href="#youtube">youtube</a></li><li><a href="#vimeo">vimeo</a></li><li><a href="#gist">gist</a></li><li><a href="#alert-callout">alert / callout</a></li><li><a href="#figure">figure</a></li><li><a href="#tweet">tweet</a></li><li><a href="#codepen">codepen</a></li></ul></li><li><a href="#creating-custom-shortcodes">Creating Custom Shortcodes</a><ul><li><a href="#example-alert-box">Example: Alert Box</a></li><li><a href="#example-youtube-embed">Example: YouTube Embed</a></li><li><a href="#example-figure-with-caption">Example: Figure with Caption</a></li><li><a href="#example-image-gallery-asset-colocation">Example: Image Gallery (Asset Colocation)</a></li></ul></li><li><a href="#block-shortcodes">Block Shortcodes</a><ul><li><a href="#nested-shortcodes">Nested Shortcodes</a></li></ul></li><li><a href="#argument-syntax">Argument Syntax</a><ul><li><a href="#named-arguments">Named Arguments</a></li><li><a href="#positional-arguments">Positional Arguments</a></li></ul></li><li><a href="#built-in-variables">Built-in Variables</a></li><li><a href="#tips">Tips</a><ul><li><a href="#validate-arguments">Validate Arguments</a></li><li><a href="#use-safe-filter-for-html">Use Safe Filter for HTML</a></li><li><a href="#organize-shortcodes">Organize Shortcodes</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>

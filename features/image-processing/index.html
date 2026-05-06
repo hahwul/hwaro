@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Automatic image resizing, LQIP placeholders, and dominant color extraction during build">
+  <title>Image Processing - Hwaro</title>
+  <meta property="og:title" content="Image Processing">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/features/image-processing/">
+<meta property="og:description" content="Automatic image resizing, LQIP placeholders, and dominant color extraction during build">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-image-processing.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Image Processing">
+<meta name="twitter:description" content="Automatic image resizing, LQIP placeholders, and dominant color extraction during build">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-image-processing.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/" class="active">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Image Processing</h1>
+    <p>Hwaro can automatically generate resized image variants during build. This is useful for responsive images, thumbnails, and performance optimization. No external tools required — image processing is built into the binary using <a href="https://github.com/nothings/stb">stb</a> libraries.</p>
+<h2 id="supported-formats">Supported Formats</h2>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Read</th>
+<th>Write</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JPEG (.jpg, .jpeg)</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PNG (.png)</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>BMP (.bmp)</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration">Configuration</h2>
+<p>Enable image processing in <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs">[image_processing]
+enabled = true
+widths = [320, 640, 1024, 1280]
+quality = 85
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable image resizing</td>
+</tr>
+<tr>
+<td>widths</td>
+<td>array</td>
+<td>[]</td>
+<td>Target widths to generate (in pixels)</td>
+</tr>
+<tr>
+<td>quality</td>
+<td>int</td>
+<td>85</td>
+<td>JPEG output quality (1-100)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="lqip-low-quality-image-placeholders">LQIP (Low-Quality Image Placeholders)</h3>
+<p>Enable LQIP to generate tiny base64-encoded placeholder images and extract dominant colors at build time. This eliminates CLS (Cumulative Layout Shift) and provides instant visual feedback while full images load.</p>
+<pre><code class="language-toml hljs">[image_processing.lqip]
+enabled = true
+width = 32
+quality = 20
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable LQIP generation</td>
+</tr>
+<tr>
+<td>width</td>
+<td>int</td>
+<td>32</td>
+<td>Placeholder image width in pixels (8-128)</td>
+</tr>
+<tr>
+<td>quality</td>
+<td>int</td>
+<td>20</td>
+<td>JPEG quality for placeholder (1-100, lower = smaller)</td>
+</tr>
+</tbody>
+</table>
+<p>A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image — small enough to inline directly in HTML.</p>
+<h2 id="how-it-works">How It Works</h2>
+<ol>
+<li>During build, Hwaro scans images in three locations:
+<ul>
+<li><strong>Page bundle assets</strong> (images colocated with <code>index.md</code>)</li>
+<li><strong>Content files</strong> (images published via <code>[content.files]</code> config)</li>
+<li><strong>Static files</strong> (images in the <code>static/</code> directory)</li>
+</ul>
+</li>
+<li>For each image, resized variants are generated for every configured width</li>
+<li>Aspect ratio is always preserved</li>
+<li>If the target width is larger than the source, the original is copied as-is (no upscaling)</li>
+<li>Each source image is decoded only once, then resized to all widths (efficient)</li>
+</ol>
+<h2 id="output-naming">Output Naming</h2>
+<p>Resized images follow the naming convention <code>{name}_{width}w.{ext}</code>. For example, with <code>static/hwaro.png</code>:</p>
+<pre><code>static/hwaro.png
+  -&gt; public/hwaro_320w.png
+  -&gt; public/hwaro_640w.png
+  -&gt; public/hwaro_1024w.png
+  -&gt; public/hwaro_1280w.png
+</code></pre>
+<h2 id="using-in-templates">Using in Templates</h2>
+<p>Use the <code>resize_image()</code> function to get the URL of a resized variant:</p>
+<pre><code class="language-jinja hljs">{% set img = resize_image(path=&quot;/hwaro.png&quot;, width=640) %}
+&lt;img src=&quot;{{ img.url }}&quot; width=&quot;{{ img.width }}&quot;&gt;
+</code></pre>
+<p>For responsive images with <code>srcset</code>:</p>
+<pre><code class="language-jinja hljs">{% set sm = resize_image(path=&quot;/hwaro.png&quot;, width=320) %}
+{% set md = resize_image(path=&quot;/hwaro.png&quot;, width=640) %}
+{% set lg = resize_image(path=&quot;/hwaro.png&quot;, width=1024) %}
+&lt;img
+  src=&quot;{{ md.url }}&quot;
+  srcset=&quot;{{ sm.url }} 320w, {{ md.url }} 640w, {{ lg.url }} 1024w&quot;
+  sizes=&quot;(max-width: 640px) 320px, (max-width: 1024px) 640px, 1024px&quot;
+  alt=&quot;Hwaro logo&quot;
+&gt;
+</code></pre>
+<p>The function selects the closest available width. If you request <code>width=500</code> and the configured widths are <code>[320, 640, 1024]</code>, it returns the 640px variant (smallest width &gt;= requested). If no variant is large enough, it falls back to the largest available.</p>
+<h3 id="using-lqip-placeholders">Using LQIP Placeholders</h3>
+<p>When LQIP is enabled, <code>resize_image()</code> returns two additional properties: <code>lqip</code> (a base64 data URI) and <code>dominant_color</code> (a hex color string). Use them for blur-up effects or solid color placeholders:</p>
+<p><strong>Blur-up effect:</strong></p>
+<pre><code class="language-jinja hljs">{% set img = resize_image(path=&quot;/images/hero.jpg&quot;, width=1024) %}
+&lt;img
+  src=&quot;{{ img.url }}&quot;
+  style=&quot;background-image: url({{ img.lqip }}); background-size: cover;&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hero image&quot;
+&gt;
+</code></pre>
+<p><strong>Dominant color placeholder:</strong></p>
+<pre><code class="language-jinja hljs">{% set img = resize_image(path=&quot;/images/hero.jpg&quot;, width=1024) %}
+&lt;img
+  src=&quot;{{ img.url }}&quot;
+  style=&quot;background-color: {{ img.dominant_color }}&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hero image&quot;
+&gt;
+</code></pre>
+<p><strong>Combined approach (color first, then blur, then full image):</strong></p>
+<pre><code class="language-jinja hljs">{% set img = resize_image(path=&quot;/images/hero.jpg&quot;, width=1024) %}
+&lt;div style=&quot;background-color: {{ img.dominant_color }}&quot;&gt;
+  &lt;img
+    src=&quot;{{ img.url }}&quot;
+    style=&quot;background-image: url({{ img.lqip }}); background-size: cover;&quot;
+    loading=&quot;lazy&quot;
+    alt=&quot;Hero image&quot;
+  &gt;
+&lt;/div&gt;
+</code></pre>
+<p>When LQIP is disabled, <code>lqip</code> and <code>dominant_color</code> return empty strings, so templates work without changes.</p>
+<h2 id="live-demo">Live Demo</h2>
+<h3 id="resize-demo">Resize Demo</h3>
+<p>This docs site has image processing enabled with <code>widths = [128, 256, 512]</code> and LQIP enabled. The images below are automatically generated resized variants of <code>static/hwaro.png</code>:</p>
+<p><strong>Original</strong> (<code>hwaro.png</code>):</p>
+<img src="/hwaro.png" alt="Hwaro logo - original" style="max-width:256px">
+<p><strong>128px</strong> (<code>hwaro_128w.png</code>):</p>
+<img src="/hwaro_128w.png" alt="Hwaro logo - 128px wide">
+<p><strong>256px</strong> (<code>hwaro_256w.png</code>):</p>
+<img src="/hwaro_256w.png" alt="Hwaro logo - 256px wide">
+<p><strong>512px</strong> (<code>hwaro_512w.png</code>):</p>
+<img src="/hwaro_512w.png" alt="Hwaro logo - 512px wide">
+<p>These files are generated at build time — no runtime resizing or external services needed. In your templates, use <code>resize_image()</code> to reference them:</p>
+<pre><code class="language-jinja hljs">{% set img = resize_image(path=&quot;/hwaro.png&quot;, width=256) %}
+&lt;img src=&quot;{{ img.url }}&quot;&gt;
+{# renders as: &lt;img src=&quot;/hwaro_256w.png&quot;&gt; #}
+</code></pre>
+<h3 id="lqip-demo">LQIP Demo</h3>
+<p>The <code>resize_image()</code> function also provides LQIP data. Here is the live output for <code>hwaro.png</code>:</p>
+
+<div class="lqip-demo">
+  <div class="lqip-demo__section">
+    <strong>Dominant color:</strong>
+    <span style="display:inline-block;width:1.2em;height:1.2em;vertical-align:middle;border-radius:3px;background:#71231e;border:1px solid var(--border)"></span>
+    <code>#71231e</code>
+  </div>
+  
+  <div class="lqip-demo__section">
+    <strong>LQIP placeholder</strong> (the tiny base64 image, shown at 256px):
+    <div style="margin-top:0.5rem">
+      <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEACgcHiMeGSgjISMtKygwPGRBPDc3PHtYXUlkkYCZlo+AjIqgtObDoKrarYqMyP/L2u71////m8H////6/+b9//gBKy0tPDU8dkFBdviljKX4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+P/AABEIACAAIAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AM9TGsSu6bifapYjE7lREVIGTkYqucGBATxmp4/kKAL68joKhm8dxZmhR2LxEnjJx/n0pP3TQPJGm0jPJFOuIzKqheueue3+cVHD/wAecuOmT/KhDlu9CJOUTIyM1OrVAGVAFLDPtSiVR3ptCi0kWVJz149KjVPLt5l7ZOPyponQfxfpStMjoUVsluBSsNtNH//Z" alt="LQIP placeholder" style="width:256px;border-radius:8px;border:1px solid var(--border);image-rendering:pixelated">
+    </div>
+  </div>
+  <div class="lqip-demo__section">
+    <strong>Blur-up effect</strong> (LQIP as background, full image on top):
+    <div style="margin-top:0.5rem">
+      <img src="https://hwaro.hahwul.com/hwaro_256w.png" alt="Full image with LQIP background" style="max-width:256px;border-radius:8px;border:1px solid var(--border);background-image:url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEACgcHiMeGSgjISMtKygwPGRBPDc3PHtYXUlkkYCZlo+AjIqgtObDoKrarYqMyP/L2u71////m8H////6/+b9//gBKy0tPDU8dkFBdviljKX4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+P/AABEIACAAIAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AM9TGsSu6bifapYjE7lREVIGTkYqucGBATxmp4/kKAL68joKhm8dxZmhR2LxEnjJx/n0pP3TQPJGm0jPJFOuIzKqheueue3+cVHD/wAecuOmT/KhDlu9CJOUTIyM1OrVAGVAFLDPtSiVR3ptCi0kWVJz149KjVPLt5l7ZOPyponQfxfpStMjoUVsluBSsNtNH//Z);background-size:cover" loading="lazy">
+    </div>
+  </div>
+  
+</div>
+<h2 id="performance">Performance</h2>
+<ul>
+<li><strong>Single decode</strong>: Each source image is decoded once and resized to all target widths in memory</li>
+<li><strong>Parallel processing</strong>: Multiple images are processed concurrently using a worker pool</li>
+<li><strong>No upscaling</strong>: Images smaller than the target width are simply copied</li>
+<li><strong>Efficient LQIP</strong>: LQIP thumbnails are generated from the smallest resize variant (not the full-resolution original), and dominant color is computed from the thumbnail</li>
+</ul>
+<h2 id="quick-example">Quick Example</h2>
+<p>Suppose your site has <code>static/hwaro.png</code> (the Hwaro logo) and you want to display it as a responsive image:</p>
+<p><strong>config.toml:</strong></p>
+<pre><code class="language-toml hljs">[image_processing]
+enabled = true
+widths = [128, 256, 512]
+quality = 90
+
+[image_processing.lqip]
+enabled = true
+width = 32
+quality = 20
+</code></pre>
+<p><strong>Template:</strong></p>
+<pre><code class="language-jinja hljs">{% set logo_sm = resize_image(path=&quot;/hwaro.png&quot;, width=128) %}
+{% set logo_md = resize_image(path=&quot;/hwaro.png&quot;, width=256) %}
+{% set logo_lg = resize_image(path=&quot;/hwaro.png&quot;, width=512) %}
+&lt;img
+  src=&quot;{{ logo_md.url }}&quot;
+  srcset=&quot;{{ logo_sm.url }} 128w, {{ logo_md.url }} 256w, {{ logo_lg.url }} 512w&quot;
+  sizes=&quot;(max-width: 480px) 128px, (max-width: 768px) 256px, 512px&quot;
+  style=&quot;background-color: {{ logo_md.dominant_color }}&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hwaro&quot;
+&gt;
+</code></pre>
+<p><strong>Build output:</strong></p>
+<pre><code>public/
+  hwaro.png           (original, copied by static files)
+  hwaro_128w.png      (128px wide)
+  hwaro_256w.png      (256px wide)
+  hwaro_512w.png      (512px wide)
+</code></pre>
+<h2 id="blog-post-images">Blog Post Images</h2>
+<p>For blog posts with a hero image in front matter:</p>
+<pre><code class="language-toml hljs">[image_processing]
+enabled = true
+widths = [320, 640, 1024]
+quality = 85
+
+[image_processing.lqip]
+enabled = true
+
+[content.files]
+allow_extensions = [&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;]
+</code></pre>
+<pre><code class="language-jinja hljs">{% if page.image %}
+  {% set hero = resize_image(path=page.image, width=1024) %}
+  {% set thumb = resize_image(path=page.image, width=320) %}
+  &lt;picture&gt;
+    &lt;source media=&quot;(min-width: 768px)&quot; srcset=&quot;{{ hero.url }}&quot;&gt;
+    &lt;img
+      src=&quot;{{ thumb.url }}&quot;
+      style=&quot;background-color: {{ thumb.dominant_color }}&quot;
+      loading=&quot;lazy&quot;
+      alt=&quot;{{ page.title }}&quot;
+    &gt;
+  &lt;/picture&gt;
+{% endif %}
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/content-files/">Content Files</a> — Publishing non-Markdown files from content/</li>
+<li><a href="/features/og-images/">Auto OG Images</a> — Auto-generated Open Graph preview images</li>
+<li><a href="/templates/functions/">Functions</a> — Template function reference</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#supported-formats">Supported Formats</a></li><li><a href="#configuration">Configuration</a><ul><li><a href="#lqip-low-quality-image-placeholders">LQIP (Low-Quality Image Placeholders)</a></li></ul></li><li><a href="#how-it-works">How It Works</a></li><li><a href="#output-naming">Output Naming</a></li><li><a href="#using-in-templates">Using in Templates</a><ul><li><a href="#using-lqip-placeholders">Using LQIP Placeholders</a></li></ul></li><li><a href="#live-demo">Live Demo</a><ul><li><a href="#resize-demo">Resize Demo</a></li><li><a href="#lqip-demo">LQIP Demo</a></li></ul></li><li><a href="#performance">Performance</a></li><li><a href="#quick-example">Quick Example</a></li><li><a href="#blog-post-images">Blog Post Images</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>

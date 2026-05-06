@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Auto-generate Open Graph preview images from page titles">
+  <title>Auto OG Images - Hwaro</title>
+  <meta property="og:title" content="Auto OG Images">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/features/og-images/">
+<meta property="og:description" content="Auto-generate Open Graph preview images from page titles">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-og-images.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Auto OG Images">
+<meta name="twitter:description" content="Auto-generate Open Graph preview images from page titles">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-og-images.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/" class="active">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main">
+    <h1>Auto OG Images</h1>
+    <p>Hwaro can automatically generate Open Graph (OG) preview images for pages that don't have a custom image set. These images are used by social media platforms when your content is shared.</p>
+<p><img src="/og-images/features-og-images.png" alt="Auto-generated OG image for the Auto OG Images page" />
+<em>Example: This is the og image of this page.</em></p>
+<h2 id="how-it-works">How It Works</h2>
+<ol>
+<li>During build, Hwaro checks each page for a custom <code>image</code> in front matter</li>
+<li>Pages without an image get an auto-generated image (1200x630)</li>
+<li>The generated image path is set as <code>page.image</code>, so <code>og:image</code> meta tags pick it up automatically</li>
+<li>SVG output requires no external dependencies; PNG output uses built-in rendering via system fonts</li>
+</ol>
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+background = &quot;#1a1a2e&quot;
+text_color = &quot;#ffffff&quot;
+accent_color = &quot;#e94560&quot;
+font_size = 48
+logo = &quot;static/logo.png&quot;
+logo_position = &quot;bottom-left&quot;
+output_dir = &quot;og-images&quot;
+show_title = true
+style = &quot;default&quot;
+pattern_opacity = 0.15
+pattern_scale = 1.0
+background_image = &quot;static/og-bg.jpg&quot;
+overlay_opacity = 0.5
+format = &quot;svg&quot;
+font_path = &quot;static/fonts/Inter-Bold.ttf&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Enable auto OG image generation</td>
+</tr>
+<tr>
+<td>background</td>
+<td>string</td>
+<td><code>&quot;#1a1a2e&quot;</code></td>
+<td>Background color (hex)</td>
+</tr>
+<tr>
+<td>text_color</td>
+<td>string</td>
+<td><code>&quot;#ffffff&quot;</code></td>
+<td>Title and description text color</td>
+</tr>
+<tr>
+<td>accent_color</td>
+<td>string</td>
+<td><code>&quot;#e94560&quot;</code></td>
+<td>Accent color for bars and site name</td>
+</tr>
+<tr>
+<td>font_size</td>
+<td>int</td>
+<td><code>48</code></td>
+<td>Title font size in pixels</td>
+</tr>
+<tr>
+<td>logo</td>
+<td>string</td>
+<td>—</td>
+<td>Logo file path (e.g., <code>static/logo.png</code>). Embedded as base64 data URI</td>
+</tr>
+<tr>
+<td>logo_position</td>
+<td>string</td>
+<td><code>&quot;bottom-left&quot;</code></td>
+<td>Logo placement: <code>bottom-left</code>, <code>bottom-right</code>, <code>top-left</code>, <code>top-right</code></td>
+</tr>
+<tr>
+<td>output_dir</td>
+<td>string</td>
+<td><code>&quot;og-images&quot;</code></td>
+<td>Directory for generated images</td>
+</tr>
+<tr>
+<td>show_title</td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Show site name at the bottom of the image</td>
+</tr>
+<tr>
+<td>style</td>
+<td>string</td>
+<td><code>&quot;default&quot;</code></td>
+<td>Style preset for background pattern</td>
+</tr>
+<tr>
+<td>pattern_opacity</td>
+<td>float</td>
+<td><code>0.15</code></td>
+<td>Opacity of the style pattern (0.0–1.0)</td>
+</tr>
+<tr>
+<td>pattern_scale</td>
+<td>float</td>
+<td><code>1.0</code></td>
+<td>Scale multiplier for the pattern (min 0.1)</td>
+</tr>
+<tr>
+<td>background_image</td>
+<td>string</td>
+<td>—</td>
+<td>Background image file path. Embedded as base64 data URI</td>
+</tr>
+<tr>
+<td>overlay_opacity</td>
+<td>float</td>
+<td><code>0.5</code></td>
+<td>Opacity of the color overlay on background images (0.0–1.0)</td>
+</tr>
+<tr>
+<td>format</td>
+<td>string</td>
+<td><code>&quot;svg&quot;</code></td>
+<td>Output format: <code>&quot;svg&quot;</code> or <code>&quot;png&quot;</code></td>
+</tr>
+<tr>
+<td>font_path</td>
+<td>string</td>
+<td>—</td>
+<td>Path to a custom <code>.ttf</code> / <code>.otf</code> font file for PNG output. Falls back to system fonts, then the bundled DejaVu Sans Bold</td>
+</tr>
+</tbody>
+</table>
+<h2 id="style-presets">Style Presets</h2>
+<p>The <code>style</code> option controls the background pattern rendered on the image:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>No pattern (solid background)</td>
+</tr>
+<tr>
+<td><code>dots</code></td>
+<td>Repeating dot grid</td>
+</tr>
+<tr>
+<td><code>grid</code></td>
+<td>Repeating line grid</td>
+</tr>
+<tr>
+<td><code>diagonal</code></td>
+<td>Diagonal stripe pattern</td>
+</tr>
+<tr>
+<td><code>gradient</code></td>
+<td>Diagonal gradient using the accent color</td>
+</tr>
+<tr>
+<td><code>waves</code></td>
+<td>Horizontal wave curves</td>
+</tr>
+<tr>
+<td><code>minimal</code></td>
+<td>Clean layout without accent bars</td>
+</tr>
+</tbody>
+</table>
+<h3 id="preview">Preview</h3>
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-default.svg" alt="default style" loading="lazy" />
+    <span class="og-style-label"><code>default</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-default.svg" alt="default style" />
+        <p><code>default</code> — No pattern (solid background)</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-dots.svg" alt="dots style" loading="lazy" />
+    <span class="og-style-label"><code>dots</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-dots.svg" alt="dots style" />
+        <p><code>dots</code> — Repeating dot grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-grid.svg" alt="grid style" loading="lazy" />
+    <span class="og-style-label"><code>grid</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-grid.svg" alt="grid style" />
+        <p><code>grid</code> — Repeating line grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" loading="lazy" />
+    <span class="og-style-label"><code>diagonal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" />
+        <p><code>diagonal</code> — Diagonal stripe pattern</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" loading="lazy" />
+    <span class="og-style-label"><code>gradient</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" />
+        <p><code>gradient</code> — Diagonal gradient using the accent color</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-waves.svg" alt="waves style" loading="lazy" />
+    <span class="og-style-label"><code>waves</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-waves.svg" alt="waves style" />
+        <p><code>waves</code> — Horizontal wave curves</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" loading="lazy" />
+    <span class="og-style-label"><code>minimal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" />
+        <p><code>minimal</code> — Clean layout without accent bars</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+<style>
+.og-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.og-style-card {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #1e1e24);
+  background: var(--bg-card, #111114);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.og-style-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--border-light, #2e2e36);
+}
+.og-style-card > img {
+  width: 100%;
+  display: block;
+}
+.og-style-label {
+  display: block;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.og-style-card dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+.og-style-card dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.og-style-dialog {
+  position: relative;
+  background: var(--bg-elevated, #101014);
+  border: 1px solid var(--border, #1e1e24);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.og-style-dialog > img {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.og-style-dialog > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.og-style-dialog > p {
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+</style>
+<h3 id="example-configuration">Example Configuration</h3>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+style = &quot;dots&quot;
+pattern_opacity = 0.2
+pattern_scale = 1.5
+</code></pre>
+<h2 id="background-image">Background Image</h2>
+<p>You can set a custom background image that gets composited behind the text:</p>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+background_image = &quot;static/og-bg.jpg&quot;
+overlay_opacity = 0.6
+</code></pre>
+<p>The rendering order is: background color → background image → color overlay → style pattern → accent bars → text/logo.</p>
+<p>The <code>overlay_opacity</code> controls how much the background color covers the image (0.0 = fully visible image, 1.0 = image completely hidden behind background color).</p>
+<h2 id="png-output">PNG Output</h2>
+<p>By default, images are generated as SVG. Set <code>format = &quot;png&quot;</code> to produce PNG files instead:</p>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+format = &quot;png&quot;
+</code></pre>
+<p>PNG rendering is built-in using stb_truetype and stb_image_write — no external tools required. System fonts are auto-detected:</p>
+<ul>
+<li><strong>macOS</strong>: Helvetica, Arial, Geneva</li>
+<li><strong>Linux</strong>: DejaVu Sans, Liberation Sans, Noto Sans</li>
+</ul>
+<p>If no system font is found, Hwaro falls back to SVG output with a warning.</p>
+<h2 id="generated-image-layout">Generated Image Layout</h2>
+<p>Each image is 1200x630 with the following structure:</p>
+<pre><code>┌─────────────────────────────────────┐
+│ ████████████ accent bar ████████████│
+│                                     │
+│   Page Title (auto-wrapped,         │
+│   bold, large font)                 │
+│                                     │
+│   Description text (smaller,        │
+│   semi-transparent)                 │
+│                                     │
+│   [logo] Site Name                  │
+│ ████████████ accent bar ████████████│
+└─────────────────────────────────────┘
+</code></pre>
+<p>When <code>style = &quot;minimal&quot;</code>, the top and bottom accent bars are removed. When <code>show_title = false</code>, the site name at the bottom is hidden.</p>
+<h2 id="logo-embedding">Logo Embedding</h2>
+<p>When a <code>logo</code> file path is configured and the file exists, the logo is read and embedded as a base64 data URI directly in the image. This ensures the logo displays correctly everywhere without external file references.</p>
+<p>If the file is not found at build time, the logo falls back to a URL reference (SVG only).</p>
+<h2 id="incremental-generation">Incremental Generation</h2>
+<p>Hwaro tracks a content hash for each page (title, description, URL) and a config hash for OG-related settings. On subsequent builds, only pages whose content or config has changed are regenerated — unchanged images are skipped.</p>
+<p>This is managed via a <code>.og_manifest.json</code> file stored alongside the generated images. As long as the output directory is preserved between builds (e.g., using <code>--cache</code> mode), incremental generation works automatically.</p>
+<p>When deploying via the GitHub Actions (<code>hahwul/hwaro</code> action), OG image caching is handled automatically — the action restores previously generated images from the <code>gh-pages</code> branch before building and enables <code>--cache</code> mode.</p>
+<h3 id="what-triggers-regeneration">What triggers regeneration</h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Regenerates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page title, description, or URL</td>
+<td>That page only</td>
+</tr>
+<tr>
+<td>OG config (colors, style, format, etc.)</td>
+<td>All pages</td>
+</tr>
+<tr>
+<td>Image file missing on disk</td>
+<td>That page only</td>
+</tr>
+</tbody>
+</table>
+<h2 id="behavior">Behavior</h2>
+<ul>
+<li>Pages with a custom <code>image</code> in front matter are <strong>skipped</strong> (the custom image takes priority)</li>
+<li>Draft pages are <strong>skipped</strong></li>
+<li>Long titles are automatically <strong>word-wrapped</strong> across multiple lines</li>
+<li>Logo and background images are loaded once and reused across all pages</li>
+<li>SVG output uses <code>system-ui</code> font family; PNG output uses detected system fonts</li>
+</ul>
+<h2 id="output">Output</h2>
+<p>Given a page at <code>/posts/hello-world/</code>, the generated image will be:</p>
+<pre><code>public/og-images/posts-hello-world.svg   # or .png if format = &quot;png&quot;
+</code></pre>
+<p>And the OG meta tag will automatically include:</p>
+<pre><code class="language-html hljs">&lt;meta property=&quot;og:image&quot; content=&quot;https://example.com/og-images/posts-hello-world.svg&quot;&gt;
+</code></pre>
+<h2 id="overriding-per-page">Overriding Per Page</h2>
+<p>To use a custom image for a specific page, set <code>image</code> in front matter:</p>
+<pre><code class="language-toml hljs">+++
+title = &quot;My Post&quot;
+image = &quot;/images/custom-og.png&quot;
++++
+</code></pre>
+<p>This page will use the custom image instead of auto-generating one.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/seo/">SEO</a> — OpenGraph, Twitter Cards, and meta tags</li>
+<li><a href="/features/image-processing/">Image Processing</a> — Responsive image resizing</li>
+<li><a href="/start/config/">Configuration</a> — Full config reference</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#how-it-works">How It Works</a></li><li><a href="#configuration">Configuration</a></li><li><a href="#style-presets">Style Presets</a><ul><li><a href="#preview">Preview</a></li><li><a href="#example-configuration">Example Configuration</a></li></ul></li><li><a href="#background-image">Background Image</a></li><li><a href="#png-output">PNG Output</a></li><li><a href="#generated-image-layout">Generated Image Layout</a></li><li><a href="#logo-embedding">Logo Embedding</a></li><li><a href="#incremental-generation">Incremental Generation</a><ul><li><a href="#what-triggers-regeneration">What triggers regeneration</a></li></ul></li><li><a href="#behavior">Behavior</a></li><li><a href="#output">Output</a></li><li><a href="#overriding-per-page">Overriding Per Page</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>

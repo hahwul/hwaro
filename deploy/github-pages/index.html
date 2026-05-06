@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Deploy your Hwaro site to GitHub Pages">
+  <title>GitHub Pages - Hwaro</title>
+  <meta property="og:title" content="GitHub Pages">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://hwaro.hahwul.com/deploy/github-pages/">
+<meta property="og:description" content="Deploy your Hwaro site to GitHub Pages">
+<meta property="og:image" content="https://hwaro.hahwul.com/og-images/deploy-github-pages.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="GitHub Pages">
+<meta name="twitter:description" content="Deploy your Hwaro site to GitHub Pages">
+<meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/deploy-github-pages.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=f9389238">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=f9389238">
+</head>
+<body data-section="deploy">
+<header class="docs-header">
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/" class="active">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Start</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Writing</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Templates</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Features</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">SEO & Discovery</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Content</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Build & Performance</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Files & Environment</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+          
+        </ul>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <div class="sidebar-group-title">Platform</div>
+        <ul class="sidebar-sublinks">
+          
+          <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+          
+          <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+          
+        </ul>
+      </li>
+      
+      
+    </ul>
+  </div>
+  
+  <div class="sidebar-section">
+    <div class="sidebar-title">Deploy</div>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/" class="active">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </div>
+  
+</aside>
+  <main class="docs-main no-toc">
+    <h1>GitHub Pages</h1>
+    <p>Deploy your Hwaro site to GitHub Pages for free hosting.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>GitHub repository</li>
+<li>Hwaro site ready to build</li>
+</ul>
+<h2 id="method-1-github-actions-recommended">Method 1: GitHub Actions (Recommended)</h2>
+<p>Use the official <a href="https://github.com/hahwul/hwaro"><code>hahwul/hwaro</code></a> action to build and deploy without installing Hwaro manually.</p>
+<h3 id="create-workflow">Create Workflow</h3>
+<p>You can auto-generate the workflow file using:</p>
+<pre><code class="language-bash hljs">hwaro tool platform github-pages
+</code></pre>
+<p>Or create <code>.github/workflows/deploy.yml</code> manually:</p>
+<pre><code class="language-yaml hljs">---
+name: Hwaro CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Only
+        uses: hahwul/hwaro@main
+        with:
+          build_only: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' &amp;&amp; github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build and Deploy
+        uses: hahwul/hwaro@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+</code></pre>
+<h3 id="action-inputs">Action Inputs</h3>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>build_dir</code></td>
+<td>Directory containing the Hwaro site</td>
+<td><code>.</code> (repository root)</td>
+</tr>
+<tr>
+<td><code>build_only</code></td>
+<td>Only build without deploying</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td>GitHub token for deployment</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>If your Hwaro site is in a subdirectory (e.g., <code>docs/</code>), set <code>build_dir</code>:</p>
+<pre><code class="language-yaml hljs">- name: Build and Deploy
+  uses: hahwul/hwaro@main
+  with:
+    build_dir: &quot;docs&quot;
+    token: ${{ secrets.GITHUB_TOKEN }}
+</code></pre>
+<h3 id="og-image-caching">OG Image Caching</h3>
+<p>The action automatically caches OG images between deploys. Before each build, it restores previously generated images from the <code>gh-pages</code> branch and enables <code>--cache</code> mode. Only pages with changed content (title, description, URL) or updated OG config will have their images regenerated. This significantly speeds up builds for large sites.</p>
+<h3 id="configure-github-pages">Configure GitHub Pages</h3>
+<ol>
+<li>Go to repository <strong>Settings</strong> → <strong>Pages</strong></li>
+<li>Under &quot;Build and deployment&quot;, select <strong>Deploy from a branch</strong></li>
+<li>Choose <code>gh-pages</code> branch, <code>/ (root)</code> folder</li>
+<li>Push to <code>main</code> branch to trigger deployment</li>
+</ol>
+<h3 id="set-base-url">Set Base URL</h3>
+<p>Update <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs"># For user/org site (username.github.io)
+base_url = &quot;https://username.github.io&quot;
+
+# For project site (username.github.io/repo)
+base_url = &quot;https://username.github.io/repo&quot;
+</code></pre>
+<h2 id="method-2-deploy-via-hwaro-deploy">Method 2: Deploy via <code>hwaro deploy</code></h2>
+<p>Create a deploy script <code>scripts/deploy-ghpages.sh</code>:</p>
+<pre><code class="language-bash hljs">#!/bin/bash
+set -e
+
+SOURCE_DIR=&quot;${1:?Usage: deploy-ghpages.sh &lt;source-dir&gt;}&quot;
+REMOTE_URL=$(git remote get-url origin)
+TMPDIR=$(mktemp -d)
+
+cp -r &quot;$SOURCE_DIR&quot;/. &quot;$TMPDIR&quot;
+touch &quot;$TMPDIR/.nojekyll&quot;
+
+cd &quot;$TMPDIR&quot;
+git init -b gh-pages
+git add -A
+git commit -m &quot;Deploy to GitHub Pages&quot;
+git push --force &quot;$REMOTE_URL&quot; gh-pages
+
+rm -rf &quot;$TMPDIR&quot;
+</code></pre>
+<pre><code class="language-bash hljs">chmod +x scripts/deploy-ghpages.sh
+</code></pre>
+<p>Add the target to <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs">[[deployment.targets]]
+name = &quot;github-pages&quot;
+command = &quot;scripts/deploy-ghpages.sh {source}&quot;
+</code></pre>
+<p>Then build and deploy:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro deploy github-pages
+
+# Preview without deploying
+hwaro deploy github-pages --dry-run
+</code></pre>
+<h3 id="configure-github-pages-1">Configure GitHub Pages</h3>
+<ol>
+<li>Go to repository <strong>Settings</strong> → <strong>Pages</strong></li>
+<li>Under &quot;Build and deployment&quot;, select <strong>Deploy from a branch</strong></li>
+<li>Choose <code>gh-pages</code> branch, <code>/ (root)</code> folder</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<h2 id="method-3-manual-branch-deploy">Method 3: Manual Branch Deploy</h2>
+<pre><code class="language-bash hljs">hwaro build
+
+# Create orphan branch
+git checkout --orphan gh-pages
+
+# Remove all files
+git rm -rf .
+
+# Copy built site
+cp -r public/* .
+
+# Commit and push
+git add .
+git commit -m &quot;Deploy site&quot;
+git push origin gh-pages --force
+
+# Return to main branch
+git checkout main
+</code></pre>
+<h2 id="custom-domain">Custom Domain</h2>
+<h3 id="configure-dns">Configure DNS</h3>
+<p>Add a CNAME record pointing to <code>username.github.io</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CNAME</td>
+<td>www</td>
+<td>username.github.io</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.108.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.109.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.110.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.111.153</td>
+</tr>
+</tbody>
+</table>
+<h3 id="add-cname-file">Add CNAME File</h3>
+<p>Create <code>static/CNAME</code>:</p>
+<pre><code>www.yourdomain.com
+</code></pre>
+<h3 id="update-config">Update Config</h3>
+<pre><code class="language-toml hljs">base_url = &quot;https://www.yourdomain.com&quot;
+</code></pre>
+<h3 id="enable-https">Enable HTTPS</h3>
+<ol>
+<li>Go to repository <strong>Settings</strong> → <strong>Pages</strong></li>
+<li>Check <strong>Enforce HTTPS</strong></li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="404-errors">404 Errors</h3>
+<ul>
+<li>Check <code>base_url</code> matches your GitHub Pages URL</li>
+<li>Ensure CNAME file is in <code>static/</code> directory</li>
+<li>Wait a few minutes for deployment to complete</li>
+</ul>
+<h3 id="assets-not-loading">Assets Not Loading</h3>
+<ul>
+<li>Verify <code>base_url</code> has no trailing slash</li>
+<li>Check asset paths use <code>{{ base_url }}</code> prefix</li>
+</ul>
+<h3 id="build-failures">Build Failures</h3>
+<ul>
+<li>Review Actions logs for error messages</li>
+<li>Check that <code>build_dir</code> points to the correct directory</li>
+</ul>
+<h2 id="example-repository-structure">Example Repository Structure</h2>
+<pre><code>my-site/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml
+├── content/
+├── templates/
+├── static/
+│   └── CNAME
+├── config.toml
+└── README.md
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/deploy/config/">Deploy Configuration</a> — Target setup and matchers</li>
+<li><a href="/start/cli/">CLI Reference</a> — All deploy command options</li>
+<li>Other platforms: <a href="/deploy/gitlab-ci/">GitLab CI</a> | <a href="/deploy/netlify/">Netlify</a> | <a href="/deploy/vercel/">Vercel</a> | <a href="/deploy/codeberg-pages/">Codeberg Pages</a></li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=f9389238"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=f9389238"></script>
+</body>
+</html>
