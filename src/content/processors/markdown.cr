@@ -705,9 +705,17 @@ module Hwaro
               end
               stack.push(toc_item)
 
-              # Rebuild the tag, injecting id if it was missing
+              # Rebuild the tag. When the heading already had an id and the
+              # dedup loop didn't touch it, the original markup is returned
+              # verbatim. Otherwise we rewrite — either replacing a duplicated
+              # existing id with its suffixed form, or injecting a fresh id.
               if existing_id
-                match # Return unchanged
+                if id == existing_id
+                  match
+                else
+                  new_attrs = attrs.sub(ID_ATTR_REGEX, %(id="#{id}"))
+                  "<#{tag_name}#{new_attrs}>#{inner_html}</#{tag_name}>"
+                end
               else
                 "<#{tag_name}#{attrs} id=\"#{id}\">#{inner_html}</#{tag_name}>"
               end

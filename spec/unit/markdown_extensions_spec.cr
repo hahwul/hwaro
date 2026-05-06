@@ -609,21 +609,26 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "heading ids (TOC dedup)" do
-    # Locks current pre-existing behaviour in markdown.cr: when an `existing_id`
-    # is detected on a heading (which now includes ones we set from `{#id}`),
-    # the TOC entry gets a deduped id but the rendered HTML keeps the original
-    # id verbatim. This means duplicate `{#id}` produce duplicate id attributes
-    # and a broken TOC anchor for the second entry. Pre-existing limitation —
-    # tracked separately from this PR.
-    it "produces duplicate ids in HTML when the user writes the same {#id} twice" do
+    it "de-duplicates identical custom IDs across both HTML and TOC" do
       cfg = make_config(heading_ids: true)
       content = "## A {#x}\n\nbody\n\n## B {#x}\n\nbody2\n"
       html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(
         content, markdown_config: cfg)
-      html.scan(/<h2 id="x">/).size.should eq(2)
+      html.scan(/<h2 id="x">/).size.should eq(1)
+      html.scan(/<h2 id="x-1">/).size.should eq(1)
       toc.size.should eq(2)
       toc[0].id.should eq("x")
-      toc[1].id.should eq("x-1") # TOC dedup, even though the HTML id wasn't updated
+      toc[1].id.should eq("x-1")
+    end
+
+    it "de-duplicates raw HTML headings that share an existing id" do
+      content = %(<h2 id="dup">First</h2>\n\n<h2 id="dup">Second</h2>\n)
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content)
+      html.scan(/id="dup"/).size.should eq(1)
+      html.should contain(%(id="dup-1"))
+      toc.size.should eq(2)
+      toc[0].id.should eq("dup")
+      toc[1].id.should eq("dup-1")
     end
   end
 
