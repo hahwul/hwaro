@@ -16,7 +16,7 @@ module Hwaro
           result = preprocess_definition_lists(result) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
           result = preprocess_math(result) if config.math
-          result = preprocess_heading_ids(result) if config.heading_ids
+          result = preprocess_heading_ids(result, safe: config.safe) if config.heading_ids
           result
         end
 
@@ -273,17 +273,28 @@ module Hwaro
         # attribute in `postprocess_heading_ids`.
         # Restricting the id charset to `[A-Za-z][\w:-]*` keeps it valid as an
         # HTML id without further escaping.
-        HEADING_ID_RE = /^(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*$/
+        # CommonMark allows up to 3 leading spaces before an ATX heading, which
+        # we capture and preserve so Markd still recognises the line as a heading.
+        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*$/
+
+        FENCE_BACKTICKS = "```"
+        FENCE_TILDES    = "~~~"
 
         # Walk lines and apply the heading-id transform only outside fenced
         # code blocks, so `## ... {#id}` shown inside a ```` ``` ```` example
         # in the docs renders verbatim.
-        def preprocess_heading_ids(content : String) : String
+        #
+        # Under Markd's safe mode, inline HTML comments are replaced with the
+        # placeholder `<!-- raw HTML omitted -->`, which would both lose the id
+        # *and* leak that placeholder into the heading text. In that case we
+        # strip the `{#id}` syntax silently — custom heading IDs are not
+        # supported alongside `markdown.safe = true`.
+        def preprocess_heading_ids(content : String, *, safe : Bool = false) : String
           return content unless content.includes?("{#")
 
           String.build do |io|
             in_fence = false
-            fence_char = '`'
+            fence_marker = FENCE_BACKTICKS
 
             content.each_line(chomp: false) do |line|
               stripped = line.lstrip
@@ -291,21 +302,25 @@ module Hwaro
               if in_fence
                 # A closing fence is a line whose first non-blank run is the
                 # same fence character repeated 3+ times.
-                if stripped.starts_with?(fence_char.to_s * 3)
+                if stripped.starts_with?(fence_marker)
                   in_fence = false
                 end
                 io << line
-              elsif stripped.starts_with?("```")
+              elsif stripped.starts_with?(FENCE_BACKTICKS)
                 in_fence = true
-                fence_char = '`'
+                fence_marker = FENCE_BACKTICKS
                 io << line
-              elsif stripped.starts_with?("~~~")
+              elsif stripped.starts_with?(FENCE_TILDES)
                 in_fence = true
-                fence_char = '~'
+                fence_marker = FENCE_TILDES
                 io << line
               elsif line.includes?("{#")
                 io << line.gsub(HEADING_ID_RE) do |_|
-                  "#{$1} #{$2.rstrip} <!--HID:#{$3}-->"
+                  if safe
+                    "#{$1}#{$2} #{$3.rstrip}"
+                  else
+                    "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
+                  end
                 end
               else
                 io << line

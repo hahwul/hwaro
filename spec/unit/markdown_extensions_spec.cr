@@ -573,6 +573,71 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("## Example {#x}")
       result.should_not contain("HID:")
     end
+
+    it "matches headings indented up to 3 spaces (CommonMark)" do
+      content = "   ## Indented heading {#deep}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq("   ## Indented heading <!--HID:deep-->")
+    end
+
+    it "does not match a heading-like line indented 4+ spaces (code block)" do
+      content = "    ## Looks like heading {#nope}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq(content)
+    end
+
+    it "strips {#id} syntax under safe mode and skips marker injection" do
+      content = "## Foo {#bar}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content, safe: true)
+      result.should eq("## Foo")
+      result.should_not contain("HID:")
+      result.should_not contain("{#")
+    end
+
+    it "leaves a clean heading end-to-end under safe mode" do
+      cfg = make_config(heading_ids: true)
+      cfg.safe = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "## Foo {#bar}\n",
+        safe: cfg.safe,
+        markdown_config: cfg,
+      )
+      html.should contain("Foo")
+      html.should_not contain("{#")
+      html.should_not contain("raw HTML omitted")
+    end
+  end
+
+  describe "heading ids (TOC dedup)" do
+    # Locks current pre-existing behaviour in markdown.cr: when an `existing_id`
+    # is detected on a heading (which now includes ones we set from `{#id}`),
+    # the TOC entry gets a deduped id but the rendered HTML keeps the original
+    # id verbatim. This means duplicate `{#id}` produce duplicate id attributes
+    # and a broken TOC anchor for the second entry. Pre-existing limitation —
+    # tracked separately from this PR.
+    it "produces duplicate ids in HTML when the user writes the same {#id} twice" do
+      cfg = make_config(heading_ids: true)
+      content = "## A {#x}\n\nbody\n\n## B {#x}\n\nbody2\n"
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(
+        content, markdown_config: cfg)
+      html.scan(/<h2 id="x">/).size.should eq(2)
+      toc.size.should eq(2)
+      toc[0].id.should eq("x")
+      toc[1].id.should eq("x-1") # TOC dedup, even though the HTML id wasn't updated
+    end
+  end
+
+  describe "admonitions (limitations)" do
+    it "closes early on a nested blockquote (documented v1 limitation)" do
+      # Inner </blockquote> ends the lazy match, so the outer admonition body
+      # is truncated before the second </blockquote>. This locks the current
+      # behaviour; lifting the restriction would mean a nest-aware matcher.
+      html = "<blockquote>\n<p>[!NOTE]\nouter</p>\n<blockquote>\n<p>inner</p>\n</blockquote>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain("admonition-note")
+      # Trailing outer </blockquote> is left behind in the output.
+      result.scan(/<\/blockquote>/).size.should eq(1)
+    end
   end
 
   describe "admonitions end-to-end" do

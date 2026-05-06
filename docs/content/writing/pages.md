@@ -352,6 +352,8 @@ The output is a `<div class="admonition admonition-{type}">` with a title paragr
 
 Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
 
+Limitations: matching is type-case-sensitive (`[!NOTE]` only, not `[!note]`), and a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape — backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
+
 ### Custom Heading IDs
 
 Append `{#custom-id}` to a heading line to override the auto-generated slug. Useful when you want stable anchor URLs that don't break on title edits.
@@ -362,9 +364,11 @@ Append `{#custom-id}` to a heading line to override the auto-generated slug. Use
 
 Renders as `<h2 id="install">Installation Guide</h2>`. The TOC and any `[link](#install)` will use the custom id.
 
-Allowed id characters: letters, digits, `_`, `-`, `:`. The id must start with a letter.
+Allowed id characters: letters, digits, `_`, `-`, `:`. The id must start with a letter. CommonMark allows up to 3 leading spaces before an ATX heading; deeper indentation makes the line a code block, in which case `{#id}` is not applied.
 
 Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
+
+Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied — use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page produces duplicate id attributes; the first anchor wins.
 
 ### Definition Lists
 
