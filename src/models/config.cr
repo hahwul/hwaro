@@ -523,6 +523,8 @@ module Hwaro
       property mermaid : Bool          # If true, renders ```mermaid blocks as diagrams
       property math : Bool             # If true, enables math syntax ($...$ and $$...$$)
       property math_engine : String    # "katex" or "mathjax"
+      property admonitions : Bool      # If true, GitHub-style `> [!NOTE]` blockquotes become admonition <div>s
+      property heading_ids : Bool      # If true, `## Heading {#custom-id}` sets an explicit id
 
       def initialize
         @safe = false
@@ -534,6 +536,8 @@ module Hwaro
         @mermaid = false
         @math = false
         @math_engine = "katex"
+        @admonitions = true
+        @heading_ids = true
       end
     end
 
@@ -1197,6 +1201,8 @@ module Hwaro
         if engine = s["math_engine"]?.try(&.as_s?)
           config.markdown.math_engine = engine
         end
+        config.markdown.admonitions = bool_value(s["admonitions"]?, config.markdown.admonitions)
+        config.markdown.heading_ids = bool_value(s["heading_ids"]?, config.markdown.heading_ids)
       end
 
       private def self.load_series(config : Config)
