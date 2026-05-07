@@ -146,8 +146,19 @@ module Hwaro
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) do |_|
               Logger.info parser.to_s
+              Logger.info ""
+              Logger.info "Target shapes (in [[deployment.targets]]):"
+              Logger.info "  path    = \"/abs/local/dir\"   # copy to a local directory"
+              Logger.info "  url     = \"file:///abs/dir\"  # same, file:// scheme"
+              Logger.info "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`"
+              Logger.info "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`"
+              Logger.info "  url     = \"az://container\"   # auto-runs `az storage blob sync …`"
+              Logger.info "  command = \"…\"                # arbitrary shell command"
               hint = configured_targets_hint(env_name)
-              Logger.info hint unless hint.empty?
+              unless hint.empty?
+                Logger.info ""
+                Logger.info hint
+              end
               exit
             end
           end

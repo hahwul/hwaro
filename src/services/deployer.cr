@@ -312,8 +312,14 @@ module Hwaro
         if url.empty?
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Target '#{target.name}' is missing 'url' (or 'command').",
-            hint: "Set either 'url' or 'command' in [[deployment.targets]].",
+            message: "Target '#{target.name}' is missing 'url' (or 'path' / 'command').",
+            hint: "Set one of:\n" \
+                  "  path    = \"/abs/local/dir\"   # copy to a local directory\n" \
+                  "  url     = \"file:///abs/dir\"  # same, file:// scheme\n" \
+                  "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`\n" \
+                  "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`\n" \
+                  "  url     = \"az://container\"   # auto-runs `az storage blob sync …`\n" \
+                  "  command = \"rsync … {source} user@host:/var/www/\"  # arbitrary shell command",
           )
         end
 
@@ -431,8 +437,14 @@ module Hwaro
         if url.empty?
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Target '#{target.name}' is missing 'url' (or 'command').",
-            hint: "Set either 'url' or 'command' in [[deployment.targets]].",
+            message: "Target '#{target.name}' is missing 'url' (or 'path' / 'command').",
+            hint: "Set one of:\n" \
+                  "  path    = \"/abs/local/dir\"   # copy to a local directory\n" \
+                  "  url     = \"file:///abs/dir\"  # same, file:// scheme\n" \
+                  "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`\n" \
+                  "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`\n" \
+                  "  url     = \"az://container\"   # auto-runs `az storage blob sync …`\n" \
+                  "  command = \"rsync … {source} user@host:/var/www/\"  # arbitrary shell command",
           )
         end
 

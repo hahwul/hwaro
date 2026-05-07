@@ -1373,7 +1373,12 @@ module Hwaro
 
           target = DeploymentTarget.new
           target.name = name
-          target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || ""
+          # `path = "/tmp/out"` is the obvious shape for the
+          # local-filesystem case and matches what Hugo / Jekyll users
+          # try first. Treat it as an alias for `url`; the deployer
+          # already routes bare local paths to its native copy
+          # implementation (gh#529).
+          target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || target_h["path"]?.try(&.as_s?) || ""
           target.command = target_h["command"]?.try(&.as_s?)
           target.include = target_h["include"]?.try(&.as_s?)
           target.exclude = target_h["exclude"]?.try(&.as_s?)

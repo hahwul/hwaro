@@ -1515,6 +1515,36 @@ describe Hwaro::Models::Config do
       config.deployment.matchers[0].gzip.should be_true
     end
 
+    # Regression for gh#529: `path = "..."` is the obvious shape for
+    # the local-filesystem case (Hugo / Jekyll users try it first).
+    # Treat it as an alias for `url`.
+    it "accepts `path = \"...\"` as an alias for `url` on a deployment target (gh#529)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[deployment.targets]]
+        name = "local"
+        path = "/tmp/site-out"
+        TOML
+
+      config.deployment.targets.size.should eq(1)
+      config.deployment.targets[0].name.should eq("local")
+      config.deployment.targets[0].url.should eq("/tmp/site-out")
+    end
+
+    it "prefers `url` over `path` when both are set (gh#529)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[deployment.targets]]
+        name = "local"
+        url = "s3://primary"
+        path = "/tmp/fallback"
+        TOML
+
+      config.deployment.targets[0].url.should eq("s3://primary")
+    end
+
     it "loads deployment confirm = false from TOML (overrides default false)" do
       config = load_config(<<-TOML)
         title = "Test"
