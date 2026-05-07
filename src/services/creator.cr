@@ -473,6 +473,11 @@ module Hwaro
       # string so unusual `--date` inputs still produce valid TOML.
       TOML_DATETIME_RE = /\A\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?\z/
 
+      # Body is intentionally empty after the front matter delimiter. Every
+      # built-in scaffold's `page.html` / `post.html` renders the title as
+      # `<h1>{{ page.title | e }}</h1>`, so injecting a markdown `# title`
+      # here would produce two H1s on every page created via `hwaro new`
+      # (gh#525).
       private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
         safe_title = escape_string(title)
         date_literal = date.matches?(TOML_DATETIME_RE) ? date : "\"#{escape_string(date)}\""
@@ -487,7 +492,6 @@ module Hwaro
             str << "tags = [#{rendered}]\n"
           end
           str << "+++\n\n"
-          str << "# #{title}\n"
         end
       end
 
@@ -504,7 +508,6 @@ module Hwaro
             tags.each { |tag| str << "  - \"#{escape_string(tag)}\"\n" }
           end
           str << "---\n\n"
-          str << "# #{title}\n"
         end
       end
 
@@ -517,7 +520,7 @@ module Hwaro
         unless tags.empty?
           fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
         end
-        "#{JSON::Any.new(fields).to_pretty_json}\n\n# #{title}\n"
+        "#{JSON::Any.new(fields).to_pretty_json}\n\n"
       end
 
       private def escape_string(value : String) : String

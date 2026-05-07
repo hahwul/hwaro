@@ -133,6 +133,11 @@ module Hwaro
         # `Services::Creator` substitutes `{{ title }}`, `{{ date }}`,
         # `{{ draft }}`, and `{{ tags }}`; other fields (description) ship
         # with empty values for users to fill in.
+        #
+        # The body is intentionally empty: every scaffold's `page.html` /
+        # `post.html` already renders `<h1>{{ page.title | e }}</h1>`, so
+        # injecting a `# {{ title }}` here would produce two H1s on every
+        # page created via `hwaro new` (gh#525).
         protected def default_archetype : String
           <<-MD
             +++
@@ -142,8 +147,6 @@ module Hwaro
             description = ""
             tags = {{ tags }}
             +++
-
-            # {{ title }}
 
             MD
         end
@@ -247,11 +250,15 @@ module Hwaro
             HTML
         end
 
-        # Common template: page (Jinja2 syntax)
+        # Common template: page (Jinja2 syntax). Renders the title as
+        # `<h1>` so content authors don't need to repeat it in every
+        # markdown body — and so `hwaro new` can ship an empty body
+        # without losing the heading (gh#525).
         protected def page_template : String
           <<-HTML
             {% include "header.html" %}
               <main class="site-main">
+                <h1>{{ page.title | e }}</h1>
                 {{ content }}
               </main>
             {% include "footer.html" %}

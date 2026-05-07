@@ -168,6 +168,9 @@ module Hwaro
         end
 
         protected def posts_archetype : String
+          # Body intentionally empty — `post.html` renders the title as
+          # `<h1>` already, so a `# {{ title }}` here would duplicate it
+          # (gh#525).
           <<-MD
             +++
             title = "{{ title }}"
@@ -178,8 +181,6 @@ module Hwaro
             categories = []
             tags = {{ tags }}
             +++
-
-            # {{ title }}
 
             MD
         end

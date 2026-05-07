@@ -172,6 +172,27 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression for https://github.com/hahwul/hwaro/issues/525
+    # When no archetype is found, the built-in fallback used to append
+    # `# <title>` after the front matter, producing two `<h1>`s once a
+    # template rendered `{{ page.title }}` as well. Body must now be empty.
+    it "fallback front matter omits the markdown H1 (gh#525)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "No Dup H1")
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/drafts/post.md")
+          content.should contain("title = \"No Dup H1\"")
+          content.should_not contain("# No Dup H1")
+          # Front matter terminator is the last non-empty line.
+          content.lines.reject(&.blank?).last.should eq("+++")
+        end
+      end
+    end
+
     # Regression for https://github.com/hahwul/hwaro/issues/487
     # The default date should be a TOML datetime literal (unquoted, ISO 8601
     # with offset) so it round-trips back through the parser as a real `Time`,

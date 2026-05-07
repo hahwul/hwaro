@@ -69,6 +69,10 @@ module Hwaro
           # page shouldn't default to the same weight or ordering becomes
           # non-deterministic. Users who care about ordering should set
           # it explicitly per page.
+          #
+          # Body intentionally empty — docs `page.html` renders the title
+          # as `<h1>` already, so a `# {{ title }}` here would duplicate
+          # it (gh#525).
           <<-MD
             +++
             title = "{{ title }}"
@@ -79,8 +83,6 @@ module Hwaro
             toc = true
             tags = {{ tags }}
             +++
-
-            # {{ title }}
 
             MD
         end

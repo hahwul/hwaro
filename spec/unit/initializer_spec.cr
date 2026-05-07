@@ -226,6 +226,10 @@ describe Hwaro::Services::Initializer do
           content.should contain("+++")
           content.should contain("title = \"{{ title }}\"")
           content.should contain("description = \"\"")
+          # Regression for gh#525: archetype must not inject `# {{ title }}`
+          # because every scaffold's `page.html` already renders the title
+          # as `<h1>` — duplicating it produced two H1s on every new post.
+          content.should_not contain("# {{ title }}")
         end
       end
 
@@ -243,6 +247,8 @@ describe Hwaro::Services::Initializer do
           content = File.read(posts_path)
           content.should contain("authors = []")
           content.should contain("categories = []")
+          # Regression for gh#525.
+          content.should_not contain("# {{ title }}")
         end
       end
 
@@ -263,6 +269,9 @@ describe Hwaro::Services::Initializer do
           content.should contain("# weight = 10")
           content.should_not match(/^weight = /m)
           content.should contain("toc = true")
+          # Regression for gh#525: docs page.html renders the title as
+          # `<h1>` already; the archetype must not inject `# {{ title }}`.
+          content.should_not contain("# {{ title }}")
         end
       end
 
