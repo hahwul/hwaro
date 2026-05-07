@@ -277,6 +277,12 @@ module Hwaro
               padding-left: 1.25rem;
             }
 
+            /* Language switcher (only rendered for multilingual sites). */
+            .lang-switcher { display: flex; gap: 0.5rem; font-size: 0.85rem; }
+            .lang-switcher a { color: var(--text-muted); text-decoration: none; padding: 0.15rem 0.4rem; border-radius: 4px; }
+            .lang-switcher a:hover { color: var(--text); background: var(--bg-secondary); }
+            .lang-switcher a[aria-current="true"] { color: var(--text); font-weight: 600; }
+
             /* Layout */
             .blog-container {
               padding-top: var(--header-h);
@@ -802,13 +808,20 @@ module Hwaro
           <<-HTML
             <header class="blog-header">
               <div class="blog-header-inner">
-                <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
                 <nav>
-                  <a href="{{ base_url }}/posts/">Posts</a>
-                  <a href="{{ base_url }}/archives/">Archives</a>
-                  <a href="{{ base_url }}/about/">About</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
                 </nav>
                 <div class="header-right">
+                  {% if page.translations | length > 0 %}
+                  <nav class="lang-switcher" aria-label="Language">
+                    {% for t in page.translations %}
+                    <a href="{{ t.url }}" hreflang="{{ t.code }}"{% if t.is_current %} aria-current="true"{% endif %}>{{ t.code | upper }}</a>
+                    {% endfor %}
+                  </nav>
+                  {% endif %}
                   <button class="search-trigger" onclick="openSearch()" title="Search">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <span>Search</span>
@@ -880,10 +893,10 @@ module Hwaro
         protected def navigation : String
           <<-NAV
             <nav>
-              <a href="{{ base_url }}/">Home</a>
-              <a href="{{ base_url }}/posts/">Posts</a>
-              <a href="{{ base_url }}/archives/">Archives</a>
-              <a href="{{ base_url }}/about/">About</a>
+              <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
+              <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
+              <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
+              <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
             </nav>
             NAV
         end
@@ -1126,11 +1139,11 @@ module Hwaro
             {% include "header.html" %}
             <header class="blog-header">
               <div class="blog-header-inner">
-                <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
                 <nav>
-                  <a href="{{ base_url }}/posts/">Posts</a>
-                  <a href="{{ base_url }}/archives/">Archives</a>
-                  <a href="{{ base_url }}/about/">About</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
                 </nav>
               </div>
             </header>

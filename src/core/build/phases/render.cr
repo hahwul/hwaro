@@ -1031,6 +1031,13 @@ module Hwaro::Core::Build::Phases::Render
     page_language = page.language || default_lang
     vars["page_language"] = Crinja::Value.new(page_language)
 
+    # `lang_prefix` is `""` for the default language and `"/<code>"`
+    # for every other configured language, so multilingual scaffold
+    # templates can write links as `{{ base_url }}{{ lang_prefix }}/posts/`
+    # and have them resolve correctly per locale (gh#524).
+    lang_prefix = page_language != default_lang && config.multilingual? ? "/#{page_language}" : ""
+    vars["lang_prefix"] = Crinja::Value.new(lang_prefix)
+
     translations = page.translations.map do |t|
       Crinja::Value.new(
         {

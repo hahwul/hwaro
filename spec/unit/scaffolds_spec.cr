@@ -645,6 +645,41 @@ describe Hwaro::Services::Scaffolds::Registry do
         multi.has_key?("about.ko.md").should be_true
         multi.has_key?("about.ja.md").should be_true
       end
+
+      # Regression for gh#524: the auto-generated `*.ko.md` stub used
+      # to keep the default-language `[Posts](/posts/)` link in its
+      # body, so a Korean reader clicked it and landed on the English
+      # `/posts/` page. The localized stub now rewrites internal
+      # absolute links to the locale prefix.
+      it "rewrites default-language internal links in localized stubs (gh#524)" do
+        scaffold = Hwaro::Services::Scaffolds::Blog.new
+        multi = scaffold.multilingual_content_files(["en", "ko"])
+
+        ko_index = multi["index.ko.md"]
+        ko_index.should contain("[Posts](/ko/posts/)")
+        ko_index.should contain("[Tags](/ko/tags/)")
+        ko_index.should_not contain("[Posts](/posts/)")
+        ko_index.should_not contain("[Tags](/tags/)")
+      end
+
+      it "leaves already-prefixed links alone in localized stubs (gh#524)" do
+        # The blog scaffold's `posts/_index.md` body links to
+        # `/posts/`. After localizing for "ko", that should become
+        # `/ko/posts/` — but the section _index file's `[Posts]`
+        # backlink (or any link already starting with `/ko/`) should
+        # not become `/ko/ko/...`. Round-trip through
+        # `multilingual_content_files` and check.
+        scaffold = Hwaro::Services::Scaffolds::Blog.new
+        multi = scaffold.multilingual_content_files(["en", "ko"])
+
+        multi.each do |path, body|
+          next unless path.ends_with?(".ko.md")
+          # No double-prefixing.
+          body.should_not contain("/ko/ko/")
+          # External links pass through.
+          body.should_not match(/\]\(http:\/\/ko\//)
+        end
+      end
     end
   end
 end

@@ -52,11 +52,36 @@ module Hwaro
           languages[1..].each do |lang|
             base.each do |path, body|
               next unless path.ends_with?(".md")
-              result[localize_path(path, lang)] = prepend_translation_notice(body, lang)
+              localized_body = localize_internal_links(body, lang)
+              result[localize_path(path, lang)] = prepend_translation_notice(localized_body, lang)
             end
           end
 
           result
+        end
+
+        # Rewrite Markdown links that point at the default-language URL
+        # space so they resolve to the translated locale's URL space
+        # instead. Without this, `index.ko.md`'s body keeps
+        # `[Posts](/posts/)` and the Korean homepage links a Korean
+        # reader straight back to the English `/posts/` index
+        # (gh#524).
+        #
+        # We only rewrite absolute internal links (`](/foo)` /
+        # `](/foo/)` /…) — external `http(s)://` URLs and relative
+        # links pass through unchanged. Already-prefixed links like
+        # `](/ko/foo)` are skipped so callers can localize a body
+        # that's already partially translated.
+        protected def localize_internal_links(body : String, lang : String) : String
+          prefix = "/#{lang}/"
+          body.gsub(/\]\((\/[^)\s]+)\)/) do |match|
+            target = $~[1]
+            if target.starts_with?(prefix) || target == "/#{lang}"
+              match
+            else
+              "](#{prefix}#{target.lchop("/")})"
+            end
+          end
         end
 
         # Insert a language code before the extension:
