@@ -1214,7 +1214,11 @@ module Hwaro
             HTML
         end
 
-        # Sidebar
+        # Sidebar / table of contents.
+        #
+        # Renders dynamically from `site.sections` so any chapter or
+        # leaf page added under `content/` shows up automatically
+        # (gh#523). Set `weight = N` in front matter to reorder.
         private def book_sidebar_html : String
           <<-HTML
             <aside class="book-sidebar collapsed">
@@ -1224,29 +1228,18 @@ module Hwaro
                   <li><a href="{{ base_url }}/">Welcome</a></li>
                 </ul>
               </div>
+              {% for sec in site.sections | sort(attribute="path") %}{% if sec.name != "" %}
+              {% set chapter_index = loop.index %}
               <div class="chapter-group">
-                <span class="chapter-title">Chapter 1</span>
+                <span class="chapter-title">{{ sec.title | e }}</span>
                 <ul class="chapter-links">
-                  <li><a href="{{ base_url }}/chapter-1/"><span class="num">1.</span> Getting Started</a></li>
-                  <li><a href="{{ base_url }}/chapter-1/getting-started/"><span class="num">1.1</span> Overview</a></li>
-                  <li><a href="{{ base_url }}/chapter-1/installation/"><span class="num">1.2</span> Installation</a></li>
+                  <li><a href="{{ base_url }}{{ sec.url }}"><span class="num">{{ chapter_index }}.</span> {{ sec.title | e }}</a></li>
+                  {% for p in sec.pages | sort(attribute="path") %}{% if not p.is_index %}
+                  <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
+                  {% endif %}{% endfor %}
                 </ul>
               </div>
-              <div class="chapter-group">
-                <span class="chapter-title">Chapter 2</span>
-                <ul class="chapter-links">
-                  <li><a href="{{ base_url }}/chapter-2/"><span class="num">2.</span> Usage</a></li>
-                  <li><a href="{{ base_url }}/chapter-2/basic-usage/"><span class="num">2.1</span> Basic Usage</a></li>
-                  <li><a href="{{ base_url }}/chapter-2/configuration/"><span class="num">2.2</span> Configuration</a></li>
-                </ul>
-              </div>
-              <div class="chapter-group">
-                <span class="chapter-title">Chapter 3</span>
-                <ul class="chapter-links">
-                  <li><a href="{{ base_url }}/chapter-3/"><span class="num">3.</span> Advanced</a></li>
-                  <li><a href="{{ base_url }}/chapter-3/advanced-topics/"><span class="num">3.1</span> Advanced Topics</a></li>
-                </ul>
-              </div>
+              {% endif %}{% endfor %}
             </aside>
             HTML
         end

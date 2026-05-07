@@ -76,6 +76,20 @@ describe Hwaro::Services::Scaffolds::Book do
       files.has_key?("taxonomy.html").should be_false
       files.has_key?("taxonomy_term.html").should be_false
     end
+
+    # Regression for gh#523: the book TOC sidebar used to bake the
+    # original three chapters with hand-numbered "1.", "1.1" links
+    # into the template. Adding a chapter via `hwaro new` left the
+    # sidebar stale. Now the template iterates `site.sections`.
+    it "renders the chapter sidebar dynamically via site.sections (gh#523)" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      page = files["page.html"]
+      page.should contain("{% for sec in site.sections")
+      page.should contain("{% for p in sec.pages")
+      page.should_not contain("/chapter-1/installation/")
+      page.should_not contain("/chapter-2/configuration/")
+      page.should_not contain("/chapter-3/advanced-topics/")
+    end
   end
 
   describe "#static_files" do

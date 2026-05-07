@@ -46,4 +46,26 @@ describe Hwaro::Services::Scaffolds::Blog do
       files["posts/hello-world.md"].should match(/date = "\d{4}-\d{2}-\d{2}"/)
     end
   end
+
+  # Regression for gh#523: blog `archives.md` used to be a one-line
+  # placeholder ("Browse all posts by date.") with no template logic
+  # to actually list anything. The scaffold now ships a working
+  # `templates/archives.html` and points the page at it.
+  describe "archives" do
+    it "ships an archives.html template that iterates site.pages (gh#523)" do
+      scaffold = Hwaro::Services::Scaffolds::Blog.new
+      tpl = scaffold.template_files["archives.html"]?
+      tpl.should_not be_nil
+      tpl = tpl.not_nil!
+      tpl.should contain(%[selectattr("section", "equalto", "posts")])
+      tpl.should contain(%[sort(attribute="date", reverse=true)])
+      tpl.should contain("archive-list")
+    end
+
+    it "wires archives.md to the archives template (gh#523)" do
+      scaffold = Hwaro::Services::Scaffolds::Blog.new
+      content = scaffold.content_files["archives.md"]
+      content.should contain(%[template = "archives"])
+    end
+  end
 end

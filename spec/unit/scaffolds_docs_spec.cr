@@ -59,6 +59,27 @@ describe Hwaro::Services::Scaffolds::Docs do
       page.should contain("header-right")
     end
 
+    # Regression for gh#523: the docs sidebar used to be a hand-written
+    # `<aside>` with the original three sections × three to four
+    # pages baked in, so any page added via `hwaro new` never appeared
+    # in the sidebar. Now the sidebar iterates `site.sections`
+    # dynamically, so the per-section URLs must NOT be present in the
+    # template source.
+    it "renders the sidebar dynamically via site.sections (gh#523)" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      page = scaffold.template_files["page.html"]
+      section = scaffold.template_files["section.html"]
+
+      [page, section].each do |tmpl|
+        tmpl.should contain("{% for sec in site.sections")
+        tmpl.should contain("{% for p in sec.pages")
+        # No hardcoded URLs.
+        tmpl.should_not contain("/getting-started/installation/")
+        tmpl.should_not contain("/guide/templates/")
+        tmpl.should_not contain("/reference/cli/")
+      end
+    end
+
     it "page template includes Documentation span in logo" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       page = scaffold.template_files["page.html"]

@@ -979,35 +979,30 @@ module Hwaro
         end
 
         # Sidebar HTML shared by page and section templates
+        # Renders the docs sidebar dynamically by iterating
+        # `site.sections` (gh#523). Previously the sidebar was a
+        # hand-written `<aside>` with three sections × three to four
+        # pages baked in, so any page added via `hwaro new` never
+        # appeared. Now every top-level section under `content/` shows
+        # up automatically with its leaf pages listed underneath.
+        #
+        # Section / page order follows whatever `site.sections` returns
+        # (filesystem / weight-driven). Set `weight = N` in front
+        # matter to reorder.
         private def docs_sidebar_html : String
           <<-HTML
             <aside class="docs-sidebar">
+              {% for sec in site.sections | sort(attribute="path") %}{% if sec.name != "" %}
               <div class="sidebar-section">
-                <div class="sidebar-title">Getting Started</div>
+                <div class="sidebar-title">{{ sec.title | e }}</div>
                 <ul class="sidebar-links">
-                  <li><a href="{{ base_url }}/getting-started/">Overview</a></li>
-                  <li><a href="{{ base_url }}/getting-started/installation/">Installation</a></li>
-                  <li><a href="{{ base_url }}/getting-started/quick-start/">Quick Start</a></li>
-                  <li><a href="{{ base_url }}/getting-started/configuration/">Configuration</a></li>
+                  <li><a href="{{ base_url }}{{ sec.url }}">Overview</a></li>
+                  {% for p in sec.pages | sort(attribute="path") %}{% if not p.is_index %}
+                  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
+                  {% endif %}{% endfor %}
                 </ul>
               </div>
-              <div class="sidebar-section">
-                <div class="sidebar-title">Guide</div>
-                <ul class="sidebar-links">
-                  <li><a href="{{ base_url }}/guide/">Overview</a></li>
-                  <li><a href="{{ base_url }}/guide/content-management/">Content Management</a></li>
-                  <li><a href="{{ base_url }}/guide/templates/">Templates</a></li>
-                  <li><a href="{{ base_url }}/guide/shortcodes/">Shortcodes</a></li>
-                </ul>
-              </div>
-              <div class="sidebar-section">
-                <div class="sidebar-title">Reference</div>
-                <ul class="sidebar-links">
-                  <li><a href="{{ base_url }}/reference/">Overview</a></li>
-                  <li><a href="{{ base_url }}/reference/cli/">CLI Commands</a></li>
-                  <li><a href="{{ base_url }}/reference/config/">Configuration</a></li>
-                </ul>
-              </div>
+              {% endif %}{% endfor %}
             </aside>
             HTML
         end

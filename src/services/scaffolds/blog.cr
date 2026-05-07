@@ -52,12 +52,13 @@ module Hwaro
 
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.html"  => header_template,
-            "footer.html"  => footer_template,
-            "page.html"    => blog_page_template,
-            "section.html" => blog_section_template,
-            "post.html"    => post_template,
-            "404.html"     => not_found_template,
+            "header.html"   => header_template,
+            "footer.html"   => footer_template,
+            "page.html"     => blog_page_template,
+            "section.html"  => blog_section_template,
+            "post.html"     => post_template,
+            "archives.html" => archives_template,
+            "404.html"      => not_found_template,
           }
 
           unless skip_taxonomies
@@ -1095,14 +1096,61 @@ module Hwaro
           )
         end
 
+        # Archives page front matter — picks up `templates/archives.html`
+        # which actually renders the archive listing dynamically. The
+        # body is just an intro line that lives above the generated
+        # list; the template iterates `site.pages` to do the work.
+        # Replaces the previous placeholder that only said "Browse all
+        # posts by date" without rendering anything (gh#523).
         private def archives_content : String
           <<-CONTENT
             +++
             title = "Archives"
+            template = "archives"
             +++
 
-            Browse all posts by date. Check the [Posts](/posts/) section for the complete list.
+            Browse every post by date.
             CONTENT
+        end
+
+        # Archives template (Jinja2 syntax). Lists every published
+        # post under the `posts` section, sorted newest-first. Each
+        # entry shows the date so readers can scan the timeline; we
+        # avoid `{% set %}` year-grouping because Crinja doesn't
+        # implement Jinja2's `namespace()` helper that would otherwise
+        # let us track the current year across iterations cleanly.
+        # Users who want grouped-by-year output can override this
+        # template in their project's `templates/archives.html`.
+        private def archives_template : String
+          <<-HTML
+            {% include "header.html" %}
+            <header class="blog-header">
+              <div class="blog-header-inner">
+                <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
+                <nav>
+                  <a href="{{ base_url }}/posts/">Posts</a>
+                  <a href="{{ base_url }}/archives/">Archives</a>
+                  <a href="{{ base_url }}/about/">About</a>
+                </nav>
+              </div>
+            </header>
+            <div class="blog-container">
+              <main class="blog-main">
+                <h1>{{ page.title | e }}</h1>
+                {{ content }}
+
+                <ul class="archive-list">
+                {% for p in site.pages | selectattr("section", "equalto", "posts") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                  <li class="archive-entry">
+                    <time datetime="{{ p.date }}">{{ p.date }}</time>
+                    <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
+                  </li>
+                {% endfor %}
+                </ul>
+              </main>
+            </div>
+            {% include "footer.html" %}
+            HTML
         end
       end
     end
