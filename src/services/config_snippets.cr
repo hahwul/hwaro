@@ -258,12 +258,15 @@ module Hwaro
             # =============================================================================
             # OpenGraph & Twitter Cards
             # =============================================================================
-            # Default meta tags for social sharing
-            # Page-level settings (front matter) override these defaults
+            # Default meta tags for social sharing.
+            # Page-level settings (front matter) override these defaults.
+            # The runtime auto-emits og:type="website" for the homepage,
+            # section indexes, taxonomy listings, and 404 page; the value
+            # below applies to article-style content pages only.
 
             [og]
-            default_image = "/images/og-default.png"   # Default image for social sharing
-            type = "article"                           # OpenGraph type (website, article, etc.)
+            # default_image = "/images/og-default.png" # Drop a 1200x630 image under static/ and uncomment
+            type = "article"                           # OpenGraph type for content pages (website, article, …)
             twitter_card = "summary_large_image"       # Twitter card type (summary, summary_large_image)
             # twitter_site = "@yourusername"           # Twitter @username for the site
             # twitter_creator = "@authorusername"      # Twitter @username for content creator

@@ -366,17 +366,24 @@ module Hwaro
         @auto_image = AutoImageConfig.new
       end
 
-      # Generate OG meta tags
+      # Generate OG meta tags.
+      #
+      # `og_type_override` lets the renderer force `og:type="website"` for
+      # the homepage, section indexes, taxonomy listings, and the 404
+      # page — the configured `@og_type` ("article" by default) only fits
+      # content pages. See render.cr's `og_type_for` helper (gh#522).
       def og_tags(
         title : String,
         description : String?,
         url : String,
         image : String?,
         base_url : String,
+        og_type_override : String? = nil,
       ) : String
+        og_type = og_type_override || @og_type
         String.build(256) do |str|
           str << %(<meta property="og:title" content="#{Utils::TextUtils.escape_xml(title)}">\n)
-          str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(@og_type)}">\n)
+          str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(og_type)}">\n)
           str << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(url)}">)
           if desc = description
             str << %(\n<meta property="og:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
@@ -429,8 +436,9 @@ module Hwaro
         url : String,
         image : String?,
         base_url : String,
+        og_type_override : String? = nil,
       ) : String
-        og = og_tags(title, description, url, image, base_url)
+        og = og_tags(title, description, url, image, base_url, og_type_override)
         twitter = twitter_tags(title, description, image, base_url)
         [og, twitter].reject(&.empty?).join("\n")
       end

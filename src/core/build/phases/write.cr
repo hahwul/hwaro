@@ -33,6 +33,11 @@ module Hwaro::Core::Build::Phases::Write
     template = templates["404"]
     page = Models::Page.new("404.html")
     page.title = "404 Not Found"
+    # Give the 404 page a real URL so `og:url` doesn't render as a bare
+    # host (gh#522). The actual file lives at `<output>/404.html`; most
+    # static hosts also serve it for any unmatched path, so a stable
+    # canonical-style URL is the best we can do.
+    page.url = "/404.html"
 
     content = ""
     section_list = ""

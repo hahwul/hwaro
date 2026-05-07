@@ -168,6 +168,37 @@ describe Hwaro::Models::OpenGraphConfig do
       tags.should contain(%(<meta property="og:type" content="website">))
     end
 
+    # Regression for gh#522: render.cr should be able to override
+    # og:type per page kind (homepage/section/taxonomy/404 -> "website",
+    # content -> the configured @og_type) without mutating the shared
+    # config object.
+    it "honors a per-call og_type_override without touching @og_type (gh#522)" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      # Default config says articles.
+      config.og_type.should eq("article")
+
+      home_tags = config.og_tags(
+        title: "Home",
+        description: nil,
+        url: "/",
+        image: nil,
+        base_url: "https://example.com",
+        og_type_override: "website",
+      )
+      home_tags.should contain(%(<meta property="og:type" content="website">))
+
+      # Subsequent call without override still uses the configured type,
+      # proving the override didn't mutate state.
+      post_tags = config.og_tags(
+        title: "Post",
+        description: nil,
+        url: "/posts/p/",
+        image: nil,
+        base_url: "https://example.com",
+      )
+      post_tags.should contain(%(<meta property="og:type" content="article">))
+    end
+
     it "escapes HTML special characters in title" do
       config = Hwaro::Models::OpenGraphConfig.new
       tags = config.og_tags(

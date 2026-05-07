@@ -1316,7 +1316,8 @@ module Hwaro::Core::Build::Phases::Render
     # global_vars (computed once in build_global_vars).
 
     # OG/Twitter tags (page-specific — depend on page title/description/url/image)
-    og_tags = config.og.og_tags(page.title, page.description, effective_url, page.image, config.base_url)
+    og_type_override = og_type_for(page, effective_url)
+    og_tags = config.og.og_tags(page.title, page.description, effective_url, page.image, config.base_url, og_type_override)
     twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
     og_all_tags = if og_tags.empty?
                     twitter_tags
@@ -1388,5 +1389,22 @@ module Hwaro::Core::Build::Phases::Render
 
   private def minify_html(html : String) : String
     Utils::HtmlMinifier.minify(html)
+  end
+
+  # Resolve the page kind into an `og:type` override. Returns "website"
+  # for non-article pages (homepage, section indexes, taxonomy listings,
+  # the synthetic 404), or `nil` to fall back to the configured
+  # `[og].type` (article, by default) for content pages (gh#522).
+  private def og_type_for(page : Models::Page, effective_url : String) : String?
+    # 404 page is synthesized in write phase with `path = "404.html"`.
+    return "website" if page.path == "404.html"
+    # Taxonomy listings (`/tags/`, `/tags/<term>/`, …).
+    return "website" if page.taxonomy_name
+    # Section indexes (`/posts/`, `/`, …) — `is_index` covers both root
+    # `_index.md` and per-section `_index.md`.
+    return "website" if page.is_index
+    # Bare homepage URL fallback in case nothing else flagged it.
+    return "website" if effective_url == "/" || effective_url.empty?
+    nil
   end
 end
