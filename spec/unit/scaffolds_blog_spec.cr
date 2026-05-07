@@ -57,7 +57,7 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl = scaffold.template_files["archives.html"]?
       tpl.should_not be_nil
       tpl = tpl.not_nil!
-      tpl.should contain(%[sort(attribute="date", reverse=true)])
+      tpl.should contain(%(sort(attribute="date", reverse=true)))
       tpl.should contain("archive-list")
     end
 
@@ -70,16 +70,16 @@ describe Hwaro::Services::Scaffolds::Blog do
     it "filters by date rather than a hardcoded section name" do
       scaffold = Hwaro::Services::Scaffolds::Blog.new
       tpl = scaffold.template_files["archives.html"].not_nil!
-      tpl.should contain(%[selectattr("date")])
-      tpl.should_not contain(%[selectattr("section", "equalto", "posts")])
-      tpl.should contain(%[rejectattr("draft")])
-      tpl.should contain(%[rejectattr("is_index")])
+      tpl.should contain(%(selectattr("date")))
+      tpl.should_not contain(%(selectattr("section", "equalto", "posts")))
+      tpl.should contain(%(rejectattr("draft")))
+      tpl.should contain(%(rejectattr("is_index")))
     end
 
     it "wires archives.md to the archives template (gh#523)" do
       scaffold = Hwaro::Services::Scaffolds::Blog.new
       content = scaffold.content_files["archives.md"]
-      content.should contain(%[template = "archives"])
+      content.should contain(%(template = "archives"))
     end
   end
 end
