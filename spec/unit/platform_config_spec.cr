@@ -49,6 +49,19 @@ describe Hwaro::Services::PlatformConfig do
         result.should contain("[[headers]]")
         result.should contain("Cache-Control")
       end
+
+      # Regression for gh#528 (D): the example HWARO_VERSION pin had
+      # hardcoded "0.5.0" and went stale across releases. Use the
+      # current `Hwaro::VERSION` so users copy-pasting the comment
+      # never see an out-of-date number.
+      it "pins the example HWARO_VERSION to the current build" do
+        config = Hwaro::Models::Config.new
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("netlify")
+
+        result.should contain("# HWARO_VERSION = \"#{Hwaro::VERSION}\"")
+        result.should_not contain("# HWARO_VERSION = \"0.5.0\"")
+      end
     end
 
     describe "vercel" do

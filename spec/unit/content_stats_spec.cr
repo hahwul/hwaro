@@ -62,6 +62,43 @@ describe Hwaro::Services::ContentStats do
       end
     end
 
+    # Regression for gh#528 (C): word counts, tags, and monthly buckets
+    # used to include drafts even though `hwaro build` skips them. Stats
+    # now reflect what would actually publish.
+    it "excludes drafts from word counts, tags, and monthly buckets (gh#528)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(
+          File.join(content_dir, "pub.md"),
+          "---\ntitle: Pub\ndate: 2024-01-10\ntags:\n  - kept\n---\n\none two three\n",
+        )
+        File.write(
+          File.join(content_dir, "draft.md"),
+          "---\ntitle: Draft\ndraft: true\ndate: 2024-02-10\ntags:\n  - dropped\n---\n\nfour five six seven eight\n",
+        )
+
+        result = Hwaro::Services::ContentStats.new(content_dir).run
+
+        # Bucket counts still reflect the whole content set.
+        result.total.should eq(2)
+        result.drafts.should eq(1)
+        result.published.should eq(1)
+
+        # Word stats reflect only the published item ("one two three" = 3).
+        result.words_total.should eq(3)
+        result.words_min.should eq(3)
+        result.words_max.should eq(3)
+
+        # Draft tags don't appear in the chart, draft month doesn't either.
+        result.tags.has_key?("dropped").should be_false
+        result.tags["kept"].should eq(1)
+        result.monthly.has_key?("2024-02").should be_false
+        result.monthly["2024-01"].should eq(1)
+      end
+    end
+
     it "aggregates monthly publishing frequency" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

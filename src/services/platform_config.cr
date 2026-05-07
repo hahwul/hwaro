@@ -1,4 +1,5 @@
 require "json"
+require "../hwaro"
 require "../models/config"
 require "../models/page"
 require "../content/processors/markdown"
@@ -61,7 +62,7 @@ module Hwaro
         lines << ""
         lines << "[build.environment]"
         lines << "  # Add environment variables here"
-        lines << "  # HWARO_VERSION = \"0.5.0\""
+        lines << "  # HWARO_VERSION = \"#{Hwaro::VERSION}\""
 
         # Redirects from aliases
         redirects = collect_aliases

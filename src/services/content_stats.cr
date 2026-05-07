@@ -56,12 +56,17 @@ module Hwaro
         drafts = items.count(&.draft)
         published = items.size - drafts
 
-        # Compute word counts and tags by reading each file
+        # Word counts, tag distribution, and publishing frequency reflect
+        # what `hwaro build` actually ships, so drafts are excluded from
+        # the metrics — `total` / `drafts` / `published` above already
+        # describe the on-disk content set (gh#528 C).
+        published_items = items.reject(&.draft)
+
         word_counts = [] of Int32
         tags = {} of String => Int32
         monthly = {} of String => Int32
 
-        items.each do |item|
+        published_items.each do |item|
           content = File.read(item.path) rescue next
 
           body = extract_body(content)
@@ -81,7 +86,7 @@ module Hwaro
         end
 
         words_total = word_counts.sum
-        words_avg = items.empty? ? 0 : words_total // items.size
+        words_avg = published_items.empty? ? 0 : words_total // published_items.size
         words_min = word_counts.min? || 0
         words_max = word_counts.max? || 0
 

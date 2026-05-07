@@ -198,6 +198,15 @@ module Hwaro
             str << "enabled = true\n"
             str << "type = \"rss\"\n"
             str << "limit = 10\n"
+            # `--minimal-config` previously dropped `[search]` entirely,
+            # which silently broke the search button in the blog/docs/
+            # book scaffolds (their JS still fetched `/search.json`).
+            # Keep search on so the scaffold templates work out of the
+            # box; users who don't want it can flip `enabled = false`
+            # (gh#528 B).
+            str << "\n[search]\n"
+            str << "enabled = true\n"
+            str << "format = \"fuse_json\"\n"
           end
         end
 

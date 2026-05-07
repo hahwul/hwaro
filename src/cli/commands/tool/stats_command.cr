@@ -101,8 +101,8 @@ module Hwaro
             Logger.info "    Drafts:    #{result.drafts}"
             Logger.info ""
 
-            # Word counts
-            Logger.info "  Word Count:"
+            # Word counts (published only — matches what `build` ships).
+            Logger.info "  Word Count (published only):"
             Logger.info "    Total:   #{result.words_total}"
             Logger.info "    Average: #{result.words_avg}"
             Logger.info "    Min:     #{result.words_min}"

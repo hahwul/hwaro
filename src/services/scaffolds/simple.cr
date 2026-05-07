@@ -14,7 +14,7 @@ module Hwaro
         end
 
         def description : String
-          "Basic pages structure with homepage and about page"
+          "Homepage, about page, taxonomies (tags/categories/authors), and search"
         end
 
         def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
