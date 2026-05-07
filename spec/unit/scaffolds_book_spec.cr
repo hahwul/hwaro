@@ -90,6 +90,21 @@ describe Hwaro::Services::Scaffolds::Book do
       page.should_not contain("/chapter-2/configuration/")
       page.should_not contain("/chapter-3/advanced-topics/")
     end
+
+    # The chapter numbering captures `loop.index` from the outer
+    # `{% for sec in site.sections %}` to render `1.`, `1.1`, etc.
+    # If empty-name (root) sections were filtered with an inner
+    # `{% if sec.name != "" %}`, Jinja's `loop.index` would still
+    # increment for the skipped iteration and chapters would be
+    # numbered `2., 3., 4.` once a user added a root `_index.md` or
+    # turned on a taxonomy-as-section. Filter the sequence first so
+    # the index lines up with the rendered chapters.
+    it "pre-filters empty-name sections so chapter numbering is stable" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      page = files["page.html"]
+      page.should contain(%q(rejectattr("name", "equalto", "")))
+      page.should_not match(/{%\s*if\s+sec\.name\s*!=\s*""\s*%}/)
+    end
   end
 
   describe "#static_files" do

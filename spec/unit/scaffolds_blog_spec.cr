@@ -57,9 +57,23 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl = scaffold.template_files["archives.html"]?
       tpl.should_not be_nil
       tpl = tpl.not_nil!
-      tpl.should contain(%[selectattr("section", "equalto", "posts")])
       tpl.should contain(%[sort(attribute="date", reverse=true)])
       tpl.should contain("archive-list")
+    end
+
+    # The first version of the archives template hardcoded
+    # `selectattr("section", "equalto", "posts")`, so renaming the
+    # `posts/` section silently produced an empty archives page even
+    # though `/archives/` was still in the header nav. The template
+    # now filters by `date` truthiness so any dated leaf page shows
+    # up regardless of its section name.
+    it "filters by date rather than a hardcoded section name" do
+      scaffold = Hwaro::Services::Scaffolds::Blog.new
+      tpl = scaffold.template_files["archives.html"].not_nil!
+      tpl.should contain(%[selectattr("date")])
+      tpl.should_not contain(%[selectattr("section", "equalto", "posts")])
+      tpl.should contain(%[rejectattr("draft")])
+      tpl.should contain(%[rejectattr("is_index")])
     end
 
     it "wires archives.md to the archives template (gh#523)" do

@@ -71,15 +71,23 @@ module Hwaro
         # `](/foo/)` /…) — external `http(s)://` URLs and relative
         # links pass through unchanged. Already-prefixed links like
         # `](/ko/foo)` are skipped so callers can localize a body
-        # that's already partially translated.
+        # that's already partially translated. Image syntax
+        # (`![alt](/img.png)`) is left alone because static assets
+        # live at the site root regardless of locale; we capture the
+        # optional leading `!` and pass image matches through
+        # untouched.
         protected def localize_internal_links(body : String, lang : String) : String
           prefix = "/#{lang}/"
-          body.gsub(/\]\((\/[^)\s]+)\)/) do |match|
-            target = $~[1]
-            if target.starts_with?(prefix) || target == "/#{lang}"
+          body.gsub(/(!?)\[([^\]]*)\]\((\/[^)\s]+)\)/) do |match|
+            bang = $~[1]
+            label = $~[2]
+            target = $~[3]
+            if !bang.empty?
+              match
+            elsif target.starts_with?(prefix) || target == "/#{lang}"
               match
             else
-              "](#{prefix}#{target.lchop("/")})"
+              "[#{label}](#{prefix}#{target.lchop("/")})"
             end
           end
         end

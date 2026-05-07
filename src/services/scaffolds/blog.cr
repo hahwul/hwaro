@@ -1126,14 +1126,17 @@ module Hwaro
             CONTENT
         end
 
-        # Archives template (Jinja2 syntax). Lists every published
-        # post under the `posts` section, sorted newest-first. Each
-        # entry shows the date so readers can scan the timeline; we
-        # avoid `{% set %}` year-grouping because Crinja doesn't
+        # Archives template (Jinja2 syntax). Lists every dated,
+        # non-draft, non-index page sorted newest-first. Filtering on
+        # `date` truthiness instead of a hardcoded section name keeps
+        # the page useful when the user renames `posts/` or adds dated
+        # content under another section. Users who only want one
+        # section can override this template and add a
+        # `selectattr("section", "equalto", "...")` filter.
+        #
+        # We avoid `{% set %}` year-grouping because Crinja doesn't
         # implement Jinja2's `namespace()` helper that would otherwise
         # let us track the current year across iterations cleanly.
-        # Users who want grouped-by-year output can override this
-        # template in their project's `templates/archives.html`.
         private def archives_template : String
           <<-HTML
             {% include "header.html" %}
@@ -1153,7 +1156,7 @@ module Hwaro
                 {{ content }}
 
                 <ul class="archive-list">
-                {% for p in site.pages | selectattr("section", "equalto", "posts") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
                   <li class="archive-entry">
                     <time datetime="{{ p.date }}">{{ p.date }}</time>
                     <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>

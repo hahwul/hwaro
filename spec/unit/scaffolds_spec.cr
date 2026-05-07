@@ -662,6 +662,28 @@ describe Hwaro::Services::Scaffolds::Registry do
         ko_index.should_not contain("[Tags](/tags/)")
       end
 
+      # Regression: the link-rewriter used to also match Markdown
+      # image syntax (`![alt](/img.png)`) because the regex only
+      # anchored on `](`. That broke localized scaffolds that ship
+      # body-level images (e.g. docs `![Diagram](/images/diagram.png)`),
+      # silently producing `/ko/images/diagram.png` paths the static
+      # asset serving doesn't know about.
+      it "does not prefix Markdown image targets in localized stubs" do
+        scaffold = Hwaro::Services::Scaffolds::Docs.new
+        multi = scaffold.multilingual_content_files(["en", "ko"])
+
+        # The docs scaffold ships at least one image markdown
+        # reference; locate the localized copy of whichever file
+        # carries it and verify the path was preserved.
+        ko_with_image = multi.find { |path, body| path.ends_with?(".ko.md") && body.includes?("![") }
+        ko_with_image.should_not be_nil
+        if entry = ko_with_image
+          _, body = entry
+          body.should contain("![")
+          body.should_not match(/!\[[^\]]*\]\(\/ko\//)
+        end
+      end
+
       it "leaves already-prefixed links alone in localized stubs (gh#524)" do
         # The blog scaffold's `posts/_index.md` body links to
         # `/posts/`. After localizing for "ko", that should become

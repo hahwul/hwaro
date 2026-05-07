@@ -1228,18 +1228,18 @@ module Hwaro
                   <li><a href="{{ base_url }}/">Welcome</a></li>
                 </ul>
               </div>
-              {% for sec in site.sections | sort(attribute="path") %}{% if sec.name != "" %}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>
                 <ul class="chapter-links">
                   <li><a href="{{ base_url }}{{ sec.url }}"><span class="num">{{ chapter_index }}.</span> {{ sec.title | e }}</a></li>
-                  {% for p in sec.pages | sort(attribute="path") %}{% if not p.is_index %}
+                  {% for p in sec.pages | rejectattr("is_index") | sort(attribute="path") %}
                   <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
-                  {% endif %}{% endfor %}
+                  {% endfor %}
                 </ul>
               </div>
-              {% endif %}{% endfor %}
+              {% endfor %}
             </aside>
             HTML
         end
