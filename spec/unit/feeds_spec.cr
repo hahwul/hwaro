@@ -1507,6 +1507,128 @@ describe Hwaro::Content::Seo::Feeds do
       rss.should contain("<description>")
     end
 
+    # Regressions for gh#526.
+    it "uses frontmatter description for the item summary (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "Hand-written summary"
+      page.raw_content = "# Hello\n\nThis is the body that should NOT replace the description."
+      page.content = "<h1>Hello</h1>\n<p>This is the body that should NOT replace the description.</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<description>Hand-written summary</description>")
+      rss.should_not contain("<description>&lt;h1&gt;Hello")
+    end
+
+    it "emits <content:encoded> with the full body when full_content is on (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = true
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "Summary"
+      page.content = "<p>Full <strong>body</strong>.</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("xmlns:content=\"http://purl.org/rss/1.0/modules/content/\"")
+      rss.should contain("<content:encoded><![CDATA[<p>Full <strong>body</strong>.</p>]]></content:encoded>")
+    end
+
+    it "skips <content:encoded> when full_content is off (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = false
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "Summary"
+      page.content = "<p>Full body.</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should_not contain("<content:encoded>")
+    end
+
+    it "emits <category> per tag and per taxonomy term (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.tags = ["crystal", "rss"]
+      page.taxonomies = {
+        "categories" => ["programming"],
+        "authors"    => ["alice"],
+      }
+      page.raw_content = "Body"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<category>crystal</category>")
+      rss.should contain("<category>rss</category>")
+      rss.should contain("<category>programming</category>")
+      rss.should contain("<category>alice</category>")
+    end
+
+    it "deduplicates categories that overlap tags and taxonomies (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.tags = ["crystal"]
+      page.taxonomies = {
+        "tags" => ["crystal"], # overlap with page.tags
+      }
+      page.raw_content = "Body"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.scan(/<category>crystal<\/category>/).size.should eq(1)
+    end
+
+    it "escapes ]]> sequences inside CDATA bodies (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = true
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "Summary"
+      page.content = "<p>before ]]> after</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      # The inner ]]> must be split so the outer CDATA terminates
+      # only at the synthetic closing `]]>`.
+      rss.should contain("]]]]><![CDATA[>")
+      rss.scan(/]]>/).size.should eq(2)
+    end
+
     it "escapes XML special characters in title" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"

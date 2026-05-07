@@ -216,10 +216,14 @@ module Hwaro
           language : String? = nil,
         ) : String
           base_url, feed_url = build_feed_url(config, base_path, filename)
+          full_content = config.feeds.full_content
 
           String.build(500 + pages.size * 300) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
+            # Declare the `content:` namespace so we can emit
+            # <content:encoded> alongside the summary <description>
+            # (gh#526).
+            str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n"
             str << "  <channel>\n"
             str << "    <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
             str << "    <link>#{Utils::TextUtils.escape_xml(config.base_url)}</link>\n"
@@ -240,11 +244,34 @@ module Hwaro
               str << "      <link>#{escaped_url}</link>\n"
               str << "      <guid>#{escaped_url}</guid>\n"
 
-              content = get_content_for_feed(page, config)
-              str << "      <description>#{Utils::TextUtils.escape_xml(content)}</description>\n"
+              # `<description>` is meant to be a summary. Prefer the
+              # frontmatter description, then the rendered `summary`,
+              # then a truncated body (gh#526).
+              summary = summary_for_feed(page, config)
+              str << "      <description>#{Utils::TextUtils.escape_xml(summary)}</description>\n"
+
+              # Emit the full body in `<content:encoded>` when the user
+              # opts into full content (default). CDATA so consumers
+              # don't have to double-decode entities.
+              if full_content
+                full_html = full_content_for_feed(page)
+                unless full_html.empty?
+                  str << "      <content:encoded><![CDATA[#{escape_cdata(full_html)}]]></content:encoded>\n"
+                end
+              end
 
               if pub_date = page.date
                 str << "      <pubDate>#{format_rfc822(pub_date)}</pubDate>\n"
+              end
+
+              # Frontmatter taxonomies (`tags`, `categories`, …) become
+              # `<category>` elements (gh#526). RSS treats them as a
+              # flat list, so we emit one per term across all
+              # taxonomies. Tags first (matching the order most blogs
+              # advertise), then any taxonomy values not already
+              # represented.
+              feed_categories(page).each do |term|
+                str << "      <category>#{Utils::TextUtils.escape_xml(term)}</category>\n"
               end
 
               str << "    </item>\n"
@@ -307,6 +334,70 @@ module Hwaro
 
             str << "</feed>\n"
           end
+        end
+
+        # Summary text for `<description>` / atom `<summary>`. Prefers
+        # frontmatter `description`, falls back to a rendered `summary`
+        # (if the markdown processor produced one), and finally to a
+        # plain-text excerpt of the body (gh#526).
+        private def self.summary_for_feed(page : Models::Page, config : Models::Config) : String
+          if desc = page.description
+            return desc unless desc.empty?
+          end
+
+          if summary = page.summary
+            return summary unless summary.empty?
+          end
+
+          # Fall back to a stripped + truncated body. Prefer the
+          # already-rendered HTML; degrade to the raw markdown only if
+          # render hasn't run.
+          html = page.content.empty? ? Processor::Markdown.render(page.raw_content)[0] : page.content
+          text = Utils::TextUtils.strip_html(html).strip
+          limit = config.feeds.truncate > 0 ? config.feeds.truncate : 300
+          if text.size > limit
+            "#{text[0...limit]}..."
+          else
+            text
+          end
+        end
+
+        # Full HTML body suitable for `<content:encoded>` / atom
+        # `<content type="html">`. Uses the already-rendered HTML when
+        # available so we don't pay for a second markdown pass per page
+        # (gh#526).
+        private def self.full_content_for_feed(page : Models::Page) : String
+          return page.content unless page.content.empty?
+          rendered, _ = Processor::Markdown.render(page.raw_content)
+          rendered
+        end
+
+        # Collect taxonomy terms that should appear as `<category>`
+        # elements in the feed: `tags` first, then every other
+        # taxonomy's terms not already emitted (gh#526). Deduplicated
+        # while preserving order so the feed mirrors how the post
+        # advertises itself.
+        private def self.feed_categories(page : Models::Page) : Array(String)
+          seen = Set(String).new
+          result = [] of String
+          page.tags.each do |tag|
+            next if tag.empty?
+            result << tag if seen.add?(tag)
+          end
+          page.taxonomies.each do |_, terms|
+            terms.each do |term|
+              next if term.empty?
+              result << term if seen.add?(term)
+            end
+          end
+          result
+        end
+
+        # Escape `]]>` so a body containing it can't terminate the CDATA
+        # section early. Replaces `]]>` with `]]]]><![CDATA[>` (the
+        # standard escape) so the run-on CDATA stays valid.
+        private def self.escape_cdata(text : String) : String
+          text.gsub("]]>", "]]]]><![CDATA[>")
         end
 
         private def self.get_content_for_feed(page : Models::Page, config : Models::Config) : String
