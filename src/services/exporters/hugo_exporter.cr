@@ -61,42 +61,30 @@ module Hwaro
             return :skipped
           end
 
-          # Build Hugo frontmatter (TOML)
+          # Build Hugo frontmatter (TOML).
+          #
+          # Strategy: walk every parsed frontmatter key and either rename
+          # it to its Hugo equivalent (`updated`→`lastmod`, `image`→`images`,
+          # `expires`→`expiryDate`) or pass it through unchanged. Hugo
+          # accepts arbitrary keys as page params, so dropping them was a
+          # silent data-loss bug for `categories`, `authors`, and any
+          # custom field the user added (gh#527). Source-iteration order
+          # is preserved so Hugo frontmatter reads similarly to the
+          # original.
           hugo_fields = {} of String => (String | Bool | Array(String))?
-
-          # Direct mappings
-          %w[title date description draft weight].each do |key|
-            hugo_fields[key] = fields[key]? if fields.has_key?(key)
-          end
-
-          # updated -> lastmod
-          if updated = fields["updated"]?
-            hugo_fields["lastmod"] = updated
-          end
-
-          # tags
-          if tags = fields["tags"]?.as?(Array(String))
-            hugo_fields["tags"] = tags
-          end
-
-          # series
-          if series = fields["series"]?
-            hugo_fields["series"] = series
-          end
-
-          # aliases
-          if aliases = fields["aliases"]?.as?(Array(String))
-            hugo_fields["aliases"] = aliases
-          end
-
-          # image -> images array in Hugo
-          if image = fields["image"]?.as?(String)
-            hugo_fields["images"] = [image] of String
-          end
-
-          # expires -> expiryDate
-          if expires = fields["expires"]?
-            hugo_fields["expiryDate"] = expires
+          fields.each do |key, value|
+            case key
+            when "updated"
+              hugo_fields["lastmod"] = value
+            when "expires"
+              hugo_fields["expiryDate"] = value
+            when "image"
+              if image = value.as?(String)
+                hugo_fields["images"] = [image] of String
+              end
+            else
+              hugo_fields[key] = value
+            end
           end
 
           frontmatter = generate_toml_frontmatter(hugo_fields)

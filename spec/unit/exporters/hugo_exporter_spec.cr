@@ -231,6 +231,44 @@ describe Hwaro::Services::Exporters::HugoExporter do
       end
     end
 
+    # Regression for gh#527: Hugo export used a hand-picked allowlist
+    # (`title`, `date`, `description`, `draft`, `weight`, `tags`,
+    # `series`, `aliases`, `image`, `expires`, `updated`) and silently
+    # dropped everything else — including `categories` and `authors`,
+    # which are standard Hugo taxonomies. Pass arbitrary keys through.
+    it "passes categories, authors, and unknown keys through (gh#527)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(
+          File.join(content_dir, "post.md"),
+          <<-MD
+            +++
+            title = "Post"
+            categories = ["programming"]
+            authors = ["alice"]
+            difficulty = "intermediate"
+            +++
+
+            Body
+            MD
+        )
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(
+          target_type: "hugo", content_dir: content_dir, output_dir: output_dir,
+        )
+        exporter.run(options)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        content.should contain("categories = [\"programming\"]")
+        content.should contain("authors = [\"alice\"]")
+        content.should contain("difficulty = \"intermediate\"")
+      end
+    end
+
     it "handles mixed published and draft files" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
