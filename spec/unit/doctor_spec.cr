@@ -105,6 +105,103 @@ describe Hwaro::Services::Doctor do
         issues = run_doctor("invalid = [toml\n")
         issues.any? { |i| i.level == :error && i.message.includes?("parse") }.should be_true
       end
+
+      # `default_language` must resolve to a `[languages.<code>]` block,
+      # otherwise the multilingual pipeline silently falls through to
+      # untranslated content with broken hreflang.
+      it "warns when default_language has no matching [languages.<code>] block" do
+        config = base_config(%(\ndefault_language = "ja"\n\n[languages.en]\nlanguage_name = "English"\nweight = 1\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "default-language-undefined" && i.message.includes?("\"ja\"") && i.message.includes?("en") }.should be_true
+      end
+
+      it "does not warn when default_language matches a defined language" do
+        config = base_config(%(\ndefault_language = "en"\n\n[languages.en]\nlanguage_name = "English"\nweight = 1\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("default-language-undefined")).should be_false
+      end
+
+      it "skips default_language check when no [languages.*] are defined (single-language site)" do
+        config = base_config(%(\ndefault_language = "ja"\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("default-language-undefined")).should be_false
+      end
+
+      # `markdown.math_engine` only renders for "katex" / "mathjax";
+      # other strings silently produce no math output. The check is
+      # gated on `math = true` because the field is a no-op otherwise.
+      it "warns on invalid markdown.math_engine when math is enabled" do
+        config = base_config(%(\n[markdown]\nmath = true\nmath_engine = "wolfram"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "markdown-math-engine-invalid" && i.message.includes?("wolfram") }.should be_true
+      end
+
+      it "does not warn on invalid markdown.math_engine when math is disabled" do
+        config = base_config(%(\n[markdown]\nmath = false\nmath_engine = "wolfram"\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("markdown-math-engine-invalid")).should be_false
+      end
+
+      it "does not warn on katex or mathjax math_engine" do
+        ["katex", "mathjax"].each do |engine|
+          config = base_config(%(\n[markdown]\nmath = true\nmath_engine = "#{engine}"\n))
+          issues = run_doctor(config)
+          issues.any?(&.id.==("markdown-math-engine-invalid")).should be_false
+        end
+      end
+
+      # `Models::Config.load` silently coerces an unknown
+      # `pwa.cache_strategy` back to "cache-first", so doctor reads the
+      # raw TOML to surface what the user actually typed.
+      it "warns on invalid pwa.cache_strategy when pwa enabled" do
+        config = base_config(%(\n[pwa]\nenabled = true\ncache_strategy = "telepathic"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "pwa-cache-strategy-invalid" && i.message.includes?("telepathic") }.should be_true
+      end
+
+      it "does not warn on valid pwa.cache_strategy values" do
+        ["cache-first", "network-first", "stale-while-revalidate"].each do |strategy|
+          config = base_config(%(\n[pwa]\nenabled = true\ncache_strategy = "#{strategy}"\n))
+          issues = run_doctor(config)
+          issues.any?(&.id.==("pwa-cache-strategy-invalid")).should be_false
+        end
+      end
+
+      # `[deployment].target` selects which `[[deployment.targets]]`
+      # block `hwaro deploy` uses. Pointing at an undefined name fails
+      # at runtime; surfacing it here saves an actual deploy attempt.
+      it "warns when deployment.target references an undefined target" do
+        config = base_config(%(\n[deployment]\ntarget = "doesnotexist"\n\n[[deployment.targets]]\nname = "prod"\nurl = "file://./out"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "deployment-target-undefined" && i.message.includes?("doesnotexist") && i.message.includes?("prod") }.should be_true
+      end
+
+      it "does not warn when deployment.target matches a defined target" do
+        config = base_config(%(\n[deployment]\ntarget = "prod"\n\n[[deployment.targets]]\nname = "prod"\nurl = "file://./out"\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("deployment-target-undefined")).should be_false
+      end
+
+      # `[related].taxonomies` referencing an undefined `[[taxonomies]]`
+      # name makes the related-posts feature silently produce zero
+      # matches — there's no other surface that flags this.
+      it "warns when [related].taxonomies references an undefined taxonomy" do
+        config = base_config(%(\n[related]\nenabled = true\ntaxonomies = ["nonexistent"]\n\n[[taxonomies]]\nname = "tags"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "related-taxonomy-undefined" && i.message.includes?("nonexistent") && i.message.includes?("tags") }.should be_true
+      end
+
+      it "does not warn when [related].taxonomies matches a defined taxonomy" do
+        config = base_config(%(\n[related]\nenabled = true\ntaxonomies = ["tags"]\n\n[[taxonomies]]\nname = "tags"\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("related-taxonomy-undefined")).should be_false
+      end
+
+      it "does not warn when [related] is disabled" do
+        config = base_config(%(\n[related]\nenabled = false\ntaxonomies = ["nonexistent"]\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("related-taxonomy-undefined")).should be_false
+      end
     end
 
     describe "config — base_url format" do

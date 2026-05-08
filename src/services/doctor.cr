@@ -76,6 +76,12 @@ module Hwaro
             ["taxonomy-duplicate", "language-duplicate"]),
           CheckSpec.new("search (format)",
             ["search-format-invalid"]),
+          CheckSpec.new("languages (default_language resolves)",
+            ["default-language-undefined"]),
+          CheckSpec.new("markdown / pwa (valid enums)",
+            ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid"]),
+          CheckSpec.new("deployment / related (refs resolve)",
+            ["deployment-target-undefined", "related-taxonomy-undefined"]),
           CheckSpec.new("referenced files & dirs",
             ["config-path-missing", "config-dir-missing"]),
         ],
@@ -103,6 +109,9 @@ module Hwaro
     class Doctor
       VALID_CHANGEFREQS    = %w[always hourly daily weekly monthly yearly never]
       VALID_SEARCH_FORMATS = %w[fuse_json fuse_javascript elasticlunr_json elasticlunr_javascript]
+      # Mirrors `MarkdownConfig#initialize` defaults — only katex/mathjax
+      # render math at runtime; other strings load nothing.
+      VALID_MATH_ENGINES = %w[katex mathjax]
 
       # Delegate to ConfigSnippets for the single source of truth
       KNOWN_CONFIG_SECTIONS = ConfigSnippets::KNOWN_SECTIONS
@@ -436,6 +445,65 @@ module Hwaro
         lang_duplicates.each do |code|
           issues << Issue.new(id: "language-duplicate", level: :warning, category: "config", file: @config_path,
             message: "Duplicate language code: \"#{code}\"")
+        end
+
+        # default_language must resolve to a `[languages.<code>]` table.
+        # Without this check a typo silently falls through to untranslated
+        # content with broken hreflang tags and a feed that omits the
+        # default locale.
+        if !config.default_language.empty? && !config.languages.empty? && !config.languages.has_key?(config.default_language)
+          known = config.languages.keys.sort!.join(", ")
+          issues << Issue.new(id: "default-language-undefined", level: :warning, category: "config", file: @config_path,
+            message: "default_language \"#{config.default_language}\" has no matching [languages.#{config.default_language}] block (defined: #{known})")
+        end
+
+        # markdown.math_engine only renders when set to a value the
+        # build pipeline actually loads; other strings silently produce
+        # no math. Skip when math is off — the field is a no-op there.
+        if config.markdown.math && !VALID_MATH_ENGINES.includes?(config.markdown.math_engine)
+          issues << Issue.new(id: "markdown-math-engine-invalid", level: :warning, category: "config", file: @config_path,
+            message: "markdown.math_engine \"#{config.markdown.math_engine}\" is not supported (expected: #{VALID_MATH_ENGINES.join(", ")})")
+        end
+
+        # PWA cache_strategy is enforced at runtime via VALID_STRATEGIES.
+        # `Models::Config.load` silently coerces an unknown value back
+        # to "cache-first" (with a `Logger.warn` the user often misses
+        # during build), so we read the user-typed value from the raw
+        # TOML tree before that coercion kicks in.
+        raw_pwa = config.raw["pwa"]?.try(&.as_h?)
+        if raw_pwa && (raw_strategy = raw_pwa["cache_strategy"]?.try(&.as_s?))
+          unless Models::PwaConfig::VALID_STRATEGIES.includes?(raw_strategy)
+            issues << Issue.new(id: "pwa-cache-strategy-invalid", level: :warning, category: "config", file: @config_path,
+              message: "pwa.cache_strategy \"#{raw_strategy}\" is not supported (expected: #{Models::PwaConfig::VALID_STRATEGIES.join(", ")})")
+          end
+        end
+
+        # `[deployment].target` selects which `[[deployment.targets]]`
+        # block `hwaro deploy` uses. Pointing at an undefined name
+        # makes `deploy` fail at runtime with a "target not found"
+        # error — catching it here surfaces the typo before the
+        # operator runs the actual deploy.
+        if (selected = config.deployment.target) && !selected.empty?
+          unless config.deployment.targets.any? { |t| t.name == selected }
+            known = config.deployment.targets.map(&.name).reject(&.empty?).sort!.join(", ")
+            known_hint = known.empty? ? "no [[deployment.targets]] defined" : "defined: #{known}"
+            issues << Issue.new(id: "deployment-target-undefined", level: :warning, category: "config", file: @config_path,
+              message: "deployment.target \"#{selected}\" has no matching [[deployment.targets]] block (#{known_hint})")
+          end
+        end
+
+        # `[related].taxonomies` references taxonomy names from
+        # `[[taxonomies]]`. A typo silently produces zero related
+        # posts on every page without any user-visible signal — the
+        # feature just looks broken.
+        if config.related.enabled
+          known_taxonomies = config.taxonomies.map(&.name)
+          config.related.taxonomies.each do |name|
+            next if known_taxonomies.includes?(name)
+            known_hint = known_taxonomies.empty? ? "no [[taxonomies]] defined" : "defined: #{known_taxonomies.sort!.join(", ")}"
+            issues << Issue.new(id: "related-taxonomy-undefined", level: :warning, category: "config", file: @config_path,
+              message: "[related] taxonomies references \"#{name}\" but no [[taxonomies]] block defines it (#{known_hint})")
+          end
         end
 
         # Check for missing config sections
