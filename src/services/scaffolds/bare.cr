@@ -25,21 +25,18 @@ module Hwaro
           }
         end
 
+        # `bare` ships no taxonomy templates by default — taxonomies are
+        # opt-in here (see `config_content`), so the matching templates
+        # would be dead files. Users who add `[[taxonomies]]` later can
+        # copy from the simple scaffold or generate their own.
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
-          files = {
+          {
             "header.html"  => bare_header_template,
             "footer.html"  => bare_footer_template,
             "page.html"    => page_template,
             "section.html" => bare_section_template,
             "404.html"     => bare_not_found_template,
           }
-
-          unless skip_taxonomies
-            files["taxonomy.html"] = bare_taxonomy_template
-            files["taxonomy_term.html"] = bare_taxonomy_term_template
-          end
-
-          files
         end
 
         def static_files : Hash(String, String)
@@ -50,19 +47,29 @@ module Hwaro
           {} of String => String
         end
 
+        # `bare` is intentionally minimal — taxonomies/search/highlight are
+        # opt-in features that conflict with the "no batteries" promise of
+        # this scaffold. Users who want them can copy from the simple
+        # scaffold or pass `--scaffold simple`. The `taxonomies_config`
+        # override above is therefore omitted from the default emit even
+        # when `--include-taxonomies` is set; we still ship the taxonomy
+        # templates below so users can wire them up later by adding
+        # `[[taxonomies]]` entries themselves.
         def config_content(skip_taxonomies : Bool = false) : String
           config = String.build do |str|
             str << base_config
             str << plugins_config
             str << content_files_config
-            str << taxonomies_config unless skip_taxonomies
             str << sitemap_config
             str << feeds_config
           end
           config
         end
 
-        # Bare header: semantic HTML only, no styles
+        # Bare header: semantic HTML only, no styles. `page.title` and
+        # `page.description` are guarded so a page without front-matter
+        # values doesn't emit `<title> - Site</title>` or an empty
+        # `<meta name="description">`.
         private def bare_header_template : String
           <<-HTML
             <!DOCTYPE html>
@@ -70,8 +77,8 @@ module Hwaro
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta name="description" content="{{ page.description | e }}">
-              <title>{{ page.title | e }} - {{ site.title | e }}</title>
+              <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
+              <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
             </head>
             <body>
               <header>
@@ -120,30 +127,6 @@ module Hwaro
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
                 <p><a href="{{ base_url }}/">Return to Home</a></p>
-              </main>
-            {% include "footer.html" %}
-            HTML
-        end
-
-        # Bare taxonomy template
-        private def bare_taxonomy_template : String
-          <<-HTML
-            {% include "header.html" %}
-              <main>
-                <h1>{{ page.title | e }}</h1>
-                {{ content }}
-              </main>
-            {% include "footer.html" %}
-            HTML
-        end
-
-        # Bare taxonomy term template
-        private def bare_taxonomy_term_template : String
-          <<-HTML
-            {% include "header.html" %}
-              <main>
-                <h1>{{ page.title | e }}</h1>
-                {{ content }}
               </main>
             {% include "footer.html" %}
             HTML

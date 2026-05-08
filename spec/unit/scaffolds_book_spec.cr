@@ -65,30 +65,36 @@ describe Hwaro::Services::Scaffolds::Book do
       files.has_key?("404.html").should be_true
     end
 
-    it "includes taxonomy templates by default" do
+    # Book scaffolds intentionally omit taxonomy templates: chapter-
+    # ordered books don't use tags by default and the matching
+    # `[[taxonomies]]` block is also dropped from the config emit.
+    # Users who want taxonomies can copy from the simple/blog scaffolds.
+    it "omits taxonomy templates by default (book uses chapter ordering)" do
       files = Hwaro::Services::Scaffolds::Book.new.template_files
-      files.has_key?("taxonomy.html").should be_true
-      files.has_key?("taxonomy_term.html").should be_true
-    end
-
-    it "excludes taxonomy templates when skip_taxonomies is true" do
-      files = Hwaro::Services::Scaffolds::Book.new.template_files(skip_taxonomies: true)
       files.has_key?("taxonomy.html").should be_false
       files.has_key?("taxonomy_term.html").should be_false
+    end
+
+    it "ships nav, search, sidebar, and page-arrows partials" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      files.has_key?("partials/nav.html").should be_true
+      files.has_key?("partials/search.html").should be_true
+      files.has_key?("partials/sidebar.html").should be_true
+      files.has_key?("partials/page-arrows.html").should be_true
     end
 
     # Regression for gh#523: the book TOC sidebar used to bake the
     # original three chapters with hand-numbered "1.", "1.1" links
     # into the template. Adding a chapter via `hwaro new` left the
-    # sidebar stale. Now the template iterates `site.sections`.
+    # sidebar stale. Now the sidebar partial iterates `site.sections`.
     it "renders the chapter sidebar dynamically via site.sections (gh#523)" do
       files = Hwaro::Services::Scaffolds::Book.new.template_files
-      page = files["page.html"]
-      page.should contain("{% for sec in site.sections")
-      page.should contain("{% for p in sec.pages")
-      page.should_not contain("/chapter-1/installation/")
-      page.should_not contain("/chapter-2/configuration/")
-      page.should_not contain("/chapter-3/advanced-topics/")
+      sidebar = files["partials/sidebar.html"]
+      sidebar.should contain("{% for sec in site.sections")
+      sidebar.should contain("{% for p in sec.pages")
+      sidebar.should_not contain("/chapter-1/installation/")
+      sidebar.should_not contain("/chapter-2/configuration/")
+      sidebar.should_not contain("/chapter-3/advanced-topics/")
     end
 
     # The chapter numbering captures `loop.index` from the outer
@@ -101,9 +107,9 @@ describe Hwaro::Services::Scaffolds::Book do
     # the index lines up with the rendered chapters.
     it "pre-filters empty-name sections so chapter numbering is stable" do
       files = Hwaro::Services::Scaffolds::Book.new.template_files
-      page = files["page.html"]
-      page.should contain(%q(rejectattr("name", "equalto", "")))
-      page.should_not match(/{%\s*if\s+sec\.name\s*!=\s*""\s*%}/)
+      sidebar = files["partials/sidebar.html"]
+      sidebar.should contain(%q(rejectattr("name", "equalto", "")))
+      sidebar.should_not match(/{%\s*if\s+sec\.name\s*!=\s*""\s*%}/)
     end
   end
 
@@ -144,13 +150,11 @@ describe Hwaro::Services::Scaffolds::Book do
       config.should_not contain(%(theme = "github-dark"))
     end
 
-    it "includes taxonomies block by default" do
+    # Book intentionally drops `[[taxonomies]]` from the default
+    # config — chapter-ordered books don't use tags. Users who want
+    # them can copy from the simple/blog scaffolds.
+    it "omits taxonomies block by default" do
       config = Hwaro::Services::Scaffolds::Book.new.config_content
-      config.should contain("[[taxonomies]]")
-    end
-
-    it "omits taxonomies block when skip_taxonomies is true" do
-      config = Hwaro::Services::Scaffolds::Book.new.config_content(skip_taxonomies: true)
       config.should_not contain("[[taxonomies]]")
     end
   end

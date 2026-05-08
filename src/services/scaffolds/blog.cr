@@ -50,20 +50,29 @@ module Hwaro
           files
         end
 
+        # Blog templates share the same chrome (header nav + search
+        # overlay + container open) across page/section/post/archives/
+        # taxonomy/404. We extract those into `partials/` so users editing
+        # the nav only have to touch one file — and so 404/taxonomy don't
+        # render as bare unstyled fragments outside the blog container,
+        # which previously left dangling `</main></div>` from
+        # `footer.html` (gh#fix-scaffold-broken-404-taxonomy).
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.html"   => header_template,
-            "footer.html"   => footer_template,
-            "page.html"     => blog_page_template,
-            "section.html"  => blog_section_template,
-            "post.html"     => post_template,
-            "archives.html" => archives_template,
-            "404.html"      => not_found_template,
+            "header.html"          => header_template,
+            "footer.html"          => footer_template,
+            "partials/nav.html"    => blog_nav_html,
+            "partials/search.html" => search_overlay_html,
+            "page.html"            => blog_page_template,
+            "section.html"         => blog_section_template,
+            "post.html"            => post_template,
+            "archives.html"        => archives_template,
+            "404.html"             => blog_not_found_template,
           }
 
           unless skip_taxonomies
-            files["taxonomy.html"] = taxonomy_template
-            files["taxonomy_term.html"] = taxonomy_term_template
+            files["taxonomy.html"] = blog_taxonomy_template
+            files["taxonomy_term.html"] = blog_taxonomy_term_template
           end
 
           files
@@ -114,7 +123,10 @@ module Hwaro
             CSS
         end
 
-        # Override header for blog - minimal, delegates layout to page templates (Jinja2 syntax)
+        # Override header for blog - minimal, delegates layout to page
+        # templates (Jinja2 syntax). `page.title` and `page.description`
+        # are guarded so untitled pages don't render `<title> - Site</title>`
+        # or an empty `<meta name="description">`.
         protected def header_template : String
           <<-HTML
             <!DOCTYPE html>
@@ -122,8 +134,8 @@ module Hwaro
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta name="description" content="{{ page.description | e }}">
-              <title>{{ page.title | e }} - {{ site.title | e }}</title>
+              <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
+              <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -833,12 +845,17 @@ module Hwaro
             HTML
         end
 
-        # Blog-specific page template (Jinja2 syntax)
+        # Blog-specific page template (Jinja2 syntax). All blog templates
+        # share the same chrome (nav, search overlay, container open) via
+        # `partials/`, so this template only carries the body — and
+        # `footer.html` closes the container the same way for all of
+        # them. That symmetry is what keeps 404/taxonomy from emitting
+        # dangling `</main></div>` like the previous version did.
         private def blog_page_template : String
           <<-HTML
             {% include "header.html" %}
-            #{blog_nav_html}
-            #{search_overlay_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
                 <h1>{{ page.title | e }}</h1>
@@ -851,8 +868,8 @@ module Hwaro
         private def blog_section_template : String
           <<-HTML
             {% include "header.html" %}
-            #{blog_nav_html}
-            #{search_overlay_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
                 <h1>{{ page.title | e }}</h1>
@@ -870,8 +887,8 @@ module Hwaro
         private def post_template : String
           <<-HTML
             {% include "header.html" %}
-            #{blog_nav_html}
-            #{search_overlay_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
                 <article class="post">
@@ -885,6 +902,56 @@ module Hwaro
                     {{ content }}
                   </div>
                 </article>
+            {% include "footer.html" %}
+            HTML
+        end
+
+        # Blog-specific 404 template — wraps the message in the same
+        # blog-container/blog-main scaffolding the rest of the site uses,
+        # so the page actually shows the nav and the closing tags from
+        # `footer.html` line up. Previously this used the generic
+        # `not_found_template` (`<main class="site-main">`) which left
+        # an unmatched `</main></div>` after the footer ran.
+        private def blog_not_found_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="blog-container">
+              <main class="blog-main">
+                <h1>404 Not Found</h1>
+                <p>The page you are looking for does not exist.</p>
+                <p><a href="{{ base_url }}/">Return to home</a></p>
+            {% include "footer.html" %}
+            HTML
+        end
+
+        # Blog-specific taxonomy template — wraps the term list in the
+        # same chrome as page.html so the footer's closing tags match.
+        private def blog_taxonomy_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="blog-container">
+              <main class="blog-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
+                {{ content }}
+            {% include "footer.html" %}
+            HTML
+        end
+
+        private def blog_taxonomy_term_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="blog-container">
+              <main class="blog-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Posts tagged with this term:</p>
+                {{ content }}
             {% include "footer.html" %}
             HTML
         end
@@ -1140,16 +1207,8 @@ module Hwaro
         private def archives_template : String
           <<-HTML
             {% include "header.html" %}
-            <header class="blog-header">
-              <div class="blog-header-inner">
-                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
-                <nav>
-                  <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
-                  <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
-                  <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
-                </nav>
-              </div>
-            </header>
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
                 <h1>{{ page.title | e }}</h1>
@@ -1163,8 +1222,6 @@ module Hwaro
                   </li>
                 {% endfor %}
                 </ul>
-              </main>
-            </div>
             {% include "footer.html" %}
             HTML
         end

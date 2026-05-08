@@ -252,7 +252,13 @@ module Hwaro
             HTML
         end
 
-        # Common template: header (Jinja2 syntax)
+        # Common template: header (Jinja2 syntax).
+        #
+        # Both `page.title` and `page.description` are guarded so a page
+        # without front-matter values doesn't render `<title> - Site</title>`
+        # or an empty `<meta name="description">` — the latter actively
+        # hurts SEO/social previews. Empty strings are treated the same as
+        # missing via `default(_, true)`.
         protected def header_template : String
           <<-HTML
             <!DOCTYPE html>
@@ -260,7 +266,7 @@ module Hwaro
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta name="description" content="{{ page.description | e }}">
+              <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               {{ og_all_tags }}
               {{ hreflang_tags }}

@@ -33,7 +33,6 @@ module Hwaro
             str << pagination_config
             str << series_config
             str << related_config
-            str << taxonomies_config unless skip_taxonomies
             str << sitemap_config
             str << robots_config
             str << llms_config

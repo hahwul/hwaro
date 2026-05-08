@@ -176,10 +176,17 @@ module Hwaro
         templates_dir = File.join(target_path, "templates")
         create_directory(templates_dir)
 
-        # Create template files
+        # Create template files. Some scaffolds emit nested paths
+        # (e.g. `partials/nav.html`) so the parent directory is
+        # created on demand instead of relying on a flat layout.
         template_files = scaffold.template_files(skip_taxonomies)
         template_files.each do |relative_path, content|
-          create_file(File.join(templates_dir, relative_path), content)
+          full_path = File.join(templates_dir, relative_path)
+          dir_path = File.dirname(full_path)
+          unless Dir.exists?(dir_path)
+            create_directory(dir_path)
+          end
+          create_file(full_path, content)
         end
 
         # Create shortcodes directory and files

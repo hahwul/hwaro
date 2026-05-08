@@ -63,17 +63,13 @@ describe Hwaro::Services::Scaffolds::Bare do
       files.has_key?("404.html").should be_true
     end
 
-    it "includes taxonomy templates by default" do
+    # `bare` is intentionally minimal — taxonomy/search/highlight are
+    # opt-in features that conflict with the "no batteries" promise of
+    # this scaffold. Templates and the matching `[[taxonomies]]` config
+    # block are dropped together so we never ship dead chrome.
+    it "omits taxonomy templates (taxonomies are opt-in for bare)" do
       scaffold = Hwaro::Services::Scaffolds::Bare.new
       files = scaffold.template_files
-
-      files.has_key?("taxonomy.html").should be_true
-      files.has_key?("taxonomy_term.html").should be_true
-    end
-
-    it "excludes taxonomy templates when skip_taxonomies is true" do
-      scaffold = Hwaro::Services::Scaffolds::Bare.new
-      files = scaffold.template_files(skip_taxonomies: true)
 
       files.has_key?("taxonomy.html").should be_false
       files.has_key?("taxonomy_term.html").should be_false
@@ -125,20 +121,14 @@ describe Hwaro::Services::Scaffolds::Bare do
       config.should contain("title")
     end
 
-    it "includes taxonomies config by default" do
+    # `bare` deliberately omits the `[[taxonomies]]` block to keep with
+    # its minimal philosophy; the `--skip-taxonomies` flag is therefore
+    # a no-op here. Users who want taxonomies should switch to the
+    # simple/blog scaffolds or add the block by hand.
+    it "omits taxonomies config in both default and skip modes" do
       scaffold = Hwaro::Services::Scaffolds::Bare.new
-      config = scaffold.config_content(skip_taxonomies: false)
-
-      config.should contain("taxonomies")
-    end
-
-    it "excludes taxonomies config when skip_taxonomies is true" do
-      scaffold = Hwaro::Services::Scaffolds::Bare.new
-      config_with = scaffold.config_content(skip_taxonomies: false)
-      config_without = scaffold.config_content(skip_taxonomies: true)
-
-      # Without taxonomies should be shorter
-      config_without.size.should be < config_with.size
+      scaffold.config_content(skip_taxonomies: false).should_not contain("[[taxonomies]]")
+      scaffold.config_content(skip_taxonomies: true).should_not contain("[[taxonomies]]")
     end
   end
 end

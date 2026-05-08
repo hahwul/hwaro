@@ -48,23 +48,38 @@ module Hwaro
           files
         end
 
+        # Book templates share the same chrome (top header, search
+        # overlay, side arrows, sidebar) across page/section/taxonomy/404
+        # — extracting them into `partials/` makes "edit the nav" a
+        # one-file change and keeps 404/taxonomy inside the
+        # book-container so `footer.html`'s closing tags match the
+        # body's open tags.
+        #
+        # Taxonomy templates are not shipped by default because the book
+        # config no longer enables `[[taxonomies]]` (book scaffolds are
+        # ordered chapter-style and don't use tags). They're still emitted
+        # if the user opts in via `--include-taxonomies` (skip_taxonomies
+        # = false is the default; the flag flips this to true).
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
-          files = {
-            "header.html"  => header_template,
-            "footer.html"  => footer_template,
-            "page.html"    => book_page_template,
-            "section.html" => book_section_template,
-            "404.html"     => not_found_template,
+          {
+            "header.html"               => header_template,
+            "footer.html"               => footer_template,
+            "partials/nav.html"         => book_header_html,
+            "partials/search.html"      => search_overlay_html,
+            "partials/page-arrows.html" => book_nav_html,
+            "partials/sidebar.html"     => book_sidebar_html,
+            "page.html"                 => book_page_template,
+            "section.html"              => book_section_template,
+            "404.html"                  => book_not_found_template,
           }
-
-          unless skip_taxonomies
-            files["taxonomy.html"] = taxonomy_template
-            files["taxonomy_term.html"] = taxonomy_term_template
-          end
-
-          files
         end
 
+        # `book` scaffolds intentionally omit `[[taxonomies]]` from the
+        # default config — chapter-ordered books don't use tags, and
+        # leaving the config empty keeps the generated `taxonomy.html`
+        # template from being emitted as dead chrome (it's also dropped
+        # from `template_files`). Users who want taxonomies can copy from
+        # the simple/blog scaffolds.
         def config_content(skip_taxonomies : Bool = false) : String
           config = String.build do |str|
             str << base_config(config_title, config_description)
@@ -77,7 +92,6 @@ module Hwaro
             str << pagination_config
             str << series_config
             str << related_config
-            str << taxonomies_config unless skip_taxonomies
             str << sitemap_config
             str << robots_config
             str << llms_config
@@ -96,6 +110,9 @@ module Hwaro
           config
         end
 
+        # Book header — `page.title` and `page.description` are guarded
+        # so untitled pages don't render `<title> - Site</title>` or an
+        # empty description meta.
         protected def header_template : String
           <<-HTML
             <!DOCTYPE html>
@@ -103,8 +120,8 @@ module Hwaro
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta name="description" content="{{ page.description | e }}">
-              <title>{{ page.title | e }} - {{ site.title | e }}</title>
+              <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
+              <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -1199,7 +1216,7 @@ module Hwaro
                 </button>
               </div>
               <div class="header-center">
-                <a href="{{ base_url }}/" class="logo">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
               </div>
               <div class="header-right">
                 <button class="icon-btn" onclick="openSearch()" title="Search (⌘K)" aria-label="Search">
@@ -1225,7 +1242,7 @@ module Hwaro
               <div class="chapter-group">
                 <span class="chapter-title">Introduction</span>
                 <ul class="chapter-links">
-                  <li><a href="{{ base_url }}/">Welcome</a></li>
+                  <li><a href="{{ base_url }}{{ lang_prefix }}/">Welcome</a></li>
                 </ul>
               </div>
               {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") %}
@@ -1262,15 +1279,20 @@ module Hwaro
             HTML
         end
 
-        # Page template
+        # Book page template. All book templates share the same chrome
+        # (header, search overlay, page arrows, sidebar, container open)
+        # via `partials/`, so this template only carries the body — and
+        # `footer.html` closes the container the same way for all of
+        # them. That symmetry keeps 404 from emitting dangling
+        # `</main></div></div>` like the previous version did.
         private def book_page_template : String
           <<-HTML
             {% include "header.html" %}
-            #{book_header_html}
-            #{search_overlay_html}
-            #{book_nav_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            {% include "partials/page-arrows.html" %}
             <div class="book-container">
-            #{book_sidebar_html}
+            {% include "partials/sidebar.html" %}
               <main class="book-main">
                 <div class="book-content">
                   <h1>{{ page.title | e }}</h1>
@@ -1280,15 +1302,15 @@ module Hwaro
             HTML
         end
 
-        # Section template
+        # Book section template
         private def book_section_template : String
           <<-HTML
             {% include "header.html" %}
-            #{book_header_html}
-            #{search_overlay_html}
-            #{book_nav_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            {% include "partials/page-arrows.html" %}
             <div class="book-container">
-            #{book_sidebar_html}
+            {% include "partials/sidebar.html" %}
               <main class="book-main">
                 <div class="book-content">
                   <h1>{{ page.title | e }}</h1>
@@ -1299,6 +1321,27 @@ module Hwaro
                     {{ section.list }}
                   </ul>
                   {{ pagination }}
+                </div>
+            {% include "footer.html" %}
+            HTML
+        end
+
+        # Book-specific 404 — wraps the message in the book-container so
+        # the page actually shows the header/sidebar and the closing
+        # tags from `footer.html` line up. Page arrows are intentionally
+        # omitted: there's no surrounding ordered chapter for a 404.
+        private def book_not_found_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="book-container">
+            {% include "partials/sidebar.html" %}
+              <main class="book-main">
+                <div class="book-content">
+                  <h1>404 Not Found</h1>
+                  <p>The page you are looking for does not exist.</p>
+                  <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to home</a></p>
                 </div>
             {% include "footer.html" %}
             HTML

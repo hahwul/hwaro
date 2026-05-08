@@ -27,24 +27,43 @@ describe Hwaro::Services::Scaffolds::Docs do
   end
 
   describe "#template_files" do
-    it "page template includes search overlay" do
+    it "ships nav, search, and sidebar partials" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
-      page = scaffold.template_files["page.html"]
-      page.should contain("searchOverlay")
-      page.should contain("searchInput")
+      files = scaffold.template_files
+      files.has_key?("partials/nav.html").should be_true
+      files.has_key?("partials/search.html").should be_true
+      files.has_key?("partials/sidebar.html").should be_true
     end
 
-    it "page template includes search trigger button" do
+    it "search partial defines the overlay" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
-      page = scaffold.template_files["page.html"]
-      page.should contain("search-trigger")
-      page.should contain("openSearch()")
+      search = scaffold.template_files["partials/search.html"]
+      search.should contain("searchOverlay")
+      search.should contain("searchInput")
     end
 
-    it "section template includes search overlay" do
+    it "nav partial defines the search trigger button" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
-      section = scaffold.template_files["section.html"]
-      section.should contain("searchOverlay")
+      nav = scaffold.template_files["partials/nav.html"]
+      nav.should contain("search-trigger")
+      nav.should contain("openSearch()")
+      nav.should contain("header-right")
+    end
+
+    # Each chrome-bearing template pulls the partials in via include
+    # so editing the nav (or 404 layout) is a one-file change. The
+    # 404/taxonomy templates that previously closed unmatched
+    # `</main></div>` get the same treatment.
+    it "page/section/404/taxonomy templates pull in nav, search, and sidebar partials" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      files = scaffold.template_files
+      ["page.html", "section.html", "404.html", "taxonomy.html"].each do |name|
+        body = files[name]
+        body.should contain(%({% include "partials/nav.html" %}))
+        body.should contain(%({% include "partials/search.html" %}))
+        body.should contain(%({% include "partials/sidebar.html" %}))
+        body.should contain("docs-container")
+      end
     end
 
     it "footer template includes search.js script" do
@@ -53,37 +72,36 @@ describe Hwaro::Services::Scaffolds::Docs do
       footer.should contain("js/search.js")
     end
 
-    it "page template includes header-right with search" do
-      scaffold = Hwaro::Services::Scaffolds::Docs.new
-      page = scaffold.template_files["page.html"]
-      page.should contain("header-right")
-    end
-
     # Regression for gh#523: the docs sidebar used to be a hand-written
     # `<aside>` with the original three sections × three to four
     # pages baked in, so any page added via `hwaro new` never appeared
     # in the sidebar. Now the sidebar iterates `site.sections`
     # dynamically, so the per-section URLs must NOT be present in the
-    # template source.
+    # sidebar partial source.
     it "renders the sidebar dynamically via site.sections (gh#523)" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
-      page = scaffold.template_files["page.html"]
-      section = scaffold.template_files["section.html"]
+      sidebar = scaffold.template_files["partials/sidebar.html"]
 
-      [page, section].each do |tmpl|
-        tmpl.should contain("{% for sec in site.sections")
-        tmpl.should contain("{% for p in sec.pages")
-        # No hardcoded URLs.
-        tmpl.should_not contain("/getting-started/installation/")
-        tmpl.should_not contain("/guide/templates/")
-        tmpl.should_not contain("/reference/cli/")
-      end
+      sidebar.should contain("{% for sec in site.sections")
+      sidebar.should contain("{% for p in sec.pages")
+      sidebar.should_not contain("/getting-started/installation/")
+      sidebar.should_not contain("/guide/templates/")
+      sidebar.should_not contain("/reference/cli/")
     end
 
-    it "page template includes Documentation span in logo" do
+    it "nav partial includes Documentation span in logo" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
-      page = scaffold.template_files["page.html"]
-      page.should contain("<span>Documentation</span>")
+      nav = scaffold.template_files["partials/nav.html"]
+      nav.should contain("<span>Documentation</span>")
+    end
+
+    # Without `lang_prefix` the docs nav was hardcoded to English URLs,
+    # so a Korean reader on a translated page was one click from being
+    # bounced back to `/getting-started/`.
+    it "nav partial routes through lang_prefix for multilingual sites" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      nav = scaffold.template_files["partials/nav.html"]
+      nav.should contain("{{ base_url }}{{ lang_prefix }}/getting-started/")
     end
   end
 end

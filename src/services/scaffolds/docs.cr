@@ -87,18 +87,26 @@ module Hwaro
             MD
         end
 
+        # Docs templates share nav, search, and sidebar across page,
+        # section, taxonomy, and 404 — extracting those into `partials/`
+        # makes "edit the nav" a one-file change and keeps 404/taxonomy
+        # inside the docs-container so `footer.html`'s closing tags
+        # actually match what the body opens.
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
-            "header.html"  => header_template,
-            "footer.html"  => footer_template,
-            "page.html"    => docs_page_template,
-            "section.html" => docs_section_template,
-            "404.html"     => not_found_template,
+            "header.html"           => header_template,
+            "footer.html"           => footer_template,
+            "partials/nav.html"     => docs_nav_html,
+            "partials/search.html"  => search_overlay_html,
+            "partials/sidebar.html" => docs_sidebar_html,
+            "page.html"             => docs_page_template,
+            "section.html"          => docs_section_template,
+            "404.html"              => docs_not_found_template,
           }
 
           unless skip_taxonomies
-            files["taxonomy.html"] = taxonomy_template
-            files["taxonomy_term.html"] = taxonomy_term_template
+            files["taxonomy.html"] = docs_taxonomy_template
+            files["taxonomy_term.html"] = docs_taxonomy_term_template
           end
 
           files
@@ -142,7 +150,10 @@ module Hwaro
           config
         end
 
-        # Override header for docs - minimal header integrated with layout (Jinja2 syntax)
+        # Override header for docs - minimal header integrated with layout
+        # (Jinja2 syntax). `page.title` and `page.description` are guarded
+        # so untitled pages don't render `<title> - Site</title>` or an
+        # empty description meta.
         protected def header_template : String
           <<-HTML
             <!DOCTYPE html>
@@ -150,8 +161,8 @@ module Hwaro
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta name="description" content="{{ page.description | e }}">
-              <title>{{ page.title | e }} - {{ site.title | e }}</title>
+              <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
+              <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -957,17 +968,29 @@ module Hwaro
             HTML
         end
 
-        # Header navigation HTML shared by page and section templates
+        # Header navigation HTML shared by every page template via
+        # `partials/nav.html`. `lang_prefix` is applied so the same
+        # navigation works for multilingual sites — without it, the
+        # English logo and section links are hardcoded and a Korean
+        # reader on a translated page is one click away from being
+        # bounced back to `/getting-started/` (English).
         private def docs_nav_html : String
           <<-HTML
             <header class="docs-header">
-              <a href="{{ base_url }}/" class="logo">{{ site.title }} <span>Documentation</span></a>
+              <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }} <span>Documentation</span></a>
               <nav>
-                <a href="{{ base_url }}/getting-started/">Getting Started</a>
-                <a href="{{ base_url }}/guide/">Guide</a>
-                <a href="{{ base_url }}/reference/">Reference</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/getting-started/">Getting Started</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/guide/">Guide</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/reference/">Reference</a>
               </nav>
               <div class="header-right">
+                {% if page.translations | length > 0 %}
+                <nav class="lang-switcher" aria-label="Language">
+                  {% for t in page.translations %}
+                  <a href="{{ t.url }}" hreflang="{{ t.code }}"{% if t.is_current %} aria-current="true"{% endif %}>{{ t.code | upper }}</a>
+                  {% endfor %}
+                </nav>
+                {% endif %}
                 <button class="search-trigger" onclick="openSearch()" title="Search">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                   <span>Search</span>
@@ -1007,14 +1030,19 @@ module Hwaro
             HTML
         end
 
-        # Docs-specific page template (Jinja2 syntax)
+        # Docs-specific page template (Jinja2 syntax). All docs templates
+        # share the same chrome (nav, search overlay, sidebar, container
+        # open) via `partials/`, so this template only carries the body —
+        # and `footer.html` closes the container the same way for all of
+        # them. That symmetry is what keeps 404/taxonomy from emitting
+        # dangling `</main></div>` like the previous version did.
         private def docs_page_template : String
           <<-HTML
             {% include "header.html" %}
-            #{docs_nav_html}
-            #{search_overlay_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="docs-container">
-            #{docs_sidebar_html}
+            {% include "partials/sidebar.html" %}
               <main class="docs-main">
                 <h1>{{ page.title | e }}</h1>
                 {{ content }}
@@ -1026,10 +1054,10 @@ module Hwaro
         private def docs_section_template : String
           <<-HTML
             {% include "header.html" %}
-            #{docs_nav_html}
-            #{search_overlay_html}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
             <div class="docs-container">
-            #{docs_sidebar_html}
+            {% include "partials/sidebar.html" %}
               <main class="docs-main">
                 <h1>{{ page.title | e }}</h1>
                 {{ content }}
@@ -1039,6 +1067,57 @@ module Hwaro
                   {{ section.list }}
                 </ul>
                 {{ pagination }}
+            {% include "footer.html" %}
+            HTML
+        end
+
+        # Docs-specific 404 — wraps the message in the docs-container so
+        # the page actually shows the nav/sidebar and the closing tags
+        # from `footer.html` line up. Previously this used the generic
+        # `not_found_template` which left an unmatched `</main></div>`.
+        private def docs_not_found_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="docs-container">
+            {% include "partials/sidebar.html" %}
+              <main class="docs-main">
+                <h1>404 Not Found</h1>
+                <p>The page you are looking for does not exist.</p>
+                <p><a href="{{ base_url }}/">Return to home</a></p>
+            {% include "footer.html" %}
+            HTML
+        end
+
+        # Docs-specific taxonomy templates — same chrome as page.html so
+        # the footer's closing tags match the body's open tags.
+        private def docs_taxonomy_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="docs-container">
+            {% include "partials/sidebar.html" %}
+              <main class="docs-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
+                {{ content }}
+            {% include "footer.html" %}
+            HTML
+        end
+
+        private def docs_taxonomy_term_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="docs-container">
+            {% include "partials/sidebar.html" %}
+              <main class="docs-main">
+                <h1>{{ page.title | e }}</h1>
+                <p class="taxonomy-desc">Pages tagged with this term:</p>
+                {{ content }}
             {% include "footer.html" %}
             HTML
         end
