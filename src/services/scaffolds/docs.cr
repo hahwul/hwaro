@@ -140,11 +140,13 @@ module Hwaro
             str << auto_includes_config
             str << assets_config
             str << markdown_config
+            str << content_new_config
             str << image_processing_config
             str << build_hooks_config
             str << pwa_config
             str << amp_config
             str << og_auto_image_config
+            str << doctor_config
             str << deployment_config
           end
           config
@@ -163,6 +165,7 @@ module Hwaro
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
+              <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -181,10 +184,10 @@ module Hwaro
         end
 
         def static_files : Hash(String, String)
-          {
+          super.merge({
             "css/style.css" => css_content,
             "js/search.js"  => search_js_content,
-          }
+          })
         end
 
         private def css_content : String
@@ -1044,7 +1047,7 @@ module Hwaro
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
               <main class="docs-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
             {% include "footer.html" %}
             HTML
@@ -1059,7 +1062,7 @@ module Hwaro
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
               <main class="docs-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
 
                 <h2>In This Section</h2>

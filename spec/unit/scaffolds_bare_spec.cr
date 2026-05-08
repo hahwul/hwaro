@@ -99,9 +99,13 @@ describe Hwaro::Services::Scaffolds::Bare do
   end
 
   describe "#static_files" do
-    it "returns empty hash" do
+    # `bare` keeps the inherited favicon — the "no batteries" promise
+    # is about CSS/JS, not about leaving every browser tab with a 404
+    # for `/favicon.ico`.
+    it "ships only the inherited favicon (no CSS/JS)" do
       scaffold = Hwaro::Services::Scaffolds::Bare.new
-      scaffold.static_files.should be_empty
+      files = scaffold.static_files
+      files.keys.should eq(["favicon.svg"])
     end
   end
 

@@ -136,9 +136,28 @@ module Hwaro
         # Returns template files as a hash of path => content
         abstract def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
 
-        # Returns static files as a hash of path => content
+        # Returns static files as a hash of path => content. Every
+        # scaffold inherits a tiny SVG favicon so a freshly-generated
+        # site doesn't show a blank tab icon. Scaffolds that override
+        # `static_files` (blog/docs/book) merge `super` to keep it.
         def static_files : Hash(String, String)
-          {} of String => String
+          {
+            "favicon.svg" => default_favicon_svg,
+          }
+        end
+
+        # 32×32 SVG favicon. Inline (no external file dep), themable
+        # by editing the `currentColor`/`fill` values, and crisp at
+        # any DPR. We use a neutral mark instead of the hwaro logo so
+        # users don't have to remember to swap branding before
+        # publishing.
+        protected def default_favicon_svg : String
+          <<-SVG
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+              <rect width="32" height="32" rx="6" fill="#0070f3"/>
+              <path d="M9 8h3v7h8V8h3v16h-3v-7h-8v7H9z" fill="#ffffff"/>
+            </svg>
+            SVG
         end
 
         # Returns shortcode files as a hash of path => content
@@ -268,6 +287,7 @@ module Hwaro
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
+              <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -301,12 +321,14 @@ module Hwaro
         # Common template: page (Jinja2 syntax). Renders the title as
         # `<h1>` so content authors don't need to repeat it in every
         # markdown body — and so `hwaro new` can ship an empty body
-        # without losing the heading (gh#525).
+        # without losing the heading (gh#525). The H1 is guarded so a
+        # title-less homepage (e.g. a hero-style index) doesn't emit an
+        # empty `<h1></h1>`.
         protected def page_template : String
           <<-HTML
             {% include "header.html" %}
               <main class="site-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
               </main>
             {% include "footer.html" %}
@@ -318,7 +340,7 @@ module Hwaro
           <<-HTML
             {% include "header.html" %}
               <main class="site-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
                 <ul class="section-list">
                   {{ section.list }}
@@ -593,6 +615,14 @@ module Hwaro
 
         protected def markdown_config : String
           ConfigSnippets.markdown
+        end
+
+        protected def content_new_config : String
+          ConfigSnippets.content_new
+        end
+
+        protected def doctor_config : String
+          ConfigSnippets.doctor
         end
 
         protected def build_hooks_config : String

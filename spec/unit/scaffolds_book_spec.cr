@@ -247,8 +247,14 @@ end
 
 describe Hwaro::Services::Scaffolds::Base do
   describe "#static_files (default)" do
-    it "is empty unless the subclass overrides it" do
-      TestBaseScaffold.new.static_files.should be_empty
+    # The base scaffold ships a tiny SVG favicon so generated sites
+    # don't show a blank tab icon out of the box. Subclasses that
+    # override `static_files` are expected to merge `super` to
+    # preserve it.
+    it "ships the inherited favicon and nothing else" do
+      files = TestBaseScaffold.new.static_files
+      files.keys.should eq(["favicon.svg"])
+      files["favicon.svg"].should contain("<svg")
     end
   end
 

@@ -106,11 +106,13 @@ module Hwaro
             str << auto_includes_config
             str << assets_config
             str << markdown_config
+            str << content_new_config
             str << image_processing_config
             str << build_hooks_config
             str << pwa_config
             str << amp_config
             str << og_auto_image_config
+            str << doctor_config
             str << deployment_config
           end
           config
@@ -136,6 +138,7 @@ module Hwaro
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
+              <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
               {{ hreflang_tags }}
               #{styles}
@@ -163,10 +166,10 @@ module Hwaro
         end
 
         def static_files : Hash(String, String)
-          {
+          super.merge({
             "css/style.css" => css_content,
             "js/search.js"  => search_js_content,
-          }
+          })
         end
 
         # Blog ships a `posts.md` archetype in addition to `default.md` so
@@ -858,7 +861,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
             {% include "footer.html" %}
             HTML
@@ -872,7 +875,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
 
                 <ul class="section-list">
@@ -975,8 +978,11 @@ module Hwaro
         end
 
         # Content files
+        # `title` may be `nil` to skip the field entirely — the homepage
+        # uses that path so its `<h1>` doesn't read "Home", and the
+        # `<title>` tag falls back to `site.title` via the header guard.
         private def render_page(
-          title : String,
+          title : String?,
           body : String,
           skip_taxonomies : Bool,
           date : String? = nil,
@@ -987,7 +993,7 @@ module Hwaro
         ) : String
           String.build do |str|
             str << "+++\n"
-            str << "title = \"#{title}\"\n"
+            str << "title = \"#{title}\"\n" if title
             str << "date = \"#{date}\"\n" if date
             unless skip_taxonomies
               str << "tags = #{tags.inspect}\n" if tags
@@ -1014,8 +1020,16 @@ module Hwaro
             end
           end
 
+          # Title intentionally empty so the homepage doesn't render an
+          # `<h1>Home</h1>` that just duplicates the site logo (the
+          # template guards the H1 with `is present`). The `<title>`
+          # tag falls back to `site.title` via the same guard in
+          # `header.html`. Note: omitting the field entirely would
+          # make the runtime default it to "Untitled", which `is
+          # present` reads as truthy and re-introduces the H1 — so we
+          # write the empty value explicitly.
           render_page(
-            title: "Home",
+            title: "",
             body: body,
             skip_taxonomies: skip_taxonomies,
             tags: ["home"]
@@ -1211,7 +1225,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="blog-container">
               <main class="blog-main">
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
 
                 <ul class="archive-list">

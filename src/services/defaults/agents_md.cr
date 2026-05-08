@@ -30,14 +30,18 @@ module Hwaro
             .
             ├── config.toml          # Site configuration
             ├── content/             # Markdown content files
-            │   ├── _index.md        # Homepage content
-            │   └── blog/            # Blog section
-            │       ├── _index.md    # Section listing page
-            │       └── *.md         # Individual pages
+            │   ├── index.md         # Homepage (single file, no underscore)
+            │   ├── about.md         # Standalone page
+            │   └── <section>/       # Section directory (posts/, guide/, chapter-1/, …)
+            │       ├── _index.md    # Section landing page (underscore-prefixed)
+            │       └── *.md         # Pages within the section
             ├── templates/           # Jinja2 templates (Crinja)
-            │   ├── base.html        # Base layout (optional)
+            │   ├── header.html      # Shared <head> + <body> open
+            │   ├── footer.html      # Shared <body>/<html> close
             │   ├── page.html        # Page template
             │   ├── section.html     # Section listing template
+            │   ├── 404.html         # Not-found page
+            │   ├── partials/        # Reusable fragments (nav, search, sidebar)
             │   └── shortcodes/      # Shortcode templates
             ├── static/              # Static assets (copied as-is)
             └── archetypes/          # Content templates for `hwaro new`
@@ -46,12 +50,12 @@ module Hwaro
             ## Notes for AI Agents
 
             1. **Front matter** can be TOML (`+++`), YAML (`---`), or JSON (`{...}` at file start). Pick one per file and keep delimiters matched.
-            2. **Rendered content** is `{{ content | safe }}`, not `{{ page.content }}`.
+            2. **Rendered content** is `{{ content }}` in templates (already-safe HTML — no extra `| safe` needed).
             3. **Custom metadata** is `page.extra.field`, not `page.params.field`.
             4. **Always preview** with `hwaro serve` before committing.
             5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
-            7. **Escape user content** with `{{ value | escape }}` in templates.
+            7. **Escape user content** with `{{ value | e }}` (or `| escape`) in templates.
 
             ## Full Reference
 
@@ -98,22 +102,25 @@ module Hwaro
 
             ```
             .
-            ├── config.toml          # Site configuration
-            ├── content/             # Markdown content files
-            │   ├── _index.md        # Homepage content
-            │   └── blog/            # Blog section
-            │       ├── _index.md    # Section listing page
-            │       └── *.md         # Individual pages
-            ├── templates/           # Jinja2 templates (Crinja)
-            │   ├── base.html        # Base layout (optional)
-            │   ├── page.html        # Page template
-            │   ├── section.html     # Section listing template
-            │   ├── taxonomy.html    # Taxonomy listing
-            │   ├── taxonomy_term.html # Taxonomy term page
-            │   ├── 404.html         # Error page
-            │   └── shortcodes/      # Shortcode templates
-            ├── static/              # Static assets (copied as-is)
-            └── archetypes/          # Content templates for `hwaro new`
+            ├── config.toml             # Site configuration
+            ├── content/                # Markdown content files
+            │   ├── index.md            # Homepage (single file, no underscore)
+            │   ├── about.md            # Standalone page
+            │   └── <section>/          # Section directory (posts/, guide/, chapter-1/, …)
+            │       ├── _index.md       # Section landing page (underscore-prefixed)
+            │       └── *.md            # Pages within the section
+            ├── templates/              # Jinja2 templates (Crinja)
+            │   ├── header.html         # Shared <head> + <body> open
+            │   ├── footer.html         # Shared <body>/<html> close
+            │   ├── page.html           # Page template
+            │   ├── section.html        # Section listing template
+            │   ├── taxonomy.html       # Taxonomy index (e.g. /tags/)
+            │   ├── taxonomy_term.html  # Single taxonomy term (e.g. /tags/foo/)
+            │   ├── 404.html            # Error page
+            │   ├── partials/           # Reusable fragments (nav, search, sidebar)
+            │   └── shortcodes/         # Shortcode templates
+            ├── static/                 # Static assets (copied as-is)
+            └── archetypes/             # Content templates for `hwaro new`
             ```
 
             ## Content
@@ -222,8 +229,8 @@ module Hwaro
             {{ page.reading_time }}   {# Reading time in minutes #}
             {{ page.word_count }}     {# Word count #}
             {{ page.extra.field }}    {# Custom front matter #}
-            {{ content | safe }}      {# Rendered HTML content #}
-            {{ toc | safe }}          {# Table of contents HTML #}
+            {{ content }}             {# Rendered HTML content (already safe) #}
+            {{ toc }}                 {# Table of contents HTML #}
             ```
 
             **In section.html:**
@@ -321,12 +328,12 @@ module Hwaro
             ## Notes for AI Agents
 
             1. **Front matter** can be TOML (`+++`), YAML (`---`), or JSON (`{...}` at file start). Pick one per file and keep delimiters matched.
-            2. **Rendered content** is `{{ content | safe }}`, not `{{ page.content }}`.
+            2. **Rendered content** is `{{ content }}` in templates (already-safe HTML — no extra `| safe` needed), not `{{ page.content }}`.
             3. **Custom metadata** is `page.extra.field`, not `page.params.field`.
             4. **Always preview** with `hwaro serve` before committing.
             5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
-            7. **Escape user content** with `{{ value | escape }}` in templates.
+            7. **Escape user content** with `{{ value | e }}` (or `| escape`) in templates.
 
             ## Site-Specific Instructions
 

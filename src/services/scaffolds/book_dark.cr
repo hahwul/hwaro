@@ -41,11 +41,13 @@ module Hwaro
             str << auto_includes_config
             str << assets_config
             str << markdown_config
+            str << content_new_config
             str << image_processing_config
             str << build_hooks_config
             str << pwa_config
             str << amp_config
             str << og_auto_image_config
+            str << doctor_config
             str << deployment_config
           end
           config

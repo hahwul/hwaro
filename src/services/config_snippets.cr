@@ -44,6 +44,7 @@ module Hwaro
       # before doctor offers to add the child).
       SUB_SECTION_REGISTRY = {
         {"content", "files"}         => {description: "Non-Markdown file publishing from content/", snippet: -> { content_files }},
+        {"content", "new"}           => {description: "Front matter and bundle defaults for `hwaro new`", snippet: -> { content_new(commented: true) }},
         {"og", "auto_image"}         => {description: "Auto-generated OG images", snippet: -> { og_auto_image }},
         {"image_processing", "lqip"} => {description: "Low-Quality Image Placeholder (LQIP) generation", snippet: -> { image_processing_lqip }},
       } of Tuple(String, String) => SectionEntry
@@ -88,6 +89,7 @@ module Hwaro
             # background_color = "#ffffff"
             # display = "standalone"
             # icons = ["static/icon-192.png", "static/icon-512.png"]
+            # cache_strategy = "cache-first"
 
             TOML
         else
@@ -109,6 +111,7 @@ module Hwaro
             # icons = ["static/icon-192.png", "static/icon-512.png"]
             # offline_page = "/offline.html"
             # precache_urls = ["/", "/about/"]
+            # cache_strategy = "cache-first"  # cache-first, network-first, stale-while-revalidate
 
             TOML
         end
@@ -141,6 +144,44 @@ module Hwaro
             # enabled = true
             # path_prefix = "amp"        # Output under /amp/ prefix
             # sections = ["posts"]       # Limit to specific sections (empty = all)
+
+            TOML
+        end
+      end
+
+      # `[content.new]` controls the front matter `hwaro new` writes.
+      # Defaults match `ContentNewConfig#initialize` in
+      # src/models/config.cr — the snippet documents the surface so
+      # users can flip from TOML to YAML/JSON or add fields without
+      # spelunking through code.
+      def self.content_new(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Content Creation (Optional)
+            # =============================================================================
+            # Front matter format and default fields used by `hwaro new`
+
+            # [content.new]
+            # front_matter_format = "toml"
+            # default_fields = ["description"]
+            # bundle = false
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Content Creation (Optional)
+            # =============================================================================
+            # Customize what `hwaro new <path>` writes when there's no archetype
+            # match. Archetypes in `archetypes/` always take priority.
+
+            # [content.new]
+            # front_matter_format = "toml"        # "toml" (default), "yaml", or "json"
+            # default_fields = ["description"]    # Extra fields beyond title/date/draft/tags
+            # bundle = false                      # If true, create page bundles (foo/index.md) instead of foo.md
 
             TOML
         end
@@ -620,9 +661,14 @@ module Hwaro
             # enabled = true
             # format = "fuse_json"
             # fields = ["title", "content"]
+            # tokenize_cjk = false
 
             TOML
         else
+          # `tokenize_cjk` defaults to false to keep Latin-script sites
+          # cheap; CJK readers should flip it to true so substring
+          # matches inside Korean/Japanese/Chinese words still surface
+          # the right pages.
           <<-TOML
 
             # =============================================================================
@@ -636,6 +682,7 @@ module Hwaro
             fields = ["title", "content"]
             filename = "search.json"
             exclude = []              # Exclude paths or patterns from search index
+            tokenize_cjk = false      # Set true for Korean/Japanese/Chinese substring matching
 
             TOML
         end
@@ -687,11 +734,20 @@ module Hwaro
             # safe = false
             # lazy_loading = false
             # emoji = false
+            # footnotes = true
+            # task_lists = true
+            # definition_lists = true
             # admonitions = true
             # heading_ids = true
+            # mermaid = false
+            # math = false
+            # math_engine = "katex"
 
             TOML
         else
+          # Defaults match `MarkdownConfig#initialize` in src/models/config.cr —
+          # showing the real defaults (rather than commenting everything out)
+          # makes the feature surface discoverable without behaviour changes.
           <<-TOML
 
             # =============================================================================
@@ -700,11 +756,17 @@ module Hwaro
             # Configure markdown parser behavior
 
             [markdown]
-            safe = false          # If true, raw HTML in markdown will be stripped (replaced by comments)
-            lazy_loading = false  # If true, automatically add loading="lazy" to img tags
-            emoji = false         # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
-            admonitions = true    # If true, GitHub-style `> [!NOTE]` blockquotes render as admonitions
-            heading_ids = true    # If true, `## Heading {#custom-id}` sets an explicit id
+            safe = false             # If true, raw HTML in markdown is stripped (replaced by comments)
+            lazy_loading = false     # If true, automatically add loading="lazy" to img tags
+            emoji = false            # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
+            footnotes = true         # GitHub-flavored footnote syntax: [^1] / [^1]: definition
+            task_lists = true        # Task list syntax: - [ ] todo / - [x] done
+            definition_lists = true  # Definition list syntax (Term newline ": Definition")
+            admonitions = true       # GitHub-style `> [!NOTE]` blockquotes render as admonition <div>s
+            heading_ids = true       # `## Heading {#custom-id}` sets an explicit id
+            mermaid = false          # Render ```mermaid code blocks as diagrams (loads mermaid.js)
+            math = false             # Inline ($...$) and block ($$...$$) math (loads math_engine)
+            math_engine = "katex"    # "katex" or "mathjax"
 
             TOML
         end

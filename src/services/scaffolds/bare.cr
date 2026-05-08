@@ -39,9 +39,9 @@ module Hwaro
           }
         end
 
-        def static_files : Hash(String, String)
-          {} of String => String
-        end
+        # `bare` keeps the inherited favicon — the "no batteries"
+        # promise is about CSS/JS, not about leaving every browser
+        # tab with a 404 for `/favicon.ico`.
 
         def shortcode_files : Hash(String, String)
           {} of String => String
@@ -79,6 +79,7 @@ module Hwaro
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
+              <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
             </head>
             <body>
               <header>
@@ -108,7 +109,7 @@ module Hwaro
           <<-HTML
             {% include "header.html" %}
               <main>
-                <h1>{{ page.title | e }}</h1>
+                {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
                 <ul>
                   {{ section.list }}
@@ -152,6 +153,23 @@ module Hwaro
 
             This is an about page.
             CONTENT
+        end
+
+        # `bare` ships no `[[taxonomies]]` block (see `config_content`),
+        # so the default archetype intentionally omits the `tags` field
+        # the base archetype includes — otherwise every page generated
+        # via `hwaro new` would carry an empty `tags = []` line that
+        # the runtime never reads.
+        protected def default_archetype : String
+          <<-MD
+            +++
+            title = "{{ title }}"
+            date = "{{ date }}"
+            draft = {{ draft }}
+            description = ""
+            +++
+
+            MD
         end
       end
     end
