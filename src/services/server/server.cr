@@ -69,7 +69,7 @@ module Hwaro
 
       def call(context)
         context.response.status_code = 404
-        context.response.content_type = "text/html"
+        context.response.content_type = "text/html; charset=utf-8"
 
         path_404 = File.join(@public_dir, "404.html")
         if File.exists?(path_404)
@@ -77,6 +77,52 @@ module Hwaro
         else
           context.response.print "404 Not Found"
         end
+      end
+    end
+
+    # `HTTP::StaticFileHandler` derives `Content-Type` from the file
+    # extension via `MIME.from_extension` and writes it without a
+    # charset parameter — so `robots.txt` / `llms.txt` / sitemap and
+    # search index responses all advertise no charset, leaving UTF-8
+    # bytes (e.g. Korean LLM-instructions) at the mercy of client-side
+    # heuristics. This handler runs after the static handler and
+    # appends `; charset=utf-8` to text-shaped responses.
+    #
+    # We only touch types we know are text. Binary types (image/png,
+    # font/woff2, etc.) are left alone — adding a charset there would
+    # be wrong, not just useless. `image/svg+xml` is treated as text
+    # because it's XML.
+    class CharsetHandler
+      include HTTP::Handler
+
+      TEXT_PREFIXES = ["text/"]
+      TEXT_SUFFIXES = ["+xml", "+json"]
+      TEXT_TYPES    = Set{
+        "application/xml",
+        "application/json",
+        "application/javascript",
+        "application/rss+xml",
+        "application/atom+xml",
+        "image/svg+xml",
+      }
+
+      def call(context)
+        call_next(context)
+
+        existing = context.response.headers["Content-Type"]?
+        return unless existing
+        return if existing.includes?("charset=")
+
+        base = existing.split(';', 2).first.strip.downcase
+        return unless text_like?(base)
+
+        context.response.headers["Content-Type"] = "#{existing}; charset=utf-8"
+      end
+
+      private def text_like?(base : String) : Bool
+        TEXT_TYPES.includes?(base) ||
+          TEXT_PREFIXES.any? { |p| base.starts_with?(p) } ||
+          TEXT_SUFFIXES.any? { |s| base.ends_with?(s) }
       end
     end
 
@@ -273,6 +319,12 @@ module Hwaro
 
         handlers = [] of HTTP::Handler
         handlers << HTTP::LogHandler.new if access_log
+        # Run before StaticFileHandler so we can append `; charset=utf-8`
+        # to text-shaped Content-Type headers after the static handler
+        # sets them — Crystal's `HTTP::Server::Response` buffers the
+        # response until first flush, so post-call_next header edits
+        # take effect for typical dev-site responses.
+        handlers << CharsetHandler.new
         if live_reload
           lr_handler = LiveReloadHandler.new
           @live_reload_handler = lr_handler
@@ -397,8 +449,13 @@ module Hwaro
               begin
                 apply_changeset(changeset, build_options)
               rescue ex
+                # Surface the failure both in the terminal and the
+                # browser. Without the WS push the developer sees the
+                # stale page and keeps editing on top of a broken
+                # build until they happen to glance at the terminal.
                 Logger.error "[Watch] Build failed: #{ex.message}"
                 Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
+                @live_reload_handler.try(&.notify_build_error(ex.message || "Build failed"))
               end
             end
           end
