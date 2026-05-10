@@ -1324,14 +1324,22 @@ module Hwaro::Core::Build::Phases::Render
 
     # OG/Twitter tags (page-specific — depend on page title/description/url/image)
     og_type_override = og_type_for(page, effective_url)
-    og_tags = config.og.og_tags(page.title, page.description, effective_url, page.image, config.base_url, og_type_override)
-    twitter_tags = config.og.twitter_tags(page.title, page.description, page.image, config.base_url)
+    # Fall back to the site title when the page itself has no title — most
+    # often the homepage, where authors deliberately leave `title = ""` so
+    # the section/page heading doesn't duplicate the site name. Without
+    # this fallback, og:title and twitter:title render as `content=""`,
+    # which breaks link previews (gh issue list, fix #1).
+    effective_og_title = page.title.empty? ? config.title : page.title
+    og_tags = config.og.og_tags(effective_og_title, page.description, effective_url, page.image, config.base_url, og_type_override)
+    twitter_tags = config.og.twitter_tags(effective_og_title, page.description, page.image, config.base_url)
+    # Mirror the 2-space indent used inside og_tags/twitter_tags so the
+    # joined block stays vertically aligned in the rendered HTML.
     og_all_tags = if og_tags.empty?
                     twitter_tags
                   elsif twitter_tags.empty?
                     og_tags
                   else
-                    "#{og_tags}\n#{twitter_tags}"
+                    "#{og_tags}\n  #{twitter_tags}"
                   end
     vars["og_tags"] = Crinja::Value.new(og_tags)
     vars["twitter_tags"] = Crinja::Value.new(twitter_tags)

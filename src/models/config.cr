@@ -381,18 +381,22 @@ module Hwaro
         og_type_override : String? = nil,
       ) : String
         og_type = og_type_override || @og_type
+        # Subsequent lines are joined with `\n  ` so the rendered output
+        # keeps the same 2-space indent the scaffold templates use for the
+        # `{{ og_all_tags }}` line. Without this, only the first tag picks
+        # up the template's indent and the rest start at column 0.
         String.build(256) do |str|
-          str << %(<meta property="og:title" content="#{Utils::TextUtils.escape_xml(title)}">\n)
-          str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(og_type)}">\n)
+          str << %(<meta property="og:title" content="#{Utils::TextUtils.escape_xml(title)}">\n  )
+          str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(og_type)}">\n  )
           str << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(url)}">)
           if desc = description
-            str << %(\n<meta property="og:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
+            str << %(\n  <meta property="og:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
           end
           if img_url = resolve_image_url(image, base_url)
-            str << %(\n<meta property="og:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
+            str << %(\n  <meta property="og:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
           end
           if fb_id = @fb_app_id
-            str << %(\n<meta property="fb:app_id" content="#{Utils::TextUtils.escape_xml(fb_id)}">)
+            str << %(\n  <meta property="fb:app_id" content="#{Utils::TextUtils.escape_xml(fb_id)}">)
           end
         end
       end
@@ -404,20 +408,21 @@ module Hwaro
         image : String?,
         base_url : String,
       ) : String
+        # See `og_tags` above for why subsequent lines are pre-indented.
         String.build(256) do |str|
-          str << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(@twitter_card)}">\n)
+          str << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(@twitter_card)}">\n  )
           str << %(<meta name="twitter:title" content="#{Utils::TextUtils.escape_xml(title)}">)
           if desc = description
-            str << %(\n<meta name="twitter:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
+            str << %(\n  <meta name="twitter:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
           end
           if img_url = resolve_image_url(image, base_url)
-            str << %(\n<meta name="twitter:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
+            str << %(\n  <meta name="twitter:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
           end
           if site = @twitter_site
-            str << %(\n<meta name="twitter:site" content="#{Utils::TextUtils.escape_xml(site)}">)
+            str << %(\n  <meta name="twitter:site" content="#{Utils::TextUtils.escape_xml(site)}">)
           end
           if creator = @twitter_creator
-            str << %(\n<meta name="twitter:creator" content="#{Utils::TextUtils.escape_xml(creator)}">)
+            str << %(\n  <meta name="twitter:creator" content="#{Utils::TextUtils.escape_xml(creator)}">)
           end
         end
       end

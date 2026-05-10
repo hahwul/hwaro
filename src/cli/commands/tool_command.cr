@@ -140,8 +140,14 @@ module Hwaro
 
         private def print_help
           visible = ToolCommand.subcommands.reject { |s| HIDDEN.includes?(s.name) }
-          max_len = visible.max_of(&.name.size)
           sub_by_name = visible.index_by(&.name)
+
+          # Render usage syntax inline so mandatory positional args (e.g.
+          # `<all|drafts|published>` for `list`) are visible without
+          # drilling into each subcommand's `--help`. Width is computed
+          # over the rendered "name + args" string, not just the name.
+          name_with_args = ->(sub : CommandInfo) { format_usage(sub) }
+          max_len = visible.max_of { |s| name_with_args.call(s).size }
 
           Logger.info "Usage: hwaro tool <subcommand> [options]"
           Logger.info ""
@@ -153,7 +159,7 @@ module Hwaro
             Logger.info "  #{category}:"
             names.each do |name|
               if sub = sub_by_name[name]?
-                Logger.info "    #{sub.name.ljust(max_len + 2)} #{sub.description}"
+                Logger.info "    #{name_with_args.call(sub).ljust(max_len + 2)} #{sub.description}"
                 categorized << name
               end
             end
@@ -165,12 +171,43 @@ module Hwaro
             Logger.info ""
             Logger.info "  Other:"
             uncategorized.each do |sub|
-              Logger.info "    #{sub.name.ljust(max_len + 2)} #{sub.description}"
+              Logger.info "    #{name_with_args.call(sub).ljust(max_len + 2)} #{sub.description}"
             end
           end
 
           Logger.info ""
           Logger.info "Run 'hwaro tool <subcommand> --help' for more information on a subcommand."
+        end
+
+        # Render a subcommand's usage signature for the help summary:
+        # `name <choice|...>` when the command exposes a closed choice
+        # positional (list, convert, export), `name <arg>` for free-form
+        # positionals, or just `name`. Inline choice lists longer than
+        # CHOICE_INLINE_LIMIT collapse to the positional arg name (e.g.
+        # `import <source-type> <path>`) so wide alternatives like
+        # `wordpress|jekyll|hugo|notion|...` don't blow out the column.
+        private CHOICE_INLINE_LIMIT = 40
+
+        private def format_usage(sub : CommandInfo) : String
+          parts = [sub.name]
+          if !sub.positional_choices.empty?
+            joined = sub.positional_choices.join("|")
+            head = if joined.size <= CHOICE_INLINE_LIMIT
+                     "<#{joined}>"
+                   else
+                     # Fall back to the positional arg label when the
+                     # choices list is too wide for the summary table.
+                     placeholder = sub.positional_args.first? || "value"
+                     "<#{placeholder}>"
+                   end
+            parts << head
+            # Tail args after the choice slot — e.g. `import` takes
+            # `<source-type> <path>`, where path is free-form.
+            sub.positional_args[1..]?.try &.each { |arg| parts << "<#{arg}>" }
+          else
+            sub.positional_args.each { |arg| parts << "<#{arg}>" }
+          end
+          parts.join(" ")
         end
       end
     end

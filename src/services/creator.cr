@@ -208,12 +208,23 @@ module Hwaro
         # Require `--title` (or an explicit `<path>.md`) whenever the title
         # cannot be inferred. The `new` command is flag-only: no interactive
         # prompts, so behavior is predictable in TTY, CI, and agent runs.
+        # When the user did pass a <path> but it has no `.md` suffix, the
+        # message names that specifically — "missing --title or <path>.md"
+        # was confusing because the user sees they already passed a path.
         if !full_path && title.empty?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "missing --title (or <path>.md) argument",
-            hint: "Pass --title, or give a path ending in .md (e.g. 'posts/my-post.md').",
-          )
+          if raw_path = path
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "path '#{raw_path}' has no .md extension and --title is not set",
+              hint: "Either append .md to the path (e.g. '#{raw_path}.md'), or pass --title to derive the filename from the title.",
+            )
+          else
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "missing --title (or <path>.md) argument",
+              hint: "Pass --title, or give a path ending in .md (e.g. 'posts/my-post.md').",
+            )
+          end
         end
 
         if !full_path

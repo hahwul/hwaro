@@ -184,7 +184,7 @@ describe Hwaro::CLI::Commands::InitCommand do
     it "generates minimal config for docs scaffold" do
       scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Docs)
       config = scaffold.minimal_config_content
-      config.should contain("title = \"Documentation\"")
+      config.should contain("title = \"My Docs\"")
       config.should_not contain("# ====")
     end
 

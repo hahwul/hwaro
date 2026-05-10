@@ -166,7 +166,12 @@ module Hwaro
               CLI.register_flag(parser, DRAFTS_FLAG) { |_| drafts = true }
               CLI.register_flag(parser, FORCE_FLAG) { |_| force = true }
               CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, HELP_FLAG) do |_|
+                Logger.info parser.to_s
+                Logger.info ""
+                Logger.info "Supported source types: #{POSITIONAL_CHOICES.join(", ")}"
+                exit
+              end
               parser.unknown_args do |remaining|
                 positional = remaining
               end

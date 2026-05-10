@@ -49,7 +49,10 @@ module Hwaro
             )
           end
 
-          def run(args : Array(String))
+          # `invocation` lets the top-level `hwaro doctor` alias and the
+          # canonical `hwaro tool doctor` form each show their own usage
+          # banner, even though both share this single implementation.
+          def run(args : Array(String), invocation : String = "hwaro tool doctor")
             content_dir = "content"
             config_path = "config.toml"
             json_output = false
@@ -60,7 +63,7 @@ module Hwaro
             max_warnings = -1 # < 0 means "unlimited"
 
             OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: hwaro doctor [options]"
+              parser.banner = "Usage: #{invocation} [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               parser.on("--fix", "Auto-fix issues (add missing sections, normalize safe values)") { fix_mode = true }
               parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }

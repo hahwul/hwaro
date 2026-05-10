@@ -27,7 +27,7 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          Tool::DoctorCommand.new.run(args)
+          Tool::DoctorCommand.new.run(args, invocation: "hwaro doctor")
         end
       end
     end

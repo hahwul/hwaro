@@ -368,6 +368,7 @@ module Hwaro
 
             # Main commands
             FISH
+          script += "\n"
 
           commands.each do |cmd|
             script += "complete -c hwaro -n \"__fish_use_subcommand\" -a \"#{cmd.name}\" -d \"#{escape_fish(cmd.description)}\"\n"

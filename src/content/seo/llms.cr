@@ -107,7 +107,11 @@ module Hwaro
                        else
                          "#{base_url}#{p.url}"
                        end
-                str << "- [" << p.title << "](" << link << ")"
+                # The root index commonly has `title = ""` so its heading
+                # falls through to the site title; without this fallback
+                # the homepage rendered as `- [](url)` (no link label).
+                label = p.title.empty? ? config.title : p.title
+                str << "- [" << label << "](" << link << ")"
                 if d = p.description
                   str << ": " << d unless d.empty?
                 end

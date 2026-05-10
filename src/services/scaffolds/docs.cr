@@ -18,7 +18,10 @@ module Hwaro
         end
 
         protected def config_title : String
-          "Documentation"
+          # Distinct from the homepage `title = "Documentation"` so the
+          # rendered <title> and the `{{ site.title }} <span>Documentation</span>`
+          # logo don't collapse into "Documentation - Documentation".
+          "My Docs"
         end
 
         protected def config_description : String
