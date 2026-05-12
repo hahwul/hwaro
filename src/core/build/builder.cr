@@ -530,6 +530,52 @@ module Hwaro
           Logger.success "Copied #{copied} static file(s)." if copied > 0
         end
 
+        # Republish non-Markdown content assets (images, etc.) to the output
+        # directory, preserving their path relative to `content/`. Mirrors what
+        # the full build does via the raw-files path in the Write phase, but
+        # only touches the files the watcher actually flagged as changed.
+        #
+        # Skips files whose extension isn't permitted by `[content.files]`, so
+        # the watcher can't smuggle a `.md` or a disallowed type into output.
+        # No-ops when `[content.files]` isn't enabled — nothing was published
+        # in the first place, so there's nothing to refresh. (`@config` is nil
+        # only before the initial build, which `Server#run_with_options`
+        # already performs before spawning the watcher, so the watcher always
+        # sees a loaded config.)
+        def copy_changed_content_files(changed_files : Array(String), output_dir : String, verbose : Bool = false)
+          config = @config
+          unless config && config.content_files.enabled?
+            Logger.debug "  Content-file republish skipped — content.files not enabled."
+            return
+          end
+
+          copied = 0
+          changed_files.each do |src_path|
+            next unless File.exists?(src_path)
+            next if File.directory?(src_path)
+
+            relative = begin
+              Path[src_path].relative_to("content").to_s
+            rescue ArgumentError
+              src_path.lchop("content/")
+            end
+
+            next unless config.content_files.publish?(relative)
+
+            dest_path = File.join(output_dir, relative)
+            unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+              Logger.warn "Skipping content file outside output directory: #{relative}"
+              next
+            end
+
+            FileUtils.mkdir_p(File.dirname(dest_path))
+            FileUtils.cp(src_path, dest_path)
+            Logger.action :copy, dest_path, :blue if verbose
+            copied += 1
+          end
+          Logger.success "Copied #{copied} content file(s)." if copied > 0
+        end
+
         def run(
           output_dir : String = "public",
           base_url : String? = nil,
