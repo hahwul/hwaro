@@ -156,11 +156,16 @@ module Hwaro
 
     # Categorised set of file-system changes detected by the watcher.
     #
-    # Changes are split into four buckets so the server can pick the
+    # Changes are split into five buckets so the server can pick the
     # cheapest rebuild strategy.
     struct ChangeSet
       # Content files (.md under content/) that were *modified* (not added/deleted)
       getter modified_content : Array(String)
+      # Non-Markdown files under content/ (images and other assets published
+      # via `[content.files] allow_extensions`) that were *modified*. These
+      # are not pages — they're copied 1:1 to the output dir on rebuild, so
+      # they can't ride the incremental page pipeline.
+      getter modified_content_files : Array(String)
       # Template files that were *modified*
       getter modified_templates : Array(String)
       # Static files that were *modified*
@@ -179,12 +184,14 @@ module Hwaro
         @added_files : Array(String),
         @removed_files : Array(String),
         @config_changed : Bool,
+        @modified_content_files : Array(String) = [] of String,
       )
       end
 
       # True when the change set is empty (nothing actually changed)
       def empty? : Bool
         @modified_content.empty? &&
+          @modified_content_files.empty? &&
           @modified_templates.empty? &&
           @modified_static.empty? &&
           @added_files.empty? &&
@@ -203,6 +210,7 @@ module Hwaro
       def templates_only? : Bool
         !@modified_templates.empty? &&
           @modified_content.empty? &&
+          @modified_content_files.empty? &&
           @modified_static.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
@@ -213,7 +221,20 @@ module Hwaro
       def static_only? : Bool
         !@modified_static.empty? &&
           @modified_content.empty? &&
+          @modified_content_files.empty? &&
           @modified_templates.empty? &&
+          @added_files.empty? &&
+          @removed_files.empty? &&
+          !@config_changed
+      end
+
+      # True when only non-Markdown content files were modified — just
+      # republish them, no markdown re-parsing, no template re-render.
+      def content_files_only? : Bool
+        !@modified_content_files.empty? &&
+          @modified_content.empty? &&
+          @modified_templates.empty? &&
+          @modified_static.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -260,6 +281,7 @@ module Hwaro
 
         ChangeSet.new(
           modified_content: (@modified_content + other.modified_content).uniq,
+          modified_content_files: (@modified_content_files + other.modified_content_files).uniq,
           modified_templates: (@modified_templates + other.modified_templates).uniq,
           modified_static: (@modified_static + other.modified_static).uniq,
           added_files: net_added,
@@ -280,6 +302,8 @@ module Hwaro
           :incremental
         elsif static_only?
           :static
+        elsif content_files_only?
+          :content_files
         else
           :full
         end
@@ -289,6 +313,7 @@ module Hwaro
       def description : String
         parts = [] of String
         parts << "#{@modified_content.size} content" unless @modified_content.empty?
+        parts << "#{@modified_content_files.size} content-asset" unless @modified_content_files.empty?
         parts << "#{@modified_templates.size} template" unless @modified_templates.empty?
         parts << "#{@modified_static.size} static" unless @modified_static.empty?
         parts << "#{@added_files.size} added" unless @added_files.empty?
@@ -532,6 +557,7 @@ module Hwaro
         new_mtimes : Hash(String, Time),
       ) : ChangeSet
         modified_content = [] of String
+        modified_content_files = [] of String
         modified_templates = [] of String
         modified_static = [] of String
         added_files = [] of String
@@ -546,7 +572,7 @@ module Hwaro
             if path == "config.toml"
               config_changed = true
             else
-              classify_modified(path, modified_content, modified_templates, modified_static)
+              classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static)
             end
           else
             # New file (exists now, didn't before)
@@ -563,6 +589,7 @@ module Hwaro
 
         ChangeSet.new(
           modified_content: modified_content,
+          modified_content_files: modified_content_files,
           modified_templates: modified_templates,
           modified_static: modified_static,
           added_files: added_files,
@@ -572,14 +599,24 @@ module Hwaro
       end
 
       # Put a modified path into the right bucket.
+      #
+      # Non-Markdown files under `content/` (images, PDFs, anything copied via
+      # `[content.files] allow_extensions`) used to land in `content` and then
+      # get silently dropped by `run_incremental` because they have no `Page`
+      # entry. They now go into their own bucket and are republished verbatim.
       private def classify_modified(
         path : String,
         content : Array(String),
+        content_files : Array(String),
         templates : Array(String),
         static : Array(String),
       )
         if path.starts_with?("content/")
-          content << path
+          if path.downcase.ends_with?(".md")
+            content << path
+          else
+            content_files << path
+          end
         elsif path.starts_with?("templates/")
           templates << path
         elsif path.starts_with?("static/")
@@ -603,11 +640,22 @@ module Hwaro
           @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
         when :static
           copy_static(changeset, build_options)
+        when :content_files
+          copy_content_files(changeset, build_options)
         end
 
         # Copy static files if they changed alongside content/template changes
         if strategy != :static && strategy != :full && !changeset.modified_static.empty?
           copy_static(changeset, build_options)
+        end
+
+        # Republish non-Markdown content assets whenever they accompany any
+        # rebuild that wasn't a full one. A full build already re-copies them
+        # via the ReadContent → Write raw-files path; for incremental,
+        # templates-only, and static-only strategies, the watcher has to do
+        # it explicitly or the served bytes stay stale (issue #530).
+        if strategy != :content_files && strategy != :full && !changeset.modified_content_files.empty?
+          copy_content_files(changeset, build_options)
         end
 
         @live_reload_handler.try(&.notify_reload)
@@ -616,6 +664,11 @@ module Hwaro
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+      end
+
+      private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
+        output_dir = sanitize_output_dir(build_options.output_dir)
+        @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose)
       end
 
       private def open_browser_url(url : String)

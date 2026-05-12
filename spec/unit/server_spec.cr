@@ -801,6 +801,62 @@ describe Hwaro::Services::ChangeSet do
       )
       cs.rebuild_strategy.should eq(:content_and_template)
     end
+
+    it "returns :content_files when only content assets changed" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.rebuild_strategy.should eq(:content_files)
+    end
+  end
+
+  describe "#content_files_only?" do
+    it "returns true when only non-Markdown content assets changed" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.content_files_only?.should be_true
+      cs.empty?.should be_false
+    end
+
+    it "returns false when a markdown file also changed" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: ["content/projects/foo/index.md"],
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.content_files_only?.should be_false
+    end
+
+    it "returns false when a structural change is present" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: ["content/projects/bar/new.jpg"],
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.content_files_only?.should be_false
+      cs.needs_full_rebuild?.should be_true
+    end
   end
 
   describe "#description" do
@@ -1065,6 +1121,44 @@ describe "Server#detect_changes" do
     cs.modified_templates.should be_empty
     cs.content_incremental?.should be_true
   end
+
+  it "routes overwritten non-Markdown content files into modified_content_files (gh#530)" do
+    server = Hwaro::Services::Server.new
+    t1 = Time.utc(2025, 1, 1, 0, 0, 0)
+    t2 = Time.utc(2025, 1, 1, 0, 0, 5)
+
+    old = {"content/projects/foo/cover.jpg" => t1}
+    new_m = {"content/projects/foo/cover.jpg" => t2}
+
+    cs = server.test_detect_changes(old, new_m)
+    cs.modified_content_files.should eq(["content/projects/foo/cover.jpg"])
+    cs.modified_content.should be_empty
+    cs.modified_static.should be_empty
+    cs.added_files.should be_empty
+    cs.content_files_only?.should be_true
+    cs.rebuild_strategy.should eq(:content_files)
+  end
+
+  it "separates markdown and image changes under the same content directory" do
+    server = Hwaro::Services::Server.new
+    t1 = Time.utc(2025, 1, 1, 0, 0, 0)
+    t2 = Time.utc(2025, 1, 1, 0, 0, 5)
+
+    old = {
+      "content/projects/foo/index.md"  => t1,
+      "content/projects/foo/cover.jpg" => t1,
+    }
+    new_m = {
+      "content/projects/foo/index.md"  => t2,
+      "content/projects/foo/cover.jpg" => t2,
+    }
+
+    cs = server.test_detect_changes(old, new_m)
+    cs.modified_content.should eq(["content/projects/foo/index.md"])
+    cs.modified_content_files.should eq(["content/projects/foo/cover.jpg"])
+    cs.content_files_only?.should be_false
+    cs.content_incremental?.should be_true
+  end
 end
 
 describe "Builder incremental methods" do
@@ -1132,6 +1226,109 @@ describe "Builder incremental methods" do
             output_dir,
             false
           )
+        end
+      end
+    end
+  end
+
+  describe "#copy_changed_content_files" do
+    it "republishes an in-place overwritten image (gh#530)" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "projects", "foo"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["jpg", "png"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "projects", "foo", "_index.md"),
+          "---\ntitle: Foo\n---\n")
+        File.write(File.join(dir, "content", "projects", "foo", "cover.jpg"), "OLD")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          options = Hwaro::Config::Options::BuildOptions.new
+          builder.run(options)
+
+          published = File.join(dir, "public", "projects", "foo", "cover.jpg")
+          File.read(published).should eq("OLD")
+
+          # Simulate the bug repro: overwrite the image in place, then ask
+          # the watcher's republish path to update output.
+          File.write(File.join(dir, "content", "projects", "foo", "cover.jpg"), "NEW")
+          builder.copy_changed_content_files(
+            ["content/projects/foo/cover.jpg"],
+            File.join(dir, "public"),
+            false,
+          )
+
+          File.read(published).should eq("NEW")
+        end
+      end
+    end
+
+    it "refuses to publish files whose extension isn't allowed" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["jpg"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "secret.psd"), "binary")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          options = Hwaro::Config::Options::BuildOptions.new
+          builder.run(options)
+
+          builder.copy_changed_content_files(
+            ["content/secret.psd"],
+            File.join(dir, "public"),
+            false,
+          )
+
+          File.exists?(File.join(dir, "public", "secret.psd")).should be_false
+        end
+      end
+    end
+
+    it "is a no-op when content.files is disabled" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+
+        File.write(File.join(dir, "config.toml"),
+          "title = \"Test\"\nbase_url = \"http://localhost\"\n")
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "cover.jpg"), "bytes")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          options = Hwaro::Config::Options::BuildOptions.new
+          builder.run(options)
+
+          builder.copy_changed_content_files(
+            ["content/cover.jpg"],
+            File.join(dir, "public"),
+            false,
+          )
+
+          File.exists?(File.join(dir, "public", "cover.jpg")).should be_false
         end
       end
     end
