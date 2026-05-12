@@ -80,6 +80,34 @@ module Hwaro
       end
     end
 
+    # Emits `Access-Control-Allow-Origin: *` on every dev-server response so
+    # a site loaded via one local hostname can still `fetch()` resources
+    # served under another — the canonical example being `localhost:3000`
+    # in the address bar while `{{ base_url }}` was baked as
+    # `http://127.0.0.1:3000` (the default bind). Same-origin policy treats
+    # those as different origins and would otherwise block the fetch.
+    #
+    # Dev-only: the built output is untouched. Matches what other SSG dev
+    # servers do (Zola, Hugo).
+    class DevCorsHandler
+      include HTTP::Handler
+
+      def call(context)
+        context.response.headers["Access-Control-Allow-Origin"] = "*"
+
+        if context.request.method == "OPTIONS"
+          requested_headers = context.request.headers["Access-Control-Request-Headers"]?
+          context.response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+          context.response.headers["Access-Control-Allow-Headers"] = requested_headers || "*"
+          context.response.headers["Access-Control-Max-Age"] = "86400"
+          context.response.status_code = 204
+          return
+        end
+
+        call_next(context)
+      end
+    end
+
     # `HTTP::StaticFileHandler` derives `Content-Type` from the file
     # extension via `MIME.from_extension` and writes it without a
     # charset parameter — so `robots.txt` / `llms.txt` / sitemap and
@@ -319,6 +347,12 @@ module Hwaro
 
         handlers = [] of HTTP::Handler
         handlers << HTTP::LogHandler.new if access_log
+        # Set CORS headers first so they apply to every downstream response,
+        # including 301 redirects from IndexRewriteHandler and 404s from
+        # NotFoundHandler. Without this, opening the site via `localhost`
+        # while base_url is baked as `127.0.0.1` (or vice versa) makes
+        # browser fetch() calls fail same-origin checks.
+        handlers << DevCorsHandler.new
         # Run before StaticFileHandler so we can append `; charset=utf-8`
         # to text-shaped Content-Type headers after the static handler
         # sets them — Crystal's `HTTP::Server::Response` buffers the
