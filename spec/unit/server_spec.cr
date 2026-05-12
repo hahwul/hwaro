@@ -246,6 +246,63 @@ describe Hwaro::Services::NotFoundHandler do
   end
 end
 
+describe Hwaro::Services::DevCorsHandler do
+  it "sets Access-Control-Allow-Origin on a normal request and passes through" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    request = HTTP::Request.new("GET", "/search_index.json")
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Origin"].should eq("*")
+    dummy.called.should be_true
+  end
+
+  it "short-circuits OPTIONS preflight with 204 and CORS headers" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    request = HTTP::Request.new(
+      "OPTIONS",
+      "/search_index.json",
+      HTTP::Headers{"Access-Control-Request-Headers" => "content-type"},
+    )
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    response.status_code.should eq(204)
+    response.headers["Access-Control-Allow-Origin"].should eq("*")
+    response.headers["Access-Control-Allow-Methods"].should eq("GET, HEAD, OPTIONS")
+    response.headers["Access-Control-Allow-Headers"].should eq("content-type")
+    response.headers["Access-Control-Max-Age"].should eq("86400")
+    dummy.called.should be_false
+  end
+
+  it "falls back to * for Access-Control-Allow-Headers when preflight omits the request" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    request = HTTP::Request.new("OPTIONS", "/search_index.json")
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Headers"].should eq("*")
+  end
+end
+
 describe Hwaro::Services::ChangeSet do
   describe "#empty?" do
     it "returns true when nothing changed" do
