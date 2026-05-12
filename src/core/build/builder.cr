@@ -537,8 +537,11 @@ module Hwaro
         #
         # Skips files whose extension isn't permitted by `[content.files]`, so
         # the watcher can't smuggle a `.md` or a disallowed type into output.
-        # Falls back to a full build when the config hasn't been loaded yet
-        # (cold serve), since there's no allowlist to check against.
+        # No-ops when `[content.files]` isn't enabled — nothing was published
+        # in the first place, so there's nothing to refresh. (`@config` is nil
+        # only before the initial build, which `Server#run_with_options`
+        # already performs before spawning the watcher, so the watcher always
+        # sees a loaded config.)
         def copy_changed_content_files(changed_files : Array(String), output_dir : String, verbose : Bool = false)
           config = @config
           unless config && config.content_files.enabled?

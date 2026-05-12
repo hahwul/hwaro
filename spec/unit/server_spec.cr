@@ -727,6 +727,34 @@ describe Hwaro::Services::ChangeSet do
       merged = cs1.merge(cs2)
       merged.removed_files.should eq(["content/old.md", "content/other.md"])
     end
+
+    it "merges modified_content_files with deduplication" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/a/cover.jpg"],
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/a/cover.jpg", "content/projects/b/cover.png"],
+      )
+
+      merged = cs1.merge(cs2)
+      merged.modified_content_files.should eq([
+        "content/projects/a/cover.jpg",
+        "content/projects/b/cover.png",
+      ])
+      merged.content_files_only?.should be_true
+    end
   end
 
   describe "#rebuild_strategy" do
