@@ -739,6 +739,7 @@ module Hwaro
             # definition_lists = true
             # admonitions = true
             # heading_ids = true
+            # strikethrough = true
             # mermaid = false
             # math = false
             # math_engine = "katex"
@@ -764,6 +765,7 @@ module Hwaro
             definition_lists = true  # Definition list syntax (Term newline ": Definition")
             admonitions = true       # GitHub-style `> [!NOTE]` blockquotes render as admonition <div>s
             heading_ids = true       # `## Heading {#custom-id}` sets an explicit id
+            strikethrough = true     # `~~text~~` renders as <del>text</del>
             mermaid = false          # Render ```mermaid code blocks as diagrams (loads mermaid.js)
             math = false             # Inline ($...$) and block ($$...$$) math (loads math_engine)
             math_engine = "katex"    # "katex" or "mathjax"

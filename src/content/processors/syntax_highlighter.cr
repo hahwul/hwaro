@@ -12,6 +12,7 @@
 require "markd"
 require "./table_parser"
 require "./markdown_extensions"
+require "./inline_markdown"
 require "set"
 
 module Hwaro
@@ -55,6 +56,33 @@ module Hwaro
         # Escape special HTML characters in language name
         private def escape_lang(text : String) : String
           HTML.escape(text)
+        end
+
+        # Strip unsafe URL schemes (`javascript:`, `vbscript:`, `file:`, non-image `data:`)
+        # from body links even when `safe = false`. Markd only applies its own
+        # `potentially_unsafe` check under safe mode, which leaves a real XSS
+        # vector wide open for the default config — `[click](javascript:...)`
+        # would render as a working onclick link. We blank the `href` instead
+        # of dropping the link entirely so the visible text is preserved.
+        def link(node : Markd::Node, entering : Bool)
+          if entering
+            destination = node.data["destination"].as(String)
+            unless InlineMarkdown.safe_url?(destination)
+              node.data["destination"] = ""
+            end
+          end
+          super
+        end
+
+        # Same protection for `![alt](javascript:...)`.
+        def image(node : Markd::Node, entering : Bool)
+          if entering
+            destination = node.data["destination"].as(String)
+            unless InlineMarkdown.safe_url?(destination)
+              node.data["destination"] = ""
+            end
+          end
+          super
         end
       end
 

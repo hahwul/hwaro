@@ -21,7 +21,7 @@
 #   - `---:` = right align
 
 require "html"
-require "uri"
+require "./inline_markdown"
 
 module Hwaro
   module Content
@@ -44,16 +44,6 @@ module Hwaro
 
           def initialize(@headers, @alignments, @rows)
           end
-
-          # Inline markdown regex patterns
-          CODE_SPAN_REGEX         = /`([^`]+)`/
-          IMAGE_REGEX             = /!\[([^\]]*)\]\(([^)]*)\)/
-          LINK_REGEX              = /\[([^\]]+)\]\(([^)]*)\)/
-          BOLD_ASTERISK_REGEX     = /\*\*(.+?)\*\*/
-          BOLD_UNDERSCORE_REGEX   = /__(.+?)__/
-          ITALIC_ASTERISK_REGEX   = /\*(.+?)\*/
-          ITALIC_UNDERSCORE_REGEX = /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/
-          STRIKETHROUGH_REGEX     = /~~(.+?)~~/
 
           # Convert table to HTML
           def to_html : String
@@ -107,68 +97,8 @@ module Hwaro
             end
           end
 
-          private def escape_html(text : String) : String
-            HTML.escape(text)
-          end
-
           private def render_inline_markdown(text : String) : String
-            result = escape_html(text)
-
-            # Extract code spans and replace with placeholders
-            code_spans = [] of String
-            result = result.gsub(CODE_SPAN_REGEX) do
-              code_spans << $1
-              "\x00CODESPAN#{code_spans.size - 1}\x00"
-            end
-
-            # Images ![alt](url) → <img> (before links)
-            result = result.gsub(IMAGE_REGEX) do
-              alt = $1
-              url = $2
-              if safe_url?(url)
-                "<img src=\"#{HTML.escape(url)}\" alt=\"#{HTML.escape(alt)}\">"
-              else
-                "![#{alt}](#{url})"
-              end
-            end
-
-            # Links [text](url) → <a>
-            result = result.gsub(LINK_REGEX) do
-              link_text = $1
-              url = $2
-              if safe_url?(url)
-                "<a href=\"#{HTML.escape(url)}\">#{link_text}</a>"
-              else
-                "[#{link_text}](#{url})"
-              end
-            end
-
-            # Bold **text** / __text__ → <strong>
-            result = result.gsub(BOLD_ASTERISK_REGEX) { "<strong>#{$1}</strong>" }
-            result = result.gsub(BOLD_UNDERSCORE_REGEX) { "<strong>#{$1}</strong>" }
-
-            # Italic *text* / _text_ → <em>
-            result = result.gsub(ITALIC_ASTERISK_REGEX) { "<em>#{$1}</em>" }
-            result = result.gsub(ITALIC_UNDERSCORE_REGEX) { "<em>#{$1}</em>" }
-
-            # Strikethrough ~~text~~ → <del>
-            result = result.gsub(STRIKETHROUGH_REGEX) { "<del>#{$1}</del>" }
-
-            # Restore code span placeholders
-            code_spans.each_with_index do |content, idx|
-              result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")
-            end
-
-            result
-          end
-
-          private def safe_url?(url : String) : Bool
-            stripped = url.strip.downcase
-            # Fully decode percent-encoding to prevent bypass (e.g. java%73cript:)
-            decoded = URI.decode(stripped)
-            return true if decoded.starts_with?("http://") || decoded.starts_with?("https://") || decoded.starts_with?("mailto:")
-            return true if decoded.starts_with?("/") || decoded.starts_with?("#") || decoded.starts_with?("./") || decoded.starts_with?("../")
-            !decoded.includes?(":")
+            InlineMarkdown.render(text)
           end
         end
 
