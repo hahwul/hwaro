@@ -538,7 +538,6 @@ module Hwaro
       property math_engine : String    # "katex" or "mathjax"
       property admonitions : Bool      # If true, GitHub-style `> [!NOTE]` blockquotes become admonition <div>s
       property heading_ids : Bool      # If true, `## Heading {#custom-id}` sets an explicit id
-      property strikethrough : Bool    # If true, `~~text~~` renders as <del>text</del> in body text
 
       def initialize
         @safe = false
@@ -552,7 +551,6 @@ module Hwaro
         @math_engine = "katex"
         @admonitions = true
         @heading_ids = true
-        @strikethrough = true
       end
     end
 
@@ -1218,7 +1216,6 @@ module Hwaro
         end
         config.markdown.admonitions = bool_value(s["admonitions"]?, config.markdown.admonitions)
         config.markdown.heading_ids = bool_value(s["heading_ids"]?, config.markdown.heading_ids)
-        config.markdown.strikethrough = bool_value(s["strikethrough"]?, config.markdown.strikethrough)
       end
 
       private def self.load_series(config : Config)

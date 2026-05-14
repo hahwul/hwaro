@@ -16,7 +16,10 @@ module Hwaro
           result = preprocess_definition_lists(result) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
           result = preprocess_math(result) if config.math
-          result = preprocess_strikethrough(result) if config.strikethrough
+          # Strikethrough has no config flag — the inline renderer used by
+          # tables/definition-lists/footnotes always rewrites `~~text~~`, so
+          # gating only body text would create an inconsistency.
+          result = preprocess_strikethrough(result)
           result = preprocess_heading_ids(result, safe: config.safe) if config.heading_ids
           result
         end
@@ -339,7 +342,14 @@ module Hwaro
         # examples inside fenced code blocks (` ``` ` / `~~~`) render verbatim,
         # and inline `` `code` `` runs on the same line are skipped via a
         # placeholder pass so e.g. `` `~~not strike~~` `` stays as code.
-        STRIKETHROUGH_RE      = /~~(.+?)~~/
+        #
+        # Known limitation: when math is also enabled, `$~~x~~$` runs the math
+        # preprocess first and the `~~` chars end up inside a math span,
+        # then this pass rewrites them — corrupting the KaTeX expression. We
+        # do not stash math spans because they can span multiple lines (display
+        # math) and the walker is line-oriented. `~~` inside math is rare and
+        # the failure is visible at render time.
+        STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
         STRIKETHROUGH_CODE_RE = /`[^`]+`/
 
         def preprocess_strikethrough(content : String) : String

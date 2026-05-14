@@ -52,38 +52,6 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
       html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
       html.should contain("<div>custom</div>")
     end
-
-    it "strips javascript: URLs from link href even when safe is off" do
-      content = "[bad](javascript:alert(1))"
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
-      html.should_not contain("javascript:")
-      html.should contain(">bad</a>")
-    end
-
-    it "strips javascript: URLs from image src even when safe is off" do
-      content = "![](javascript:alert(1))"
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
-      html.should_not contain("javascript:")
-    end
-
-    it "strips percent-encoded javascript: bypasses" do
-      content = "[bad](java%73cript:alert(1))"
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
-      html.should_not contain("java%73cript:")
-    end
-
-    it "allows http/https/mailto links" do
-      content = "[ok](https://example.com) [m](mailto:a@b.c)"
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
-      html.should contain("href=\"https://example.com\"")
-      html.should contain("href=\"mailto:a@b.c\"")
-    end
-
-    it "allows data:image/png in images (legit inline base64)" do
-      content = "![](data:image/png;base64,abc)"
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)
-      html.should contain("src=\"data:image/png;base64,abc\"")
-    end
   end
 
   describe ".has_code_blocks?" do

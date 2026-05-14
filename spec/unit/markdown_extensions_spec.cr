@@ -10,7 +10,6 @@ private def make_config(**opts) : Hwaro::Models::MarkdownConfig
   config.math = opts[:math]? || false
   config.admonitions = opts[:admonitions]? || false
   config.heading_ids = opts[:heading_ids]? || false
-  config.strikethrough = opts[:strikethrough]? || false
   config
 end
 
@@ -688,19 +687,10 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<del>real</del>")
     end
 
-    it "honors the strikethrough config flag (default on)" do
+    it "renders body strikethrough through the full pipeline" do
       cfg = make_config
-      cfg.strikethrough = true
       html, _ = Hwaro::Processor::Markdown.render("~~bye~~", markdown_config: cfg)
       html.should contain("<del>bye</del>")
-    end
-
-    it "leaves text alone when strikethrough flag is off" do
-      cfg = make_config
-      cfg.strikethrough = false
-      html, _ = Hwaro::Processor::Markdown.render("~~bye~~", markdown_config: cfg)
-      html.should contain("~~bye~~")
-      html.should_not contain("<del>")
     end
   end
 
