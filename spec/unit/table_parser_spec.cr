@@ -555,7 +555,7 @@ describe Hwaro::Content::Processors::TableParser do
       result.should contain("<code>foo</code> and <code>bar</code>")
     end
 
-    it "blocks data: URLs in images" do
+    it "allows image data: URLs in images" do
       content = <<-MD
         | Header |
         |--------|
@@ -563,7 +563,29 @@ describe Hwaro::Content::Processors::TableParser do
         MD
 
       result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain(%(<img src="data:image/png;base64,abc"))
+    end
+
+    it "blocks non-image data: URLs in images" do
+      content = <<-MD
+        | Header |
+        |--------|
+        | ![x](data:text/html,abc) |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
       result.should_not contain("<img")
+    end
+
+    it "blocks javascript: URLs in table links" do
+      content = <<-MD
+        | Header |
+        |--------|
+        | [click](javascript:alert(1)) |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<a href=\"javascript:")
     end
   end
 

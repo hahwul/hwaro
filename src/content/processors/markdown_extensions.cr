@@ -1,5 +1,5 @@
 require "html"
-require "uri"
+require "./inline_markdown"
 require "../../models/config"
 require "../../utils/text_utils"
 
@@ -16,6 +16,10 @@ module Hwaro
           result = preprocess_definition_lists(result) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
           result = preprocess_math(result) if config.math
+          # Strikethrough has no config flag — the inline renderer used by
+          # tables/definition-lists/footnotes always rewrites `~~text~~`, so
+          # gating only body text would create an inconsistency.
+          result = preprocess_strikethrough(result)
           result = preprocess_heading_ids(result, safe: config.safe) if config.heading_ids
           result
         end
@@ -166,14 +170,17 @@ module Hwaro
 
           return html if footnotes.empty?
 
-          # Build footnotes section
+          # Build footnotes section. Body text is rendered through the shared
+          # inline-md helper so `` `code` ``/`*em*`/`[link](url)`/`~~del~~`
+          # inside a footnote behave the same way they do in table cells and
+          # definition lists.
           section = String.build do |str|
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
               escaped_key = HTML.escape(fn[:key])
-              escaped_text = HTML.escape(fn[:text])
+              rendered_text = InlineMarkdown.render(fn[:text])
               str << "<li id=\"fn-#{escaped_key}\">\n"
-              str << "<p>#{escaped_text} <a href=\"#fnref-#{escaped_key}\" class=\"footnote-backref\">\u21A9</a></p>\n"
+              str << "<p>#{rendered_text} <a href=\"#fnref-#{escaped_key}\" class=\"footnote-backref\">\u21A9</a></p>\n"
               str << "</li>\n"
             end
             str << "</ol>\n</section>\n"
@@ -329,6 +336,70 @@ module Hwaro
           end
         end
 
+        # --- Strikethrough (GFM) ---
+        # `~~text~~` → `<del>text</del>`. Markd doesn't ship a GFM strikethrough
+        # parser, so we apply this pre-Markd. The walk is fence-aware so
+        # examples inside fenced code blocks (` ``` ` / `~~~`) render verbatim,
+        # and inline `` `code` `` runs on the same line are skipped via a
+        # placeholder pass so e.g. `` `~~not strike~~` `` stays as code.
+        #
+        # Known limitation: when math is also enabled, `$~~x~~$` runs the math
+        # preprocess first and the `~~` chars end up inside a math span,
+        # then this pass rewrites them — corrupting the KaTeX expression. We
+        # do not stash math spans because they can span multiple lines (display
+        # math) and the walker is line-oriented. `~~` inside math is rare and
+        # the failure is visible at render time.
+        STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
+        STRIKETHROUGH_CODE_RE = /`[^`]+`/
+
+        def preprocess_strikethrough(content : String) : String
+          return content unless content.includes?("~~")
+
+          String.build do |io|
+            in_fence = false
+            fence_marker = FENCE_BACKTICKS
+
+            content.each_line(chomp: false) do |line|
+              stripped = line.lstrip
+
+              if in_fence
+                if stripped.starts_with?(fence_marker)
+                  in_fence = false
+                end
+                io << line
+              elsif stripped.starts_with?(FENCE_BACKTICKS)
+                in_fence = true
+                fence_marker = FENCE_BACKTICKS
+                io << line
+              elsif stripped.starts_with?(FENCE_TILDES)
+                in_fence = true
+                fence_marker = FENCE_TILDES
+                io << line
+              elsif line.includes?("~~")
+                io << rewrite_strikethrough_line(line)
+              else
+                io << line
+              end
+            end
+          end
+        end
+
+        private def rewrite_strikethrough_line(line : String) : String
+          # Stash inline code spans so a `~~` inside backticks is not rewritten.
+          code_spans = [] of String
+          stashed = line.gsub(STRIKETHROUGH_CODE_RE) do |match|
+            code_spans << match
+            "\x00CS#{code_spans.size - 1}\x00"
+          end
+
+          rewritten = stashed.gsub(STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+
+          code_spans.each_with_index do |span, idx|
+            rewritten = rewritten.gsub("\x00CS#{idx}\x00", span)
+          end
+          rewritten
+        end
+
         HEADING_TAG_FOR_HID_RE = /<(h[1-6])([^>]*)>(.*?)<\/\1>/m
         HID_MARKER_RE          = /<!--HID:([A-Za-z][\w:-]*)-->/
         EXISTING_ID_RE         = /\bid\s*=\s*"[^"]*"/i
@@ -359,69 +430,11 @@ module Hwaro
           end
         end
 
-        # --- Inline Markdown Renderer ---
-        # Renders a small subset of inline markdown (code/image/link/bold/italic/
-        # strikethrough) in HTML-escaped text. Used by definition lists so that
-        # `**bold**`/`[link](url)`/`` `code` `` work inside <dt>/<dd> while raw
-        # HTML remains escaped. Mirrors the table-cell renderer in
-        # `table_parser.cr` to keep semantics consistent across both consumers.
-        INLINE_CODE_SPAN_RE         = /`([^`]+)`/
-        INLINE_IMAGE_RE             = /!\[([^\]]*)\]\(([^)]*)\)/
-        INLINE_LINK_RE              = /\[([^\]]+)\]\(([^)]*)\)/
-        INLINE_BOLD_ASTERISK_RE     = /\*\*(.+?)\*\*/
-        INLINE_BOLD_UNDERSCORE_RE   = /__(.+?)__/
-        INLINE_ITALIC_ASTERISK_RE   = /\*(.+?)\*/
-        INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/
-        INLINE_STRIKETHROUGH_RE     = /~~(.+?)~~/
-
+        # Inline-markdown renderer used by definition lists (and now footnote
+        # bodies). Delegates to the shared `InlineMarkdown` module so the same
+        # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
         private def render_inline_md(text : String) : String
-          result = HTML.escape(text)
-
-          code_spans = [] of String
-          result = result.gsub(INLINE_CODE_SPAN_RE) do
-            code_spans << $1
-            "\x00CODESPAN#{code_spans.size - 1}\x00"
-          end
-
-          result = result.gsub(INLINE_IMAGE_RE) do
-            alt = $1
-            url = $2
-            if safe_inline_url?(url)
-              %(<img src="#{HTML.escape(url)}" alt="#{HTML.escape(alt)}">)
-            else
-              "![#{alt}](#{url})"
-            end
-          end
-
-          result = result.gsub(INLINE_LINK_RE) do
-            link_text = $1
-            url = $2
-            if safe_inline_url?(url)
-              %(<a href="#{HTML.escape(url)}">#{link_text}</a>)
-            else
-              "[#{link_text}](#{url})"
-            end
-          end
-
-          result = result.gsub(INLINE_BOLD_ASTERISK_RE) { "<strong>#{$1}</strong>" }
-          result = result.gsub(INLINE_BOLD_UNDERSCORE_RE) { "<strong>#{$1}</strong>" }
-          result = result.gsub(INLINE_ITALIC_ASTERISK_RE) { "<em>#{$1}</em>" }
-          result = result.gsub(INLINE_ITALIC_UNDERSCORE_RE) { "<em>#{$1}</em>" }
-          result = result.gsub(INLINE_STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
-
-          code_spans.each_with_index do |content, idx|
-            result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")
-          end
-
-          result
-        end
-
-        private def safe_inline_url?(url : String) : Bool
-          stripped = url.strip.downcase
-          decoded = URI.decode(stripped)
-          return true if decoded.starts_with?("http://") || decoded.starts_with?("https://") || decoded.starts_with?("mailto:")
-          return true if decoded.starts_with?("/") || decoded.starts_with?("#") || decoded.starts_with?("./") || decoded.starts_with?("../")
-          !decoded.includes?(":")
+          InlineMarkdown.render(text)
         end
       end
     end

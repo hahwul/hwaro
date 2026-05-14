@@ -667,4 +667,52 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("[!NOTE]")
     end
   end
+
+  describe "strikethrough" do
+    it "converts ~~text~~ to <del> in body text" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough("Some ~~deleted~~ thing.")
+      result.should contain("<del>deleted</del>")
+    end
+
+    it "leaves ~~ inside fenced code blocks alone" do
+      content = "```\n~~not strike~~\n```\n\n~~yes strike~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough(content)
+      result.should contain("~~not strike~~")
+      result.should contain("<del>yes strike</del>")
+    end
+
+    it "leaves ~~ inside inline code spans alone" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough("inline `~~code~~` here, ~~real~~ there")
+      result.should contain("`~~code~~`")
+      result.should contain("<del>real</del>")
+    end
+
+    it "renders body strikethrough through the full pipeline" do
+      cfg = make_config
+      html, _ = Hwaro::Processor::Markdown.render("~~bye~~", markdown_config: cfg)
+      html.should contain("<del>bye</del>")
+    end
+  end
+
+  describe "footnote inline markdown" do
+    it "renders inline markdown inside footnote bodies" do
+      html = "<p>Text<sup class=\"footnote-ref\"><a href=\"#fn-1\" id=\"fnref-1\">[1]</a></sup></p>\n" \
+             "<!--HWARO-FOOTNOTES-START-->\n" \
+             "<!--HWARO-FN:1:1:Has `code` and *emphasis* and ~~strike~~-->\n" \
+             "<!--HWARO-FOOTNOTES-END-->\n"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)
+      result.should contain("<code>code</code>")
+      result.should contain("<em>emphasis</em>")
+      result.should contain("<del>strike</del>")
+    end
+
+    it "blocks javascript: links inside footnote bodies" do
+      html = "<p>x<sup class=\"footnote-ref\"><a href=\"#fn-1\" id=\"fnref-1\">[1]</a></sup></p>\n" \
+             "<!--HWARO-FOOTNOTES-START-->\n" \
+             "<!--HWARO-FN:1:1:bad [click](javascript:alert(1)) link-->\n" \
+             "<!--HWARO-FOOTNOTES-END-->\n"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)
+      result.should_not contain("href=\"javascript:")
+    end
+  end
 end
