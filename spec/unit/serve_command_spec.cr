@@ -163,6 +163,46 @@ describe Hwaro::CLI::Commands::ServeCommand do
       build_options.memory_limit.should eq("2G")
       build_options.streaming?.should be_true
     end
+
+    it "defaults fast_start to false" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.fast_start.should be_false
+      options.fast_start_count.should eq(20)
+    end
+
+    it "enables fast_start when --fast-start is passed" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--fast-start"])
+      options.fast_start.should be_true
+      options.fast_start_count.should eq(20)
+    end
+
+    it "parses --fast-start-count and implies --fast-start" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--fast-start-count", "50"])
+      options.fast_start.should be_true
+      options.fast_start_count.should eq(50)
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when --fast-start-count is not a positive integer" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+
+      ["0", "-1", "abc", ""].each do |bad|
+        err = expect_raises(Hwaro::HwaroError) do
+          cmd.test_parse_options(["--fast-start-count", bad])
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
+    end
+
+    it "propagates fast_start fields to build options" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--fast-start", "--fast-start-count", "5"])
+      build_options = options.to_build_options
+      build_options.fast_start.should be_true
+      build_options.fast_start_count.should eq(5)
+    end
   end
 
   describe "#run" do

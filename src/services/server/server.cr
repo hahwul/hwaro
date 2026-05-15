@@ -442,6 +442,16 @@ module Hwaro
         # subset immediately. Notify the browser via live-reload when the
         # background pass finishes so any tab parked on a not-yet-rendered
         # URL automatically refreshes once its HTML is on disk.
+        #
+        # `deferred_done` gates the file watcher: starting the watcher
+        # before the deferred fiber returns would let a save-triggered
+        # incremental rebuild race with the deferred render, both fibers
+        # mutating shared Builder state (`@pages_by_path`,
+        # `@page_crinja_value_cache`, `@cache`, …) at IO yield points.
+        # The channel is closed once the deferred pass finishes (or
+        # immediately if there's nothing to defer), at which point the
+        # watcher proceeds.
+        deferred_done = Channel(Nil).new
         fast_start_pending = build_options.fast_start && @builder.has_deferred_pages?
         if fast_start_pending
           deferred_options = build_options.dup
@@ -455,11 +465,19 @@ module Hwaro
               Logger.error "[Fast-start] Background render failed: #{ex.message}"
               Logger.debug "[Fast-start] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
               @live_reload_handler.try(&.notify_build_error(ex.message || "Background render failed"))
+            ensure
+              deferred_done.close
             end
           end
+        else
+          deferred_done.close
         end
 
         spawn do
+          # Block here — not in a sleep loop — until the deferred fiber
+          # signals completion. `receive?` on a closed channel returns
+          # `nil` without blocking.
+          deferred_done.receive?
           watch_for_changes(watch_options)
         end
 

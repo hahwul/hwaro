@@ -562,7 +562,9 @@ module Hwaro
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index
-          # only cover the priority subset.
+          # only cover the priority subset. Per-taxonomy RSS feeds and tag
+          # listing pages pull from `page.content` too, so they have to be
+          # regenerated for the same reason — matches `run_rerender`.
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
@@ -571,7 +573,12 @@ module Hwaro
             -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
           ] of Proc(Nil)
           ParallelHelper.execute(seo_tasks, options.parallel)
+          Content::Taxonomies.generate(site, output_dir, templates, verbose)
 
+          # Persist cache updates from the deferred pass. The initial build
+          # already saved once; without this second save, killing the server
+          # before any watch rebuild loses the deferred pages' cache entries
+          # and the next `--cache` cold start has to re-render them.
           cache.save if options.cache
 
           # Clear the stash so a second call is a no-op and subsequent
