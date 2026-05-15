@@ -532,7 +532,7 @@ module Hwaro
         # during the initial Generate phase.
         def render_deferred(options : Config::Options::BuildOptions) : Int32
           pages = @deferred_pages
-          return 0 unless pages && !pages.empty?
+          return 0 if pages.nil? || pages.empty?
 
           site = @site
           templates = @templates
