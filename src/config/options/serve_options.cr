@@ -24,6 +24,8 @@ module Hwaro
         property stream : Bool
         property memory_limit : String?
         property json : Bool
+        property fast_start : Bool
+        property fast_start_count : Int32
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -48,6 +50,8 @@ module Hwaro
           @stream : Bool = false,
           @memory_limit : String? = nil,
           @json : Bool = false,
+          @fast_start : Bool = false,
+          @fast_start_count : Int32 = 20,
         )
         end
 
@@ -76,6 +80,8 @@ module Hwaro
             env: @env,
             skip_og_image: @skip_og_image,
             skip_image_processing: @skip_image_processing,
+            fast_start: @fast_start,
+            fast_start_count: @fast_start_count,
           )
         end
       end

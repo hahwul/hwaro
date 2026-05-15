@@ -31,6 +31,10 @@ module Hwaro::Core::Build
     def test_build_global_vars(site : Models::Site)
       build_global_vars(site)
     end
+
+    def test_split_priority_pages(pages : Array(Models::Page), count : Int32)
+      split_priority_pages(pages, count)
+    end
   end
 end
 
@@ -362,6 +366,100 @@ describe Hwaro::Core::Build::Phases::Render do
       first_sub = subsections.first.raw.as(Hash)
       first_sub["name"].raw.should eq("posts/cli-series")
       first_sub["pages_count"].raw.should eq(1)
+    end
+  end
+
+  # `split_priority_pages` underpins `--fast-start` — it picks the page
+  # subset that gets rendered before the dev server binds the port and
+  # defers the rest to a background fiber. Wrong partitioning either
+  # makes ready-time regress (too many pages priority) or makes obvious
+  # URLs 404 until the background finishes (homepage in deferred).
+  describe "#split_priority_pages" do
+    it "returns everything as priority when total page count is <= count" do
+      builder = Hwaro::Core::Build::Builder.new
+      pages = [
+        Hwaro::Models::Page.new("a.md"),
+        Hwaro::Models::Page.new("b.md"),
+      ]
+      priority, deferred = builder.test_split_priority_pages(pages, 5)
+      priority.should eq(pages)
+      deferred.empty?.should be_true
+    end
+
+    it "always puts section index pages in priority regardless of date" do
+      builder = Hwaro::Core::Build::Builder.new
+      home = Hwaro::Models::Page.new("_index.md")
+      home.is_index = true
+      home.date = nil
+
+      section_idx = Hwaro::Models::Page.new("posts/_index.md")
+      section_idx.is_index = true
+      section_idx.date = Time.utc(2000, 1, 1)
+
+      recent = Hwaro::Models::Page.new("posts/new.md")
+      recent.date = Time.utc(2026, 5, 1)
+
+      old = Hwaro::Models::Page.new("posts/old.md")
+      old.date = Time.utc(2024, 1, 1)
+
+      undated = Hwaro::Models::Page.new("about.md")
+      undated.date = nil
+
+      pages = [home, section_idx, recent, old, undated]
+      priority, deferred = builder.test_split_priority_pages(pages, 1)
+
+      priority.includes?(home).should be_true
+      priority.includes?(section_idx).should be_true
+      # With count=1 only the most recent regular post is included
+      priority.includes?(recent).should be_true
+      priority.includes?(old).should be_false
+      priority.includes?(undated).should be_false
+      # Deferred must contain exactly the leftovers
+      deferred.sort_by(&.path).should eq([old, undated].sort_by(&.path))
+    end
+
+    it "sorts regular pages by date descending, nil-dated pages last" do
+      builder = Hwaro::Core::Build::Builder.new
+      a = Hwaro::Models::Page.new("a.md")
+      a.date = Time.utc(2026, 5, 1)
+      b = Hwaro::Models::Page.new("b.md")
+      b.date = Time.utc(2024, 1, 1)
+      c = Hwaro::Models::Page.new("c.md")
+      c.date = nil
+      d = Hwaro::Models::Page.new("d.md")
+      d.date = Time.utc(2025, 6, 1)
+
+      pages = [b, c, a, d] # input order intentionally scrambled
+      priority, deferred = builder.test_split_priority_pages(pages, 2)
+      # Top 2 by date desc: a (2026), d (2025)
+      priority.includes?(a).should be_true
+      priority.includes?(d).should be_true
+      priority.size.should eq(2)
+      # nil-dated falls into deferred ahead of dated b? No — both deferred
+      deferred.includes?(b).should be_true
+      deferred.includes?(c).should be_true
+    end
+
+    it "preserves the original input order in the priority list" do
+      builder = Hwaro::Core::Build::Builder.new
+      a = Hwaro::Models::Page.new("a.md")
+      a.date = Time.utc(2026, 5, 1)
+      b = Hwaro::Models::Page.new("b.md")
+      b.is_index = true
+      c = Hwaro::Models::Page.new("c.md")
+      c.date = Time.utc(2024, 1, 1)
+
+      pages = [a, b, c] # b is section index, a is most recent
+      priority, _deferred = builder.test_split_priority_pages(pages, 1)
+      # Priority should contain a and b, ordered as they appeared in input
+      priority.should eq([a, b])
+    end
+
+    it "handles an empty input gracefully" do
+      builder = Hwaro::Core::Build::Builder.new
+      priority, deferred = builder.test_split_priority_pages([] of Hwaro::Models::Page, 5)
+      priority.empty?.should be_true
+      deferred.empty?.should be_true
     end
   end
 end

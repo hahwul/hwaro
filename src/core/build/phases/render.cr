@@ -48,6 +48,21 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
+    # Fast-start mode: render only homepage + most recent N pages on this
+    # pass and stash the rest on the Builder so a background fiber in
+    # `serve` can render them after the server is already accepting
+    # connections. Has no effect outside of `hwaro serve --fast-start`.
+    if ctx.options.fast_start
+      priority, deferred = split_priority_pages(pages_to_build, ctx.options.fast_start_count)
+      @deferred_pages = deferred
+      if !deferred.empty?
+        Logger.info "  Fast-start: rendering #{priority.size} priority page(s) up front, deferring #{deferred.size} for background render."
+      end
+      pages_to_build = priority
+    else
+      @deferred_pages = nil
+    end
+
     profiler.start_phase("Render")
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
       global_vars = build_global_vars(site, ctx.options.cache_busting)
@@ -63,6 +78,50 @@ module Hwaro::Core::Build::Phases::Render
     end
     profiler.end_phase
     result
+  end
+
+  # Pick a "priority" subset of pages for fast-start: every section index
+  # (so the homepage and any top-level list pages always come up first),
+  # plus the N most recent regular pages by `date` descending. Pages
+  # without a date sort last (they're typically standalone pages like
+  # /about/ that visitors don't land on first).
+  protected def split_priority_pages(
+    pages : Array(Models::Page),
+    count : Int32,
+  ) : {Array(Models::Page), Array(Models::Page)}
+    return {pages, [] of Models::Page} if pages.size <= count
+
+    priority = Set(Models::Page).new
+    regulars = [] of Models::Page
+
+    pages.each do |page|
+      if page.is_index
+        priority << page
+      else
+        regulars << page
+      end
+    end
+
+    # Sort by date descending, nil dates last
+    regulars.sort! do |a, b|
+      ad = a.date
+      bd = b.date
+      if ad && bd
+        bd <=> ad
+      elsif ad
+        -1
+      elsif bd
+        1
+      else
+        0
+      end
+    end
+
+    regulars.first(count).each { |p| priority << p }
+
+    priority_list = pages.select { |p| priority.includes?(p) }
+    deferred_list = pages.reject { |p| priority.includes?(p) }
+    {priority_list, deferred_list}
   end
 
   private def render_streaming(
