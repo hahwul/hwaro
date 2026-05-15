@@ -118,6 +118,10 @@ module Hwaro
         @created_dirs_mutex : Mutex = Mutex.new
         # Unified cache manager for all cache layers
         @cache_manager : CacheManager = CacheManager.new
+        # Pages stashed by `--fast-start` during the initial build so the
+        # dev server can render them in a background fiber after the
+        # "ready" signal has been emitted. Nil outside of fast-start mode.
+        @deferred_pages : Array(Models::Page)? = nil
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -192,6 +196,8 @@ module Hwaro
             stream: options.stream,
             memory_limit: options.memory_limit,
             env: options.env,
+            fast_start: options.fast_start,
+            fast_start_count: options.fast_start_count,
           )
         end
 
@@ -508,6 +514,75 @@ module Hwaro
           end
         end
 
+        # Are there any pages stashed by `--fast-start` waiting to render?
+        # Server checks this to decide whether to spawn the background fiber.
+        def has_deferred_pages? : Bool
+          if pages = @deferred_pages
+            !pages.empty?
+          else
+            false
+          end
+        end
+
+        # Render pages that were skipped on the initial `--fast-start` build.
+        # Runs after the dev server is already serving the priority subset,
+        # so user-visible "ready" time stays bounded on large sites.
+        # Regenerates SEO/search files at the end since feeds and the search
+        # index pull from `page.content`, which was empty for deferred pages
+        # during the initial Generate phase.
+        def render_deferred(options : Config::Options::BuildOptions) : Int32
+          pages = @deferred_pages
+          return 0 unless pages && !pages.empty?
+
+          site = @site
+          templates = @templates
+          unless site && templates
+            Logger.warn "render_deferred called before initial build completed; skipping."
+            return 0
+          end
+
+          Logger.info "Fast-start: background-rendering #{pages.size} deferred page(s)..."
+          start_time = Time.instant
+
+          output_dir = options.output_dir
+          minify = options.minify
+          highlight = options.highlight && site.config.highlight.enabled
+          verbose = options.verbose
+          cache = @cache || Cache.new(enabled: false)
+
+          global_vars = build_global_vars(site, options.cache_busting)
+          @pages_by_path = build_pages_by_path(site)
+          renderable = pages.select(&.render)
+
+          count = if options.parallel && renderable.size > 1
+                    process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay)
+                  else
+                    process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay)
+                  end
+
+          # Refresh feeds / sitemap / search now that every page has rendered
+          # content. Without this, feed descriptions and the search index
+          # only cover the priority subset.
+          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          seo_tasks = [
+            -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose); nil },
+            -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
+          ] of Proc(Nil)
+          ParallelHelper.execute(seo_tasks, options.parallel)
+
+          cache.save if options.cache
+
+          # Clear the stash so a second call is a no-op and subsequent
+          # watch-triggered full rebuilds start clean.
+          @deferred_pages = nil
+
+          elapsed = Time.instant - start_time
+          Logger.success "Fast-start: deferred render complete (#{count} pages in #{elapsed.total_milliseconds.round(2)}ms)."
+          count
+        end
+
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
@@ -594,6 +669,8 @@ module Hwaro
           stream : Bool = false,
           memory_limit : String? = nil,
           env : String? = nil,
+          fast_start : Bool = false,
+          fast_start_count : Int32 = 20,
         )
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
@@ -640,6 +717,8 @@ module Hwaro
             stream: stream,
             memory_limit: memory_limit,
             env: env,
+            fast_start: fast_start,
+            fast_start_count: fast_start_count,
           )
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"

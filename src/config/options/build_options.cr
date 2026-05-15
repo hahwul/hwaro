@@ -27,6 +27,13 @@ module Hwaro
         # already-processed resized images (see `ImageHooks#process_images`
         # mtime-skip logic, which only works when destinations survive).
         property preserve_output : Bool
+        # When set (dev-server only), render only the homepage + the N most
+        # recent pages on the initial pass; the remaining pages are stashed
+        # on the Builder and rendered by a background fiber after the server
+        # is already serving. Drops "ready" time on large sites from O(all)
+        # to O(N). Always paired with `fast_start_count`.
+        property fast_start : Bool
+        property fast_start_count : Int32
 
         def initialize(
           @output_dir : String = "public",
@@ -50,6 +57,8 @@ module Hwaro
           @skip_og_image : Bool = false,
           @skip_image_processing : Bool = false,
           @preserve_output : Bool = false,
+          @fast_start : Bool = false,
+          @fast_start_count : Int32 = 20,
         )
         end
 

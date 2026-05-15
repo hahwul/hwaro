@@ -358,7 +358,11 @@ module Hwaro
       end
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false)
-        Logger.info "Performing initial build..."
+        if build_options.fast_start
+          Logger.info "Performing fast-start initial build (priority pages only)..."
+        else
+          Logger.info "Performing initial build..."
+        end
         @builder.run(build_options)
 
         # Watch-triggered rebuilds should preserve the already-built output
@@ -367,6 +371,11 @@ module Hwaro
         # serve honest about fresh state.
         watch_options = build_options.dup
         watch_options.preserve_output = true
+        # Once the deferred pages have been rendered we don't want subsequent
+        # watch-triggered rebuilds to also defer — that would re-stash the
+        # same pages on every file save. Fast-start is a cold-start only
+        # optimisation.
+        watch_options.fast_start = false
 
         output_dir = sanitize_output_dir(build_options.output_dir)
 
@@ -425,6 +434,28 @@ module Hwaro
           spawn do
             sleep 0.5.seconds
             open_browser_url(url)
+          end
+        end
+
+        # If fast-start stashed pages on the builder, render them in the
+        # background so the dev server can start serving the priority
+        # subset immediately. Notify the browser via live-reload when the
+        # background pass finishes so any tab parked on a not-yet-rendered
+        # URL automatically refreshes once its HTML is on disk.
+        fast_start_pending = build_options.fast_start && @builder.has_deferred_pages?
+        if fast_start_pending
+          deferred_options = build_options.dup
+          deferred_options.preserve_output = true
+          deferred_options.fast_start = false
+          spawn do
+            begin
+              @builder.render_deferred(deferred_options)
+              @live_reload_handler.try(&.notify_reload)
+            rescue ex
+              Logger.error "[Fast-start] Background render failed: #{ex.message}"
+              Logger.debug "[Fast-start] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
+              @live_reload_handler.try(&.notify_build_error(ex.message || "Background render failed"))
+            end
           end
         end
 
