@@ -517,6 +517,11 @@ module Hwaro
         return if missing.empty?
 
         missing.each do |key|
+          # Niche/advanced sections are intentionally skipped by `--fix` in its
+          # minimal mode (see `fix_config`), so flagging them here would tell
+          # users to run a command that won't add them. Stay silent for those —
+          # users opt in by manually configuring the section.
+          next if OPTIONAL_SECTIONS.includes?(key)
           desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
           issues << Issue.new(id: "missing-config-#{key}", level: :info, category: "config_missing", file: @config_path,
             message: "Missing config section [#{key}] (#{desc}) — run 'hwaro doctor --fix' to add it")

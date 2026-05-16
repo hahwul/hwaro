@@ -112,6 +112,14 @@ module Hwaro
           config
         end
 
+        # `book` ships no `[[taxonomies]]` block, so emit `[related]` as a
+        # commented placeholder rather than the default enabled snippet
+        # (which references `tags`, triggering a doctor warning out of the
+        # box). Users who add taxonomies can uncomment it.
+        protected def related_config : String
+          ConfigSnippets.related(commented: true)
+        end
+
         # Book header — `page.title` and `page.description` are guarded
         # so untitled pages don't render `<title> - Site</title>` or an
         # empty description meta.
@@ -1373,6 +1381,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Introduction"
+            description = "Welcome to your book — overview and starting point."
             weight = 0
             +++
 
@@ -1401,6 +1410,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Getting Started"
+            description = "Set up your book project and run the first build."
             weight = 1
             +++
 
@@ -1420,6 +1430,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Overview"
+            description = "High-level tour of what this section covers."
             weight = 1
             +++
 
@@ -1455,6 +1466,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Installation"
+            description = "Install Hwaro and the prerequisites for building this book."
             weight = 2
             +++
 
@@ -1498,6 +1510,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Usage"
+            description = "Day-to-day workflows for authoring and building."
             weight = 2
             +++
 
@@ -1514,6 +1527,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Basic Usage"
+            description = "Common commands and authoring patterns."
             weight = 1
             +++
 
@@ -1572,6 +1586,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Configuration"
+            description = "Tweak your book via config.toml."
             weight = 2
             +++
 
@@ -1625,6 +1640,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Advanced"
+            description = "Beyond the basics — power-user features and tips."
             weight = 3
             +++
 
@@ -1640,6 +1656,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Advanced Topics"
+            description = "Custom shortcodes, taxonomies, and multilingual setups."
             weight = 1
             +++
 

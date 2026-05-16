@@ -1133,6 +1133,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Documentation"
+            description = "Project documentation powered by Hwaro."
             +++
 
             This documentation site is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
@@ -1158,6 +1159,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Getting Started"
+            description = "Install Hwaro, scaffold a project, and run your first build."
             +++
 
             Welcome to the Getting Started guide. This section will help you set up your first Hwaro documentation site.
@@ -1175,6 +1177,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Installation"
+            description = "Install Hwaro on your system."
             +++
 
             Learn how to install Hwaro on your system.
@@ -1211,6 +1214,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Quick Start"
+            description = "Get up and running with a new Hwaro docs site in minutes."
             +++
 
             Get up and running with Hwaro in minutes.
@@ -1262,6 +1266,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Configuration"
+            description = "Configure your Hwaro site via config.toml."
             +++
 
             Hwaro is configured through a `config.toml` file in your project root.
@@ -1303,6 +1308,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Guide"
+            description = "In-depth guides on content, templates, and shortcodes."
             +++
 
             This section contains in-depth guides for using Hwaro effectively.
@@ -1321,6 +1327,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Content Management"
+            description = "How to organize, author, and front-matter your content."
             +++
 
             Learn how to organize and write content in Hwaro.
@@ -1380,6 +1387,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Templates"
+            description = "Customize your site's look with Crinja (Jinja2) templates."
             +++
 
             Hwaro uses Jinja2-compatible templates (via Crinja) for rendering pages.
@@ -1436,6 +1444,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Shortcodes"
+            description = "Reusable template snippets you can embed in Markdown."
             +++
 
             Shortcodes are reusable content snippets you can embed in your Markdown.
@@ -1499,6 +1508,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Reference"
+            description = "CLI commands and configuration reference."
             +++
 
             Technical reference documentation for Hwaro.
@@ -1514,6 +1524,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "CLI Commands"
+            description = "Complete reference for every hwaro subcommand."
             +++
 
             Reference for all Hwaro command-line commands.
@@ -1592,6 +1603,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Configuration Reference"
+            description = "Every option you can set in config.toml."
             +++
 
             Complete reference for `config.toml` options.

@@ -4,44 +4,65 @@ require "../../src/services/creator"
 
 describe Hwaro::Services::Creator do
   describe "#run" do
-    it "creates a file from a direct path with inferred title" do
+    it "creates a file from a direct path with inferred title (honours user's path)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          # Create necessary directories
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "my-first-post.md")
           creator = Hwaro::Services::Creator.new
 
           result = creator.run(options)
 
-          expected_path = "content/drafts/my-first-post.md"
+          # `hwaro new foo.md` now lands at `content/foo.md` — the previous
+          # behaviour silently rerouted to `content/drafts/foo.md`, which
+          # surprised users who didn't ask for drafts.
+          expected_path = "content/my-first-post.md"
           File.exists?(expected_path).should be_true
-          # run returns the final path so callers (e.g. --json) can report it.
           result.should eq(expected_path)
 
           content = File.read(expected_path)
           content.should contain("title = \"My First Post\"")
-          content.should contain("draft = true")
+          # And since it no longer lives under drafts/, draft defaults to false.
+          content.should_not contain("draft = true")
         end
       end
     end
 
-    it "creates a file from a direct path with explicit title" do
+    it "creates a file from a direct path with explicit title (honours user's path)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "custom.md", title: "My Custom Title")
           creator = Hwaro::Services::Creator.new
 
           creator.run(options)
 
-          expected_path = "content/drafts/custom.md"
+          expected_path = "content/custom.md"
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
           content.should contain("title = \"My Custom Title\"")
+        end
+      end
+    end
+
+    it "places explicit drafts/ paths under drafts and marks them draft" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "drafts/wip.md")
+          creator = Hwaro::Services::Creator.new
+
+          creator.run(options)
+
+          expected_path = "content/drafts/wip.md"
+          File.exists?(expected_path).should be_true
+
+          content = File.read(expected_path)
+          content.should contain("draft = true")
         end
       end
     end
@@ -85,7 +106,7 @@ describe Hwaro::Services::Creator do
     it "uses an explicit archetype if provided" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
           FileUtils.mkdir_p("archetypes")
 
           File.write("archetypes/custom.md", "+++\ntitle = \"{{ title }}\"\ncustom = true\n+++\n\n# Custom Content")
@@ -95,7 +116,7 @@ describe Hwaro::Services::Creator do
 
           creator.run(options)
 
-          expected_path = "content/drafts/post.md"
+          expected_path = "content/post.md"
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
@@ -132,7 +153,7 @@ describe Hwaro::Services::Creator do
     it "uses the default archetype if no specific archetype matches" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
           FileUtils.mkdir_p("archetypes")
 
           File.write("archetypes/default.md", "---\ntitle: {{ title }}\ndefault: true\n---\n")
@@ -142,7 +163,7 @@ describe Hwaro::Services::Creator do
 
           creator.run(options)
 
-          expected_path = "content/drafts/post.md"
+          expected_path = "content/post.md"
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
@@ -154,7 +175,7 @@ describe Hwaro::Services::Creator do
     it "falls back to built-in generation if no archetype exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
           # No archetypes directory
 
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Fallback Test")
@@ -162,7 +183,7 @@ describe Hwaro::Services::Creator do
 
           creator.run(options)
 
-          expected_path = "content/drafts/post.md"
+          expected_path = "content/post.md"
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
@@ -179,12 +200,12 @@ describe Hwaro::Services::Creator do
     it "fallback front matter omits the markdown H1 (gh#525)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "No Dup H1")
           Hwaro::Services::Creator.new.run(options)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.should contain("title = \"No Dup H1\"")
           content.should_not contain("# No Dup H1")
           # Front matter terminator is the last non-empty line.
@@ -200,12 +221,12 @@ describe Hwaro::Services::Creator do
     it "writes the default date as an unquoted TOML datetime literal" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Date Form")
           Hwaro::Services::Creator.new.run(options)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           # No quoted form anywhere on the date line.
           content.should_not match(/^date = "[^"]*"$/m)
           # ISO 8601 with explicit offset (e.g. `2026-04-25T16:26:10+09:00` or `…Z`).
@@ -252,8 +273,8 @@ describe Hwaro::Services::Creator do
     it "raises HwaroError(HWARO_E_IO) when the file already exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
-          File.write("content/drafts/existing.md", "content")
+          FileUtils.mkdir_p("content")
+          File.write("content/existing.md", "content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "existing.md", title: "Existing Post")
           creator = Hwaro::Services::Creator.new
@@ -263,7 +284,7 @@ describe Hwaro::Services::Creator do
           end
           err.code.should eq(Hwaro::Errors::HWARO_E_IO)
           err.exit_code.should eq(Hwaro::Errors::EXIT_IO)
-          (err.message || "").should contain("File already exists: content/drafts/existing.md")
+          (err.message || "").should contain("File already exists: content/existing.md")
         end
       end
     end
@@ -349,12 +370,12 @@ describe Hwaro::Services::Creator do
     it "defaults to TOML front matter with a description field" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
           Hwaro::Services::Creator.new.run(options)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.should contain("+++\n")
           content.should contain("title = \"Hello\"")
           content.should contain("description = \"\"")
@@ -366,7 +387,7 @@ describe Hwaro::Services::Creator do
     it "emits YAML front matter when config selects yaml" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           config = Hwaro::Models::Config.new
           config.content_new.front_matter_format = "yaml"
@@ -374,7 +395,7 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
           Hwaro::Services::Creator.new.run(options, config)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.should contain("---\n")
           content.should contain("title: \"Hello\"")
           content.should contain("description: \"\"")
@@ -386,7 +407,7 @@ describe Hwaro::Services::Creator do
     it "emits JSON front matter when config selects json" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           config = Hwaro::Models::Config.new
           config.content_new.front_matter_format = "json"
@@ -394,15 +415,15 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
           Hwaro::Services::Creator.new.run(options, config)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.should start_with("{")
           # The JSON block must be parseable and contain the expected fields.
           end_idx = content.index!("}\n") + 1
           parsed = JSON.parse(content[0, end_idx])
           parsed["title"].as_s.should eq("Hello")
           parsed["description"].as_s.should eq("")
-          # Since the draft was placed in content/drafts, draft should be true
-          parsed["draft"].as_bool.should be_true
+          # Default location no longer routes to drafts/, so draft is omitted.
+          parsed.as_h.has_key?("draft").should be_false
           content.should_not contain("+++\n")
           content.should_not contain("---\n")
         end
@@ -412,7 +433,7 @@ describe Hwaro::Services::Creator do
     it "honours custom default_fields from config" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           config = Hwaro::Models::Config.new
           config.content_new.default_fields = ["description", "author", "summary"]
@@ -420,7 +441,7 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
           Hwaro::Services::Creator.new.run(options, config)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.should contain("description = \"\"")
           content.should contain("author = \"\"")
           content.should contain("summary = \"\"")
@@ -433,7 +454,7 @@ describe Hwaro::Services::Creator do
       # them in default_fields must not duplicate them with empty values.
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/drafts")
+          FileUtils.mkdir_p("content")
 
           config = Hwaro::Models::Config.new
           config.content_new.default_fields = ["title", "date", "draft", "tags", "description"]
@@ -441,7 +462,7 @@ describe Hwaro::Services::Creator do
           options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
           Hwaro::Services::Creator.new.run(options, config)
 
-          content = File.read("content/drafts/post.md")
+          content = File.read("content/post.md")
           content.scan("title = ").size.should eq(1)
           content.scan("date = ").size.should eq(1)
           content.should_not contain("title = \"\"")

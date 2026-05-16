@@ -16,7 +16,9 @@ module Hwaro
             return
           end
 
-          sitemap_pages = pages.select { |p| p.in_sitemap && p.render }
+          # Match feeds/llms/search behavior: drafts are excluded from public
+          # discovery surfaces even when the build is run with --drafts.
+          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft }
 
           # Deduplicate by URL (keep last occurrence, matching build behavior)
           seen_urls = Set(String).new

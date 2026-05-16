@@ -130,9 +130,11 @@ module Hwaro
           return
         end
 
-        # Calculate column widths
-        max_path_width = [contents.max_of(&.path.size), 40].min
-        max_title_width = [contents.max_of(&.title.size), 30].min
+        # Calculate column widths.
+        # Cap to a max, but keep at least the header label width so columns separate cleanly
+        # even when all values are shorter than the label (e.g. one short-titled draft).
+        max_path_width = [[contents.max_of(&.path.size), 40].min, "Path".size].max
+        max_title_width = [[contents.max_of(&.title.size), 30].min, "Title".size].max
 
         # Print header
         header = String.build do |str|

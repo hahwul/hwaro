@@ -140,7 +140,10 @@ module Hwaro
           create_file(File.join(target_path, "AGENTS.md"), agents_content)
         end
 
-        # Auto-add missing optional config sections (commented out)
+        # Auto-add missing optional config sections (commented out).
+        # This is an internal scaffold-completion step; users didn't ask for it,
+        # and surfacing it inconsistently (some scaffolds add 0, others 8+) is
+        # more noise than signal. Log at debug so --verbose still shows it.
         unless minimal_config
           config_path = File.join(target_path, "config.toml")
           doctor = Services::Doctor.new(
@@ -149,11 +152,12 @@ module Hwaro
           )
           summary = doctor.fix_config(minimal: true)
           unless summary.sections_added.empty?
-            Logger.info "Added #{summary.sections_added.size} optional config section(s) (commented out)."
+            Logger.debug "Added #{summary.sections_added.size} optional config section(s) (commented out)."
           end
         end
 
         Logger.success "Done! Run `hwaro build` to generate the site."
+        Logger.info "Tip: update `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
       end
 
       private def create_scaffold_content(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)

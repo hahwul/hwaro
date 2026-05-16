@@ -173,9 +173,13 @@ module Hwaro
           is_no_bundle_flat = !path.nil? && options.bundle == false && !path.ends_with?(".md")
 
           if is_file_path && path
-            # Extract directory and filename from path
-            base_dir = File.dirname(path)
-            base_dir = "content/drafts" if base_dir == "."
+            # Honor the path the user typed. Previously a bare `foo.md`
+            # got silently rerouted to `content/drafts/foo.md`, which
+            # surprised users who didn't ask for drafts.
+            #
+            # Now: `hwaro new foo.md` lands at `content/foo.md`,
+            # `hwaro new drafts/foo.md` still lands at `content/drafts/foo.md`
+            # (and is_draft picks that up via the path-based heuristic below).
 
             # Extract title from filename if not provided
             if title.empty?
@@ -183,12 +187,7 @@ module Hwaro
               title = filename_without_ext.split("-").map(&.capitalize).join(" ")
             end
 
-            filename = File.basename(path)
-            if base_dir == "content/drafts"
-              full_path = File.join(base_dir, filename)
-            else
-              full_path = path.starts_with?("content/") ? path : File.join("content", path)
-            end
+            full_path = path.starts_with?("content/") ? path : File.join("content", path)
             base_dir = File.dirname(full_path)
           elsif is_no_bundle_flat && path
             normalized = path.starts_with?("content/") ? path : File.join("content", path)

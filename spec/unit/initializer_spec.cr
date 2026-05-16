@@ -285,11 +285,12 @@ describe Hwaro::Services::Initializer do
           Hwaro::Services::Initializer.new.run(target)
 
           Dir.cd(target) do
-            FileUtils.mkdir_p("content/drafts")
             options = Hwaro::Config::Options::NewOptions.new(path: "hello.md", title: "Hello")
             Hwaro::Services::Creator.new.run(options)
 
-            content = File.read("content/drafts/hello.md")
+            # `hwaro new foo.md` now honours the path the user typed —
+            # so a bare filename lands at content/foo.md, not content/drafts/foo.md.
+            content = File.read("content/hello.md")
             content.should contain("+++")
             content.should contain("title = \"Hello\"")
             content.should contain("description = \"\"")

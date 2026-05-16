@@ -753,7 +753,13 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           raw_msg = ctx.stats.raw_files_processed > 0 ? " + #{ctx.stats.raw_files_processed} raw files" : ""
-          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} pages#{raw_msg} in #{elapsed.total_milliseconds.round(2)}ms."
+          # "content pages" rather than just "pages" — taxonomy/archive/section
+          # index files are also written to disk, so a bare "N pages" count
+          # misleads users who diff this number against `find public -name '*.html'`.
+          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} content pages#{raw_msg} in #{elapsed.total_milliseconds.round(2)}ms."
+          if ctx.stats.pages_rendered == 0 && ctx.stats.raw_files_processed == 0
+            Logger.info "No content found. Add Markdown files under content/ before deploying, or run `hwaro new <path>.md` to scaffold one."
+          end
 
           # Print profiling report if enabled
           profiler.report

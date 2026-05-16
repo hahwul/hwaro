@@ -334,13 +334,27 @@ describe Hwaro::Services::Doctor do
         missing_issues = issues.select { |i| i.category == "config_missing" }
         missing_issues.should_not be_empty
 
-        # Should mention pwa, amp among others
+        # Should mention non-optional sections like [robots], [markdown]
+        # (advanced/niche sections like [pwa], [amp] are skipped because
+        # `doctor --fix` (minimal) won't add them either)
         messages = missing_issues.map(&.message)
-        messages.any?(&.includes?("[pwa]")).should be_true
-        messages.any?(&.includes?("[amp]")).should be_true
+        messages.any?(&.includes?("[robots]")).should be_true
+        messages.any?(&.includes?("[markdown]")).should be_true
       end
 
-      it "reports og.auto_image when [og] exists but sub-section is missing" do
+      it "does not report niche optional sections (pwa/amp/etc) that --fix won't auto-add" do
+        # Without this skip, a freshly-scaffolded `bare` site would flag
+        # 8 'info' rows for sections that the recommended fix path won't
+        # actually add. Stay silent — users opt in by configuring them.
+        issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"))
+        missing_issues = issues.select { |i| i.category == "config_missing" }
+        messages = missing_issues.map(&.message)
+        messages.any?(&.includes?("[pwa]")).should be_false
+        messages.any?(&.includes?("[amp]")).should be_false
+        messages.any?(&.includes?("[build]")).should be_false
+      end
+
+      it "does not report og.auto_image (optional sub-section) even when [og] exists" do
         config = <<-TOML
           title = "My Site"
           base_url = "https://example.com"
@@ -349,7 +363,7 @@ describe Hwaro::Services::Doctor do
           TOML
         issues = run_doctor(config)
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.any?(&.message.includes?("[og.auto_image]")).should be_true
+        missing_issues.any?(&.message.includes?("[og.auto_image]")).should be_false
       end
 
       it "does not report og.auto_image when [og] itself is missing" do

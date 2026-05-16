@@ -1032,6 +1032,7 @@ module Hwaro
             title: "",
             body: body,
             skip_taxonomies: skip_taxonomies,
+            description: "A blog powered by Hwaro — posts, archives, and tags.",
             tags: ["home"]
           )
         end
@@ -1049,6 +1050,7 @@ module Hwaro
             title: "About",
             body: body,
             skip_taxonomies: skip_taxonomies,
+            description: "A short introduction to this blog and its author.",
             tags: ["about"],
             categories: ["pages"]
           )
@@ -1058,6 +1060,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Posts"
+            description = "An index of every published blog post."
             +++
 
             Browse all blog posts below.
@@ -1201,6 +1204,7 @@ module Hwaro
             +++
             title = "Archives"
             template = "archives"
+            description = "Every blog post, sorted by date."
             +++
 
             Browse every post by date.

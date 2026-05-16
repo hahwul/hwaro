@@ -67,6 +67,19 @@ module Hwaro
             Logger.quiet = true
           end
 
+          # Refuse to run outside a Hwaro project. Previously `hwaro new` would
+          # happily create `content/drafts/foo.md` in any directory, so a typo
+          # in `cd` (or running before `hwaro init`) silently scattered files
+          # in unexpected places. Match `hwaro build`'s contract: require a
+          # config.toml first.
+          unless File.exists?("config.toml")
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "config.toml not found in current directory",
+              hint: "Run 'hwaro init' to scaffold a project, or cd into a directory containing config.toml.",
+            )
+          end
+
           # `hwaro new` is flag-only: there is no interactive prompt, so a
           # missing <path> always fails fast with a classified usage error.
           # Keeping this a HwaroError lets both text and --json consumers see

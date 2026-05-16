@@ -145,6 +145,25 @@ describe Hwaro::CLI::Commands::NewCommand do
     end
   end
 
+  # `hwaro new` must refuse to run outside a Hwaro project — otherwise a
+  # mis-typed `cd` would silently scatter `content/…` files in arbitrary
+  # directories. Same contract as `hwaro build`.
+  describe "#run outside a Hwaro project" do
+    it "raises HwaroError(HWARO_E_CONFIG) when config.toml is missing" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["post.md", "-t", "Hello"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").should contain("config.toml not found")
+          # Crucially, nothing was written.
+          Dir.exists?(File.join(dir, "content")).should be_false
+        end
+      end
+    end
+  end
+
   # Path-shape validation happens at the CLI boundary so each bad path
   # surfaces as a classified usage error (exit 2, JSON payload if --json).
   # The Creator class itself is tested more thoroughly in creator_spec.cr.
@@ -152,6 +171,7 @@ describe Hwaro::CLI::Commands::NewCommand do
     it "rejects `..`-escaping paths with HWARO_E_USAGE" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
           FileUtils.mkdir_p("content")
           err = expect_raises(Hwaro::HwaroError) do
             Hwaro::CLI::Commands::NewCommand.new.run(["../escaped.md", "-t", "X"])
@@ -170,6 +190,7 @@ describe Hwaro::CLI::Commands::NewCommand do
     it "rejects absolute paths with HWARO_E_USAGE" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
           FileUtils.mkdir_p("content")
           err = expect_raises(Hwaro::HwaroError) do
             Hwaro::CLI::Commands::NewCommand.new.run(["/tmp/hwaro-evil.md", "-t", "X"])
@@ -186,6 +207,7 @@ describe Hwaro::CLI::Commands::NewCommand do
     it "rejects empty path with HWARO_E_USAGE" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
           FileUtils.mkdir_p("content")
           err = expect_raises(Hwaro::HwaroError) do
             Hwaro::CLI::Commands::NewCommand.new.run(["", "-t", "X"])
@@ -199,6 +221,7 @@ describe Hwaro::CLI::Commands::NewCommand do
     it "normalizes double slashes in the input path" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
           FileUtils.mkdir_p("content")
           Hwaro::CLI::Commands::NewCommand.new.run(["posts//slashy.md", "-t", "Slashy"])
 

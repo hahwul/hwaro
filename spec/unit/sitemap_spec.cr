@@ -88,6 +88,32 @@ describe Hwaro::Content::Seo::Sitemap do
       end
     end
 
+    it "excludes draft pages so --drafts builds don't leak them via sitemap" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        published = Hwaro::Models::Page.new("blog/published.md")
+        published.url = "/blog/published/"
+        published.in_sitemap = true
+        published.render = true
+
+        draft = Hwaro::Models::Page.new("blog/wip.md")
+        draft.url = "/blog/wip/"
+        draft.in_sitemap = true
+        draft.render = true
+        draft.draft = true
+
+        Hwaro::Content::Seo::Sitemap.generate([published, draft], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("/blog/published/")
+        content.should_not contain("/blog/wip/")
+      end
+    end
+
     it "excludes paths matching exclude patterns" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
