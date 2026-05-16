@@ -23,6 +23,10 @@ module Hwaro::Core::Build
     def test_render_shortcode_jinja(template, args, context, crinja_env_override = nil)
       render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override)
     end
+
+    def test_warn_hugo_shortcode_syntax(raw, path)
+      warn_hugo_shortcode_syntax(raw, path)
+    end
   end
 end
 
@@ -680,6 +684,53 @@ describe Hwaro::Core::Build::Builder do
       content = "{% empty %}{% end %}"
       result = builder.test_process_shortcodes_jinja(content, templates, context)
       result.should eq("<section></section>")
+    end
+  end
+
+  describe "#warn_hugo_shortcode_syntax" do
+    # Hugo-style `{{< name >}}` shortcodes silently HTML-escape if left to
+    # reach Markdown, so authors migrating from Hugo see `{{&lt; alert &gt;}}`
+    # in their rendered pages and have no clue why. The build emits a
+    # one-line warning per page that lists distinct shortcode names so the
+    # message is actionable in the log.
+    it "warns once per page and lists each distinct Hugo shortcode name" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        raw = <<-MD
+          # Page
+
+          {{< alert type="warning" >}}body{{< /alert >}}
+          {{< youtube id="abc" >}}
+          {{< alert type="info" >}}other{{< /alert >}}
+          MD
+        builder.test_warn_hugo_shortcode_syntax(raw, "content/hugo.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      output = io.to_s
+      output.should contain("Hugo-style shortcode syntax")
+      output.should contain("content/hugo.md")
+      # `alert` should appear exactly once even though it's used twice.
+      output.scan("alert").size.should eq(1)
+      output.should contain("youtube")
+      output.should contain("Crinja syntax")
+    end
+
+    it "stays silent when content has no Hugo-style shortcodes" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        # Plain Crinja syntax must not trip the Hugo warner.
+        builder.test_warn_hugo_shortcode_syntax("{% alert(type=\"warn\") %}body{% end %}", "content/ok.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      io.to_s.should be_empty
     end
   end
 end

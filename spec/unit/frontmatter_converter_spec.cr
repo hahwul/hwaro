@@ -495,6 +495,43 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    # Regression: the close-delimiter regex `\s*$\n?` greedily ate two
+    # trailing newlines, so a blank line between the front matter and the
+    # body was silently dropped on every conversion. Round-tripping a
+    # well-formatted file would visibly change its whitespace.
+    it "preserves the blank line between front matter and body on round-trip" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "spaced.md")
+        original = "+++\ntitle = \"Spaced\"\n+++\n\nFirst paragraph.\n"
+        File.write(file_path, original)
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        intermediate = File.read(file_path)
+        # YAML auto-decides quoting; what matters is the blank line is preserved
+        # between the closing `---` and the first body paragraph.
+        intermediate.should contain("---\n\nFirst paragraph.\n")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        File.read(file_path).should eq(original)
+      end
+    end
+
+    # When the author didn't include a blank line, conversion must not add
+    # one either — otherwise a "fix" would still drift formatting.
+    it "does not invent a blank line that wasn't there" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "tight.md")
+        original = "+++\ntitle = \"Tight\"\n+++\nFirst paragraph.\n"
+        File.write(file_path, original)
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        File.read(file_path).should eq(original)
+      end
+    end
+
     it "preserves data through JSON -> TOML -> YAML -> JSON" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)

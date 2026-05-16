@@ -12,6 +12,17 @@ def capture_logger_output(&) : String
   output
 end
 
+# IO::Memory that pretends to be a TTY — used by progress-bar tests so
+# they exercise the animated path. Plain IO::Memory reports tty? = false,
+# which matches the new `Logger.progress` non-TTY fallback (no per-step
+# output), so without this helper the bar-shape assertions would fail
+# even though the code is correct.
+class TtyMemory < IO::Memory
+  def tty?
+    true
+  end
+end
+
 describe Hwaro::Logger do
   describe ".level" do
     it "defaults to Info level" do
@@ -233,7 +244,7 @@ describe Hwaro::Logger do
 
   describe ".progress" do
     it "outputs progress bar" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(5, 10, "Building: ")
       output = io.to_s
@@ -245,7 +256,7 @@ describe Hwaro::Logger do
     end
 
     it "shows 100% on completion" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(10, 10, "Done: ")
       output = io.to_s
@@ -256,7 +267,7 @@ describe Hwaro::Logger do
     end
 
     it "outputs nothing when total is 0" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(0, 0)
       output = io.to_s
@@ -266,7 +277,7 @@ describe Hwaro::Logger do
     end
 
     it "outputs nothing when total is negative" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(0, -1)
       output = io.to_s
@@ -276,7 +287,7 @@ describe Hwaro::Logger do
     end
 
     it "shows partial progress" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(1, 4)
       output = io.to_s
@@ -287,7 +298,7 @@ describe Hwaro::Logger do
     end
 
     it "contains block characters for progress bar" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(5, 10)
       output = io.to_s
@@ -298,13 +309,37 @@ describe Hwaro::Logger do
     end
 
     it "works without prefix" do
-      io = IO::Memory.new
+      io = TtyMemory.new
       Hwaro::Logger.io = io
       Hwaro::Logger.progress(3, 10)
       output = io.to_s
       output.should contain("30.0%")
       output.should contain("3/10")
       # Restore
+      Hwaro::Logger.io = IO::Memory.new
+    end
+
+    # When output isn't a TTY (pipes, CI logs, agent capture, files),
+    # the animated `\r`-overwriting bar would concatenate into one
+    # 60-line smear because `\r` doesn't return to column 0 there.
+    # Suppress per-step output and emit only the final completion line.
+    it "suppresses per-step output in non-TTY mode" do
+      io = IO::Memory.new
+      Hwaro::Logger.io = io
+      Hwaro::Logger.progress(5, 10, "Building: ")
+      output = io.to_s
+      output.should be_empty
+      Hwaro::Logger.io = IO::Memory.new
+    end
+
+    it "emits a final summary line on completion in non-TTY mode" do
+      io = IO::Memory.new
+      Hwaro::Logger.io = io
+      Hwaro::Logger.progress(10, 10, "Copying ")
+      output = io.to_s
+      output.should contain("Copying done (10/10)")
+      output.should_not contain("\r")
+      output.should_not contain("█")
       Hwaro::Logger.io = IO::Memory.new
     end
   end

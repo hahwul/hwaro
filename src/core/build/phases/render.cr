@@ -400,6 +400,7 @@ module Hwaro::Core::Build::Phases::Render
     shortcode_results = {} of String => String
     raw = page.raw_content
     has_shortcodes = raw.includes?("{{") || raw.includes?("{%")
+    warn_hugo_shortcode_syntax(raw, page.path) if raw.includes?("{{<")
     shortcode_context : Hash(String, Crinja::Value)? = nil
 
     processed_content = if has_shortcodes
@@ -1463,6 +1464,25 @@ module Hwaro::Core::Build::Phases::Render
 
   private def minify_html(html : String) : String
     Utils::HtmlMinifier.minify(html)
+  end
+
+  # Hugo-style `{{< name >}}` shortcodes aren't a Hwaro syntax — they'd
+  # otherwise reach Markdown unchanged and ship as HTML-escaped literals
+  # (`{{&lt; alert &gt;}}`) in the rendered page. The conversion is
+  # mechanical (`{{< name args >}}` → `{% name(args) %}`), but doing it
+  # silently would hide the migration step from the author. Warn once
+  # per page and list the distinct shortcode names so the message is
+  # actionable in a `hwaro build` log even with hundreds of pages.
+  HUGO_SHORTCODE_RE = /\{\{<\s*\/?\s*([a-zA-Z_][\w\-]*)/
+
+  private def warn_hugo_shortcode_syntax(raw : String, path : String) : Nil
+    names = Set(String).new
+    raw.scan(HUGO_SHORTCODE_RE) { |m| names << m[1] }
+    return if names.empty?
+    sorted = names.to_a.sort
+    Logger.warn "Hugo-style shortcode syntax `{{< … >}}` is not supported and will render as literal text in #{path}. " \
+                "Found: #{sorted.join(", ")}. Convert to Hwaro's Crinja syntax: " \
+                "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}`."
   end
 
   # Resolve the page kind into an `og:type` override. Returns "website"

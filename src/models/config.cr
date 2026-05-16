@@ -819,7 +819,12 @@ module Hwaro
         substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
         config.raw = parse_toml(substituted_content, config_path)
 
-        # Merge environment-specific override (e.g. config.production.toml)
+        # Merge environment-specific override (e.g. config.production.toml).
+        # A missing override is recoverable (we just use the base config), but
+        # it's the most common way to ship a localhost build to production by
+        # accident (typo `--env prdo`, file not committed, etc.), so the warning
+        # is intentionally explicit and names both the requested env and the
+        # exact filename we looked for.
         if env_name = env
           env_path = config_path.sub(/\.toml$/, ".#{env_name}.toml")
           if File.exists?(env_path)
@@ -829,7 +834,7 @@ module Hwaro
             config.raw = deep_merge(config.raw, env_raw)
             Logger.info "Loaded environment config: #{env_path}"
           else
-            Logger.warn "Environment config not found: #{env_path}"
+            Logger.warn "--env #{env_name}: override file '#{env_path}' not found; continuing with base #{config_path} only. If you intended to ship environment-specific settings (e.g. a production base_url), create #{env_path} or check for a typo in --env."
           end
         end
 

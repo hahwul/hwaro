@@ -9,6 +9,9 @@
 
 ### Fixed
 - `tool list drafts`: column header no longer renders `TitlePath` glued together when the only draft has a short title.
+- `tool convert`: round-tripping front matter (TOML↔YAML) no longer strips the blank line between the closing delimiter and the body. Also doesn't invent one when none existed.
+- `tool export jekyll`: produce a Jekyll-conventional layout. Dated content lands flat in `_posts/<YYYY-MM-DD>-<slug>.md` (subdirectories used to nest under `_posts/posts/…`, which Jekyll reads as a category hint). Non-dated content like `about.md` / `index.md` / `archives.md` stays at the export root as regular pages instead of being buried in `_posts/`.
+- `Logger.progress` no longer emits `\r`-overwriting animation when stdout isn't a TTY (CI logs, pipes, file redirects). Per-step output is suppressed and a single completion line is emitted, so logs stay readable.
 - `doctor`: stop reporting niche optional sections (`[pwa]`, `[amp]`, `[build]`, etc.) as missing — `doctor --fix` in its minimal mode wouldn't add them anyway, so the advice was a dead end. Freshly-init'd `bare` sites are now doctor-clean.
 - `book` scaffold: emit `[related]` commented (book ships no `[[taxonomies]]`, so the default enabled snippet referenced an undefined taxonomy and tripped doctor on a fresh init).
 - All shipped scaffolds (`simple`/`bare`/`blog[-dark]`/`docs[-dark]`/`book[-dark]`) now populate `description` in scaffolded content so freshly-init'd sites pass `tool validate` cleanly.
@@ -17,6 +20,8 @@
 - Build summary: `Generated N pages` → `Generated N content pages` (taxonomy/archive/section index files weren't in the count, and the bare wording misled users diffing against `find public -name '*.html'`).
 - `hwaro build` now surfaces a one-line hint when a build produces zero content pages, so empty sites don't deploy silently.
 - `hwaro init` now prints a `Tip: update base_url in config.toml before deploying` line so the localhost default doesn't ship unchanged. The inconsistent "Added N optional config section(s)" line was demoted to debug.
+- `--env <name>`: the warning when `config.<name>.toml` is missing now names both the env and the file we looked for, and explains the recovery (create the file or fix the typo). Catches the common "shipped localhost build to prod because `--env prdo`" foot-gun.
+- `hwaro build` now warns once per page when Hugo-style `{{< … >}}` shortcode syntax is found in content. Hwaro uses Crinja syntax (`{% name(args) %}body{% end %}`); unconverted Hugo shortcodes would otherwise reach Markdown and ship as HTML-escaped literals (`{{&lt; alert &gt;}}`) in the rendered page.
 
 ## v0.13.1
 

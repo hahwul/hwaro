@@ -55,7 +55,7 @@ module Hwaro
           raw = File.read(file_path)
           fields, body = parse_content(raw)
 
-          is_draft = fields["draft"]?.try { |v| v == true }
+          is_draft = (fields["draft"]?.try { |v| v == true }) == true
           if is_draft && !include_drafts
             return :skipped
           end
@@ -98,47 +98,64 @@ module Hwaro
           frontmatter = "---\n#{yaml_lines.join("\n")}\n---"
           body = rewrite_internal_links(body)
 
-          # Determine output path
+          out_path = resolve_jekyll_path(file_path, content_dir, output_dir, fields, is_draft, include_drafts)
+
+          write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
+          :exported
+        end
+
+        # Map a Hwaro content path to its Jekyll-conventional destination.
+        # Jekyll has three buckets that look superficially similar but aren't:
+        #   - `_posts/<YYYY-MM-DD>-<slug>.md` — dated blog posts, FLAT layout.
+        #     Subdirectories under `_posts/` are interpreted by Jekyll as
+        #     category hints, so nesting `content/posts/foo.md` under
+        #     `_posts/posts/foo.md` would erroneously put every post in a
+        #     `posts` category.
+        #   - `_drafts/<slug>.md` — drafts, no date prefix.
+        #   - Root pages (`about.md`, `index.md`, ...) — anything else.
+        # `_index.md` (Hwaro's section index) maps to `<section>/index.md`,
+        # the closest Jekyll equivalent (a normal page that happens to be
+        # the section landing page).
+        private def resolve_jekyll_path(
+          file_path : String,
+          content_dir : String,
+          output_dir : String,
+          fields : Hash(String, (String | Bool | Array(String))?),
+          is_draft : Bool,
+          include_drafts : Bool,
+        ) : String
           relative = file_path.sub(content_dir, "").lstrip('/')
           filename = File.basename(relative)
           dir_part = File.dirname(relative)
 
-          # For regular posts (not _index), use Jekyll's date-based naming
-          if filename != "_index.md" && filename != "_index.markdown"
-            if date_str = fields["date"]?.as?(String)
-              # Extract YYYY-MM-DD from date
-              date_prefix = date_str.size >= 10 ? date_str[0, 10] : ""
-              if date_prefix.matches?(/^\d{4}-\d{2}-\d{2}$/)
-                slug = filename.sub(/\.(md|markdown)$/, "")
-                filename = "#{date_prefix}-#{slug}.md"
-              end
-            end
-
-            # Posts go to _posts directory
-            if dir_part == "." || dir_part.empty?
-              out_path = File.join(output_dir, "_posts", filename)
-            else
-              out_path = File.join(output_dir, "_posts", dir_part, filename)
-            end
-          else
-            # Section index files -> Jekyll pages
-            slug = dir_part == "." ? "index" : dir_part
-            out_path = File.join(output_dir, slug, "index.md")
+          # Section indices become regular pages (Jekyll has no `_index`).
+          if filename == "_index.md" || filename == "_index.markdown"
+            slug = (dir_part == "." || dir_part.empty?) ? "index" : dir_part
+            return File.join(output_dir, slug, "index.md")
           end
 
-          # Drafts go to _drafts without date prefix
-          if is_draft && include_drafts
-            out_path = out_path.sub("/_posts/", "/_drafts/")
-            # Remove date prefix for drafts
-            draft_basename = File.basename(out_path)
-            if draft_basename.matches?(/^\d{4}-\d{2}-\d{2}-/)
-              draft_basename = draft_basename.sub(/^\d{4}-\d{2}-\d{2}-/, "")
-              out_path = File.join(File.dirname(out_path), draft_basename)
+          date_str = fields["date"]?.as?(String)
+          date_prefix = date_str && date_str.size >= 10 ? date_str[0, 10] : nil
+          dated = date_prefix && date_prefix.matches?(/^\d{4}-\d{2}-\d{2}$/)
+          slug = filename.sub(/\.(md|markdown)$/, "")
+
+          # Files with a `date` are blog posts. Place them flat in `_posts/`
+          # (or `_drafts/` for drafts) — any source subdirectory like
+          # `content/posts/` or `content/blog/` is collapsed, because Jekyll
+          # treats subdirs under `_posts/` as category hints and re-applying
+          # the source folder as a category is almost never what the author
+          # meant on a Hwaro→Jekyll migration.
+          if dated
+            if is_draft && include_drafts
+              return File.join(output_dir, "_drafts", "#{slug}.md")
             end
+            return File.join(output_dir, "_posts", "#{date_prefix}-#{slug}.md")
           end
 
-          write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
-          :exported
+          # Non-dated content (about, index, archives, etc.) → keep the
+          # on-disk layout under the export root so Jekyll picks them up as
+          # regular pages (not as posts hidden under `_posts/`).
+          File.join(output_dir, relative)
         end
       end
     end

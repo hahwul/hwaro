@@ -136,24 +136,30 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
-    it "handles posts without date (no date prefix)" do
+    it "treats files without a date as plain Jekyll pages (root, not _posts)" do
+      # Jekyll's `_posts/` is for dated blog posts. A non-dated file like
+      # `about.md` is a regular page — putting it under `_posts/` would
+      # bury it in the post feed and require Jekyll-side workarounds.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
         FileUtils.mkdir_p(content_dir)
 
-        File.write(File.join(content_dir, "no-date.md"), "+++\ntitle = \"No Date\"\n+++\n\nContent\n")
+        File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\n\nAbout page\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
         exporter.run(options)
 
-        # Should be in _posts without date prefix
-        File.exists?(File.join(output_dir, "_posts", "no-date.md")).should be_true
+        File.exists?(File.join(output_dir, "about.md")).should be_true
+        Dir.exists?(File.join(output_dir, "_posts")).should be_false
       end
     end
 
-    it "handles short date strings without crashing" do
+    it "treats short/invalid date strings as plain pages too" do
+      # A `date = \"2024\"` isn't a valid ISO date, so we can't safely place
+      # it under `_posts/<YYYY-MM-DD>-…`. Falling back to a plain page is
+      # safer than emitting a malformed Jekyll filename.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
@@ -165,9 +171,8 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
         result = exporter.run(options)
 
-        # Should not crash, exported without date prefix
         result.exported_count.should eq(1)
-        File.exists?(File.join(output_dir, "_posts", "short-date.md")).should be_true
+        File.exists?(File.join(output_dir, "short-date.md")).should be_true
       end
     end
 
@@ -209,7 +214,11 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
-    it "exports posts in subdirectories" do
+    it "flattens dated posts from subdirectories into _posts/ root" do
+      # Jekyll reads subdirectories under `_posts/` as category hints, so
+      # nesting `content/posts/foo.md` under `_posts/posts/foo.md` would
+      # spuriously tag every post with a `posts` category. We drop the
+      # source subdir and write a flat `_posts/<date>-<slug>.md`.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
@@ -221,7 +230,8 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
         exporter.run(options)
 
-        File.exists?(File.join(output_dir, "_posts", "blog", "2024-03-10-post.md")).should be_true
+        File.exists?(File.join(output_dir, "_posts", "2024-03-10-post.md")).should be_true
+        Dir.exists?(File.join(output_dir, "_posts", "blog")).should be_false
       end
     end
 

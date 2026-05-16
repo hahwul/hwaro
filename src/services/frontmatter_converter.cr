@@ -44,6 +44,15 @@ module Hwaro
       YAML_DELIMITER = "---"
       TOML_DELIMITER = "+++"
 
+      # Frontmatter splitters. The closing-delimiter clause matches trailing
+      # horizontal whitespace and exactly one newline (or end of file) — *not*
+      # `\s*$\n?`, which would silently swallow a blank line between the
+      # delimiter and the body. The body capture keeps any blank line as a
+      # leading `\n`, so round-tripping TOML↔YAML preserves the author's
+      # original spacing (regression: blank line was lost).
+      YAML_FRONTMATTER_RE = /\A---\s*\n(.*?\n?)^---[ \t]*(?:\r?\n|\z)(.*)\z/m
+      TOML_FRONTMATTER_RE = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+[ \t]*(?:\r?\n|\z)(.*)\z/m
+
       private enum ConversionStatus
         Converted
         Skipped
@@ -218,7 +227,7 @@ module Hwaro
 
       private def yaml_to_toml(content : String) : String?
         # Extract YAML frontmatter
-        if match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+        if match = content.match(YAML_FRONTMATTER_RE)
           yaml_str = match[1]
           body = match[2]
 
@@ -236,7 +245,7 @@ module Hwaro
 
       private def toml_to_yaml(content : String) : String?
         # Extract TOML frontmatter
-        if match = content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
+        if match = content.match(TOML_FRONTMATTER_RE)
           toml_str = match[1]
           body = match[2]
 
@@ -253,7 +262,7 @@ module Hwaro
       end
 
       private def yaml_to_json(content : String) : String?
-        if match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?(.*)\z/m)
+        if match = content.match(YAML_FRONTMATTER_RE)
           yaml_str = match[1]
           body = match[2]
           begin
@@ -268,7 +277,7 @@ module Hwaro
       end
 
       private def toml_to_json(content : String) : String?
-        if match = content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m)
+        if match = content.match(TOML_FRONTMATTER_RE)
           toml_str = match[1]
           body = match[2]
           begin

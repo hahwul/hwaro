@@ -128,10 +128,19 @@ module Hwaro
       result
     end
 
-    # Progress indicator for long operations
+    # Progress indicator for long operations.
+    # In TTY mode: animated \r-overwriting bar.
+    # In non-TTY mode (pipes, CI, agent capture, redirected files):
+    # suppress the per-step animation — `\r` doesn't return to column 0
+    # there, so every step concatenates into one giant smeared line. Emit
+    # only a final "<prefix>done (current/total)" line so logs stay readable.
     def self.progress(current : Int32, total : Int32, prefix : String = "")
       return if total <= 0
       return if @@quiet
+      unless @@io.tty?
+        @@io.puts "#{prefix}done (#{current}/#{total})" if current >= total
+        return
+      end
       percent = (current.to_f / total * 100).round(1)
       bar_width = 30
       filled = (current.to_f / total * bar_width).to_i

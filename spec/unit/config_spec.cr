@@ -218,6 +218,28 @@ describe Hwaro::Models::Config do
       end
     end
 
+    it "warns with both the env name and the missing path when the override is absent" do
+      # Missing-override is the most common way to ship a localhost build to
+      # production by accident (typo `--env prdo`, file uncommitted). The
+      # message must name *both* the requested env and the path we looked at,
+      # so the user can pick the right fix (rename the file vs. fix the flag).
+      Dir.cd(Dir.tempdir) do
+        File.write("config.toml", %(title = "Test"))
+        captured = IO::Memory.new
+        original_io = Hwaro::Logger.io
+        Hwaro::Logger.io = captured
+        begin
+          Hwaro::Models::Config.load("config.toml", env: "prdo")
+        ensure
+          Hwaro::Logger.io = original_io
+        end
+        output = captured.to_s
+        output.should contain("--env prdo")
+        output.should contain("config.prdo.toml")
+        output.should contain("base config.toml")
+      end
+    end
+
     it "loads normally when env is nil" do
       Dir.cd(Dir.tempdir) do
         File.write("config.toml", %(title = "No Env"))
