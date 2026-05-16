@@ -21,7 +21,7 @@ module Hwaro
       # external mutex.
       def self.mkdir_p(path : String | Path, mode : Int32 = 0o777) : Nil
         Dir.mkdir_p(path, mode)
-      rescue ex : File::AlreadyExistsError
+      rescue File::AlreadyExistsError
         # Two workers calling `mkdir_p("/out/posts/a")` and
         # `mkdir_p("/out/posts/b")` can race on the shared parent `/out/posts`:
         # both pass the `Dir.exists?` precondition (`/out/posts` is absent),
@@ -32,12 +32,12 @@ module Hwaro
         # that step and only creates the leaf the caller actually asked for.
         begin
           Dir.mkdir_p(path, mode)
-        rescue ex2 : File::AlreadyExistsError
+        rescue ex : File::AlreadyExistsError
           # Genuinely repeated EEXIST after retry: surface only when the
           # final target *still* isn't a directory. Otherwise the
           # post-condition `mkdir_p` promises ("path exists as a directory")
           # already holds and we treat as success.
-          raise ex2 unless Dir.exists?(path)
+          raise ex unless Dir.exists?(path)
         end
       end
     end
