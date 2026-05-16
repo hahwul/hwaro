@@ -58,6 +58,15 @@ module Hwaro
       YAML_DELIMITER = "---"
       TOML_DELIMITER = "+++"
 
+      # Column header labels — also used as the minimum column width so the
+      # header row never glues two adjacent labels together when the data
+      # values are shorter than the label itself (see column-width clamp in
+      # `#display`). Keep these and the header `String.build` block in sync.
+      HEADER_STATUS = "Status"
+      HEADER_DATE   = "Date"
+      HEADER_TITLE  = "Title"
+      HEADER_PATH   = "Path"
+
       # Content directory path
       @content_dir : String
 
@@ -133,16 +142,16 @@ module Hwaro
         # Calculate column widths.
         # Cap to a max, but keep at least the header label width so columns separate cleanly
         # even when all values are shorter than the label (e.g. one short-titled draft).
-        max_path_width = [[contents.max_of(&.path.size), 40].min, "Path".size].max
-        max_title_width = [[contents.max_of(&.title.size), 30].min, "Title".size].max
+        max_path_width = [[contents.max_of(&.path.size), 40].min, HEADER_PATH.size].max
+        max_title_width = [[contents.max_of(&.title.size), 30].min, HEADER_TITLE.size].max
 
         # Print header
         header = String.build do |str|
           str << "  "
-          str << "Status".ljust(10)
-          str << "Date".ljust(12)
-          str << "Title".ljust(max_title_width + 2)
-          str << "Path"
+          str << HEADER_STATUS.ljust(10)
+          str << HEADER_DATE.ljust(12)
+          str << HEADER_TITLE.ljust(max_title_width + 2)
+          str << HEADER_PATH
         end
         Logger.info header
         Logger.info "  " + "-" * (10 + 12 + max_title_width + 2 + max_path_width)

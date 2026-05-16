@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Behavior changes
+- `hwaro new <path>.md` now honors the path the user typed instead of silently rerouting bare filenames to `content/drafts/`. `hwaro new foo.md` lands at `content/foo.md`; explicit `hwaro new drafts/foo.md` still drops into drafts and marks the file as draft.
+- `hwaro new` refuses to run outside a Hwaro project (missing `config.toml`) with `HWARO_E_CONFIG`, matching `hwaro build`'s contract.
+- `hwaro build --drafts` no longer includes drafts in `sitemap.xml`, matching the existing behavior of feeds, llms.txt, and the search index.
+
+### Fixed
+- `tool list drafts`: column header no longer renders `TitlePath` glued together when the only draft has a short title.
+- `doctor`: stop reporting niche optional sections (`[pwa]`, `[amp]`, `[build]`, etc.) as missing — `doctor --fix` in its minimal mode wouldn't add them anyway, so the advice was a dead end. Freshly-init'd `bare` sites are now doctor-clean.
+- `book` scaffold: emit `[related]` commented (book ships no `[[taxonomies]]`, so the default enabled snippet referenced an undefined taxonomy and tripped doctor on a fresh init).
+- All shipped scaffolds (`simple`/`bare`/`blog[-dark]`/`docs[-dark]`/`book[-dark]`) now populate `description` in scaffolded content so freshly-init'd sites pass `tool validate` cleanly.
+
+### Changed
+- Build summary: `Generated N pages` → `Generated N content pages` (taxonomy/archive/section index files weren't in the count, and the bare wording misled users diffing against `find public -name '*.html'`).
+- `hwaro build` now surfaces a one-line hint when a build produces zero content pages, so empty sites don't deploy silently.
+- `hwaro init` now prints a `Tip: update base_url in config.toml before deploying` line so the localhost default doesn't ship unchanged. The inconsistent "Added N optional config section(s)" line was demoted to debug.
+
 ## v0.13.1
 
 ### Fixed
