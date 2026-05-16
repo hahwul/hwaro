@@ -31,7 +31,9 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Build
-        run: shards build
+        # `-Dpreview_mt` mirrors release builds so CI surfaces fiber-race
+        # regressions before they ship.
+        run: shards build -Dpreview_mt
   build-docker:
     strategy:
       fail-fast: false
@@ -83,7 +85,9 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Build binary
-        run: shards build
+        # `-Dpreview_mt` mirrors release builds so CI surfaces fiber-race
+        # regressions before they ship.
+        run: shards build -Dpreview_mt
       - name: Run tests
         run: crystal spec
   build-snapcraft:

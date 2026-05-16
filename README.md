@@ -47,7 +47,8 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 - Page weight and custom sorting (by date, weight, title)
 
 ### Build & Performance
-- Parallel processing and incremental build caching
+- Multi-threaded parallel processing (Crystal `preview_mt`) — tune with `CRYSTAL_WORKERS` (default 4)
+- Incremental build caching
 - Streaming build mode with memory limits
 - Pre/post build hooks
 - CSS/JS bundling, minification, and content-hash fingerprinting

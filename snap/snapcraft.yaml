@@ -25,7 +25,7 @@ parts:
     override-build: |
       curl -fsSL https://crystal-lang.org/install.sh | bash
       shards install --production
-      shards build --release --no-debug --production
+      shards build --release --no-debug --production -Dpreview_mt
       cp ./bin/hwaro $CRAFT_PART_INSTALL/
     build-packages:
       - git

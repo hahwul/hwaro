@@ -5,13 +5,15 @@ Hwaro is a fast, lifecycle-driven static site generator written in Crystal. Feat
 
 ## Build & Run
 ```bash
-just build          # shards install && shards build → bin/hwaro
+just build          # shards install && shards build -Dpreview_mt → bin/hwaro
 just test           # crystal spec (unit + functional + content)
 just fix            # crystal tool format
 just dev            # Serve docs site locally (bin/hwaro serve -i docs)
 just clean          # Remove bin/, lib/, stb_impl.o
 ```
 Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
+
+All build paths (dev, CI, docker, snap, homebrew, release-binary) pass `-Dpreview_mt` so the multi-threaded Crystal runtime is enabled. Set `CRYSTAL_WORKERS=N` to override the worker count (default 4). New code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under MT).
 
 ## Directory Structure
 ```

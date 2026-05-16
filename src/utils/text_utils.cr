@@ -56,6 +56,12 @@ module Hwaro
       #   escape_xml("<script>")     # => "&lt;script&gt;"
       #
       def escape_xml(text : String) : String
+        # Fast path: most inputs (URLs, slug-like titles, dates) contain none
+        # of the XML special chars, so the loop below would just copy bytes
+        # into a fresh String.build. Bailing out here saves an allocation
+        # per call — this function is on the per-page hot path for sitemaps,
+        # feeds, and llms.txt, so the savings stack up on large builds.
+        return text unless contains_xml_special?(text)
         String.build(text.bytesize) do |io|
           text.each_char do |char|
             case char
@@ -68,6 +74,19 @@ module Hwaro
             end
           end
         end
+      end
+
+      # Byte-level scan for the five XML special chars. Avoids the regex
+      # engine and Unicode decoding — all targets are 7-bit ASCII so the
+      # byte view is exact even for UTF-8 input.
+      private def contains_xml_special?(text : String) : Bool
+        text.each_byte do |b|
+          case b
+          when 0x26, 0x3C, 0x3E, 0x22, 0x27 # & < > " '
+            return true
+          end
+        end
+        false
       end
 
       # Strip HTML tags from text (single-pass)

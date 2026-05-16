@@ -64,7 +64,7 @@ module Hwaro
               # Construct output path for section feed
               # e.g., output_dir/posts/rss.xml
               section_output_dir = File.join(output_dir, page.url.lchop("/"))
-              FileUtils.mkdir_p(section_output_dir)
+              Hwaro::Utils::FileSafe.mkdir_p(section_output_dir)
 
               feed_title = "#{config.title} - #{page.title}"
 
@@ -104,7 +104,7 @@ module Hwaro
 
             # Build the output directory: output_dir/{lang}/
             lang_output_dir = File.join(output_dir, lang_code)
-            FileUtils.mkdir_p(lang_output_dir)
+            Hwaro::Utils::FileSafe.mkdir_p(lang_output_dir)
 
             # Build a language-specific feed title
             lang_name = lang_config.language_name

@@ -42,12 +42,15 @@ jobs:
         name: Build binary (Linux)
         run: |
           mkdir -p build
-          # Use Alpine/musl-based Crystal container for proper static binary
+          # Use Alpine/musl-based Crystal container for proper static binary.
+          # `-Dpreview_mt` enables Crystal's multi-threaded runtime; without
+          # it, `hwaro build` runs all fibers on a single OS thread and big
+          # sites are bottlenecked on one core.
           docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.20.0-alpine sh -c "
             apk add --no-cache yaml-dev git curl &&
             shards install --release --no-debug --production &&
             mkdir -p build &&
-            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static
+            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static -Dpreview_mt
           "
       - if: matrix.platform == 'macos'
         name: Build binary (macOS)
@@ -55,7 +58,8 @@ jobs:
           mkdir -p build
           crystal build src/main.cr \
             -o build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH} \
-            --no-debug --release
+            --no-debug --release \
+            -Dpreview_mt
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:

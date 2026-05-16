@@ -85,7 +85,7 @@ module Hwaro
 
             # Skip resize if output would be larger than source
             if out_w >= src_w && out_h >= src_h
-              FileUtils.mkdir_p(File.dirname(dest))
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
               FileUtils.cp(source, dest)
               return dest
             end
@@ -119,7 +119,7 @@ module Hwaro
               end
 
               # Write output
-              FileUtils.mkdir_p(File.dirname(dest))
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
               ext = File.extname(dest).downcase
               ok = write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
               unless ok
@@ -295,7 +295,7 @@ module Hwaro
 
             ext = File.extname(source).downcase
             basename = File.basename(source, File.extname(source))
-            FileUtils.mkdir_p(dest_dir)
+            Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
 
             # Resize variants (sorted ascending so smallest is processed first)
             sorted_widths = widths.sort

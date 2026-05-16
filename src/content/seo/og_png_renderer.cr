@@ -271,7 +271,7 @@ module Hwaro
             end
 
             # Write PNG
-            FileUtils.mkdir_p(File.dirname(png_path))
+            Hwaro::Utils::FileSafe.mkdir_p(File.dirname(png_path))
             result = LibStb.stbi_write_png(
               png_path, WIDTH, HEIGHT, CHANNELS,
               pixels.as(Void*), WIDTH * CHANNELS

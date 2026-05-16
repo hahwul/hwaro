@@ -1203,18 +1203,27 @@ module Hwaro::Core::Build::Phases::Render
         page.series.try { |s| @series_crinja_cache[s] = val }
         val
       },
-      "related_posts" => @crinja_cache_mutex.synchronize {
-        if cached = @related_posts_crinja_cache[page.path]?
-          @cache_manager.record_hit("related_posts_crinja")
-          next cached
+      "related_posts" => if page.related_posts.empty?
+        # Mirror the early-return that `series_pages` does for series-less
+        # pages. Sites without `[related]` enabled (the default) get an
+        # empty list on every page, and acquiring the cache mutex 1000+
+        # times to hand back the same empty array measurably hurts on big
+        # builds.
+        Crinja::Value.new([] of Crinja::Value)
+      else
+        @crinja_cache_mutex.synchronize do
+          if cached = @related_posts_crinja_cache[page.path]?
+            @cache_manager.record_hit("related_posts_crinja")
+            next cached
+          end
+          @cache_manager.record_miss("related_posts_crinja")
+          val = Crinja::Value.new(page.related_posts.map { |rp|
+            cached_page_crinja_value(rp, default_lang)
+          })
+          @related_posts_crinja_cache[page.path] = val
+          val
         end
-        @cache_manager.record_miss("related_posts_crinja")
-        val = Crinja::Value.new(page.related_posts.map { |rp|
-          cached_page_crinja_value(rp, default_lang)
-        })
-        @related_posts_crinja_cache[page.path] = val
-        val
-      },
+      end,
     }
     vars["page"] = Crinja::Value.new(page_obj)
 

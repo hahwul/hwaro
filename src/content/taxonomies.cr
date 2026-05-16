@@ -274,7 +274,7 @@ module Hwaro
         return if site.config.base_url.empty?
 
         feed_output_dir = File.join(output_dir, base_url.lchop("/"))
-        FileUtils.mkdir_p(feed_output_dir)
+        Hwaro::Utils::FileSafe.mkdir_p(feed_output_dir)
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
 
         feed_pages = pages.sort { |a, b| Utils::SortUtils.compare_by_date(a, b) }
@@ -345,7 +345,7 @@ module Hwaro
           return
         end
 
-        FileUtils.mkdir_p(Path[output_path].dirname)
+        Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
         Logger.action :create, output_path if verbose
       end
@@ -359,7 +359,7 @@ module Hwaro
           return
         end
 
-        FileUtils.mkdir_p(Path[output_path].dirname)
+        Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
         File.write(output_path, content)
         Logger.action :create, output_path if verbose
       end

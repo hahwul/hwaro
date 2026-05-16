@@ -91,7 +91,7 @@ module Hwaro
           end
 
           img_dir = File.join(output_dir, ai.output_dir)
-          FileUtils.mkdir_p(img_dir) unless Dir.exists?(img_dir)
+          Hwaro::Utils::FileSafe.mkdir_p(img_dir) unless Dir.exists?(img_dir)
 
           # Load manifest for incremental generation
           manifest_path = File.join(img_dir, ".og_manifest.json")

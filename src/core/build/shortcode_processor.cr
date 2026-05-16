@@ -357,11 +357,18 @@ module Hwaro
             # re-parsing the template AST on every shortcode invocation.
             # XOR with a salt to avoid collisions with page template cache entries
             # that share @compiled_templates_cache.
+            #
+            # Under MT (`-Dpreview_mt`), the cache is reached from multiple OS
+            # threads concurrently — a plain Hash read+write would race during
+            # resize. Reuse the existing crinja cache mutex (reentrant) so
+            # callers that nest into other cached accessors don't self-deadlock.
             cache_key = template.hash ^ 0x5C0DE_CAFE_u64
-            crinja_template = @compiled_templates_cache[cache_key]? || begin
-              compiled = env.from_string(template)
-              @compiled_templates_cache[cache_key] = compiled
-              compiled
+            crinja_template = @crinja_cache_mutex.synchronize do
+              @compiled_templates_cache[cache_key]? || begin
+                compiled = env.from_string(template)
+                @compiled_templates_cache[cache_key] = compiled
+                compiled
+              end
             end
             crinja_template.render(local_context)
           rescue ex : Crinja::TemplateError
@@ -410,10 +417,17 @@ module Hwaro
         # Emit a "shortcode template not found" warning at most once per
         # template key per build to avoid spamming the log when the same
         # typo appears on many pages.
+        #
+        # MT note: `Set#includes?` + `Set#<<` is a check-then-write race
+        # under `-Dpreview_mt`. Two workers hitting the same missing
+        # shortcode could each emit one warning before the other had a
+        # chance to record it. Cheap to guard with the shared crinja mutex.
         private def warn_missing_shortcode(template_key : String) : Nil
-          seen = (@shortcode_warnings_seen ||= Set(String).new)
-          return if seen.includes?(template_key)
-          seen << template_key
+          should_warn = @crinja_cache_mutex.synchronize do
+            seen = (@shortcode_warnings_seen ||= Set(String).new)
+            seen.add?(template_key)
+          end
+          return unless should_warn
           Logger.warn "Shortcode template '#{template_key}' not found."
         end
       end

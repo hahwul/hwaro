@@ -48,7 +48,7 @@ module Hwaro::Core::Build::Phases::Write
     final_html = minify_html(final_html) if minify
 
     output_path = File.join(output_dir, "404.html")
-    FileUtils.mkdir_p(File.dirname(output_path))
+    Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
     File.write(output_path, final_html)
     Logger.action :create, output_path if verbose
   end
@@ -69,7 +69,7 @@ module Hwaro::Core::Build::Phases::Write
       # Get appropriate processor
       processor = Content::Processors::Registry.for_file(raw_file.source_path).first?
 
-      FileUtils.mkdir_p(File.dirname(output_path))
+      Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
 
       if processor && minify
         content = File.read(raw_file.source_path)
@@ -109,7 +109,7 @@ module Hwaro::Core::Build::Phases::Write
       url_path = page.url.lchop("/")
       dest_dir = File.join(output_dir, url_path)
 
-      FileUtils.mkdir_p(dest_dir)
+      Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
 
       page.assets.each do |asset_path|
         # asset_path is relative to content/ (e.g. "blog/post/image.jpg")
@@ -121,7 +121,7 @@ module Hwaro::Core::Build::Phases::Write
 
         next unless File.exists?(source_path)
 
-        FileUtils.mkdir_p(File.dirname(dest_path))
+        Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
         FileUtils.cp(source_path, dest_path)
         Logger.action :copy, dest_path, :blue if verbose
       end
@@ -149,6 +149,6 @@ module Hwaro::Core::Build::Phases::Write
         true
       end
     end
-    FileUtils.mkdir_p(dir) if needs_create
+    Hwaro::Utils::FileSafe.mkdir_p(dir) if needs_create
   end
 end

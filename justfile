@@ -8,10 +8,14 @@ default:
     @just --list
 
 # Build hwaro binary.
+#
+# Always passes `-Dpreview_mt` so dev/CI builds exercise the same
+# multi-threaded runtime that release binaries ship with. Without this,
+# fiber races stay hidden in dev and only surface for end users.
 [group('build')]
 build:
     shards install
-    shards build
+    shards build -Dpreview_mt
 
 # Update shards.nix.
 [group('build')]

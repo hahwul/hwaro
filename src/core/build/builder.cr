@@ -42,6 +42,7 @@ require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/errors"
+require "../../utils/file_safe"
 require "../../utils/logger"
 require "../../utils/profiler"
 require "../../utils/text_utils"
@@ -605,7 +606,7 @@ module Hwaro
             end
             dest_path = File.join(output_dir, relative)
 
-            FileUtils.mkdir_p(File.dirname(dest_path))
+            Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             FileUtils.cp(src_path, dest_path)
             copied += 1
           end
@@ -650,7 +651,7 @@ module Hwaro
               next
             end
 
-            FileUtils.mkdir_p(File.dirname(dest_path))
+            Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             FileUtils.cp(src_path, dest_path)
             Logger.action :copy, dest_path, :blue if verbose
             copied += 1

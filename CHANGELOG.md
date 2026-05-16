@@ -26,6 +26,14 @@
 - Importers (Hugo, Jekyll, Obsidian, Hexo, Eleventy, Astro, Notion, WordPress) now strip the imported body's leading `# Title` when it matches the front-matter title, so imported pages don't render two `<h1>` elements (the Hwaro page template renders one from `page.title` already). Same rationale as the existing `hwaro new` behavior (gh#525).
 - `tool import obsidian` now resolves `[[Wiki-Link]]`, `[[Wiki-Link|alias]]`, and `[[Wiki-Link#anchor]]` to absolute site URLs (`/posts/note-two/#section`) by pre-scanning the vault for filenames, titles, and `aliases:`. Previously the importer produced `[Note](note)`, which the browser resolved relative to the current page and 404'd. Inline-tag stripping no longer eats URL fragments either.
 
+### Performance
+- Multi-threaded build is now enabled by default. All release/dev/CI build paths compile with Crystal's `-Dpreview_mt`, so `hwaro build` actually uses multiple OS threads instead of running every fiber on one core. On a 1000-page site with `CRYSTAL_WORKERS=8` this is roughly **~30% wall-clock faster** (0.39s → 0.28s on an M1 Pro; CPU utilization jumps from ~1 core to ~3 cores). Smaller sites are mostly startup-bound and see little change. Tune the worker count via the `CRYSTAL_WORKERS` env var (default: 4). Spec suite runs under MT in CI to catch fiber-race regressions.
+- New `Hwaro::Utils::FileSafe.mkdir_p` wrapper replaces `FileUtils.mkdir_p` in the build hot path. Crystal's stdlib `Dir.mkdir_p` is check-then-create, which races under MT (two workers can both pass `Dir.exists?` and then both `mkdir`, the loser getting `File::AlreadyExistsError`). The wrapper retries once and then verifies the directory exists, which is the post-condition `mkdir -p` semantics already promise.
+- Shortcode template cache and the missing-shortcode warning Set are now mutex-protected. Both had check-then-write patterns that race under MT — a shared cache resize during concurrent writes could corrupt the underlying Hash.
+- `Hwaro::Models::MarkdownConfig#math_tags` and `#mermaid_tags` plus the matching scaffold header partials skip output entirely when the feature flag is off (cheap fast path that avoids string concat per build).
+- `Hwaro::Utils::TextUtils.escape_xml` now short-circuits when no XML-special bytes are present in the input — sitemap/feed/llms.txt URL escaping skips a `String.build` allocation for the common case where escaping isn't needed.
+- `related_posts` Crinja value lookup skips the cache mutex entirely when the page has no related posts. The cache key is per-page (unique), so for sites without `[related]` enabled the cache could never hit anyway — the lock acquire was pure overhead.
+
 ## v0.13.1
 
 ### Fixed

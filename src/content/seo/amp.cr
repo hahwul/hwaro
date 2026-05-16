@@ -42,7 +42,7 @@ module Hwaro
               next
             end
             dir = File.dirname(amp_output)
-            FileUtils.mkdir_p(dir) unless Dir.exists?(dir)
+            Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
             File.write(amp_output, amp_html)
 
             # Inject <link rel="amphtml"> into the canonical page

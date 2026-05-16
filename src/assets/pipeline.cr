@@ -25,7 +25,7 @@ module Hwaro
         return unless @config.enabled
 
         assets_output = File.join(output_dir, @config.output_dir)
-        FileUtils.mkdir_p(assets_output)
+        Hwaro::Utils::FileSafe.mkdir_p(assets_output)
 
         @config.bundles.each do |bundle|
           process_bundle(bundle, assets_output)
@@ -72,7 +72,7 @@ module Hwaro
 
         # Write the bundle
         output_path = File.join(assets_output, output_name)
-        FileUtils.mkdir_p(File.dirname(output_path))
+        Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
         File.write(output_path, contents)
 
         # Record in manifest

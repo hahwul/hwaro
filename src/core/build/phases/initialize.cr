@@ -76,7 +76,7 @@ module Hwaro::Core::Build::Phases::Initialize
         FileUtils.rm_rf(output_dir)
       end
     end
-    FileUtils.mkdir_p(output_dir)
+    Hwaro::Utils::FileSafe.mkdir_p(output_dir)
   end
 
   private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
@@ -113,7 +113,7 @@ module Hwaro::Core::Build::Phases::Initialize
     return if files_to_copy.empty?
 
     # Ensure destination directories exist (must be sequential to avoid races)
-    files_to_copy.each { |_, dest| FileUtils.mkdir_p(File.dirname(dest)) }
+    files_to_copy.each { |_, dest| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
 
     # Second pass: copy files in parallel using worker pool
     config = ParallelConfig.new(enabled: true)
