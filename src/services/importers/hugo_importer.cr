@@ -193,6 +193,7 @@ module Hwaro
             file_slug = filename.sub(/\.(md|markdown)$/, "")
           end
 
+          body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported

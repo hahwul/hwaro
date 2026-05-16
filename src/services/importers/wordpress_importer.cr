@@ -170,6 +170,7 @@ module Hwaro
 
           # Convert HTML content to Markdown
           body = HtmlToMarkdown.convert(content_html)
+          body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
 
           written = write_content_file(output_dir, section, slug, frontmatter, body, verbose, force)
           written ? :imported : :skipped

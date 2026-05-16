@@ -56,6 +56,43 @@ module Hwaro
           Utils::TextUtils.slugify(title)
         end
 
+        # If the imported body's first non-blank line is an H1 matching the
+        # front-matter title, drop it. Hwaro page templates render
+        # `<h1>{{ page.title }}</h1>` themselves, so keeping the body H1
+        # produces two H1 elements on the same page — same problem that
+        # gh#525 fixed for `hwaro new`. Importers from Hugo/Jekyll/Obsidian
+        # all hit this because those engines typically render the title from
+        # the body H1 rather than from front matter.
+        protected def strip_redundant_title_h1(body : String, title : String?) : String
+          return body if title.nil? || title.empty?
+          # Match `# Title`, ATX-style only — setext H1 (`=====` underline)
+          # is rare in imported content and ambiguous to detect without a
+          # second-line peek. Authors using setext can clean up by hand.
+          normalized_title = title.strip
+          # `chomp: false` keeps the trailing `\n` on each line so joining
+          # afterwards reproduces the original byte sequence exactly — the
+          # default behavior strips newlines and would smash paragraphs
+          # together when we rejoin.
+          lines = body.lines(chomp: false)
+          # Skip leading blank lines so a body that begins with `\n# Title` works.
+          idx = 0
+          while idx < lines.size && lines[idx].strip.empty?
+            idx += 1
+          end
+          return body if idx >= lines.size
+
+          first = lines[idx]
+          if match = first.match(/\A#\s+(.+?)\s*#*\s*\z/)
+            return body if match[1].strip != normalized_title
+            # Drop the H1 line and exactly one trailing blank line if present,
+            # so the body doesn't gain a leading blank gap.
+            lines.delete_at(idx)
+            lines.delete_at(idx) if idx < lines.size && lines[idx].strip.empty?
+            return lines.join
+          end
+          body
+        end
+
         # Write a content file. Skips if it already exists unless `force`
         # is true, in which case the existing file is overwritten. Returns
         # true when a file was written, false when it was skipped.

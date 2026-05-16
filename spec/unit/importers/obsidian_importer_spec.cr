@@ -78,31 +78,84 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
-    it "converts wiki-links to standard markdown links" do
+    it "converts wiki-links to absolute site URLs when the target exists in the vault" do
+      # `[[Other Page]]` used to produce `[Other Page](other-page)`, which the
+      # browser resolved relative to the *current* page (e.g.
+      # `/posts/wiki-links/other-page`) — guaranteed 404 because the actual
+      # target lives at `/posts/other-page/`. The importer now pre-scans the
+      # whole vault and emits absolute paths instead.
       Dir.mktmpdir do |dir|
-        post_content = <<-OBSIDIAN
+        File.write(File.join(dir, "wiki-links.md"), <<-OBSIDIAN)
           ---
           title: "Wiki Links"
           ---
           See [[Other Page]] for details.
           Also check [[Long Page Name|short name]].
+          Anchor: [[Long Page Name#Subsection]].
+          Unknown target: [[Ghost]].
+          OBSIDIAN
+        File.write(File.join(dir, "other-page.md"), <<-OBSIDIAN)
+          ---
+          title: "Other Page"
+          ---
+          Body.
+          OBSIDIAN
+        File.write(File.join(dir, "long-page-name.md"), <<-OBSIDIAN)
+          ---
+          title: "Long Page Name"
+          ---
+          ## Subsection
+          Body.
           OBSIDIAN
 
-        File.write(File.join(dir, "wiki-links.md"), post_content)
-
         output_dir = File.join(dir, "output")
-        options = Hwaro::Config::Options::ImportOptions.new(
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
           source_type: "obsidian",
           path: dir,
           output_dir: output_dir,
-        )
-
-        importer = Hwaro::Services::Importers::ObsidianImporter.new
-        importer.run(options)
+        ))
 
         content = File.read(File.join(output_dir, "posts", "wiki-links.md"))
-        content.should contain("[Other Page](other-page)")
-        content.should contain("[short name](long-page-name)")
+        content.should contain("[Other Page](/posts/other-page/)")
+        content.should contain("[short name](/posts/long-page-name/)")
+        # Anchor should survive — the inline-tag stripper previously ate it.
+        content.should contain("[Long Page Name#Subsection](/posts/long-page-name/#subsection)")
+        # Unknown targets fall back to a slug rather than dropping the link,
+        # so the author still has *something* to fix up manually.
+        content.should contain("[Ghost](ghost)")
+      end
+    end
+
+    it "resolves wiki-links via the front-matter `aliases:` list" do
+      # Obsidian's killer feature for wiki-links is renaming a note without
+      # breaking inbound links — the alias list keeps the old names valid.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "linker.md"), <<-OBSIDIAN)
+          ---
+          title: "Linker"
+          ---
+          Follow [[Old Name]] please.
+          OBSIDIAN
+        File.write(File.join(dir, "new-page.md"), <<-OBSIDIAN)
+          ---
+          title: "New Page"
+          aliases:
+            - Old Name
+          ---
+          Body.
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        ))
+
+        content = File.read(File.join(output_dir, "posts", "linker.md"))
+        content.should contain("[Old Name](/posts/new-page/)")
       end
     end
 

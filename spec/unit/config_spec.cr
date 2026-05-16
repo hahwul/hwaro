@@ -1967,6 +1967,61 @@ describe Hwaro::Models::MarkdownConfig do
     config.lazy_loading.should be_false
     config.emoji.should be_false
   end
+
+  describe "#math_tags" do
+    # The markdown processor emits `\(…\)`/`\[…\]` with `class="math math-*"`
+    # but doesn't load the renderer. Setting `math = true` must also inject
+    # the right CDN script tags so the feature actually works in the
+    # browser — otherwise users see literal TeX source.
+    it "returns empty string when math is disabled" do
+      Hwaro::Models::MarkdownConfig.new.math_tags.should be_empty
+    end
+
+    it "emits KaTeX auto-render scripts when math = true (default engine)" do
+      config = Hwaro::Models::MarkdownConfig.new
+      config.math = true
+      tags = config.math_tags
+      tags.should contain("katex.min.css")
+      tags.should contain("katex.min.js")
+      tags.should contain("auto-render.min.js")
+      tags.should contain("renderMathInElement")
+    end
+
+    it "emits MathJax tags when math_engine = mathjax" do
+      config = Hwaro::Models::MarkdownConfig.new
+      config.math = true
+      config.math_engine = "mathjax"
+      tags = config.math_tags
+      tags.should contain("mathjax")
+      tags.should contain("inlineMath")
+      tags.should_not contain("katex")
+    end
+
+    it "stays silent for an unknown math_engine instead of guessing" do
+      # A typo in `math_engine` shouldn't silently load a wrong renderer.
+      # Doctor already validates this on config load; this guards the
+      # rendering path so a misconfigured site fails closed.
+      config = Hwaro::Models::MarkdownConfig.new
+      config.math = true
+      config.math_engine = "asciimath"
+      config.math_tags.should be_empty
+    end
+  end
+
+  describe "#mermaid_tags" do
+    it "returns empty string when mermaid is disabled" do
+      Hwaro::Models::MarkdownConfig.new.mermaid_tags.should be_empty
+    end
+
+    it "emits a Mermaid.js ESM import when mermaid = true" do
+      config = Hwaro::Models::MarkdownConfig.new
+      config.mermaid = true
+      tags = config.mermaid_tags
+      tags.should contain("mermaid")
+      tags.should contain("mermaid.initialize")
+      tags.should contain("startOnLoad")
+    end
+  end
 end
 
 describe Hwaro::Models::LanguageConfig do

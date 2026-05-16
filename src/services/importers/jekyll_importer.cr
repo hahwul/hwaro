@@ -228,6 +228,7 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
+          body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, "posts", slug, frontmatter, body, verbose, force)
 
           return :skipped unless written

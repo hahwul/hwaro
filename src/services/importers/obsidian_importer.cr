@@ -11,8 +11,11 @@ module Hwaro
         # Obsidian embed pattern: ![[filename]]
         EMBED_PATTERN = /!\[\[([^\]]+?)\]\]/
 
-        # Obsidian tag pattern: #tag (but not inside code blocks or headings)
-        OBSIDIAN_TAG_PATTERN = /(?<!\w)#([a-zA-Z][\w\-\/]*)/
+        # Obsidian tag pattern: #tag (but not inside code blocks, headings,
+        # or as a URL fragment like `path/#section`). Requires the `#` to
+        # sit at start-of-line or after whitespace — this matches Obsidian's
+        # own tag-detection heuristic and avoids treating URL anchors as tags.
+        OBSIDIAN_TAG_PATTERN = /(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/
 
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
@@ -37,9 +40,15 @@ module Hwaro
             )
           end
 
+          # First pass: build a name → URL map of every imported note so
+          # second-pass `[[Wiki-Link]]` resolution can produce absolute URLs
+          # instead of slugs that resolve relative to the current page.
+          # Keys are case-insensitive matches on filename, title, and aliases.
+          link_map = build_link_map(files, path)
+
           files.each do |file_path|
             begin
-              result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force)
+              result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map)
               case result
               when :imported
                 imported += 1
@@ -67,6 +76,88 @@ module Hwaro
           files
         end
 
+        # Build a name → URL map covering every note in the vault. Keys are
+        # lowercased lookup names: the filename (with and without extension),
+        # the front-matter `title`, and every `aliases:` entry. Values are
+        # absolute site paths (e.g. `/posts/note-2/`) computed the same way
+        # `import_file` builds the on-disk destination.
+        #
+        # The lookup is case-insensitive because Obsidian itself treats
+        # wiki-links that way (`[[Note]]` and `[[note]]` resolve to the same
+        # file), and Hwaro authors typically lowercase slugs on publish.
+        private def build_link_map(files : Array(String), base_path : String) : Hash(String, String)
+          map = Hash(String, String).new
+          files.each do |file_path|
+            begin
+              raw = File.read(file_path)
+              fm_yaml, _ = parse_markdown_file(raw)
+
+              # Section mirrors `import_file`'s computation so the URL we
+              # emit lands at the same path the file will be written to.
+              relative = file_path.sub(base_path, "").lstrip('/')
+              parts = relative.split("/")
+              section = parts.size > 1 ? parts[0..-2].join("/") : "posts"
+
+              basename = File.basename(file_path, File.extname(file_path))
+              title = basename
+              aliases = [] of String
+
+              if fm_yaml && (yaml = YAML.parse(fm_yaml))
+                if t = yaml["title"]?
+                  title = t.as_s? || t.raw.to_s
+                end
+                if a = yaml["aliases"]?
+                  case a.raw
+                  when Array
+                    flatten_yaml_strings(a).each { |s| aliases << s }
+                  when String
+                    aliases << a.as_s
+                  end
+                end
+              end
+
+              slug = slugify(title)
+              url = "/#{section}/#{slug}/"
+
+              # Register every name a wiki-link could plausibly use.
+              [basename, "#{basename}.md", title, *aliases].each do |key|
+                next if key.empty?
+                map[key.downcase.strip] = url
+              end
+            rescue ex
+              # Don't fail the whole import if one note's YAML is malformed;
+              # we just won't be able to resolve links pointing at it. The
+              # per-file import below will surface the actual error.
+              Logger.debug "build_link_map: skipped #{file_path}: #{ex.message}"
+            end
+          end
+          map
+        end
+
+        # Map a `[[Wiki-Link]]` target to either an absolute site URL (when
+        # the target was found in the vault) or the slugified fallback (so
+        # external references still produce *some* link rather than nothing).
+        private def resolve_wikilink(page : String, link_map : Hash(String, String)) : String
+          # Obsidian links can include a `#heading` anchor (`[[Note#Section]]`)
+          # and `^block-ref` ids (`[[Note#^abc]]`). Strip those before lookup
+          # and re-append the anchor in slugified form afterwards.
+          name, anchor = page, ""
+          if hash_idx = page.index('#')
+            name = page[0...hash_idx]
+            anchor = page[hash_idx..]
+          end
+
+          key = name.strip.downcase
+          if url = link_map[key]?
+            return anchor.empty? ? url : "#{url}##{slugify(anchor.lchop('#').lchop('^'))}"
+          end
+          # Unknown target: fall back to a relative slug. This keeps behavior
+          # backwards-compatible for vaults that link to pages outside the
+          # import scope, and the user can fix up by hand.
+          slug = slugify(name)
+          anchor.empty? ? slug : "#{slug}##{slugify(anchor.lchop('#').lchop('^'))}"
+        end
+
         private def scan_dir(dir : String, files : Array(String))
           Dir.each_child(dir) do |entry|
             full_path = File.join(dir, entry)
@@ -86,6 +177,7 @@ module Hwaro
           include_drafts : Bool,
           verbose : Bool,
           force : Bool,
+          link_map : Hash(String, String) = {} of String => String,
         ) : Symbol
           raw = File.read(file_path)
           frontmatter_yaml, body = parse_markdown_file(raw)
@@ -178,7 +270,7 @@ module Hwaro
           end
 
           # Convert Obsidian-specific syntax
-          body = convert_obsidian_syntax(body)
+          body = convert_obsidian_syntax(body, link_map)
 
           # Determine section from vault folder structure
           relative = file_path.sub(base_path, "").lstrip('/')
@@ -192,6 +284,7 @@ module Hwaro
           slug = slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
 
           frontmatter = generate_frontmatter(fields)
+          body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
         end
@@ -259,7 +352,7 @@ module Hwaro
           tags.uniq
         end
 
-        private def convert_obsidian_syntax(body : String) : String
+        private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String) : String
           result = body
 
           # Convert embeds ![[file]] to markdown image/link
@@ -272,12 +365,16 @@ module Hwaro
             end
           end
 
-          # Convert wiki-links [[Page|Display]] to standard markdown links
+          # Convert wiki-links [[Page|Display]] to standard markdown links.
+          # Resolve against the prebuilt link_map so the output is an absolute
+          # site URL (e.g. `/posts/note-2/`) rather than a same-page-relative
+          # slug — the old behavior wrote `[Note2](note2)` which the browser
+          # resolved as `<current-page>/note2`, producing 404s.
           result = result.gsub(WIKILINK_PATTERN) do
             page = $1
             display = $~[2]? || page
-            slug = slugify(page)
-            "[#{display}](#{slug})"
+            target = resolve_wikilink(page, link_map)
+            "[#{display}](#{target})"
           end
 
           # Remove inline tags (already extracted to frontmatter)
@@ -298,7 +395,12 @@ module Hwaro
               # Preserve markdown headings
               line
             else
-              line.gsub(/(?<!\w)#([a-zA-Z][\w\-\/]*)/, "").rstrip
+              # Strip inline `#tag` references (already extracted to
+              # frontmatter), but require start-of-line or whitespace before
+              # the `#` — otherwise we'd eat the `#section` anchor inside a
+              # markdown link URL like `[Note](/posts/note/#section)` that
+              # the wiki-link conversion above just emitted.
+              line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/, "").rstrip
             end
           end
           result = lines.join("\n")

@@ -137,6 +137,8 @@ module Hwaro
               {{ hreflang_tags }}
               #{styles}
               {{ highlight_css }}
+              {{ math_tags }}
+              {{ mermaid_tags }}
               {{ auto_includes_css }}
             </head>
             <body data-section="{{ page.section }}">

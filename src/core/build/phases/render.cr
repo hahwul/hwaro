@@ -976,6 +976,15 @@ module Hwaro::Core::Build::Phases::Render
     vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust))
     vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust))
 
+    # Math (KaTeX/MathJax) and Mermaid renderer scripts. When `math = true`
+    # or `mermaid = true` is set in config, the markdown processor emits the
+    # right wrapper markup but without these script tags the browser sees
+    # only literal TeX / DOT source. Templates can pull them in via
+    # `{{ math_tags }}` and `{{ mermaid_tags }}`; the default header partials
+    # include them so the feature flags work out of the box.
+    vars["math_tags"] = Crinja::Value.new(config.markdown.math_tags)
+    vars["mermaid_tags"] = Crinja::Value.new(config.markdown.mermaid_tags)
+
     # Auto includes
     vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust))
     vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust))

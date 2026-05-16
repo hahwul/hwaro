@@ -26,6 +26,10 @@ class TestImporter < Hwaro::Services::Importers::Base
   def test_write_content_file(output_dir, section, slug, frontmatter, body, verbose = false, force = false)
     write_content_file(output_dir, section, slug, frontmatter, body, verbose, force)
   end
+
+  def test_strip_redundant_title_h1(body, title)
+    strip_redundant_title_h1(body, title)
+  end
 end
 
 describe Hwaro::Services::Importers::Base do
@@ -187,5 +191,61 @@ describe Hwaro::Services::Importers::ImportResult do
     r.imported_count.should eq(7)
     r.skipped_count.should eq(2)
     r.error_count.should eq(1)
+  end
+end
+
+# Hwaro page templates render `<h1>{{ page.title }}</h1>` already, so
+# importers that preserve the body's leading `# Title` ship pages with two
+# H1 elements — bad for accessibility and SEO. Same rationale as the
+# gh#525 fix for `hwaro new`.
+describe Hwaro::Services::Importers::Base do
+  describe "#strip_redundant_title_h1" do
+    it "drops a leading H1 that matches the front-matter title" do
+      importer = TestImporter.new
+      body = "# My Post\n\nBody paragraph.\n\n## Heading 2\n"
+      result = importer.test_strip_redundant_title_h1(body, "My Post")
+      result.should eq("Body paragraph.\n\n## Heading 2\n")
+    end
+
+    it "preserves intermediate blank lines after dropping the H1" do
+      # Regression: an earlier draft used `String#lines` (chomp: true),
+      # which stripped newlines and smashed paragraphs together when
+      # rejoined.
+      importer = TestImporter.new
+      body = "# Title\n\nPara 1.\n\nPara 2.\n"
+      importer.test_strip_redundant_title_h1(body, "Title").should eq("Para 1.\n\nPara 2.\n")
+    end
+
+    it "leaves the body alone when the leading H1 doesn't match the title" do
+      # Don't drop *every* leading H1 — only the one that duplicates what
+      # the template will render. A different H1 was probably intentional.
+      importer = TestImporter.new
+      body = "# Different Heading\n\nBody.\n"
+      importer.test_strip_redundant_title_h1(body, "My Title").should eq(body)
+    end
+
+    it "handles leading blank lines before the H1" do
+      importer = TestImporter.new
+      body = "\n\n# Title\n\nBody.\n"
+      importer.test_strip_redundant_title_h1(body, "Title").should eq("\n\nBody.\n")
+    end
+
+    it "is a no-op when there is no title" do
+      importer = TestImporter.new
+      body = "# Anything\n\nBody.\n"
+      importer.test_strip_redundant_title_h1(body, nil).should eq(body)
+      importer.test_strip_redundant_title_h1(body, "").should eq(body)
+    end
+
+    it "tolerates ATX-style closing hashes (`# Title #`)" do
+      importer = TestImporter.new
+      importer.test_strip_redundant_title_h1("# Title ##\n\nBody.\n", "Title").should eq("Body.\n")
+    end
+
+    it "doesn't touch H2/H3 even if they would otherwise match" do
+      importer = TestImporter.new
+      body = "## Title\n\nBody.\n"
+      importer.test_strip_redundant_title_h1(body, "Title").should eq(body)
+    end
   end
 end

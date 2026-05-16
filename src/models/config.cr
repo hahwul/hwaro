@@ -552,6 +552,51 @@ module Hwaro
         @admonitions = true
         @heading_ids = true
       end
+
+      # Generate CDN script tags for the math engine. The markdown processor
+      # emits `\(…\)`/`\[…\]` wrappers with `class="math math-{inline,display}"`
+      # but doesn't load the renderer — without these tags the math reaches
+      # the browser as literal TeX. Templates can opt out by overriding the
+      # `{{ math_tags }}` variable or by leaving `math = false` and inlining
+      # their own includes via [auto_includes].
+      def math_tags : String
+        return "" unless @math
+        case @math_engine
+        when "katex"
+          # auto-render finds class="math math-{inline,display}" automatically
+          # and replaces the inner TeX with rendered KaTeX. Pinned KaTeX 0.16.x
+          # to avoid surprise major-version churn in build outputs.
+          <<-HTML.gsub('\n', "")
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+            HTML
+        when "mathjax"
+          # MathJax 3 reads `class="math math-*"` via the `[tex]` extension
+          # configured to recognise `\(…\)` and `\[…\]` delimiters (which is
+          # how the markdown processor emits them).
+          <<-HTML.gsub('\n', "")
+            <script>window.MathJax={tex:{inlineMath:[["\\\\(","\\\\)"]],displayMath:[["\\\\[","\\\\]"]]}};</script>
+            <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+            HTML
+        else
+          ""
+        end
+      end
+
+      # Generate the Mermaid.js script tag. Mirrors `math_tags`: the markdown
+      # processor emits `<div class="mermaid">…</div>`, but without a renderer
+      # those blocks ship to the browser as DOT-like source text. Pinned to
+      # 10.x to avoid major-version drift.
+      def mermaid_tags : String
+        return "" unless @mermaid
+        <<-HTML.gsub('\n', "")
+          <script type="module">
+            import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+            mermaid.initialize({ startOnLoad: true });
+          </script>
+          HTML
+      end
     end
 
     # Language configuration for multilingual sites
