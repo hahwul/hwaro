@@ -26,8 +26,15 @@ module Hwaro
           end
           return unless site.config.og.auto_image.enabled
 
+          # When --fast-start is active, only generate images for the
+          # priority subset on the cold pass. The deferred render pass
+          # re-runs this hook for the rest. PNG OG generation is the
+          # single largest cost on big sites — rendering 700+ PNGs
+          # eats ~20s on a 1k-page site and is what made fast-start
+          # indistinguishable from a normal cold start.
+          pages = ctx.priority_pages || ctx.all_pages
           Content::Seo::OgImage.generate(
-            ctx.all_pages,
+            pages,
             site.config,
             ctx.output_dir,
             ctx.options.verbose,

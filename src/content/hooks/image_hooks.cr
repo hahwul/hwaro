@@ -113,11 +113,23 @@ module Hwaro
           resolved_output = File.expand_path(output_dir)
 
           # Phase 1: Collect all image jobs (fast, single-threaded)
+          #
+          # Under `--fast-start`, only collect page-asset jobs for the
+          # priority subset and skip the (potentially thousands of) static
+          # and content-file globs entirely on the cold pass. The deferred
+          # render pass re-invokes this hook with priority_pages cleared so
+          # the full job set runs in the background. The `resize_image()`
+          # template helper falls back to the original URL on a cache miss,
+          # so priority pages render correctly even if their non-asset
+          # image references haven't been resized yet.
+          fast_start_priority = ctx.priority_pages
           jobs = [] of ImageJob
           seen = Set(String).new
-          collect_page_asset_jobs(ctx, output_dir, resolved_output, jobs, seen)
-          collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen) if config.content_files.enabled?
-          collect_static_jobs(output_dir, resolved_output, jobs, seen)
+          collect_page_asset_jobs(ctx, output_dir, resolved_output, jobs, seen, fast_start_priority)
+          if fast_start_priority.nil?
+            collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen) if config.content_files.enabled?
+            collect_static_jobs(output_dir, resolved_output, jobs, seen)
+          end
 
           return if jobs.empty?
 
@@ -257,8 +269,10 @@ module Hwaro
           resolved_output : String,
           jobs : Array(ImageJob),
           seen : Set(String),
+          priority_pages : Array(Models::Page)? = nil,
         )
-          ctx.all_pages.each do |page|
+          source = priority_pages || ctx.all_pages
+          source.each do |page|
             next if page.assets.empty?
 
             page_bundle_dir = File.dirname(page.path)

@@ -199,6 +199,10 @@ module Hwaro
             env: options.env,
             fast_start: options.fast_start,
             fast_start_count: options.fast_start_count,
+            skip_og_image: options.skip_og_image,
+            skip_image_processing: options.skip_image_processing,
+            preserve_output: options.preserve_output,
+            cache_busting: options.cache_busting,
           )
         end
 
@@ -531,6 +535,12 @@ module Hwaro
         # Regenerates SEO/search files at the end since feeds and the search
         # index pull from `page.content`, which was empty for deferred pages
         # during the initial Generate phase.
+        #
+        # Also runs the BeforeRender hooks for the remaining work the
+        # cold pass deferred — OG image generation for non-priority pages
+        # and image resizing for static/content_file globs + non-priority
+        # page assets. Without this step those images never get produced
+        # in a fast-start serve session until the user saves a file.
         def render_deferred(options : Config::Options::BuildOptions) : Int32
           pages = @deferred_pages
           return 0 if pages.nil? || pages.empty?
@@ -550,6 +560,26 @@ module Hwaro
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
           cache = @cache || Cache.new(enabled: false)
+
+          # Re-run the BeforeRender hooks against the full page set. The
+          # ctx carries no priority_pages this time, so OG image
+          # generation and image resizing process whatever the cold pass
+          # left undone. We construct a fresh context rather than reusing
+          # the original — the original's priority_pages would short-
+          # circuit the very hooks we want to fully execute here.
+          deferred_ctx = Lifecycle::BuildContext.new(options)
+          deferred_ctx.site = site
+          deferred_ctx.config = site.config
+          deferred_ctx.pages = site.pages
+          deferred_ctx.sections = site.sections
+          deferred_ctx.templates = templates
+          deferred_ctx.output_dir = output_dir
+          deferred_ctx.cache = @cache
+          deferred_ctx.priority_pages = nil
+
+          # Trigger BeforeRender hooks directly — we're not re-running the
+          # Render phase, just the prep work it would have done.
+          @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
 
           global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
@@ -679,6 +709,10 @@ module Hwaro
           env : String? = nil,
           fast_start : Bool = false,
           fast_start_count : Int32 = 20,
+          skip_og_image : Bool = false,
+          skip_image_processing : Bool = false,
+          preserve_output : Bool = false,
+          cache_busting : Bool = true,
         )
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
@@ -727,6 +761,10 @@ module Hwaro
             env: env,
             fast_start: fast_start,
             fast_start_count: fast_start_count,
+            skip_og_image: skip_og_image,
+            skip_image_processing: skip_image_processing,
+            preserve_output: preserve_output,
+            cache_busting: cache_busting,
           )
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"

@@ -386,14 +386,16 @@ describe Hwaro::Core::Build::Phases::Render do
       deferred.empty?.should be_true
     end
 
-    it "always puts section index pages in priority regardless of date" do
+    it "always puts shallow section index pages in priority regardless of date" do
       builder = Hwaro::Core::Build::Builder.new
-      home = Hwaro::Models::Page.new("_index.md")
+      home = Hwaro::Models::Section.new("_index.md")
       home.is_index = true
+      home.section = ""
       home.date = nil
 
-      section_idx = Hwaro::Models::Page.new("posts/_index.md")
+      section_idx = Hwaro::Models::Section.new("posts/_index.md")
       section_idx.is_index = true
+      section_idx.section = "posts"
       section_idx.date = Time.utc(2000, 1, 1)
 
       recent = Hwaro::Models::Page.new("posts/new.md")
@@ -405,17 +407,72 @@ describe Hwaro::Core::Build::Phases::Render do
       undated = Hwaro::Models::Page.new("about.md")
       undated.date = nil
 
-      pages = [home, section_idx, recent, old, undated]
+      pages = [home.as(Hwaro::Models::Page), section_idx.as(Hwaro::Models::Page), recent, old, undated]
       priority, deferred = builder.test_split_priority_pages(pages, 1)
 
-      priority.includes?(home).should be_true
-      priority.includes?(section_idx).should be_true
+      priority.includes?(home.as(Hwaro::Models::Page)).should be_true
+      priority.includes?(section_idx.as(Hwaro::Models::Page)).should be_true
       # With count=1 only the most recent regular post is included
       priority.includes?(recent).should be_true
       priority.includes?(old).should be_false
       priority.includes?(undated).should be_false
       # Deferred must contain exactly the leftovers
-      deferred.sort_by(&.path).should eq([old, undated].sort_by(&.path))
+      deferred.sort_by(&.path).should eq([old.as(Hwaro::Models::Page), undated.as(Hwaro::Models::Page)].sort_by(&.path))
+    end
+
+    it "defers deeply nested section indexes — only depth ≤ 1 are auto-priority" do
+      builder = Hwaro::Core::Build::Builder.new
+      home = Hwaro::Models::Section.new("_index.md")
+      home.is_index = true
+      home.section = ""
+
+      top = Hwaro::Models::Section.new("archive/_index.md")
+      top.is_index = true
+      top.section = "archive"
+
+      deep = Hwaro::Models::Section.new("archive/dev/crystal/_index.md")
+      deep.is_index = true
+      deep.section = "archive/dev/crystal"
+
+      # Many regulars so depth-deep section can't sneak in via the recent-N fill.
+      regulars = (1..30).map do |i|
+        p = Hwaro::Models::Page.new("posts/p#{i}.md")
+        p.date = Time.utc(2026, 5, i)
+        p
+      end
+
+      pages = [home.as(Hwaro::Models::Page), top.as(Hwaro::Models::Page), deep.as(Hwaro::Models::Page)] + regulars.map(&.as(Hwaro::Models::Page))
+      priority, deferred = builder.test_split_priority_pages(pages, 5)
+
+      priority.includes?(home.as(Hwaro::Models::Page)).should be_true
+      priority.includes?(top.as(Hwaro::Models::Page)).should be_true
+      priority.includes?(deep.as(Hwaro::Models::Page)).should be_false
+      deferred.includes?(deep.as(Hwaro::Models::Page)).should be_true
+    end
+
+    it "treats `index.md` page bundles as regulars, not auto-priority" do
+      builder = Hwaro::Core::Build::Builder.new
+      home = Hwaro::Models::Section.new("_index.md")
+      home.is_index = true
+      home.section = ""
+
+      # A regular post that happens to use Hugo-style page-bundle layout —
+      # `is_index` is true on the underlying Page but it's still just a
+      # post, not a section listing. Must compete for the recent-N slot.
+      old_bundle = Hwaro::Models::Page.new("posts/2020/old/index.md")
+      old_bundle.is_index = true
+      old_bundle.date = Time.utc(2020, 1, 1)
+
+      new_post = Hwaro::Models::Page.new("posts/new.md")
+      new_post.date = Time.utc(2026, 5, 1)
+
+      pages = [home.as(Hwaro::Models::Page), old_bundle.as(Hwaro::Models::Page), new_post.as(Hwaro::Models::Page)]
+      priority, deferred = builder.test_split_priority_pages(pages, 1)
+
+      priority.includes?(home.as(Hwaro::Models::Page)).should be_true
+      priority.includes?(new_post).should be_true
+      priority.includes?(old_bundle.as(Hwaro::Models::Page)).should be_false
+      deferred.includes?(old_bundle.as(Hwaro::Models::Page)).should be_true
     end
 
     it "sorts regular pages by date descending, nil-dated pages last" do
@@ -444,15 +501,16 @@ describe Hwaro::Core::Build::Phases::Render do
       builder = Hwaro::Core::Build::Builder.new
       a = Hwaro::Models::Page.new("a.md")
       a.date = Time.utc(2026, 5, 1)
-      b = Hwaro::Models::Page.new("b.md")
+      b = Hwaro::Models::Section.new("b/_index.md")
       b.is_index = true
+      b.section = "b"
       c = Hwaro::Models::Page.new("c.md")
       c.date = Time.utc(2024, 1, 1)
 
-      pages = [a, b, c] # b is section index, a is most recent
+      pages = [a, b.as(Hwaro::Models::Page), c] # b is section index, a is most recent
       priority, _deferred = builder.test_split_priority_pages(pages, 1)
       # Priority should contain a and b, ordered as they appeared in input
-      priority.should eq([a, b])
+      priority.should eq([a, b.as(Hwaro::Models::Page)])
     end
 
     it "handles an empty input gracefully" do

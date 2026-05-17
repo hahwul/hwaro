@@ -53,6 +53,13 @@ module Hwaro
         # Track build statistics
         property stats : BuildStats
 
+        # When `--fast-start` is active, this is populated with the subset of
+        # pages the initial pass should process (homepage + recent N + section
+        # indexes). BeforeRender hooks (OG image, image resize) consult this to
+        # skip work for the deferred subset; the background render pass clears
+        # it and re-runs those hooks for the rest. Nil outside of fast-start.
+        property priority_pages : Array(Models::Page)?
+
         @all_pages_cache : Array(Models::Page)?
 
         def initialize(@options : Config::Options::BuildOptions)

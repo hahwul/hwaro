@@ -97,13 +97,25 @@ module Hwaro
           manifest_path = File.join(img_dir, ".og_manifest.json")
           config_hash = compute_config_hash(config)
           old_config_hash, old_entries = load_manifest(manifest_path)
-          new_entries = {} of String => String
           config_changed = old_config_hash != config_hash
+          # Start from the old manifest so partial passes (e.g.
+          # `--fast-start` calling `generate` once for the priority subset
+          # and again for the deferred subset) accumulate rather than
+          # truncate. When config changed, every entry is stale so the
+          # snapshot starts empty.
+          new_entries = config_changed ? ({} of String => String) : old_entries.dup
 
           generated = 0
           skipped = 0
 
-          pages.each do |page|
+          pages.each_with_index do |page, idx|
+            # Yield to other fibers every few PNG renders so a serve
+            # session that runs this in a background fiber doesn't starve
+            # its own HTTP accept loop. PNG encoding is pure CPU and
+            # never yields on its own; without this, requests sit on the
+            # OS backlog indefinitely while the deferred render pass
+            # runs.
+            Fiber.yield if idx > 0 && (idx & 0x07) == 0
             next if page.draft
             next if page.generated
             next unless page.render

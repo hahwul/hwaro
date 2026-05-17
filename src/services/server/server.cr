@@ -453,11 +453,36 @@ module Hwaro
         # watcher proceeds.
         deferred_done = Channel(Nil).new
         fast_start_pending = build_options.fast_start && @builder.has_deferred_pages?
+
+        # Run `server.listen` in its own fiber so the accept loop is
+        # already established before we kick off the heavy deferred
+        # render. With fast-start the deferred fiber does ~20s of mostly
+        # pure-CPU work (PNG OG image encoding + image resize); if we
+        # spawned it first and only then called `server.listen` from the
+        # main fiber, the cooperative scheduler would pick the deferred
+        # fiber at the first yield and the accept loop would never get
+        # to run — TCP connects succeeded (OS-level backlog) but HTTP
+        # responses sat indefinitely.
+        listen_done = Channel(Nil).new
+        spawn do
+          begin
+            server.listen
+          ensure
+            listen_done.close
+          end
+        end
+
         if fast_start_pending
           deferred_options = build_options.dup
           deferred_options.preserve_output = true
           deferred_options.fast_start = false
           spawn do
+            # Yield once so the listen fiber spawned just above has a
+            # chance to enter its accept loop before we start
+            # CPU-saturating work. The accept loop itself yields on the
+            # first `accept?` call, so once it's running the deferred
+            # fiber can coexist with it.
+            Fiber.yield
             begin
               @builder.render_deferred(deferred_options)
               @live_reload_handler.try(&.notify_reload)
@@ -482,7 +507,9 @@ module Hwaro
         end
 
         emit_ready_signal(host, port, json_output)
-        server.listen
+        # Block the main fiber on the listen fiber's completion so the
+        # process stays alive for the lifetime of the server.
+        listen_done.receive?
       end
 
       # Emit a single deterministic, machine-parseable line indicating the
