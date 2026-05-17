@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.14.0
 
 ### Behavior changes
 - `hwaro new <path>.md` now honors the path the user typed instead of silently rerouting bare filenames to `content/drafts/`. `hwaro new foo.md` lands at `content/foo.md`; explicit `hwaro new drafts/foo.md` still drops into drafts and marks the file as draft.
