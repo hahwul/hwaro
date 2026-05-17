@@ -60,6 +60,14 @@ module Hwaro
         # it and re-runs those hooks for the rest. Nil outside of fast-start.
         property priority_pages : Array(Models::Page)?
 
+        # True when the current run only handles a subset of the site's
+        # pages — set on both passes of a `--fast-start` session
+        # (priority + deferred). Hooks that persist per-page state
+        # (e.g. the OG image manifest) use this to skip the "truncate
+        # entries for missing pages" prune, so the second pass doesn't
+        # wipe the first pass's writes.
+        property partial_render : Bool = false
+
         @all_pages_cache : Array(Models::Page)?
 
         def initialize(@options : Config::Options::BuildOptions)

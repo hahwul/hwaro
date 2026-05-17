@@ -66,14 +66,22 @@ module Hwaro::Core::Build::Phases::Render
       @deferred_pages = deferred
       if !deferred.empty?
         Logger.info "  Fast-start: rendering #{priority.size} priority page(s) up front, deferring #{deferred.size} for background render."
+        # NOTE — both `priority_pages` and `partial_render` are consumed
+        # by BeforeRender hooks below (`og_image:generate`,
+        # `image:resize`). Don't move these assignments after
+        # `run_phase` or those hooks will fall back to the all-pages
+        # path and `--fast-start` becomes a no-op again.
         ctx.priority_pages = priority
+        ctx.partial_render = true
       else
         ctx.priority_pages = nil
+        ctx.partial_render = false
       end
       pages_to_build = priority
     else
       @deferred_pages = nil
       ctx.priority_pages = nil
+      ctx.partial_render = false
     end
 
     profiler.start_phase("Render")

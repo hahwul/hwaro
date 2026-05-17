@@ -477,12 +477,18 @@ module Hwaro
           deferred_options.preserve_output = true
           deferred_options.fast_start = false
           spawn do
-            # Yield once so the listen fiber spawned just above has a
-            # chance to enter its accept loop before we start
-            # CPU-saturating work. The accept loop itself yields on the
-            # first `accept?` call, so once it's running the deferred
-            # fiber can coexist with it.
-            Fiber.yield
+            # Block until the listen fiber has actually entered the
+            # accept loop. `HTTP::Server#listening?` flips to true
+            # synchronously inside `#listen`, just before the accept
+            # fiber is spawned, so once we observe it the accept path
+            # is guaranteed to be live. Polling with `Fiber.yield` (not
+            # `sleep`) keeps the wait sub-microsecond on a quiet
+            # scheduler. A single `Fiber.yield` was *probabilistically*
+            # enough in practice but offered no ordering guarantee
+            # under `-Dpreview_mt` work-stealing.
+            until server.listening?
+              Fiber.yield
+            end
             begin
               @builder.render_deferred(deferred_options)
               @live_reload_handler.try(&.notify_reload)

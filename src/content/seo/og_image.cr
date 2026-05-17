@@ -36,11 +36,20 @@ module Hwaro
         # Generate OG images for all pages that lack a custom image.
         # Sets page.image to the generated SVG path so that og:image
         # meta tags pick it up automatically.
+        #
+        # `partial` signals that the caller is only handing in a subset
+        # of the site's pages (e.g. `--fast-start` runs this once for
+        # the priority subset and again for the deferred remainder).
+        # In partial mode we accumulate manifest entries across calls
+        # rather than overwriting; in full mode (default) we still
+        # truncate so manifest entries — and the disk files they
+        # describe — for deleted pages get pruned naturally.
         def self.generate(
           pages : Array(Models::Page),
           config : Models::Config,
           output_dir : String,
           verbose : Bool = false,
+          partial : Bool = false,
         )
           ai = config.og.auto_image
           return unless ai.enabled
@@ -98,12 +107,19 @@ module Hwaro
           config_hash = compute_config_hash(config)
           old_config_hash, old_entries = load_manifest(manifest_path)
           config_changed = old_config_hash != config_hash
-          # Start from the old manifest so partial passes (e.g.
-          # `--fast-start` calling `generate` once for the priority subset
-          # and again for the deferred subset) accumulate rather than
-          # truncate. When config changed, every entry is stale so the
-          # snapshot starts empty.
-          new_entries = config_changed ? ({} of String => String) : old_entries.dup
+          # In partial mode, start from the old manifest so a follow-up
+          # call (e.g. the `--fast-start` deferred pass) doesn't truncate
+          # the entries the previous call just wrote. In full mode we
+          # truncate so entries for deleted pages don't accumulate
+          # forever — the on-disk PNG/SVG for a removed page becomes
+          # orphaned, and the manifest growing unbounded across builds
+          # would defeat the cache-hit check by always "matching"
+          # stale slugs. Config-changed always truncates.
+          new_entries = if config_changed || !partial
+                          {} of String => String
+                        else
+                          old_entries.dup
+                        end
 
           generated = 0
           skipped = 0

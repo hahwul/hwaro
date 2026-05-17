@@ -576,6 +576,12 @@ module Hwaro
           deferred_ctx.output_dir = output_dir
           deferred_ctx.cache = @cache
           deferred_ctx.priority_pages = nil
+          # Still a partial pass — the priority pass just wrote OG
+          # manifest entries we must not truncate. Without this flag the
+          # deferred pass would overwrite `.og_manifest.json` with only
+          # its own slugs and the next cold start would re-render every
+          # priority page's OG image from scratch.
+          deferred_ctx.partial_render = true
 
           # Trigger BeforeRender hooks directly — we're not re-running the
           # Render phase, just the prep work it would have done.
