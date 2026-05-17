@@ -52,15 +52,36 @@ module Hwaro::Core::Build::Phases::Render
     # pass and stash the rest on the Builder so a background fiber in
     # `serve` can render them after the server is already accepting
     # connections. Has no effect outside of `hwaro serve --fast-start`.
+    #
+    # Critically, the priority set is published on `ctx.priority_pages`
+    # BEFORE BeforeRender hooks run so OG image generation and image
+    # resizing (the dominant cost on large sites) only run for the
+    # priority subset on the cold pass. Without this they iterated
+    # `ctx.all_pages` and ate the savings the render-phase filter was
+    # supposed to deliver — fast-start was indistinguishable from a
+    # normal serve cold start. The background pass re-runs those hooks
+    # for the rest, then renders the deferred pages.
     if ctx.options.fast_start
       priority, deferred = split_priority_pages(pages_to_build, ctx.options.fast_start_count)
       @deferred_pages = deferred
       if !deferred.empty?
         Logger.info "  Fast-start: rendering #{priority.size} priority page(s) up front, deferring #{deferred.size} for background render."
+        # NOTE — both `priority_pages` and `partial_render` are consumed
+        # by BeforeRender hooks below (`og_image:generate`,
+        # `image:resize`). Don't move these assignments after
+        # `run_phase` or those hooks will fall back to the all-pages
+        # path and `--fast-start` becomes a no-op again.
+        ctx.priority_pages = priority
+        ctx.partial_render = true
+      else
+        ctx.priority_pages = nil
+        ctx.partial_render = false
       end
       pages_to_build = priority
     else
       @deferred_pages = nil
+      ctx.priority_pages = nil
+      ctx.partial_render = false
     end
 
     profiler.start_phase("Render")
@@ -80,11 +101,21 @@ module Hwaro::Core::Build::Phases::Render
     result
   end
 
-  # Pick a "priority" subset of pages for fast-start: every section index
-  # (so the homepage and any top-level list pages always come up first),
-  # plus the N most recent regular pages by `date` descending. Pages
-  # without a date sort last (they're typically standalone pages like
-  # /about/ that visitors don't land on first).
+  # Pick a "priority" subset of pages for fast-start: the homepage and
+  # shallow section indexes (depth ≤ 1) plus the N most recent regular
+  # pages by `date` descending. Pages without a date sort last.
+  #
+  # Earlier iterations included every `is_index` page, but on real sites
+  # that pulls in deeply-nested `_index.md` files (e.g.
+  # `archive/dev/crystal/_index.md`) plus every `index.md` page-bundle
+  # leaf — on a 1k-page site this ballooned the priority set to 200+
+  # pages and wiped out the win, since OG image generation and image
+  # resize were still running for the whole subset. Section listings
+  # for deep archive folders are exactly the pages users don't hit
+  # first; live-reload will refresh any tab parked on one once the
+  # background pass finishes.
+  PRIORITY_MAX_SECTION_DEPTH = 1
+
   protected def split_priority_pages(
     pages : Array(Models::Page),
     count : Int32,
@@ -95,7 +126,7 @@ module Hwaro::Core::Build::Phases::Render
     regulars = [] of Models::Page
 
     pages.each do |page|
-      if page.is_index
+      if priority_section_index?(page)
         priority << page
       else
         regulars << page
@@ -122,6 +153,18 @@ module Hwaro::Core::Build::Phases::Render
     priority_list = pages.select { |p| priority.includes?(p) }
     deferred_list = pages.reject { |p| priority.includes?(p) }
     {priority_list, deferred_list}
+  end
+
+  # Treat only the root section index and depth-1 section indexes as
+  # always-priority. `Page#is_index` is also true for `index.md`
+  # page-bundle leaves (regular posts that live alongside their
+  # assets) — those should compete with other regulars for the
+  # `fast_start_count` slots, not bypass the limit.
+  private def priority_section_index?(page : Models::Page) : Bool
+    return false unless page.is_a?(Models::Section)
+    section = page.section
+    return true if section.empty?
+    section.count('/') < PRIORITY_MAX_SECTION_DEPTH
   end
 
   private def render_streaming(

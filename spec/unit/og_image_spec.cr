@@ -791,6 +791,77 @@ describe Hwaro::Content::Seo::OgImage do
       config_hash.should eq("")
       entries.should be_empty
     end
+
+    # Default `partial: false` truncates the manifest each pass so
+    # entries for pages that no longer exist don't accumulate. Without
+    # this, an `--fast-start` regression that started writing partial
+    # manifests in full builds would leak slugs forever — the cache
+    # check `old_entries[slug]? == page_hash` would keep matching
+    # against stale entries and the on-disk OG file for a removed
+    # page would never get cleaned up.
+    it "prunes manifest entries for pages no longer in the input (full mode)" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        page_a = Hwaro::Models::Page.new("a.md")
+        page_a.title = "A"
+        page_a.url = "/a/"
+        page_a.render = true
+
+        page_b = Hwaro::Models::Page.new("b.md")
+        page_b.title = "B"
+        page_b.url = "/b/"
+        page_b.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page_a, page_b], config, dir)
+
+        manifest_path = File.join(dir, "og-images", ".og_manifest.json")
+        entries = JSON.parse(File.read(manifest_path))["entries"].as_h
+        entries.has_key?("a").should be_true
+        entries.has_key?("b").should be_true
+
+        # Second pass with only page_a — page_b's manifest entry must drop.
+        page_a.image = nil
+        Hwaro::Content::Seo::OgImage.generate([page_a], config, dir)
+
+        entries = JSON.parse(File.read(manifest_path))["entries"].as_h
+        entries.has_key?("a").should be_true
+        entries.has_key?("b").should be_false
+      end
+    end
+
+    # Partial mode is the `--fast-start` two-pass path: the priority
+    # pass writes a manifest, the deferred pass writes another for the
+    # remainder. The second call must NOT truncate the first call's
+    # entries, otherwise the next cold start would re-render every
+    # priority page's OG image from scratch.
+    it "accumulates manifest entries across calls (partial mode)" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+
+        priority_page = Hwaro::Models::Page.new("home.md")
+        priority_page.title = "Home"
+        priority_page.url = "/"
+        priority_page.render = true
+
+        deferred_page = Hwaro::Models::Page.new("old.md")
+        deferred_page.title = "Old Post"
+        deferred_page.url = "/old/"
+        deferred_page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([priority_page], config, dir, partial: true)
+        Hwaro::Content::Seo::OgImage.generate([deferred_page], config, dir, partial: true)
+
+        manifest_path = File.join(dir, "og-images", ".og_manifest.json")
+        entries = JSON.parse(File.read(manifest_path))["entries"].as_h
+        entries.has_key?("home").should be_true # slugified from title since "/" yields empty URL slug
+        entries.has_key?("old").should be_true
+      end
+    end
   end
 
   describe ".split_into_segments" do
