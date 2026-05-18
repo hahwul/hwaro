@@ -806,6 +806,15 @@ module Hwaro::Core::Build::Phases::Render
       end
       @cache_manager.record_miss("page_crinja_value")
       begin
+        translations = p.translations.map do |t|
+          Crinja::Value.new({
+            "code"       => Crinja::Value.new(t.code),
+            "url"        => Crinja::Value.new(t.url),
+            "title"      => Crinja::Value.new(t.title),
+            "is_current" => Crinja::Value.new(t.is_current),
+            "is_default" => Crinja::Value.new(t.is_default),
+          })
+        end
         val = Crinja::Value.new({
           "path"         => Crinja::Value.new(p.path),
           "title"        => Crinja::Value.new(p.title),
@@ -821,6 +830,7 @@ module Hwaro::Core::Build::Phases::Render
           "generated"    => Crinja::Value.new(p.generated),
           "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
           "language"     => Crinja::Value.new(p.language || default_language),
+          "translations" => Crinja::Value.new(translations),
           "weight"       => Crinja::Value.new(p.weight),
           "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
           "word_count"   => Crinja::Value.new(p.word_count),
