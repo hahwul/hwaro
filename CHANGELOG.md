@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.1
+
+### Fixed
+- Multilingual: `section.pages`, `get_section(...).pages`, `series_pages`, `related_posts`, and the global pages array now expose `translations` on each item. The per-page Crinja value cache was omitting the field, so sibling-navigation templates iterating `section.pages` saw empty translation arrays even when the same page exposed populated translations as `page.translations` (gh#540).
+- `page.lower` / `page.higher` are now populated for page bundles. The transform step skipped any page with `is_index = true`, but `ctx.pages` only contains regular files and page-bundle leaves (`index.md`) — section indexes (`_index.md`) live in `ctx.sections`. Page bundles set `is_index` for URL generation, so the filter silently excluded them and left their flat-navigation neighbors always `nil` (gh#539).
+
 ## v0.14.0
 
 ### Behavior changes
