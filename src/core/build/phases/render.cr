@@ -806,6 +806,15 @@ module Hwaro::Core::Build::Phases::Render
       end
       @cache_manager.record_miss("page_crinja_value")
       begin
+        translations = p.translations.map do |t|
+          Crinja::Value.new({
+            "code"       => Crinja::Value.new(t.code),
+            "url"        => Crinja::Value.new(t.url),
+            "title"      => Crinja::Value.new(t.title),
+            "is_current" => Crinja::Value.new(t.is_current),
+            "is_default" => Crinja::Value.new(t.is_default),
+          })
+        end
         val = Crinja::Value.new({
           "path"         => Crinja::Value.new(p.path),
           "title"        => Crinja::Value.new(p.title),
@@ -821,6 +830,7 @@ module Hwaro::Core::Build::Phases::Render
           "generated"    => Crinja::Value.new(p.generated),
           "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
           "language"     => Crinja::Value.new(p.language || default_language),
+          "translations" => Crinja::Value.new(translations),
           "weight"       => Crinja::Value.new(p.weight),
           "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
           "word_count"   => Crinja::Value.new(p.word_count),
@@ -1150,29 +1160,19 @@ module Hwaro::Core::Build::Phases::Render
     lang_prefix = page_language != default_lang && config.multilingual? ? "/#{page_language}" : ""
     vars["lang_prefix"] = Crinja::Value.new(lang_prefix)
 
-    translations = page.translations.map do |t|
-      Crinja::Value.new(
-        {
-          "code"       => Crinja::Value.new(t.code),
-          "url"        => Crinja::Value.new(t.url),
-          "title"      => Crinja::Value.new(t.title),
-          "is_current" => Crinja::Value.new(t.is_current),
-          "is_default" => Crinja::Value.new(t.is_default),
-        }
-      )
-    end
-    vars["page_translations"] = Crinja::Value.new(translations)
-
     # Generate permalink only if not already set
     page.generate_permalink(config.base_url) unless page.permalink
 
-    # Reuse cached Crinja arrays for tags/authors/assets/extra (avoids per-page .map allocation)
+    # Reuse cached Crinja arrays for tags/authors/assets/extra/translations
+    # (avoids per-page .map allocation)
     cached_page_val = cached_page_crinja_value(page, default_lang)
     cached_raw = cached_page_val.raw.as(Hash)
     tags_crinja = cached_raw["tags"].as(Crinja::Value)
     authors_crinja = cached_raw["authors"].as(Crinja::Value)
     assets_crinja = cached_raw["assets"].as(Crinja::Value)
     extra_crinja = cached_raw["extra"].as(Crinja::Value)
+    translations_crinja = cached_raw["translations"].as(Crinja::Value)
+    vars["page_translations"] = translations_crinja
 
     # Reuse cached Crinja::Value for lower/higher pages
     lower_obj = page.lower.try { |l| cached_page_crinja_value(l, default_lang) }
@@ -1212,7 +1212,7 @@ module Hwaro::Core::Build::Phases::Render
       "generated"    => Crinja::Value.new(page.generated),
       "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
       "language"     => Crinja::Value.new(page_language),
-      "translations" => Crinja::Value.new(translations),
+      "translations" => translations_crinja,
       # New properties
       "authors"         => authors_crinja,
       "tags"            => tags_crinja,
@@ -1483,7 +1483,7 @@ module Hwaro::Core::Build::Phases::Render
       "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),
       "twitter_creator" => Crinja::Value.new(config.og.twitter_creator || ""),
       "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),
-      "hreflang"        => Crinja::Value.new(translations),
+      "hreflang"        => translations_crinja,
     }
     vars["seo"] = Crinja::Value.new(seo_obj)
 

@@ -88,6 +88,35 @@ describe "Multilingual: Translation links" do
   end
 end
 
+describe "Multilingual: section.pages translations" do
+  it "exposes translations on each page in section.pages (#540)" do
+    build_site(
+      MULTILINGUAL_CONFIG,
+      content_files: {
+        "posts/_index.md"       => "---\ntitle: Posts\n---\n",
+        "posts/_index.ko.md"    => "---\ntitle: 포스트\n---\n",
+        "posts/foo/index.md"    => "---\ntitle: Foo\n---\nEN foo",
+        "posts/foo/index.ko.md" => "---\ntitle: 푸\n---\nKO foo",
+      },
+      template_files: {
+        "page.html" => "{% set section = get_section(path=page.section) %}" \
+                       "SIB={% for p in section.pages %}" \
+                       "[{{ p.url }} t={% for t in p.translations %}{{ t.code }}:{{ t.url }},{% endfor %}]" \
+                       "{% endfor %}",
+      },
+    ) do
+      # Sibling page in section.pages must expose the same translations
+      # as the page itself does (gh#540). The previously broken output
+      # was `t=` (empty); the fix populates both language entries.
+      en_html = File.read("public/posts/foo/index.html")
+      en_html.should contain("t=en:/posts/foo/,ko:/ko/posts/foo/,")
+
+      ko_html = File.read("public/ko/posts/foo/index.html")
+      ko_html.should contain("t=en:/posts/foo/,ko:/ko/posts/foo/,")
+    end
+  end
+end
+
 describe "Multilingual: Section list isolation" do
   it "section_list only shows pages of the same language" do
     build_site(
