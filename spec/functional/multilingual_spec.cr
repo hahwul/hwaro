@@ -105,11 +105,14 @@ describe "Multilingual: section.pages translations" do
                        "{% endfor %}",
       },
     ) do
-      en_html = File.read("public/posts/foo/index.html")
       # Sibling page in section.pages must expose the same translations
       # as the page itself does (gh#540). The previously broken output
       # was `t=` (empty); the fix populates both language entries.
+      en_html = File.read("public/posts/foo/index.html")
       en_html.should contain("t=en:/posts/foo/,ko:/ko/posts/foo/,")
+
+      ko_html = File.read("public/ko/posts/foo/index.html")
+      ko_html.should contain("t=en:/posts/foo/,ko:/ko/posts/foo/,")
     end
   end
 end
