@@ -126,6 +126,40 @@ describe Hwaro::Core::Build::Phases::Transform do
       page_b.lower.should eq(page_a)
       page_b.higher.should be_nil
     end
+
+    it "links page bundles alongside single-file pages (issue #539)" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      section = make_section("posts/_index.md", "posts")
+      section.is_index = true
+      section.weight = 1
+      section.sort_by = "weight"
+
+      # Single-file page
+      foo = make_page("posts/foo.md", "posts")
+      foo.title = "Foo"
+      foo.weight = 1
+      # Page bundle (index.md) — also has is_index = true for URL generation,
+      # but should still receive lower/higher links.
+      bar = make_page("posts/bar/index.md", "posts")
+      bar.title = "Bar"
+      bar.weight = 2
+      bar.is_index = true
+
+      ctx.sections = [section]
+      ctx.pages = [foo, bar]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_link_page_navigation(ctx)
+
+      # Flat order: section index → foo (weight 1) → bar (weight 2)
+      foo.lower.should eq(section)
+      foo.higher.should eq(bar)
+
+      bar.lower.should eq(foo)
+      bar.higher.should be_nil
+    end
   end
 
   describe "#populate_taxonomies / #rebuild_taxonomies" do

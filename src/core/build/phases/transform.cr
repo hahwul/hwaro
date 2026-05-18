@@ -41,10 +41,14 @@ module Hwaro::Core::Build::Phases::Transform
     sections_by_path = {} of String => Models::Section
     ctx.sections.each { |s| sections_by_path[s.section] = s }
 
-    # Group non-index pages by section
+    # Group pages by section. `ctx.pages` only contains regular pages and
+    # page-bundle leaves (`index.md`) — section indexes (`_index.md`) live
+    # in `ctx.sections` and are interleaved separately by
+    # `flatten_section_tree`. Page bundles set `is_index = true` for URL
+    # generation, but for navigation they're ordinary pages within their
+    # parent section.
     pages_by_section = {} of String => Array(Models::Page)
     ctx.pages.each do |page|
-      next if page.is_index
       section = page.section
       pages_by_section[section] ||= [] of Models::Page
       pages_by_section[section] << page
@@ -70,7 +74,6 @@ module Hwaro::Core::Build::Phases::Transform
     # Add any orphan pages not belonging to any section
     section_names = sections_by_path.keys.to_set
     ctx.pages.each do |page|
-      next if page.is_index
       next if section_names.includes?(page.section)
       flat_list << page unless flat_list.includes?(page)
     end
@@ -254,7 +257,6 @@ module Hwaro::Core::Build::Phases::Transform
 
     pages_by_section = {} of String => Array(Models::Page)
     site.pages.each do |page|
-      next if page.is_index
       section = page.section
       pages_by_section[section] ||= [] of Models::Page
       pages_by_section[section] << page
@@ -275,7 +277,6 @@ module Hwaro::Core::Build::Phases::Transform
 
     section_names = sections_by_path.keys.to_set
     site.pages.each do |page|
-      next if page.is_index
       next if section_names.includes?(page.section)
       flat_list << page unless flat_list.includes?(page)
     end
