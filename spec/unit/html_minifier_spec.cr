@@ -179,6 +179,23 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should contain("<pre>third</pre>")
       end
 
+      it "does not let a literal <script> string inside <style> derail extraction" do
+        # `<style>` is extracted before `<script>` precisely so the
+        # script pass cannot mis-pair a real `</script>` elsewhere
+        # with a `<script>` text fragment that lived inside CSS.
+        html = "<style>p::before { content: \"<script>\" }</style>\n<p>hi</p>\n<script>real()</script>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("<style>p::before { content: \"<script>\" }</style>")
+        result.should contain("<script>real()</script>")
+        result.should contain("<p>hi</p>")
+      end
+
+      it "preserves XML comments inside <svg>" do
+        html = "<div>\n  <svg><!-- generator note --><circle/></svg>\n</div>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("<!-- generator note -->")
+      end
+
       it "cleans template-induced whitespace inside pre/code" do
         # The protection covers <pre> first, so its content is opaque
         # afterward. Whitespace inside the <code> alone (without a
@@ -186,6 +203,27 @@ describe Hwaro::Utils::HtmlMinifier do
         html = "<pre><code>x\n  y</code></pre>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should contain("x\n  y")
+      end
+    end
+
+    describe "edge cases" do
+      it "treats uppercase tag names the same as lowercase" do
+        html = "<DIV>\n  <P>hi</P>\n</DIV>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<DIV><P>hi</P></DIV>")
+      end
+
+      it "collapses whitespace around self-closing void elements between blocks" do
+        html = "<head>\n  <meta charset=\"utf-8\"/>\n  <link rel=\"icon\" href=\"x\"/>\n</head>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<head><meta charset=\"utf-8\"/><link rel=\"icon\" href=\"x\"/></head>")
+      end
+
+      it "preserves DOCTYPE and collapses whitespace before <html>" do
+        html = "<!doctype html>\n<html>\n  <head></head>\n</html>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should start_with("<!doctype html>")
+        result.should contain("<html><head></head></html>")
       end
     end
 

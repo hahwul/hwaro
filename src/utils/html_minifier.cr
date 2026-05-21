@@ -48,7 +48,12 @@ module Hwaro
       # placeholders before any whitespace pass and restored afterward.
       # `code` is included because inline-code snippets often carry
       # whitespace that authors expect to ship unchanged.
-      PROTECTED_TAGS = %w[pre textarea script style code svg math noscript]
+      #
+      # Order matters: a `<style>` body may legitimately contain the
+      # literal string `<script>` (e.g. `content: "<script>"`), so
+      # `style` is extracted first to remove that text from view
+      # before the `script` pass runs.
+      PROTECTED_TAGS = %w[pre textarea style script code svg math noscript]
 
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
       # so the placeholder cannot collide with author content.
@@ -66,6 +71,11 @@ module Hwaro
       #   $4 = whitespace run
       #   $5 = "/" or "" on the next tag
       #   $6 = next tag's name
+      #
+      # Known limitation: `[^>]*` does not understand quoted attribute
+      # values, so a literal `>` inside an attribute (`title="x > y"`)
+      # is treated as the tag's end. Hwaro's rendered output does not
+      # produce such attributes in practice.
       private REGEX_INTERTAG_WS    = /(<\/?)([A-Za-z][\w-]*)([^>]*)>(\s+)(?=<(\/?)([A-Za-z][\w-]*))/
       private REGEX_BLANK_LINES    = /\n{2,}/
       private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P_(\d+)\x00/
