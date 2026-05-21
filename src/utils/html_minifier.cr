@@ -1,62 +1,151 @@
 # HTML minification utilities
 #
-# Provides conservative HTML minification that only removes
-# clearly unnecessary content while preserving meaningful whitespace.
+# Aggressively shrinks rendered HTML while staying visually equivalent
+# to the input. Two ideas keep it safe:
 #
-# Conservative-by-default is a deliberate choice: prior attempts at
-# aggressive whitespace collapsing (leading-whitespace strip, inter-tag
-# whitespace collapse, etc.) broke content rendering even with
-# `<pre>/<textarea>/<script>/<style>` protection. If more aggressive
-# output shrinking is required, post-process with an external tool.
+#   1. Whitespace-sensitive elements (<pre>, <textarea>, <script>,
+#      <style>, <code>, <svg>, <math>, <noscript>) are extracted as
+#      opaque blocks before any whitespace pass touches the document
+#      and restored verbatim at the end. Each tag is handled in its
+#      own pass so a stray alternation in non-greedy matching can't
+#      pair an open <pre> with a close </script>.
 #
-# Operations:
-# - Clean up template-induced whitespace inside <pre> blocks
-# - Remove HTML comments (preserving conditional and <!--more--> markers)
-# - Strip trailing whitespace from each line
-# - Collapse excessive blank lines
+#   2. Inter-tag whitespace is collapsed by classifying both
+#      neighboring tag names. Between two block-level tags whitespace
+#      is removed entirely; otherwise it collapses to a single space,
+#      preserving the visible gap between adjacent inline elements
+#      (e.g. `<a>x</a> <a>y</a>`).
+#
+# What is NOT done: variable renaming, attribute rewriting, or
+# entity collapsing. For more aggressive output shrinking, post-process
+# with a dedicated tool (`html-minifier-terser`, `minify-html`).
 
 module Hwaro
   module Utils
     module HtmlMinifier
       extend self
 
-      # Regex constants for HTML minification
-      private REGEX_PRE_OPEN       = /<pre([^>]*)>\s*<code/
-      private REGEX_PRE_CLOSE      = /<\/code>\s*<\/pre>/
+      # HTML block-level elements. Whitespace between two block-level
+      # neighbors has no visual effect (the user agent renders them on
+      # separate lines anyway), so it is safe to strip entirely.
+      # Anything not listed here is treated as inline, where whitespace
+      # between siblings collapses to a single rendered space and must
+      # therefore be kept as one literal space.
+      BLOCK_TAGS = Set{
+        "address", "article", "aside", "base", "blockquote", "body",
+        "caption", "col", "colgroup", "dd", "details", "dialog",
+        "div", "dl", "dt", "fieldset", "figcaption", "figure",
+        "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
+        "head", "header", "hgroup", "hr", "html", "iframe",
+        "li", "link", "main", "meta", "nav", "noscript",
+        "ol", "p", "picture", "pre", "script", "section",
+        "source", "style", "summary", "table", "tbody", "td",
+        "tfoot", "th", "thead", "title", "tr", "track", "ul",
+        "video", "audio", "canvas",
+      }
+
+      # Tags whose content must be preserved verbatim. Extracted into
+      # placeholders before any whitespace pass and restored afterward.
+      # `code` is included because inline-code snippets often carry
+      # whitespace that authors expect to ship unchanged.
+      #
+      # Order matters: a `<style>` body may legitimately contain the
+      # literal string `<script>` (e.g. `content: "<script>"`), so
+      # `style` is extracted first to remove that text from view
+      # before the `script` pass runs.
+      PROTECTED_TAGS = %w[pre textarea style script code svg math noscript]
+
+      # Sentinel format for protected blocks. `\x00` is illegal in HTML,
+      # so the placeholder cannot collide with author content.
+      private PRESERVE_PREFIX = "\x00HW_HTML_P_"
+      private PRESERVE_SUFFIX = "\x00"
+
+      # Regex constants
       private REGEX_COMMENTS       = /<!--(?!\[if|#|\s*more\s*-->).*?-->/m
       private REGEX_TRAILING_SPACE = /[ \t]+$/m
-      private REGEX_BLANK_LINES    = /\n{3,}/
-
-      # Perform conservative HTML minification
+      # Match a complete tag immediately followed by whitespace and
+      # lookahead at the next tag. Captures:
+      #   $1 = "/" or "" on the prior tag
+      #   $2 = prior tag's name
+      #   $3 = prior tag's attribute slice (may contain a self-closing /)
+      #   $4 = whitespace run
+      #   $5 = "/" or "" on the next tag
+      #   $6 = next tag's name
       #
-      # Only removes: HTML comments, trailing whitespace on lines, excessive blank lines
-      # Preserves: all meaningful whitespace, newlines, indentation structure
+      # Known limitation: `[^>]*` does not understand quoted attribute
+      # values, so a literal `>` inside an attribute (`title="x > y"`)
+      # is treated as the tag's end. Hwaro's rendered output does not
+      # produce such attributes in practice.
+      private REGEX_INTERTAG_WS    = /(<\/?)([A-Za-z][\w-]*)([^>]*)>(\s+)(?=<(\/?)([A-Za-z][\w-]*))/
+      private REGEX_BLANK_LINES    = /\n{2,}/
+      private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P_(\d+)\x00/
+
+      # Minify the given HTML.
       #
       # Example:
-      #   minify("<p>Hello</p>\n\n\n\n<p>World</p>")  # => "<p>Hello</p>\n\n<p>World</p>"
+      #   minify("<div>\n  <p>Hello</p>\n</div>")
+      #   # => "<div><p>Hello</p></div>"
       #
+      #   minify("<span>x</span>\n<span>y</span>")
+      #   # => "<span>x</span> <span>y</span>"
       def minify(html : String) : String
-        # Clean up template-induced whitespace inside pre blocks
-        # This handles cases like: <pre>\n  <code>content</code>\n</pre>
-        # Converting to: <pre><code>content</code></pre>
-        cleaned = html
-          .gsub(REGEX_PRE_OPEN, "<pre\\1><code")
-          .gsub(REGEX_PRE_CLOSE, "</code></pre>")
+        preserves = [] of String
+        result = protect_sensitive_blocks(html, preserves)
+        result = result.gsub(REGEX_COMMENTS, "")
+        result = result.gsub(REGEX_TRAILING_SPACE, "")
+        result = collapse_inter_tag_whitespace(result)
+        result = result.gsub(REGEX_BLANK_LINES, "\n")
+        result = restore_sensitive_blocks(result, preserves)
+        result.strip
+      end
 
-        # Remove HTML comments (but not conditional comments like <!--[if IE]>)
-        # Also preserve <!-- more --> markers used for content summaries
-        minified = cleaned.gsub(REGEX_COMMENTS, "")
+      # Extract whitespace-sensitive elements one tag at a time. A
+      # single regex with alternation in the open/close tag (e.g.
+      # `<(pre|script)>...</(pre|script)>`) does not enforce that both
+      # sides reference the same tag, which let prior implementations
+      # pair `<pre>` openers with `</script>` closers when the document
+      # mixed both. One pass per tag avoids that whole class of bug.
+      private def protect_sensitive_blocks(html : String, preserves : Array(String)) : String
+        result = html
+        PROTECTED_TAGS.each do |tag|
+          pattern = Regex.new(
+            "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
+            Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
+          )
+          result = result.gsub(pattern) do |match|
+            idx = preserves.size
+            preserves << match
+            "#{PRESERVE_PREFIX}#{idx}#{PRESERVE_SUFFIX}"
+          end
+        end
+        result
+      end
 
-        # Strip trailing whitespace from each line. Trailing spaces have no
-        # rendering effect in HTML anywhere — including inside <pre>, where
-        # line-ending whitespace is invisible — so this is safe regardless
-        # of context.
-        minified = minified.gsub(REGEX_TRAILING_SPACE, "")
+      private def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
+        html.gsub(REGEX_PRESERVE_TOKEN) do
+          idx = $1.to_i
+          idx < preserves.size ? preserves[idx] : $0
+        end
+      end
 
-        # Collapse 3+ consecutive blank lines to 2
-        minified = minified.gsub(REGEX_BLANK_LINES, "\n\n")
+      # Collapse whitespace between two tags according to neighbor type.
+      # Both block-level → strip entirely. Otherwise → single space, so
+      # adjacent inline siblings keep their visible gap.
+      private def collapse_inter_tag_whitespace(html : String) : String
+        html.gsub(REGEX_INTERTAG_WS) do
+          slash_prev = $1
+          name_prev = $2
+          attrs_prev = $3
+          # $4 = whitespace run (discarded)
+          name_next = $6
 
-        minified.strip
+          rebuilt = "#{slash_prev}#{name_prev}#{attrs_prev}>"
+          if BLOCK_TAGS.includes?(name_prev.downcase) && BLOCK_TAGS.includes?(name_next.downcase)
+            rebuilt
+          else
+            "#{rebuilt} "
+          end
+        end
       end
     end
   end
