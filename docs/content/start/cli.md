@@ -228,15 +228,15 @@ The build output is identical — streaming only affects memory usage during the
 
 **About `--minify`:**
 
-The minify flag performs conservative optimization on generated files:
+The minify flag shrinks generated files while keeping them visually identical to the un-minified output:
 
-- **HTML**: Removes comments and trailing whitespace, collapses excessive blank lines. Preserves all indentation, newlines, inter-tag whitespace, and content structure.
+- **HTML**: Removes comments (preserves conditional comments, SSI directives, `<!-- more -->`), strips trailing whitespace, and collapses inter-tag whitespace. Whitespace between two block-level tags (e.g. `</p>\n<p>`) is removed entirely; whitespace between an inline neighbor (e.g. `<a>x</a> <a>y</a>`) is collapsed to a single space so the visible gap is preserved.
 - **JSON**: Removes whitespace and newlines for compact output.
 - **XML**: Removes whitespace between tags for smaller file sizes.
 
-Code blocks (`<pre>`, `<code>`) and script/style content are always preserved intact.
+Whitespace-sensitive elements — `<pre>`, `<code>`, `<textarea>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<noscript>` — are extracted before any whitespace pass and restored verbatim, so their contents are never touched.
 
-**HTML minification is intentionally conservative.** Prior attempts at aggressive HTML reduction (stripping indentation, collapsing whitespace between tags, etc.) caused content-rendering regressions even with `<pre>`/`<script>`/`<style>` protection. If you need aggressive HTML minification for deployment, post-process the output of `public/` with a dedicated minifier (e.g. `html-minifier-terser`, `minify-html`) rather than relying on `--minify`.
+For more aggressive output shrinking (attribute quoting, entity collapsing, etc.) post-process `public/` with a dedicated tool such as `html-minifier-terser` or `minify-html`.
 
 **About `--cache` (Incremental Build):**
 
