@@ -161,7 +161,7 @@ module Hwaro
             refs << File.basename(path)
           end
         end
-      rescue
+      rescue Exception
         # Treat config-load failures as "no extra references" so the
         # tool stays best-effort rather than crashing on a partial
         # site.

@@ -467,13 +467,18 @@ module Hwaro
         def self.load_manifest(manifest_path : String) : Tuple(String, Hash(String, String))
           return {"", {} of String => String} unless File.exists?(manifest_path)
           data = JSON.parse(File.read(manifest_path))
-          config_hash = data["config_hash"]?.try(&.as_s) || ""
+          config_hash = data["config_hash"]?.try(&.as_s?) || ""
           entries = {} of String => String
-          if e = data["entries"]?.try(&.as_h)
-            e.each { |k, v| entries[k] = v.as_s }
+          if e = data["entries"]?.try(&.as_h?)
+            e.each do |k, v|
+              if str = v.as_s?
+                entries[k] = str
+              end
+            end
           end
           {config_hash, entries}
-        rescue
+        rescue ex : JSON::ParseException | IO::Error
+          Logger.debug "OG manifest load failed (#{manifest_path}): #{ex.message}"
           {"", {} of String => String}
         end
 

@@ -2,6 +2,7 @@ require "file_utils"
 require "yaml"
 require "toml"
 require "../../config/options/export_options"
+require "../../utils/file_safe"
 require "../../utils/logger"
 
 module Hwaro
@@ -60,7 +61,8 @@ module Hwaro
                   fields[key] = arr unless arr.empty?
                 end
               end
-            rescue
+            rescue TOML::ParseException
+              # Malformed TOML front matter: surface no fields, keep body.
             end
             return {fields, body}
           elsif match = content.match(YAML_FRONTMATTER_RE)
@@ -86,7 +88,8 @@ module Hwaro
                   end
                 end
               end
-            rescue
+            rescue YAML::ParseException
+              # Malformed YAML front matter: surface no fields, keep body.
             end
             return {fields, body}
           end
@@ -96,7 +99,7 @@ module Hwaro
 
         # Write a file, creating parent directories as needed
         protected def write_file(path : String, content : String, verbose : Bool = false)
-          FileUtils.mkdir_p(File.dirname(path))
+          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
           File.write(path, content)
           Logger.debug "Exported: #{path}" if verbose
         end

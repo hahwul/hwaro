@@ -254,7 +254,7 @@ module Hwaro
             return [] of String unless File.exists?("config.toml")
             config = Models::Config.load
             config.taxonomies.map(&.name)
-          rescue
+          rescue Exception
             [] of String
           end
 
@@ -325,7 +325,7 @@ module Hwaro
                   ip.starts_with?("fe80") ||                        # IPv6 link-local
                   private_172?(ip)
               end
-            rescue
+            rescue Socket::Error
               false
             end
           end

@@ -221,7 +221,7 @@ module Hwaro
             Time.parse(date_str, fmt, Time::Location::UTC)
             parsed = true
             break
-          rescue
+          rescue Time::Format::Error
             next
           end
         end
@@ -231,7 +231,7 @@ module Hwaro
           begin
             Time.parse_rfc3339(date_str)
             parsed = true
-          rescue
+          rescue Time::Format::Error
           end
         end
 

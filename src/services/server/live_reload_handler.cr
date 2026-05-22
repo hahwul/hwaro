@@ -45,7 +45,7 @@ module Hwaro
             if message = @current_error
               begin
                 socket.send("error:#{{"message" => message}.to_json}")
-              rescue
+              rescue IO::Error | Socket::Error
                 # Connection torn down before the replay; harmless.
               end
             end
@@ -93,7 +93,7 @@ module Hwaro
         snapshot.each do |socket|
           begin
             socket.send(message)
-          rescue
+          rescue IO::Error | Socket::Error
             dead << socket
           end
         end
@@ -187,8 +187,16 @@ module Hwaro
         file_path = File.join(@public_dir, relative)
 
         # Verify resolved path is within public_dir
-        resolved = File.realpath(file_path) rescue nil
-        public_real = File.realpath(@public_dir) rescue @public_dir
+        resolved = begin
+          File.realpath(file_path)
+        rescue File::Error
+          nil
+        end
+        public_real = begin
+          File.realpath(@public_dir)
+        rescue File::Error
+          @public_dir
+        end
         unless resolved && (resolved == public_real || resolved.starts_with?(public_real + "/"))
           call_next(context)
           return

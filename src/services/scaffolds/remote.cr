@@ -129,8 +129,9 @@ module Hwaro
           targets = [] of {category: Symbol, key: String, full_path: String, display: String}
 
           tree.each do |entry|
-            full_path = entry["path"].as_s
-            next unless entry["type"].as_s == "blob"
+            full_path = entry["path"]?.try(&.as_s?)
+            next unless full_path
+            next unless entry["type"]?.try(&.as_s?) == "blob"
 
             unless prefix.empty?
               next unless full_path.starts_with?(prefix)
@@ -276,7 +277,10 @@ module Hwaro
           end
 
           data = JSON.parse(response.body)
-          data["default_branch"].as_s
+          data["default_branch"]?.try(&.as_s?) || raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_NETWORK,
+            message: "GitHub repo info for #{owner}/#{repo} is missing 'default_branch'",
+          )
         end
 
         private def fetch_tree(owner : String, repo : String, branch : String) : Array(JSON::Any)
@@ -290,7 +294,10 @@ module Hwaro
           end
 
           data = JSON.parse(response.body)
-          data["tree"].as_a
+          data["tree"]?.try(&.as_a?) || raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_NETWORK,
+            message: "GitHub tree response for #{owner}/#{repo}@#{branch} is missing 'tree'",
+          )
         end
 
         private def fetch_file(owner : String, repo : String, branch : String, path : String) : String

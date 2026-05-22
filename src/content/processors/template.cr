@@ -302,7 +302,7 @@ module Hwaro
                 regex_cache[regex_str] ||= Regex.new(regex_str)
               end
               target.to_s.matches?(regex)
-            rescue
+            rescue ArgumentError
               false
             end
           end

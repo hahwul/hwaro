@@ -837,7 +837,7 @@ module Hwaro
 
         uri = begin
           URI.parse(value)
-        rescue
+        rescue URI::Error
           raise ArgumentError.new("Invalid base_url: '#{value}'. Expected http(s)://host[/path].")
         end
 

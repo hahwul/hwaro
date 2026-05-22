@@ -410,7 +410,7 @@ module Hwaro
         private def crinja_function?(name : String, crinja_env_override : Crinja?) : Bool
           env = crinja_env_override || crinja_env
           env.functions.has_key?(name)
-        rescue
+        rescue Exception
           false
         end
 

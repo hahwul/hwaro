@@ -19,7 +19,7 @@ module Hwaro
                 else
                   Crinja::Value.new(num.to_i64)
                 end
-              rescue
+              rescue Exception
                 target
               end
             end
@@ -37,7 +37,7 @@ module Hwaro
                 else
                   Crinja::Value.new(num.to_i64)
                 end
-              rescue
+              rescue Exception
                 target
               end
             end

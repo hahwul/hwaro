@@ -119,16 +119,16 @@ module Hwaro
           if data_file
             begin
               json = JSON.parse(File.read(data_file))
-              if json.as_h?
+              if h = json.as_h?
                 relative_dir = dir.sub(base_path, "").lstrip('/')
                 parsed = {} of String => YAML::Any
-                json.as_h.each do |k, v|
+                h.each do |k, v|
                   parsed[k] = json_any_to_yaml_any(v)
                 end
                 data[relative_dir] = parsed
               end
-            rescue
-              # Skip invalid data files
+            rescue JSON::ParseException | File::Error
+              # Skip invalid or unreadable data files
             end
           end
 
@@ -335,7 +335,7 @@ module Hwaro
                   end
                   return YAML.dump(merged).strip
                 end
-              rescue
+              rescue YAML::ParseException
                 return frontmatter_yaml
               end
             end

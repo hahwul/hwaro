@@ -18,12 +18,12 @@ module Hwaro
                     item_hash = item.as_h
                     item_val = item_hash[attr_key]?
                     item_val == val
-                  rescue
+                  rescue Exception
                     false
                   end
                 end
                 Crinja::Value.new(filtered)
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result
@@ -40,14 +40,14 @@ module Hwaro
                   begin
                     item_hash = item.as_h
                     item_hash[attr_key]?.try(&.to_s) || ""
-                  rescue
+                  rescue Exception
                     ""
                   end
                 end
 
                 sorted = sorted.reverse if reverse
                 Crinja::Value.new(sorted)
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result
@@ -66,7 +66,7 @@ module Hwaro
                     key = item_hash[attr_key]?.try(&.to_s) || ""
                     groups[key] ||= [] of Crinja::Value
                     groups[key] << item
-                  rescue
+                  rescue Exception
                     # Skip non-hash items
                   end
                 end
@@ -79,7 +79,7 @@ module Hwaro
                 end
 
                 Crinja::Value.new(group_result.map { |h| Crinja::Value.new(h) })
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result
@@ -100,7 +100,7 @@ module Hwaro
                   end
                 end
                 Crinja::Value.new(unique_items)
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result
@@ -115,12 +115,12 @@ module Hwaro
                   begin
                     sub = item.as_a
                     sub.each { |v| flattened << v }
-                  rescue
+                  rescue Exception
                     flattened << item
                   end
                 end
                 Crinja::Value.new(flattened)
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result
@@ -134,7 +134,7 @@ module Hwaro
                   item.raw.nil? || item.to_s.empty?
                 end
                 Crinja::Value.new(compacted)
-              rescue
+              rescue Exception
                 Crinja::Value.new([] of Crinja::Value)
               end
               result

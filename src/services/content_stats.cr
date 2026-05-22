@@ -129,7 +129,8 @@ module Hwaro
                 return raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
               end
             end
-          rescue
+          rescue TOML::ParseException
+            # Malformed TOML front matter — treat as no tags.
           end
         elsif match = content.match(YAML_FRONTMATTER_RE)
           begin
@@ -141,7 +142,8 @@ module Hwaro
                 end
               end
             end
-          rescue
+          rescue YAML::ParseException
+            # Malformed YAML front matter — treat as no tags.
           end
         end
 

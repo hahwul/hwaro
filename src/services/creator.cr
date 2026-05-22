@@ -4,6 +4,7 @@ require "time"
 require "../config/options/new_options"
 require "../models/config"
 require "../utils/errors"
+require "../utils/file_safe"
 require "../utils/logger"
 require "../utils/text_utils"
 
@@ -238,7 +239,7 @@ module Hwaro
           full_path = File.join(base_dir, filename)
         end
 
-        FileUtils.mkdir_p(base_dir) unless Dir.exists?(base_dir)
+        Hwaro::Utils::FileSafe.mkdir_p(base_dir) unless Dir.exists?(base_dir)
 
         # Draft: CLI flag > path-based detection
         is_draft = if options.draft.nil?
@@ -301,7 +302,7 @@ module Hwaro
           end
           full_path = candidate
           base_dir = File.dirname(full_path)
-          FileUtils.mkdir_p(base_dir) unless Dir.exists?(base_dir)
+          Hwaro::Utils::FileSafe.mkdir_p(base_dir) unless Dir.exists?(base_dir)
         end
 
         content = if archetype_content
