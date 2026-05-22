@@ -362,6 +362,22 @@ describe "Build Integration: Redirects" do
     end
   end
 
+  it "does not write redirect_to output outside output_dir" do
+    # Regression for #549: previously, a content file whose frontmatter
+    # `path` traversed upward could cause the redirect writer to drop
+    # index.html outside output_dir (a sibling of `public/`).
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "evil.md" => "---\ntitle: PoC\npath: \"../escape-poc-549\"\nredirect_to: /\n---\n",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      Dir.exists?("escape-poc-549").should be_false
+      File.exists?("escape-poc-549/index.html").should be_false
+    end
+  end
+
   it "generates alias redirect pages" do
     build_site(
       BASIC_CONFIG,
