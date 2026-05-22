@@ -285,16 +285,6 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<a href=\"/x\">link</a>")
       end
 
-      it "collapses newlines between attributes spanning multiple lines" do
-        html = "<svg\n  width=\"10\"\n  height=\"10\"\n  viewBox=\"0 0 10 10\">x</svg>"
-        result = Hwaro::Utils::HtmlMinifier.minify(html)
-        # <svg> is protected — its body is opaque — but the *opening*
-        # tag is part of the protected match too, so it survives
-        # untouched. The collapse below confirms a non-protected
-        # multi-line tag gets squashed.
-        result.should contain("<svg")
-      end
-
       it "collapses multi-line attribute lists on a normal tag" do
         html = "<a\n  href=\"/x\"\n  class=\"y\"\n  data-x=\"1\"\n>link</a>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
@@ -341,6 +331,22 @@ describe Hwaro::Utils::HtmlMinifier do
         html = "<meta charset=\"utf-8\"   />"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<meta charset=\"utf-8\"/>")
+      end
+
+      it "preserves UTF-8 in attribute values when stripping space before />" do
+        # Regression: a prior implementation used char-indexed
+        # `body[0, body.bytesize - 2]` to drop the trailing ` /`,
+        # which over-ran the string for multi-byte UTF-8 and left
+        # a stray `/` in the output.
+        html = "<img alt=\"안녕 세계\"   />"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<img alt=\"안녕 세계\"/>")
+      end
+
+      it "preserves UTF-8 in attribute values when collapsing inter-attribute whitespace" do
+        html = "<a   title=\"안녕\"   class=\"y\">x</a>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<a title=\"안녕\" class=\"y\">x</a>")
       end
     end
 

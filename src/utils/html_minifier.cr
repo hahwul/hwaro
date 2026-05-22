@@ -307,14 +307,12 @@ module Hwaro
         # Drop trailing whitespace before the `>`. For self-closing
         # tags `<br />` the `/` is the last byte of `body`; we then
         # also strip the single space we inserted between the
-        # attributes and the `/` so the output is `<br/>`. That edge
-        # is only safe when the byte preceding the `/` is the space
-        # this pass inserted, never the tag name itself (no real
-        # input ever ends a tag-name with `/`).
+        # attributes and the `/` so the output is `<br/>`. `rchop`
+        # is suffix-equality (byte-safe), so it works even when
+        # the byte preceding the `" /"` is part of a multi-byte
+        # UTF-8 sequence inside a quoted attribute value.
         body = body.rstrip
-        if body.ends_with?(" /")
-          body = body[0, body.bytesize - 2] + "/"
-        end
+        body = body.rchop(" /") + "/" if body.ends_with?(" /")
         io << body
         io.write_byte('>'.ord.to_u8)
       end
