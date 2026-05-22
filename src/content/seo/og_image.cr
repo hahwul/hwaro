@@ -477,7 +477,7 @@ module Hwaro
             end
           end
           {config_hash, entries}
-        rescue ex : JSON::ParseException | File::Error
+        rescue ex : JSON::ParseException | IO::Error
           Logger.debug "OG manifest load failed (#{manifest_path}): #{ex.message}"
           {"", {} of String => String}
         end
