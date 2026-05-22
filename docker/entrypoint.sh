@@ -29,19 +29,22 @@ else
     TARGET_REPOSITORY=${GITHUB_REPOSITORY}
 fi
 
-# Support both INPUT_TOKEN (from action inputs) and GITHUB_TOKEN
-if [[ -n "$INPUT_TOKEN" ]]; then
-    GITHUB_TOKEN=$INPUT_TOKEN
-fi
+# Support both INPUT_TOKEN (from action inputs) and GITHUB_TOKEN.
+# Keep the deploy credential in DEPLOY_TOKEN — a name user-defined build
+# hooks have no reason to read — and remove GITHUB_TOKEN from the build
+# environment so untrusted site config can't exfiltrate it. See issue #550.
+DEPLOY_TOKEN="${INPUT_TOKEN:-${GITHUB_TOKEN:-}}"
+unset INPUT_TOKEN
+unset GITHUB_TOKEN
 
-if [[ -z "$GITHUB_TOKEN" ]] && [[ "$BUILD_ONLY" == "false" ]]; then
-    echo "Error: GITHUB_TOKEN is required for deployment."
+if [[ -z "$DEPLOY_TOKEN" ]] && [[ "$BUILD_ONLY" == "false" ]]; then
+    echo "Error: a GitHub token is required for deployment."
     echo "Please set the token input or GITHUB_TOKEN environment variable."
     exit 1
 fi
 
 restore_og_cache() {
-    local remote_url="https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@${GITHUB_HOSTNAME}/${TARGET_REPOSITORY}.git"
+    local remote_url="https://${GITHUB_ACTOR}:${DEPLOY_TOKEN}@${GITHUB_HOSTNAME}/${TARGET_REPOSITORY}.git"
     local og_dir="${OUT_DIR}/og-images"
 
     # Check if gh-pages branch exists on remote
@@ -95,7 +98,7 @@ main() {
     git config --global --unset-all http.extraheader 2>/dev/null || true
 
     # Restore OG image cache before building (requires token for remote access)
-    if [[ "$BUILD_ONLY" != "true" ]] && [[ -n "$GITHUB_TOKEN" ]]; then
+    if [[ "$BUILD_ONLY" != "true" ]] && [[ -n "$DEPLOY_TOKEN" ]]; then
         restore_og_cache
     fi
 
@@ -122,7 +125,7 @@ main() {
     # Deploy to GitHub Pages
     echo "Pushing artifacts to ${TARGET_REPOSITORY}:${PAGES_BRANCH}"
 
-    remote_repo="https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@${GITHUB_HOSTNAME}/${TARGET_REPOSITORY}.git"
+    remote_repo="https://${GITHUB_ACTOR}:${DEPLOY_TOKEN}@${GITHUB_HOSTNAME}/${TARGET_REPOSITORY}.git"
     remote_branch=$PAGES_BRANCH
 
     cd "${OUT_DIR}"

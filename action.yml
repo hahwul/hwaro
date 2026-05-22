@@ -36,9 +36,9 @@ inputs:
     required: false
     default: "github.com"
   token:
-    description: "GitHub token for deployment (defaults to GITHUB_TOKEN)"
+    description: "GitHub token for deployment. Defaults to the workflow token when deploying; intentionally empty for build_only runs so it is not exposed to user build hooks. Pass an explicit value to override."
     required: false
-    default: ${{ github.token }}
+    default: ""
 
 runs:
   using: "composite"
@@ -54,6 +54,27 @@ runs:
         TAG="${TAG:-latest}"
         echo "image=ghcr.io/hahwul/hwaro:${TAG}" >> "$GITHUB_OUTPUT"
         echo "Using Hwaro image: ghcr.io/hahwul/hwaro:${TAG}"
+
+    - name: Resolve deploy token
+      id: token
+      shell: bash
+      env:
+        BUILD_ONLY: ${{ inputs.build_only }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        WORKFLOW_TOKEN: ${{ github.token }}
+      run: |
+        # Only fall back to the workflow token when actually deploying.
+        # build_only runs receive no token by default so the value cannot
+        # be exfiltrated by user-controlled build hooks. See issue #550.
+        if [[ -n "$INPUT_TOKEN" ]]; then
+          TOKEN="$INPUT_TOKEN"
+        elif [[ "$BUILD_ONLY" != "true" ]]; then
+          TOKEN="$WORKFLOW_TOKEN"
+        else
+          TOKEN=""
+        fi
+        echo "::add-mask::$TOKEN"
+        echo "value=$TOKEN" >> "$GITHUB_OUTPUT"
 
     - name: Run Hwaro
       shell: bash
@@ -71,5 +92,5 @@ runs:
           -e BUILD_ONLY="${{ inputs.build_only }}" \
           -e REPOSITORY="${{ inputs.repository }}" \
           -e GITHUB_HOSTNAME="${{ inputs.github_hostname }}" \
-          -e INPUT_TOKEN="${{ inputs.token }}" \
+          -e INPUT_TOKEN="${{ steps.token.outputs.value }}" \
           "${{ steps.resolve.outputs.image }}"
