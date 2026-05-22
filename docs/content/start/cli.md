@@ -230,7 +230,7 @@ The build output is identical — streaming only affects memory usage during the
 
 The minify flag shrinks generated files while keeping them visually identical to the un-minified output:
 
-- **HTML**: Removes comments (preserves conditional comments, SSI directives, `<!-- more -->`), strips trailing whitespace, and collapses inter-tag whitespace. Whitespace between two block-level tags (e.g. `</p>\n<p>`) is removed entirely; whitespace between an inline neighbor (e.g. `<a>x</a> <a>y</a>`) is collapsed to a single space so the visible gap is preserved.
+- **HTML**: Removes comments (preserves conditional comments, SSI directives, `<!-- more -->`), strips trailing whitespace, collapses intra-tag whitespace (runs between attributes shrink to one space, quoted attribute values stay untouched), and collapses inter-tag whitespace by neighbour classification. If either neighbour is a block-level element the whitespace is stripped entirely (browsers collapse whitespace at the start, end, or between block siblings anyway); only when *both* neighbours are inline is a single space kept so the visible gap of `<a>x</a> <a>y</a>` is preserved.
 - **JSON**: Removes whitespace and newlines for compact output.
 - **XML**: Removes whitespace between tags for smaller file sizes.
 

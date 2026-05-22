@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- `hwaro build --minify` now collapses whitespace adjacent to *any* block-level neighbour (not just block-to-block) and shrinks runs of whitespace inside tag openings with a quote-aware scan. Indented templates like `<header>\n  <a>...</a>\n</header>` and multi-line attribute lists like `<a\n  href=…\n  class=…>` shrink further while inline siblings (`<a>x</a> <a>y</a>`), text content, and the contents of `<pre>`/`<code>`/`<script>`/`<style>`/`<svg>`/`<math>`/`<textarea>`/`<noscript>` stay byte-identical. Protected-block placeholders carry their original display class so a `<pre>` adjacent to a `<div>` is also stripped while a `<code>` between two inline siblings still keeps a space on each side.
+
 ## v0.14.1
 
 ### Fixed
