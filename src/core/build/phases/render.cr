@@ -527,7 +527,14 @@ module Hwaro::Core::Build::Phases::Render
     redirect_url = page.redirect_to
     return unless redirect_url
 
-    output_path = File.join(output_dir, page.url.lchop("/"), "index.html")
+    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
+    candidate = File.join(output_dir, url_path, "index.html")
+    output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir)
+    unless output_path
+      Logger.warn "Skipping redirect outside output directory: #{candidate}"
+      return
+    end
+
     ensure_dir(Path[output_path].dirname.to_s)
     File.write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
     Logger.action :create, output_path if verbose
