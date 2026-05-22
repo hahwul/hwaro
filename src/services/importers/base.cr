@@ -1,5 +1,6 @@
 require "file_utils"
 require "../../config/options/import_options"
+require "../../utils/file_safe"
 require "../../utils/logger"
 require "../../utils/text_utils"
 
@@ -106,7 +107,7 @@ module Hwaro
           force : Bool = false,
         ) : Bool
           dir = section.empty? ? output_dir : File.join(output_dir, section)
-          FileUtils.mkdir_p(dir) unless Dir.exists?(dir)
+          Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
 
           filename = slug.ends_with?(".md") ? slug : "#{slug}.md"
           path = File.join(dir, filename)
@@ -140,7 +141,7 @@ module Hwaro
           formats.each do |fmt|
             begin
               return Time.parse(date_str.strip, fmt, Time::Location::UTC)
-            rescue
+            rescue Time::Format::Error
               next
             end
           end

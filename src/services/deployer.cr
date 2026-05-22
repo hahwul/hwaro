@@ -7,6 +7,7 @@ require "uri"
 require "../models/config"
 require "../utils/command_runner"
 require "../utils/errors"
+require "../utils/file_safe"
 require "../utils/logger"
 
 module Hwaro
@@ -545,7 +546,7 @@ module Hwaro
           )
         end
 
-        FileUtils.mkdir_p(dest_dir_expanded)
+        Hwaro::Utils::FileSafe.mkdir_p(dest_dir_expanded)
 
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir_expanded)
@@ -577,7 +578,7 @@ module Hwaro
           Logger.progress(idx + 1, to_copy.size, "Copying ")
           dest_path = File.join(dest_dir_expanded, dest_rel)
           existed_before = File.exists?(dest_path)
-          FileUtils.mkdir_p(File.dirname(dest_path))
+          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           FileUtils.cp(src_path, dest_path)
           if existed_before
             counts.updated += 1
@@ -613,7 +614,7 @@ module Hwaro
           )
         end
 
-        FileUtils.mkdir_p(dest_dir)
+        Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
 
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir)
@@ -649,7 +650,7 @@ module Hwaro
         to_copy.each_with_index do |(dest_rel, src_path), idx|
           Logger.progress(idx + 1, to_copy.size, "Copying ")
           dest_path = File.join(dest_dir, dest_rel)
-          FileUtils.mkdir_p(File.dirname(dest_path))
+          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           FileUtils.cp(src_path, dest_path)
           summary.copied += 1
         end

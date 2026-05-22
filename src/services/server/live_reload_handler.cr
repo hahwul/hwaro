@@ -45,7 +45,7 @@ module Hwaro
             if message = @current_error
               begin
                 socket.send("error:#{{"message" => message}.to_json}")
-              rescue
+              rescue IO::Error
                 # Connection torn down before the replay; harmless.
               end
             end
@@ -93,7 +93,7 @@ module Hwaro
         snapshot.each do |socket|
           begin
             socket.send(message)
-          rescue
+          rescue IO::Error
             dead << socket
           end
         end

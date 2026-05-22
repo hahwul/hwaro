@@ -213,7 +213,7 @@ module Hwaro
               begin
                 data = TOML.parse(toml_str)
                 return {data, body}
-              rescue
+              rescue TOML::ParseException
                 return {nil, raw}
               end
             end
@@ -223,14 +223,16 @@ module Hwaro
               body = match[2].lstrip('\n')
               begin
                 yaml_data = YAML.parse(yaml_str)
-                if yaml_data.as_h?
+                if h = yaml_data.as_h?
                   data = {} of String => TOML::Any
-                  yaml_data.as_h.each do |k, v|
-                    data[k.as_s] = yaml_any_to_toml_any(v)
+                  h.each do |k, v|
+                    key_str = k.as_s? || k.raw.to_s
+                    data[key_str] = yaml_any_to_toml_any(v)
                   end
                   return {data, body}
                 end
-              rescue
+              rescue ex : YAML::ParseException
+                Logger.debug "YAML front matter parse failed: #{ex.message}"
                 return {nil, raw}
               end
             end
@@ -258,7 +260,9 @@ module Hwaro
           when Hash
             hash = {} of String => TOML::Any
             raw.each do |k, v|
-              hash[k.as(YAML::Any).as_s] = yaml_any_to_toml_any(v.as(YAML::Any))
+              k_any = k.as(YAML::Any)
+              key_str = k_any.as_s? || k_any.raw.to_s
+              hash[key_str] = yaml_any_to_toml_any(v.as(YAML::Any))
             end
             TOML::Any.new(hash)
           when Nil

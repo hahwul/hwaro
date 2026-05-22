@@ -202,8 +202,8 @@ module Hwaro
         if match = content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m)
           begin
             toml_fm = TOML.parse(match[1])
-            title = toml_fm["title"]?.try(&.as_s) || title
-            draft = toml_fm["draft"]?.try(&.as_bool) || false
+            title = toml_fm["title"]?.try(&.as_s?) || title
+            draft = toml_fm["draft"]?.try(&.as_bool?) || false
             # TOML parser may return Time directly or String
             if date_val = toml_fm["date"]?
               raw = date_val.raw
@@ -274,7 +274,7 @@ module Hwaro
         formats.each do |fmt|
           begin
             return Time.parse(time_str, fmt, Time::Location::UTC)
-          rescue
+          rescue Time::Format::Error
             next
           end
         end
@@ -282,7 +282,7 @@ module Hwaro
         # Try ISO 8601 parsing as last resort
         begin
           Time.parse_rfc3339(time_str)
-        rescue
+        rescue Time::Format::Error
           nil
         end
       end

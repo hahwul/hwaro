@@ -44,7 +44,7 @@ module Hwaro
                     end
                   end
                 end
-              rescue
+              rescue Exception
                 # No translations available
               end
 

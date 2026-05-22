@@ -2,6 +2,7 @@ require "file_utils"
 require "option_parser"
 require "../../metadata"
 require "../../../utils/logger"
+require "../../../utils/file_safe"
 require "../../../services/platform_config"
 require "../../../models/config"
 
@@ -106,7 +107,7 @@ module Hwaro
               end
 
               dir = File.dirname(filename)
-              FileUtils.mkdir_p(dir) unless dir == "." || Dir.exists?(dir)
+              Hwaro::Utils::FileSafe.mkdir_p(dir) unless dir == "." || Dir.exists?(dir)
               File.write(filename, content)
               Logger.success "Generated #{filename}"
             end
