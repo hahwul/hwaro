@@ -978,7 +978,11 @@ module Hwaro
       # Auto-generate a deploy command for known cloud URL schemes.
       # Returns nil if the scheme is not recognized.
       private def auto_command_for_url(url : String, source_dir : String) : String?
-        uri = URI.parse(url) rescue return
+        uri = begin
+          URI.parse(url)
+        rescue URI::Error
+          return
+        end
         case uri.scheme
         when "s3"
           "aws s3 sync {source}/ {url} --delete"

@@ -506,7 +506,11 @@ module Hwaro
               # Resolve symlinks BEFORE boundary check to prevent TOCTOU attacks.
               project_root = File.realpath(Dir.current)
               resolved = File.expand_path(path, project_root)
-              resolved = File.realpath(resolved) rescue nil
+              resolved = begin
+                File.realpath(resolved)
+              rescue File::Error
+                nil
+              end
 
               if resolved &&
                  (resolved == project_root || resolved.starts_with?(project_root + "/")) &&

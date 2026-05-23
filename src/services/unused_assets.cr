@@ -127,7 +127,11 @@ module Hwaro
         end
 
         scan_files.each do |file|
-          text = File.read(file) rescue next
+          text = begin
+            File.read(file)
+          rescue File::Error
+            next
+          end
           text.scan(ext_pattern) do |match|
             refs << match[0]
           end

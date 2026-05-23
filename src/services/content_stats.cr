@@ -67,7 +67,11 @@ module Hwaro
         monthly = {} of String => Int32
 
         published_items.each do |item|
-          content = File.read(item.path) rescue next
+          content = begin
+            File.read(item.path)
+          rescue File::Error
+            next
+          end
 
           body = extract_body(content)
           wc = count_words(body)
