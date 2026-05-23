@@ -201,9 +201,61 @@ module Hwaro
           nil
         end
 
+        # Pre-render the config-only layers (background fill, background
+        # image + overlay, style pattern, top accent bar) into a reusable
+        # RGBA buffer that can be memcpy'd into each per-page pixel
+        # buffer. On large sites these layers account for the bulk of
+        # the per-page cost — the "gradient" pattern alone touches every
+        # one of the 756,000 pixels in Crystal-level math — so doing
+        # them once per build instead of once per page is the largest
+        # single win in PNG OG generation.
+        #
+        # Z-order is preserved: the original render order is bg → bg
+        # image → pattern → top bar → text → logo → bottom bar, and the
+        # remaining per-page work (text, logo, bottom bar) is layered
+        # on top of this base in the same order.
+        def self.build_base_layer(
+          config : Models::Config,
+          bg_image_path : String? = nil,
+          cached_bg : CachedImage? = nil,
+        ) : Bytes
+          ai = config.og.auto_image
+          is_minimal = ai.style == "minimal"
+          bg_color = parse_hex_color(ai.background)
+          accent_color = parse_hex_color(ai.accent_color)
+
+          base = Bytes.new(WIDTH * HEIGHT * CHANNELS)
+          pixels = base.to_unsafe
+
+          fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
+
+          if bg_image_path
+            if cbg = cached_bg
+              blit_cached_image(pixels, cbg, 0, 0)
+            else
+              composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
+            end
+            fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, ai.overlay_opacity)
+          end
+
+          render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
+
+          unless is_minimal
+            fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
+          end
+
+          base
+        end
+
         # Render OG image directly to PNG file. Returns true on success.
         # Accepts optional pre-loaded CachedImage for logo/background to avoid
         # repeated decode+resize when generating many pages.
+        #
+        # When `base_layer` is given, the config-only layers (background,
+        # pattern, top accent bar) are memcpy'd from it instead of being
+        # re-rendered per page. Callers that render many pages should
+        # build the base layer once via `build_base_layer` and pass it
+        # in here.
         def self.render_png(
           page : Models::Page,
           config : Models::Config,
@@ -213,6 +265,7 @@ module Hwaro
           font_ctx : FontContext? = nil,
           cached_logo : CachedImage? = nil,
           cached_bg : CachedImage? = nil,
+          base_layer : Bytes? = nil,
         ) : Bool
           ai = config.og.auto_image
           is_minimal = ai.style == "minimal"
@@ -228,26 +281,32 @@ module Hwaro
           return false if pixels.null?
 
           begin
-            # 1. Fill background
-            fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
+            if base = base_layer
+              # Fast path: the config-only layers (steps 1–4) are
+              # already baked into `base`; memcpy them in.
+              base.to_unsafe.copy_to(pixels, base.size)
+            else
+              # 1. Fill background
+              fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
 
-            # 2. Background image (if configured)
-            if bg_image_path
-              if cbg = cached_bg
-                blit_cached_image(pixels, cbg, 0, 0)
-              else
-                composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
+              # 2. Background image (if configured)
+              if bg_image_path
+                if cbg = cached_bg
+                  blit_cached_image(pixels, cbg, 0, 0)
+                else
+                  composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
+                end
+                # Overlay
+                fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, ai.overlay_opacity)
               end
-              # Overlay
-              fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, ai.overlay_opacity)
-            end
 
-            # 3. Style pattern
-            render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
+              # 3. Style pattern
+              render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
-            # 4. Accent bar at top
-            unless is_minimal
-              fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
+              # 4. Accent bar at top
+              unless is_minimal
+                fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
+              end
             end
 
             # 5. Render text
