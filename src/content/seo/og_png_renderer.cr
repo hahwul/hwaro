@@ -368,7 +368,11 @@ module Hwaro
         # Parse "#RRGGBB" to 0xRRGGBB
         def self.parse_hex_color(hex : String) : UInt32
           hex = hex.lchop("#")
-          hex.to_u32(16) rescue 0x000000_u32
+          begin
+            hex.to_u32(16)
+          rescue ArgumentError
+            0x000000_u32
+          end
         end
 
         # Fill a solid rectangle

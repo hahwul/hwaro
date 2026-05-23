@@ -53,7 +53,11 @@ module Hwaro
 
             # Pluralize filter: {{ count | pluralize("item", "items") }}
             env.filters["pluralize"] = Crinja.filter({singular: "", plural: ""}) do
-              count = target.as_number.to_i rescue 0
+              count = begin
+                target.as_number.to_i
+              rescue Exception
+                0
+              end
               singular = arguments["singular"].to_s
               plural = arguments["plural"].to_s
               count == 1 ? singular : plural

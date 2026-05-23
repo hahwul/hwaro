@@ -388,7 +388,8 @@ module Hwaro
               hint: "Check JSON frontmatter object at start of file",
             )
           end
-          return unless json_fm.as_h?
+          fm_hash = json_fm.as_h?
+          return unless fm_hash
 
           date = parse_time(json_fm["date"]?.try(&.as_s?))
           updated = parse_time(json_fm["updated"]?.try(&.as_s?))
@@ -396,7 +397,7 @@ module Hwaro
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
-          json_fm.as_h.each do |key, value|
+          fm_hash.each do |key, value|
             next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
             if key == "extra" && (inner = value.as_h?)
               inner.each do |inner_key, inner_value|
@@ -409,7 +410,7 @@ module Hwaro
           end
           warn_typo_keys(unknown_keys, file_path)
 
-          front_matter_keys = json_fm.as_h.keys
+          front_matter_keys = fm_hash.keys
           taxonomies = extract_taxonomies(json_fm, front_matter_keys)
           tags = fm_string_array(json_fm, "tags")
           taxonomies["tags"] = tags if tags.present?

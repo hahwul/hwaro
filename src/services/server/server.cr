@@ -44,9 +44,17 @@ module Hwaro
           # Only attempt realpath if the path exists on disk; otherwise skip
           # the redirect entirely so non-existent traversal paths cannot
           # bypass the boundary check (realpath returns nil for missing paths).
-          public_real = File.realpath(@public_dir) rescue @public_dir
+          public_real = begin
+            File.realpath(@public_dir)
+          rescue File::Error
+            @public_dir
+          end
           resolved = if File.exists?(fs_path.to_s)
-                       File.realpath(fs_path) rescue nil
+                       begin
+                         File.realpath(fs_path)
+                       rescue File::Error
+                         nil
+                       end
                      end
           if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
             context.response.status_code = 301

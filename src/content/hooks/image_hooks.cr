@@ -360,8 +360,16 @@ module Hwaro
         # Verify that a source path resolves within the expected base directory.
         # Uses File.realpath to resolve symlinks before the boundary check.
         private def safe_path?(path : String, base : String) : Bool
-          resolved = File.realpath(path) rescue return false
-          resolved_base = File.realpath(base) rescue File.expand_path(base)
+          resolved = begin
+            File.realpath(path)
+          rescue File::Error
+            return false
+          end
+          resolved_base = begin
+            File.realpath(base)
+          rescue File::Error
+            File.expand_path(base)
+          end
           resolved == resolved_base || resolved.starts_with?(resolved_base + "/")
         end
 
