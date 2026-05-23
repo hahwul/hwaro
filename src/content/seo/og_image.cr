@@ -143,7 +143,7 @@ module Hwaro
           # hash + stat + property assignment, far too cheap to be worth
           # parallelising. Only the cache-miss renders go into the
           # worker pool below.
-          pending = [] of Tuple(Models::Page, String, String)
+          pending = [] of Tuple(Models::Page, String)
           pages.each do |page|
             next if page.draft
             next if page.generated
@@ -168,7 +168,7 @@ module Hwaro
               next
             end
 
-            pending << {page, slug, expected_file}
+            pending << {page, slug}
           end
 
           # Pass 2 (parallel): render the cache-miss pages. Each worker
@@ -179,9 +179,9 @@ module Hwaro
           # logo/bg, and base layer are read-only after build.
           unless pending.empty?
             config_struct = Hwaro::Core::Build::ParallelConfig.new(enabled: parallel)
-            processor = Hwaro::Core::Build::Parallel(Tuple(Models::Page, String, String), Bool).new(config_struct)
+            processor = Hwaro::Core::Build::Parallel(Tuple(Models::Page, String), Bool).new(config_struct)
             results = processor.process(pending) do |item, _idx|
-              page, slug, _expected = item
+              page, slug = item
               if format == "png" && png_available
                 png_filename = "#{slug}.png"
                 png_path = File.join(img_dir, png_filename)
@@ -202,6 +202,14 @@ module Hwaro
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
               end
               Logger.debug "  OG image: #{page.image}" if verbose
+              # Yield after each render so a `serve` session running this
+              # in a background fiber doesn't starve its own HTTP accept
+              # loop. PNG encoding is pure CPU and never yields on its
+              # own; under MT with a saturated worker pool, or in the
+              # sequential path (parallel: false, or a single pending
+              # item), nothing else in this block would otherwise hand
+              # control back to the scheduler.
+              Fiber.yield
               true
             end
             generated = results.count(&.success)
