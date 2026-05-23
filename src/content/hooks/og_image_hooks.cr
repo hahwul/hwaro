@@ -39,6 +39,7 @@ module Hwaro
             ctx.output_dir,
             ctx.options.verbose,
             partial: ctx.partial_render,
+            parallel: ctx.options.parallel,
           )
         end
       end

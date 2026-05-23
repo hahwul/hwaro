@@ -2,6 +2,7 @@ require "base64"
 require "digest/sha256"
 require "file_utils"
 require "json"
+require "../../core/build/parallel"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
@@ -50,6 +51,7 @@ module Hwaro
           output_dir : String,
           verbose : Bool = false,
           partial : Bool = false,
+          parallel : Bool = true,
         )
           ai = config.og.auto_image
           return unless ai.enabled
@@ -99,6 +101,17 @@ module Hwaro
             cached_bg = OgPngRenderer.load_image(bg_abs_path, WIDTH, HEIGHT) if bg_abs_path
           end
 
+          # Pre-render the config-only layers once. Per-page rendering
+          # then memcpy's this 3MB base buffer instead of redoing the
+          # background fill, optional background image blit, overlay,
+          # style pattern, and top accent bar on every page — work
+          # that dominates the per-page cost (the "gradient" pattern
+          # alone touches all 756,000 pixels in Crystal math).
+          base_layer = nil
+          if png_available
+            base_layer = OgPngRenderer.build_base_layer(config, bg_abs_path, cached_bg)
+          end
+
           img_dir = File.join(output_dir, ai.output_dir)
           Hwaro::Utils::FileSafe.mkdir_p(img_dir) unless Dir.exists?(img_dir)
 
@@ -123,15 +136,15 @@ module Hwaro
 
           generated = 0
           skipped = 0
+          ext = (format == "png" && png_available) ? "png" : "svg"
 
-          pages.each_with_index do |page, idx|
-            # Yield to other fibers every few PNG renders so a serve
-            # session that runs this in a background fiber doesn't starve
-            # its own HTTP accept loop. PNG encoding is pure CPU and
-            # never yields on its own; without this, requests sit on the
-            # OS backlog indefinitely while the deferred render pass
-            # runs.
-            Fiber.yield if idx > 0 && (idx & 0x07) == 0
+          # Pass 1 (sequential): work out the slug, hash the page, and
+          # short-circuit on a cache hit. The cache-hit path is just a
+          # hash + stat + property assignment, far too cheap to be worth
+          # parallelising. Only the cache-miss renders go into the
+          # worker pool below.
+          pending = [] of Tuple(Models::Page, String)
+          pages.each do |page|
             next if page.draft
             next if page.generated
             next unless page.render
@@ -146,11 +159,8 @@ module Hwaro
             page_hash = compute_page_hash(page)
             new_entries[slug] = page_hash
 
-            # Determine expected output file extension
-            ext = (format == "png" && png_available) ? "png" : "svg"
             expected_file = File.join(img_dir, "#{slug}.#{ext}")
 
-            # Skip if content unchanged, config unchanged, and file exists
             if !config_changed && old_entries[slug]? == page_hash && File.exists?(expected_file)
               page.image = "/#{ai.output_dir}/#{slug}.#{ext}"
               skipped += 1
@@ -158,28 +168,51 @@ module Hwaro
               next
             end
 
-            if format == "png" && png_available
-              png_filename = "#{slug}.png"
-              png_path = File.join(img_dir, png_filename)
-              if OgPngRenderer.render_png(page, config, png_path, logo_abs_path, bg_abs_path, font_ctx, cached_logo, cached_bg)
-                page.image = "/#{ai.output_dir}/#{png_filename}"
+            pending << {page, slug}
+          end
+
+          # Pass 2 (parallel): render the cache-miss pages. Each worker
+          # owns its own pixel buffer and file path so there is no
+          # shared mutable state to guard. The stb bindings have no
+          # global state, and `page.image = ...` writes only to a page
+          # touched by exactly one worker. The font context, cached
+          # logo/bg, and base layer are read-only after build.
+          unless pending.empty?
+            config_struct = Hwaro::Core::Build::ParallelConfig.new(enabled: parallel)
+            processor = Hwaro::Core::Build::Parallel(Tuple(Models::Page, String), Bool).new(config_struct)
+            results = processor.process(pending) do |item, _idx|
+              page, slug = item
+              if format == "png" && png_available
+                png_filename = "#{slug}.png"
+                png_path = File.join(img_dir, png_filename)
+                if OgPngRenderer.render_png(page, config, png_path, logo_abs_path, bg_abs_path, font_ctx, cached_logo, cached_bg, base_layer)
+                  page.image = "/#{ai.output_dir}/#{png_filename}"
+                else
+                  # Fallback to SVG on render failure
+                  svg_filename = "#{slug}.svg"
+                  svg = render_svg(page, config, logo_data_uri, bg_data_uri)
+                  File.write(File.join(img_dir, svg_filename), svg)
+                  page.image = "/#{ai.output_dir}/#{svg_filename}"
+                  Logger.warn "  PNG render failed for #{slug}, falling back to SVG"
+                end
               else
-                # Fallback to SVG on render failure
                 svg_filename = "#{slug}.svg"
                 svg = render_svg(page, config, logo_data_uri, bg_data_uri)
                 File.write(File.join(img_dir, svg_filename), svg)
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
-                Logger.warn "  PNG render failed for #{slug}, falling back to SVG"
               end
-            else
-              svg_filename = "#{slug}.svg"
-              svg = render_svg(page, config, logo_data_uri, bg_data_uri)
-              File.write(File.join(img_dir, svg_filename), svg)
-              page.image = "/#{ai.output_dir}/#{svg_filename}"
+              Logger.debug "  OG image: #{page.image}" if verbose
+              # Yield after each render so a `serve` session running this
+              # in a background fiber doesn't starve its own HTTP accept
+              # loop. PNG encoding is pure CPU and never yields on its
+              # own; under MT with a saturated worker pool, or in the
+              # sequential path (parallel: false, or a single pending
+              # item), nothing else in this block would otherwise hand
+              # control back to the scheduler.
+              Fiber.yield
+              true
             end
-
-            generated += 1
-            Logger.debug "  OG image: #{page.image}" if verbose
+            generated = results.count(&.success)
           end
 
           save_manifest(manifest_path, config_hash, new_entries)
