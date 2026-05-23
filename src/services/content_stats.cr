@@ -69,7 +69,7 @@ module Hwaro
         published_items.each do |item|
           content = begin
             File.read(item.path)
-          rescue File::Error
+          rescue IO::Error
             next
           end
 

@@ -129,7 +129,7 @@ module Hwaro
         scan_files.each do |file|
           text = begin
             File.read(file)
-          rescue File::Error
+          rescue IO::Error
             next
           end
           text.scan(ext_pattern) do |match|
