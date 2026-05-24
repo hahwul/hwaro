@@ -31,9 +31,14 @@ describe Hwaro::Utils::FileSafe do
     end
 
     # Drives many fibers at the same shared parent so the per-component race
-    # window is exercised. Pre-fix, a worker could fail with EEXIST on a parent
-    # during both its first attempt and the retry's parent walk and surface
-    # "Unable to create directory: '…': File exists" to the caller.
+    # window is exercised. Pre-fix, EEXIST on a shared parent surfaced as
+    # "Unable to create directory: '…': File exists" because the wrapper's
+    # whole-call retry could re-race and the leaf-only fallback check was
+    # false.
+    #
+    # Note: meaningful only under `-Dpreview_mt`. In ST mode the syscalls
+    # serialize and the race window never opens, so this test still asserts
+    # the post-conditions but cannot catch an MT regression.
     it "tolerates concurrent creation of siblings under a shared parent" do
       Dir.mktmpdir do |root|
         # Multiple shared parents (deep tree) amplify the cascading race

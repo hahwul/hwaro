@@ -31,7 +31,7 @@ module Hwaro
       # out and a render fails ("Unable to create directory: '…': File
       # exists"). Tolerating EEXIST per component avoids the cascade.
       def self.mkdir_p(path : String | Path, mode : Int32 = 0o777) : Nil
-        path = path.is_a?(Path) ? path : Path.new(path)
+        path = Path.new(path)
         return if Dir.exists?(path)
 
         path.each_parent do |parent|
