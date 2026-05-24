@@ -19,26 +19,35 @@ module Hwaro
       # Equivalent to `FileUtils.mkdir_p` but tolerates concurrent creation
       # of any path component. Safe to call from MT workers without an
       # external mutex.
+      #
+      # We walk parents ourselves so EEXIST is absorbed *per component*.
+      # Crystal's `Dir.mkdir_p` is `exists? → mkdir` for each parent and the
+      # leaf, so two workers calling `mkdir_p("/out/a/b/x")` and
+      # `mkdir_p("/out/a/b/y")` can race on every shared parent
+      # (`/out`, `/out/a`, `/out/a/b`). A single retry of the whole call
+      # isn't enough: the retry's parent walk can re-race on a *different*
+      # shared parent, raise again, and a post-hoc `Dir.exists?(leaf)` check
+      # is false because we never reached the leaf — so the EEXIST bubbles
+      # out and a render fails ("Unable to create directory: '…': File
+      # exists"). Tolerating EEXIST per component avoids the cascade.
       def self.mkdir_p(path : String | Path, mode : Int32 = 0o777) : Nil
-        Dir.mkdir_p(path, mode)
-      rescue File::AlreadyExistsError
-        # Two workers calling `mkdir_p("/out/posts/a")` and
-        # `mkdir_p("/out/posts/b")` can race on the shared parent `/out/posts`:
-        # both pass the `Dir.exists?` precondition (`/out/posts` is absent),
-        # both descend, both call `mkdir("/out/posts")`, and the loser gets
-        # EEXIST on the parent — even though its own leaf hasn't been created
-        # yet. So a single retry is enough: on the second attempt `/out/posts`
-        # now exists (whoever won the race created it), and `mkdir_p` skips
-        # that step and only creates the leaf the caller actually asked for.
-        begin
-          Dir.mkdir_p(path, mode)
-        rescue ex : File::AlreadyExistsError
-          # Genuinely repeated EEXIST after retry: surface only when the
-          # final target *still* isn't a directory. Otherwise the
-          # post-condition `mkdir_p` promises ("path exists as a directory")
-          # already holds and we treat as success.
-          raise ex unless Dir.exists?(path)
+        path = path.is_a?(Path) ? path : Path.new(path)
+        return if Dir.exists?(path)
+
+        path.each_parent do |parent|
+          mkdir_tolerant(parent, mode)
         end
+        mkdir_tolerant(path, mode)
+      end
+
+      # Create a single directory, treating "already exists as a directory"
+      # as success. Anything else (including the path existing as a file)
+      # propagates.
+      private def self.mkdir_tolerant(path : Path, mode : Int32) : Nil
+        return if Dir.exists?(path)
+        Dir.mkdir(path, mode)
+      rescue ex : File::AlreadyExistsError
+        raise ex unless Dir.exists?(path)
       end
     end
   end
