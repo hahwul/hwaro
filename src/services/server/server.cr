@@ -162,6 +162,34 @@ module Hwaro
       end
     end
 
+    # Injects user-provided custom response headers on every dev-server response.
+    #
+    # Runs *after* `call_next` so the configured headers always win over any
+    # headers set by built-in handlers (DevCorsHandler, CharsetHandler, 404
+    # handler, redirect Location from IndexRewriteHandler, etc.). This gives
+    # predictable "what I put in [serve.headers] is what the browser receives"
+    # behaviour — exactly what users need when reproducing production server
+    # configuration locally.
+    class CustomHeadersHandler
+      include HTTP::Handler
+
+      def initialize(@headers : Hash(String, String))
+      end
+
+      def call(context)
+        call_next(context)
+
+        # Apply after all other handlers so user values override built-ins
+        # (including Content-Type adjustments and dev CORS headers).
+        @headers.each do |name, value|
+          # Final guard: never emit control characters in headers even if they
+          # somehow made it through config/CLI validation.
+          next if name.each_char.any?(&.ascii_control?) || value.each_char.any?(&.ascii_control?)
+          context.response.headers[name] = value
+        end
+      end
+    end
+
     # Categorised set of file-system changes detected by the watcher.
     #
     # Changes are split into five buckets so the server can pick the
@@ -357,15 +385,15 @@ module Hwaro
 
       def run(options : Config::Options::ServeOptions)
         build_options = options.to_build_options
-        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json, options.headers)
       end
 
       def run(host : String = "127.0.0.1", port : Int32 = 3000, drafts : Bool = false)
         build_options = Config::Options::BuildOptions.new(drafts: drafts)
-        run_with_options(host, port, false, false, false, build_options, false)
+        run_with_options(host, port, false, false, false, build_options, false, {} of String => String)
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false)
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
         if build_options.fast_start
           Logger.info "Performing fast-start initial build (priority pages only)..."
         else
@@ -401,6 +429,10 @@ module Hwaro
         # response until first flush, so post-call_next header edits
         # take effect for typical dev-site responses.
         handlers << CharsetHandler.new
+        # User-provided headers (from config + CLI). Placed here so:
+        # - it wraps IndexRewrite / LiveReloadInject (catches their early returns)
+        # - it runs after DevCors + Charset on the return path (user values win)
+        handlers << CustomHeadersHandler.new(headers) unless headers.empty?
         if live_reload
           lr_handler = LiveReloadHandler.new
           @live_reload_handler = lr_handler

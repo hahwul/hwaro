@@ -4,6 +4,7 @@ require "../../config/options/serve_options"
 require "../../services/server/server"
 require "../../utils/errors"
 require "../../utils/logger"
+require "../../models/config"
 
 module Hwaro
   module CLI
@@ -43,6 +44,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
           FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes (default: enabled; kept for backwards compatibility)"),
           FlagInfo.new(short: nil, long: "--no-live-reload", description: "Disable live reload on file changes"),
+          FlagInfo.new(short: nil, long: "--header", description: "Add custom response header for dev server (repeatable, e.g. --header 'X-Foo: bar')", takes_value: true, value_hint: "NAME: VALUE"),
 
           # Skip options
           SKIP_OG_IMAGE_FLAG,
@@ -88,6 +90,20 @@ module Hwaro
             Dir.cd(input_dir)
           end
 
+          # Enrich CLI headers with [serve.headers] from config.toml (now in the correct
+          # directory after any -i/--input chdir). CLI values win on duplicate keys.
+          # This must happen after Dir.cd so `hwaro serve -i /other/project` reads the
+          # right config. We deliberately do not load config earlier in parse_options.
+          begin
+            cfg = Models::Config.load(env: options.env)
+            final = cfg.serve.headers.dup
+            options.headers.each { |k, v| final[k] = v } # CLI wins
+            options.headers = final
+          rescue Hwaro::HwaroError
+            # Missing/invalid config — the build inside Server will emit the proper
+            # classified error. We just proceed with whatever --header the user gave.
+          end
+
           Services::Server.new.run(options)
         end
 
@@ -117,6 +133,10 @@ module Hwaro
           access_log = false
           error_overlay = true
           live_reload = true
+
+          # CLI-provided headers only. Config [serve.headers] is merged later in #run
+          # (after any -i chdir) so that `hwaro serve -i other/dir` works correctly.
+          headers = {} of String => String
 
           # Skip options
           skip_og_image = false
@@ -180,6 +200,10 @@ module Hwaro
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--live-reload", "Enable live reload on file changes (default: enabled; kept for backwards compatibility)") { live_reload = true }
             parser.on("--no-live-reload", "Disable live reload on file changes") { live_reload = false }
+            parser.on("--header NAME:VALUE", "Add custom response header (repeatable)") do |h|
+              key, value = parse_header(h)
+              headers[key] = value
+            end
 
             # Skip options
             CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
@@ -220,7 +244,46 @@ module Hwaro
             json: json_output,
             fast_start: fast_start,
             fast_start_count: fast_start_count,
+            headers: headers,
           )}
+        end
+
+        # Parse "Name: Value" or "Name=Value" or "Name Value" into {name, value}.
+        # Header names are case-insensitive per HTTP spec; we preserve the
+        # casing the user gave us (common convention is Title-Case).
+        private def parse_header(raw : String) : {String, String}
+          s = raw.strip
+          # Try "key: value", "key = value", "key value"
+          if s.includes?(":")
+            key, value = s.split(":", 2)
+          elsif s.includes?("=")
+            key, value = s.split("=", 2)
+          else
+            # fallback: first whitespace
+            key, value = s.split(/\s+/, 2)
+          end
+          key = key.strip
+          value = (value || "").strip
+
+          if key.empty?
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Invalid --header value: #{raw.inspect}",
+              hint: "Use the form --header 'X-Foo: bar' or --header 'X-Foo=bar'.",
+            )
+          end
+
+          # Prevent HTTP response splitting / header injection attacks.
+          # Control characters (especially CR/LF) in names or values are dangerous.
+          if key.each_char.any? { |c| c.ascii_control? || c == ':' } || value.each_char.any?(&.ascii_control?)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Invalid characters in --header: #{raw.inspect}",
+              hint: "Header names and values must not contain control characters, newlines, or colons in the name.",
+            )
+          end
+
+          {key, value}
         end
       end
     end

@@ -292,6 +292,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
 | --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
 | --no-live-reload | Disable browser live reload on file changes |
+| --header "NAME: VALUE" | Add custom response header (repeatable). Merged with `[serve.headers]` from `config.toml` (CLI wins). Only affects `hwaro serve`. |
 | --cache | Enable build caching (skip unchanged files) |
 | --stream | Enable streaming build to reduce memory usage |
 | --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
@@ -317,6 +318,26 @@ Live reload is **enabled by default**. The server injects a small WebSocket clie
 Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally). The `--live-reload` flag is kept as a no-op alias for backwards compatibility with existing invocations.
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
+
+**Custom response headers (`--header` / `[serve.headers]`):**
+
+Use this to reproduce headers that your production reverse-proxy, CDN, or static hosting sets (security headers, `Cache-Control`, custom CORS, etc.) so you can test locally before deploying the static output.
+
+```toml
+[serve.headers]
+X-Frame-Options = "SAMEORIGIN"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+# Cache-Control = "public, max-age=3600"
+```
+
+```bash
+hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
+```
+
+- CLI `--header` values win over the same key in `config.toml`.
+- Headers are injected on **every** dev-server response (HTML, assets, 404s, redirects, live-reload injected pages).
+- This feature only affects `hwaro serve`. The files written to `public/` are untouched.
 
 ### deploy
 

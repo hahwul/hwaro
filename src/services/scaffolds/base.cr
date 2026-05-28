@@ -650,6 +650,10 @@ module Hwaro
         protected def deployment_config : String
           ConfigSnippets.deployment
         end
+
+        protected def serve_config : String
+          ConfigSnippets.serve
+        end
       end
     end
   end

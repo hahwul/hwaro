@@ -26,6 +26,8 @@ module Hwaro
         property json : Bool
         property fast_start : Bool
         property fast_start_count : Int32
+        # Custom response headers to inject during serve (from config.toml [serve.headers] + CLI --header)
+        property headers : Hash(String, String)
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -52,6 +54,7 @@ module Hwaro
           @json : Bool = false,
           @fast_start : Bool = false,
           @fast_start_count : Int32 = 20,
+          @headers : Hash(String, String) = {} of String => String,
         )
         end
 

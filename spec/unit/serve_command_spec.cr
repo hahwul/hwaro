@@ -203,6 +203,42 @@ describe Hwaro::CLI::Commands::ServeCommand do
       build_options.fast_start.should be_true
       build_options.fast_start_count.should eq(5)
     end
+
+    it "parses --header and stores in options.headers (CLI only at parse time)" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--header", "X-Test: hello", "--header", "Cache-Control=no-store"])
+      options.headers["X-Test"].should eq("hello")
+      options.headers["Cache-Control"].should eq("no-store")
+      options.headers.size.should eq(2)
+    end
+
+    it "supports --header with = separator and whitespace" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--header", "X-Foo = bar baz"])
+      options.headers["X-Foo"].should eq("bar baz")
+    end
+
+    it "raises on invalid --header (empty key)" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.test_parse_options(["--header", ": value"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    end
+
+    it "raises on --header containing control characters (CRLF injection guard)" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      # Pass the flag and the bad value as two separate argv elements (the value itself contains \n)
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.test_parse_options(["--header", "X-Bad: foo\nbar"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+
+      err2 = expect_raises(Hwaro::HwaroError) do
+        cmd.test_parse_options(["--header", "X-Bad2: foo\r\nX-Inject: evil"])
+      end
+      err2.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    end
   end
 
   describe "#run" do
