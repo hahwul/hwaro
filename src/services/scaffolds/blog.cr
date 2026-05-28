@@ -827,6 +827,14 @@ module Hwaro
               <div class="blog-header-inner">
                 <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
                 <nav>
+                  <!-- To add new top-level sections (e.g. /notes/, /projects/):
+                       1. Create content/SECTION/_index.md
+                       2. Replace the links below with this compact dynamic loop:
+
+                       {% for s in site.sections | sort(attribute="weight") %}
+                         {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
+                       {% endfor %}
+                  -->
                   <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
@@ -926,7 +934,7 @@ module Hwaro
               <main class="blog-main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
-                <p><a href="{{ base_url }}/">Return to home</a></p>
+                <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to home</a></p>
             {% include "footer.html" %}
             HTML
         end

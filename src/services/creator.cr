@@ -248,10 +248,10 @@ module Hwaro
                      options.draft == true
                    end
 
-        # ISO 8601 with explicit offset — round-trips back through TOML/YAML
-        # parsers as a real datetime (TOML offset-datetime / YAML timestamp)
-        # rather than a string fallback.
-        date = options.date || Time.local.to_s("%Y-%m-%dT%H:%M:%S%:z")
+        # Default to date-only (YYYY-MM-DD). This is what most authors want
+        # for blog posts and pages. Users who need time can pass --date explicitly.
+        # Full ISO with offset is still accepted if provided via --date.
+        date = options.date || Time.local.to_s("%Y-%m-%d")
         tags = options.tags
 
         # Find archetype, extracting any hwaro directives (e.g. bundle=true)

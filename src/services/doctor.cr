@@ -154,10 +154,17 @@ module Hwaro
         return [] of String unless raw
 
         # Collect commented section headers (e.g. "# [pwa]", "# [og.auto_image]")
+        # For dotted keys like "serve.headers", we also record the parent ("serve")
+        # so that top-level container sections are not repeatedly re-added by doctor --fix.
         commented_sections = Set(String).new
         raw_text.each_line do |line|
           if match = line.match(/^\s*#\s*\[(?!\[)([^\]]+)\]/)
-            commented_sections << match[1]
+            dotted = match[1]
+            commented_sections << dotted
+            if dotted.includes?(".")
+              parent = dotted.split(".")[0]
+              commented_sections << parent
+            end
           end
         end
 

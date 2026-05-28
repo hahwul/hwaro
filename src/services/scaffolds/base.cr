@@ -299,7 +299,7 @@ module Hwaro
             <body data-section="{{ page.section }}">
               <div class="site-wrapper">
                 <header class="site-header">
-                  <a href="{{ base_url }}/" class="site-logo">{{ site.title }}</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title }}</a>
                   #{navigation}
                 </header>
 
@@ -360,7 +360,7 @@ module Hwaro
               <main class="site-main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
-                <p><a href="{{ base_url }}/">Return to Home</a></p>
+                <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to Home</a></p>
               </main>
             {% include "footer.html" %}
             HTML
@@ -455,8 +455,15 @@ module Hwaro
         protected def navigation : String
           <<-NAV
             <nav>
-              <a href="{{ base_url }}/">Home</a>
-              <a href="{{ base_url }}/about/">About</a>
+              <!-- Add links for new sections here (e.g. /notes/, /til/).
+                   Quick dynamic version (uncomment and remove the hardcoded links below):
+
+                   {% for s in site.sections | sort(attribute="weight") %}
+                     {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
+                   {% endfor %}
+              -->
+              <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
+              <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
             </nav>
             NAV
         end

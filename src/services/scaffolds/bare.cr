@@ -83,10 +83,10 @@ module Hwaro
             </head>
             <body>
               <header>
-                <a href="{{ base_url }}/">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/">{{ site.title }}</a>
                 <nav>
-                  <a href="{{ base_url }}/">Home</a>
-                  <a href="{{ base_url }}/about/">About</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
                 </nav>
               </header>
 
@@ -127,7 +127,7 @@ module Hwaro
               <main>
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
-                <p><a href="{{ base_url }}/">Return to Home</a></p>
+                <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to Home</a></p>
               </main>
             {% include "footer.html" %}
             HTML

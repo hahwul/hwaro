@@ -1093,7 +1093,7 @@ module Hwaro
               <main class="docs-main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
-                <p><a href="{{ base_url }}/">Return to home</a></p>
+                <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to home</a></p>
             {% include "footer.html" %}
             HTML
         end
@@ -1453,23 +1453,32 @@ module Hwaro
 
             ## Using Shortcodes
 
-            In your Markdown content:
+            Two syntaxes are supported in Markdown content:
 
+            Inline (function call):
             ```jinja
             {{ alert(type="info", body="This is an info alert") }}
             ```
 
+            Block form (for multi-line or rich content):
+            ```jinja
+            {% alert(type="warning", title="Caution") %}
+            Be careful with this!
+            {% end %}
+            ```
+
             ## Built-in Shortcodes
 
-            ### Alert
+            ### Alert / Callout
 
-            Display an alert box:
+            Display an alert box. Works in both inline and block forms.
 
             ```jinja
             {{ alert(type="warning", body="Be careful!") }}
+            {% alert(type="tip") %}A helpful tip here.{% end %}
             ```
 
-            Types: `info`, `warning`, `tip`, `note`
+            Types: `info`, `warning`, `tip`, `note`, etc. (depends on your shortcode template).
 
             ## Creating Custom Shortcodes
 

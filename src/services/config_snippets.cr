@@ -952,6 +952,9 @@ module Hwaro
             # `hwaro serve`. Extremely useful for reproducing production
             # reverse-proxy, CDN, or security header behaviour locally.
 
+            # [serve]
+            # (response headers live under the [serve.headers] table below)
+
             # [serve.headers]
             # X-Frame-Options = "SAMEORIGIN"
             # X-Content-Type-Options = "nosniff"

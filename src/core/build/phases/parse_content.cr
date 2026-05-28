@@ -100,7 +100,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
 
     Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
-    Logger.info "  #{draft_count} page(s) skipped (draft)." if draft_count > 0
+    Logger.info "  #{draft_count} page(s) skipped (draft) — excluded from sitemap, feeds & search by default." if draft_count > 0
     Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
     Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
 

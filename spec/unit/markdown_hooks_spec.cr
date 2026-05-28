@@ -128,7 +128,7 @@ describe Hwaro::Content::Hooks::MarkdownHooks do
           Hwaro::Logger.io = previous_io
         end
 
-        buffer.to_s.should contain("2 page(s) skipped (draft).")
+        buffer.to_s.should contain("2 page(s) skipped (draft) — excluded from sitemap, feeds & search by default.")
       end
     end
 
