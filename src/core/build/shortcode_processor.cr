@@ -24,7 +24,7 @@ module Hwaro
         MAX_SHORTCODE_NESTING = 5
         BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
-        BLOCK_CLOSE_RE        = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
+        BLOCK_CLOSE_RE = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
 
         # Placeholder left in the content stream for each rendered shortcode
         # before Markdown runs. HTML-comment form so CommonMark treats it as
