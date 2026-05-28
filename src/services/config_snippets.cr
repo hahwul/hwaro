@@ -22,6 +22,7 @@ module Hwaro
         "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: -> { highlight(commented: true) }},
         "og"               => {description: "OpenGraph & Twitter Cards", snippet: -> { og(commented: true) }},
         "search"           => {description: "Client-side search index", snippet: -> { search(commented: true) }},
+        "serve"            => {description: "Development server options (custom response headers)", snippet: -> { serve(commented: true) }},
         "pagination"       => {description: "Pagination settings", snippet: -> { pagination(commented: true) }},
         "series"           => {description: "Series grouping", snippet: -> { series(commented: true) }},
         "related"          => {description: "Related posts", snippet: -> { related(commented: true) }},
@@ -935,6 +936,44 @@ module Hwaro
             # pattern = "^.+\\.css$"
             # cacheControl = "max-age=31536000"
             # gzip = true
+
+            TOML
+        end
+      end
+
+      def self.serve(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Serve (Development Server) (Optional)
+            # =============================================================================
+            # Custom response headers injected on every request while running
+            # `hwaro serve`. Extremely useful for reproducing production
+            # reverse-proxy, CDN, or security header behaviour locally.
+
+            # [serve.headers]
+            # X-Frame-Options = "SAMEORIGIN"
+            # X-Content-Type-Options = "nosniff"
+            # Referrer-Policy = "strict-origin-when-cross-origin"
+            # # Cache-Control = "public, max-age=3600"
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Serve (Development Server) (Optional)
+            # =============================================================================
+            # Custom response headers injected on every request while running
+            # `hwaro serve`. Extremely useful for reproducing production
+            # reverse-proxy, CDN, or security header behaviour locally.
+
+            [serve.headers]
+            X-Frame-Options = "SAMEORIGIN"
+            X-Content-Type-Options = "nosniff"
+            Referrer-Policy = "strict-origin-when-cross-origin"
+            # Cache-Control = "public, max-age=3600"
 
             TOML
         end

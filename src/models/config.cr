@@ -524,6 +524,27 @@ module Hwaro
       end
     end
 
+    # Serve (development server) configuration
+    #
+    # Currently used to configure custom response headers that are injected
+    # on every request while running `hwaro serve`. This makes it easy to
+    # reproduce production reverse-proxy / CDN header behaviour locally.
+    class ServeConfig
+      # Custom HTTP response headers applied to *all* responses during
+      # `hwaro serve` (including 404s, redirects, and static assets).
+      #
+      # Example in config.toml:
+      #   [serve.headers]
+      #   X-Frame-Options = "SAMEORIGIN"
+      #   X-Content-Type-Options = "nosniff"
+      #   Referrer-Policy = "strict-origin-when-cross-origin"
+      property headers : Hash(String, String)
+
+      def initialize
+        @headers = {} of String => String
+      end
+    end
+
     # Markdown parser configuration
     # Maps to Markd::Options for controlling markdown parsing behavior
     class MarkdownConfig
@@ -750,6 +771,7 @@ module Hwaro
       property default_language : String
       property languages : Hash(String, LanguageConfig)
       property build : BuildConfig
+      property serve : ServeConfig
       property markdown : MarkdownConfig
       property series : SeriesConfig
       property related : RelatedConfig
@@ -783,6 +805,7 @@ module Hwaro
         @default_language = "en"
         @languages = {} of String => LanguageConfig
         @build = BuildConfig.new
+        @serve = ServeConfig.new
         @markdown = MarkdownConfig.new
         @series = SeriesConfig.new
         @related = RelatedConfig.new
@@ -914,6 +937,7 @@ module Hwaro
         load_taxonomies(config)
         load_languages(config)
         load_build(config)
+        load_serve(config)
         load_markdown(config)
         load_series(config)
         load_related(config)
@@ -1246,6 +1270,23 @@ module Hwaro
           end
           if post_hooks = hooks_section["post"]?.try(&.as_a?)
             config.build.hooks.post = post_hooks.compact_map(&.as_s?)
+          end
+        end
+      end
+
+      private def self.load_serve(config : Config)
+        return unless s = config.raw["serve"]?.try(&.as_h?)
+
+        if headers_table = s["headers"]?.try(&.as_h?)
+          headers_table.each do |name, value|
+            next unless str = value.as_s?
+            # Drop obviously dangerous values (CRLF, other controls) coming from config.
+            # This is defense-in-depth; a bad config.toml should ideally be caught by
+            # the user or by `hwaro doctor`, but we refuse to emit split responses.
+            next if name.each_char.any? { |c| c.ascii_control? || c == ':' } ||
+                    str.each_char.any?(&.ascii_control?)
+
+            config.serve.headers[name] = str
           end
         end
       end

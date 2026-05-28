@@ -1218,6 +1218,50 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
+  # Serve (dev server) configuration
+  # ---------------------------------------------------------------------------
+
+  describe "serve configuration" do
+    it "has default (empty) serve headers" do
+      config = Hwaro::Models::Config.new
+      config.serve.headers.should eq({} of String => String)
+    end
+
+    it "loads custom serve headers from TOML" do
+      config = load_config(<<-TOML)
+        title = "Test"
+        base_url = "http://localhost"
+
+        [serve.headers]
+        X-Frame-Options = "SAMEORIGIN"
+        X-Content-Type-Options = "nosniff"
+        Referrer-Policy = "strict-origin-when-cross-origin"
+        TOML
+
+      config.serve.headers["X-Frame-Options"].should eq("SAMEORIGIN")
+      config.serve.headers["X-Content-Type-Options"].should eq("nosniff")
+      config.serve.headers.size.should eq(3)
+    end
+
+    it "ignores non-string values and dangerous header names (colon)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+        base_url = "http://localhost"
+
+        [serve.headers]
+        "Good-Header" = "safe-value"
+        "Bad:Name" = "x"
+        ignored = 123
+        also_ignored = ["array", "not", "string"]
+        TOML
+
+      config.serve.headers.has_key?("Good-Header").should be_true
+      config.serve.headers.has_key?("Bad:Name").should be_false
+      config.serve.headers.size.should eq(1)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Markdown
   # ---------------------------------------------------------------------------
 
