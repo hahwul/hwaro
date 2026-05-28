@@ -226,6 +226,16 @@ describe Hwaro::CLI::Commands::ServeCommand do
       err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
     end
 
+    it "handles bare --header token (no separator) gracefully instead of IndexError" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.test_parse_options(["--header", "JustKeyNoValue"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      # Use to_s because Exception#message is String? in the base class
+      err.message.to_s.should contain("Invalid --header value")
+    end
+
     it "raises on --header containing control characters (CRLF injection guard)" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       # Pass the flag and the bad value as two separate argv elements (the value itself contains \n)

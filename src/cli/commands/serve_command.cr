@@ -258,12 +258,21 @@ module Hwaro
             key, value = s.split(":", 2)
           elsif s.includes?("=")
             key, value = s.split("=", 2)
+          elsif s =~ /\s/
+            # Only treat as "key value" if there actually is whitespace.
+            parts = s.split(/\s+/, 2)
+            key = parts[0]? || ""
+            value = parts[1]? || ""
           else
-            # fallback: first whitespace
-            key, value = s.split(/\s+/, 2)
+            # Bare token with no separator at all (e.g. --header "Foo").
+            # This used to cause an IndexError on parallel assignment before the
+            # safe split. Now we give the user the same friendly error as other
+            # malformed inputs (addresses Copilot review feedback on #556).
+            key = ""
+            value = ""
           end
           key = key.strip
-          value = (value || "").strip
+          value = value.strip
 
           if key.empty?
             raise Hwaro::HwaroError.new(
