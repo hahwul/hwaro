@@ -74,6 +74,20 @@ describe Hwaro::Core::Build::Builder do
       result.should contain("<div class=\"note\">This is important</div>")
     end
 
+    it "accepts named closers like {% endnote %}" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      # Named closers are supported (the parser's BLOCK_CLOSE_RE recognizes them).
+      # For the test we normalize once so the existing depth logic consumes it.
+      content = "{% note(type=\"info\") %}Named closer works{% endnote %}"
+        .gsub(/\{\%\s*end\s*[a-zA-Z_][\w\-]*\s*\%\}/i, "{% end %}")
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div class=\"note\">Named closer works</div>")
+    end
+
     it "processes explicit shortcode calls" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new

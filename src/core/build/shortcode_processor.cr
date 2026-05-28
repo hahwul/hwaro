@@ -1,9 +1,11 @@
 # Shortcode processing module extracted from Builder
 #
 # Handles Jinja2/Crinja-style shortcode expansion in content:
-# - Block shortcodes:  {% name(args) %}body{% end %}
+# - Block shortcodes:  {% name(args) %}body{% end %}   or   {% name(args) %}body{% endname %}
 # - Explicit calls:    {{ shortcode("name", args) }}
 # - Direct calls:      {{ name(args) }}
+#
+# Both bare {% end %} and named {% endNAME %} closers are supported (localized normalization).
 #
 # Shortcodes inside fenced code blocks (``` / ~~~) are left untouched
 # so documentation can show literal `{{ ... }}` examples safely.
@@ -21,7 +23,8 @@ module Hwaro
         # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
         MAX_SHORTCODE_NESTING = 5
         BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
-        BLOCK_CLOSE_RE        = /\{\%\s*end\s*\%\}/
+        # Support both bare {% end %} and named {% endNAME %}.
+        BLOCK_CLOSE_RE        = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
 
         # Placeholder left in the content stream for each rendered shortcode
         # before Markdown runs. HTML-comment form so CommonMark treats it as
@@ -96,10 +99,12 @@ module Hwaro
         end
 
         private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, depth : Int32) : String
-          # 1. Block shortcodes: {% name(args) %}body{% end %}
-          # Use stack-based parsing to correctly handle nested block shortcodes
-          # of the same type, instead of a single regex that matches the first {% end %}.
-          processed = process_block_shortcodes(content, templates, context, shortcode_results, crinja_env_override, depth)
+          # Localized normalization for named closers (only affects shortcode block content).
+          # Avoid touching real Jinja/Crinja control tags (endif, endfor, etc.).
+          normalized = content.gsub(/\{\%\s*end\s*(?!if|for|macro|block|call|set|with|autoescape|raw|filter|trans|pluralize|comment)[a-zA-Z_][\w\-]*\s*\%\}/i, "{% end %}")
+
+          # 1. Block shortcodes
+          processed = process_block_shortcodes(normalized, templates, context, shortcode_results, crinja_env_override, depth)
 
           # 2. Explicit call: {{ shortcode("name", args) }}
           processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|

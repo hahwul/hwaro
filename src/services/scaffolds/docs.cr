@@ -1453,18 +1453,20 @@ module Hwaro
 
             ## Using Shortcodes
 
-            Two syntaxes are supported in Markdown content:
+            Inline and block forms are supported. **Named closers are recommended** for clarity:
 
-            Inline (function call):
+            Inline:
             ```jinja
             {{ alert(type="info", body="This is an info alert") }}
             ```
 
-            Block form (for multi-line or rich content):
+            Block:
             ```jinja
             {% alert(type="warning", title="Caution") %}
             Be careful with this!
             {% end %}
+
+            {% alert(type="tip") %}Named closer recommended{% endalert %}
             ```
 
             ## Built-in Shortcodes

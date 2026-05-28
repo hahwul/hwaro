@@ -1557,7 +1557,7 @@ module Hwaro::Core::Build::Phases::Render
     sorted = names.to_a.sort
     Logger.warn "Hugo-style shortcode syntax `{{< … >}}` is not supported and will render as literal text in #{path}. " \
                 "Found: #{sorted.join(", ")}. Convert to Hwaro's Crinja syntax: " \
-                "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}`."
+                "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}` (or better: `{% endname %}`). Named closers are recommended."
   end
 
   # Resolve the page kind into an `og:type` override. Returns "website"

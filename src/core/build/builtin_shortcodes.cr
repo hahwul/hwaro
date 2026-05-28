@@ -90,6 +90,7 @@ module Hwaro
           # ── Alert / Callout ──────────────────────────────────────
           # Usage: {% alert(type="warning") %}Watch out!{% end %}
           #        {% alert(type="info", title="Note") %}Some info{% end %}
+          #        {% alert(type="tip") %}Named closer recommended{% endalert %}
           # Types: info, warning, danger, tip, success
           t["shortcodes/alert"] = <<-HTML
             {% set tone = type | default(value="info") | lower %}

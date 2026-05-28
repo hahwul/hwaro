@@ -21,6 +21,23 @@ Or explicitly:
 {%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
 ```
 
+### Block Shortcode Closers
+
+Block shortcodes support two closer styles:
+
+- **Bare closer** (simple):
+  ```jinja
+  {% note %}...{% end %}
+  ```
+
+- **Named closer** (recommended):
+  ```jinja
+  {% note %}...{% endnote %}
+  {% alert(type="info") %}...{% endalert %}
+  ```
+
+**We strongly recommend named closers** (`{% endNAME %}`) for any non-trivial content. They make your Markdown much easier to read and maintain, especially when mixing multiple shortcodes or using deep nesting.
+
 ## Built-in Shortcodes
 
 Hwaro ships with built-in shortcodes that work out of the box — no template files needed.
@@ -75,9 +92,14 @@ Embed a GitHub Gist.
 
 Display an alert box. Use as a block shortcode to wrap content.
 
+Both bare and named closers are supported (named closers are recommended for complex pages):
+
 ```markdown
 {%raw%}{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
-{% callout(type="tip") %}Here is a helpful tip.{% end %}{%endraw%}
+{% alert(type="tip") %}Using named closer also works{% endalert %}{%endraw%}
+```
+
+(We recommend the named closer style for clarity.)
 ```
 
 | Param | Default | Description |
