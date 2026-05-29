@@ -95,7 +95,6 @@ module Hwaro
 
         site.pages.each do |page|
           next if page.draft || page.generated
-          page_lang = page.language || site.config.default_language
 
           enabled_taxonomy_names.each do |tax_name|
             values = page.taxonomy_values(tax_name)

@@ -172,7 +172,7 @@ module Hwaro
           # always "create a post at /posts/my-cool-post/", not a nested directory.
           # Default to single-file mode unless they explicitly pass --bundle.
           user_intends_file_under_section = !path.nil? && !path.ends_with?(".md") &&
-            path.includes?("/") && options.bundle != true && options.section.nil?
+                                            path.includes?("/") && options.bundle != true && options.section.nil?
 
           # With explicit --no-bundle (or the section-path heuristic above), treat the
           # provided path as the desired file location.

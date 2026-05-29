@@ -288,7 +288,6 @@ module Hwaro
             return [] of String unless File.exists?(config_path)
 
             # Temporarily chdir so Models::Config.load finds the right file
-            original_dir = Dir.current
             Dir.cd(project_root) do
               config = Models::Config.load
               return config.taxonomies.map(&.name)
