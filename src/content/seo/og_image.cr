@@ -25,6 +25,16 @@ module Hwaro
         LOGO_BOTTOM_OFFSET = 100
         LOGO_TEXT_GAP      =  12 # gap between logo and site name text
 
+        # Yield frequency inside the heavy OG PNG (and fallback SVG) rendering
+        # worker loop (see generate()).
+        #
+        # Yielding after every single render adds scheduler overhead on
+        # CPU-bound work. Yielding too rarely can starve the HTTP accept
+        # fiber during `serve --fast-start` background OG generation.
+        #
+        # 8 is a pragmatic balance for current workloads.
+        PNG_YIELD_INTERVAL = 8
+
         MIME_TYPES = {
           ".png"  => "image/png",
           ".jpg"  => "image/jpeg",
@@ -202,14 +212,23 @@ module Hwaro
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
               end
               Logger.debug "  OG image: #{page.image}" if verbose
-              # Yield after each render so a `serve` session running this
-              # in a background fiber doesn't starve its own HTTP accept
-              # loop. PNG encoding is pure CPU and never yields on its
-              # own; under MT with a saturated worker pool, or in the
-              # sequential path (parallel: false, or a single pending
-              # item), nothing else in this block would otherwise hand
-              # control back to the scheduler.
-              Fiber.yield
+
+              # Cooperative yielding for responsiveness during heavy OG
+              # generation (especially PNG) when running in a background
+              # fiber (e.g. `serve --fast-start`).
+              #
+              # PNG rendering is pure CPU work and never yields by itself.
+              # Without periodic yields, a saturated worker pool (or the
+              # sequential path) can starve the main HTTP accept fiber.
+              #
+              # We batch the yields (every N renders) rather than yielding
+              # after every single item. This significantly reduces
+              # scheduler overhead while still giving other fibers regular
+              # opportunities to run. The constant is defined at the top
+              # of the class for easy tuning.
+              if (_idx + 1) % PNG_YIELD_INTERVAL == 0
+                Fiber.yield
+              end
               true
             end
             generated = results.count(&.success)
