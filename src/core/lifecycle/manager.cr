@@ -75,8 +75,6 @@ module Hwaro
               # Lightweight per-hook timing when --profile is enabled (#561)
               start = if (p = context.profiler) && p.enabled?
                         Time.instant
-                      else
-                        nil
                       end
 
               result = hook.handler.call(context)
