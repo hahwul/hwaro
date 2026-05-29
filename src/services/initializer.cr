@@ -128,7 +128,7 @@ module Hwaro
         # - full_config    : maximum discoverability (current verbose behavior + doctor injection)
         # - default        : balanced (core + commonly useful sections with light comments)
         if minimal_config
-          config_content = scaffold.minimal_config_content(skip_taxonomies)
+          config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
         elsif full_config
           config_content = scaffold.config_content(skip_taxonomies)
         else
@@ -596,13 +596,16 @@ module Hwaro
         is_multilingual : Bool,
         multilingual_languages : Array(String),
       ) : String
-        # Start with the clean minimal content
-        base = scaffold.minimal_config_content(skip_taxonomies)
+        # Start with the clean minimal content (which now includes multilingual
+        # block when languages.size > 1, plus sitemap/feeds/search etc.)
+        base = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
 
         str = String.build do |io|
           io << base
 
-          # Add a few high-value sections with light comments (not full examples)
+          # Add a few high-value sections with light comments (not full examples).
+          # Note: sitemap/feeds are already provided by minimal_config_content
+          # (avoiding the previous duplicate-key TOML errors).
           io << "\n# =============================================================================\n"
           io << "# OpenGraph & Twitter Cards (recommended for social sharing)\n"
           io << "# =============================================================================\n\n"
@@ -618,18 +621,6 @@ module Hwaro
           io << "task_lists = true\n"
           io << "definition_lists = true\n"
           io << "footnotes = true\n\n"
-
-          unless skip_taxonomies
-            io << "# =============================================================================\n"
-            io << "# SEO & Feeds (commonly used)\n"
-            io << "# =============================================================================\n\n"
-            io << "[sitemap]\n"
-            io << "enabled = true\n\n"
-            io << "[feeds]\n"
-            io << "enabled = true\n"
-            io << "type = \"rss\"\n"
-            io << "limit = 10\n\n"
-          end
         end
 
         str

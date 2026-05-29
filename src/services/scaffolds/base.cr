@@ -221,13 +221,56 @@ module Hwaro
           "github"
         end
 
+        # Display name for language codes (used in minimal + balanced config for --include-multilingual).
+        protected def language_display_name(code : String) : String
+          case code.downcase
+          when "en" then "English"
+          when "ko" then "한국어"
+          when "ja" then "日本語"
+          when "zh" then "中文"
+          when "es" then "Español"
+          when "fr" then "Français"
+          when "de" then "Deutsch"
+          when "pt" then "Português"
+          when "ru" then "Русский"
+          when "it" then "Italiano"
+          when "nl" then "Nederlands"
+          when "pl" then "Polski"
+          when "vi" then "Tiếng Việt"
+          when "th" then "ไทย"
+          when "ar" then "العربية"
+          when "hi" then "हिन्दी"
+          else           code.upcase
+          end
+        end
+
         # Returns a minimal config.toml without comments and optional sections
-        def minimal_config_content(skip_taxonomies : Bool = false) : String
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           String.build do |str|
             str << "title = \"#{config_title}\"\n"
             str << "description = \"#{config_description}\"\n"
             str << "base_url = \"http://localhost:3000\"\n"
-            str << "\n[plugins]\n"
+
+            # Multilingual support (only when 2+ languages requested; single lang
+            # is treated as non-multilingual per initializer tests).
+            if multilingual_languages.size > 1
+              default_lang = multilingual_languages.first
+              str << "default_language = \"#{default_lang}\"\n\n"
+              str << "[languages]\n"
+              lang_blocks = multilingual_languages.map_with_index do |lang, index|
+                lang_name = language_display_name(lang)
+                tax_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\"]"
+                "  [languages.#{lang}]\n" \
+                "  language_name = \"#{lang_name}\"\n" \
+                "  weight = #{index + 1}\n" \
+                "  generate_feed = true\n" \
+                "  build_search_index = true#{tax_line}"
+              end
+              str << lang_blocks.join("\n\n")
+              str << "\n\n"
+            end
+
+            str << "[plugins]\n"
             str << "processors = [\"markdown\"]\n"
             str << "\n[content.files]\n"
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"

@@ -334,12 +334,13 @@ describe Hwaro::Services::Doctor do
         missing_issues = issues.select { |i| i.category == "config_missing" }
         missing_issues.should_not be_empty
 
-        # Should mention non-optional sections like [robots], [markdown]
-        # (advanced/niche sections like [pwa], [amp] are skipped because
-        # `doctor --fix` (minimal) won't add them either)
+        # Should mention non-optional sections like [markdown], [sitemap]
+        # (niche/optional sections like [robots], [pwa], [amp] are skipped in
+        # normal doctor output because `doctor --fix` (without --full/--approve)
+        # won't add them either; users opt-in explicitly).
         messages = missing_issues.map(&.message)
-        messages.any?(&.includes?("[robots]")).should be_true
         messages.any?(&.includes?("[markdown]")).should be_true
+        messages.any?(&.includes?("[sitemap]")).should be_true
       end
 
       it "does not report niche optional sections (pwa/amp/etc) that --fix won't auto-add" do
@@ -432,10 +433,12 @@ describe Hwaro::Services::Doctor do
         missing_issues.none?(&.message.includes?("[og.auto_image]")).should be_true
       end
 
-      it "suggests --fix in issue messages" do
+      it "suggests --full in issue messages" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"))
         missing_issues = issues.select { |i| i.category == "config_missing" }
-        missing_issues.all?(&.message.includes?("--fix")).should be_true
+        # Current messages guide users to `hwaro doctor --full` (or --approve)
+        # for section recommendations; plain --fix only does value corrections.
+        missing_issues.all?(&.message.includes?("--full")).should be_true
       end
     end
 
