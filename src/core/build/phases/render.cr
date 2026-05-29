@@ -6,6 +6,12 @@
 # and compiled templates to minimize allocations during parallel rendering.
 
 module Hwaro::Core::Build::Phases::Render
+  # In streaming mode, we release per-page rendered content every batch,
+  # but do the more expensive Crinja cache invalidation + GC.collect
+  # only every N batches. This is the main D5 tuning knob for
+  # memory vs. speed on very large sites.
+  private STREAMING_CLEAR_INTERVAL = 4
+
   private def execute_render_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     site = @site || raise "Site not initialized"
     templates = @templates || raise "Templates not loaded"
@@ -195,17 +201,26 @@ module Hwaro::Core::Build::Phases::Render
               end
       total_count += count
 
-      # Release rendered HTML and per-section/page caches to free memory
+      # Always release the rendered HTML strings for this batch immediately.
+      # This is cheap and the primary mechanism for keeping peak memory low.
       batch.each(&.content=(""))
-      @cache_manager.clear(
-        "page_crinja_value",
-        "section_pages_crinja",
-        "section_assets_crinja",
-        "ancestors_crinja",
-        "related_posts_crinja",
-        reset_stats: false,
-      )
-      GC.collect
+
+      # Only do the heavier cache invalidation + full GC on every Nth batch.
+      # This significantly reduces overhead compared to doing it on every batch,
+      # while still preventing unbounded growth of cached Crinja values on
+      # extremely large sites.
+      if batch_num % STREAMING_CLEAR_INTERVAL == 0
+        @cache_manager.clear(
+          "page_crinja_value",
+          "section_pages_crinja",
+          "section_assets_crinja",
+          "series_crinja",
+          "ancestors_crinja",
+          "related_posts_crinja",
+          reset_stats: false,
+        )
+        GC.collect
+      end
     end
 
     total_count
