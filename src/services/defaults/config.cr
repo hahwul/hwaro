@@ -1,3 +1,5 @@
+require "../config_snippets"
+
 module Hwaro
   module Services
     module Defaults
@@ -43,6 +45,8 @@ module Hwaro
             limit = 10
             sections = []   # Optional: e.g. ["blog"]
             default_language_only = true  # true: main feed = default language only, false: all languages
+
+            #{ConfigSnippets.og_auto_image}
 
             # Series
             [series]
@@ -136,6 +140,8 @@ module Hwaro
             limit = 10
             sections = []   # Optional: e.g. ["blog"]
             default_language_only = true  # true: main feed = default language only, false: all languages
+
+            #{ConfigSnippets.og_auto_image}
 
             # Series
             [series]
@@ -241,6 +247,7 @@ module Hwaro
             str << "limit = 10\n"
             str << "sections = []   # Optional: e.g. [\"blog\"]\n"
             str << "default_language_only = true  # true: main feed = default language only, false: all languages\n\n"
+            str << ConfigSnippets.og_auto_image
             str << "# Series\n"
             str << "[series]\n"
             str << "enabled = true\n\n"

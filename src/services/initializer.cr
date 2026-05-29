@@ -11,6 +11,7 @@ require "../services/scaffolds/registry"
 require "../services/scaffolds/remote"
 require "./defaults/agents_md"
 require "./doctor"
+require "./config_snippets"
 
 module Hwaro
   module Services
@@ -360,6 +361,8 @@ module Hwaro
           str << "# twitter_site = \"@yourusername\"           # Twitter @username for the site\n"
           str << "# twitter_creator = \"@authorusername\"      # Twitter @username for content creator\n"
           str << "# fb_app_id = \"your_fb_app_id\"             # Facebook App ID (optional)\n\n"
+
+          str << ConfigSnippets.og_auto_image
 
           str << "# =============================================================================\n"
           str << "# Search Configuration\n"
