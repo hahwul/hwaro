@@ -458,9 +458,10 @@ module Hwaro
               <!-- Add links for new sections here (e.g. /notes/, /til/).
                    Quick dynamic version (uncomment and remove the hardcoded links below):
 
-                   {% for s in site.sections | sort(attribute="weight") %}
+                   {% for s in site.sections | sort(attribute="title") %}
                      {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
                    {% endfor %}
+                   {# For custom ordering, set `weight` in each section's front matter and use sort(attribute="weight") #}
               -->
               <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
               <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>

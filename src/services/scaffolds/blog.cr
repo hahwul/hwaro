@@ -451,6 +451,24 @@ module Hwaro
             .post-header h1 { margin-bottom: 0.75rem; }
             .post-content { line-height: 1.8; }
 
+            .series-nav {
+              margin-top: 2rem;
+              padding: 0.75rem 1rem;
+              border: 1px solid var(--border);
+              border-radius: var(--radius-sm);
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 0.75rem;
+              font-size: 0.85rem;
+            }
+            .series-nav .series-name {
+              color: var(--text-muted);
+              font-weight: 500;
+            }
+            .series-nav a { color: var(--primary); text-decoration: none; }
+            .series-nav a:hover { text-decoration: underline; }
+
             .post-content h2 {
               margin-top: 2.5rem;
               padding-bottom: 0.4rem;
@@ -831,9 +849,10 @@ module Hwaro
                        1. Create content/SECTION/_index.md
                        2. Replace the links below with this compact dynamic loop:
 
-                       {% for s in site.sections | sort(attribute="weight") %}
+                       {% for s in site.sections | sort(attribute="title") %}
                          {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
                        {% endfor %}
+                       {# Use weight for explicit order: sort(attribute="weight") after setting weight in front matter #}
                   -->
                   <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
@@ -914,6 +933,18 @@ module Hwaro
                   <div class="post-content">
                     {{ content }}
                   </div>
+
+                  {% if page.series %}
+                  <nav class="series-nav" aria-label="Series navigation">
+                    {% if page.lower %}
+                    <a href="{{ base_url }}{{ page.lower.url }}" class="series-prev" rel="prev">← {{ page.lower.title | e }}</a>
+                    {% endif %}
+                    <span class="series-name">{{ page.series | e }}</span>
+                    {% if page.higher %}
+                    <a href="{{ base_url }}{{ page.higher.url }}" class="series-next" rel="next">{{ page.higher.title | e }} →</a>
+                    {% endif %}
+                  </nav>
+                  {% endif %}
                 </article>
             {% include "footer.html" %}
             HTML

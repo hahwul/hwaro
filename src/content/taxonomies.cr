@@ -27,21 +27,106 @@ module Hwaro
         # Reuse a single Builder instance across all taxonomy renders
         builder = Core::Build::Builder.new
 
-        config.taxonomies.each do |taxonomy|
-          next if taxonomy.name.strip.empty?
+        # Generate root taxonomies (for default language / non-multilingual sites)
+        generate_taxonomies_for_language(config.taxonomies, site, output_dir, templates, builder, verbose, language: nil, lang_prefix: "")
 
-          terms = site.taxonomies[taxonomy.name]?
-          next unless terms
+        # For multilingual sites, also generate language-prefixed taxonomy pages
+        # (e.g. /en/tags/, /en/categories/) using only pages of that language.
+        # This closes the gap where non-default languages had no taxonomy UI at all.
+        if config.multilingual?
+          config.languages.each do |lang_code, lang_cfg|
+            next if lang_cfg.taxonomies.empty?
 
-          base_path = "/#{taxonomy.name}/"
-          index_page = build_taxonomy_index_page(taxonomy, base_path)
+            # Build a filtered view of taxonomies for just this language's pages
+            lang_taxonomies = build_language_taxonomies(site, lang_cfg.taxonomies)
+            next if lang_taxonomies.empty?
 
-          render_taxonomy_index(index_page, terms.keys.sort!, templates, site, output_dir, builder, verbose)
-
-          terms.each do |term, pages|
-            render_taxonomy_term(taxonomy, term, pages, templates, site, output_dir, builder, verbose)
+            lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
+            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose,
+              language: lang_code, lang_prefix: "/#{lang_code}", lang_taxonomies: lang_taxonomies)
           end
         end
+      end
+
+      # Generate taxonomy index + terms for a (possibly language-scoped) set of taxonomies.
+      private def self.generate_taxonomies_for_language(
+        taxonomies : Array(Models::TaxonomyConfig),
+        site : Models::Site,
+        output_dir : String,
+        templates : Hash(String, String),
+        builder : Core::Build::Builder,
+        verbose : Bool,
+        language : String?,
+        lang_prefix : String,
+        lang_taxonomies : Hash(String, Hash(String, Array(Models::Page)))? = nil,
+      )
+        taxonomies.each do |taxonomy|
+          next if taxonomy.name.strip.empty?
+
+          terms_map = lang_taxonomies.try(&.[taxonomy.name]?) || site.taxonomies[taxonomy.name]?
+          next unless terms_map
+
+          base_path = "#{lang_prefix}/#{taxonomy.name}/"
+          index_page = build_taxonomy_index_page(taxonomy, base_path)
+          if language
+            index_page.language = language
+          end
+
+          render_taxonomy_index(index_page, terms_map.keys.sort!, templates, site, output_dir, builder, verbose)
+
+          terms_map.each do |term, pages|
+            # Filter pages to the requested language when doing per-lang generation
+            filtered_pages = if language
+                               pages.select { |p| (p.language || site.config.default_language) == language }
+                             else
+                               pages
+                             end
+            next if filtered_pages.empty?
+
+            render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, lang_prefix: lang_prefix, language: language)
+          end
+        end
+      end
+
+      # Build per-language taxonomy maps from the already-aggregated site.taxonomies,
+      # but only using pages that belong to the given language.
+      private def self.build_language_taxonomies(site : Models::Site, enabled_taxonomy_names : Array(String)) : Hash(String, Hash(String, Array(Models::Page)))
+        result = {} of String => Hash(String, Array(Models::Page))
+
+        site.pages.each do |page|
+          next if page.draft || page.generated
+          page_lang = page.language || site.config.default_language
+
+          enabled_taxonomy_names.each do |tax_name|
+            values = page.taxonomy_values(tax_name)
+            next if values.empty?
+
+            values.each do |term|
+              next if term.strip.empty?
+
+              tax_map = result[tax_name]? || begin
+                result[tax_name] = {} of String => Array(Models::Page)
+                result[tax_name]
+              end
+
+              term_list = tax_map[term]? || begin
+                tax_map[term] = [] of Models::Page
+                tax_map[term]
+              end
+
+              term_list << page
+            end
+          end
+        end
+
+        # Sort each term's pages by date (consistent with global behavior)
+        result.each_value do |terms|
+          terms.each_value do |pages|
+            pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
+          end
+        end
+
+        result
       end
 
       private def self.build_taxonomy_index(site : Models::Site)
@@ -109,9 +194,11 @@ module Hwaro
         output_dir : String,
         builder : Core::Build::Builder,
         verbose : Bool = false,
+        lang_prefix : String = "",
+        language : String? = nil,
       )
         slug = Utils::TextUtils.slugify(term)
-        base_url = "/#{taxonomy.name}/#{slug}/"
+        base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
 
         index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
         index_page.title = "#{taxonomy.name.capitalize}: #{term}"
@@ -125,6 +212,9 @@ module Hwaro
         index_page.taxonomy_name = taxonomy.name
         index_page.taxonomy_term = term
         index_page.pagination_enabled = false
+        if language
+          index_page.language = language
+        end
 
         paginated_pages = paginate_taxonomy(taxonomy, pages, index_page)
 

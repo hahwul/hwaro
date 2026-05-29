@@ -166,12 +166,17 @@ module Hwaro
         else
           # Determine if path is a file path or directory
           is_file_path = path && path.ends_with?(".md")
-          # With explicit --no-bundle, a bare `<path>` (no .md) is treated as
-          # a flat file slug (→ `content/<path>.md`) rather than as a section
-          # directory that gets a `<title-slug>.md` appended. This avoids
-          # `--no-bundle` producing a directory wrapper, which defeats the
-          # whole point of the flag.
-          is_no_bundle_flat = !path.nil? && options.bundle == false && !path.ends_with?(".md")
+
+          # When user types something like `posts/my-cool-post` (with a slash, no .md),
+          # their clear intent is "create a post at /posts/my-cool-post/", not
+          # "create a subdirectory posts/my-cool-post/ inside content/".
+          # Default to single-file mode in this case unless they explicitly pass --bundle.
+          # This is the most common "blog author" workflow and was a major pain point.
+          user_intends_file_under_section = !path.nil? && !path.ends_with?(".md") && path.includes?("/") && options.bundle != true
+
+          # With explicit --no-bundle (or the section-path heuristic above), treat the
+          # provided path as the desired file location.
+          is_no_bundle_flat = (!path.nil? && options.bundle == false && !path.ends_with?(".md")) || user_intends_file_under_section
 
           if is_file_path && path
             # Honor the path the user typed. Previously a bare `foo.md`
