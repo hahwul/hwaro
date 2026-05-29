@@ -68,6 +68,12 @@ module Hwaro
         # wipe the first pass's writes.
         property partial_render : Bool = false
 
+        # Profiler reference (only set when --profile is active).
+        # Allows expensive hooks (OG image, image resize) to record their
+        # own timing so the true cost distribution inside the Render phase
+        # becomes visible.
+        property profiler : Hwaro::Profiler?
+
         @all_pages_cache : Array(Models::Page)?
 
         def initialize(@options : Config::Options::BuildOptions)

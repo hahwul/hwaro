@@ -48,6 +48,20 @@ module Hwaro
     @markdown_profiles : Hash(String, MarkdownProfile)
     @markdown_mutex : Mutex
 
+    # Simple aggregate stats for expensive BeforeRender hooks
+    struct AssetGenerationStats
+      property name : String
+      property generated : Int32
+      property skipped : Int32
+      property time_ms : Float64
+
+      def initialize(@name, @generated = 0, @skipped = 0, @time_ms = 0.0)
+      end
+    end
+
+    @asset_stats : Array(AssetGenerationStats)
+    @asset_mutex : Mutex
+
     def initialize(@enabled : Bool = false)
       @phases = [] of PhaseTime
       @current_phase = nil
@@ -57,6 +71,8 @@ module Hwaro
       @template_mutex = Mutex.new
       @markdown_profiles = {} of String => MarkdownProfile
       @markdown_mutex = Mutex.new
+      @asset_stats = [] of AssetGenerationStats
+      @asset_mutex = Mutex.new
     end
 
     def enabled? : Bool
@@ -161,6 +177,15 @@ module Hwaro
       end
     end
 
+    # Record timing for expensive asset generation hooks (OG images, image resizing).
+    # These are the #1 cost on many sites even with aggressive caching.
+    def record_asset_generation(name : String, generated : Int32, skipped : Int32, time_ms : Float64)
+      return unless @enabled
+      @asset_mutex.synchronize do
+        @asset_stats << AssetGenerationStats.new(name, generated, skipped, time_ms)
+      end
+    end
+
     # Print the per-template profiling report
     def template_report(io : IO = STDOUT)
       return unless @enabled
@@ -230,6 +255,31 @@ module Hwaro
       total_bytes = sorted.sum(&.total_bytes)
       io.puts "#{" " * header_width}   #{" " * 5}   #{" " * 10}  #{"─" * 10}"
       io.puts "#{" " * header_width}    Total#{" " * (10 + 5)} #{format_time(total_time).rjust(10)} (#{format_bytes(total_bytes)} processed)"
+      io.puts ""
+    end
+
+    # Print timing for heavy BeforeRender asset generation (OG images + image resizing).
+    # These often dominate the Render phase on sites with auto OG or responsive images enabled.
+    def asset_report(io : IO = STDOUT)
+      return unless @enabled
+      return if @asset_stats.empty?
+
+      io.puts ""
+      io.puts "Asset Generation (OG + Image Hooks)".colorize(:cyan).bold
+      io.puts "─" * 60
+
+      total_time = 0.0
+      @asset_stats.each do |s|
+        total_time += s.time_ms
+        label = s.name.ljust(28)
+        gen = "gen=#{s.generated}".rjust(10)
+        skp = s.skipped > 0 ? " skip=#{s.skipped}" : ""
+        t = format_time(s.time_ms).rjust(10)
+        io.puts "  #{label} #{gen}#{skp}  #{t}"
+      end
+
+      io.puts "─" * 60
+      io.puts "  Total asset generation time: #{format_time(total_time).rjust(10)}"
       io.puts ""
     end
 

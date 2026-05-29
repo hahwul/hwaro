@@ -104,6 +104,8 @@ module Hwaro
           return unless config.image_processing.enabled
           return if config.image_processing.widths.empty?
 
+          start = ctx.profiler ? Time.instant : nil
+
           widths = config.image_processing.widths
           quality = config.image_processing.quality
           lqip_enabled = config.image_processing.lqip_enabled
@@ -205,6 +207,11 @@ module Hwaro
           Logger.success "  Generated #{resized_count} resized image(s)." if resized_count > 0
           Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
           Logger.success "  Generated #{new_lqip_map.size} LQIP placeholder(s)." if new_lqip_map.size > 0
+
+          if (p = ctx.profiler) && start
+            elapsed = (Time.instant - start).total_milliseconds
+            p.record_asset_generation("image:resize", resized_count, reused_count, elapsed)
+          end
         end
 
         # Returns a `width => filename` map when every expected destination

@@ -576,6 +576,7 @@ module Hwaro
           deferred_ctx.output_dir = output_dir
           deferred_ctx.cache = @cache
           deferred_ctx.priority_pages = nil
+          deferred_ctx.profiler = @profiler if @profiler.try(&.enabled?)
           # Still a partial pass — the priority pass just wrote OG
           # manifest entries we must not truncate. Without this flag the
           # deferred pass would overwrite `.og_manifest.json` with only
@@ -778,6 +779,7 @@ module Hwaro
 
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
+          ctx.profiler = profiler if profiler.enabled?
           @context = ctx
 
           # Reset internal caches (preserve @config loaded above)
@@ -810,6 +812,7 @@ module Hwaro
           profiler.report
           profiler.template_report
           profiler.markdown_report
+          profiler.asset_report
 
           # Print cache stats
           if options.verbose

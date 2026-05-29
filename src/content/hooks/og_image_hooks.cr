@@ -33,6 +33,8 @@ module Hwaro
           # eats ~20s on a 1k-page site and is what made fast-start
           # indistinguishable from a normal cold start.
           pages = ctx.priority_pages || ctx.all_pages
+
+          start = ctx.profiler ? Time.instant : nil
           Content::Seo::OgImage.generate(
             pages,
             site.config,
@@ -41,6 +43,13 @@ module Hwaro
             partial: ctx.partial_render,
             parallel: ctx.options.parallel,
           )
+          if (p = ctx.profiler) && start
+            elapsed = (Time.instant - start).total_milliseconds
+            # We don't have exact generated/skipped counts here without changing
+            # the generate API, so we record wall time only. The log lines from
+            # OgImage still show the numbers to the user.
+            p.record_asset_generation("og_image:generate", 0, 0, elapsed)
+          end
         end
       end
     end
