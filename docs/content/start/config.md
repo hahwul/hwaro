@@ -135,7 +135,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[sitemap]` | [SEO](/features/seo/) | Sitemap XML generation |
 | `[robots]` | [SEO](/features/seo/) | Robots.txt generation |
 | `[og]` | [SEO](/features/seo/) | OpenGraph & Twitter Card meta tags |
-| `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images |
+| `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images (including `lazy_generate` for fast dev server) |
 | `[search]` | [Search](/features/search/) | Client-side search index |
 | `[highlight]` | [Syntax Highlighting](/features/syntax-highlighting/) | Code syntax highlighting |
 | `[pagination]` | [Pagination](/features/pagination/) | Section pagination |

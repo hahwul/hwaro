@@ -37,6 +37,7 @@ background_image = "static/og-bg.jpg"
 overlay_opacity = 0.5
 format = "svg"
 font_path = "static/fonts/Inter-Bold.ttf"
+# lazy_generate = true   # Recommended: true for fast `hwaro serve` on large sites
 ```
 
 | Key | Type | Default | Description |
@@ -57,6 +58,7 @@ font_path = "static/fonts/Inter-Bold.ttf"
 | overlay_opacity | float | `0.5` | Opacity of the color overlay on background images (0.0–1.0) |
 | format | string | `"svg"` | Output format: `"svg"` or `"png"` |
 | font_path | string | — | Path to a custom `.ttf` / `.otf` font file for PNG output. Falls back to system fonts, then the bundled DejaVu Sans Bold |
+| lazy_generate | bool | `false` | When `true`, skip bulk OG image generation during `hwaro serve`. Images are generated on-demand the first time a page is requested. **Recommended for local development on large sites.** Has no effect on `hwaro build`. |
 
 ## Style Presets
 
@@ -312,6 +314,45 @@ When deploying via the GitHub Actions (`hahwul/hwaro` action), OG image caching 
 | Page title, description, or URL | That page only |
 | OG config (colors, style, format, etc.) | All pages |
 | Image file missing on disk | That page only |
+
+## Performance in Development
+
+Auto-generating OG images (especially PNG) is one of the most expensive operations during a build. On large sites this can add 10–30+ seconds to the initial startup of `hwaro serve`.
+
+The `lazy_generate` option lets you defer OG image generation to the first time a page is actually requested:
+
+```toml
+[og.auto_image]
+enabled = true
+lazy_generate = true   # Recommended for local development on large sites
+```
+
+### How it works
+
+- **`hwaro build`** is **completely unaffected** — images are generated exactly as before.
+- During `hwaro serve`, the build phase **skips** bulk OG image generation when `lazy_generate = true`.
+- The first HTTP request for a page that needs an OG image triggers on-demand generation.
+- Once generated, the image is cached on disk and served instantly on subsequent requests and rebuilds.
+
+This is especially powerful when combined with `--fast-start`:
+
+```bash
+hwaro serve --fast-start
+```
+
+You get near-instant feedback on your priority pages while still having correct OG images the moment you preview them in the browser.
+
+### Comparison with `--skip-og-image`
+
+| Option / Flag         | Serve behavior                     | Build behavior       | Recommended when |
+|-----------------------|------------------------------------|----------------------|------------------|
+| `--skip-og-image`     | No OG images at all (even on request) | None generated      | You don't use auto OG images |
+| `lazy_generate = true`| Generated on first request (lazy) | Normal (eager)      | Fast dev server startup on big sites |
+| (default)             | Generated during initial build     | Normal (eager)      | Small sites or when you want OG images immediately in dev |
+
+The default remains `lazy_generate = false` so existing workflows are unchanged.
+
+See also the updated comment in the generated config snippets from `hwaro init` and `hwaro doctor --fix`.
 
 ## Behavior
 
