@@ -337,7 +337,7 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
 
     it "returns false when {{ and {% only appear inside fenced code blocks" do
       builder = Hwaro::Core::Build::Builder.new
-      content = <<-'MD'
+      content = <<-MD
         Example:
 
         ```jinja
@@ -349,13 +349,13 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         ~~~
         {{ youtube(id="abc") }}
         ~~~
-      MD
+        MD
       builder.test_content_may_contain_shortcodes?(content).should be_false
     end
 
     it "returns true when a real shortcode appears between fenced examples" do
       builder = Hwaro::Core::Build::Builder.new
-      content = <<-'MD'
+      content = <<-MD
         ```example
         {% fake %}
         ```
@@ -363,7 +363,7 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         ```
         {% another_fake %}
         ```
-      MD
+        MD
       builder.test_content_may_contain_shortcodes?(content).should be_true
     end
 
