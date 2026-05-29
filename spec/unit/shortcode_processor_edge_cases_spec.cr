@@ -21,6 +21,10 @@ module Hwaro::Core::Build
     def test_sc_parse_args(s)
       parse_shortcode_args_jinja(s)
     end
+
+    def test_content_may_contain_shortcodes?(s)
+      content_may_contain_shortcodes?(s)
+    end
   end
 end
 
@@ -312,6 +316,91 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
 
       results.size.should eq(2)
       results.keys.uniq!.size.should eq(2)
+    end
+  end
+
+  describe "content_may_contain_shortcodes? pre-filter (D2 optimization #562)" do
+    # These tests verify that the cheap pre-filter used in render_page
+    # correctly identifies pages that need full shortcode processing vs.
+    # pages that only contain example syntax inside code regions.
+
+    it "returns false for content with no {{ or {% at all" do
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_content_may_contain_shortcodes?("plain text and **markdown**").should be_false
+    end
+
+    it "returns true for real shortcode outside any code" do
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_content_may_contain_shortcodes?("Hello {% note %}world{% end %}").should be_true
+      builder.test_content_may_contain_shortcodes?("{{ youtube(id=\"x\") }}").should be_true
+    end
+
+    it "returns false when {{ and {% only appear inside fenced code blocks" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = <<-'MD'
+        Example:
+
+        ```jinja
+        {% alert(kind="warning") %}careful{% end %}
+        ```
+
+        More docs:
+
+        ~~~
+        {{ youtube(id="abc") }}
+        ~~~
+      MD
+      builder.test_content_may_contain_shortcodes?(content).should be_false
+    end
+
+    it "returns true when a real shortcode appears between fenced examples" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = <<-'MD'
+        ```example
+        {% fake %}
+        ```
+        {% real %}this one counts{% end %}
+        ```
+        {% another_fake %}
+        ```
+      MD
+      builder.test_content_may_contain_shortcodes?(content).should be_true
+    end
+
+    it "returns false for shortcode syntax only inside inline code spans" do
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_content_may_contain_shortcodes?("Use `{% note %}...{% end %}` in your content.").should be_false
+      builder.test_content_may_contain_shortcodes?("See `` {{ asset(name=\"x\") }} `` for details.").should be_false
+    end
+
+    it "returns true when real shortcode is on same line as inline code example" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = %(Live: {{ alert("hi") }} and example: `{% note %}`)
+      builder.test_content_may_contain_shortcodes?(content).should be_true
+    end
+
+    it "handles tilde fences correctly" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = "~~~\n{% example %}skipped{% end %}\n~~~"
+      builder.test_content_may_contain_shortcodes?(content).should be_false
+    end
+
+    it "handles mixed backtick and tilde fences" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = "```\n{% a %}\n```\nreal: {% b %}{% end %}\n~~~\n{% c %}\n~~~"
+      builder.test_content_may_contain_shortcodes?(content).should be_true
+    end
+
+    it "is not fooled by {{ or {% inside fenced blocks with language tags" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = "```html\n<div>{{ must_be_literal }}</div>\n```"
+      builder.test_content_may_contain_shortcodes?(content).should be_false
+    end
+
+    it "still detects shortcodes that happen to contain backticks in arguments (outside code)" do
+      builder = Hwaro::Core::Build::Builder.new
+      # The token is outside any fence or inline code
+      builder.test_content_may_contain_shortcodes?(%({% codeblock(lang="crystal") %} `code` {% end %})).should be_true
     end
   end
 end

@@ -44,6 +44,60 @@ module Hwaro
         # loop in `process_shortcodes_jinja` already skips.
         INLINE_CODE_RE = /(`{1,3})((?:(?!\1)[^\n])+?)\1/
 
+        # Fast pre-filter used by the render hot path (see render.cr).
+        # Returns true only when {{ or {% appear *outside* fenced code blocks
+        # (``` / ~~~) and *outside* inline code spans. This lets us skip the
+        # expensive build_template_variables + full shortcode processing for
+        # the very common case of documentation pages that only show literal
+        # shortcode examples inside code regions.
+        def content_may_contain_shortcodes?(content : String) : Bool
+          return false unless content.includes?("{{") || content.includes?("{%")
+
+          in_fence = false
+          fence_marker = ""
+          fence_close_regex : Regex? = nil
+
+          content.each_line(chomp: false) do |line|
+            if in_fence
+              if fence_close_regex.try(&.match(line))
+                in_fence = false
+                fence_marker = ""
+                fence_close_regex = nil
+              end
+              next
+            end
+
+            if match = line.match(/^\s*(`{3,}|~{3,})/)
+              in_fence = true
+              fence_marker = match[1]
+              fence_close_regex = Regex.new("^\\s*#{Regex.escape(fence_marker)}\\s*$")
+              next
+            end
+
+            # Outside fence: check whether any {{ or {% survives inline-code stripping
+            if line.includes?("{{") || line.includes?("{%")
+              if has_shortcode_token_outside_inline_code?(line)
+                return true
+              end
+            end
+          end
+
+          false
+        end
+
+        private def has_shortcode_token_outside_inline_code?(line : String) : Bool
+          pos = 0
+          while match = INLINE_CODE_RE.match(line, pos)
+            before = line[pos...match.begin]
+            return true if before.includes?("{{") || before.includes?("{%")
+
+            pos = match.begin + match[0].size
+          end
+
+          tail = line[pos..]
+          tail.includes?("{{") || tail.includes?("{%")
+        end
+
         # Process shortcodes in content (Jinja2/Crinja style)
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}

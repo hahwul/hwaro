@@ -443,7 +443,11 @@ module Hwaro::Core::Build::Phases::Render
     # shortcodes.
     shortcode_results = {} of String => String
     raw = page.raw_content
-    has_shortcodes = raw.includes?("{{") || raw.includes?("{%")
+    # Use accurate fence + inline-code aware pre-filter instead of naive includes?.
+    # This is the main D2 optimization for the shortcode hot path (#562):
+    # documentation pages full of example syntax no longer pay the cost of
+    # build_template_variables + full shortcode processing.
+    has_shortcodes = content_may_contain_shortcodes?(raw)
     warn_hugo_shortcode_syntax(raw, page.path) if raw.includes?("{{<")
     shortcode_context : Hash(String, Crinja::Value)? = nil
 
