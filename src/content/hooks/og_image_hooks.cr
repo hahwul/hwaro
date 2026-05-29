@@ -35,7 +35,7 @@ module Hwaro
           pages = ctx.priority_pages || ctx.all_pages
 
           start = ctx.profiler ? Time.instant : nil
-          Content::Seo::OgImage.generate(
+          stats = Content::Seo::OgImage.generate(
             pages,
             site.config,
             ctx.output_dir,
@@ -45,9 +45,7 @@ module Hwaro
           )
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
-            # Real generated/skipped numbers are printed by OgImage itself.
-            # We record wall time (the expensive part) for the profile report.
-            p.record_asset_generation("og_image:generate", 0, 0, elapsed)
+            p.record_asset_generation("og_image:generate", stats[:generated], stats[:skipped], elapsed)
           end
         end
       end

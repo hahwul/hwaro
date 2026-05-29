@@ -54,7 +54,7 @@ module Hwaro
           parallel : Bool = true,
         )
           ai = config.og.auto_image
-          return unless ai.enabled
+          return {generated: 0, skipped: 0} unless ai.enabled
 
           # Validate and resolve output format
           format = ai.format
@@ -220,6 +220,8 @@ module Hwaro
           if generated > 0 || skipped > 0
             Logger.info "  Generated #{generated} OG image(s)#{skipped > 0 ? ", skipped #{skipped} unchanged" : ""}"
           end
+
+          {generated: generated, skipped: skipped}
         end
 
         # Render an SVG image for a page

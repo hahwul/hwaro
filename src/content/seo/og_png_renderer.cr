@@ -139,6 +139,17 @@ module Hwaro
           end
         end
 
+        # Simple memoization for expensive font loading (helps fast-start priority + deferred passes
+        # and watch rebuilds during `hwaro serve`).
+        @@cached_font_ctx : FontContext? = nil
+        @@cached_font_key : String = ""
+
+        # Last-built base layer + the key that produced it. This avoids re-doing
+        # the heavy pixel work (fill + pattern + overlay) on the second fast-start
+        # pass and on typical watch-triggered rebuilds.
+        @@last_base_layer : Bytes? = nil
+        @@last_base_key : String = ""
+
         # Initialize a single font from raw bytes. Returns {info, data} or nil.
         private def self.init_font(data : Bytes) : {LibStb::HwaroFontInfo, Bytes}?
           info = LibStb.hwaro_font_alloc
@@ -160,45 +171,64 @@ module Hwaro
 
         # Load fonts once, return a reusable context. Returns nil if no font found.
         # Priority: custom font_path > system fonts > bundled DejaVu Sans Bold.
+        # Results are memoized so repeated calls (fast-start priority + deferred passes,
+        # or watch rebuilds) do not re-scan the filesystem or re-parse TTF data.
         def self.load_fonts(custom_font_path : String? = nil) : FontContext?
+          key = custom_font_path || "system"
+
+          if @@cached_font_key == key && (cached = @@cached_font_ctx)
+            return cached
+          end
+
+          ctx : FontContext? = nil
+
           # 1) Custom font path (user-specified via config)
           if cfp = custom_font_path
             abs = cfp.starts_with?("/") ? cfp : File.join(Dir.current, cfp)
             if result = load_font_file(abs)
               bold_info, bold_data = result
-              return FontContext.new(bold_data, bold_info)
+              ctx = FontContext.new(bold_data, bold_info)
+            else
+              Logger.warn "  Custom font '#{cfp}' not found or failed to load. Trying system fonts."
             end
-            Logger.warn "  Custom font '#{cfp}' not found or failed to load. Trying system fonts."
           end
 
           # 2) System fonts
-          bold_path = find_system_font(bold: true)
-          regular_path = find_system_font(bold: false)
-          font_path = bold_path || regular_path
+          if ctx.nil?
+            bold_path = find_system_font(bold: true)
+            regular_path = find_system_font(bold: false)
+            font_path = bold_path || regular_path
 
-          if font_path
-            if result = load_font_file(font_path)
-              bold_info, bold_data = result
-              # Try loading a separate regular font
-              regular_info = nil
-              regular_data = nil
-              r_path = regular_path
-              if r_path && r_path != font_path
-                if r_result = load_font_file(r_path)
-                  regular_info, regular_data = r_result
+            if font_path
+              if result = load_font_file(font_path)
+                bold_info, bold_data = result
+                # Try loading a separate regular font
+                regular_info = nil
+                regular_data = nil
+                r_path = regular_path
+                if r_path && r_path != font_path
+                  if r_result = load_font_file(r_path)
+                    regular_info, regular_data = r_result
+                  end
                 end
+                ctx = FontContext.new(bold_data, bold_info, regular_data, regular_info)
               end
-              return FontContext.new(bold_data, bold_info, regular_data, regular_info)
             end
           end
 
           # 3) Bundled fallback (DejaVu Sans Bold)
-          if result = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
-            bold_info, bold_data = result
-            return FontContext.new(bold_data, bold_info)
+          if ctx.nil?
+            if result = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
+              bold_info, bold_data = result
+              ctx = FontContext.new(bold_data, bold_info)
+            end
           end
 
-          nil
+          if ctx
+            @@cached_font_ctx = ctx
+            @@cached_font_key = key
+          end
+          ctx
         end
 
         # Pre-render the config-only layers (background fill, background
@@ -220,6 +250,15 @@ module Hwaro
           cached_bg : CachedImage? = nil,
         ) : Bytes
           ai = config.og.auto_image
+
+          # Build a cheap cache key from the things that affect the base pixels.
+          key = "#{ai.background}|#{ai.accent_color}|#{ai.style}|#{ai.pattern_opacity}|" \
+                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}"
+
+          if @@last_base_key == key && (cached = @@last_base_layer)
+            return cached
+          end
+
           is_minimal = ai.style == "minimal"
           bg_color = parse_hex_color(ai.background)
           accent_color = parse_hex_color(ai.accent_color)
@@ -244,6 +283,8 @@ module Hwaro
             fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
           end
 
+          @@last_base_layer = base
+          @@last_base_key = key
           base
         end
 
