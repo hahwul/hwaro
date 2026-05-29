@@ -190,8 +190,47 @@ module Hwaro
         missing
       end
 
-      # Sections that are advanced/niche — skipped when minimal: true
-      OPTIONAL_SECTIONS = Set{"pwa", "amp", "assets", "deployment", "image_processing", "og.auto_image", "image_processing.lqip", "build", "permalinks", "auto_includes"}
+      # Sections that are advanced/niche or low-value for most users.
+      # These are now treated as opt-in by default (not auto-suggested in normal doctor,
+      # and not added by plain --fix unless the user explicitly wants them).
+      #
+      # Goal: Reduce config bloat and the "you should add all these things" pressure.
+      OPTIONAL_SECTIONS = Set{
+        # Very specialized / rarely needed
+        "pwa", "amp",
+        # Advanced image features
+        "image_processing", "image_processing.lqip", "og.auto_image",
+        # Build/deploy related (power-user territory)
+        "build", "deployment", "permalinks", "auto_includes",
+        # Asset pipeline (many people prefer manual control or external tools)
+        "assets",
+        # These are useful but not something we should nag about
+        "related", "series", "pagination",
+        # Content creation niceties
+        "content.new"
+      }
+
+      # Broad full-text check to prevent appending a duplicate commented section.
+      # Used as a final safety net in fix_config even after missing_config_sections
+      # has already filtered the list.
+      private def would_cause_duplicate_section?(text : String, key : String) : Bool
+        lowered = text.downcase
+        section = "[#{key.downcase}]"
+
+        # Check for active section
+        return true if lowered.includes?(section)
+
+        # Check for common commented forms
+        # "# [key]", "#[key]", "  #   [key]", etc.
+        commented_variants = [
+          "# #{section}",
+          "##{section}",
+          " # #{section}",
+          "\t# #{section}",
+        ]
+
+        commented_variants.any? { |v| lowered.includes?(v) }
+      end
 
       # A surgical edit `--fix` applied to an existing config value.
       # Distinct from "section appends" because it modifies the user's
@@ -213,18 +252,16 @@ module Hwaro
         end
       end
 
-      # Append missing config sections to config.toml AND apply safe
-      # surgical value edits (trailing slash on `base_url`, out-of-range
-      # `sitemap.priority`). When `dry_run` is true, the same plan is
-      # produced but nothing is written — the CLI shows a preview.
-      # When `minimal` is true, advanced optional sections (pwa, amp, …)
-      # are skipped.
+      # Apply real fixes (Phase 1: value corrections like base_url trailing slash)
+      # and optionally approve/add recommended config sections (Phase 2).
       #
-      # Raises `HwaroError` when the config cannot be read or parsed so
-      # `--fix` refuses to append to a broken file (prior behaviour was
-      # to silently say "Config is up to date"), and when the atomic
-      # write fails (temp file + rename; see below).
-      def fix_config(minimal : Bool = false, dry_run : Bool = false) : FixSummary
+      # - approve_sections: When true, doctor will add the recommended/optional
+      #   config sections as commented documentation.
+      # - When false (default with plain --fix), only real value fixes are performed.
+      #
+      # This separation makes --fix focused on corrections, while --approve / --full
+      # controls bringing in the larger set of recommendations.
+      def fix_config(approve_sections : Bool = false, dry_run : Bool = false) : FixSummary
         unless File.exists?(@config_path)
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
@@ -273,7 +310,21 @@ module Hwaro
         added = [] of String
 
         missing.each do |key|
-          next if minimal && OPTIONAL_SECTIONS.includes?(key)
+          # With the new --fix / --approve model:
+          # - Plain --fix only performs real value corrections (Phase 1).
+          # - Adding recommended/optional sections (Phase 2) only happens when
+          #   approve_sections is true (i.e. user used --approve or --full).
+          #
+          # This is the key change to stop over-injection of dozens of commented sections.
+          unless approve_sections
+            next
+          end
+
+          # Extra safety net against duplication (from earlier work)
+          if would_cause_duplicate_section?(current_text, key)
+            next
+          end
+
           if snippet = config_snippet_for(key)
             snippets << snippet
             added << key
@@ -531,7 +582,7 @@ module Hwaro
           next if OPTIONAL_SECTIONS.includes?(key)
           desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
           issues << Issue.new(id: "missing-config-#{key}", level: :info, category: "config_missing", file: @config_path,
-            message: "Missing config section [#{key}] (#{desc}) — run 'hwaro doctor --fix' to add it")
+            message: "Optional config section [#{key}] is not present (#{desc}). You can add it manually or run 'hwaro doctor --fix' if you want the default snippet.")
         end
       end
 

@@ -24,9 +24,10 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
-            FlagInfo.new(short: nil, long: "--fix", description: "Auto-fix issues (add missing sections, normalize safe values)"),
-            FlagInfo.new(short: nil, long: "--minimal", description: "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)"),
-            FlagInfo.new(short: nil, long: "--dry-run", description: "With --fix, preview changes without writing config.toml"),
+            FlagInfo.new(short: nil, long: "--fix", description: "Perform real fixes (normalize values like base_url trailing slash, sitemap priority, etc.)"),
+            FlagInfo.new(short: nil, long: "--approve", description: "Approve and add recommended optional config sections (use with --fix or alone)"),
+            FlagInfo.new(short: nil, long: "--full", description: "Equivalent to --fix --approve (real fixes + all recommended sections)"),
+            FlagInfo.new(short: nil, long: "--dry-run", description: "Preview changes without writing config.toml"),
             FlagInfo.new(short: nil, long: "--strict", description: "Treat warnings as errors when computing the exit code"),
             FlagInfo.new(short: nil, long: "--max-warnings=N", description: "Exit non-zero when warning count exceeds N (default: unlimited)"),
             JSON_FLAG,
@@ -57,7 +58,8 @@ module Hwaro
             config_path = "config.toml"
             json_output = false
             fix_mode = false
-            minimal_mode = false
+            approve_mode = false
+            full_mode = false
             dry_run_mode = false
             strict_mode = false
             max_warnings = -1 # < 0 means "unlimited"
@@ -65,9 +67,10 @@ module Hwaro
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: #{invocation} [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
-              parser.on("--fix", "Auto-fix issues (add missing sections, normalize safe values)") { fix_mode = true }
-              parser.on("--minimal", "With --fix, skip advanced optional sections (pwa, amp, assets, etc.)") { minimal_mode = true }
-              parser.on("--dry-run", "With --fix, preview changes without writing config.toml") { dry_run_mode = true }
+              parser.on("--fix", "Perform real fixes (normalize values like base_url trailing slash, sitemap priority, etc.)") { fix_mode = true }
+              parser.on("--approve", "Approve and add recommended optional config sections") { approve_mode = true }
+              parser.on("--full", "Perform real fixes and approve all recommended sections (equivalent to --fix --approve)") { full_mode = true }
+              parser.on("--dry-run", "Preview changes without writing config.toml") { dry_run_mode = true }
               parser.on("--strict", "Treat warnings as errors when computing the exit code") { strict_mode = true }
               parser.on("--max-warnings=N", "Exit non-zero when warning count exceeds N") do |v|
                 parsed = v.to_i?
@@ -84,16 +87,21 @@ module Hwaro
 
             doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
 
-            if minimal_mode && !fix_mode
-              Logger.warn "--minimal has no effect without --fix"
+            if approve_mode && !fix_mode && !full_mode
+              # --approve without --fix or --full is allowed (just add recommendations)
             end
 
-            if dry_run_mode && !fix_mode
-              Logger.warn "--dry-run has no effect without --fix"
+            if dry_run_mode && !fix_mode && !approve_mode && !full_mode
+              Logger.warn "--dry-run has no effect without --fix, --approve, or --full"
             end
 
-            if fix_mode
-              run_fix(doctor, minimal_mode, dry_run_mode, json_output)
+            if full_mode
+              fix_mode = true
+              approve_mode = true
+            end
+
+            if fix_mode || approve_mode
+              run_fix(doctor, approve_mode, dry_run_mode, json_output)
               return
             end
 
@@ -293,8 +301,8 @@ module Hwaro
             plain ? "[ok]" : "✓".colorize(:green).to_s
           end
 
-          private def run_fix(doctor : Services::Doctor, minimal : Bool, dry_run : Bool, json_output : Bool)
-            summary = doctor.fix_config(minimal: minimal, dry_run: dry_run)
+          private def run_fix(doctor : Services::Doctor, approve_sections : Bool, dry_run : Bool, json_output : Bool)
+            summary = doctor.fix_config(approve_sections: approve_sections, dry_run: dry_run)
 
             if json_output
               puts summary.to_json
@@ -321,14 +329,18 @@ module Hwaro
             end
 
             unless summary.sections_added.empty?
-              Logger.success "#{verb_added} #{summary.sections_added.size} missing config section(s) to config.toml:"
+              if approve_sections
+                Logger.success "#{verb_added} #{summary.sections_added.size} recommended config section(s):"
+              else
+                Logger.success "#{verb_added} #{summary.sections_added.size} config section(s):"
+              end
               plus = plain ? "+" : "＋".colorize(:green).to_s
               summary.sections_added.each do |key|
                 Logger.info "  #{plus} [#{key}]"
               end
               Logger.info ""
-              Logger.info "All new sections are commented out by default."
-              Logger.info "Edit config.toml to enable the features you need."
+              Logger.info "These sections are added as comments by default."
+              Logger.info "Uncomment the ones you want to enable."
             end
 
             if dry_run

@@ -151,7 +151,7 @@ module Hwaro
             content_dir: File.join(target_path, "content"),
             config_path: config_path
           )
-          summary = doctor.fix_config(minimal: true)
+          summary = doctor.fix_config(approve_sections: true)
           unless summary.sections_added.empty?
             Logger.debug "Added #{summary.sections_added.size} optional config section(s) (commented out)."
           end

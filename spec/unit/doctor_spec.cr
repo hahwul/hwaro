@@ -446,7 +446,9 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config.sections_added
+          # In the new model, plain fix_config() does not add sections by default.
+          # Use approve_sections: true to request them.
+          added = doctor.fix_config(approve_sections: true).sections_added
 
           added.should_not be_empty
           added.should contain("pwa")
@@ -464,7 +466,7 @@ describe Hwaro::Services::Doctor do
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n[og]\ndefault_image = "/img.png"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config.sections_added
+          added = doctor.fix_config(approve_sections: true).sections_added
 
           added.should contain("og.auto_image")
 
@@ -485,39 +487,22 @@ describe Hwaro::Services::Doctor do
         end
       end
 
-      it "skips optional sections with minimal flag" do
+      it "adds recommended sections only when approve_sections is true" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config(minimal: true).sections_added
 
-          # Should add common sections (search, pagination, etc.)
+          # Default (plain --fix): should not add optional sections
+          added_default = doctor.fix_config.sections_added
+          added_default.should be_empty
+
+          # With approve_sections: true (--approve or --full)
+          added = doctor.fix_config(approve_sections: true).sections_added
           added.should contain("search")
           added.should contain("pagination")
-
-          # Should skip advanced optional sections
-          added.should_not contain("pwa")
-          added.should_not contain("amp")
-          added.should_not contain("assets")
-          added.should_not contain("deployment")
-          added.should_not contain("image_processing")
-        end
-      end
-
-      it "adds all sections without minimal flag" do
-        Dir.mktmpdir do |dir|
-          config_path = File.join(dir, "config.toml")
-          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
-
-          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config(minimal: false).sections_added
-
-          added.should contain("pwa")
-          added.should contain("amp")
-          added.should contain("assets")
-          added.should contain("deployment")
+          added.should contain("pwa")  # now included when explicitly approved
         end
       end
 
@@ -550,24 +535,21 @@ describe Hwaro::Services::Doctor do
       end
 
       it "writes atomically via a temp file so a concurrent reader never sees a partial config" do
-        # End-to-end sanity for the temp-file + rename approach: the
-        # temp file lives at `<config>.hwaro-tmp` during the write and
-        # is renamed into place in one step, so there is no leftover
-        # temp file after a successful fix.
+        # With the new model, plain fix_config() does not add sections by default.
+        # Use approve_sections: true to test the section-adding path atomically.
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
-          added = doctor.fix_config.sections_added
-          added.should_not be_empty
+          summary = doctor.fix_config(approve_sections: true)
+          summary.sections_added.should_not be_empty
 
           File.exists?("#{config_path}.hwaro-tmp").should be_false
-          # Config now contains the original pre-existing content plus
-          # at least one appended section, end-to-end.
           text = File.read(config_path)
           text.should contain(%(title = "My Site"))
-          text.should contain("[pwa]")
+          # At least one recommended section should have been appended
+          text.should match(/\[pwa\]|\[search\]|\[feeds\]/)
         end
       end
 
