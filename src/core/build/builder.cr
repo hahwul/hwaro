@@ -813,6 +813,7 @@ module Hwaro
           profiler.template_report
           profiler.markdown_report
           profiler.asset_report
+          profiler.hook_report
 
           # Print cache stats
           if options.verbose

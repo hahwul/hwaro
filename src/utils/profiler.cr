@@ -62,6 +62,19 @@ module Hwaro
     @asset_stats : Array(AssetGenerationStats)
     @asset_mutex : Mutex
 
+    # General per-hook timing (D3 for #561)
+    struct HookProfile
+      property name : String
+      property count : Int32
+      property total_time_ms : Float64
+
+      def initialize(@name, @count = 0, @total_time_ms = 0.0)
+      end
+    end
+
+    @hook_profiles : Hash(String, HookProfile)
+    @hook_mutex : Mutex
+
     def initialize(@enabled : Bool = false)
       @phases = [] of PhaseTime
       @current_phase = nil
@@ -73,6 +86,8 @@ module Hwaro
       @markdown_mutex = Mutex.new
       @asset_stats = [] of AssetGenerationStats
       @asset_mutex = Mutex.new
+      @hook_profiles = {} of String => HookProfile
+      @hook_mutex = Mutex.new
     end
 
     def enabled? : Bool
@@ -186,6 +201,20 @@ module Hwaro
       end
     end
 
+    # Record timing for any lifecycle hook (general per-hook profiling, #561).
+    # Called automatically from Lifecycle::Manager#trigger when profiler is enabled.
+    def record_hook(name : String, time_ms : Float64)
+      return unless @enabled
+      @hook_mutex.synchronize do
+        profile = @hook_profiles[name]? || HookProfile.new(name)
+        @hook_profiles[name] = HookProfile.new(
+          name: name,
+          count: profile.count + 1,
+          total_time_ms: profile.total_time_ms + time_ms,
+        )
+      end
+    end
+
     # Print the per-template profiling report
     def template_report(io : IO = STDOUT)
       return unless @enabled
@@ -280,6 +309,33 @@ module Hwaro
 
       io.puts "─" * 60
       io.puts "  Total asset generation time: #{format_time(total_time).rjust(10)}"
+      io.puts ""
+    end
+
+    # Print timing for all lifecycle hooks that ran during the build.
+    # This gives visibility into taxonomy, SEO, PWA, AMP, asset, and custom hooks.
+    def hook_report(io : IO = STDOUT)
+      return unless @enabled
+      return if @hook_profiles.empty?
+
+      sorted = @hook_profiles.values.sort_by! { |h| -h.total_time_ms }
+
+      io.puts ""
+      io.puts "Hook Profile".colorize(:cyan).bold
+      io.puts "─" * 60
+
+      max_name_len = sorted.max_of(&.name.size)
+
+      sorted.each do |h|
+        name = h.name.ljust(max_name_len)
+        count = "×#{h.count}".rjust(6)
+        time = format_time(h.total_time_ms).rjust(10)
+        io.puts "  #{name} #{count}  #{time}"
+      end
+
+      total_time = sorted.sum(&.total_time_ms)
+      io.puts "─" * 60
+      io.puts "  Total hook execution time: #{format_time(total_time).rjust(10)}"
       io.puts ""
     end
 

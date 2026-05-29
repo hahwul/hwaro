@@ -72,7 +72,19 @@ module Hwaro
             Logger.debug "  → Hook: #{hook.name} @ #{point}" if @debug
 
             begin
+              # Lightweight per-hook timing when --profile is enabled (#561)
+              start = if (p = context.profiler) && p.enabled?
+                        Time.instant
+                      else
+                        nil
+                      end
+
               result = hook.handler.call(context)
+
+              if start && (p = context.profiler)
+                elapsed = (Time.instant - start).total_milliseconds
+                p.record_hook(hook.name, elapsed)
+              end
 
               case result
               when HookResult::Skip
