@@ -33,6 +33,7 @@ module Hwaro
           scaffold,
           options.agents_mode,
           options.minimal_config,
+          options.full_config,
           options.clean
         )
       end
@@ -46,10 +47,12 @@ module Hwaro
         multilingual_languages : Array(String) = [] of String,
         scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
         agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
+        minimal_config : Bool = false,
+        full_config : Bool = false,
         clean : Bool = false,
       )
         scaffold = Scaffolds::Registry.get(scaffold_type)
-        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode, false, clean)
+        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode, minimal_config, full_config, clean)
       end
 
       private def run_with_scaffold(
@@ -62,6 +65,7 @@ module Hwaro
         scaffold : Scaffolds::Base,
         agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
         minimal_config : Bool = false,
+        full_config : Bool = false,
         clean : Bool = false,
       )
         if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
@@ -119,13 +123,18 @@ module Hwaro
         create_scaffold_archetypes(target_path, scaffold)
 
         # Create config.toml
-        config_content = if minimal_config
-                           scaffold.minimal_config_content(skip_taxonomies)
-                         elsif is_multilingual
-                           create_multilingual_config(multilingual_languages, skip_taxonomies, scaffold)
-                         else
-                           scaffold.config_content(skip_taxonomies)
-                         end
+        # Hybrid philosophy (C):
+        # - minimal_config : bare essentials, no comments
+        # - full_config    : maximum discoverability (current verbose behavior + doctor injection)
+        # - default        : balanced (core + commonly useful sections with light comments)
+        if minimal_config
+          config_content = scaffold.minimal_config_content(skip_taxonomies)
+        elsif full_config
+          config_content = scaffold.config_content(skip_taxonomies)
+        else
+          config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+        end
+
         create_file(File.join(target_path, "config.toml"), config_content)
 
         # Create AGENTS.md unless skipped
@@ -142,10 +151,11 @@ module Hwaro
         end
 
         # Auto-add missing optional config sections (commented out).
-        # This is an internal scaffold-completion step; users didn't ask for it,
-        # and surfacing it inconsistently (some scaffolds add 0, others 8+) is
-        # more noise than signal. Log at debug so --verbose still shows it.
-        unless minimal_config
+        # Hybrid behavior (C):
+        # - minimal_config: never auto-inject
+        # - full_config: inject everything for maximum discoverability
+        # - default: do not inject (keeps generated config much cleaner)
+        if full_config
           config_path = File.join(target_path, "config.toml")
           doctor = Services::Doctor.new(
             content_dir: File.join(target_path, "content"),
@@ -575,6 +585,54 @@ module Hwaro
           File.write(path, content)
           Logger.action :create, path
         end
+      end
+
+      # Builds a balanced default config for Hybrid C.
+      # Starts from the minimal base and adds the most commonly useful sections
+      # with relatively light comments (not the full verbose monster).
+      private def build_balanced_default_config(
+        scaffold : Scaffolds::Base,
+        skip_taxonomies : Bool,
+        is_multilingual : Bool,
+        multilingual_languages : Array(String),
+      ) : String
+        # Start with the clean minimal content
+        base = scaffold.minimal_config_content(skip_taxonomies)
+
+        str = String.build do |io|
+          io << base
+
+          # Add a few high-value sections with light comments (not full examples)
+          io << "\n# =============================================================================\n"
+          io << "# OpenGraph & Twitter Cards (recommended for social sharing)\n"
+          io << "# =============================================================================\n\n"
+          io << "[og]\n"
+          io << "type = \"article\"\n"
+          io << "twitter_card = \"summary_large_image\"\n\n"
+
+          io << "# =============================================================================\n"
+          io << "# Markdown (commonly customized)\n"
+          io << "# =============================================================================\n\n"
+          io << "[markdown]\n"
+          io << "emoji = true\n"
+          io << "task_lists = true\n"
+          io << "definition_lists = true\n"
+          io << "footnotes = true\n\n"
+
+          unless skip_taxonomies
+            io << "# =============================================================================\n"
+            io << "# SEO & Feeds (commonly used)\n"
+            io << "# =============================================================================\n\n"
+            io << "[sitemap]\n"
+            io << "enabled = true\n\n"
+            io << "[feeds]\n"
+            io << "enabled = true\n"
+            io << "type = \"rss\"\n"
+            io << "limit = 10\n\n"
+          end
+        end
+
+        str
       end
     end
   end

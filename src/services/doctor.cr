@@ -196,18 +196,20 @@ module Hwaro
       #
       # Goal: Reduce config bloat and the "you should add all these things" pressure.
       OPTIONAL_SECTIONS = Set{
-        # Very specialized / rarely needed
+        # Very specialized / rarely needed for most sites
         "pwa", "amp",
-        # Advanced image features
+        # Advanced/optional image features
         "image_processing", "image_processing.lqip", "og.auto_image",
-        # Build/deploy related (power-user territory)
+        # Power-user / deployment related
         "build", "deployment", "permalinks", "auto_includes",
-        # Asset pipeline (many people prefer manual control or external tools)
+        # Asset pipeline (many prefer manual or external bundlers)
         "assets",
-        # These are useful but not something we should nag about
+        # Useful but not essential to nag about
         "related", "series", "pagination",
-        # Content creation niceties
-        "content.new"
+        # Content authoring niceties
+        "content.new",
+        # Nice-to-have SEO / crawler files (most people can add manually if needed)
+        "robots", "llms",
       }
 
       # Broad full-text check to prevent appending a duplicate commented section.
@@ -582,7 +584,7 @@ module Hwaro
           next if OPTIONAL_SECTIONS.includes?(key)
           desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
           issues << Issue.new(id: "missing-config-#{key}", level: :info, category: "config_missing", file: @config_path,
-            message: "Optional config section [#{key}] is not present (#{desc}). You can add it manually or run 'hwaro doctor --fix' if you want the default snippet.")
+            message: "Optional section [#{key}] not present (#{desc}). Add it manually if needed, or use 'hwaro doctor --full' for recommendations.")
         end
       end
 

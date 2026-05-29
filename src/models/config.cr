@@ -538,16 +538,16 @@ module Hwaro
     class ServeConfig
       # Custom HTTP response headers applied to *all* responses during
       # `hwaro serve` (including 404s, redirects, and static assets).
-      #
-      # Example in config.toml:
-      #   [serve.headers]
-      #   X-Frame-Options = "SAMEORIGIN"
-      #   X-Content-Type-Options = "nosniff"
-      #   Referrer-Policy = "strict-origin-when-cross-origin"
       property headers : Hash(String, String)
+
+      # When true, `hwaro serve` will behave as if `--fast` was passed
+      # (skips heavy OG image generation and image processing by default).
+      # CLI flags can still override this.
+      property fast : Bool = false
 
       def initialize
         @headers = {} of String => String
+        @fast = false
       end
     end
 
@@ -1287,15 +1287,15 @@ module Hwaro
         if headers_table = s["headers"]?.try(&.as_h?)
           headers_table.each do |name, value|
             next unless str = value.as_s?
-            # Drop obviously dangerous values (CRLF, other controls) coming from config.
-            # This is defense-in-depth; a bad config.toml should ideally be caught by
-            # the user or by `hwaro doctor`, but we refuse to emit split responses.
             next if name.each_char.any? { |c| c.ascii_control? || c == ':' } ||
                     str.each_char.any?(&.ascii_control?)
 
             config.serve.headers[name] = str
           end
         end
+
+        # Fast dev mode default (can be overridden by CLI flags like --fast or explicit --skip-*)
+        config.serve.fast = bool_value(s["fast"]?, config.serve.fast)
       end
 
       private def self.load_markdown(config : Config)

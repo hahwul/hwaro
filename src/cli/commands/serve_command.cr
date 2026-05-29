@@ -39,17 +39,19 @@ module Hwaro
           # Server
           FlagInfo.new(short: "-b", long: "--bind", description: "Bind address (default: 127.0.0.1)", takes_value: true, value_hint: "HOST"),
           FlagInfo.new(short: "-p", long: "--port", description: "Port to listen on (default: 3000)", takes_value: true, value_hint: "PORT"),
-          FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server"),
+          OPEN_BROWSER_FLAG,
+          NO_OPEN_BROWSER_FLAG,
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
-          FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes (default: enabled; kept for backwards compatibility)"),
+          FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes (default: enabled)"),
           FlagInfo.new(short: nil, long: "--no-live-reload", description: "Disable live reload on file changes"),
-          FlagInfo.new(short: nil, long: "--header", description: "Add custom response header for dev server (repeatable, e.g. --header 'X-Foo: bar')", takes_value: true, value_hint: "NAME: VALUE"),
+          FlagInfo.new(short: nil, long: "--header", description: "Add custom response header (repeatable, e.g. --header 'X-Frame-Options: SAMEORIGIN')", takes_value: true, value_hint: "NAME: VALUE"),
 
-          # Skip options
+          # Fast iteration helpers (very common for local development)
           SKIP_OG_IMAGE_FLAG,
           SKIP_IMAGE_PROCESSING_FLAG,
           SKIP_CACHE_BUSTING_FLAG,
+          FlagInfo.new(short: nil, long: "--fast", description: "Fast dev mode: equivalent to --skip-og-image --skip-image-processing (great with -q)"),
 
           # Debug & output
           VERBOSE_FLAG,
@@ -96,12 +98,20 @@ module Hwaro
           # right config. We deliberately do not load config earlier in parse_options.
           begin
             cfg = Models::Config.load(env: options.env)
+
+            # Merge headers (CLI wins)
             final = cfg.serve.headers.dup
-            options.headers.each { |k, v| final[k] = v } # CLI wins
+            options.headers.each { |k, v| final[k] = v }
             options.headers = final
+
+            # Apply [serve.fast] default, but let explicit CLI skip flags win.
+            # If user passed --fast on CLI, those skips are already true.
+            if cfg.serve.fast
+              options.skip_og_image ||= true
+              options.skip_image_processing ||= true
+            end
           rescue Hwaro::HwaroError
-            # Missing/invalid config — the build inside Server will emit the proper
-            # classified error. We just proceed with whatever --header the user gave.
+            # Missing/invalid config — proceed with CLI-provided values only.
           end
 
           Services::Server.new.run(options)
@@ -195,7 +205,8 @@ module Hwaro
             # Server
             parser.on("-b HOST", "--bind HOST", "Bind address (default: 127.0.0.1)") { |h| host = h }
             parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
-            parser.on("--open", "Open browser after starting server") { open_browser = true }
+            CLI.register_flag(parser, OPEN_BROWSER_FLAG) { |_| open_browser = true }
+            CLI.register_flag(parser, NO_OPEN_BROWSER_FLAG) { |_| open_browser = false }
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--live-reload", "Enable live reload on file changes (default: enabled; kept for backwards compatibility)") { live_reload = true }
@@ -209,6 +220,10 @@ module Hwaro
             CLI.register_flag(parser, SKIP_OG_IMAGE_FLAG) { |_| skip_og_image = true }
             CLI.register_flag(parser, SKIP_IMAGE_PROCESSING_FLAG) { |_| skip_image_processing = true }
             CLI.register_flag(parser, SKIP_CACHE_BUSTING_FLAG) { |_| cache_busting = false }
+            parser.on("--fast", "Fast dev mode: skip heavy processing (OG images + image resizing)") do
+              skip_og_image = true
+              skip_image_processing = true
+            end
 
             # Debug & output
             CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }

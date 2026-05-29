@@ -955,6 +955,8 @@ module Hwaro
             # reverse-proxy, CDN, or security header behaviour locally.
 
             # [serve]
+            # fast = true                    # Default to fast dev mode (skip heavy OG + image processing)
+            #
             # (response headers live under the [serve.headers] table below)
 
             # [serve.headers]

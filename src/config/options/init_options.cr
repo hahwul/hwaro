@@ -101,6 +101,7 @@ module Hwaro
         property scaffold_remote : String?
         property agents_mode : AgentsMode
         property minimal_config : Bool
+        property full_config : Bool
 
         def initialize(
           @path : String = ".",
@@ -114,6 +115,7 @@ module Hwaro
           @scaffold_remote : String? = nil,
           @agents_mode : AgentsMode = AgentsMode::Remote,
           @minimal_config : Bool = false,
+          @full_config : Bool = false,
         )
         end
 

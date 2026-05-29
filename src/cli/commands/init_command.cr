@@ -26,6 +26,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
           FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
           FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
+          FlagInfo.new(short: nil, long: "--full-config", description: "Generate full config.toml with maximum comments and optional sections for discoverability"),
           FlagInfo.new(short: nil, long: "--agents", description: "AGENTS.md content mode: remote (lightweight, default) or local (full embedded)", takes_value: true, value_hint: "MODE"),
 
           # Skip options
@@ -105,6 +106,7 @@ module Hwaro
           scaffold_remote : String? = nil
           multilingual_languages = [] of String
           minimal_config = false
+          full_config = false
           agents_mode = Config::Options::AgentsMode::Remote
 
           # Skip options
@@ -151,6 +153,7 @@ module Hwaro
               multilingual_languages = parsed
             end
             parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
+            parser.on("--full-config", "Generate full config.toml with all comments and optional sections (maximum discoverability)") { full_config = true }
             parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|
               begin
                 agents_mode = Config::Options::AgentsMode.from_string(mode)
@@ -201,7 +204,8 @@ module Hwaro
             scaffold: scaffold,
             scaffold_remote: scaffold_remote,
             agents_mode: agents_mode,
-            minimal_config: minimal_config
+            minimal_config: minimal_config,
+            full_config: full_config
           )
         end
       end

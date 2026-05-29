@@ -502,7 +502,7 @@ describe Hwaro::Services::Doctor do
           added = doctor.fix_config(approve_sections: true).sections_added
           added.should contain("search")
           added.should contain("pagination")
-          added.should contain("pwa")  # now included when explicitly approved
+          added.should contain("pwa") # now included when explicitly approved
         end
       end
 
