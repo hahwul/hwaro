@@ -26,6 +26,16 @@ module Hwaro
           end
           return unless site.config.og.auto_image.enabled
 
+          ai = site.config.og.auto_image
+
+          # Lazy mode: skip automatic bulk generation during `hwaro serve`.
+          # OG images will be generated on first request instead (much faster
+          # initial dev server startup on large sites).
+          if ai.lazy_generate && ctx.options.serve_mode
+            Logger.debug "  Skipping OG image generation (lazy_generate enabled in serve mode)"
+            return
+          end
+
           # When --fast-start is active, only generate images for the
           # priority subset on the cold pass. The deferred render pass
           # re-runs this hook for the rest. PNG OG generation is the

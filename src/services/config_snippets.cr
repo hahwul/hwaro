@@ -583,6 +583,8 @@ module Hwaro
           # background_image = ""          # Background image file path (embedded as base64)
           # overlay_opacity = 0.5
           # format = "svg"                 # svg or png
+          # lazy_generate = false          # If true, skip bulk OG generation during `hwaro serve`.
+          #                                  # Images are generated on-demand the first time a page is requested.
 
           TOML
       end

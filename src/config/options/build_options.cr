@@ -35,6 +35,10 @@ module Hwaro
         property fast_start : Bool
         property fast_start_count : Int32
 
+        # True when this build is being run as part of `hwaro serve` (dev server).
+        # Hooks can use this to change behavior (e.g. lazy OG generation).
+        property serve_mode : Bool = false
+
         def initialize(
           @output_dir : String = "public",
           @base_url : String? = nil,
@@ -59,6 +63,7 @@ module Hwaro
           @preserve_output : Bool = false,
           @fast_start : Bool = false,
           @fast_start_count : Int32 = 20,
+          @serve_mode : Bool = false,
         )
         end
 

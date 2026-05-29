@@ -326,6 +326,11 @@ module Hwaro
       property font_path : String?
       property logo_position : String
 
+      # If true, skip automatic OG image generation during `hwaro serve`.
+      # Images will be generated on-demand the first time they are requested
+      # from the dev server. Greatly improves initial serve time on large sites.
+      property lazy_generate : Bool
+
       def initialize
         @enabled = false
         @background = "#1a1a2e"
@@ -343,6 +348,7 @@ module Hwaro
         @format = "svg"
         @font_path = nil
         @logo_position = "bottom-left"
+        @lazy_generate = false
       end
     end
 
@@ -1220,6 +1226,7 @@ module Hwaro
               config.og.auto_image.logo_position = lp
             end
           end
+          config.og.auto_image.lazy_generate = bool_value(ai["lazy_generate"]?, config.og.auto_image.lazy_generate)
         end
       end
 
