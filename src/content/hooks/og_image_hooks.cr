@@ -45,9 +45,8 @@ module Hwaro
           )
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
-            # We don't have exact generated/skipped counts here without changing
-            # the generate API, so we record wall time only. The log lines from
-            # OgImage still show the numbers to the user.
+            # Real generated/skipped numbers are printed by OgImage itself.
+            # We record wall time (the expensive part) for the profile report.
             p.record_asset_generation("og_image:generate", 0, 0, elapsed)
           end
         end
