@@ -866,6 +866,11 @@ module Hwaro
       def parse(raw_content : String, file_path : String = "")
         @@instance.parse(raw_content, file_path)
       end
+
+      # Renders with anchor links injected into headings (delegates to shared instance)
+      def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render_with_anchors(content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config)
+      end
     end
   end
 end

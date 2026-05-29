@@ -27,6 +27,17 @@ module Hwaro
       end
     end
 
+    # Represents per-page Markdown rendering profiling data (the dominant cost inside Render phase)
+    struct MarkdownProfile
+      property path : String
+      property count : Int32
+      property total_bytes : Int64
+      property total_time_ms : Float64
+
+      def initialize(@path : String, @count : Int32 = 0, @total_bytes : Int64 = 0_i64, @total_time_ms : Float64 = 0.0)
+      end
+    end
+
     @enabled : Bool
     @phases : Array(PhaseTime)
     @current_phase : String?
@@ -34,6 +45,8 @@ module Hwaro
     @total_start : Time::Instant?
     @template_profiles : Hash(String, TemplateProfile)
     @template_mutex : Mutex
+    @markdown_profiles : Hash(String, MarkdownProfile)
+    @markdown_mutex : Mutex
 
     def initialize(@enabled : Bool = false)
       @phases = [] of PhaseTime
@@ -42,6 +55,8 @@ module Hwaro
       @total_start = nil
       @template_profiles = {} of String => TemplateProfile
       @template_mutex = Mutex.new
+      @markdown_profiles = {} of String => MarkdownProfile
+      @markdown_mutex = Mutex.new
     end
 
     def enabled? : Bool
@@ -131,6 +146,21 @@ module Hwaro
       end
     end
 
+    # Record per-page Markdown rendering profiling data.
+    # This captures the dominant cost inside the Render phase (Markd + extensions + TOC + shortcode prep).
+    def record_markdown(path : String, bytes : Int64, time_ms : Float64)
+      return unless @enabled
+      @markdown_mutex.synchronize do
+        profile = @markdown_profiles[path]? || MarkdownProfile.new(path)
+        @markdown_profiles[path] = MarkdownProfile.new(
+          path: path,
+          count: profile.count + 1,
+          total_bytes: profile.total_bytes + bytes,
+          total_time_ms: profile.total_time_ms + time_ms,
+        )
+      end
+    end
+
     # Print the per-template profiling report
     def template_report(io : IO = STDOUT)
       return unless @enabled
@@ -163,6 +193,43 @@ module Hwaro
       total_time = sorted.sum(&.total_time_ms)
       io.puts "#{" " * header_width}   #{" " * 5}   #{" " * 10}  #{"─" * 10}"
       io.puts "#{" " * header_width}    Total#{" " * (10 + 5)} #{format_time(total_time).rjust(10)}"
+      io.puts ""
+    end
+
+    # Print the per-page Markdown rendering report (sorted by total time, top consumers first)
+    def markdown_report(io : IO = STDOUT)
+      return unless @enabled
+      return if @markdown_profiles.empty?
+
+      sorted = @markdown_profiles.values.sort_by! { |mp| -mp.total_time_ms }
+
+      max_name_len = sorted.max_of(&.path.size)
+      max_name_len = {max_name_len, 12}.max
+      header_width = max_name_len
+
+      io.puts ""
+      io.puts "Markdown Render Profile (top consumers)".colorize(:cyan).bold
+
+      io.puts "#{"Page".ljust(header_width)} | Count | #{" Bytes".rjust(10)} | #{"Time".rjust(10)}"
+      io.puts "#{"-" * header_width}-+-------+#{"-" * 12}+#{"-" * 11}"
+
+      # Show top 20 to avoid flooding output on large sites
+      sorted.first(20).each do |mp|
+        name = mp.path.ljust(header_width)
+        count = mp.count.to_s.rjust(5)
+        bytes = format_bytes(mp.total_bytes).rjust(10)
+        time = format_time(mp.total_time_ms).rjust(10)
+        io.puts "#{name} | #{count} | #{bytes} | #{time}"
+      end
+
+      if sorted.size > 20
+        io.puts "  ... and #{sorted.size - 20} more pages (#{sorted.size} total)"
+      end
+
+      total_time = sorted.sum(&.total_time_ms)
+      total_bytes = sorted.sum(&.total_bytes)
+      io.puts "#{" " * header_width}   #{" " * 5}   #{" " * 10}  #{"─" * 10}"
+      io.puts "#{" " * header_width}    Total#{" " * (10 + 5)} #{format_time(total_time).rjust(10)} (#{format_bytes(total_bytes)} processed)"
       io.puts ""
     end
 

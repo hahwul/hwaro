@@ -278,7 +278,7 @@ module Hwaro::Core::Build::Phases::Render
           begin
             page_start = profiler ? Time.instant : nil
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
-              crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay)
+              crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay, profiler: profiler)
             if profiler && page_start
               elapsed_ms = (Time.instant - page_start).total_milliseconds
               template_name = determine_template(page, templates)
@@ -396,7 +396,7 @@ module Hwaro::Core::Build::Phases::Render
     safe = site.config.markdown.safe
     pages.each do |page|
       page_start = profiler ? Time.instant : nil
-      render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay)
+      render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: profiler)
       if profiler && page_start
         elapsed_ms = (Time.instant - page_start).total_milliseconds
         template_name = determine_template(page, templates)
@@ -423,6 +423,7 @@ module Hwaro::Core::Build::Phases::Render
     crinja_env_override : Crinja? = nil,
     template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
     error_overlay : Bool = false,
+    profiler : Profiler? = nil,
   )
     return unless page.render
 
@@ -459,11 +460,17 @@ module Hwaro::Core::Build::Phases::Render
 
     # Use anchor links if enabled
     md_config = site.config.markdown
+    md_start = profiler ? Time.instant : nil
+    md_input_bytes = processed_content.bytesize.to_i64
     html_content, toc_headers = if page.insert_anchor_links
-                                  Content::Processors::Markdown.new.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config)
+                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config)
                                 else
                                   Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config)
                                 end
+    if profiler && md_start
+      md_elapsed = (Time.instant - md_start).total_milliseconds
+      profiler.record_markdown(page.path, md_input_bytes, md_elapsed)
+    end
 
     # Replace shortcode placeholders with their rendered HTML content
     html_content = replace_shortcode_placeholders(html_content, shortcode_results)
