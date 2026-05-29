@@ -16,6 +16,9 @@ docs/public
 # Hwaro benchmark
 benchmark
 
+# Hwaro Test
+.test_friends
+
 # stb compiled object
 src/ext/stb_impl.o
 
