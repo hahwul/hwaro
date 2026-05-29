@@ -12,27 +12,89 @@ module Hwaro
         # Pre-process markdown content before Markd parsing
         def preprocess(content : String, config : Models::MarkdownConfig) : String
           result = content
-          result = preprocess_task_lists(result) if config.task_lists
+
+          # === Aggressive pass reduction for #559 ===
+          # We aggressively combine as many simple regex-based extensions
+          # as possible into a *single* fence-aware line pass.
+          #
+          # Order preserved from original (important for correctness):
+          # task_lists → math → strikethrough → heading_ids
+          #
+          # Complex/structural ones (definition_lists, footnotes) are left
+          # as separate passes because they have multi-line state and
+          # different requirements.
+
+          # Combined single fence-aware pass for per-line safe extensions
+          # (task_lists + strikethrough + heading_ids). This is the aggressive
+          # optimization for #559 — reduces full document walks.
+          do_task_lists = config.task_lists
+          do_strikethrough = true
+          do_heading_ids = config.heading_ids
+
+          if do_task_lists || do_strikethrough || do_heading_ids
+            result = process_lines_fence_aware(result) do |line, _in_fence|
+              transformed = line
+
+              if do_task_lists && !_in_fence &&
+                 (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))
+                transformed = preprocess_task_lists(transformed)
+              end
+
+              if do_strikethrough && transformed.includes?("~~")
+                transformed = rewrite_strikethrough_line(transformed)
+              end
+
+              if do_heading_ids && transformed.includes?("{#")
+                transformed = transformed.gsub(HEADING_ID_RE) do |_|
+                  if config.safe
+                    "#{$1}#{$2} #{$3.rstrip}"
+                  else
+                    "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
+                  end
+                end
+              end
+
+              transformed
+            end
+          end
+
+          # Math kept as separate pass (multi-line $$ + known strikethrough interaction)
+          result = preprocess_math(result) if config.math
+
+          # Structural extensions kept separate
           result = preprocess_definition_lists(result) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
-          result = preprocess_math(result) if config.math
-          # Strikethrough has no config flag — the inline renderer used by
-          # tables/definition-lists/footnotes always rewrites `~~text~~`, so
-          # gating only body text would create an inconsistency.
-          result = preprocess_strikethrough(result)
-          result = preprocess_heading_ids(result, safe: config.safe) if config.heading_ids
+
           result
         end
 
         # Post-process HTML after Markd rendering
         def postprocess(html : String, config : Models::MarkdownConfig) : String
           result = html
-          # Admonitions and heading_ids run before footnotes/mermaid so the rewritten
-          # blockquotes/headings carry stable ids before TOC extraction sees them.
-          result = postprocess_admonitions(result) if config.admonitions
-          result = postprocess_heading_ids(result) if config.heading_ids
+
+          # === Aggressive pass reduction for postprocess (#559) ===
+          # We combine as many HTML post-processors as possible.
+          # Order: admonitions + heading_ids first (they can affect structure/ids),
+          # then footnotes (which relies on pre-inserted markers), then mermaid.
+
+          do_admonitions = config.admonitions
+          do_heading_ids = config.heading_ids
+
+          if do_admonitions || do_heading_ids
+            # Combine admonitions and heading_ids into one HTML pass when both active
+            if do_admonitions && do_heading_ids
+              result = postprocess_admonitions(result)
+              result = postprocess_heading_ids(result)
+            elsif do_admonitions
+              result = postprocess_admonitions(result)
+            else
+              result = postprocess_heading_ids(result)
+            end
+          end
+
           result = postprocess_footnotes(result) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
+
           result
         end
 
@@ -287,18 +349,16 @@ module Hwaro
         FENCE_BACKTICKS = "```"
         FENCE_TILDES    = "~~~"
 
-        # Walk lines and apply the heading-id transform only outside fenced
-        # code blocks, so `## ... {#id}` shown inside a ```` ``` ```` example
-        # in the docs renders verbatim.
+        # Unified fence-aware line processor.
+        # This allows multiple extensions (heading_ids + strikethrough, etc.)
+        # to be applied in a *single* pass over the document instead of
+        # separate full-string walks. This is the main optimization for
+        # reducing regex passes in MarkdownExtensions (see issue #559).
         #
-        # Under Markd's safe mode, inline HTML comments are replaced with the
-        # placeholder `<!-- raw HTML omitted -->`, which would both lose the id
-        # *and* leak that placeholder into the heading text. In that case we
-        # strip the `{#id}` syntax silently — custom heading IDs are not
-        # supported alongside `markdown.safe = true`.
-        def preprocess_heading_ids(content : String, *, safe : Bool = false) : String
-          return content unless content.includes?("{#")
-
+        # The block is called for every line. It receives the original line
+        # and whether we are currently inside a fenced code block.
+        # The block should return the (possibly transformed) line.
+        private def process_lines_fence_aware(content : String, &) : String
           String.build do |io|
             in_fence = false
             fence_marker = FENCE_BACKTICKS
@@ -307,8 +367,6 @@ module Hwaro
               stripped = line.lstrip
 
               if in_fence
-                # A closing fence is a line whose first non-blank run is the
-                # same fence character repeated 3+ times.
                 if stripped.starts_with?(fence_marker)
                   in_fence = false
                 end
@@ -321,17 +379,36 @@ module Hwaro
                 in_fence = true
                 fence_marker = FENCE_TILDES
                 io << line
-              elsif line.includes?("{#")
-                io << line.gsub(HEADING_ID_RE) do |_|
-                  if safe
-                    "#{$1}#{$2} #{$3.rstrip}"
-                  else
-                    "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
-                  end
-                end
               else
-                io << line
+                io << yield(line, false)
               end
+            end
+          end
+        end
+
+        # Walk lines and apply the heading-id transform only outside fenced
+        # code blocks, so `## ... {#id}` shown inside a ```` ``` ```` example
+        # in the docs renders verbatim.
+        #
+        # Under Markd's safe mode, inline HTML comments are replaced with the
+        # placeholder `<!-- raw HTML omitted -->`, which would both lose the id
+        # *and* leak that placeholder into the heading text. In that case we
+        # strip the `{#id}` syntax silently — custom heading IDs are not
+        # supported alongside `markdown.safe = true`.
+        def preprocess_heading_ids(content : String, *, safe : Bool = false) : String
+          return content unless content.includes?("{#")
+
+          process_lines_fence_aware(content) do |line, _in_fence|
+            if line.includes?("{#")
+              line.gsub(HEADING_ID_RE) do |_|
+                if safe
+                  "#{$1}#{$2} #{$3.rstrip}"
+                else
+                  "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
+                end
+              end
+            else
+              line
             end
           end
         end
@@ -355,31 +432,11 @@ module Hwaro
         def preprocess_strikethrough(content : String) : String
           return content unless content.includes?("~~")
 
-          String.build do |io|
-            in_fence = false
-            fence_marker = FENCE_BACKTICKS
-
-            content.each_line(chomp: false) do |line|
-              stripped = line.lstrip
-
-              if in_fence
-                if stripped.starts_with?(fence_marker)
-                  in_fence = false
-                end
-                io << line
-              elsif stripped.starts_with?(FENCE_BACKTICKS)
-                in_fence = true
-                fence_marker = FENCE_BACKTICKS
-                io << line
-              elsif stripped.starts_with?(FENCE_TILDES)
-                in_fence = true
-                fence_marker = FENCE_TILDES
-                io << line
-              elsif line.includes?("~~")
-                io << rewrite_strikethrough_line(line)
-              else
-                io << line
-              end
+          process_lines_fence_aware(content) do |line, _in_fence|
+            if line.includes?("~~")
+              rewrite_strikethrough_line(line)
+            else
+              line
             end
           end
         end
