@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.15.0
+
+### Added
+- `hwaro serve`: custom response headers via `--header 'Name: Value'` (repeatable) and `[serve.headers]` config table.
+- Shortcodes: full named closer support (`{% alert %}...{% endalert %}`) with mismatch diagnostics and improved unclosed warnings.
+- `[og.auto_image] lazy_generate = true`: defer expensive OG PNG/SVG generation during `hwaro serve` (especially effective with `--fast-start`).
+- `hwaro init --full-config`: emit verbose recommended config for maximum discoverability.
+
+### Changed
+- `hwaro init` / `doctor`: Hybrid config strategy (C). Default `init` now emits a balanced, much shorter config (~67 lines vs ~389). Doctor is less aggressive by default.
+- `doctor`: `--fix` performs real corrective fixes only; new `--approve` adds recommended optional sections; `--full` is shorthand for `--fix --approve`. Removed confusing `--minimal` flag.
+
+### Fixed
+- `hwaro init`/`doctor`: restored multilingual support (`default_language` + `[languages.*]`) and eliminated duplicate `[sitemap]`/`[feeds]` emission after Hybrid C changes.
+- `tool check-links`: recognizes assets in `static/` and `public/` (including image-processed outputs), removing false positives.
+- Render: `site.sections` Crinja values now expose `weight`, `draft`, `transparent`, `sort_by` etc. (prevents sort/compare crashes in scaffold templates).
+- `hwaro new`: `--section` override now properly takes precedence over path-based section inference.
+- Multiple authoring UX fixes from real-site testing (multilingual nav, doctor dedup, draft messaging, default `new` dates, social meta fallbacks).
+
+### Performance
+- Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
+- Shortcodes: fence + inline-code aware pre-filter to skip unnecessary processing on docs pages.
+- OG / profiling: base-layer caching, batched yielding, full hook + asset + Markdown timing in `--profile`.
+- Streaming: reduced cache invalidation / GC frequency under `--stream` / `--memory-limit`.
+
 ## v0.14.2
 
 ### Fixed
