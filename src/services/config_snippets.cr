@@ -577,19 +577,20 @@ module Hwaro
           # logo_position = "bottom-left"  # bottom-left, bottom-right, top-left, top-right
           # output_dir = "og-images"
           # show_title = true
-          # style = "editorial"            # clean modern default
-          # style = "framed"             # stronger distinct content card
-          # style = "artistic"           # bold & high-production
-          # style = "hero"               # very large, confident typography (poster-like)
-          # style = "surreal"            # experimental, artistic, strong background integration
-          # style = "monument"           # extreme minimal + massive typography + huge whitespace
+          # style = "default"              # classic solid background (current default)
+          # # Recommended modern styles (much more distinctive):
+          # # style = "editorial"   # clean + harmonious (great default for most sites)
+          # # style = "artistic"    # rich/illustrative backgrounds
+          # # style = "hero"        # bold poster-style typography
+          # # style = "surreal"     # experimental & artistic
+          # # style = "monument"    # extreme minimal + massive type
           # pattern_opacity = 0.12
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)
           # overlay_opacity = 0.45
           # format = "svg"                 # svg or png
-          # text_panel = 0.28              # Subtle panel behind text for harmony with artistic backgrounds
-          # accent_bars = false            # Thin top/bottom bars (disabled by default for modern look)
+          # text_panel = 0.0               # 0.0–0.6 — adds subtle panel behind text (recommended with modern styles)
+          # accent_bars = true             # Draw thin accent bars (set false for modern styles)
           # lazy_generate = false          # If true, skip bulk OG generation during `hwaro serve`.
           #                                  # Recommended: true for local development on large sites.
 

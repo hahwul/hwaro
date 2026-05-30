@@ -351,7 +351,7 @@ module Hwaro
         @logo = nil
         @output_dir = "og-images"
         @show_title = true
-        @style = "editorial"
+        @style = "default"
         @pattern_opacity = 0.12
         @pattern_scale = 1.0
         @background_image = nil
@@ -359,8 +359,8 @@ module Hwaro
         @format = "svg"
         @font_path = nil
         @logo_position = "bottom-left"
-        @text_panel = 0.28
-        @accent_bars = false
+        @text_panel = 0.0
+        @accent_bars = true
         @lazy_generate = false
       end
     end

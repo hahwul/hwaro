@@ -24,6 +24,7 @@ echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
 STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "minimal" "gradient" "waves")
+MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument")
 
 mkdir -p "$OUT_DIR"
 
@@ -33,8 +34,12 @@ for style in "${STYLES[@]}"; do
     TMP=$(mktemp -d -t hwaro-og-sample-XXXXXX)
     pushd "$TMP" >/dev/null
 
-    # Initialize a bare project (gives us minimal working templates)
-    "$HWARO_BIN" init . --scaffold bare --skip-agents-md --skip-sample-content -q 2>/dev/null || true
+    # For modern/ambitious styles, use a richer base so previews look more realistic
+    if [[ " ${MODERN_STYLES[*]} " =~ " ${style} " ]]; then
+        "$HWARO_BIN" init . --scaffold docs --skip-agents-md --skip-sample-content -q 2>/dev/null || true
+    else
+        "$HWARO_BIN" init . --scaffold bare --skip-agents-md --skip-sample-content -q 2>/dev/null || true
+    fi
 
     # Prepare assets for rich samples
     mkdir -p static/images
@@ -49,15 +54,14 @@ for style in "${STYLES[@]}"; do
             FONT_SIZE="62"
             OVERLAY="0.00"      # No overlay
 
-            # Try the exact custom JPEG first
+            # Use the user's custom artistic background image (highest priority)
             CUSTOM_BG="$HOME/Downloads/afb89274-cfaa-43a0-b555-d9ab9f93f77e.jpg"
             if [ -f "$CUSTOM_BG" ]; then
                 cp "$CUSTOM_BG" static/images/artistic-bg.jpg
                 BG_IMAGE="static/images/artistic-bg.jpg"
-                echo " (using custom image from ~/Downloads as artistic background)"
+                echo " (using custom artistic background)"
             else
-                echo " (warning: custom image not found at $CUSTOM_BG, falling back)"
-                # Fallback to local style preview if custom image missing
+                echo " (warning: custom image not found, using fallback)"
                 if [ -f "$PROJECT_ROOT/docs/static/images/og-style-examples/style-waves.png" ]; then
                     cp "$PROJECT_ROOT/docs/static/images/og-style-examples/style-waves.png" static/images/artistic-bg.png
                     BG_IMAGE="static/images/artistic-bg.png"
@@ -131,37 +135,38 @@ for style in "${STYLES[@]}"; do
         fi
     } > config.toml
 
-    # Nice sample page for preview (tailored per style)
-    case "${style}" in
-        artistic)
-            TITLE="Winter '26"
-            DESC="High-production design for ambitious brands. Rich backgrounds, confident typography."
-            ;;
-        hero)
-            TITLE="THE DROP"
-            DESC=""
-            ;;
-        surreal)
-            TITLE="Echoes"
-            DESC="Where reality bends and design becomes myth."
-            ;;
-        monument)
-            TITLE="VOID"
-            DESC=""
-            ;;
-        framed)
-            TITLE="The Frame"
-            DESC="Clear content separation with modern card treatment on artistic backgrounds."
-            ;;
-        editorial)
-            TITLE="Editorial"
-            DESC="Clean, generous, and harmonious. The modern default for thoughtful brands."
-            ;;
-        *)
-            TITLE="OG Sample"
-            DESC="Preview image for style: ${style}"
-            ;;
-    esac
+    # Create richer sample content for modern styles
+    if [[ " ${MODERN_STYLES[*]} " =~ " ${style} " ]]; then
+        case "${style}" in
+            artistic)
+                TITLE="Winter '26"
+                DESC="High-production design for ambitious brands. Rich backgrounds meet confident typography."
+                ;;
+            hero)
+                TITLE="THE DROP"
+                DESC="Limited drop. Bold design for those who move first."
+                ;;
+            surreal)
+                TITLE="Echo Chamber"
+                DESC="Where form dissolves and meaning multiplies."
+                ;;
+            monument)
+                TITLE="SILENCE"
+                DESC="A statement in negative space."
+                ;;
+            framed)
+                TITLE="Boundary"
+                DESC="Clear separation. Modern presence on complex backgrounds."
+                ;;
+            editorial)
+                TITLE="Field Notes"
+                DESC="Thoughtful writing deserves thoughtful presentation."
+                ;;
+        esac
+    else
+        TITLE="OG Sample"
+        DESC="Preview image for style: ${style}"
+    fi
 
     cat > content/index.md <<EOPAGE
 +++
@@ -169,7 +174,7 @@ title = "${TITLE}"
 description = "${DESC}"
 +++
 
-Sample content for OG image style previews.
+This is a sample page used to demonstrate the "${style}" OG image style.
 EOPAGE
 
     BUILD_LOG=$("$HWARO_BIN" build -q 2>&1)
