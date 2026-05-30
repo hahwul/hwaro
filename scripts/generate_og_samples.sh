@@ -23,7 +23,7 @@ echo ""
 echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
-STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "minimal" "gradient" "waves")
+STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "minimal" "gradient" "waves" "dots" "grid" "diagonal")
 MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist")
 
 mkdir -p "$OUT_DIR"

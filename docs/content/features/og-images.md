@@ -100,78 +100,78 @@ The `style` option controls the background treatment.
 
 <div class="og-style-grid">
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-default.svg" alt="default style" loading="lazy" />
+    <img src="/images/og-style-examples/style-default.png" alt="default style" loading="lazy" />
     <span class="og-style-label"><code>default</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-default.svg" alt="default style" />
+        <img src="/images/og-style-examples/style-default.png" alt="default style" />
         <p><code>default</code> — No pattern (solid background)</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-dots.svg" alt="dots style" loading="lazy" />
+    <img src="/images/og-style-examples/style-dots.png" alt="dots style" loading="lazy" />
     <span class="og-style-label"><code>dots</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-dots.svg" alt="dots style" />
+        <img src="/images/og-style-examples/style-dots.png" alt="dots style" />
         <p><code>dots</code> — Repeating dot grid</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-grid.svg" alt="grid style" loading="lazy" />
+    <img src="/images/og-style-examples/style-grid.png" alt="grid style" loading="lazy" />
     <span class="og-style-label"><code>grid</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-grid.svg" alt="grid style" />
+        <img src="/images/og-style-examples/style-grid.png" alt="grid style" />
         <p><code>grid</code> — Repeating line grid</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" loading="lazy" />
+    <img src="/images/og-style-examples/style-diagonal.png" alt="diagonal style" loading="lazy" />
     <span class="og-style-label"><code>diagonal</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-diagonal.svg" alt="diagonal style" />
+        <img src="/images/og-style-examples/style-diagonal.png" alt="diagonal style" />
         <p><code>diagonal</code> — Diagonal stripe pattern</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" loading="lazy" />
+    <img src="/images/og-style-examples/style-gradient.png" alt="gradient style" loading="lazy" />
     <span class="og-style-label"><code>gradient</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-gradient.svg" alt="gradient style" />
+        <img src="/images/og-style-examples/style-gradient.png" alt="gradient style" />
         <p><code>gradient</code> — Diagonal gradient using the accent color</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-waves.svg" alt="waves style" loading="lazy" />
+    <img src="/images/og-style-examples/style-waves.png" alt="waves style" loading="lazy" />
     <span class="og-style-label"><code>waves</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-waves.svg" alt="waves style" />
+        <img src="/images/og-style-examples/style-waves.png" alt="waves style" />
         <p><code>waves</code> — Horizontal wave curves</p>
       </div>
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
-    <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" loading="lazy" />
+    <img src="/images/og-style-examples/style-minimal.png" alt="minimal style" loading="lazy" />
     <span class="og-style-label"><code>minimal</code></span>
     <dialog onclick="if(event.target===this)this.close()">
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
-        <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" />
+        <img src="/images/og-style-examples/style-minimal.png" alt="minimal style" />
         <p><code>minimal</code> — Clean layout without accent bars</p>
       </div>
     </dialog>
