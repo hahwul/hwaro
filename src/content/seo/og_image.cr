@@ -104,13 +104,32 @@ module Hwaro
           hsl_to_hex(h2, s2, l2)
         end
 
+        # Normalize a user-supplied hex color to a bare 6-digit "rrggbb" form.
+        # Accepts "#rgb" shorthand (expanded to "rrggbb"), "#rrggbb", and
+        # "#rrggbbaa" (alpha is dropped). Returns nil for anything that isn't
+        # a valid hex color so callers can fall back deterministically.
+        def self.normalize_hex(hex : String) : String?
+          h = hex.lchop("#").strip
+          case h.size
+          when 3
+            h = String.build { |s| h.each_char { |c| s << c << c } }
+          when 6
+            # already the canonical length
+          when 8
+            h = h[0, 6] # drop the alpha byte
+          else
+            return
+          end
+          h.matches?(/\A[0-9a-fA-F]{6}\z/) ? h : nil
+        end
+
         # Convert "#RRGGBB" to {hue(0-360), saturation(0-1), lightness(0-1)}.
         def self.hex_to_hsl(hex : String) : Tuple(Float64, Float64, Float64)
-          h = hex.lchop("#")
-          return {0.0, 0.0, 0.0} if h.size < 6
-          r = (h[0, 2].to_i(16) rescue 0) / 255.0
-          g = (h[2, 2].to_i(16) rescue 0) / 255.0
-          b = (h[4, 2].to_i(16) rescue 0) / 255.0
+          h = normalize_hex(hex)
+          return {0.0, 0.0, 0.0} unless h
+          r = h[0, 2].to_i(16) / 255.0
+          g = h[2, 2].to_i(16) / 255.0
+          b = h[4, 2].to_i(16) / 255.0
           max = {r, g, b}.max
           min = {r, g, b}.min
           l = (max + min) / 2.0

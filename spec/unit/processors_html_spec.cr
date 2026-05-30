@@ -51,6 +51,15 @@ describe Hwaro::Content::Processors::Html do
       result.should eq("Line 1\n<!--  more  -->\nLine 2")
     end
 
+    it "does not crash on a literal preserve marker in content" do
+      # If the source content itself contains the internal sentinel with an
+      # out-of-range index, restoration must leave it intact, not raise IndexError.
+      html = "before\u0000HTML_PRESERVE_5\u0000after"
+      processor = Hwaro::Content::Processors::Html.new
+      result = processor.test_minify_html(html)
+      result.should eq("before\u0000HTML_PRESERVE_5\u0000after")
+    end
+
     it "cleans up pre/code blocks" do
       html = "<pre>\n  <code>code</code>\n</pre>"
       processor = Hwaro::Content::Processors::Html.new
