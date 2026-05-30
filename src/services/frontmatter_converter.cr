@@ -335,6 +335,23 @@ module Hwaro
         root.to_pretty_json
       end
 
+      # Serialize a frontmatter date/time value without corrupting the calendar day.
+      #
+      # Frontmatter dates are commonly written as TOML/YAML *local dates* such as
+      # `2026-05-20`, which parse to midnight in the local time zone. Rendering
+      # those through `to_rfc3339` (always UTC) rolls the day back in any
+      # positive-offset zone — e.g. in KST `2026-05-20` becomes
+      # `2026-05-19T15:00:00Z`, silently shifting the post's date on a format
+      # round-trip. When the value carries no time-of-day we emit a bare
+      # `YYYY-MM-DD` date and keep the day; genuine timestamps round-trip as RFC 3339.
+      def self.serialize_time(time : Time) : String
+        if time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
+          time.to_s("%Y-%m-%d")
+        else
+          time.to_rfc3339
+        end
+      end
+
       private def yaml_any_to_json_any(yaml : YAML::Any) : JSON::Any
         raw = yaml.raw
         case raw
@@ -344,7 +361,7 @@ module Hwaro
         when Float32 then JSON::Any.new(raw.to_f64)
         when Float64 then JSON::Any.new(raw)
         when String  then JSON::Any.new(raw)
-        when Time    then JSON::Any.new(raw.to_rfc3339)
+        when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Nil     then JSON::Any.new(nil)
         when Array
           arr = yaml.as_a.map { |v| yaml_any_to_json_any(v) }
@@ -368,7 +385,7 @@ module Hwaro
         when Int64   then JSON::Any.new(raw)
         when Float64 then JSON::Any.new(raw)
         when String  then JSON::Any.new(raw)
-        when Time    then JSON::Any.new(raw.to_rfc3339)
+        when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Array
           arr = raw.map do |item|
             item.is_a?(TOML::Any) ? toml_any_to_json_any(item) : JSON::Any.new(item.to_s)
@@ -513,7 +530,7 @@ module Hwaro
           when Float32, Float64
             raw.to_s
           when Time
-            raw.to_rfc3339
+            FrontmatterConverter.serialize_time(raw)
           when Array
             items = value.as_a.map { |v| to_toml_value(v) }
             "[#{items.join(", ")}]"
@@ -564,7 +581,7 @@ module Hwaro
         when Bool
           YAML::Any.new(raw)
         when Time
-          YAML::Any.new(raw.to_rfc3339)
+          YAML::Any.new(FrontmatterConverter.serialize_time(raw))
         when Array
           arr = raw.map { |item|
             if item.is_a?(TOML::Any)

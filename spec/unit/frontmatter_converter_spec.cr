@@ -734,4 +734,63 @@ describe Hwaro::Services::ConversionResult do
     result.skipped_count.should eq(3)
     result.error_count.should eq(1)
   end
+
+  describe ".serialize_time" do
+    # A TOML/YAML local date (e.g. `2026-05-20`) parses to midnight in the local
+    # zone. Forcing it through `to_rfc3339` (UTC) rolls the day back in any
+    # positive-offset zone; these cases must keep the calendar day regardless of
+    # the zone the value was parsed in.
+    it "keeps the calendar day for a positive-offset midnight (no UTC rollback)" do
+      time = Time.local(2026, 5, 20, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
+    end
+
+    it "emits a bare date for a UTC midnight (no spurious time component)" do
+      time = Time.utc(2026, 5, 20, 0, 0, 0)
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
+    end
+
+    it "keeps the calendar day for a negative-offset midnight" do
+      time = Time.local(2026, 5, 20, 0, 0, 0, location: Time::Location.fixed(-5 * 3600))
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
+    end
+
+    it "preserves genuine timestamps as RFC 3339" do
+      time = Time.utc(2026, 5, 20, 1, 30, 0)
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20T01:30:00Z")
+    end
+  end
+
+  describe "date round-trip" do
+    # Regression: converting a file's frontmatter format must not shift a
+    # date-only value by a day or graft a spurious time onto it.
+    it "preserves a TOML local date when converting to YAML" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "post.md")
+        File.write(file_path, "+++\ntitle = \"Post\"\ndate = 2026-05-20\n+++\n\n# Content")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+
+        converted = File.read(file_path)
+        converted.should contain("2026-05-20")
+        converted.should_not contain("2026-05-20T") # no time-of-day grafted on
+        converted.should_not contain("2026-05-19")  # no day rollback
+      end
+    end
+
+    it "preserves a TOML local date when converting to JSON" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "post.md")
+        File.write(file_path, "+++\ntitle = \"Post\"\ndate = 2026-05-20\n+++\n\n# Content")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+
+        converted = File.read(file_path)
+        converted.should contain("\"date\": \"2026-05-20\"")
+        converted.should_not contain("2026-05-19")
+      end
+    end
+  end
 end
