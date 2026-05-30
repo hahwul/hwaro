@@ -434,14 +434,21 @@ module Hwaro
         image : String?,
         base_url : String,
       ) : String
+        # A "summary_large_image" card with no image renders as a blank preview
+        # on most platforms, so downgrade to the plain "summary" card when this
+        # page resolves to no image (e.g. auto OG images disabled and no
+        # per-page or default image set).
+        img_url = resolve_image_url(image, base_url)
+        card = (@twitter_card == "summary_large_image" && img_url.nil?) ? "summary" : @twitter_card
+
         # See `og_tags` above for why subsequent lines are pre-indented.
         String.build(256) do |str|
-          str << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(@twitter_card)}">\n  )
+          str << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(card)}">\n  )
           str << %(<meta name="twitter:title" content="#{Utils::TextUtils.escape_xml(title)}">)
           if desc = description
             str << %(\n  <meta name="twitter:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
           end
-          if img_url = resolve_image_url(image, base_url)
+          if img_url
             str << %(\n  <meta name="twitter:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
           end
           if site = @twitter_site

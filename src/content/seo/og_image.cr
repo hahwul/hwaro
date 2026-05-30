@@ -19,6 +19,11 @@ module Hwaro
         WIDTH  = 1200
         HEIGHT =  630
 
+        # Emit the "CJK text but no CJK font" advisory at most once per process
+        # (the generate hook can run multiple times — e.g. --fast-start's
+        # deferred pass, or every rebuild in `serve`).
+        @@cjk_font_warning_shown = false
+
         LOGO_SIZE          =  48
         LOGO_MARGIN        =  80
         LOGO_TOP_Y         =  20
@@ -203,6 +208,18 @@ module Hwaro
             png_available = !font_ctx.nil?
             unless png_available
               Logger.warn "  PNG format requested but font initialization failed. Falling back to SVG."
+            end
+
+            # The bundled/system fallback fonts cover only Latin scripts. Warn
+            # once if any page has CJK text but no CJK-capable font is set, since
+            # those titles would otherwise render as blank "tofu" boxes.
+            if png_available && !@@cjk_font_warning_shown && ai.font_path.nil? &&
+               pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+              @@cjk_font_warning_shown = true
+              Logger.warn "  OG images: page titles/descriptions contain CJK characters, " \
+                          "but the bundled font covers only Latin scripts — they will render " \
+                          "as blank boxes. Set [og.auto_image].font_path to a CJK-capable font " \
+                          "(e.g. Noto Sans CJK)."
             end
           end
 
@@ -403,6 +420,9 @@ module Hwaro
           desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
 
           title_lines = word_wrap(page.title, chars_per_line)
+          # The band style draws the title inside a fixed-height color band;
+          # cap the lines so a long title can't overflow the band invisibly.
+          title_lines = cap_band_title(title_lines, font_size) if style == "band"
           desc_lines = word_wrap(page.description || "", desc_chars)
 
           title_block_height = title_lines.size * (font_size + 8)
@@ -764,6 +784,32 @@ module Hwaro
             (code >= 0x30A0 && code <= 0x30FF) || # Katakana
             (code >= 0xAC00 && code <= 0xD7AF) || # Hangul Syllables
             (code >= 0xFF00 && code <= 0xFFEF)    # Fullwidth Forms
+        end
+
+        # True if the text contains CJK ideographs, kana, hangul, or fullwidth
+        # forms — glyphs the bundled/system Latin fonts cannot render, so PNG
+        # OG images would show blank "tofu" boxes unless a CJK-capable
+        # `font_path` is configured.
+        def self.contains_cjk?(text : String) : Bool
+          text.each_char.any? { |c| cjk_char?(c) }
+        end
+
+        # How many title lines fit inside the fixed-height color band used by
+        # the `band` style. Beyond this the title overflows the band and, being
+        # drawn in the background color, renders invisibly off-band.
+        def self.band_line_capacity(font_size : Int32) : Int32
+          Math.max(1, BAND_HEIGHT // (font_size + 8))
+        end
+
+        # Cap a `band`-style title to the lines that fit the band, marking the
+        # last kept line with an ellipsis so the truncation is visible rather
+        # than silent.
+        def self.cap_band_title(lines : Array(String), font_size : Int32) : Array(String)
+          cap = band_line_capacity(font_size)
+          return lines if lines.size <= cap
+          capped = lines.first(cap)
+          capped[-1] = "#{capped[-1].rstrip}…"
+          capped
         end
 
         # Compute a hash of OG-relevant config properties.

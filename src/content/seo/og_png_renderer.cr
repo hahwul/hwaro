@@ -452,6 +452,9 @@ module Hwaro
                        end
 
           title_lines = word_wrap_measured(bold_info, bold_scale, page.title, wrap_width)
+          # The band style draws the title inside a fixed-height color band;
+          # cap the lines so a long title can't overflow the band invisibly.
+          title_lines = OgImage.cap_band_title(title_lines, font_size.to_i) if ai.style == "band"
           desc_text = page.description || ""
           desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, wrap_width)
 
