@@ -259,7 +259,6 @@ logo = "static/hwaro.png"
 logo_position = "bottom-left"
 output_dir = "og-images"
 show_title = true
-style = "default"
 pattern_opacity = 0.15
 pattern_scale = 1.0
 format = "png"
