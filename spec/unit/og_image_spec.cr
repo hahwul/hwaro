@@ -630,6 +630,23 @@ describe Hwaro::Content::Seo::OgImage do
     end
   end
 
+  describe "text & layout helpers" do
+    it "detects CJK / kana / hangul characters" do
+      Hwaro::Content::Seo::OgImage.contains_cjk?("Hello World").should be_false
+      Hwaro::Content::Seo::OgImage.contains_cjk?("café résumé").should be_false # Latin-1, covered
+      Hwaro::Content::Seo::OgImage.contains_cjk?("한글 제목").should be_true
+      Hwaro::Content::Seo::OgImage.contains_cjk?("日本語のタイトル").should be_true
+      Hwaro::Content::Seo::OgImage.contains_cjk?("Mixed 中文 text").should be_true
+    end
+
+    it "caps band title lines to what fits the fixed-height band" do
+      # BAND_HEIGHT is 200: a 52px line (+8 gap) fits 3 lines, a 60px line fits 2.
+      Hwaro::Content::Seo::OgImage.band_line_capacity(52).should eq(3)
+      Hwaro::Content::Seo::OgImage.band_line_capacity(60).should eq(2)
+      Hwaro::Content::Seo::OgImage.band_line_capacity(1000).should eq(1) # never zero
+    end
+  end
+
   describe "style predicates" do
     it "classifies geometric styles" do
       Hwaro::Content::Seo::OgImage.geometric?("split").should be_true

@@ -204,6 +204,17 @@ module Hwaro
             unless png_available
               Logger.warn "  PNG format requested but font initialization failed. Falling back to SVG."
             end
+
+            # The bundled/system fallback fonts cover only Latin scripts. Warn
+            # once if any page has CJK text but no CJK-capable font is set, since
+            # those titles would otherwise render as blank "tofu" boxes.
+            if png_available && ai.font_path.nil? &&
+               pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+              Logger.warn "  OG images: page titles/descriptions contain CJK characters, " \
+                          "but the bundled font covers only Latin scripts — they will render " \
+                          "as blank boxes. Set [og.auto_image].font_path to a CJK-capable font " \
+                          "(e.g. Noto Sans CJK)."
+            end
           end
 
           # Resolve absolute paths for logo and background image
@@ -403,6 +414,9 @@ module Hwaro
           desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
 
           title_lines = word_wrap(page.title, chars_per_line)
+          # The band style draws the title inside a fixed-height color band;
+          # cap the lines so a long title can't overflow the band invisibly.
+          title_lines = title_lines.first(band_line_capacity(font_size)) if style == "band"
           desc_lines = word_wrap(page.description || "", desc_chars)
 
           title_block_height = title_lines.size * (font_size + 8)
@@ -764,6 +778,21 @@ module Hwaro
             (code >= 0x30A0 && code <= 0x30FF) || # Katakana
             (code >= 0xAC00 && code <= 0xD7AF) || # Hangul Syllables
             (code >= 0xFF00 && code <= 0xFFEF)    # Fullwidth Forms
+        end
+
+        # True if the text contains CJK ideographs, kana, hangul, or fullwidth
+        # forms — glyphs the bundled/system Latin fonts cannot render, so PNG
+        # OG images would show blank "tofu" boxes unless a CJK-capable
+        # `font_path` is configured.
+        def self.contains_cjk?(text : String) : Bool
+          text.each_char.any? { |c| cjk_char?(c) }
+        end
+
+        # How many title lines fit inside the fixed-height color band used by
+        # the `band` style. Beyond this the title overflows the band and, being
+        # drawn in the background color, renders invisibly off-band.
+        def self.band_line_capacity(font_size : Int32) : Int32
+          Math.max(1, BAND_HEIGHT // (font_size + 8))
         end
 
         # Compute a hash of OG-relevant config properties.

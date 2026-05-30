@@ -248,12 +248,51 @@ describe Hwaro::Models::OpenGraphConfig do
       tags = config.twitter_tags(
         title: "My Page",
         description: nil,
-        image: nil,
+        image: "/images/card.png",
         base_url: "https://example.com"
       )
 
       tags.should contain(%(<meta name="twitter:card" content="summary_large_image">))
       tags.should contain(%(<meta name="twitter:title" content="My Page">))
+    end
+
+    it "downgrades summary_large_image to summary when there is no image" do
+      config = Hwaro::Models::OpenGraphConfig.new # defaults to summary_large_image
+      tags = config.twitter_tags(
+        title: "My Page",
+        description: nil,
+        image: nil,
+        base_url: "https://example.com"
+      )
+
+      # A large-image card with no image renders as a blank preview.
+      tags.should contain(%(<meta name="twitter:card" content="summary">))
+      tags.should_not contain("summary_large_image")
+    end
+
+    it "keeps summary_large_image when an image is present" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      tags = config.twitter_tags(
+        title: "My Page",
+        description: nil,
+        image: "/images/card.png",
+        base_url: "https://example.com"
+      )
+
+      tags.should contain(%(<meta name="twitter:card" content="summary_large_image">))
+    end
+
+    it "respects a non-large card type even without an image" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.twitter_card = "summary"
+      tags = config.twitter_tags(
+        title: "My Page",
+        description: nil,
+        image: nil,
+        base_url: "https://example.com"
+      )
+
+      tags.should contain(%(<meta name="twitter:card" content="summary">))
     end
 
     it "includes description when provided" do
