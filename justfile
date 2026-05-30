@@ -178,7 +178,8 @@ test-friends:
 # The generated images will be placed in:
 #     docs/static/images/og-style-examples/style-*.png
 #
-# Currently generates samples for: default, editorial, minimal, gradient, waves
+# Generates samples for every style preset, including the bold geometric
+# styles (split, band, brutalist).
 [group('documents')]
 og-samples:
     @[ -f bin/hwaro ] || just build

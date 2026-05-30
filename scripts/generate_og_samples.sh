@@ -23,8 +23,8 @@ echo ""
 echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
-STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "minimal" "gradient" "waves")
-MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument")
+STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "minimal" "gradient" "waves")
+MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist")
 
 mkdir -p "$OUT_DIR"
 
@@ -45,6 +45,9 @@ for style in "${STYLES[@]}"; do
     mkdir -p static/images
 
     # Per-style background and settings to make the samples visually distinct and modern
+    TEXT="#ffffff"
+    SECONDARY=""
+    SHOW_TITLE="false"
     case "${style}" in
         artistic)
             # Use the custom image the user provided from ~/Downloads
@@ -91,6 +94,29 @@ for style in "${STYLES[@]}"; do
             FONT_SIZE="82"
             OVERLAY="0.00"
             ;;
+        split)
+            BG="#10131c"
+            ACCENT="#ff3b6b"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="58"
+            SHOW_TITLE="true"   # site name fills the color block
+            ;;
+        band)
+            BG="#0e1116"
+            ACCENT="#ffd23f"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="60"
+            SHOW_TITLE="true"
+            ;;
+        brutalist)
+            BG="#f6f1e7"
+            ACCENT="#161616"
+            TEXT="#161616"
+            SECONDARY="#ff5b2e"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="78"
+            SHOW_TITLE="true"
+            ;;
         framed)
             BG="#22222b"
             ACCENT="#fda4af"
@@ -123,9 +149,12 @@ for style in "${STYLES[@]}"; do
         echo "text_panel = ${TEXT_PANEL}"
         echo "background = \"${BG}\""
         echo "accent_color = \"${ACCENT}\""
-        echo 'text_color = "#ffffff"'
+        echo "text_color = \"${TEXT}\""
+        if [ -n "${SECONDARY:-}" ]; then
+            echo "secondary_color = \"${SECONDARY}\""
+        fi
         echo "font_size = ${FONT_SIZE}"
-        echo 'show_title = false'
+        echo "show_title = ${SHOW_TITLE}"
         echo 'format = "png"'
         echo 'output_dir = "og-images"'
 
@@ -161,6 +190,18 @@ for style in "${STYLES[@]}"; do
             editorial)
                 TITLE="Field Notes"
                 DESC="Thoughtful writing deserves thoughtful presentation."
+                ;;
+            split)
+                TITLE="A Field Guide to Bold Layouts"
+                DESC="A diagonal color block anchors the whole composition."
+                ;;
+            band)
+                TITLE="Cover Story"
+                DESC="A magazine-style color band behind a knocked-out title."
+                ;;
+            brutalist)
+                TITLE="Raw & Loud"
+                DESC="Thick frames, hard shadows, and oversized type."
                 ;;
         esac
     else

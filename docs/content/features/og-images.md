@@ -25,6 +25,7 @@ enabled = true
 background = "#1a1a2e"
 text_color = "#ffffff"
 accent_color = "#e94560"
+secondary_color = "#3fc7c0"   # optional 2nd color for split/brutalist (auto-derived if omitted)
 font_size = 48
 logo = "static/logo.png"
 logo_position = "bottom-left"
@@ -45,7 +46,8 @@ font_path = "static/fonts/Inter-Bold.ttf"
 | enabled | bool | `false` | Enable auto OG image generation |
 | background | string | `"#1a1a2e"` | Background color (hex) |
 | text_color | string | `"#ffffff"` | Title and description text color |
-| accent_color | string | `"#e94560"` | Accent color for bars and site name |
+| accent_color | string | `"#e94560"` | Accent color for bars, site name, and geometric color blocks |
+| secondary_color | string | — | Second color for two-tone geometric styles (`split`, `brutalist`). When omitted, a complementary tone is auto-derived from `accent_color` |
 | font_size | int | `48` | Title font size in pixels |
 | logo | string | — | Logo file path (e.g., `static/logo.png`). Embedded as base64 data URI |
 | logo_position | string | `"bottom-left"` | Logo placement: `bottom-left`, `bottom-right`, `top-left`, `top-right` |
@@ -75,6 +77,9 @@ The `style` option controls the background treatment.
 | `hero` | Very large, confident typography with strong focal point. Poster/campaign style. |
 | `surreal` | Experimental and dramatic. Heavy background integration with artistic treatment. |
 | `monument` | Extreme minimalism. Massive typography + huge whitespace. |
+| `split` | **Bold & geometric**. Diagonal two-tone color block on the left with the title on the right. Uses `accent_color` + `secondary_color`. |
+| `band` | **Bold & geometric**. Full-width color band with the title knocked out of it (magazine-cover look). Works best with a high-contrast `background`/`accent_color`. |
+| `brutalist` | **Bold & geometric**. Thick framed panel with a hard offset shadow block (`secondary_color`) and oversized type. |
 | `minimal` | Clean layout without accent bars |
 | `dots` | Repeating dot grid |
 | `grid` | Repeating line grid |
@@ -87,6 +92,9 @@ The `style` option controls the background treatment.
 | `surreal` | Experimental and artistic. Heavy background integration, dramatic text treatment. |
 | `monument` | Extreme minimalism. Massive typography + huge whitespace. Almost no decorative elements. |
 | `editorial` | Modern editorial style — no hard bars, strong text integration via subtle panel, generous breathing room. Great with artistic backgrounds. |
+| `split` | Diagonal two-tone color block (accent + secondary) on the left, title/description on the right. Strong editorial/fashion identity. |
+| `band` | Solid color band running behind a knocked-out title, description below. Magazine-cover color blocking. |
+| `brutalist` | Thick framed panel with a hard offset shadow block and huge type. Neo-brutalist, high-contrast look. |
 
 ### Preview
 
@@ -165,6 +173,39 @@ The `style` option controls the background treatment.
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-minimal.svg" alt="minimal style" />
         <p><code>minimal</code> — Clean layout without accent bars</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-split.png" alt="split style" loading="lazy" />
+    <span class="og-style-label"><code>split</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-split.png" alt="split style" />
+        <p><code>split</code> — Diagonal two-tone color block</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-band.png" alt="band style" loading="lazy" />
+    <span class="og-style-label"><code>band</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-band.png" alt="band style" />
+        <p><code>band</code> — Magazine color band behind a knocked-out title</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-brutalist.png" alt="brutalist style" loading="lazy" />
+    <span class="og-style-label"><code>brutalist</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-brutalist.png" alt="brutalist style" />
+        <p><code>brutalist</code> — Thick framed panel with a hard offset shadow</p>
       </div>
     </dialog>
   </div>

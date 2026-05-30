@@ -313,6 +313,11 @@ module Hwaro
       property background : String
       property text_color : String
       property accent_color : String
+
+      # Optional second color for two-tone geometric styles (split / brutalist).
+      # When nil, a complementary tone is auto-derived from accent_color.
+      property secondary_color : String?
+
       property font_size : Int32
       property logo : String?
       property output_dir : String
@@ -347,6 +352,7 @@ module Hwaro
         @background = "#1a1a2e"
         @text_color = "#ffffff"
         @accent_color = "#e94560"
+        @secondary_color = nil
         @font_size = 48
         @logo = nil
         @output_dir = "og-images"
@@ -1223,6 +1229,7 @@ module Hwaro
           config.og.auto_image.background = ai["background"]?.try(&.as_s?) || config.og.auto_image.background
           config.og.auto_image.text_color = ai["text_color"]?.try(&.as_s?) || config.og.auto_image.text_color
           config.og.auto_image.accent_color = ai["accent_color"]?.try(&.as_s?) || config.og.auto_image.accent_color
+          config.og.auto_image.secondary_color = ai["secondary_color"]?.try(&.as_s?)
           config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size)
           config.og.auto_image.logo = ai["logo"]?.try(&.as_s?)
           config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?) || config.og.auto_image.output_dir

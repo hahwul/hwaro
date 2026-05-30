@@ -252,27 +252,19 @@ module Hwaro
           ai = config.og.auto_image
 
           # Build a cheap cache key from the things that affect the base pixels.
-          key = "#{ai.background}|#{ai.accent_color}|#{ai.style}|#{ai.pattern_opacity}|" \
+          key = "#{ai.background}|#{ai.accent_color}|#{ai.secondary_color}|#{ai.style}|#{ai.pattern_opacity}|" \
                 "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}"
 
           if @@last_base_key == key && (cached = @@last_base_layer)
             return cached
           end
 
-          is_minimal = ai.style == "minimal"
-          is_editorial = ai.style == "editorial"
-          is_framed = ai.style == "framed"
-          is_artistic = ai.style == "artistic"
-          is_hero = ai.style == "hero"
-          is_surreal = ai.style == "surreal"
-          is_monument = ai.style == "monument"
           bg_color = parse_hex_color(ai.background)
           accent_color = parse_hex_color(ai.accent_color)
+          secondary_color = parse_hex_color(OgImage.resolve_secondary(ai))
 
-          show_accent_bars = ai.accent_bars
-          if is_editorial || is_framed || is_artistic || is_hero || is_surreal || is_monument
-            show_accent_bars = false
-          end
+          # Minimal / modern / geometric styles drop the classic accent bars.
+          show_accent_bars = ai.accent_bars && !OgImage.no_accent_bars?(ai.style)
 
           base = Bytes.new(WIDTH * HEIGHT * CHANNELS)
           pixels = base.to_unsafe
@@ -289,6 +281,9 @@ module Hwaro
           end
 
           render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
+
+          # Bold geometric background (split / band / brutalist)
+          render_geometric_background(pixels, ai.style, bg_color, accent_color, secondary_color)
 
           if show_accent_bars
             fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
@@ -320,24 +315,15 @@ module Hwaro
           base_layer : Bytes? = nil,
         ) : Bool
           ai = config.og.auto_image
-          is_minimal = ai.style == "minimal"
-          is_editorial = ai.style == "editorial"
-          is_framed = ai.style == "framed"
-          is_artistic = ai.style == "artistic"
-          is_hero = ai.style == "hero"
-          is_surreal = ai.style == "surreal"
-          is_monument = ai.style == "monument"
 
-          # Modern styles disable the old thin accent bars.
-          show_accent_bars = ai.accent_bars
-          if (is_editorial || is_framed || is_artistic || is_hero || is_surreal || is_monument) && show_accent_bars
-            show_accent_bars = false
-          end
+          # Minimal / modern / geometric styles drop the classic accent bars.
+          show_accent_bars = ai.accent_bars && !OgImage.no_accent_bars?(ai.style)
 
           # Parse colors
           bg_color = parse_hex_color(ai.background)
           text_color = parse_hex_color(ai.text_color)
           accent_color = parse_hex_color(ai.accent_color)
+          secondary_color = parse_hex_color(OgImage.resolve_secondary(ai))
 
           # Allocate pixel buffer (RGBA) with LibC.malloc for explicit lifecycle control.
           buf_size = WIDTH * HEIGHT * CHANNELS
@@ -366,6 +352,9 @@ module Hwaro
 
               # 3. Style pattern
               render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
+
+              # 3b. Bold geometric background (split / band / brutalist)
+              render_geometric_background(pixels, ai.style, bg_color, accent_color, secondary_color)
 
               # 4. Accent bar at top (legacy / classic look)
               if show_accent_bars
@@ -420,9 +409,9 @@ module Hwaro
           ai = config.og.auto_image
           font_size = Math.max(ai.font_size, 1).to_f32
 
-          # Ambitious styles get much bolder default typography
+          # Ambitious + geometric styles get much bolder default typography
           case ai.style
-          when "hero", "monument"
+          when "hero", "monument", "brutalist"
             if ai.font_size <= 48
               font_size = 78.0
             end
@@ -430,8 +419,16 @@ module Hwaro
             if ai.font_size <= 48
               font_size = 64.0
             end
+          when "band"
+            if ai.font_size <= 48
+              font_size = 60.0
+            end
+          when "split"
+            if ai.font_size <= 48
+              font_size = 58.0
+            end
           end
-          desc_size = Math.max((font_size * 0.38).to_i, 1).to_f32  # smaller desc ratio for ambitious styles
+          desc_size = Math.max((font_size * 0.38).to_i, 1).to_f32 # smaller desc ratio for ambitious styles
 
           bold_info = ctx.bold_info
           bold_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size)
@@ -440,13 +437,19 @@ module Hwaro
           r_info = ctx.regular_info || bold_info
           r_scale = LibStb.hwaro_font_scale_for_pixel_height(r_info, desc_size)
 
-          # Word-wrap width and margins — modern ambitious styles get very generous treatment
+          # Word-wrap width and margins — modern + geometric styles get tailored treatment
           margin_x = case ai.style
-                     when "editorial", "framed"       then 110
+                     when "editorial", "framed"                     then 110
                      when "artistic", "hero", "surreal", "monument" then 140
-                     else 80
+                     when "split"                                   then OgImage::SPLIT_TEXT_X
+                     when "brutalist"                               then OgImage::BRUTALIST_TEXT_X
+                     else                                                80
                      end
-          wrap_width = WIDTH - (margin_x * 2)
+          wrap_width = case ai.style
+                       when "split"     then WIDTH - OgImage::SPLIT_TEXT_X - 80
+                       when "brutalist" then WIDTH - OgImage::BRUTALIST_TEXT_X - (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 40)
+                       else                  WIDTH - (margin_x * 2)
+                       end
 
           title_lines = word_wrap_measured(bold_info, bold_scale, page.title, wrap_width)
           desc_text = page.description || ""
@@ -468,6 +471,15 @@ module Hwaro
           when "monument"
             # Monument: Extremely dominant title with massive breathing room
             title_start_y = Math.max(font_size + 10, 120_f32)
+          when "band"
+            # Band: vertically centered inside the color band.
+            band_center = (OgImage::BAND_TOP + OgImage::BAND_HEIGHT // 2).to_f32
+            title_start_y = band_center - (title_block_height / 2) + font_size - 6
+          when "brutalist"
+            # Brutalist: large title anchored near the top of the framed panel.
+            title_start_y = (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 100).to_f32
+          when "split"
+            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 10)
           else
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_f32 + font_size)
           end
@@ -485,7 +497,8 @@ module Hwaro
             end
           end
 
-          if panel > 0.01
+          # Geometric styles are intentionally flat — they never use the soft panel.
+          if panel > 0.01 && !OgImage.geometric?(ai.style)
             top_offset : Float32 = ai.style == "framed" ? 48_f32 : 36_f32
             bottom_offset : Float32 = ai.style == "framed" ? 52_f32 : 40_f32
             panel_top = (title_start_y - font_size - top_offset).to_f32.clamp(16_f32, HEIGHT * 0.52_f32)
@@ -493,15 +506,17 @@ module Hwaro
             draw_text_panel(pixels, panel_top, panel_bottom, panel, bg_color, accent_color)
           end
 
-          # Render title lines
+          # Render title lines. `band` knocks the title out of the color band
+          # using the background color for strong magazine-cover contrast.
+          title_color = ai.style == "band" ? bg_color : text_color
           title_lines.each_with_index do |line, i|
             y = title_start_y + i * (font_size + 8)
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, text_color, 1.0_f32)
+            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, title_color, 1.0_f32)
           end
 
           # Render description — hero and monument get very small or minimal desc treatment
           unless desc_lines.empty?
-            desc_start_y = title_start_y + title_block_height + 16
+            desc_start_y = ai.style == "band" ? (OgImage::BAND_TOP + OgImage::BAND_HEIGHT + 24).to_f32 + desc_size : title_start_y + title_block_height + 16
 
             # For hero/monument, make description much more subtle
             desc_opacity = if ai.style == "hero" || ai.style == "monument"
@@ -527,12 +542,16 @@ module Hwaro
             else
               site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
               site_margin = case ai.style
-                            when "editorial", "framed"             then 110
-                            when "artistic", "surreal"             then 140
-                            else OgImage::LOGO_MARGIN
+                            when "editorial", "framed" then 110
+                            when "artistic", "surreal" then 140
+                            when "split"               then 80
+                            when "brutalist"           then OgImage::BRUTALIST_TEXT_X
+                            else                            OgImage::LOGO_MARGIN
                             end
               site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
-              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
+              # `split` renders the site name inside the accent block → readable color.
+              site_color = ai.style == "split" ? text_color : accent_color
+              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, site_color, 1.0_f32)
             end
           end
         end
@@ -628,7 +647,7 @@ module Hwaro
             ag = ((accent >> 8) & 0xFF).to_i
             ab = (accent & 0xFF).to_i
 
-            mix = 0.18   # how much accent tint
+            mix = 0.18 # how much accent tint
             panel_r = ((r * (1 - mix) + ar * mix)).to_u8
             panel_g = ((g * (1 - mix) + ag * mix)).to_u8
             panel_b = ((b * (1 - mix) + ab * mix)).to_u8
@@ -653,9 +672,9 @@ module Hwaro
             # - Very gentle falloff toward description
             # - Slight extra softness at the very edges for modern feel
             fade = if t < 0.15
-                     1.0 - (t * 1.8)          # stronger near title
+                     1.0 - (t * 1.8) # stronger near title
                    elsif t < 0.65
-                     0.73 - (t - 0.15) * 0.9  # main body
+                     0.73 - (t - 0.15) * 0.9 # main body
                    else
                      0.28 * (1.0 - (t - 0.65) / 0.35) # soft tail
                    end
@@ -673,7 +692,7 @@ module Hwaro
               side_t = (px.to_f / WIDTH - 0.5).abs * 0.6
               side_alpha = alpha * (1.0 - side_t * 0.25)
 
-              pixels[idx]     = (dr + (panel_r.to_f - dr) * side_alpha).to_u8
+              pixels[idx] = (dr + (panel_r.to_f - dr) * side_alpha).to_u8
               pixels[idx + 1] = (dg + (panel_g.to_f - dg) * side_alpha).to_u8
               pixels[idx + 2] = (db + (panel_b.to_f - db) * side_alpha).to_u8
             end
@@ -851,6 +870,64 @@ module Hwaro
               end
             end
           end
+        end
+
+        # Render a bold, opaque geometric background (color block / band /
+        # framed panel) for the design-forward geometric styles. Painted into
+        # the config-only base layer, so it costs nothing per page.
+        private def self.render_geometric_background(pixels : UInt8*, style : String, bg : UInt32, accent : UInt32, secondary : UInt32)
+          case style
+          when "split"
+            # Secondary strip first (wider), then the accent block on top —
+            # leaving a two-tone diagonal seam between them.
+            fill_left_diagonal(pixels, secondary, OgImage::SPLIT_TOP_X + OgImage::SPLIT_EDGE, OgImage::SPLIT_BOTTOM_X + OgImage::SPLIT_EDGE)
+            fill_left_diagonal(pixels, accent, OgImage::SPLIT_TOP_X, OgImage::SPLIT_BOTTOM_X)
+          when "band"
+            fill_rect(pixels, 0, OgImage::BAND_TOP, WIDTH, OgImage::BAND_HEIGHT, accent)
+          when "brutalist"
+            inset = OgImage::BRUTALIST_INSET
+            offset = OgImage::BRUTALIST_OFFSET
+            frame = OgImage::BRUTALIST_FRAME
+            iw = WIDTH - 2 * inset
+            ih = HEIGHT - 2 * inset
+            # Hard offset shadow block (secondary), peeking down-right.
+            fill_rect(pixels, inset + offset, inset + offset, iw, ih, secondary)
+            # Main panel (background color) covers the shadow's top-left.
+            fill_rect(pixels, inset, inset, iw, ih, bg)
+            # Thick accent border around the panel.
+            draw_border(pixels, inset, inset, iw, ih, frame, accent)
+          end
+        end
+
+        # Fill every pixel to the left of a diagonal edge that runs from
+        # `top_x` (at y=0) to `bottom_x` (at y=HEIGHT). Opaque fill.
+        private def self.fill_left_diagonal(pixels : UInt8*, color : UInt32, top_x : Int32, bottom_x : Int32)
+          r = ((color >> 16) & 0xFF).to_u8
+          g = ((color >> 8) & 0xFF).to_u8
+          b = (color & 0xFF).to_u8
+
+          HEIGHT.times do |py|
+            edge = top_x + ((bottom_x - top_x) * py) // HEIGHT
+            edge = 0 if edge < 0
+            edge = WIDTH if edge > WIDTH
+            px = 0
+            while px < edge
+              idx = (py * WIDTH + px) * CHANNELS
+              pixels[idx] = r
+              pixels[idx + 1] = g
+              pixels[idx + 2] = b
+              pixels[idx + 3] = 255_u8
+              px += 1
+            end
+          end
+        end
+
+        # Draw a solid rectangular border of `thickness` px inside (x, y, w, h).
+        private def self.draw_border(pixels : UInt8*, x : Int32, y : Int32, w : Int32, h : Int32, thickness : Int32, color : UInt32)
+          fill_rect(pixels, x, y, w, thickness, color)                 # top
+          fill_rect(pixels, x, y + h - thickness, w, thickness, color) # bottom
+          fill_rect(pixels, x, y, thickness, h, color)                 # left
+          fill_rect(pixels, x + w - thickness, y, thickness, h, color) # right
         end
 
         # Draw a filled circle with alpha blending

@@ -128,6 +128,47 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       end
     end
 
+    it "renders geometric styles (split / band / brutalist)" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      Dir.mktmpdir do |dir|
+        %w[split band brutalist].each do |style|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Geometric #{style}"
+          page.description = "bold layout"
+
+          config = Hwaro::Models::Config.new
+          config.title = "Site"
+          config.og.auto_image.style = style
+
+          png_path = File.join(dir, "#{style}.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path, font_ctx: ctx)
+          result.should be_true
+          File.exists?(png_path).should be_true
+        end
+      end
+    end
+
+    it "renders with an explicit secondary_color" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      Dir.mktmpdir do |dir|
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Two Tone"
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.style = "split"
+        config.og.auto_image.accent_color = "#ff3b6b"
+        config.og.auto_image.secondary_color = "#00f3b7"
+
+        png_path = File.join(dir, "split2.png")
+        result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+        result.should be_true
+        File.exists?(png_path).should be_true
+      end
+    end
+
     it "renders without site name when show_title is false" do
       next unless Hwaro::Content::Seo::OgPngRenderer.available?
 

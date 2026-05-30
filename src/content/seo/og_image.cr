@@ -44,6 +44,103 @@ module Hwaro
           ".webp" => "image/webp",
         }
 
+        # --- Style families (single source of truth, shared by SVG + PNG renderers) ---
+        #
+        # "Modern" styles are typography/panel-driven and reuse the classic
+        # background patterns. "Geometric" styles paint bold, distinctive
+        # background shapes (color blocks, bands, frames) and are the
+        # high-contrast, design-forward additions.
+        MODERN_STYLES    = {"editorial", "framed", "artistic", "hero", "surreal", "monument"}
+        GEOMETRIC_STYLES = {"split", "band", "brutalist"}
+
+        def self.modern?(style : String) : Bool
+          MODERN_STYLES.includes?(style)
+        end
+
+        def self.geometric?(style : String) : Bool
+          GEOMETRIC_STYLES.includes?(style)
+        end
+
+        # Styles that drop the classic thin top/bottom accent bars for a
+        # cleaner, more modern composition.
+        def self.no_accent_bars?(style : String) : Bool
+          style == "minimal" || modern?(style) || geometric?(style)
+        end
+
+        # --- Geometric style layout (shared by SVG + PNG so both stay in sync) ---
+        # `split`: a diagonal color block on the left; text lives on the right.
+        SPLIT_TOP_X    = 480 # block's right edge at the top
+        SPLIT_BOTTOM_X = 320 # block's right edge at the bottom (slanted)
+        SPLIT_EDGE     =  16 # secondary-color accent strip along the diagonal
+        SPLIT_TEXT_X   = 540 # left margin of the title/description block
+
+        # `band`: a full-width solid band behind the (knocked-out) title.
+        BAND_TOP    = 210
+        BAND_HEIGHT = 200
+
+        # `brutalist`: thick framed panel with a hard offset shadow block.
+        BRUTALIST_INSET  = 36 # gap from the canvas edge to the panel
+        BRUTALIST_FRAME  = 14 # border thickness
+        BRUTALIST_OFFSET = 20 # hard shadow offset (down-right)
+        BRUTALIST_TEXT_X = 88 # left margin of the title inside the frame
+
+        # Resolve the second color for two-tone geometric styles. Falls back
+        # to a complementary tone auto-derived from the accent color.
+        def self.resolve_secondary(ai : Models::AutoImageConfig) : String
+          sc = ai.secondary_color
+          (sc && !sc.empty?) ? sc : derive_secondary(ai.accent_color)
+        end
+
+        # Derive a punchy complementary color from a hex string via HSL.
+        def self.derive_secondary(accent_hex : String) : String
+          h, s, l = hex_to_hsl(accent_hex)
+          h2 = (h + 180.0) % 360.0 # complementary hue
+          s2 = Math.max(s, 0.45)   # keep it vivid
+          l2 = l < 0.5 ? Math.min(l + 0.14, 0.74) : Math.max(l - 0.14, 0.30)
+          hsl_to_hex(h2, s2, l2)
+        end
+
+        # Convert "#RRGGBB" to {hue(0-360), saturation(0-1), lightness(0-1)}.
+        def self.hex_to_hsl(hex : String) : Tuple(Float64, Float64, Float64)
+          h = hex.lchop("#")
+          return {0.0, 0.0, 0.0} if h.size < 6
+          r = (h[0, 2].to_i(16) rescue 0) / 255.0
+          g = (h[2, 2].to_i(16) rescue 0) / 255.0
+          b = (h[4, 2].to_i(16) rescue 0) / 255.0
+          max = {r, g, b}.max
+          min = {r, g, b}.min
+          l = (max + min) / 2.0
+          return {0.0, 0.0, l} if max == min
+          d = max - min
+          s = l > 0.5 ? d / (2.0 - max - min) : d / (max + min)
+          hue = case max
+                when r then (g - b) / d + (g < b ? 6.0 : 0.0)
+                when g then (b - r) / d + 2.0
+                else        (r - g) / d + 4.0
+                end
+          {hue * 60.0, s, l}
+        end
+
+        # Convert HSL back to a "#rrggbb" hex string.
+        def self.hsl_to_hex(h : Float64, s : Float64, l : Float64) : String
+          h = h % 360.0
+          c = (1.0 - (2.0 * l - 1.0).abs) * s
+          x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs)
+          m = l - c / 2.0
+          r1, g1, b1 = case
+                       when h < 60.0  then {c, x, 0.0}
+                       when h < 120.0 then {x, c, 0.0}
+                       when h < 180.0 then {0.0, c, x}
+                       when h < 240.0 then {0.0, x, c}
+                       when h < 300.0 then {x, 0.0, c}
+                       else                {c, 0.0, x}
+                       end
+          r = ((r1 + m) * 255.0).round.to_i.clamp(0, 255)
+          g = ((g1 + m) * 255.0).round.to_i.clamp(0, 255)
+          b = ((b1 + m) * 255.0).round.to_i.clamp(0, 255)
+          "#%02x%02x%02x" % {r, g, b}
+        end
+
         # Generate OG images for all pages that lack a custom image.
         # Sets page.image to the generated SVG path so that og:image
         # meta tags pick it up automatically.
@@ -249,21 +346,57 @@ module Hwaro
           bg = escape_attr(ai.background)
           text_color = escape_attr(ai.text_color)
           accent = escape_attr(ai.accent_color)
-          font_size = Math.max(ai.font_size, 1)
-          desc_size = Math.max((font_size * 0.45).to_i, 1)
+          secondary = escape_attr(resolve_secondary(ai))
+          style = ai.style
           site_name = escape_xml(config.title)
-          is_minimal = ai.style == "minimal"
 
-          # Word-wrap title for SVG (approx 25 chars per line at 48px in 1200px width)
-          chars_per_line = (900 / (font_size * 0.55)).to_i
+          # Geometric styles get bolder default typography unless the user
+          # explicitly raised the font size.
+          font_size = Math.max(ai.font_size, 1)
+          if ai.font_size <= 48
+            case style
+            when "brutalist" then font_size = 76
+            when "band"      then font_size = 60
+            when "split"     then font_size = 58
+            end
+          end
+          desc_size = Math.max((font_size * 0.45).to_i, 1)
+
+          # Per-style horizontal text box (left margin + wrap width).
+          text_x = case style
+                   when "split"     then SPLIT_TEXT_X
+                   when "brutalist" then BRUTALIST_TEXT_X
+                   else                  80
+                   end
+          text_w = case style
+                   when "split"     then WIDTH - SPLIT_TEXT_X - 80
+                   when "brutalist" then WIDTH - BRUTALIST_TEXT_X - (BRUTALIST_INSET + BRUTALIST_FRAME + 40)
+                   else                  WIDTH - text_x - 80
+                   end
+          chars_per_line = Math.max((text_w / (font_size * 0.55)).to_i, 1)
+          desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
+
           title_lines = word_wrap(page.title, chars_per_line)
-          desc_lines = word_wrap(page.description || "", (900 / (desc_size * 0.55)).to_i)
+          desc_lines = word_wrap(page.description || "", desc_chars)
 
-          # Calculate vertical positioning
           title_block_height = title_lines.size * (font_size + 8)
           desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * (desc_size + 6)
           total_text_height = title_block_height + desc_block_height + 20
-          title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
+
+          # Per-style vertical placement + title color.
+          title_fill = text_color
+          case style
+          when "band"
+            title_fill = bg # knock the title out of the color band
+            band_center = BAND_TOP + BAND_HEIGHT // 2
+            title_start_y = band_center - title_block_height // 2 + font_size
+          when "brutalist"
+            title_start_y = BRUTALIST_INSET + BRUTALIST_FRAME + 100
+          when "split"
+            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_i + font_size)
+          else
+            title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
+          end
 
           # Compute logo position
           logo_x, logo_y = logo_coordinates(ai.logo_position)
@@ -295,33 +428,37 @@ module Hwaro
               svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity.clamp(0.0, 1.0)}" />\n)
             end
 
-            # Style pattern
-            pattern_svg = render_style_pattern(ai.style, accent, bg, ai.pattern_opacity, ai.pattern_scale)
+            # Classic background pattern (dots/grid/diagonal/gradient/waves)
+            pattern_svg = render_style_pattern(style, accent, bg, ai.pattern_opacity, ai.pattern_scale)
             svg << pattern_svg unless pattern_svg.empty?
 
-            # Accent bar at top (skip for minimal style)
-            unless is_minimal
+            # Bold geometric background (split / band / brutalist)
+            geo_svg = render_style_background(style, accent, bg, secondary)
+            svg << geo_svg unless geo_svg.empty?
+
+            # Accent bar at top (skip for minimal / modern / geometric styles)
+            unless no_accent_bars?(style)
               svg << %(<rect width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 
             # Title text
             title_lines.each_with_index do |line, i|
               y = title_start_y + i * (font_size + 8)
-              svg << %(<text x="80" y="#{y}" )
+              svg << %(<text x="#{text_x}" y="#{y}" )
               svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-              svg << %(font-size="#{font_size}" font-weight="700" fill="#{text_color}">)
+              svg << %(font-size="#{font_size}" font-weight="700" fill="#{title_fill}">)
               svg << escape_xml(line)
               svg << %(</text>\n)
             end
 
             # Description text
             unless desc_lines.empty?
-              desc_start_y = title_start_y + title_block_height + 16
+              desc_start_y = style == "band" ? BAND_TOP + BAND_HEIGHT + desc_size + 24 : title_start_y + title_block_height + 16
               desc_lines.each_with_index do |line, i|
                 y = desc_start_y + i * (desc_size + 6)
-                svg << %(<text x="80" y="#{y}" )
+                svg << %(<text x="#{text_x}" y="#{y}" )
                 svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-                svg << %(font-size="#{desc_size}" font-weight="400" fill="#{text_color}" opacity="0.75">)
+                svg << %(font-size="#{desc_size}" font-weight="400" fill="#{text_color}" opacity="0.78">)
                 svg << escape_xml(line)
                 svg << %(</text>\n)
               end
@@ -329,14 +466,22 @@ module Hwaro
 
             # Site name at bottom (controlled by show_title)
             if ai.show_title
+              # `split` places the site name inside the accent block, so it
+              # must use the readable text color rather than the accent.
+              site_name_fill = style == "split" ? text_color : accent
+              base_margin = case style
+                            when "split"     then 80
+                            when "brutalist" then BRUTALIST_TEXT_X
+                            else                  LOGO_MARGIN
+                            end
               site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
-                              LOGO_MARGIN + LOGO_SIZE + LOGO_TEXT_GAP
+                              base_margin + LOGO_SIZE + LOGO_TEXT_GAP
                             else
-                              LOGO_MARGIN
+                              base_margin
                             end
               svg << %(<text x="#{site_name_x}" y="#{HEIGHT - 65}" )
               svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-              svg << %(font-size="22" font-weight="600" fill="#{accent}">)
+              svg << %(font-size="22" font-weight="600" fill="#{site_name_fill}">)
               svg << site_name
               svg << %(</text>\n)
             end
@@ -344,12 +489,45 @@ module Hwaro
             # Logo
             svg << logo_svg << "\n" unless logo_svg.empty?
 
-            # Bottom border (skip for minimal style)
-            unless is_minimal
+            # Bottom border (skip for minimal / modern / geometric styles)
+            unless no_accent_bars?(style)
               svg << %(<rect y="#{HEIGHT - 6}" width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 
             svg << %(</svg>\n)
+          end
+        end
+
+        # Render a bold geometric background (color block / band / framed panel)
+        # for the design-forward geometric styles. Returns "" for other styles.
+        def self.render_style_background(style : String, accent : String, bg : String, secondary : String) : String
+          case style
+          when "split"
+            String.build do |s|
+              # Diagonal accent color block on the left.
+              s << %(<polygon points="0,0 #{SPLIT_TOP_X},0 #{SPLIT_BOTTOM_X},#{HEIGHT} 0,#{HEIGHT}" fill="#{accent}" />\n)
+              # Secondary-color strip along the diagonal edge for a two-tone seam.
+              s << %(<polygon points="#{SPLIT_TOP_X},0 #{SPLIT_TOP_X + SPLIT_EDGE},0 )
+              s << %(#{SPLIT_BOTTOM_X + SPLIT_EDGE},#{HEIGHT} #{SPLIT_BOTTOM_X},#{HEIGHT}" fill="#{secondary}" />\n)
+            end
+          when "band"
+            %(<rect x="0" y="#{BAND_TOP}" width="#{WIDTH}" height="#{BAND_HEIGHT}" fill="#{accent}" />\n)
+          when "brutalist"
+            iw = WIDTH - 2 * BRUTALIST_INSET
+            ih = HEIGHT - 2 * BRUTALIST_INSET
+            f = BRUTALIST_FRAME
+            String.build do |s|
+              # Hard offset shadow block (secondary), peeking down-right.
+              s << %(<rect x="#{BRUTALIST_INSET + BRUTALIST_OFFSET}" y="#{BRUTALIST_INSET + BRUTALIST_OFFSET}" )
+              s << %(width="#{iw}" height="#{ih}" fill="#{secondary}" />\n)
+              # Main panel (background color) covers the shadow's top-left.
+              s << %(<rect x="#{BRUTALIST_INSET}" y="#{BRUTALIST_INSET}" width="#{iw}" height="#{ih}" fill="#{bg}" />\n)
+              # Thick accent border, inset by half the stroke width.
+              s << %(<rect x="#{BRUTALIST_INSET + f // 2}" y="#{BRUTALIST_INSET + f // 2}" )
+              s << %(width="#{iw - f}" height="#{ih - f}" fill="none" stroke="#{accent}" stroke-width="#{f}" />\n)
+            end
+          else
+            ""
           end
         end
 
@@ -506,7 +684,7 @@ module Hwaro
           ai = config.og.auto_image
           Digest::SHA256.hexdigest(
             "#{config.title}|#{ai.background}|#{ai.text_color}|#{ai.accent_color}|" \
-            "#{ai.font_size}|#{ai.logo}|#{ai.logo_position}|#{ai.show_title}|" \
+            "#{ai.secondary_color}|#{ai.font_size}|#{ai.logo}|#{ai.logo_position}|#{ai.show_title}|" \
             "#{ai.style}|#{ai.pattern_opacity}|#{ai.pattern_scale}|" \
             "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}"
           )

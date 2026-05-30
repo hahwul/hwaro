@@ -572,6 +572,7 @@ module Hwaro
           # background = "#0f0f12"
           # text_color = "#ffffff"
           # accent_color = "#ff4d6d"
+          # secondary_color = ""           # 2nd color for split/brutalist (auto-derived if empty)
           # font_size = 52
           # logo = "static/logo.png"
           # logo_position = "bottom-left"  # bottom-left, bottom-right, top-left, top-right
@@ -584,6 +585,10 @@ module Hwaro
           # # style = "hero"        # bold poster-style typography
           # # style = "surreal"     # experimental & artistic
           # # style = "monument"    # extreme minimal + massive type
+          # # Bold geometric styles (high-contrast, design-forward):
+          # # style = "split"       # diagonal two-tone color block
+          # # style = "band"        # magazine color band behind the title
+          # # style = "brutalist"   # thick framed panel with a hard offset shadow
           # pattern_opacity = 0.12
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)

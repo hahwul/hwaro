@@ -32,10 +32,10 @@ describe Hwaro::Models::AutoImageConfig do
       ai = config.og.auto_image
       ai.show_title.should be_true
       ai.style.should eq("default")
-      ai.pattern_opacity.should eq(0.15)
+      ai.pattern_opacity.should eq(0.12)
       ai.pattern_scale.should eq(1.0)
       ai.background_image.should be_nil
-      ai.overlay_opacity.should eq(0.5)
+      ai.overlay_opacity.should eq(0.45)
       ai.format.should eq("svg")
       ai.font_path.should be_nil
     end
@@ -120,6 +120,26 @@ describe Hwaro::Models::AutoImageConfig do
         TOML
 
       config.og.auto_image.font_path.should eq("fonts/Pretendard-Bold.ttf")
+    end
+
+    it "loads secondary_color from TOML" do
+      config = make_og_config(<<-TOML)
+        [og.auto_image]
+        enabled = true
+        style = "brutalist"
+        secondary_color = "#ff5b2e"
+        TOML
+
+      config.og.auto_image.secondary_color.should eq("#ff5b2e")
+    end
+
+    it "leaves secondary_color nil when not set" do
+      config = make_og_config(<<-TOML)
+        [og.auto_image]
+        enabled = true
+        TOML
+
+      config.og.auto_image.secondary_color.should be_nil
     end
   end
 end
@@ -424,7 +444,7 @@ describe Hwaro::Content::Seo::OgImage do
         svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, bg_data_uri)
         svg.should contain("data:image/jpeg;base64,")
         svg.should contain("preserveAspectRatio=\"xMidYMid slice\"")
-        svg.should contain("opacity=\"0.5\"")
+        svg.should contain("opacity=\"0.45\"")
       end
     end
 
@@ -444,6 +464,44 @@ describe Hwaro::Content::Seo::OgImage do
         svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, bg_data_uri)
         svg.should contain("opacity=\"0.8\"")
       end
+    end
+
+    it "renders the split style as a diagonal color block" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Split"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "split"
+      config.og.auto_image.accent_color = "#ff3b6b"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain("<polygon")
+      svg.should contain("fill=\"#ff3b6b\"")
+      # Geometric styles drop the classic 6px accent bars.
+      svg.should_not contain("height=\"6\"")
+    end
+
+    it "renders the band style as a full-width color band" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Band"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "band"
+      config.og.auto_image.accent_color = "#ffd23f"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain(%(<rect x="0" y="#{Hwaro::Content::Seo::OgImage::BAND_TOP}" width="1200" height="#{Hwaro::Content::Seo::OgImage::BAND_HEIGHT}" fill="#ffd23f" />))
+    end
+
+    it "renders the brutalist style with a framed panel and offset shadow" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Brutalist"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "brutalist"
+      config.og.auto_image.accent_color = "#161616"
+      config.og.auto_image.secondary_color = "#ff5b2e"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain("stroke=\"#161616\"") # thick frame border
+      svg.should contain("fill=\"#ff5b2e\"")   # offset shadow uses secondary color
     end
   end
 
@@ -468,6 +526,51 @@ describe Hwaro::Content::Seo::OgImage do
       result2 = Hwaro::Content::Seo::OgImage.render_style_pattern("dots", "#e94560", "#1a1a2e", 0.15, 2.0)
       # Different scale should produce different pattern sizes
       result1.should_not eq(result2)
+    end
+  end
+
+  describe "color helpers" do
+    it "derives a complementary secondary color from the accent" do
+      sec = Hwaro::Content::Seo::OgImage.derive_secondary("#ff3b6b")
+      sec.should start_with("#")
+      sec.size.should eq(7)
+      sec.should_not eq("#ff3b6b")
+    end
+
+    it "round-trips pure and gray colors through HSL" do
+      Hwaro::Content::Seo::OgImage.hsl_to_hex(*Hwaro::Content::Seo::OgImage.hex_to_hsl("#ff0000")).should eq("#ff0000")
+      Hwaro::Content::Seo::OgImage.hsl_to_hex(*Hwaro::Content::Seo::OgImage.hex_to_hsl("#808080")).should eq("#808080")
+    end
+
+    it "prefers an explicit secondary_color" do
+      ai = Hwaro::Models::AutoImageConfig.new
+      ai.accent_color = "#ff3b6b"
+      ai.secondary_color = "#00f3b7"
+      Hwaro::Content::Seo::OgImage.resolve_secondary(ai).should eq("#00f3b7")
+    end
+
+    it "falls back to a derived secondary color when unset" do
+      ai = Hwaro::Models::AutoImageConfig.new
+      ai.accent_color = "#ff3b6b"
+      ai.secondary_color = nil
+      Hwaro::Content::Seo::OgImage.resolve_secondary(ai).should eq(Hwaro::Content::Seo::OgImage.derive_secondary("#ff3b6b"))
+    end
+  end
+
+  describe "style predicates" do
+    it "classifies geometric styles" do
+      Hwaro::Content::Seo::OgImage.geometric?("split").should be_true
+      Hwaro::Content::Seo::OgImage.geometric?("band").should be_true
+      Hwaro::Content::Seo::OgImage.geometric?("brutalist").should be_true
+      Hwaro::Content::Seo::OgImage.geometric?("default").should be_false
+    end
+
+    it "drops accent bars for minimal / modern / geometric styles" do
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("minimal").should be_true
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("editorial").should be_true
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("split").should be_true
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("default").should be_false
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("dots").should be_false
     end
   end
 
