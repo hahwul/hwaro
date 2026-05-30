@@ -78,6 +78,10 @@ module Hwaro
         BAND_TOP    = 210
         BAND_HEIGHT = 200
 
+        # `framed`: an elegant thin frame inset from the canvas edge.
+        FRAMED_INSET = 30
+        FRAMED_WIDTH =  3
+
         # `brutalist`: thick framed panel with a hard offset shadow block.
         BRUTALIST_INSET  = 36 # gap from the canvas edge to the panel
         BRUTALIST_FRAME  = 14 # border thickness
@@ -355,18 +359,21 @@ module Hwaro
           font_size = Math.max(ai.font_size, 1)
           if ai.font_size <= 48
             case style
-            when "brutalist" then font_size = 76
-            when "band"      then font_size = 60
-            when "split"     then font_size = 58
+            when "brutalist", "hero", "monument" then font_size = 78
+            when "artistic", "surreal"           then font_size = 64
+            when "band"                          then font_size = 60
+            when "split"                         then font_size = 58
             end
           end
           desc_size = Math.max((font_size * 0.45).to_i, 1)
 
           # Per-style horizontal text box (left margin + wrap width).
           text_x = case style
-                   when "split"     then SPLIT_TEXT_X
-                   when "brutalist" then BRUTALIST_TEXT_X
-                   else                  80
+                   when "split"                                   then SPLIT_TEXT_X
+                   when "brutalist"                               then BRUTALIST_TEXT_X
+                   when "editorial", "framed"                     then 110
+                   when "artistic", "hero", "surreal", "monument" then 140
+                   else                                                80
                    end
           text_w = case style
                    when "split"     then WIDTH - SPLIT_TEXT_X - 80
@@ -394,6 +401,10 @@ module Hwaro
             title_start_y = BRUTALIST_INSET + BRUTALIST_FRAME + 100
           when "split"
             title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_i + font_size)
+          when "hero"
+            title_start_y = Math.max(font_size + 20, 180)
+          when "monument"
+            title_start_y = Math.max(font_size + 10, 120)
           else
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
           end
@@ -432,9 +443,17 @@ module Hwaro
             pattern_svg = render_style_pattern(style, accent, bg, ai.pattern_opacity, ai.pattern_scale)
             svg << pattern_svg unless pattern_svg.empty?
 
-            # Bold geometric background (split / band / brutalist)
-            geo_svg = render_style_background(style, accent, bg, secondary)
+            # Per-style signature background (color blocks, gradient, glow, frame)
+            has_bg = !bg_data_uri.nil?
+            geo_svg = render_style_background(style, accent, bg, secondary, has_bg)
             svg << geo_svg unless geo_svg.empty?
+
+            # Legibility scrim behind text over generated gradient/glow backdrops.
+            if !has_bg && (style == "artistic" || style == "hero" || style == "surreal")
+              scrim_top = (title_start_y - font_size - 28).clamp(0, HEIGHT)
+              scrim_h = total_text_height + 56
+              svg << %(<rect x="0" y="#{scrim_top}" width="#{WIDTH}" height="#{scrim_h}" fill="#{bg}" opacity="0.34" />\n)
+            end
 
             # Accent bar at top (skip for minimal / modern / geometric styles)
             unless no_accent_bars?(style)
@@ -449,6 +468,18 @@ module Hwaro
               svg << %(font-size="#{font_size}" font-weight="700" fill="#{title_fill}">)
               svg << escape_xml(line)
               svg << %(</text>\n)
+            end
+
+            # Editorial: thin vertical accent rule to the left of the title.
+            if style == "editorial"
+              rule_top = title_start_y - font_size
+              svg << %(<rect x="#{text_x - 28}" y="#{rule_top}" width="6" height="#{title_block_height}" fill="#{accent}" />\n)
+            end
+
+            # Monument: a single long thin rule under the title.
+            if style == "monument"
+              rule_y = title_start_y + (title_lines.size - 1) * (font_size + 8) + 30
+              svg << %(<rect x="#{text_x}" y="#{rule_y}" width="220" height="5" fill="#{accent}" />\n)
             end
 
             # Description text
@@ -498,10 +529,42 @@ module Hwaro
           end
         end
 
-        # Render a bold geometric background (color block / band / framed panel)
-        # for the design-forward geometric styles. Returns "" for other styles.
-        def self.render_style_background(style : String, accent : String, bg : String, secondary : String) : String
+        # Render each style's signature background: bold geometric shapes
+        # (split / band / brutalist) plus generated backdrops for the modern
+        # styles (artistic gradient, hero glow, surreal aurora, framed frame).
+        # The generated modern backdrops are skipped when a background image is
+        # present so a user photo shows through. Returns "" for plain styles.
+        def self.render_style_background(style : String, accent : String, bg : String, secondary : String, has_bg_image : Bool = false) : String
           case style
+          when "artistic"
+            return "" if has_bg_image
+            String.build do |s|
+              s << %(<defs><linearGradient id="ogGrad" x1="0%" y1="0%" x2="100%" y2="100%">)
+              s << %(<stop offset="0%" stop-color="#{accent}" /><stop offset="100%" stop-color="#{secondary}" />)
+              s << %(</linearGradient></defs>\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGrad)" />\n)
+            end
+          when "hero"
+            return "" if has_bg_image
+            String.build do |s|
+              s << %(<defs><radialGradient id="ogGlow" cx="50%" cy="37%" r="60%">)
+              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="0.55" />)
+              s << %(<stop offset="100%" stop-color="#{accent}" stop-opacity="0" />)
+              s << %(</radialGradient></defs>\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGlow)" />\n)
+            end
+          when "surreal"
+            return "" if has_bg_image
+            String.build do |s|
+              s << %(<defs>)
+              s << %(<radialGradient id="ogO1" cx="25%" cy="32%" r="42%"><stop offset="0%" stop-color="#{accent}" stop-opacity="0.5" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogO2" cx="79%" cy="60%" r="46%"><stop offset="0%" stop-color="#{secondary}" stop-opacity="0.45" /><stop offset="100%" stop-color="#{secondary}" stop-opacity="0" /></radialGradient>)
+              s << %(</defs>\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogO1)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogO2)" />\n)
+            end
+          when "framed"
+            %(<rect x="#{FRAMED_INSET}" y="#{FRAMED_INSET}" width="#{WIDTH - 2 * FRAMED_INSET}" height="#{HEIGHT - 2 * FRAMED_INSET}" fill="none" stroke="#{accent}" stroke-width="#{FRAMED_WIDTH}" />\n)
           when "split"
             String.build do |s|
               # Diagonal accent color block on the left.

@@ -150,6 +150,28 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       end
     end
 
+    it "renders modern styles with generated backgrounds (gradient / glow / frame)" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      Dir.mktmpdir do |dir|
+        %w[editorial framed artistic hero surreal monument].each do |style|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Modern #{style}"
+          page.description = "distinct background signature"
+
+          config = Hwaro::Models::Config.new
+          config.title = "Site"
+          config.og.auto_image.style = style
+
+          png_path = File.join(dir, "#{style}.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path, font_ctx: ctx)
+          result.should be_true
+          File.exists?(png_path).should be_true
+        end
+      end
+    end
+
     it "renders with an explicit secondary_color" do
       next unless Hwaro::Content::Seo::OgPngRenderer.available?
 

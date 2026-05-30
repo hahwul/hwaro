@@ -503,6 +503,37 @@ describe Hwaro::Content::Seo::OgImage do
       svg.should contain("stroke=\"#161616\"") # thick frame border
       svg.should contain("fill=\"#ff5b2e\"")   # offset shadow uses secondary color
     end
+
+    it "renders generated backdrops for modern styles" do
+      {"artistic" => "linearGradient", "hero" => "radialGradient", "surreal" => "radialGradient"}.each do |style, marker|
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Modern"
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.style = style
+        Hwaro::Content::Seo::OgImage.render_svg(page, config).should contain(marker)
+      end
+    end
+
+    it "renders the framed style as an inset stroked frame" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Framed"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "framed"
+      config.og.auto_image.accent_color = "#e2c044"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain("fill=\"none\" stroke=\"#e2c044\"")
+    end
+
+    it "skips the generated gradient when a background image is present" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Artistic"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "artistic"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, "data:image/png;base64,AAAA")
+      svg.should_not contain("linearGradient")
+    end
   end
 
   describe ".render_style_pattern" do

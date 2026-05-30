@@ -177,6 +177,72 @@ The `style` option controls the background treatment.
     </dialog>
   </div>
   <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-editorial.png" alt="editorial style" loading="lazy" />
+    <span class="og-style-label"><code>editorial</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-editorial.png" alt="editorial style" />
+        <p><code>editorial</code> — Clean type with a vertical accent rule</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-framed.png" alt="framed style" loading="lazy" />
+    <span class="og-style-label"><code>framed</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-framed.png" alt="framed style" />
+        <p><code>framed</code> — Elegant thin inset frame</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-artistic.png" alt="artistic style" loading="lazy" />
+    <span class="og-style-label"><code>artistic</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-artistic.png" alt="artistic style" />
+        <p><code>artistic</code> — Vivid two-color gradient backdrop</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-hero.png" alt="hero style" loading="lazy" />
+    <span class="og-style-label"><code>hero</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-hero.png" alt="hero style" />
+        <p><code>hero</code> — Dramatic spotlight glow with big type</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-surreal.png" alt="surreal style" loading="lazy" />
+    <span class="og-style-label"><code>surreal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-surreal.png" alt="surreal style" />
+        <p><code>surreal</code> — Soft aurora orbs in two colors</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/style-monument.png" alt="monument style" loading="lazy" />
+    <span class="og-style-label"><code>monument</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/style-monument.png" alt="monument style" />
+        <p><code>monument</code> — Massive type with a single rule</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
     <img src="/images/og-style-examples/style-split.png" alt="split style" loading="lazy" />
     <span class="og-style-label"><code>split</code></span>
     <dialog onclick="if(event.target===this)this.close()">

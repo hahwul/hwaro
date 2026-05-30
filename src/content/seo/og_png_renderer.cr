@@ -282,8 +282,8 @@ module Hwaro
 
           render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
-          # Bold geometric background (split / band / brutalist)
-          render_geometric_background(pixels, ai.style, bg_color, accent_color, secondary_color)
+          # Per-style signature decoration (color blocks, gradient, glow, frame)
+          render_style_decoration(pixels, ai.style, bg_color, accent_color, secondary_color, !bg_image_path.nil?)
 
           if show_accent_bars
             fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
@@ -353,8 +353,8 @@ module Hwaro
               # 3. Style pattern
               render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
-              # 3b. Bold geometric background (split / band / brutalist)
-              render_geometric_background(pixels, ai.style, bg_color, accent_color, secondary_color)
+              # 3b. Per-style signature decoration (color blocks, gradient, glow, frame)
+              render_style_decoration(pixels, ai.style, bg_color, accent_color, secondary_color, !bg_image_path.nil?)
 
               # 4. Accent bar at top (legacy / classic look)
               if show_accent_bars
@@ -487,13 +487,18 @@ module Hwaro
           # Optional semi-transparent panel behind text for better integration
           # with artistic/complex backgrounds (modern editorial style).
           panel = ai.text_panel
-          # Strong modern panels for ambitious styles
+          # Auto panel: strong over a user-supplied photo (for legibility),
+          # but light or none over our generated backgrounds so each style's
+          # signature reads clearly.
           if panel < 0.01
+            has_bg = !((bgi = ai.background_image).nil? || bgi.empty?)
             case ai.style
-            when "artistic", "surreal" then panel = 0.78
-            when "hero", "monument"    then panel = 0.65
-            when "framed"              then panel = 0.58
-            when "editorial"           then panel = 0.32
+            when "artistic"  then panel = has_bg ? 0.78 : 0.26
+            when "surreal"   then panel = has_bg ? 0.80 : 0.34
+            when "hero"      then panel = has_bg ? 0.65 : 0.30
+            when "framed"    then panel = has_bg ? 0.55 : 0.0
+            when "editorial" then panel = has_bg ? 0.34 : 0.0
+            when "monument"  then panel = has_bg ? 0.60 : 0.0
             end
           end
 
@@ -512,6 +517,20 @@ module Hwaro
           title_lines.each_with_index do |line, i|
             y = title_start_y + i * (font_size + 8)
             LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, title_color, 1.0_f32)
+          end
+
+          # Editorial: thin vertical accent rule to the left of the title.
+          if ai.style == "editorial"
+            rule_x = margin_x - 28
+            rule_top = (title_start_y - font_size).to_i.clamp(0, HEIGHT)
+            rule_h = title_block_height.to_i
+            fill_rect(pixels, rule_x, rule_top, 6, rule_h, accent_color) if rule_x >= 0
+          end
+
+          # Monument: a single long thin rule under the title.
+          if ai.style == "monument"
+            rule_y = (title_start_y + (title_lines.size - 1) * (font_size + 8) + 30).to_i.clamp(0, HEIGHT - 5)
+            fill_rect(pixels, margin_x, rule_y, 220, 5, accent_color)
           end
 
           # Render description — hero and monument get very small or minimal desc treatment
@@ -872,10 +891,14 @@ module Hwaro
           end
         end
 
-        # Render a bold, opaque geometric background (color block / band /
-        # framed panel) for the design-forward geometric styles. Painted into
-        # the config-only base layer, so it costs nothing per page.
-        private def self.render_geometric_background(pixels : UInt8*, style : String, bg : UInt32, accent : UInt32, secondary : UInt32)
+        # Paint each style's signature background decoration into the
+        # config-only base layer (so it costs nothing per page):
+        #   - geometric color blocks (split / band / brutalist)
+        #   - generated backgrounds for the modern styles when no background
+        #     image is configured (gradient / glow / frame)
+        # `has_bg_image` suppresses the generated modern backgrounds so a
+        # user-supplied photo shows through untouched.
+        private def self.render_style_decoration(pixels : UInt8*, style : String, bg : UInt32, accent : UInt32, secondary : UInt32, has_bg_image : Bool)
           case style
           when "split"
             # Secondary strip first (wider), then the accent block on top —
@@ -896,6 +919,23 @@ module Hwaro
             fill_rect(pixels, inset, inset, iw, ih, bg)
             # Thick accent border around the panel.
             draw_border(pixels, inset, inset, iw, ih, frame, accent)
+          when "artistic"
+            # Vivid two-color diagonal gradient as a self-contained backdrop.
+            fill_linear_gradient(pixels, accent, secondary) unless has_bg_image
+          when "hero"
+            # Single dramatic spotlight glow behind the title.
+            draw_radial_glow(pixels, WIDTH // 2, 230, 640, accent, 0.55) unless has_bg_image
+          when "surreal"
+            # Aurora: several soft overlapping orbs in accent + secondary.
+            unless has_bg_image
+              draw_radial_glow(pixels, 300, 200, 470, accent, 0.50)
+              draw_radial_glow(pixels, 950, 380, 540, secondary, 0.45)
+              draw_radial_glow(pixels, 640, 560, 420, accent, 0.30)
+            end
+          when "framed"
+            # Elegant thin frame inset from the edges.
+            fi = OgImage::FRAMED_INSET
+            draw_border(pixels, fi, fi, WIDTH - 2 * fi, HEIGHT - 2 * fi, OgImage::FRAMED_WIDTH, accent)
           end
         end
 
@@ -928,6 +968,67 @@ module Hwaro
           fill_rect(pixels, x, y + h - thickness, w, thickness, color) # bottom
           fill_rect(pixels, x, y, thickness, h, color)                 # left
           fill_rect(pixels, x + w - thickness, y, thickness, h, color) # right
+        end
+
+        # Linearly interpolate between two packed RGB colors.
+        private def self.lerp_color(c1 : UInt32, c2 : UInt32, t : Float64) : UInt32
+          t = t.clamp(0.0, 1.0)
+          r1 = ((c1 >> 16) & 0xFF).to_f; g1 = ((c1 >> 8) & 0xFF).to_f; b1 = (c1 & 0xFF).to_f
+          r2 = ((c2 >> 16) & 0xFF).to_f; g2 = ((c2 >> 8) & 0xFF).to_f; b2 = (c2 & 0xFF).to_f
+          r = (r1 + (r2 - r1) * t).round.to_u32
+          g = (g1 + (g2 - g1) * t).round.to_u32
+          b = (b1 + (b2 - b1) * t).round.to_u32
+          (r << 16) | (g << 8) | b
+        end
+
+        # Fill the whole canvas with a diagonal (top-left → bottom-right)
+        # two-color gradient. Opaque.
+        private def self.fill_linear_gradient(pixels : UInt8*, c1 : UInt32, c2 : UInt32)
+          HEIGHT.times do |py|
+            ty = py.to_f / HEIGHT
+            WIDTH.times do |px|
+              t = (px.to_f / WIDTH + ty) * 0.5
+              c = lerp_color(c1, c2, t)
+              idx = (py * WIDTH + px) * CHANNELS
+              pixels[idx] = ((c >> 16) & 0xFF).to_u8
+              pixels[idx + 1] = ((c >> 8) & 0xFF).to_u8
+              pixels[idx + 2] = (c & 0xFF).to_u8
+              pixels[idx + 3] = 255_u8
+            end
+          end
+        end
+
+        # Blend a soft radial glow (orb of `color`) over the existing pixels,
+        # fading out quadratically to the edge of `radius`.
+        private def self.draw_radial_glow(pixels : UInt8*, cx : Int32, cy : Int32, radius : Int32, color : UInt32, intensity : Float64)
+          return if radius <= 0
+          cr = ((color >> 16) & 0xFF).to_f
+          cg = ((color >> 8) & 0xFF).to_f
+          cb = (color & 0xFF).to_f
+          rad = radius.to_f
+          r2 = rad * rad
+
+          y0 = Math.max(cy - radius, 0)
+          y1 = Math.min(cy + radius, HEIGHT)
+          x0 = Math.max(cx - radius, 0)
+          x1 = Math.min(cx + radius, WIDTH)
+
+          (y0...y1).each do |py|
+            dy = (py - cy).to_f
+            (x0...x1).each do |px|
+              dx = (px - cx).to_f
+              d2 = dx * dx + dy * dy
+              next if d2 > r2
+              f = 1.0 - Math.sqrt(d2) / rad
+              a = intensity * f * f
+              next if a <= 0.0
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
+              pixels[idx] = (dr + (cr - dr) * a).to_u8
+              pixels[idx + 1] = (dg + (cg - dg) * a).to_u8
+              pixels[idx + 2] = (db + (cb - db) * a).to_u8
+            end
+          end
         end
 
         # Draw a filled circle with alpha blending

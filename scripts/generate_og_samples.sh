@@ -48,51 +48,38 @@ for style in "${STYLES[@]}"; do
     TEXT="#ffffff"
     SECONDARY=""
     SHOW_TITLE="false"
+    BG_IMAGE=""
     case "${style}" in
         artistic)
-            # Use the custom image the user provided from ~/Downloads
-            BG="#2a2a35"
-            ACCENT="#c4b5fd"
-            TEXT_PANEL="0.05"   # Very low so the custom background shows clearly
-            FONT_SIZE="62"
-            OVERLAY="0.00"      # No overlay
-
-            # Use the user's custom artistic background image (highest priority)
-            CUSTOM_BG="$HOME/Downloads/afb89274-cfaa-43a0-b555-d9ab9f93f77e.jpg"
-            if [ -f "$CUSTOM_BG" ]; then
-                cp "$CUSTOM_BG" static/images/artistic-bg.jpg
-                BG_IMAGE="static/images/artistic-bg.jpg"
-                echo " (using custom artistic background)"
-            else
-                echo " (warning: custom image not found, using fallback)"
-                if [ -f "$PROJECT_ROOT/docs/static/images/og-style-examples/style-waves.png" ]; then
-                    cp "$PROJECT_ROOT/docs/static/images/og-style-examples/style-waves.png" static/images/artistic-bg.png
-                    BG_IMAGE="static/images/artistic-bg.png"
-                else
-                    BG_IMAGE=""
-                fi
-            fi
+            # Built-in two-color gradient backdrop (no background image needed).
+            BG="#1a1430"
+            ACCENT="#7c3aed"
+            SECONDARY="#06b6d4"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="64"
+            SHOW_TITLE="true"
             ;;
         hero)
             BG="#0a0a0e"
             ACCENT="#ff2d55"
-            TEXT_PANEL="0.82"
+            TEXT_PANEL="0.0"   # rely on the built-in spotlight glow
             FONT_SIZE="72"
-            OVERLAY="0.00"
+            SHOW_TITLE="true"
             ;;
         surreal)
             BG="#0c0818"
-            ACCENT="#c084fc"
-            TEXT_PANEL="0.85"
-            FONT_SIZE="56"
-            OVERLAY="0.15"
+            ACCENT="#a855f7"
+            SECONDARY="#22d3ee"
+            TEXT_PANEL="0.0"   # rely on the built-in aurora orbs
+            FONT_SIZE="60"
+            SHOW_TITLE="true"
             ;;
         monument)
             BG="#0f0f11"
             ACCENT="#e0e0e0"
-            TEXT_PANEL="0.72"
+            TEXT_PANEL="0.0"
             FONT_SIZE="82"
-            OVERLAY="0.00"
+            SHOW_TITLE="true"
             ;;
         split)
             BG="#10131c"
@@ -118,16 +105,18 @@ for style in "${STYLES[@]}"; do
             SHOW_TITLE="true"
             ;;
         framed)
-            BG="#22222b"
-            ACCENT="#fda4af"
-            TEXT_PANEL="0.58"
+            BG="#14141b"
+            ACCENT="#e2c044"
+            TEXT_PANEL="0.0"   # rely on the built-in thin frame
             FONT_SIZE="56"
+            SHOW_TITLE="true"
             ;;
         editorial)
-            BG="#1a1a1f"
+            BG="#14141b"
             ACCENT="#ff4d6d"
-            TEXT_PANEL="0.38"
+            TEXT_PANEL="0.0"   # rely on the built-in vertical rule
             FONT_SIZE="52"
+            SHOW_TITLE="true"
             ;;
         *)
             BG="#0f0f12"
