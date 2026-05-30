@@ -595,7 +595,7 @@ module Hwaro
           # overlay_opacity = 0.45
           # format = "svg"                 # svg or png
           # text_panel = 0.0               # 0.0–0.6 — adds subtle panel behind text (recommended with modern styles)
-          # accent_bars = true             # Draw thin accent bars (set false for modern styles)
+          # accent_bars = false            # Draw thin top/bottom accent bars (off by default; set true to opt in)
           # lazy_generate = false          # If true, skip bulk OG generation during `hwaro serve`.
           #                                  # Recommended: true for local development on large sites.
 

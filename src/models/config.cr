@@ -338,8 +338,9 @@ module Hwaro
       property text_panel : Float64
 
       # Whether to draw the thin top/bottom accent bars using accent_color.
-      # These are the classic "old school" OG accent lines.
-      # Set to false for cleaner, more modern editorial/brand looks.
+      # These are the classic "old school" OG accent lines, drawn for the
+      # pattern styles (default / dots / grid / diagonal / gradient / waves).
+      # Off by default for a cleaner, more modern look; set to true to opt in.
       property accent_bars : Bool
 
       # If true, skip automatic OG image generation during `hwaro serve`.
@@ -366,7 +367,7 @@ module Hwaro
         @font_path = nil
         @logo_position = "bottom-left"
         @text_panel = 0.0
-        @accent_bars = true
+        @accent_bars = false
         @lazy_generate = false
       end
     end

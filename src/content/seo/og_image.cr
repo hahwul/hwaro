@@ -409,6 +409,11 @@ module Hwaro
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
           end
 
+          # Thin top/bottom accent bars are opt-in via `accent_bars` and are
+          # never drawn for minimal / modern / geometric styles. Mirrors the
+          # PNG renderer so both formats stay in sync.
+          show_accent_bars = ai.accent_bars && !no_accent_bars?(style)
+
           # Compute logo position
           logo_x, logo_y = logo_coordinates(ai.logo_position)
 
@@ -455,8 +460,8 @@ module Hwaro
               svg << %(<rect x="0" y="#{scrim_top}" width="#{WIDTH}" height="#{scrim_h}" fill="#{bg}" opacity="0.34" />\n)
             end
 
-            # Accent bar at top (skip for minimal / modern / geometric styles)
-            unless no_accent_bars?(style)
+            # Accent bar at top (opt-in; skipped for minimal / modern / geometric)
+            if show_accent_bars
               svg << %(<rect width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 
@@ -520,8 +525,8 @@ module Hwaro
             # Logo
             svg << logo_svg << "\n" unless logo_svg.empty?
 
-            # Bottom border (skip for minimal / modern / geometric styles)
-            unless no_accent_bars?(style)
+            # Bottom border (opt-in; skipped for minimal / modern / geometric)
+            if show_accent_bars
               svg << %(<rect y="#{HEIGHT - 6}" width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 

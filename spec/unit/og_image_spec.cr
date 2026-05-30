@@ -38,6 +38,7 @@ describe Hwaro::Models::AutoImageConfig do
       ai.overlay_opacity.should eq(0.45)
       ai.format.should eq("svg")
       ai.font_path.should be_nil
+      ai.accent_bars.should be_false
     end
   end
 
@@ -414,6 +415,47 @@ describe Hwaro::Content::Seo::OgImage do
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
 
       # Should not have 6px accent bars
+      svg.should_not contain("height=\"6\"")
+    end
+
+    it "omits accent bars by default for pattern styles" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "dots"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+
+      # accent_bars defaults to false, so no 6px top/bottom bars
+      svg.should_not contain("height=\"6\"")
+    end
+
+    it "draws accent bars for pattern styles when accent_bars is enabled" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "dots"
+      config.og.auto_image.accent_bars = true
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+
+      # Opting in brings back both the top and bottom 6px accent bars
+      svg.scan(/height="6"/).size.should eq(2)
+    end
+
+    it "keeps accent bars off for modern styles even when enabled" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "editorial"
+      config.og.auto_image.accent_bars = true
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+
+      # no_accent_bars? styles never draw the bars, regardless of the flag
       svg.should_not contain("height=\"6\"")
     end
 

@@ -61,7 +61,7 @@ font_path = "static/fonts/Inter-Bold.ttf"
 | format | string | `"svg"` | Output format: `"svg"` or `"png"` |
 | font_path | string | — | Path to a custom `.ttf` / `.otf` font file for PNG output. Falls back to system fonts, then the bundled DejaVu Sans Bold |
 | text_panel | float | `0.0` | 0.0–0.6. Subtle dark gradient panel behind the title for better harmony with artistic backgrounds. Useful with `editorial`, `framed`, `artistic`, etc. |
-| accent_bars | bool | `true` | Draw thin top/bottom accent bars using `accent_color`. Set to `false` for cleaner modern looks (recommended with `editorial` / `artistic` styles). |
+| accent_bars | bool | `false` | Draw thin top/bottom accent bars using `accent_color` on the pattern styles (`default` / `dots` / `grid` / `diagonal` / `gradient` / `waves`). Off by default for a cleaner look; set to `true` to bring back the classic accent lines. |
 | lazy_generate | bool | `false` | When `true`, skip bulk OG image generation during `hwaro serve`. Images are generated on-demand the first time a page is requested. **Recommended for local development on large sites.** Has no effect on `hwaro build`. |
 
 ## Style Presets
