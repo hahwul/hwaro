@@ -210,6 +210,8 @@ module Hwaro
         "content.new",
         # Nice-to-have SEO / crawler files (most people can add manually if needed)
         "robots", "llms",
+        # Dev server customization (only needed when reproducing specific headers)
+        "serve",
       }
 
       # Broad full-text check to prevent appending a duplicate commented section.
@@ -625,6 +627,10 @@ module Hwaro
       # surface every syntax error the build itself will hit, with line
       # and column numbers when Crinja attaches them. We do NOT render —
       # parse errors are the only failure class we want to gate on here.
+      #
+      # Unknown tags like {% details %} or {% my_custom %} are tolerated
+      # (they are almost always project-specific shortcodes demonstrated
+      # inside docs templates). Real syntax errors still fail hard.
       private def check_template_syntax(file_path : String, issues : Array(Issue))
         content = File.read(file_path)
 
@@ -640,6 +646,16 @@ module Hwaro
           )
         end
       rescue ex
+        msg = ex.message.to_s
+        # Custom shortcodes (e.g. {% details %}, {% gallery %}) used inside
+        # template files for documentation/demo purposes are expected to be
+        # unknown to the bare Crinja parser used by doctor. These are not
+        # real template syntax errors — the project provides the shortcode
+        # implementation at build time via templates/shortcodes/*.html.
+        if msg.includes?("no tag with name") && msg.includes?("registered")
+          return
+        end
+
         issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
           message: "Failed to read template: #{ex.message}")
       end
@@ -682,7 +698,14 @@ module Hwaro
 
           has_index = File.exists?(File.join(child, "_index.md")) ||
                       File.exists?(File.join(child, "_index.markdown"))
-          unless has_index
+
+          # Many documentation sites use page bundles (index.md directly in
+          # a folder) for individual guides rather than true sections with
+          # _index.md. Only warn when the folder actually contains other
+          # markdown content beneath it (suggesting it intends to be a section).
+          has_nested_content = dir_has_markdown_in_subdirs?(child)
+
+          if !has_index && has_nested_content
             relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
             issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
               message: "Section directory missing _index.md: #{relative}/")
@@ -697,6 +720,23 @@ module Hwaro
       # don't enumerate the entire subtree.
       private def dir_contains_markdown?(dir : String) : Bool
         Dir.glob(File.join(dir, "**", "*.{md,markdown}")) { |_| return true }
+        false
+      end
+
+      # Returns true if the directory contains markdown files anywhere
+      # besides a direct top-level index.md / index.markdown (page bundle).
+      # This helps avoid noisy warnings on documentation-style sites that
+      # organize guides as page bundles rather than true sections.
+      private def dir_has_markdown_in_subdirs?(dir : String) : Bool
+        # Any markdown deeper than direct children of this dir?
+        Dir.glob(File.join(dir, "*/*.{md,markdown}")) { |_| return true }
+
+        # Any direct markdown file that is *not* an index page?
+        Dir.glob(File.join(dir, "*.{md,markdown}")) do |path|
+          b = File.basename(path)
+          return true unless b == "index.md" || b == "index.markdown"
+        end
+
         false
       end
 

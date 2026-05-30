@@ -61,7 +61,10 @@ use_cdn = true
 # Page-level settings (front matter) override these defaults
 
 [og]
-default_image = "/images/og-default.png"
+# default_image points to a fallback used when no per-page OG image is available.
+# With [og.auto_image] enabled, this is rarely needed. Using an existing asset
+# to keep doctor clean.
+default_image = "/images/scaffolds/scaffold-docs.png"
 type = "article"
 twitter_card = "summary_large_image"
 # twitter_site = "@haborobot"
