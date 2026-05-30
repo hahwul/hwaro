@@ -263,11 +263,14 @@ module Hwaro
           is_editorial = ai.style == "editorial"
           is_framed = ai.style == "framed"
           is_artistic = ai.style == "artistic"
+          is_hero = ai.style == "hero"
+          is_surreal = ai.style == "surreal"
+          is_monument = ai.style == "monument"
           bg_color = parse_hex_color(ai.background)
           accent_color = parse_hex_color(ai.accent_color)
 
           show_accent_bars = ai.accent_bars
-          if is_editorial || is_framed || is_artistic
+          if is_editorial || is_framed || is_artistic || is_hero || is_surreal || is_monument
             show_accent_bars = false
           end
 
@@ -321,10 +324,13 @@ module Hwaro
           is_editorial = ai.style == "editorial"
           is_framed = ai.style == "framed"
           is_artistic = ai.style == "artistic"
+          is_hero = ai.style == "hero"
+          is_surreal = ai.style == "surreal"
+          is_monument = ai.style == "monument"
 
-          # Modern styles (editorial, framed, artistic) disable the old thin accent bars.
+          # Modern styles disable the old thin accent bars.
           show_accent_bars = ai.accent_bars
-          if (is_editorial || is_framed || is_artistic) && show_accent_bars
+          if (is_editorial || is_framed || is_artistic || is_hero || is_surreal || is_monument) && show_accent_bars
             show_accent_bars = false
           end
 
@@ -414,11 +420,18 @@ module Hwaro
           ai = config.og.auto_image
           font_size = Math.max(ai.font_size, 1).to_f32
 
-          # "artistic" style gets bolder default typography if user didn't override
-          if ai.style == "artistic" && ai.font_size <= 48
-            font_size = 60.0
+          # Ambitious styles get much bolder default typography
+          case ai.style
+          when "hero", "monument"
+            if ai.font_size <= 48
+              font_size = 78.0
+            end
+          when "artistic", "surreal"
+            if ai.font_size <= 48
+              font_size = 64.0
+            end
           end
-          desc_size = Math.max((font_size * 0.45).to_i, 1).to_f32
+          desc_size = Math.max((font_size * 0.38).to_i, 1).to_f32  # smaller desc ratio for ambitious styles
 
           bold_info = ctx.bold_info
           bold_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size)
@@ -429,8 +442,8 @@ module Hwaro
 
           # Word-wrap width and margins — modern ambitious styles get very generous treatment
           margin_x = case ai.style
-                     when "editorial", "framed" then 110
-                     when "artistic"          then 130
+                     when "editorial", "framed"       then 110
+                     when "artistic", "hero", "surreal", "monument" then 140
                      else 80
                      end
           wrap_width = WIDTH - (margin_x * 2)
@@ -439,7 +452,7 @@ module Hwaro
           desc_text = page.description || ""
           desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, wrap_width)
 
-          # Vertical positioning — "artistic" gets very bold, confident, centered placement
+          # Vertical positioning — ambitious styles get very bold, confident, centered placement
           title_block_height = title_lines.size * (font_size + 8)
           desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * (desc_size + 6)
           total_text_height = title_block_height + desc_block_height + 20
@@ -447,9 +460,14 @@ module Hwaro
           case ai.style
           when "editorial", "framed"
             title_start_y = Math.max(font_size + 32, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 12)
-          when "artistic"
-            # More centered + luxurious for artistic/hero compositions
-            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 20)
+          when "artistic", "surreal"
+            title_start_y = Math.max(font_size + 48, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 28)
+          when "hero"
+            # Hero: Title dominates, pushed higher for impact
+            title_start_y = Math.max(font_size + 20, 180_f32)
+          when "monument"
+            # Monument: Extremely dominant title with massive breathing room
+            title_start_y = Math.max(font_size + 10, 120_f32)
           else
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_f32 + font_size)
           end
@@ -460,9 +478,10 @@ module Hwaro
           # Strong modern panels for ambitious styles
           if panel < 0.01
             case ai.style
-            when "artistic"         then panel = 0.72   # very strong card for rich backgrounds
-            when "framed"           then panel = 0.58
-            when "editorial"        then panel = 0.32
+            when "artistic", "surreal" then panel = 0.78
+            when "hero", "monument"    then panel = 0.65
+            when "framed"              then panel = 0.58
+            when "editorial"           then panel = 0.32
             end
           end
 
@@ -480,25 +499,41 @@ module Hwaro
             LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, text_color, 1.0_f32)
           end
 
-          # Render description
+          # Render description — hero and monument get very small or minimal desc treatment
           unless desc_lines.empty?
             desc_start_y = title_start_y + title_block_height + 16
+
+            # For hero/monument, make description much more subtle
+            desc_opacity = if ai.style == "hero" || ai.style == "monument"
+                             0.45_f32
+                           else
+                             0.75_f32
+                           end
+
             desc_lines.each_with_index do |line, i|
               y = desc_start_y + i * (desc_size + 6)
-              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - desc_size, r_scale, line, text_color, 0.75_f32)
+              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - desc_size, r_scale, line, text_color, desc_opacity)
             end
           end
 
-          # Site name
+          # Site name — hide or minimize for the most ambitious styles
           if ai.show_title
-            site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
-            site_margin = case ai.style
-                          when "editorial", "framed" then 110
-                          when "artistic"            then 130
-                          else OgImage::LOGO_MARGIN
-                          end
-            site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
+            if ai.style == "hero" || ai.style == "monument"
+              # Very small and subtle for hero/monument
+              site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 18_f32)
+              site_margin = 140_f32
+              site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin
+              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 55 - 18).to_f32, site_scale, config.title, accent_color, 0.6_f32)
+            else
+              site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
+              site_margin = case ai.style
+                            when "editorial", "framed"             then 110
+                            when "artistic", "surreal"             then 140
+                            else OgImage::LOGO_MARGIN
+                            end
+              site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
+              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
+            end
           end
         end
 

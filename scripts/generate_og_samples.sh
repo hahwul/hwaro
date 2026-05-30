@@ -23,7 +23,7 @@ echo ""
 echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
-STYLES=("default" "editorial" "framed" "artistic" "minimal" "gradient" "waves")
+STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "minimal" "gradient" "waves")
 
 mkdir -p "$OUT_DIR"
 
@@ -65,6 +65,27 @@ for style in "${STYLES[@]}"; do
                     BG_IMAGE=""
                 fi
             fi
+            ;;
+        hero)
+            BG="#0a0a0e"
+            ACCENT="#ff2d55"
+            TEXT_PANEL="0.82"
+            FONT_SIZE="72"
+            OVERLAY="0.00"
+            ;;
+        surreal)
+            BG="#0c0818"
+            ACCENT="#c084fc"
+            TEXT_PANEL="0.85"
+            FONT_SIZE="56"
+            OVERLAY="0.15"
+            ;;
+        monument)
+            BG="#0f0f11"
+            ACCENT="#e0e0e0"
+            TEXT_PANEL="0.72"
+            FONT_SIZE="82"
+            OVERLAY="0.00"
             ;;
         framed)
             BG="#22222b"
@@ -115,6 +136,18 @@ for style in "${STYLES[@]}"; do
         artistic)
             TITLE="Winter '26"
             DESC="High-production design for ambitious brands. Rich backgrounds, confident typography."
+            ;;
+        hero)
+            TITLE="THE DROP"
+            DESC=""
+            ;;
+        surreal)
+            TITLE="Echoes"
+            DESC="Where reality bends and design becomes myth."
+            ;;
+        monument)
+            TITLE="VOID"
+            DESC=""
             ;;
         framed)
             TITLE="The Frame"

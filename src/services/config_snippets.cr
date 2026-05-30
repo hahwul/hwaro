@@ -579,7 +579,10 @@ module Hwaro
           # show_title = true
           # style = "editorial"            # clean modern default
           # style = "framed"             # stronger distinct content card
-          # style = "artistic"           # bold & high-production (great with rich/illustrative backgrounds)
+          # style = "artistic"           # bold & high-production
+          # style = "hero"               # very large, confident typography (poster-like)
+          # style = "surreal"            # experimental, artistic, strong background integration
+          # style = "monument"           # extreme minimal + massive typography + huge whitespace
           # pattern_opacity = 0.12
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)

@@ -51,7 +51,7 @@ font_path = "static/fonts/Inter-Bold.ttf"
 | logo_position | string | `"bottom-left"` | Logo placement: `bottom-left`, `bottom-right`, `top-left`, `top-right` |
 | output_dir | string | `"og-images"` | Directory for generated images |
 | show_title | bool | `true` | Show site name at the bottom of the image |
-| style | string | `"editorial"` | Style preset. `editorial` (default, clean), `framed` (strong card), `artistic` (bold/high-production for rich backgrounds) are the modern options. |
+| style | string | `"editorial"` | Style preset. Modern options include: `editorial` (clean default), `framed`, `artistic`, `hero`, `surreal`, `monument`. |
 | pattern_opacity | float | `0.12` | Opacity of the style pattern (0.0–1.0) |
 | pattern_scale | float | `1.0` | Scale multiplier for the pattern (min 0.1) |
 | background_image | string | — | Background image file path. Embedded as base64 data URI |
@@ -78,7 +78,10 @@ The `style` option controls the background treatment. `editorial` is now the def
 | `minimal` | Clean layout without accent bars |
 | `editorial` | **Default**. Clean modern style. No hard accent bars. Uses subtle text panel + generous spacing. Best for artistic or high-quality backgrounds. |
 | `framed` | Stronger content card/panel treatment. Text lives in a more distinct framed area on top of the background. |
-| `artistic` | **Bold & modern**. Very strong panel, confident typography, designed for high-production / illustrative / artistic backgrounds (inspired by premium brand campaigns). |
+| `artistic` | **Bold & modern**. Very strong panel, confident typography, designed for high-production / illustrative / artistic backgrounds. |
+| `hero` | Extremely large, bold typography with minimal description. Poster/campaign feel with strong focal point. |
+| `surreal` | Experimental and artistic. Heavy background integration, dramatic text treatment. |
+| `monument` | Extreme minimalism. Massive typography + huge whitespace. Almost no decorative elements. |
 | `editorial` | Modern editorial style — no hard bars, strong text integration via subtle panel, generous breathing room. Great with artistic backgrounds. |
 
 ### Preview
