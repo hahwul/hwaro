@@ -296,7 +296,7 @@ module Hwaro::Core::Build::Phases::Render
               crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay, profiler: profiler)
             if profiler && page_start
               elapsed_ms = (Time.instant - page_start).total_milliseconds
-              template_name = determine_template(page, templates)
+              template_name = determine_template(page, templates, site)
               profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
             end
             source_path = File.join("content", page.path)
@@ -313,7 +313,7 @@ module Hwaro::Core::Build::Phases::Render
             error_mutex.synchronize do
               failures << {page_path: page.path, message: ex.message.to_s}
             end
-            Logger.debug "  Template: #{determine_template(page, templates)}, Section: #{page.section}"
+            Logger.debug "  Template: #{determine_template(page, templates, site)}, Section: #{page.section}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
             results.send(false)
           end
@@ -414,7 +414,7 @@ module Hwaro::Core::Build::Phases::Render
       render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: profiler)
       if profiler && page_start
         elapsed_ms = (Time.instant - page_start).total_milliseconds
-        template_name = determine_template(page, templates)
+        template_name = determine_template(page, templates, site)
         profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
       end
       source_path = File.join("content", page.path)
@@ -511,7 +511,7 @@ module Hwaro::Core::Build::Phases::Render
       toc_headers = [] of Models::TocHeader
     end
 
-    template_name = determine_template(page, templates)
+    template_name = determine_template(page, templates, site)
     template_content = templates[template_name]? || templates["page"]?
     Logger.debug "Rendering #{page.path} (section=#{page.section.empty? ? "<root>" : page.section}, index=#{page.is_index}) using template '#{template_name}'" if verbose
 
@@ -641,7 +641,7 @@ module Hwaro::Core::Build::Phases::Render
     Logger.action :create, output_path if verbose
   end
 
-  private def determine_template(page : Models::Page, templates : Hash(String, String)) : String
+  private def determine_template(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String
     if custom = page.template
       return custom if templates.has_key?(custom)
       msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
@@ -655,6 +655,17 @@ module Hwaro::Core::Build::Phases::Render
 
     if page.is_index && page.section.empty? && templates.has_key?("index")
       return "index"
+    end
+
+    # Inherit the parent section's default template (`page_template`) for regular
+    # child pages that did not set an explicit `template`. Sections render with
+    # their own "section" template (handled above), so they are excluded here.
+    unless page.is_a?(Models::Section)
+      if section = site.sections_by_name[page.section]?
+        if pt = section.effective_page_template
+          return pt if templates.has_key?(pt)
+        end
+      end
     end
 
     "page"

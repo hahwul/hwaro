@@ -8,8 +8,9 @@ module Hwaro::Core::Build
       get_output_path(page, output_dir)
     end
 
-    def test_determine_template(page : Models::Page, templates : Hash(String, String))
-      determine_template(page, templates)
+    def test_determine_template(page : Models::Page, templates : Hash(String, String),
+                                site : Models::Site = Models::Site.new(Models::Config.new))
+      determine_template(page, templates, site)
     end
 
     def test_filter_changed_pages(pages, output_dir, cache)
@@ -114,6 +115,52 @@ describe Hwaro::Core::Build::Phases::Render do
       templates = {"page" => "p"}
       builder.test_determine_template(page, templates).should eq("page")
       page.build_warnings.any?(&.includes?("missing")).should be_true
+    end
+
+    it "inherits the parent section's page_template for child pages" do
+      builder = Hwaro::Core::Build::Builder.new
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      section = Hwaro::Models::Section.new("guide/_index.md")
+      section.section = "guide"
+      section.page_template = "doc-page"
+      site.sections << section
+      site.build_lookup_index
+
+      page = Hwaro::Models::Page.new("guide/intro.md")
+      page.section = "guide"
+      templates = {"page" => "p", "doc-page" => "d"}
+      builder.test_determine_template(page, templates, site).should eq("doc-page")
+    end
+
+    it "lets a page-level template override the section page_template" do
+      builder = Hwaro::Core::Build::Builder.new
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      section = Hwaro::Models::Section.new("guide/_index.md")
+      section.section = "guide"
+      section.page_template = "doc-page"
+      site.sections << section
+      site.build_lookup_index
+
+      page = Hwaro::Models::Page.new("guide/intro.md")
+      page.section = "guide"
+      page.template = "landing"
+      templates = {"page" => "p", "doc-page" => "d", "landing" => "l"}
+      builder.test_determine_template(page, templates, site).should eq("landing")
+    end
+
+    it "falls back to 'page' when the section page_template is not a real template" do
+      builder = Hwaro::Core::Build::Builder.new
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      section = Hwaro::Models::Section.new("guide/_index.md")
+      section.section = "guide"
+      section.page_template = "doc-page"
+      site.sections << section
+      site.build_lookup_index
+
+      page = Hwaro::Models::Page.new("guide/intro.md")
+      page.section = "guide"
+      templates = {"page" => "p"}
+      builder.test_determine_template(page, templates, site).should eq("page")
     end
   end
 
