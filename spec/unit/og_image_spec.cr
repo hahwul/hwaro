@@ -645,6 +645,14 @@ describe Hwaro::Content::Seo::OgImage do
       Hwaro::Content::Seo::OgImage.band_line_capacity(60).should eq(2)
       Hwaro::Content::Seo::OgImage.band_line_capacity(1000).should eq(1) # never zero
     end
+
+    it "marks band title truncation with an ellipsis" do
+      lines = ["One", "Two", "Three", "Four"]
+      # 60px → capacity 2; the kept lines gain an ellipsis on the last one.
+      Hwaro::Content::Seo::OgImage.cap_band_title(lines, 60).should eq(["One", "Two…"])
+      # Within capacity → untouched, no ellipsis.
+      Hwaro::Content::Seo::OgImage.cap_band_title(["Only"], 60).should eq(["Only"])
+    end
   end
 
   describe "style predicates" do

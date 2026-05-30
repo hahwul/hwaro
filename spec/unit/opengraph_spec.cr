@@ -343,6 +343,8 @@ describe Hwaro::Models::OpenGraphConfig do
       )
 
       tags.should contain(%(<meta name="twitter:image" content="https://example.com/images/default-twitter.png">))
+      # default_image satisfies the image requirement, so the large card stays.
+      tags.should contain(%(<meta name="twitter:card" content="summary_large_image">))
     end
 
     it "does not include image tag when no image available" do
