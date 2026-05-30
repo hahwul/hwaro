@@ -326,6 +326,17 @@ module Hwaro
       property font_path : String?
       property logo_position : String
 
+      # Controls a semi-transparent panel behind the title/description area.
+      # Higher values make text more readable on busy/artistic backgrounds
+      # while still letting the background show through (0.0 = disabled).
+      # Modern editorial/brand styles benefit from 0.25~0.45.
+      property text_panel : Float64
+
+      # Whether to draw the thin top/bottom accent bars using accent_color.
+      # These are the classic "old school" OG accent lines.
+      # Set to false for cleaner, more modern editorial/brand looks.
+      property accent_bars : Bool
+
       # If true, skip automatic OG image generation during `hwaro serve`.
       # Images will be generated on-demand the first time they are requested
       # from the dev server. Greatly improves initial serve time on large sites.
@@ -340,14 +351,16 @@ module Hwaro
         @logo = nil
         @output_dir = "og-images"
         @show_title = true
-        @style = "default"
-        @pattern_opacity = 0.15
+        @style = "editorial"
+        @pattern_opacity = 0.12
         @pattern_scale = 1.0
         @background_image = nil
-        @overlay_opacity = 0.5
+        @overlay_opacity = 0.45
         @format = "svg"
         @font_path = nil
         @logo_position = "bottom-left"
+        @text_panel = 0.28
+        @accent_bars = false
         @lazy_generate = false
       end
     end
@@ -1226,6 +1239,8 @@ module Hwaro
               config.og.auto_image.logo_position = lp
             end
           end
+          config.og.auto_image.text_panel = float_value(ai["text_panel"]?, config.og.auto_image.text_panel)
+          config.og.auto_image.accent_bars = bool_value(ai["accent_bars"]?, config.og.auto_image.accent_bars)
           config.og.auto_image.lazy_generate = bool_value(ai["lazy_generate"]?, config.og.auto_image.lazy_generate)
         end
       end

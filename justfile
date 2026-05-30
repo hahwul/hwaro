@@ -165,3 +165,21 @@ test-friends:
         echo "! $failed friend site(s) failed to build."
         exit 1
     fi
+
+
+# Generate fresh PNG samples for all OG image styles.
+#
+# This is extremely useful when modifying the OG renderer
+# (src/content/seo/og_png_renderer.cr). Instead of manually
+# building the docs site and taking screenshots, just run:
+#
+#     just og-samples
+#
+# The generated images will be placed in:
+#     docs/static/images/og-style-examples/style-*.png
+#
+# Currently generates samples for: default, editorial, minimal, gradient, waves
+[group('documents')]
+og-samples:
+    @[ -f bin/hwaro ] || just build
+    ./scripts/generate_og_samples.sh

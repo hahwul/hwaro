@@ -569,20 +569,24 @@ module Hwaro
 
           # [og.auto_image]
           # enabled = true
-          # background = "#1a1a2e"
+          # background = "#0f0f12"
           # text_color = "#ffffff"
-          # accent_color = "#e94560"
-          # font_size = 48
+          # accent_color = "#ff4d6d"
+          # font_size = 52
           # logo = "static/logo.png"
           # logo_position = "bottom-left"  # bottom-left, bottom-right, top-left, top-right
           # output_dir = "og-images"
           # show_title = true
-          # style = "default"              # default, dots, grid, diagonal, gradient, waves, minimal
-          # pattern_opacity = 0.15
+          # style = "editorial"            # clean modern default
+          # style = "framed"             # stronger distinct content card
+          # style = "artistic"           # bold & high-production (great with rich/illustrative backgrounds)
+          # pattern_opacity = 0.12
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)
-          # overlay_opacity = 0.5
+          # overlay_opacity = 0.45
           # format = "svg"                 # svg or png
+          # text_panel = 0.28              # Subtle panel behind text for harmony with artistic backgrounds
+          # accent_bars = false            # Thin top/bottom bars (disabled by default for modern look)
           # lazy_generate = false          # If true, skip bulk OG generation during `hwaro serve`.
           #                                  # Recommended: true for local development on large sites.
 

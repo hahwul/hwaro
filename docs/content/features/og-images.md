@@ -51,21 +51,24 @@ font_path = "static/fonts/Inter-Bold.ttf"
 | logo_position | string | `"bottom-left"` | Logo placement: `bottom-left`, `bottom-right`, `top-left`, `top-right` |
 | output_dir | string | `"og-images"` | Directory for generated images |
 | show_title | bool | `true` | Show site name at the bottom of the image |
-| style | string | `"default"` | Style preset for background pattern |
-| pattern_opacity | float | `0.15` | Opacity of the style pattern (0.0–1.0) |
+| style | string | `"editorial"` | Style preset. `editorial` (default, clean), `framed` (strong card), `artistic` (bold/high-production for rich backgrounds) are the modern options. |
+| pattern_opacity | float | `0.12` | Opacity of the style pattern (0.0–1.0) |
 | pattern_scale | float | `1.0` | Scale multiplier for the pattern (min 0.1) |
 | background_image | string | — | Background image file path. Embedded as base64 data URI |
-| overlay_opacity | float | `0.5` | Opacity of the color overlay on background images (0.0–1.0) |
+| overlay_opacity | float | `0.45` | Opacity of the color overlay on background images (0.0–1.0) |
 | format | string | `"svg"` | Output format: `"svg"` or `"png"` |
 | font_path | string | — | Path to a custom `.ttf` / `.otf` font file for PNG output. Falls back to system fonts, then the bundled DejaVu Sans Bold |
+| text_panel | float | `0.28` | 0.0–0.6. Subtle dark gradient panel behind the title for better harmony with artistic backgrounds. Enabled by default in the modern `editorial` style. |
+| accent_bars | bool | `false` | Draw thin top/bottom accent bars using `accent_color`. Disabled by default for the clean modern look (the old thin bars often feel dated). |
 | lazy_generate | bool | `false` | When `true`, skip bulk OG image generation during `hwaro serve`. Images are generated on-demand the first time a page is requested. **Recommended for local development on large sites.** Has no effect on `hwaro build`. |
 
 ## Style Presets
 
-The `style` option controls the background pattern rendered on the image:
+The `style` option controls the background treatment. `editorial` is now the default (clean & modern).
 
 | Style | Description |
 |-------|-------------|
+| `editorial` | **Recommended default**. Clean modern style with subtle text panel and no dated thin accent bars. Excellent harmony with artistic backgrounds. |
 | `default` | No pattern (solid background) |
 | `dots` | Repeating dot grid |
 | `grid` | Repeating line grid |
@@ -73,6 +76,10 @@ The `style` option controls the background pattern rendered on the image:
 | `gradient` | Diagonal gradient using the accent color |
 | `waves` | Horizontal wave curves |
 | `minimal` | Clean layout without accent bars |
+| `editorial` | **Default**. Clean modern style. No hard accent bars. Uses subtle text panel + generous spacing. Best for artistic or high-quality backgrounds. |
+| `framed` | Stronger content card/panel treatment. Text lives in a more distinct framed area on top of the background. |
+| `artistic` | **Bold & modern**. Very strong panel, confident typography, designed for high-production / illustrative / artistic backgrounds (inspired by premium brand campaigns). |
+| `editorial` | Modern editorial style — no hard bars, strong text integration via subtle panel, generous breathing room. Great with artistic backgrounds. |
 
 ### Preview
 

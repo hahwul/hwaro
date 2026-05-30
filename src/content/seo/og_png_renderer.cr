@@ -260,8 +260,16 @@ module Hwaro
           end
 
           is_minimal = ai.style == "minimal"
+          is_editorial = ai.style == "editorial"
+          is_framed = ai.style == "framed"
+          is_artistic = ai.style == "artistic"
           bg_color = parse_hex_color(ai.background)
           accent_color = parse_hex_color(ai.accent_color)
+
+          show_accent_bars = ai.accent_bars
+          if is_editorial || is_framed || is_artistic
+            show_accent_bars = false
+          end
 
           base = Bytes.new(WIDTH * HEIGHT * CHANNELS)
           pixels = base.to_unsafe
@@ -279,7 +287,7 @@ module Hwaro
 
           render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
-          unless is_minimal
+          if show_accent_bars
             fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
           end
 
@@ -310,6 +318,15 @@ module Hwaro
         ) : Bool
           ai = config.og.auto_image
           is_minimal = ai.style == "minimal"
+          is_editorial = ai.style == "editorial"
+          is_framed = ai.style == "framed"
+          is_artistic = ai.style == "artistic"
+
+          # Modern styles (editorial, framed, artistic) disable the old thin accent bars.
+          show_accent_bars = ai.accent_bars
+          if (is_editorial || is_framed || is_artistic) && show_accent_bars
+            show_accent_bars = false
+          end
 
           # Parse colors
           bg_color = parse_hex_color(ai.background)
@@ -344,15 +361,15 @@ module Hwaro
               # 3. Style pattern
               render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
-              # 4. Accent bar at top
-              unless is_minimal
+              # 4. Accent bar at top (legacy / classic look)
+              if show_accent_bars
                 fill_rect(pixels, 0, 0, WIDTH, 6, accent_color)
               end
             end
 
             # 5. Render text
             if ctx = font_ctx
-              render_text_content(pixels, page, config, ctx, text_color, accent_color)
+              render_text_content(pixels, page, config, ctx, text_color, accent_color, bg_color)
             end
 
             # 6. Logo image
@@ -365,8 +382,8 @@ module Hwaro
               end
             end
 
-            # 7. Bottom accent bar
-            unless is_minimal
+            # 7. Bottom accent bar (legacy / classic look)
+            if show_accent_bars
               fill_rect(pixels, 0, HEIGHT - 6, WIDTH, 6, accent_color)
             end
 
@@ -392,9 +409,15 @@ module Hwaro
           ctx : FontContext,
           text_color : UInt32,
           accent_color : UInt32,
+          bg_color : UInt32,
         )
           ai = config.og.auto_image
           font_size = Math.max(ai.font_size, 1).to_f32
+
+          # "artistic" style gets bolder default typography if user didn't override
+          if ai.style == "artistic" && ai.font_size <= 48
+            font_size = 60.0
+          end
           desc_size = Math.max((font_size * 0.45).to_i, 1).to_f32
 
           bold_info = ctx.bold_info
@@ -404,21 +427,57 @@ module Hwaro
           r_info = ctx.regular_info || bold_info
           r_scale = LibStb.hwaro_font_scale_for_pixel_height(r_info, desc_size)
 
-          # Word-wrap
-          title_lines = word_wrap_measured(bold_info, bold_scale, page.title, WIDTH - 160)
-          desc_text = page.description || ""
-          desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, WIDTH - 160)
+          # Word-wrap width and margins — modern ambitious styles get very generous treatment
+          margin_x = case ai.style
+                     when "editorial", "framed" then 110
+                     when "artistic"          then 130
+                     else 80
+                     end
+          wrap_width = WIDTH - (margin_x * 2)
 
-          # Vertical positioning
+          title_lines = word_wrap_measured(bold_info, bold_scale, page.title, wrap_width)
+          desc_text = page.description || ""
+          desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, wrap_width)
+
+          # Vertical positioning — "artistic" gets very bold, confident, centered placement
           title_block_height = title_lines.size * (font_size + 8)
           desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * (desc_size + 6)
           total_text_height = title_block_height + desc_block_height + 20
-          title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_f32 + font_size)
+
+          case ai.style
+          when "editorial", "framed"
+            title_start_y = Math.max(font_size + 32, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 12)
+          when "artistic"
+            # More centered + luxurious for artistic/hero compositions
+            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 20)
+          else
+            title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_f32 + font_size)
+          end
+
+          # Optional semi-transparent panel behind text for better integration
+          # with artistic/complex backgrounds (modern editorial style).
+          panel = ai.text_panel
+          # Strong modern panels for ambitious styles
+          if panel < 0.01
+            case ai.style
+            when "artistic"         then panel = 0.72   # very strong card for rich backgrounds
+            when "framed"           then panel = 0.58
+            when "editorial"        then panel = 0.32
+            end
+          end
+
+          if panel > 0.01
+            top_offset : Float32 = ai.style == "framed" ? 48_f32 : 36_f32
+            bottom_offset : Float32 = ai.style == "framed" ? 52_f32 : 40_f32
+            panel_top = (title_start_y - font_size - top_offset).to_f32.clamp(16_f32, HEIGHT * 0.52_f32)
+            panel_bottom = (title_start_y + total_text_height + bottom_offset).to_f32.clamp(panel_top + 90, HEIGHT - 60_f32)
+            draw_text_panel(pixels, panel_top, panel_bottom, panel, bg_color, accent_color)
+          end
 
           # Render title lines
           title_lines.each_with_index do |line, i|
             y = title_start_y + i * (font_size + 8)
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, 80_f32, y - font_size, bold_scale, line, text_color, 1.0_f32)
+            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, text_color, 1.0_f32)
           end
 
           # Render description
@@ -426,14 +485,19 @@ module Hwaro
             desc_start_y = title_start_y + title_block_height + 16
             desc_lines.each_with_index do |line, i|
               y = desc_start_y + i * (desc_size + 6)
-              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, 80_f32, y - desc_size, r_scale, line, text_color, 0.75_f32)
+              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - desc_size, r_scale, line, text_color, 0.75_f32)
             end
           end
 
           # Site name
           if ai.show_title
             site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
-            site_x = (ai.logo && ai.logo_position == "bottom-left") ? (OgImage::LOGO_MARGIN + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : OgImage::LOGO_MARGIN.to_f32
+            site_margin = case ai.style
+                          when "editorial", "framed" then 110
+                          when "artistic"            then 130
+                          else OgImage::LOGO_MARGIN
+                          end
+            site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
             LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, accent_color, 1.0_f32)
           end
         end
@@ -508,6 +572,75 @@ module Hwaro
               pixels[idx] = (dr + (r.to_f - dr) * alpha).to_u8
               pixels[idx + 1] = (dg + (g.to_f - dg) * alpha).to_u8
               pixels[idx + 2] = (db + (b.to_f - db) * alpha).to_u8
+            end
+          end
+        end
+
+        # Draw a soft, premium vertical gradient panel behind the text area.
+        # For "framed" style this acts more like a distinct content card.
+        private def self.draw_text_panel(pixels : UInt8*, top : Float32, bottom : Float32, strength : Float64, bg_color : UInt32, accent : UInt32 = 0)
+          return if strength <= 0.01
+
+          r = ((bg_color >> 16) & 0xFF).to_i
+          g = ((bg_color >> 8) & 0xFF).to_i
+          b = (bg_color & 0xFF).to_i
+
+          # For strong modern styles (framed/artistic), we tint toward accent color
+          # instead of pure darkening — this creates more visible, premium card/frame effect
+          if strength > 0.55
+            # Mix background with accent for a tinted card look
+            ar = ((accent >> 16) & 0xFF).to_i
+            ag = ((accent >> 8) & 0xFF).to_i
+            ab = (accent & 0xFF).to_i
+
+            mix = 0.18   # how much accent tint
+            panel_r = ((r * (1 - mix) + ar * mix)).to_u8
+            panel_g = ((g * (1 - mix) + ag * mix)).to_u8
+            panel_b = ((b * (1 - mix) + ab * mix)).to_u8
+
+            alpha_base = (strength * 0.55).clamp(0.0, 0.65)
+          else
+            darken_factor = 0.40
+            panel_r = (r * darken_factor).to_u8
+            panel_g = (g * darken_factor).to_u8
+            panel_b = (b * darken_factor).to_u8
+            alpha_base = (strength * 0.70).clamp(0.0, 0.70)
+          end
+
+          top_i = top.to_i.clamp(0, HEIGHT)
+          bottom_i = bottom.to_i.clamp(0, HEIGHT)
+
+          (top_i...bottom_i).each do |py|
+            t = (py - top_i).to_f / [(bottom_i - top_i), 1].max
+
+            # More sophisticated fade:
+            # - Stronger near the title (top)
+            # - Very gentle falloff toward description
+            # - Slight extra softness at the very edges for modern feel
+            fade = if t < 0.15
+                     1.0 - (t * 1.8)          # stronger near title
+                   elsif t < 0.65
+                     0.73 - (t - 0.15) * 0.9  # main body
+                   else
+                     0.28 * (1.0 - (t - 0.65) / 0.35) # soft tail
+                   end
+
+            alpha = (alpha_base * fade).clamp(0.0, 0.72)
+
+            # Subtle horizontal vignette on the sides for depth
+            WIDTH.times do |px|
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]
+              dg = pixels[idx + 1]
+              db = pixels[idx + 2]
+
+              # Very gentle side softening
+              side_t = (px.to_f / WIDTH - 0.5).abs * 0.6
+              side_alpha = alpha * (1.0 - side_t * 0.25)
+
+              pixels[idx]     = (dr + (panel_r.to_f - dr) * side_alpha).to_u8
+              pixels[idx + 1] = (dg + (panel_g.to_f - dg) * side_alpha).to_u8
+              pixels[idx + 2] = (db + (panel_b.to_f - db) * side_alpha).to_u8
             end
           end
         end
