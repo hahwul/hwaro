@@ -602,12 +602,12 @@ module Hwaro
           lines.first(4)
         end
 
-        # Parse "#RRGGBB" to 0xRRGGBB
+        # Parse "#RRGGBB" to 0xRRGGBB. Also accepts "#rgb" shorthand and
+        # "#rrggbbaa" (alpha dropped); falls back to black for invalid input.
         def self.parse_hex_color(hex : String) : UInt32
-          hex = hex.lchop("#")
-          begin
-            hex.to_u32(16)
-          rescue ArgumentError
+          if normalized = OgImage.normalize_hex(hex)
+            normalized.to_u32(16)
+          else
             0x000000_u32
           end
         end

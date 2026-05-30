@@ -59,8 +59,11 @@ module Hwaro
             "\x00HTML_PRESERVE_#{idx}\x00"
           end
           minified = cleaned.gsub(/<!--(?!\[if|#|\s*more\s*-->).*?-->/m, "")
-          minified = minified.gsub(/\x00HTML_PRESERVE_(\d+)\x00/) do
-            preserves[$1.to_i]
+          minified = minified.gsub(/\x00HTML_PRESERVE_(\d+)\x00/) do |match|
+            # Restore the preserved block. If the index is out of range — e.g.
+            # the source content itself contained a literal marker — leave the
+            # matched text untouched rather than raising IndexError.
+            preserves[$1.to_i]? || match
           end
 
           # Remove trailing whitespace on each line

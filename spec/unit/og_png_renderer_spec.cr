@@ -12,8 +12,20 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("ffffff").should eq(0xffffff_u32)
     end
 
+    it "expands 3-digit shorthand" do
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#fff").should eq(0xffffff_u32)
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#f00").should eq(0xff0000_u32)
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#1a2").should eq(0x11aa22_u32)
+    end
+
+    it "drops the alpha byte from 8-digit hex" do
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#ff0000aa").should eq(0xff0000_u32)
+    end
+
     it "returns 0 for invalid input" do
       Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("not-a-color").should eq(0_u32)
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#12345").should eq(0_u32)
+      Hwaro::Content::Seo::OgPngRenderer.parse_hex_color("#gggggg").should eq(0_u32)
     end
   end
 

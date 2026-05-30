@@ -233,7 +233,12 @@ module Hwaro
           return unless @enabled
           tmp_path = "#{@cache_path}.tmp"
           begin
-            data = CacheData.new(metadata: @metadata, entries: @entries.values)
+            # Snapshot shared state under the mutex: parallel fibers may still
+            # be writing @entries via #update, and iterating a Hash mid-mutation
+            # is undefined behavior under -Dpreview_mt.
+            data = @mutex.synchronize do
+              CacheData.new(metadata: @metadata, entries: @entries.values)
+            end
             File.write(tmp_path, data.to_json)
             File.rename(tmp_path, @cache_path)
           rescue ex
