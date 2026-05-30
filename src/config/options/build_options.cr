@@ -88,18 +88,30 @@ module Hwaro
         end
 
         private def parse_memory_limit(value : String) : Int64
-          case value.strip
-          when /^(\d+(?:\.\d+)?)\s*[Gg]$/
-            ($1.to_f * 1024 * 1024 * 1024).to_i64
-          when /^(\d+(?:\.\d+)?)\s*[Mm]$/
-            ($1.to_f * 1024 * 1024).to_i64
-          when /^(\d+(?:\.\d+)?)\s*[Kk]$/
-            ($1.to_f * 1024).to_i64
-          when /^(\d+)$/
-            $1.to_i64
-          else
-            raise "Invalid memory limit format: #{value}. Use format like '2G', '512M', or '256K'."
+          bytes =
+            case value.strip
+            when /^(\d+(?:\.\d+)?)\s*[Gg]$/
+              $1.to_f * 1024 * 1024 * 1024
+            when /^(\d+(?:\.\d+)?)\s*[Mm]$/
+              $1.to_f * 1024 * 1024
+            when /^(\d+(?:\.\d+)?)\s*[Kk]$/
+              $1.to_f * 1024
+            when /^(\d+)$/
+              $1.to_f
+            else
+              raise "Invalid memory limit format: #{value}. Use format like '2G', '512M', or '256K'."
+            end
+
+          # Validate the resolved size before narrowing to Int64 so callers get a
+          # clear message instead of a degenerate batch size (0 -> batch of 1) or
+          # a raw "Arithmetic overflow" from `.to_i64` on an enormous value.
+          if bytes < 1
+            raise "Invalid memory limit: #{value}. Must be a positive size like '2G', '512M', or '256K'."
+          elsif bytes >= Int64::MAX.to_f
+            raise "Memory limit too large: #{value}. Maximum is #{Int64::MAX} bytes (~8 EiB)."
           end
+
+          bytes.to_i64
         end
       end
     end

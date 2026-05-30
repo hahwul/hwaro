@@ -116,5 +116,33 @@ describe Hwaro::Config::Options::BuildOptions do
         opts.batch_size
       end
     end
+
+    it "raises on a zero memory limit instead of silently using a batch of 1" do
+      opts = Hwaro::Config::Options::BuildOptions.new(memory_limit: "0")
+      expect_raises(Exception, /Invalid memory limit: 0\. Must be a positive size/) do
+        opts.batch_size
+      end
+    end
+
+    it "raises on a zero memory limit with a unit suffix" do
+      opts = Hwaro::Config::Options::BuildOptions.new(memory_limit: "0G")
+      expect_raises(Exception, /Invalid memory limit: 0G/) do
+        opts.batch_size
+      end
+    end
+
+    it "raises a friendly error on an overflowing memory limit (not 'Arithmetic overflow')" do
+      opts = Hwaro::Config::Options::BuildOptions.new(memory_limit: "999999999999999999999G")
+      expect_raises(Exception, /Memory limit too large/) do
+        opts.batch_size
+      end
+    end
+
+    it "raises a friendly error on an overflowing plain-bytes memory limit" do
+      opts = Hwaro::Config::Options::BuildOptions.new(memory_limit: "99999999999999999999999999")
+      expect_raises(Exception, /Memory limit too large/) do
+        opts.batch_size
+      end
+    end
   end
 end
