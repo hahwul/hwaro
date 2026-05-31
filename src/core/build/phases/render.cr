@@ -1092,6 +1092,12 @@ module Hwaro::Core::Build::Phases::Render
     vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust))
     vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust))
 
+    # `use_cdn = false` emits <script src="/assets/js/highlight.min.js"> (+ css),
+    # but Hwaro doesn't ship those files — if the user hasn't placed them under
+    # static/assets/ the references 404 and highlighting silently breaks. Warn
+    # once per build (build_global_vars runs once) so it isn't a silent footgun.
+    warn_missing_local_highlight_assets(config)
+
     # Math (KaTeX/MathJax) and Mermaid renderer scripts. When `math = true`
     # or `mermaid = true` is set in config, the markdown processor emits the
     # right wrapper markup but without these script tags the browser sees
@@ -1131,6 +1137,33 @@ module Hwaro::Core::Build::Phases::Render
     vars["_i18n_default_language"] = Crinja::Value.new(config.default_language)
 
     vars
+  end
+
+  # Public URLs of self-hosted highlight.js assets that are referenced
+  # (`[highlight] use_cdn = false`) but missing from `static/`. Empty when the
+  # CDN is used, highlighting is disabled, or every asset is present. Hwaro
+  # never copies these files itself, so the user is expected to drop them under
+  # `static/assets/`; this surfaces the gap instead of shipping 404s.
+  def missing_local_highlight_assets(config : Models::Config) : Array(String)
+    return [] of String unless config.highlight.enabled
+    return [] of String if config.highlight.use_cdn
+
+    missing = [] of String
+    css_rel = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
+    js_rel = File.join("static", "assets", "js", "highlight.min.js")
+    missing << "/assets/css/highlight/#{config.highlight.theme}.min.css" unless File.exists?(css_rel)
+    missing << "/assets/js/highlight.min.js" unless File.exists?(js_rel)
+    missing
+  end
+
+  private def warn_missing_local_highlight_assets(config : Models::Config)
+    missing = missing_local_highlight_assets(config)
+    return if missing.empty?
+
+    Logger.warn "[highlight] use_cdn = false but self-hosted asset(s) are missing: " \
+                "#{missing.join(", ")}. Syntax highlighting will not load (the references 404). " \
+                "Add the highlight.js build under static/ (static/assets/js/highlight.min.js and " \
+                "static/assets/css/highlight/#{config.highlight.theme}.min.css), or set [highlight] use_cdn = true."
   end
 
   # Compute a content-based cache bust hash from local CSS/JS files.
