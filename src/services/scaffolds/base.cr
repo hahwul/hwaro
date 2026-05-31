@@ -309,10 +309,15 @@ module Hwaro
         end
 
         # Common shortcode: alert (Jinja2 syntax)
+        #
+        # The body is piped through `markdownify` so markdown written inside
+        # the alert — **bold**, `code`, [links](…) — renders as HTML instead
+        # of appearing as literal markup. (Crinja autoescaping is off here, the
+        # same way `{{ content }}` emits rendered HTML.)
         protected def alert_shortcode : String
           <<-HTML
             <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-              <strong>{{ type | upper }}:</strong> {{ body }}
+              <strong>{{ type | upper }}:</strong> {{ body | markdownify }}
             </div>
             HTML
         end
