@@ -11,6 +11,7 @@
 ### Changed
 - `hwaro init` / `doctor`: Hybrid config strategy (C). Default `init` now emits a balanced, much shorter config (~67 lines vs ~389). Doctor is less aggressive by default.
 - `doctor`: `--fix` performs real corrective fixes only; new `--approve` adds recommended optional sections; `--full` is shorthand for `--fix --approve`. Removed confusing `--minimal` flag.
+- Auto OG images now default to PNG instead of SVG. Social platforms (Facebook, X/Twitter, LinkedIn, Slack, Discord, iMessage) do not render an SVG `og:image`, so the previous default silently produced shares with no preview image. PNG generation falls back to SVG automatically when PNG font initialization is unavailable (#583).
 
 ### Fixed
 - `hwaro init`/`doctor`: restored multilingual support (`default_language` + `[languages.*]`) and eliminated duplicate `[sitemap]`/`[feeds]` emission after Hybrid C changes.
@@ -18,6 +19,12 @@
 - Render: `site.sections` Crinja values now expose `weight`, `draft`, `transparent`, `sort_by` etc. (prevents sort/compare crashes in scaffold templates).
 - `hwaro new`: `--section` override now properly takes precedence over path-based section inference.
 - Multiple authoring UX fixes from real-site testing (multilingual nav, doctor dedup, draft messaging, default `new` dates, social meta fallbacks).
+- Multilingual: default-language taxonomy pages are no longer duplicated under the `/<default_language>/` prefix. They were emitted both at the site root (`/tags/`) and again under e.g. `/en/tags/` as orphaned URLs — absent from the sitemap, without a canonical, and missing the cross-language links the root copies carried (#579).
+- `blog` scaffold: posts now render with the shipped `post.html` (article layout, publish date, post meta, series navigation). The `posts` section wasn't wired to the template via `page_template`, so every post fell back to the bare `page.html` and showed no date or meta — and edits to `post.html` had no effect (#580).
+- Alert shortcode: the body is now rendered as Markdown, so `**bold**`, `` `code` ``, and `[links](…)` inside an alert render as HTML instead of appearing as literal markup (#581).
+- Homepage JSON-LD: the homepage now emits `WebSite` structured data instead of an `Article` with an empty `headline` (invalid per Google's Article guidelines); other untitled pages no longer emit an empty-headline Article either (#582).
+- `docs` and `book` themes now render the in-page table of contents when a page sets `toc = true`. The `{{ toc }}` data was exposed by the engine but no built-in theme referenced it, so the documented option silently did nothing; the `book` archetype now enables `toc` by default (#584).
+- `[highlight] use_cdn = false` now warns at build time when the self-hosted highlight.js assets (`static/assets/js/highlight.min.js` + theme CSS) are missing, instead of silently emitting 404 references and shipping a site with no syntax highlighting (#585).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
