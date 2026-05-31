@@ -1113,9 +1113,11 @@ module Hwaro
                   return;
                 }
                 var q = query.trim().toLowerCase();
+                var pageLang = document.documentElement.lang || '';
                 var results = [];
                 for (var i = 0; i < searchData.length; i++) {
                   var item = searchData[i];
+                  if (pageLang && item.lang && item.lang !== pageLang) continue;
                   var titleIdx = item.title.toLowerCase().indexOf(q);
                   var contentIdx = item.content.toLowerCase().indexOf(q);
                   if (titleIdx !== -1 || contentIdx !== -1) {

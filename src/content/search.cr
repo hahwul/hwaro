@@ -40,6 +40,17 @@ module Hwaro
           end
         end
 
+        # Multilingual: honor each language's `build_search_index` toggle so a
+        # language opted out is excluded from the index. Pages without an
+        # explicit language fall back to the default language.
+        if config.multilingual?
+          default_lang = config.default_language
+          search_pages.reject! do |page|
+            lang_config = config.language(page.language || default_lang)
+            lang_config ? !lang_config.build_search_index : false
+          end
+        end
+
         if search_pages.empty?
           Logger.info "  No pages to include in search index."
           return
@@ -121,6 +132,10 @@ module Hwaro
 
           # Always include URL even if not in fields list
           data["url"] = base_path + page.url unless data.has_key?("url")
+
+          # Always include the page language so the client can scope results
+          # to the current language (mirrors per-language feeds).
+          data["lang"] = page.language || config.default_language
 
           data
         end
