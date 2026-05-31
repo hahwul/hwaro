@@ -21,10 +21,10 @@ module Hwaro
           "github-dark"
         end
 
-        def config_content(skip_taxonomies : Bool = false) : String
+        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           config = String.build do |str|
             str << base_config(config_title, config_description)
-            str << multilingual_config
+            str << multilingual_config(multilingual_languages)
             str << plugins_config
             str << content_files_config
             str << highlight_dark_config

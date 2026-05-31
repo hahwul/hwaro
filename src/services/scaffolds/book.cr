@@ -80,10 +80,10 @@ module Hwaro
         # template from being emitted as dead chrome (it's also dropped
         # from `template_files`). Users who want taxonomies can copy from
         # the simple/blog scaffolds.
-        def config_content(skip_taxonomies : Bool = false) : String
+        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           config = String.build do |str|
             str << base_config(config_title, config_description)
-            str << multilingual_config
+            str << multilingual_config(multilingual_languages)
             str << plugins_config
             str << content_files_config
             str << highlight_config

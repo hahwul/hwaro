@@ -240,8 +240,8 @@ private class TestBaseScaffold < Hwaro::Services::Scaffolds::Base
     {} of String => String
   end
 
-  def config_content(skip_taxonomies : Bool = false) : String
-    minimal_config_content(skip_taxonomies)
+  def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+    minimal_config_content(skip_taxonomies, multilingual_languages)
   end
 end
 

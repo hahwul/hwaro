@@ -69,7 +69,7 @@ module Hwaro
           {} of String => String
         end
 
-        def config_content(skip_taxonomies : Bool = false) : String
+        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           @config_data
         end
 

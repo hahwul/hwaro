@@ -147,7 +147,10 @@ module Hwaro
             filename = File.basename(path)
             full_path = File.join("content", section, filename)
           elsif path
-            full_path = File.join("content", section, path)
+            # When the path already carries the section dir (`new posts/foo
+            # -s posts`), don't join it twice into `content/posts/posts/foo`.
+            relative = path.starts_with?("#{section}/") ? path : File.join(section, path)
+            full_path = File.join("content", relative)
             full_path += ".md" unless full_path.ends_with?(".md")
           else
             # No path given; title must be supplied via --title.

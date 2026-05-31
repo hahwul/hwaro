@@ -19,6 +19,21 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    it "exposes math and mermaid toggles in the default [markdown] config" do
+      # Discoverability: the balanced default config listed emoji/task_lists/
+      # footnotes but omitted math/mermaid, so users couldn't tell the
+      # features existed.
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "mysite")
+        Hwaro::Services::Initializer.new.run(target)
+
+        config = File.read(File.join(target, "config.toml"))
+        config.should contain("mermaid =")
+        config.should contain("math =")
+        config.should contain("math_engine =")
+      end
+    end
+
     it "creates target directory if it does not exist" do
       Dir.mktmpdir do |dir|
         target = File.join(dir, "new", "nested", "site")
@@ -316,6 +331,24 @@ describe Hwaro::Services::Initializer do
           File.exists?(File.join(target, "content", "index.md")).should be_true
           # Second language content (with lang suffix)
           File.exists?(File.join(target, "content", "index.ko.md")).should be_true
+        end
+      end
+
+      it "enables languages in --full-config mode (regression: full config dropped multilingual)" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(
+            target,
+            multilingual_languages: ["en", "ko"],
+            full_config: true
+          )
+
+          config_content = File.read(File.join(target, "config.toml"))
+          # Must be the real, *uncommented* block — not the placeholder.
+          config_content.should contain("default_language = \"en\"")
+          config_content.should contain("[languages.ko]")
+          config_content.should_not contain("# default_language = \"en\"")
+          config_content.should_not contain("# [languages.ko]")
         end
       end
 

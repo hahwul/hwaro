@@ -898,6 +898,23 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "does not double the dir when a slash-path's leading segment matches --section" do
+        # Regression: `hwaro new posts/foo -s posts` (no .md extension) used to
+        # join the section onto a path that already carried it, producing
+        # content/posts/posts/foo.md.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "posts/foo", title: "Foo", section: "posts")
+            Hwaro::Services::Creator.new.run(options)
+
+            File.exists?("content/posts/foo.md").should be_true
+            Dir.exists?("content/posts/posts").should be_false
+          end
+        end
+      end
+
       it "does not warn when the path has no leading directory (section provides it)" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
