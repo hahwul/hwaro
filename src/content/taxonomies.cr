@@ -27,8 +27,14 @@ module Hwaro
         # Reuse a single Builder instance across all taxonomy renders
         builder = Core::Build::Builder.new
 
-        # Generate root taxonomies (for default language / non-multilingual sites)
-        generate_taxonomies_for_language(config.taxonomies, site, output_dir, templates, builder, verbose, language: nil, lang_prefix: "")
+        # Generate root taxonomies. On a multilingual site the root is the
+        # default language's space (its content pages live at the root), so
+        # scope the term listings to default-language pages — otherwise the
+        # English `/tags/foo/` page also lists the Korean posts (with `/ko/`
+        # links and translated titles), a cross-language leak. Non-multilingual
+        # sites pass `nil` (no filtering needed — every page is the one space).
+        root_language = config.multilingual? ? config.default_language : nil
+        generate_taxonomies_for_language(config.taxonomies, site, output_dir, templates, builder, verbose, language: root_language, lang_prefix: "")
 
         # For multilingual sites, also generate language-prefixed taxonomy pages
         # (e.g. /en/tags/, /en/categories/) using only pages of that language.

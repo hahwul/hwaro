@@ -320,4 +320,51 @@ describe "Multilingual: Taxonomy output" do
       Dir.exists?("public/en").should be_false
     end
   end
+
+  it "scopes the root taxonomy term listing to the default language (no cross-language leak)" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [[taxonomies]]
+      name = "tags"
+
+      [languages.en]
+      language_name = "English"
+      taxonomies = ["tags"]
+
+      [languages.ko]
+      language_name = "한국어"
+      taxonomies = ["tags"]
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "posts/_index.md"    => "---\ntitle: Posts\n---\n",
+        "posts/_index.ko.md" => "---\ntitle: 포스트\n---\n",
+        "posts/p.md"         => "---\ntitle: English Post\ntags:\n  - crystal\n---\nEN",
+        "posts/p.ko.md"      => "---\ntitle: 한국어 포스트\ntags:\n  - crystal\n---\nKO",
+      },
+      template_files: {
+        "page.html"     => "{{ content }}",
+        "section.html"  => "{{ content }}",
+        "taxonomy.html" => "{{ content }}",
+        # The engine renders the term's page list into `content`.
+        "taxonomy_term.html" => "{{ content }}",
+      },
+    ) do
+      # Root (default-language) term lists the English post only.
+      root = File.read("public/tags/crystal/index.html")
+      root.should contain("English Post")
+      root.should_not contain("한국어 포스트")
+      root.should_not contain("/ko/posts/")
+
+      # Korean term lists the Korean post only.
+      ko = File.read("public/ko/tags/crystal/index.html")
+      ko.should contain("한국어 포스트")
+      ko.should_not contain("English Post")
+    end
+  end
 end
