@@ -393,6 +393,48 @@ module Hwaro
               line-height: 1.2;
             }
 
+            .docs-toc {
+              margin: 1.5rem 0 2rem 0;
+              padding: 1rem 1.25rem;
+              background: var(--bg-secondary);
+              border: 1px solid var(--border-light);
+              border-radius: var(--radius);
+            }
+
+            .docs-toc-title {
+              margin: 0 0 0.5rem 0;
+              font-size: 0.8rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--text-muted);
+            }
+
+            .docs-toc ul {
+              margin: 0;
+              padding-left: 1.1rem;
+              list-style: none;
+            }
+
+            .docs-toc ul ul {
+              padding-left: 1rem;
+            }
+
+            .docs-toc li {
+              margin: 0.25rem 0;
+              line-height: 1.5;
+            }
+
+            .docs-toc a {
+              color: var(--text-secondary);
+              text-decoration: none;
+            }
+
+            .docs-toc a:hover {
+              color: var(--primary);
+              text-decoration: underline;
+            }
+
             .docs-main h2 {
               font-size: 1.4rem;
               font-weight: 600;
@@ -1056,6 +1098,7 @@ module Hwaro
             {% include "partials/sidebar.html" %}
               <main class="docs-main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
+                {% if toc %}<nav class="docs-toc" aria-label="On this page"><p class="docs-toc-title">On this page</p>{{ toc }}</nav>{% endif %}
                 {{ content }}
             {% include "footer.html" %}
             HTML

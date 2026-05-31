@@ -83,6 +83,18 @@ describe Hwaro::Services::Scaffolds::Book do
       files.has_key?("partials/page-arrows.html").should be_true
     end
 
+    # The page template renders `{{ toc }}`, and the archetype enables it,
+    # so a chapter's in-page table of contents actually appears (previously
+    # `toc` was exposed by the engine but no scaffold template used it).
+    it "renders an in-page table of contents driven by the archetype" do
+      scaffold = Hwaro::Services::Scaffolds::Book.new
+      page = scaffold.template_files["page.html"]
+      page.should contain("{% if toc %}")
+      page.should contain("{{ toc }}")
+      page.should contain("book-toc")
+      scaffold.archetype_files["default.md"].should contain("toc = true")
+    end
+
     # Regression for gh#523: the book TOC sidebar used to bake the
     # original three chapters with hand-numbered "1.", "1.1" links
     # into the template. Adding a chapter via `hwaro new` left the

@@ -90,4 +90,28 @@ describe "TOC: toc_obj.headers exposes structured header data" do
       html.should contain("my-section")
     end
   end
+
+  # The scaffolds (docs/book) render the TOC with the guarded wrapper
+  # `{% if toc %}<nav class="...-toc">{{ toc }}</nav>{% endif %}`. Verify the
+  # wrapper appears with a header link when toc is on, and is omitted when off.
+  it "renders the guarded toc wrapper only when toc is enabled" do
+    build_site(
+      TOC_CONFIG,
+      content_files: {
+        "on.md"  => "+++\ntitle = \"On\"\ntoc = true\ninsert_anchor_links = true\n+++\n## Alpha\n## Beta\n",
+        "off.md" => "+++\ntitle = \"Off\"\ntoc = false\n+++\n## Alpha\n",
+      },
+      template_files: {
+        "page.html" => %({% if toc %}<nav class="docs-toc">{{ toc }}</nav>{% endif %}OUT={{ content }}),
+      },
+    ) do
+      on = File.read("public/on/index.html")
+      on.should contain(%(<nav class="docs-toc">))
+      on.should contain("<ul>")
+      on.should contain("#alpha")
+
+      off = File.read("public/off/index.html")
+      off.should_not contain("docs-toc")
+    end
+  end
 end
