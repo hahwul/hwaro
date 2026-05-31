@@ -499,6 +499,11 @@ module Hwaro::Core::Build::Phases::Render
       html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
     end
 
+    # Make content images responsive: when image_processing generated width
+    # variants for an <img>, add srcset/sizes so browsers pick an appropriate
+    # size instead of always loading the full-resolution source.
+    html_content = apply_responsive_images(html_content, page, site.config)
+
     # Store rendered HTML in page.content for reuse by Feed/Search generators
     # (avoids expensive re-rendering of Markdown in Generate phase)
     page.content = html_content
@@ -691,6 +696,50 @@ module Hwaro::Core::Build::Phases::Render
       redirect_url = page.url
       File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
       Logger.action :create, dest_path, :yellow if verbose
+    end
+  end
+
+  # Rewrite content <img> tags to add `srcset`/`sizes` when the image has
+  # generated width variants (see ImageHooks). Only runs when image_processing
+  # is enabled and at least one variant exists. A relative `src` is resolved
+  # against the page URL to match the resize map keys (which are site-absolute,
+  # e.g. `/posts/foo/photo.png`); absolute `src` is used as-is. External
+  # (http/protocol-relative/data:) sources and tags that already carry a
+  # `srcset` (e.g. emitted by the `resize_image()` helper) are left untouched.
+  IMG_TAG_RE = /<img\b[^>]*>/
+  IMG_SRC_RE = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
+
+  private def apply_responsive_images(html : String, page : Models::Page, config : Models::Config) : String
+    return html unless config.image_processing.enabled
+    return html unless html.includes?("<img")
+
+    resize_map = Content::Hooks::ImageHooks.resize_map
+    return html if resize_map.empty?
+
+    html.gsub(IMG_TAG_RE) do |tag|
+      next tag if tag.includes?("srcset")
+      m = tag.match(IMG_SRC_RE)
+      next tag unless m
+      src = m[2]? || m[3]? || ""
+      next tag if src.empty?
+      next tag if src.starts_with?("http://") || src.starts_with?("https://") ||
+                  src.starts_with?("//") || src.starts_with?("data:")
+
+      key = if src.starts_with?("/")
+              src
+            else
+              base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
+              "#{base}#{src}".gsub("//", "/")
+            end
+
+      widths = resize_map[key]?
+      next tag unless widths
+      next tag if widths.empty?
+
+      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{url} #{w}w" }.join(", ")
+      additions = %( srcset="#{srcset}")
+      additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
+      tag.sub("<img", "<img#{additions}")
     end
   end
 
