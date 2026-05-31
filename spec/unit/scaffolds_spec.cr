@@ -91,6 +91,20 @@ describe Hwaro::Services::Scaffolds::Simple do
       end
     end
 
+    it "wires pagination SEO links (rel=prev/next) into the header of SEO scaffolds" do
+      # Regression: the engine builds `pagination_seo_links` (<link rel="prev"/
+      # "next">) for paginated pages, but no scaffold rendered it, so paginated
+      # pages shipped without rel=prev/next.
+      {
+        Hwaro::Services::Scaffolds::Simple.new,
+        Hwaro::Services::Scaffolds::Blog.new,
+        Hwaro::Services::Scaffolds::Docs.new,
+        Hwaro::Services::Scaffolds::Book.new,
+      }.each do |scaffold|
+        scaffold.template_files["header.html"].should contain("{{ pagination_seo_links }}")
+      end
+    end
+
     it "markdownifies the alert shortcode body so markdown inside alerts renders" do
       # Regression: the alert shortcode emitted `{{ body }}` verbatim, so
       # `{% alert %}**bold**{% end %}` rendered the literal `**bold**` instead

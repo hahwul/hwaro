@@ -136,6 +136,7 @@ module Hwaro
               {{ og_all_tags }}
               {{ jsonld }}
               {{ hreflang_tags }}
+              {{ pagination_seo_links }}
               #{styles}
               {{ highlight_css }}
               {{ math_tags }}
