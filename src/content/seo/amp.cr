@@ -7,6 +7,18 @@ module Hwaro
   module Content
     module Seo
       class Amp
+        # Font providers AMP allows via `<link rel="stylesheet">`. Every other
+        # external stylesheet is disallowed and is stripped during conversion.
+        AMP_FONT_PROVIDERS = %w[
+          cloud.typography.com
+          fast.fonts.net
+          fonts.googleapis.com
+          use.typekit.net
+          maxcdn.bootstrapcdn.com
+          use.fontawesome.com
+          fonts.bunny.net
+        ]
+
         # Generate AMP versions of rendered pages.
         # Reads the already-rendered HTML files, converts to AMP-compliant HTML,
         # and writes them under the configured path prefix.
@@ -65,6 +77,20 @@ module Hwaro
           # Remove disallowed tags: <script> (except application/ld+json and amp scripts)
           # Use [\s\S]*? instead of .*? to match across newlines
           result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*(?:async|custom-element|src=["']https:\/\/cdn\.ampproject\.org))[^>]*>[\s\S]*?<\/script>/mi, "")
+
+          # Remove disallowed external stylesheets. AMP forbids
+          # `<link rel="stylesheet">` except from allowlisted font providers;
+          # all other CSS must live in a single `<style amp-custom>`. Without
+          # this the site CSS and highlight.js/KaTeX CDN links make every AMP
+          # page fail validation.
+          result = result.gsub(/<link\b[^>]*>/i) do |tag|
+            if tag =~ /rel=["']stylesheet["']/i
+              href = tag.match(/href=["']([^"']*)["']/i).try(&.[1]) || ""
+              AMP_FONT_PROVIDERS.any? { |provider| href.includes?(provider) } ? tag : ""
+            else
+              tag
+            end
+          end
 
           # Remove style attributes and JS event handlers BEFORE element conversion
           # (so that container divs added by amp-img conversion aren't affected)

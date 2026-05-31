@@ -111,6 +111,25 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("text")
     end
 
+    it "strips disallowed external stylesheets but keeps font-provider links" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = "<html><head>" +
+             %(<link rel="stylesheet" href="/css/style.css">) +
+             %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/highlight.min.css">) +
+             %(<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter">) +
+             "</head><body>x</body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+
+      # Disallowed stylesheets (site CSS, highlight.js CDN) are removed...
+      result.should_not contain("/css/style.css")
+      result.should_not contain("cdnjs.cloudflare.com")
+      # ...but allowlisted font-provider stylesheets stay.
+      result.should contain("fonts.googleapis.com")
+    end
+
     it "injects AMP boilerplate CSS" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
