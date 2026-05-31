@@ -8,6 +8,7 @@
 - `[og.auto_image] lazy_generate = true`: defer expensive OG PNG/SVG generation during `hwaro serve` (especially effective with `--fast-start`).
 - `hwaro init --full-config`: emit verbose recommended config for maximum discoverability.
 - Responsive content images: when `[image_processing]` is enabled, markdown `![]()` images that have generated width variants are auto-rewritten with `srcset` + `sizes` so browsers pick an appropriate size instead of always loading the full-resolution source (previously the variants were only used via the `resize_image()` template helper) (#587).
+- Blog theme: the post template now renders a Related Posts block when `[related]` is enabled (the engine computed `related_posts` but no scaffold surfaced it) (#593).
 
 ### Changed
 - `hwaro init` / `doctor`: Hybrid config strategy (C). Default `init` now emits a balanced, much shorter config (~67 lines vs ~389). Doctor is less aggressive by default.
@@ -30,6 +31,8 @@
 - AMP: self-closing markdown images (`<img … />`) no longer produce an invalid `<amp-img … / layout="fill">` (stray slash mid-tag) that failed AMP validation. The conversion now strips the trailing slash before appending the layout attribute (#588).
 - `base_url` with a trailing slash (from `config.toml` or `--base-url`) no longer produces `//` in links, canonical, and OG URLs. The value is normalized (trailing slash stripped) on assignment, so `{{ base_url }}/path` and the sitemap agree; `doctor` still flags/`--fix`es a trailing slash in the config file (#589).
 - `hwaro new`: a title or date containing a double quote (e.g. `-t 'My "Quoted" Post'`) is now escaped in archetype-generated front matter, so the new file is valid TOML instead of failing the next build. Tags were already escaped; title/date now match (#590).
+- Blog series navigation now orders prev/next by `series_weight` (walking `series_pages` via `series_index`) instead of the section's flat date-ordered neighbours, which mis-ordered chapters, showed prev/next on the first/last chapter, and could link non-series posts (#591).
+- Multilingual: root taxonomy term pages now list only the default language's posts. Previously the English `/tags/foo/` page also listed the other languages' posts (translated titles, `/<lang>/` links) — a cross-language leak; the per-language `/<lang>/tags/foo/` pages were already correctly scoped (#592).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
