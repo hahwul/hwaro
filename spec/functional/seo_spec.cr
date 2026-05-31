@@ -418,9 +418,9 @@ describe "SEO: JSON-LD by page type" do
       config,
       content_files: {
         # Homepage with an empty title, exactly like the default scaffold.
-        "index.md"     => "+++\ntitle = \"\"\n+++\nWelcome",
+        "index.md"       => "+++\ntitle = \"\"\n+++\nWelcome",
         "blog/_index.md" => "---\ntitle: Blog\n---\n",
-        "blog/post.md" => "---\ntitle: My Post\ndate: 2026-01-01\n---\nBody",
+        "blog/post.md"   => "---\ntitle: My Post\ndate: 2026-01-01\n---\nBody",
       },
       template_files: {
         "page.html"    => "{{ jsonld }}",
