@@ -405,3 +405,38 @@ describe "SEO: llms.txt content structure" do
     end
   end
 end
+
+describe "SEO: JSON-LD by page type" do
+  it "emits WebSite for the homepage (not an Article with an empty headline) and Article for titled pages" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      description = "A site about things"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        # Homepage with an empty title, exactly like the default scaffold.
+        "index.md"     => "+++\ntitle = \"\"\n+++\nWelcome",
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        "blog/post.md" => "---\ntitle: My Post\ndate: 2026-01-01\n---\nBody",
+      },
+      template_files: {
+        "page.html"    => "{{ jsonld }}",
+        "section.html" => "{{ jsonld }}",
+      },
+    ) do
+      home = File.read("public/index.html")
+      home.should contain(%("@type":"WebSite"))
+      # The homepage must not be an Article, and must never carry an empty headline.
+      home.should_not contain(%("@type":"Article"))
+      home.should_not contain(%("headline":""))
+
+      # A normal titled page still gets a proper Article with a real headline.
+      post = File.read("public/blog/post/index.html")
+      post.should contain(%("@type":"Article"))
+      post.should contain(%("headline":"My Post"))
+    end
+  end
+end
