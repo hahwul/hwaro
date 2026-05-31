@@ -50,7 +50,7 @@ describe Hwaro::Services::Defaults::TemplateSamples do
     it "returns a string containing expected tags" do
       alert = Hwaro::Services::Defaults::TemplateSamples.alert
       alert.should contain("{{ type | upper }}")
-      alert.should contain("{{ body }}")
+      alert.should contain("{{ body | markdownify }}")
     end
   end
 

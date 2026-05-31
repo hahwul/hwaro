@@ -91,6 +91,20 @@ describe Hwaro::Services::Scaffolds::Simple do
       end
     end
 
+    it "markdownifies the alert shortcode body so markdown inside alerts renders" do
+      # Regression: the alert shortcode emitted `{{ body }}` verbatim, so
+      # `{% alert %}**bold**{% end %}` rendered the literal `**bold**` instead
+      # of `<strong>bold</strong>`.
+      {
+        Hwaro::Services::Scaffolds::Simple.new,
+        Hwaro::Services::Scaffolds::Blog.new,
+        Hwaro::Services::Scaffolds::Docs.new,
+        Hwaro::Services::Scaffolds::Book.new,
+      }.each do |scaffold|
+        scaffold.shortcode_files["shortcodes/alert.html"].should contain("body | markdownify")
+      end
+    end
+
     it "includes footer.html" do
       scaffold = Hwaro::Services::Scaffolds::Simple.new
       files = scaffold.template_files

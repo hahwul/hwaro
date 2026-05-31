@@ -93,7 +93,7 @@ module Hwaro
         def self.alert : String
           <<-HTML
             <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
-              <strong>{{ type | upper }}:</strong> {{ body }}
+              <strong>{{ type | upper }}:</strong> {{ body | markdownify }}
             </div>
             HTML
         end
