@@ -82,4 +82,25 @@ describe Hwaro::Services::Scaffolds::Blog do
       content.should contain(%(template = "archives"))
     end
   end
+
+  describe "posts" do
+    # The blog scaffold ships a post.html with an <article> layout, a
+    # post-meta block (publish date) and series navigation, but posts
+    # inherit their template from the section's `page_template`. Without
+    # this wiring every post fell back to the bare page.html — rendering
+    # no date, no meta and no series nav, and edits to post.html had no
+    # effect at all.
+    it "wires the posts section to templates/post.html" do
+      scaffold = Hwaro::Services::Scaffolds::Blog.new
+      scaffold.content_files["posts/_index.md"].should contain(%(page_template = "post"))
+      scaffold.template_files["post.html"]?.should_not be_nil
+    end
+
+    it "ships a post.html that renders the publish date" do
+      scaffold = Hwaro::Services::Scaffolds::Blog.new
+      tpl = scaffold.template_files["post.html"].not_nil!
+      tpl.should contain("post-meta")
+      tpl.should contain("page.date")
+    end
+  end
 end

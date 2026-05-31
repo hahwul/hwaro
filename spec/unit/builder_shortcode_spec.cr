@@ -1,5 +1,6 @@
 require "../spec_helper"
 require "../../src/core/build/builder"
+require "../../src/content/processors/filters/html_filter"
 
 # Reopen Builder to expose private methods for testing
 module Hwaro::Core::Build
@@ -72,6 +73,19 @@ describe Hwaro::Core::Build::Builder do
       content = "{% note(type=\"warning\") %}This is important{% end %}"
       result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
       result.should contain("<div class=\"note\">This is important</div>")
+    end
+
+    it "renders markdown in a block shortcode body via markdownify (the scaffold alert pattern)" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      Hwaro::Content::Processors::Filters::HtmlFilters.register(env)
+      templates = {"shortcodes/alert" => "<div class=\"alert\">{{ body | markdownify }}</div>"}
+      context = {} of String => Crinja::Value
+
+      content = "{% alert(type=\"info\") %}This is **bold** text{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<strong>bold</strong>")
+      result.should_not contain("**bold**")
     end
 
     it "accepts named closers like {% endnote %}" do

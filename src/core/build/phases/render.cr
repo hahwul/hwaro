@@ -1590,15 +1590,31 @@ module Hwaro::Core::Build::Phases::Render
     }
     vars["seo"] = Crinja::Value.new(seo_obj)
 
-    # JSON-LD structured data — generate breadcrumb only when needed
-    jsonld_article = Content::Seo::JsonLd.article(page, config)
+    # JSON-LD structured data.
+    #
+    # The homepage is a WebSite, not an Article — and because the scaffold
+    # homepage ships an empty title, emitting an Article there produced an
+    # invalid empty `headline`. Use the WebSite schema for the homepage, and
+    # for any other untitled page skip the Article entirely rather than emit
+    # one with an empty headline.
+    is_homepage = page.is_index && page.section.empty?
+    jsonld_article = if is_homepage || page.title.empty?
+                       ""
+                     else
+                       Content::Seo::JsonLd.article(page, config)
+                     end
     needs_breadcrumb = !page.ancestors.empty? || !page.is_index
     jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config) : ""
 
     # Extended schema types (FAQ, HowTo) auto-detected from extra.schema_type
     jsonld_extra = Content::Seo::JsonLd.for_page(page, config)
 
-    jsonld_parts = [jsonld_article]
+    jsonld_parts = [] of String
+    if is_homepage
+      jsonld_home_website = Content::Seo::JsonLd.website(config)
+      jsonld_parts << jsonld_home_website unless jsonld_home_website.empty?
+    end
+    jsonld_parts << jsonld_article unless jsonld_article.empty?
     jsonld_parts << jsonld_breadcrumb unless jsonld_breadcrumb.empty?
     jsonld_parts << jsonld_extra unless jsonld_extra.empty?
     jsonld_all = jsonld_parts.join("\n")

@@ -262,11 +262,10 @@ describe Hwaro::Services::Scaffolds::Base do
     it "ships the shared alert shortcode" do
       files = TestBaseScaffold.new.shortcode_files
       files.has_key?("shortcodes/alert.html").should be_true
-      # Alert shortcode references body and type via Jinja. The `{{ type`
-      # substring is intentionally truncated — the source uses
-      # `{{ type | upper }}`, and the partial form matches both the filtered
-      # and unfiltered forms.
-      files["shortcodes/alert.html"].should contain("{{ body }}")
+      # Alert shortcode references body and type via Jinja. The body is
+      # piped through `markdownify` so markdown inside the alert renders;
+      # `{{ type` is truncated to match `{{ type | upper }}`.
+      files["shortcodes/alert.html"].should contain("{{ body | markdownify }}")
       files["shortcodes/alert.html"].should contain("{{ type")
     end
   end
