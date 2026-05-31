@@ -55,7 +55,7 @@ module Hwaro
         # when `--include-taxonomies` is set; we still ship the taxonomy
         # templates below so users can wire them up later by adding
         # `[[taxonomies]]` entries themselves.
-        def config_content(skip_taxonomies : Bool = false) : String
+        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           config = String.build do |str|
             str << base_config
             str << plugins_config

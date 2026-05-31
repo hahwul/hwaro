@@ -130,7 +130,7 @@ module Hwaro
         if minimal_config
           config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
         elsif full_config
-          config_content = scaffold.config_content(skip_taxonomies)
+          config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
         else
           config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
         end
@@ -620,7 +620,10 @@ module Hwaro
           io << "emoji = true\n"
           io << "task_lists = true\n"
           io << "definition_lists = true\n"
-          io << "footnotes = true\n\n"
+          io << "footnotes = true\n"
+          io << "mermaid = false        # Render ```mermaid code blocks as diagrams (loads mermaid.js)\n"
+          io << "math = false           # Inline ($...$) and block ($$...$$) math (loads math_engine)\n"
+          io << "math_engine = \"katex\"  # \"katex\" or \"mathjax\"\n\n"
         end
 
         str

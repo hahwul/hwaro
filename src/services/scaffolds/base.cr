@@ -203,8 +203,11 @@ module Hwaro
             MD
         end
 
-        # Returns the config.toml content
-        abstract def config_content(skip_taxonomies : Bool = false) : String
+        # Returns the config.toml content. `multilingual_languages` (from
+        # `--include-multilingual`) is threaded through so the full config
+        # emits a real, enabled `[languages]` block instead of the commented
+        # placeholder.
+        abstract def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
 
         # Returns the site title used in config (overridable per scaffold)
         protected def config_title : String
@@ -472,6 +475,11 @@ module Hwaro
               code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
               pre { background: var(--bg-subtle); padding: 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
               pre code { background: none; padding: 0; }
+              img { max-width: 100%; height: auto; }
+              blockquote { margin: 1em 0; padding: 0.25rem 1rem; color: var(--text-muted); border-left: 3px solid var(--border); }
+              table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
+              th, td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+              th { background: var(--bg-subtle); font-weight: 600; }
 
               /* Components */
               ul.section-list { list-style: none; padding: 0; margin: 1.5rem 0; }
@@ -526,7 +534,35 @@ module Hwaro
             TOML
         end
 
-        protected def multilingual_config : String
+        protected def multilingual_config(multilingual_languages : Array(String) = [] of String) : String
+          # When `--include-multilingual` requested 2+ languages, emit a real,
+          # enabled languages block so the full config honors the flag (gh: the
+          # full-config path used to drop multilingual entirely, leaving
+          # `.ko.md` variants routed as literal `/about.ko/` pages).
+          if multilingual_languages.size > 1
+            default_lang = multilingual_languages.first
+            lang_blocks = multilingual_languages.map_with_index do |lang, index|
+              "  [languages.#{lang}]\n" \
+              "  language_name = \"#{language_display_name(lang)}\"\n" \
+              "  weight = #{index + 1}\n" \
+              "  generate_feed = true\n" \
+              "  build_search_index = true"
+            end
+            return String.build do |str|
+              str << "\n"
+              str << "# =============================================================================\n"
+              str << "# Multilingual\n"
+              str << "# =============================================================================\n"
+              str << "# Language variants use filename suffixes:\n"
+              str << "# - content/about.md -> /about/\n"
+              str << "# - content/about.ko.md -> /ko/about/\n\n"
+              str << "default_language = \"#{default_lang}\"\n\n"
+              str << "[languages]\n"
+              str << lang_blocks.join("\n\n")
+              str << "\n\n"
+            end
+          end
+
           <<-TOML
 
             # =============================================================================

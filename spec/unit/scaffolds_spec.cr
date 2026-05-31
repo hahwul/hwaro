@@ -67,6 +67,16 @@ describe Hwaro::Services::Scaffolds::Simple do
       files.has_key?("header.html").should be_true
     end
 
+    it "styles tables, images, and blockquotes in the default header CSS" do
+      # Regression: the default theme shipped no table/img/blockquote rules,
+      # so markdown tables rendered borderless and images could overflow.
+      header = Hwaro::Services::Scaffolds::Simple.new.template_files["header.html"]
+      header.should contain("table {")
+      header.should contain("border-collapse")
+      header.should contain("blockquote {")
+      header.should contain("img {")
+    end
+
     it "includes footer.html" do
       scaffold = Hwaro::Services::Scaffolds::Simple.new
       files = scaffold.template_files
