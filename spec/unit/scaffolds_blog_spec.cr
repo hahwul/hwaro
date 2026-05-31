@@ -103,6 +103,19 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl.should contain("page.date")
     end
 
+    # Series nav must walk `series_pages` (ordered by series_weight) via the
+    # 1-based `series_index`. It previously used page.lower/page.higher, which
+    # are the section's flat date-ordered neighbours — so chapters were ordered
+    # by date and could even link non-series posts.
+    it "builds series nav from series_pages/series_index, not page.lower/higher" do
+      tpl = Hwaro::Services::Scaffolds::Blog.new.template_files["post.html"].not_nil!
+      series_nav = tpl.partition("series-nav")[2]
+      series_nav.should contain("page.series_pages[page.series_index")
+      series_nav.should contain("page.series_index > 1")
+      series_nav.should_not contain("page.lower")
+      series_nav.should_not contain("page.higher")
+    end
+
     # The engine computes `page.related_posts` when [related] is enabled, but
     # no scaffold rendered it — so the advertised feature produced nothing.
     # post.html now renders a guarded related block.

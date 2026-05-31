@@ -955,14 +955,19 @@ module Hwaro
                     {{ content }}
                   </div>
 
+                  {# Series nav walks `series_pages` (ordered by series_weight)
+                     via the 1-based `series_index`, NOT page.lower/page.higher
+                     — those are the section's flat date-ordered neighbours, so
+                     they ordered chapters by date and even linked non-series
+                     posts. #}
                   {% if page.series %}
                   <nav class="series-nav" aria-label="Series navigation">
-                    {% if page.lower %}
-                    <a href="{{ base_url }}{{ page.lower.url }}" class="series-prev" rel="prev">← {{ page.lower.title | e }}</a>
+                    {% if page.series_index > 1 %}
+                    <a href="{{ base_url }}{{ page.series_pages[page.series_index - 2].url }}" class="series-prev" rel="prev">← {{ page.series_pages[page.series_index - 2].title | e }}</a>
                     {% endif %}
                     <span class="series-name">{{ page.series | e }}</span>
-                    {% if page.higher %}
-                    <a href="{{ base_url }}{{ page.higher.url }}" class="series-next" rel="next">{{ page.higher.title | e }} →</a>
+                    {% if page.series_index < (page.series_pages | length) %}
+                    <a href="{{ base_url }}{{ page.series_pages[page.series_index].url }}" class="series-next" rel="next">{{ page.series_pages[page.series_index].title | e }} →</a>
                     {% endif %}
                   </nav>
                   {% endif %}
