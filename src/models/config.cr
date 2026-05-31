@@ -363,7 +363,11 @@ module Hwaro
         @pattern_scale = 1.0
         @background_image = nil
         @overlay_opacity = 0.45
-        @format = "svg"
+        # PNG is the default because social platforms (Facebook, X/Twitter,
+        # LinkedIn, Slack, Discord, iMessage) do not render SVG og:image —
+        # an SVG preview silently shows nothing. Generation falls back to SVG
+        # automatically if PNG font initialization is unavailable.
+        @format = "png"
         @font_path = nil
         @logo_position = "bottom-left"
         @text_panel = 0.0

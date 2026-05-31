@@ -593,7 +593,7 @@ module Hwaro
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)
           # overlay_opacity = 0.45
-          # format = "svg"                 # svg or png
+          # format = "png"                 # png (default) or svg — social platforms don't render SVG og:image
           # text_panel = 0.0               # 0.0–0.6 — adds subtle panel behind text (recommended with modern styles)
           # accent_bars = false            # Draw thin top/bottom accent bars (off by default; set true to opt in)
           # lazy_generate = false          # If true, skip bulk OG generation during `hwaro serve`.
