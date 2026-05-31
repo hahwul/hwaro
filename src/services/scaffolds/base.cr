@@ -514,12 +514,17 @@ module Hwaro
           <<-NAV
             <nav>
               <!-- Add links for new sections here (e.g. /notes/, /til/).
-                   Quick dynamic version (uncomment and remove the hardcoded links below):
-
+                   Dynamic version (copy out and remove the hardcoded links
+                   below). It lists only the current language's sections;
+                   s.url already includes the language prefix, so do NOT add
+                   lang_prefix. For custom ordering, set `weight` in each
+                   section's front matter and use sort(attribute="weight").
+                   (Wrapped in {% raw %} so the example isn't executed here.)
+                   {% raw %}
                    {% for s in site.sections | sort(attribute="title") %}
-                     {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
+                     {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}
                    {% endfor %}
-                   {# For custom ordering, set `weight` in each section's front matter and use sort(attribute="weight") #}
+                   {% endraw %}
               -->
               <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
               <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>

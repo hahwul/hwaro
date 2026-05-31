@@ -869,12 +869,17 @@ module Hwaro
                 <nav>
                   <!-- To add new top-level sections (e.g. /notes/, /projects/):
                        1. Create content/SECTION/_index.md
-                       2. Replace the links below with this compact dynamic loop:
-
+                       2. Replace the hardcoded links below with this dynamic
+                          loop. It shows only the current language's sections;
+                          s.url already carries the language prefix, so do NOT
+                          add lang_prefix. Sort by "weight" for explicit order.
+                       (Wrapped in {% raw %} so this example isn't executed
+                       while it lives in the comment.)
+                       {% raw %}
                        {% for s in site.sections | sort(attribute="title") %}
-                         {% if not s.transparent and s.name %}<a href="{{ base_url }}{{ lang_prefix }}{{ s.url }}">{{ s.title }}</a>{% endif %}
+                         {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}
                        {% endfor %}
-                       {# Use weight for explicit order: sort(attribute="weight") after setting weight in front matter #}
+                       {% endraw %}
                   -->
                   <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
