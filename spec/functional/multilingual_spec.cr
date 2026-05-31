@@ -268,3 +268,56 @@ describe "Multilingual: Homepage per language" do
     end
   end
 end
+
+describe "Multilingual: Taxonomy output" do
+  it "emits default-language taxonomies at the root and non-default under a prefix, with no duplicate /<default_language>/ tree" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [[taxonomies]]
+      name = "tags"
+
+      [languages.en]
+      language_name = "English"
+      weight = 1
+      taxonomies = ["tags"]
+
+      [languages.ko]
+      language_name = "한국어"
+      weight = 2
+      taxonomies = ["tags"]
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md"    => "---\ntitle: Blog\n---\n",
+        "blog/_index.ko.md" => "---\ntitle: 블로그\n---\n",
+        "blog/post.md"      => "---\ntitle: Post\ntags:\n  - crystal\n---\nEnglish post",
+        "blog/post.ko.md"   => "---\ntitle: 포스트\ntags:\n  - crystal\n---\n한국어 포스트",
+      },
+      template_files: {
+        "page.html"          => "{{ content }}",
+        "section.html"       => "{{ content }}",
+        "taxonomy.html"      => "<h1>{{ taxonomy_name }}</h1>",
+        "taxonomy_term.html" => "<h1>{{ taxonomy_term }}</h1>",
+      },
+    ) do
+      # Default language (en) taxonomies live at the root.
+      File.exists?("public/tags/index.html").should be_true
+      File.exists?("public/tags/crystal/index.html").should be_true
+
+      # Non-default language (ko) taxonomies are language-prefixed.
+      File.exists?("public/ko/tags/index.html").should be_true
+      File.exists?("public/ko/tags/crystal/index.html").should be_true
+
+      # The default language must NOT also be duplicated under /en/ — that
+      # produced orphaned URLs (absent from the sitemap, no canonical).
+      File.exists?("public/en/tags/index.html").should be_false
+      File.exists?("public/en/tags/crystal/index.html").should be_false
+      Dir.exists?("public/en").should be_false
+    end
+  end
+end
