@@ -401,6 +401,26 @@ describe "Build Integration: Redirects" do
       alias2.should contain("url=/new-page/")
     end
   end
+
+  it "writes .html aliases to that exact path instead of appending index.html" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "new-page.md" => "---\ntitle: New Page\naliases:\n  - /promo.html\n  - /docs/guide.html\n---\nNew content",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      # Alias is written as a file at that exact path...
+      File.file?("public/promo.html").should be_true
+      File.read("public/promo.html").should contain("url=/new-page/")
+      File.file?("public/docs/guide.html").should be_true
+
+      # ...not a directory `promo.html/` with an index.html inside it
+      # (the previous behaviour blindly appended /index.html).
+      Dir.exists?("public/promo.html").should be_false
+      File.exists?("public/promo.html/index.html").should be_false
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

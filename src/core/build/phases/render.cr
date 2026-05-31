@@ -674,7 +674,16 @@ module Hwaro::Core::Build::Phases::Render
   private def generate_aliases(page : Models::Page, output_dir : String, verbose : Bool)
     page.aliases.each do |alias_path|
       alias_clean = Utils::PathUtils.sanitize_path(alias_path.lchop("/"))
-      dest_path = File.join(output_dir, alias_clean, "index.html")
+      # An alias that already names an HTML file (`/legacy.html`,
+      # `/old/index.html`) is written to that exact path; only "pretty"
+      # aliases (`/old/`) get an `index.html` appended. Previously every
+      # alias got `/index.html` tacked on, so `/legacy/index.html` became
+      # the directory `legacy/index.html/` with an `index.html` inside.
+      dest_path = if alias_clean.ends_with?(".html") || alias_clean.ends_with?(".htm")
+                    File.join(output_dir, alias_clean)
+                  else
+                    File.join(output_dir, alias_clean, "index.html")
+                  end
       next unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
 
       ensure_dir(File.dirname(dest_path))
