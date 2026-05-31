@@ -228,6 +228,55 @@ describe Hwaro::Content::Search do
       end
     end
 
+    it "tags each entry with its language (defaults to default_language)" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain(%("lang":"en"))
+      end
+    end
+
+    it "excludes pages of a language whose build_search_index is false" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.default_language = "en"
+      config.languages["en"] = Hwaro::Models::LanguageConfig.new("en")
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      ko.build_search_index = false
+      config.languages["ko"] = ko
+
+      en_page = Hwaro::Models::Page.new("about.md")
+      en_page.title = "About"
+      en_page.url = "/about/"
+      en_page.draft = false
+      en_page.raw_content = "English"
+
+      ko_page = Hwaro::Models::Page.new("about.ko.md")
+      ko_page.title = "소개"
+      ko_page.url = "/ko/about/"
+      ko_page.language = "ko"
+      ko_page.draft = false
+      ko_page.raw_content = "한국어"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([en_page, ko_page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("About")
+        content.should_not contain("소개")
+      end
+    end
+
     it "prepends base_url path to URLs for subpath deployments" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true
