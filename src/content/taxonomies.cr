@@ -35,6 +35,11 @@ module Hwaro
         # This closes the gap where non-default languages had no taxonomy UI at all.
         if config.multilingual?
           config.languages.each do |lang_code, lang_cfg|
+            # The default language is served at the site root, and its
+            # taxonomies were already emitted there by the call above. Emitting
+            # them again under `/<default_language>/` produces orphaned
+            # duplicate URLs (not in the sitemap, no canonical) — skip it.
+            next if lang_code == config.default_language
             next if lang_cfg.taxonomies.empty?
 
             # Build a filtered view of taxonomies for just this language's pages
