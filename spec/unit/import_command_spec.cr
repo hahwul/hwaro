@@ -1,25 +1,5 @@
 require "../spec_helper"
 
-# Capture human-readable Logger output while running a block, restoring all
-# global Logger state afterwards.
-private def capture_import_log(&)
-  previous_io = Hwaro::Logger.io
-  previous_level = Hwaro::Logger.level
-  previous_quiet = Hwaro::Logger.quiet?
-  sink = IO::Memory.new
-  Hwaro::Logger.io = sink
-  Hwaro::Logger.level = Hwaro::Logger::Level::Info
-  Hwaro::Logger.quiet = false
-  begin
-    yield
-    sink.to_s
-  ensure
-    Hwaro::Logger.io = previous_io
-    Hwaro::Logger.level = previous_level
-    Hwaro::Logger.quiet = previous_quiet
-  end
-end
-
 # Command-level tests for `hwaro tool import`.
 #
 # The individual importers are exercised in spec/unit/importers/*; these tests
@@ -98,7 +78,7 @@ describe Hwaro::CLI::Commands::Tool::ImportCommand do
         )
         output_dir = File.join(dir, "out")
 
-        output = capture_import_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::ImportCommand.new
           cmd.run(["jekyll", dir, "-o", output_dir])
         end
@@ -120,10 +100,10 @@ describe Hwaro::CLI::Commands::Tool::ImportCommand do
         output_dir = File.join(dir, "out")
 
         cmd = Hwaro::CLI::Commands::Tool::ImportCommand.new
-        capture_import_log { cmd.run(["jekyll", dir, "-o", output_dir]) }
+        with_captured_log { cmd.run(["jekyll", dir, "-o", output_dir]) }
 
         # Second run without --force: the destination exists, so it is skipped.
-        output = capture_import_log do
+        output = with_captured_log do
           cmd2 = Hwaro::CLI::Commands::Tool::ImportCommand.new
           cmd2.run(["jekyll", dir, "-o", output_dir])
         end

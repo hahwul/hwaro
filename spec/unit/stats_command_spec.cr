@@ -1,25 +1,5 @@
 require "../spec_helper"
 
-# Capture human-readable Logger output while running a block, restoring all
-# global Logger state afterwards.
-private def capture_stats_log(&)
-  previous_io = Hwaro::Logger.io
-  previous_level = Hwaro::Logger.level
-  previous_quiet = Hwaro::Logger.quiet?
-  sink = IO::Memory.new
-  Hwaro::Logger.io = sink
-  Hwaro::Logger.level = Hwaro::Logger::Level::Info
-  Hwaro::Logger.quiet = false
-  begin
-    yield
-    sink.to_s
-  ensure
-    Hwaro::Logger.io = previous_io
-    Hwaro::Logger.level = previous_level
-    Hwaro::Logger.quiet = previous_quiet
-  end
-end
-
 # Command-level tests for `hwaro tool stats`.
 #
 # The ContentStats service is exercised in spec/unit/content_stats_spec.cr;
@@ -43,7 +23,7 @@ describe Hwaro::CLI::Commands::Tool::StatsCommand do
   describe "#run" do
     it "reports when no content is found" do
       Dir.mktmpdir do |dir|
-        output = capture_stats_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
           cmd.run(["-c", dir])
         end
@@ -62,7 +42,7 @@ describe Hwaro::CLI::Commands::Tool::StatsCommand do
           "---\ntitle: Second\ndate: 2024-02-20\ntags:\n  - crystal\n---\nMore content with several words inside.\n"
         )
 
-        output = capture_stats_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
           cmd.run(["-c", dir])
         end

@@ -1,25 +1,5 @@
 require "../spec_helper"
 
-# Capture human-readable Logger output while running a block, restoring all
-# global Logger state afterwards.
-private def capture_validate_log(&)
-  previous_io = Hwaro::Logger.io
-  previous_level = Hwaro::Logger.level
-  previous_quiet = Hwaro::Logger.quiet?
-  sink = IO::Memory.new
-  Hwaro::Logger.io = sink
-  Hwaro::Logger.level = Hwaro::Logger::Level::Info
-  Hwaro::Logger.quiet = false
-  begin
-    yield
-    sink.to_s
-  ensure
-    Hwaro::Logger.io = previous_io
-    Hwaro::Logger.level = previous_level
-    Hwaro::Logger.quiet = previous_quiet
-  end
-end
-
 # Command-level tests for `hwaro tool validate`.
 #
 # The ContentValidator service is exercised in spec/unit/content_validator_spec.cr;
@@ -48,7 +28,7 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
           "---\ntitle: A Good Post\ndescription: A perfectly fine description for SEO purposes.\ndate: 2024-01-10\n---\n\n# A Good Post\n\nThis post has a healthy amount of body text so the validator is satisfied that it is a real article and not an empty stub document.\n"
         )
 
-        output = capture_validate_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::ValidateCommand.new
           cmd.run(["-c", dir])
         end
@@ -66,13 +46,16 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
           "---\ndescription: no title here\n---\n\nShort.\n"
         )
 
-        output = capture_validate_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::ValidateCommand.new
           cmd.run(["-c", dir])
         end
 
+        # The offending file is listed and a count summary is printed. We assert
+        # on the summary line shape rather than a specific severity so the test
+        # does not break if the validator reclassifies this issue.
         output.should contain("bad.md")
-        output.should match(/Found \d+ error/)
+        output.should match(/Found \d+ error\(s\), \d+ warning\(s\), \d+ info\(s\)/)
       end
     end
   end

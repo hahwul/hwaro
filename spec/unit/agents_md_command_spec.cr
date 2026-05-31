@@ -1,25 +1,5 @@
 require "../spec_helper"
 
-# Capture human-readable Logger output while running a block, restoring all
-# global Logger state afterwards.
-private def capture_agents_md_log(&)
-  previous_io = Hwaro::Logger.io
-  previous_level = Hwaro::Logger.level
-  previous_quiet = Hwaro::Logger.quiet?
-  sink = IO::Memory.new
-  Hwaro::Logger.io = sink
-  Hwaro::Logger.level = Hwaro::Logger::Level::Info
-  Hwaro::Logger.quiet = false
-  begin
-    yield
-    sink.to_s
-  ensure
-    Hwaro::Logger.io = previous_io
-    Hwaro::Logger.level = previous_level
-    Hwaro::Logger.quiet = previous_quiet
-  end
-end
-
 # Command-level tests for `hwaro tool agents-md`.
 #
 # The generated content itself is exercised in spec/unit/defaults_agents_md_spec.cr;
@@ -47,7 +27,7 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
     it "writes the local AGENTS.md and logs success" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          output = capture_agents_md_log do
+          output = with_captured_log do
             cmd = Hwaro::CLI::Commands::Tool::AgentsMdCommand.new
             cmd.run(["--write"])
           end
@@ -62,7 +42,7 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
     it "writes the remote AGENTS.md variant when --remote is given" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          output = capture_agents_md_log do
+          output = with_captured_log do
             cmd = Hwaro::CLI::Commands::Tool::AgentsMdCommand.new
             cmd.run(["--remote", "--write"])
           end
@@ -78,7 +58,7 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
         Dir.cd(dir) do
           File.write("AGENTS.md", "stale content")
 
-          capture_agents_md_log do
+          with_captured_log do
             cmd = Hwaro::CLI::Commands::Tool::AgentsMdCommand.new
             cmd.run(["--write", "--force"])
           end

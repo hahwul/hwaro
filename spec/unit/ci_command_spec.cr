@@ -1,25 +1,5 @@
 require "../spec_helper"
 
-# Capture human-readable Logger output while running a block, restoring all
-# global Logger state afterwards.
-private def capture_ci_log(&)
-  previous_io = Hwaro::Logger.io
-  previous_level = Hwaro::Logger.level
-  previous_quiet = Hwaro::Logger.quiet?
-  sink = IO::Memory.new
-  Hwaro::Logger.io = sink
-  Hwaro::Logger.level = Hwaro::Logger::Level::Info
-  Hwaro::Logger.quiet = false
-  begin
-    yield
-    sink.to_s
-  ensure
-    Hwaro::Logger.io = previous_io
-    Hwaro::Logger.level = previous_level
-    Hwaro::Logger.quiet = previous_quiet
-  end
-end
-
 # Command-level tests for `hwaro tool ci` (deprecated alias for
 # `tool platform github-pages`).
 #
@@ -48,7 +28,7 @@ describe Hwaro::CLI::Commands::Tool::CICommand do
       Dir.mktmpdir do |dir|
         out_path = File.join(dir, "deploy.yml")
 
-        output = capture_ci_log do
+        output = with_captured_log do
           cmd = Hwaro::CLI::Commands::Tool::CICommand.new
           cmd.run(["github-actions", "-o", out_path])
         end
@@ -63,7 +43,7 @@ describe Hwaro::CLI::Commands::Tool::CICommand do
     it "auto-detects the workflow path and creates intermediate directories" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          capture_ci_log do
+          with_captured_log do
             cmd = Hwaro::CLI::Commands::Tool::CICommand.new
             cmd.run(["github-actions"])
           end
