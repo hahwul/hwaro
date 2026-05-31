@@ -7,6 +7,7 @@
 - Shortcodes: full named closer support (`{% alert %}...{% endalert %}`) with mismatch diagnostics and improved unclosed warnings.
 - `[og.auto_image] lazy_generate = true`: defer expensive OG PNG/SVG generation during `hwaro serve` (especially effective with `--fast-start`).
 - `hwaro init --full-config`: emit verbose recommended config for maximum discoverability.
+- Responsive content images: when `[image_processing]` is enabled, markdown `![]()` images that have generated width variants are auto-rewritten with `srcset` + `sizes` so browsers pick an appropriate size instead of always loading the full-resolution source (previously the variants were only used via the `resize_image()` template helper) (#587).
 
 ### Changed
 - `hwaro init` / `doctor`: Hybrid config strategy (C). Default `init` now emits a balanced, much shorter config (~67 lines vs ~389). Doctor is less aggressive by default.
@@ -25,6 +26,7 @@
 - Homepage JSON-LD: the homepage now emits `WebSite` structured data instead of an `Article` with an empty `headline` (invalid per Google's Article guidelines); other untitled pages no longer emit an empty-headline Article either (#582).
 - `docs` and `book` themes now render the in-page table of contents when a page sets `toc = true`. The `{{ toc }}` data was exposed by the engine but no built-in theme referenced it, so the documented option silently did nothing; the `book` archetype now enables `toc` by default (#584).
 - `[highlight] use_cdn = false` now warns at build time when the self-hosted highlight.js assets (`static/assets/js/highlight.min.js` + theme CSS) are missing, instead of silently emitting 404 references and shipping a site with no syntax highlighting (#585).
+- `hwaro build --cache`: a no-op rebuild (all pages cached) no longer prints the false "No content found" hint. The hint keyed off pages *rendered* this build, which is 0 when everything is served from cache; it now also requires zero cache hits, so it only fires for a genuinely empty site (#586).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
