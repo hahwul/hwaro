@@ -29,6 +29,7 @@
 - `hwaro build --cache`: a no-op rebuild (all pages cached) no longer prints the false "No content found" hint. The hint keyed off pages *rendered* this build, which is 0 when everything is served from cache; it now also requires zero cache hits, so it only fires for a genuinely empty site (#586).
 - AMP: self-closing markdown images (`<img … />`) no longer produce an invalid `<amp-img … / layout="fill">` (stray slash mid-tag) that failed AMP validation. The conversion now strips the trailing slash before appending the layout attribute (#588).
 - `base_url` with a trailing slash (from `config.toml` or `--base-url`) no longer produces `//` in links, canonical, and OG URLs. The value is normalized (trailing slash stripped) on assignment, so `{{ base_url }}/path` and the sitemap agree; `doctor` still flags/`--fix`es a trailing slash in the config file (#589).
+- `hwaro new`: a title or date containing a double quote (e.g. `-t 'My "Quoted" Post'`) is now escaped in archetype-generated front matter, so the new file is valid TOML instead of failing the next build. Tags were already escaped; title/date now match (#590).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
