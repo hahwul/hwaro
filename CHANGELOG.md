@@ -28,6 +28,7 @@
 - `[highlight] use_cdn = false` now warns at build time when the self-hosted highlight.js assets (`static/assets/js/highlight.min.js` + theme CSS) are missing, instead of silently emitting 404 references and shipping a site with no syntax highlighting (#585).
 - `hwaro build --cache`: a no-op rebuild (all pages cached) no longer prints the false "No content found" hint. The hint keyed off pages *rendered* this build, which is 0 when everything is served from cache; it now also requires zero cache hits, so it only fires for a genuinely empty site (#586).
 - AMP: self-closing markdown images (`<img … />`) no longer produce an invalid `<amp-img … / layout="fill">` (stray slash mid-tag) that failed AMP validation. The conversion now strips the trailing slash before appending the layout attribute (#588).
+- `base_url` with a trailing slash (from `config.toml` or `--base-url`) no longer produces `//` in links, canonical, and OG URLs. The value is normalized (trailing slash stripped) on assignment, so `{{ base_url }}/path` and the sitemap agree; `doctor` still flags/`--fix`es a trailing slash in the config file (#589).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
