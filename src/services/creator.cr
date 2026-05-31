@@ -452,12 +452,19 @@ module Hwaro
       end
 
       private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String)) : String
-        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{t.gsub("\"", "\\\"")}\"" }.join(", ")}]"
+        # Archetypes wrap these placeholders in quoted TOML fields
+        # (`title = "{{ title }}"`), so the substituted values must be escaped
+        # the same way `tags` already is — otherwise a title/date containing a
+        # double quote (e.g. `My "Quoted" Post`) yields invalid TOML and the
+        # generated file fails to build.
+        safe_title = escape_string(title)
+        safe_date = escape_string(date)
+        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")}]"
         content = archetype_content
-          .gsub("{{ title }}", title)
-          .gsub("{{title}}", title)
-          .gsub("{{ date }}", date)
-          .gsub("{{date}}", date)
+          .gsub("{{ title }}", safe_title)
+          .gsub("{{title}}", safe_title)
+          .gsub("{{ date }}", safe_date)
+          .gsub("{{date}}", safe_date)
           .gsub("{{ draft }}", is_draft.to_s)
           .gsub("{{draft}}", is_draft.to_s)
           .gsub("{{ tags }}", tags_str)

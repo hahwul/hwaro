@@ -127,6 +127,32 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression: archetype substitution injected the raw title/date, so a
+    # title containing a double quote (`My "Quoted" Post`) produced invalid
+    # TOML (`title = "My "Quoted" Post"`) and the generated file failed to
+    # build. The values must be escaped like `tags` already is.
+    it "escapes a quoted title/tags in archetype front matter (valid TOML)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/custom.md", "+++\ntitle = \"{{ title }}\"\ndate = \"{{ date }}\"\ntags = {{ tags }}\n+++\n")
+
+          options = Hwaro::Config::Options::NewOptions.new(
+            path: "post.md", title: %(My "Quoted" Post), archetype: "custom", tags: [%(a "b"), "c"])
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/post.md")
+          content.should contain(%(title = "My \\"Quoted\\" Post"))
+          # Front matter must parse as valid TOML.
+          fm = content.lines.reject { |l| l.strip == "+++" }.join("\n")
+          parsed = TOML.parse(fm)
+          parsed["title"].as_s.should eq(%(My "Quoted" Post))
+          parsed["tags"].as_a.map(&.as_s).should eq([%(a "b"), "c"])
+        end
+      end
+    end
+
     it "uses an implicit archetype based on directory" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
