@@ -34,6 +34,7 @@
 - Blog series navigation now orders prev/next by `series_weight` (walking `series_pages` via `series_index`) instead of the section's flat date-ordered neighbours, which mis-ordered chapters, showed prev/next on the first/last chapter, and could link non-series posts (#591).
 - Multilingual: root taxonomy term pages now list only the default language's posts. Previously the English `/tags/foo/` page also listed the other languages' posts (translated titles, `/<lang>/` links) — a cross-language leak; the per-language `/<lang>/tags/foo/` pages were already correctly scoped (#592).
 - Pagination SEO: theme headers now render `{{ pagination_seo_links }}`, so paginated section/taxonomy pages emit `<link rel="prev">`/`<link rel="next">` (with correct per-language prefixes on multilingual sites). The engine built these links but no scaffold surfaced them (#594).
+- Scaffold nav: the dynamic-section-loop example in the `blog`/`simple` nav comment is now wrapped in `{% raw %}` (Crinja executes tags even inside HTML comments, so it was running — emitting hidden malformed `/<lang>/<lang>/…` links on multilingual sites) and the example is corrected to list only the current language's sections via `{{ base_url }}{{ s.url }}` (no doubled `lang_prefix`) (#595).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
