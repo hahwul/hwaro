@@ -77,6 +77,20 @@ describe Hwaro::Services::Scaffolds::Simple do
       header.should contain("img {")
     end
 
+    it "wires JSON-LD structured data into the header of SEO scaffolds" do
+      # Regression: the engine generates JSON-LD and exposes it as `{{ jsonld }}`,
+      # but no scaffold included it, so the advertised structured-data feature
+      # produced nothing out of the box.
+      {
+        Hwaro::Services::Scaffolds::Simple.new,
+        Hwaro::Services::Scaffolds::Blog.new,
+        Hwaro::Services::Scaffolds::Docs.new,
+        Hwaro::Services::Scaffolds::Book.new,
+      }.each do |scaffold|
+        scaffold.template_files["header.html"].should contain("{{ jsonld }}")
+      end
+    end
+
     it "includes footer.html" do
       scaffold = Hwaro::Services::Scaffolds::Simple.new
       files = scaffold.template_files

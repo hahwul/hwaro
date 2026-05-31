@@ -335,6 +335,7 @@ module Hwaro
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
+              {{ jsonld }}
               {{ hreflang_tags }}
               #{styles}
               {{ highlight_css }}
