@@ -470,6 +470,24 @@ module Hwaro
             .series-nav a { color: var(--primary); text-decoration: none; }
             .series-nav a:hover { text-decoration: underline; }
 
+            .related-posts {
+              margin-top: 2.5rem;
+              padding-top: 1.5rem;
+              border-top: 1px solid var(--border);
+            }
+            .related-title {
+              font-size: 0.8rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--text-muted);
+              margin: 0 0 0.75rem 0;
+            }
+            .related-posts ul { margin: 0; padding-left: 1.1rem; }
+            .related-posts li { margin: 0.25rem 0; }
+            .related-posts a { color: var(--primary); text-decoration: none; }
+            .related-posts a:hover { text-decoration: underline; }
+
             .post-content h2 {
               margin-top: 2.5rem;
               padding-bottom: 0.4rem;
@@ -947,6 +965,18 @@ module Hwaro
                     <a href="{{ base_url }}{{ page.higher.url }}" class="series-next" rel="next">{{ page.higher.title | e }} →</a>
                     {% endif %}
                   </nav>
+                  {% endif %}
+
+                  {# Related posts (shown when [related] is enabled and matches exist). #}
+                  {% if page.related_posts %}
+                  <aside class="related-posts" aria-label="Related posts">
+                    <h2 class="related-title">Related posts</h2>
+                    <ul>
+                      {% for r in page.related_posts %}
+                      <li><a href="{{ base_url }}{{ r.url }}">{{ r.title | e }}</a></li>
+                      {% endfor %}
+                    </ul>
+                  </aside>
                   {% endif %}
                 </article>
             {% include "footer.html" %}

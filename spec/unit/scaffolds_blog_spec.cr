@@ -102,5 +102,15 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl.should contain("post-meta")
       tpl.should contain("page.date")
     end
+
+    # The engine computes `page.related_posts` when [related] is enabled, but
+    # no scaffold rendered it — so the advertised feature produced nothing.
+    # post.html now renders a guarded related block.
+    it "renders related posts (guarded by page.related_posts)" do
+      tpl = Hwaro::Services::Scaffolds::Blog.new.template_files["post.html"].not_nil!
+      tpl.should contain("{% if page.related_posts %}")
+      tpl.should contain("{% for r in page.related_posts %}")
+      tpl.should contain("class=\"related-posts\"")
+    end
   end
 end
