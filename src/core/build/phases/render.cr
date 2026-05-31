@@ -733,7 +733,8 @@ module Hwaro::Core::Build::Phases::Render
             end
 
       widths = resize_map[key]?
-      next tag unless widths && !widths.empty?
+      next tag unless widths
+      next tag if widths.empty?
 
       srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{url} #{w}w" }.join(", ")
       additions = %( srcset="#{srcset}")
