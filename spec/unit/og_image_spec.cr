@@ -36,7 +36,7 @@ describe Hwaro::Models::AutoImageConfig do
       ai.pattern_scale.should eq(1.0)
       ai.background_image.should be_nil
       ai.overlay_opacity.should eq(0.45)
-      ai.format.should eq("svg")
+      ai.format.should eq("png")
       ai.font_path.should be_nil
       ai.accent_bars.should be_false
     end
@@ -688,6 +688,7 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.title = "My Site"
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # explicit SVG path coverage
 
         page = Hwaro::Models::Page.new("test.md")
         page.title = "My Post"
@@ -751,6 +752,7 @@ describe Hwaro::Content::Seo::OgImage do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: asserts the .svg output path
         config.og.auto_image.output_dir = "social-images"
 
         page = Hwaro::Models::Page.new("test.md")
@@ -769,6 +771,7 @@ describe Hwaro::Content::Seo::OgImage do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: asserts the .svg output paths
 
         page1 = Hwaro::Models::Page.new("a.md")
         page1.title = "First Post"
@@ -880,6 +883,7 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.title = "My Site"
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: asserts the .svg path + mtime
 
         page = Hwaro::Models::Page.new("test.md")
         page.title = "My Post"
@@ -908,6 +912,7 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.title = "My Site"
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: reads rendered text from the file
 
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Original Title"
@@ -933,6 +938,7 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.title = "My Site"
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: compares rendered file contents
 
         page = Hwaro::Models::Page.new("test.md")
         page.title = "My Post"
@@ -957,6 +963,7 @@ describe Hwaro::Content::Seo::OgImage do
         config = Hwaro::Models::Config.new
         config.title = "My Site"
         config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg" # pin SVG: asserts the .svg path
 
         page = Hwaro::Models::Page.new("test.md")
         page.title = "My Post"
