@@ -99,7 +99,10 @@ module Hwaro
 
           # Convert <img> to <amp-img>
           result = result.gsub(/<img([^>]*)\/?>/mi) do
-            attrs = $1
+            # `[^>]*` greedily swallows the self-closing slash from `<img … />`,
+            # which would otherwise be appended mid-tag as
+            # `<amp-img … / layout="…">` — invalid AMP. Strip a trailing slash.
+            attrs = $1.sub(/\s*\/\s*$/, "")
             has_width = attrs.includes?("width=")
             has_height = attrs.includes?("height=")
 

@@ -100,6 +100,24 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain(%(<div class="amp-img-container"><amp-img))
     end
 
+    # Markdown renders images as self-closing `<img … />`. The conversion regex
+    # greedily captured that trailing slash, producing the invalid
+    # `<amp-img … / layout="fill">`. The slash must be stripped.
+    it "does not leave a stray slash mid-tag for self-closing <img />" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<p><img src="https://example.com/a.png" alt="A diagram" /></p>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<amp-img")
+      result.should_not contain("<img")
+      result.should contain("</amp-img>")
+      # No orphaned self-closing slash before the appended layout attribute.
+      result.should_not match(/<amp-img[^>]*\/\s+layout=/)
+      result.should_not contain(%(alt="A diagram" /))
+    end
+
     it "removes inline style attributes" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
