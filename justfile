@@ -85,6 +85,7 @@ test-friends:
         "omarluq/termisu docs-web"
         "hahwul/dalfox docs"
         "owasp-noir/noir docs"
+        "chei-l/chei-l.github.io ."
     )
 
     # Ensure we have a built binary
@@ -92,6 +93,11 @@ test-friends:
         echo "Building hwaro binary..."
         just build
     fi
+
+    # Absolute path to the binary, resolved once from the project root.
+    # Using an absolute path keeps the build step independent of how deep
+    # a friend's doc-path is — including "." when the repo root *is* the site.
+    HWARO_BIN="$PWD/bin/hwaro"
 
     echo ""
     echo "Testing hwaro friend sites"
@@ -135,7 +141,7 @@ test-friends:
 
         echo "    ... Building..."
 
-        if (cd "$site_path" && ../../../bin/hwaro build -q); then
+        if (cd "$site_path" && "$HWARO_BIN" build -q); then
             echo "    ✓ Build successful"
             results+=("✓ $repo ($doc_path)")
             ((passed++))
