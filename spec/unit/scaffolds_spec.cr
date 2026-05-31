@@ -91,6 +91,23 @@ describe Hwaro::Services::Scaffolds::Simple do
       end
     end
 
+    it "keeps the dynamic-nav example inert ({% raw %}) and multilingual-safe" do
+      # Regression: the example `{% for s in site.sections %}` loop lived in a
+      # plain HTML comment, so Crinja executed it — emitting hidden, malformed
+      # `/ko/ko/posts/` links — and the example itself double-prefixed
+      # (`{{ lang_prefix }}{{ s.url }}`) and listed every language's section.
+      navs = {
+        Hwaro::Services::Scaffolds::Simple.new.template_files["header.html"],
+        Hwaro::Services::Scaffolds::Blog.new.template_files["partials/nav.html"],
+      }
+      navs.each do |nav|
+        nav.should contain("{% raw %}")                        # example is inert in the comment
+        nav.should contain("s.language == page_language")      # only current-language sections
+        nav.should contain("{{ base_url }}{{ s.url }}")        # s.url already carries the prefix
+        nav.should_not contain("{{ lang_prefix }}{{ s.url }}") # no double prefix
+      end
+    end
+
     it "wires pagination SEO links (rel=prev/next) into the header of SEO scaffolds" do
       # Regression: the engine builds `pagination_seo_links` (<link rel="prev"/
       # "next">) for paginated pages, but no scaffold rendered it, so paginated
