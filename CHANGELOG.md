@@ -27,6 +27,7 @@
 - `docs` and `book` themes now render the in-page table of contents when a page sets `toc = true`. The `{{ toc }}` data was exposed by the engine but no built-in theme referenced it, so the documented option silently did nothing; the `book` archetype now enables `toc` by default (#584).
 - `[highlight] use_cdn = false` now warns at build time when the self-hosted highlight.js assets (`static/assets/js/highlight.min.js` + theme CSS) are missing, instead of silently emitting 404 references and shipping a site with no syntax highlighting (#585).
 - `hwaro build --cache`: a no-op rebuild (all pages cached) no longer prints the false "No content found" hint. The hint keyed off pages *rendered* this build, which is 0 when everything is served from cache; it now also requires zero cache hits, so it only fires for a genuinely empty site (#586).
+- AMP: self-closing markdown images (`<img … />`) no longer produce an invalid `<amp-img … / layout="fill">` (stray slash mid-tag) that failed AMP validation. The conversion now strips the trailing slash before appending the layout attribute (#588).
 
 ### Performance
 - Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
