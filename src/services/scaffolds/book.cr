@@ -171,6 +171,7 @@ module Hwaro
             draft = {{ draft }}
             description = ""
             weight = 0
+            toc = true
             +++
 
             MD
@@ -425,6 +426,48 @@ module Hwaro
               margin: 0 auto;
               padding: 2.5rem 3rem;
               width: 100%;
+            }
+
+            .book-toc {
+              margin: 1.5rem 0 2rem 0;
+              padding: 1rem 1.25rem;
+              background: var(--bg-secondary);
+              border: 1px solid var(--border-light);
+              border-radius: var(--radius);
+            }
+
+            .book-toc-title {
+              margin: 0 0 0.5rem 0;
+              font-size: 0.8rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--text-muted);
+            }
+
+            .book-toc ul {
+              margin: 0;
+              padding-left: 1.1rem;
+              list-style: none;
+            }
+
+            .book-toc ul ul {
+              padding-left: 1rem;
+            }
+
+            .book-toc li {
+              margin: 0.25rem 0;
+              line-height: 1.5;
+            }
+
+            .book-toc a {
+              color: var(--text-secondary);
+              text-decoration: none;
+            }
+
+            .book-toc a:hover {
+              color: var(--primary);
+              text-decoration: underline;
             }
 
             /* ── Typography ── */
@@ -1329,6 +1372,7 @@ module Hwaro
               <main class="book-main">
                 <div class="book-content">
                   {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
+                  {% if toc %}<nav class="book-toc" aria-label="On this page"><p class="book-toc-title">On this page</p>{{ toc }}</nav>{% endif %}
                   {{ content }}
                 </div>
             {% include "footer.html" %}

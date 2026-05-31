@@ -72,6 +72,18 @@ describe Hwaro::Services::Scaffolds::Docs do
       footer.should contain("js/search.js")
     end
 
+    # The docs archetype sets `toc = true`, but the page template never
+    # rendered `{{ toc }}` — so the table of contents was silently dropped.
+    it "renders an in-page table of contents in the page template" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      page = scaffold.template_files["page.html"]
+      page.should contain("{% if toc %}")
+      page.should contain("{{ toc }}")
+      page.should contain("docs-toc")
+      # And the docs archetypes that drive it still enable toc.
+      scaffold.archetype_files["guide.md"].should contain("toc = true")
+    end
+
     # Regression for gh#523: the docs sidebar used to be a hand-written
     # `<aside>` with the original three sections × three to four
     # pages baked in, so any page added via `hwaro new` never appeared
