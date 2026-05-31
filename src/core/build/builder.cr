@@ -804,7 +804,12 @@ module Hwaro
           # index files are also written to disk, so a bare "N pages" count
           # misleads users who diff this number against `find public -name '*.html'`.
           Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} content pages#{raw_msg} in #{elapsed.total_milliseconds.round(2)}ms."
-          if ctx.stats.pages_rendered == 0 && ctx.stats.raw_files_processed == 0
+          # Only warn about an empty site when nothing was built at all. Under
+          # `--cache`, unchanged pages are skipped (counted as `cache_hits`)
+          # rather than re-rendered, so `pages_rendered` is 0 on a no-op rebuild
+          # even though the site is full — guarding on `cache_hits == 0` keeps
+          # the hint from misfiring on every cached rebuild.
+          if ctx.stats.pages_rendered == 0 && ctx.stats.cache_hits == 0 && ctx.stats.raw_files_processed == 0
             Logger.info "No content found. Add Markdown files under content/ before deploying, or run `hwaro new <path>.md` to scaffold one."
           end
 

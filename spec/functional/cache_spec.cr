@@ -323,3 +323,64 @@ describe "Cache: Cache with section content" do
     end
   end
 end
+
+describe "Cache: empty-site hint" do
+  # The "No content found" hint must not fire on a cached no-op rebuild.
+  # `--cache` skips unchanged pages (counted as cache_hits) rather than
+  # re-rendering them, so pages_rendered is 0 even though the site is full.
+  it "does not print 'No content found' on a cached no-op rebuild" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/page.md", "---\ntitle: Page\n---\nContent")
+        File.write("templates/page.html", "{{ content }}")
+
+        builder1 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
+        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+
+        # Capture the second (no-op) build's log.
+        io = IO::Memory.new
+        prev = Hwaro::Logger.io
+        Hwaro::Logger.io = io
+        begin
+          builder2 = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
+          builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        ensure
+          Hwaro::Logger.io = prev
+        end
+
+        io.to_s.should_not contain("No content found")
+      end
+    end
+  end
+
+  # Positive control: a genuinely empty site still warns (and confirms the
+  # hint is reachable through Logger.io capture, so the assertion above is real).
+  it "still prints 'No content found' when there is no content at all" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+
+        io = IO::Memory.new
+        prev = Hwaro::Logger.io
+        Hwaro::Logger.io = io
+        begin
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        ensure
+          Hwaro::Logger.io = prev
+        end
+
+        io.to_s.should contain("No content found")
+      end
+    end
+  end
+end
