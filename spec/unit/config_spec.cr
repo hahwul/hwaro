@@ -126,6 +126,29 @@ describe Hwaro::Models::Config do
     end
   end
 
+  describe "#base_url= normalization" do
+    # A trailing slash makes `{{ base_url }}/path` templates and canonical/og
+    # URLs emit `//`; the setter strips it so config.toml and --base-url agree.
+    it "strips a trailing slash on assignment" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/"
+      config.base_url.should eq("https://example.com")
+      config.base_url_stripped.should eq("https://example.com")
+    end
+
+    it "strips a trailing slash from a subpath base_url" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/sub/"
+      config.base_url.should eq("https://example.com/sub")
+    end
+
+    it "leaves a slash-free base_url unchanged" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/sub"
+      config.base_url.should eq("https://example.com/sub")
+    end
+  end
+
   describe "#initialize" do
     it "has default values" do
       config = Hwaro::Models::Config.new

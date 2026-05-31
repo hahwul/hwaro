@@ -791,7 +791,7 @@ module Hwaro
     class Config
       property title : String
       property description : String
-      property base_url : String
+      getter base_url : String
       property sitemap : SitemapConfig
       property robots : RobotsConfig
       property llms : LlmsConfig
@@ -854,6 +854,15 @@ module Hwaro
         @doctor = DoctorConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
+      end
+
+      # Normalize on assignment: a trailing slash makes `{{ base_url }}/path`
+      # templates (and canonical/og URLs) emit `//`. Strip it so the build is
+      # correct whether the trailing slash came from config.toml or `--base-url`
+      # (previously only `doctor --fix` normalized this).
+      def base_url=(value : String)
+        @base_url = value.rstrip("/")
+        @base_url_stripped = nil
       end
 
       # Cached base_url with trailing slash stripped (avoids repeated rstrip per page)
