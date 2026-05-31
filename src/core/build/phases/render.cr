@@ -1139,14 +1139,14 @@ module Hwaro::Core::Build::Phases::Render
     vars
   end
 
-  # Compute a content-based cache bust hash from local CSS/JS files.
   # Public URLs of self-hosted highlight.js assets that are referenced
   # (`[highlight] use_cdn = false`) but missing from `static/`. Empty when the
   # CDN is used, highlighting is disabled, or every asset is present. Hwaro
   # never copies these files itself, so the user is expected to drop them under
   # `static/assets/`; this surfaces the gap instead of shipping 404s.
   def missing_local_highlight_assets(config : Models::Config) : Array(String)
-    return [] of String unless config.highlight.enabled && !config.highlight.use_cdn
+    return [] of String unless config.highlight.enabled
+    return [] of String if config.highlight.use_cdn
 
     missing = [] of String
     css_rel = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
@@ -1166,6 +1166,7 @@ module Hwaro::Core::Build::Phases::Render
                 "static/assets/css/highlight/#{config.highlight.theme}.min.css), or set [highlight] use_cdn = true."
   end
 
+  # Compute a content-based cache bust hash from local CSS/JS files.
   # Returns an 8-character hex digest, or "" if no local files exist.
   private def compute_cache_bust(config : Models::Config) : String
     has_local_highlight = config.highlight.enabled && !config.highlight.use_cdn
