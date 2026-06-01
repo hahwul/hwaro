@@ -425,6 +425,53 @@ describe "Multilingual: Taxonomy output" do
     end
   end
 
+  it "emits all global taxonomies at the root when the default language omits the taxonomies key" do
+    # A `[languages.<default>]` block without a `taxonomies` key inherits the
+    # global set, so a third taxonomy (`authors`) is still emitted at the root
+    # rather than silently dropped — guards the upgrade path for hand-written
+    # configs that predate per-language taxonomy filtering.
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [[taxonomies]]
+      name = "tags"
+
+      [[taxonomies]]
+      name = "authors"
+
+      [languages.en]
+      language_name = "English"
+      weight = 1
+
+      [languages.ko]
+      language_name = "한국어"
+      weight = 2
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "posts/_index.md"    => "---\ntitle: Posts\n---\n",
+        "posts/_index.ko.md" => "---\ntitle: 포스트\n---\n",
+        "posts/p.md"         => "---\ntitle: Post\ntags:\n  - x\nauthors:\n  - alice\n---\nEN",
+        "posts/p.ko.md"      => "---\ntitle: 글\ntags:\n  - x\nauthors:\n  - alice\n---\nKO",
+      },
+      template_files: {
+        "page.html"          => "{{ content }}",
+        "section.html"       => "{{ content }}",
+        "taxonomy.html"      => "<h1>{{ taxonomy_name }}</h1>",
+        "taxonomy_term.html" => "<h1>{{ taxonomy_term }}</h1>",
+      },
+    ) do
+      File.exists?("public/tags/x/index.html").should be_true
+      File.exists?("public/authors/alice/index.html").should be_true
+      # Non-default language inherits the global set too.
+      File.exists?("public/ko/authors/alice/index.html").should be_true
+    end
+  end
+
   it "emits a taxonomy for every language when each per-language list enables it" do
     # Mirror of the scaffold's fixed config: the per-language `taxonomies`
     # lists include `authors`, so both the root and the language-prefixed
