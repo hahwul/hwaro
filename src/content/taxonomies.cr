@@ -34,7 +34,20 @@ module Hwaro
         # links and translated titles), a cross-language leak. Non-multilingual
         # sites pass `nil` (no filtering needed — every page is the one space).
         root_language = config.multilingual? ? config.default_language : nil
-        generate_taxonomies_for_language(config.taxonomies, site, output_dir, templates, builder, verbose, language: root_language, lang_prefix: "")
+
+        # On a multilingual site the default language is served at the root and,
+        # like every other language, should honor its own per-language
+        # `taxonomies` list. Previously the root always used the global
+        # `config.taxonomies`, so the default language silently ignored
+        # `[languages.<default>].taxonomies` while non-default languages
+        # respected theirs — an asymmetry that emitted e.g. `/authors/` but never
+        # `/ko/authors/` for identical per-language config. Fall back to the
+        # global list when the default language has no `[languages.<code>]` block.
+        root_taxonomies = config.taxonomies
+        if root_language && (default_cfg = config.languages[root_language]?)
+          root_taxonomies = config.taxonomies.select { |t| default_cfg.taxonomies.includes?(t.name) }
+        end
+        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, language: root_language, lang_prefix: "")
 
         # For multilingual sites, also generate language-prefixed taxonomy pages
         # (e.g. /en/tags/, /en/categories/) using only pages of that language.
