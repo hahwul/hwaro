@@ -163,18 +163,7 @@ module Hwaro
 
           # Apply permalinks mapping
           directory_path = Path[relative_path].dirname.to_s
-          effective_dir = directory_path
-
-          config.permalinks.each do |source, target|
-            if directory_path == source
-              effective_dir = target
-              break
-            elsif directory_path.starts_with?("#{source}/")
-              rest = directory_path[(source.size + 1)..]
-              effective_dir = target.empty? ? rest : "#{target}/#{rest}"
-              break
-            end
-          end
+          effective_dir = config.resolve_permalink_dir(directory_path)
 
           # For multilingual sites, include language prefix for non-default languages
           lang_prefix = if page.language && page.language != config.default_language
