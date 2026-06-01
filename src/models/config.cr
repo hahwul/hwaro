@@ -887,6 +887,26 @@ module Hwaro
         @languages.values.sort_by!(&.weight)
       end
 
+      # Resolve a content directory through the configured `permalinks` rules.
+      #
+      # Returns the remapped directory (relative to the site root) for the first
+      # rule whose source matches `directory_path` exactly or as a parent prefix;
+      # the matched prefix is replaced and any deeper path is preserved. An empty
+      # target maps the matched tree to the site root (so `pages/contact` under
+      # `"pages" => ""` becomes `contact`, not `/contact`). Returns
+      # `directory_path` unchanged when no rule matches.
+      def resolve_permalink_dir(directory_path : String) : String
+        permalinks.each do |source, target|
+          if directory_path == source
+            return target
+          elsif directory_path.starts_with?("#{source}/")
+            rest = directory_path[(source.size + 1)..]
+            return target.empty? ? rest : "#{target}/#{rest}"
+          end
+        end
+        directory_path
+      end
+
       # Load and parse a `config.toml` into a populated `Config`.
       #
       # Raises `Hwaro::HwaroError(HWARO_E_CONFIG)` directly at the source for

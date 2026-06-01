@@ -2122,3 +2122,48 @@ describe Hwaro::Models::OpenGraphConfig do
     config.og_type.should eq("article")
   end
 end
+
+private def config_with(permalinks : Hash(String, String)) : Hwaro::Models::Config
+  config = Hwaro::Models::Config.new
+  config.permalinks = permalinks
+  config
+end
+
+describe "Hwaro::Models::Config#resolve_permalink_dir" do
+  it "returns the directory unchanged when no rules are configured" do
+    config_with({} of String => String).resolve_permalink_dir("blog/posts").should eq("blog/posts")
+  end
+
+  it "returns the directory unchanged when no rule matches" do
+    config_with({"old/posts" => "posts"}).resolve_permalink_dir("blog").should eq("blog")
+  end
+
+  it "remaps an exact directory match to the target" do
+    config_with({"old/posts" => "posts"}).resolve_permalink_dir("old/posts").should eq("posts")
+  end
+
+  it "remaps an exact match with an empty target to the root" do
+    config_with({"pages" => ""}).resolve_permalink_dir("pages").should eq("")
+  end
+
+  it "remaps a nested subdirectory and preserves the deeper path" do
+    config_with({"old/posts" => "archive"}).resolve_permalink_dir("old/posts/2024").should eq("archive/2024")
+  end
+
+  it "maps a nested subdirectory to the root without a leading slash for an empty target" do
+    config_with({"pages" => ""}).resolve_permalink_dir("pages/contact").should eq("contact")
+  end
+
+  it "honors the first matching rule" do
+    permalinks = {
+      "2023/drafts" => "archive/2023",
+      "old/posts"   => "posts",
+    }
+    config_with(permalinks).resolve_permalink_dir("2023/drafts/wip").should eq("archive/2023/wip")
+  end
+
+  it "matches the source literally rather than as a regular expression" do
+    config_with({"a.b" => "x"}).resolve_permalink_dir("a.b/c").should eq("x/c")
+    config_with({"a.b" => "x"}).resolve_permalink_dir("axb/c").should eq("axb/c")
+  end
+end
