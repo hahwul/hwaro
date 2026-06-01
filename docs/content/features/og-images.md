@@ -376,6 +376,46 @@ The rendering order is: background color → background image → color overlay 
 
 The `overlay_opacity` controls how much the background color covers the image (0.0 = fully visible image, 1.0 = image completely hidden behind background color).
 
+### Preview
+
+The examples below use the same photo, `style = "editorial"`, and a near-black `background` — only `overlay_opacity` changes. Lower values let the photo come through; higher values dim it so the title stays readable. Click any image to zoom.
+
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/bg-image-low.png" alt="background image with low overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.3</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/bg-image-low.png" alt="background image with low overlay" />
+        <p><code>overlay_opacity = 0.3</code> — Photo stays vivid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/bg-image-mid.png" alt="background image with balanced overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.55</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/bg-image-mid.png" alt="background image with balanced overlay" />
+        <p><code>overlay_opacity = 0.55</code> — Balanced photo and text</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img src="/images/og-style-examples/bg-image-high.png" alt="background image with high overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.8</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img src="/images/og-style-examples/bg-image-high.png" alt="background image with high overlay" />
+        <p><code>overlay_opacity = 0.8</code> — Photo dimmed, text dominant</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+
 ## PNG Output
 
 By default, images are generated as SVG. Set `format = "png"` to produce PNG files instead:

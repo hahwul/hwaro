@@ -190,3 +190,17 @@ test-friends:
 og-samples:
     @[ -f bin/hwaro ] || just build
     ./scripts/generate_og_samples.sh
+
+# Regenerate the `background_image` preview samples for the docs.
+#
+# These demonstrate how `overlay_opacity` dims a real background photo,
+# using the same photo/style across three overlay values.
+#
+#     just og-bg-samples
+#
+# The generated images will be placed in:
+#     docs/static/images/og-style-examples/bg-image-{low,mid,high}.png
+[group('documents')]
+og-bg-samples:
+    @[ -f bin/hwaro ] || just build
+    ./scripts/generate_og_bg_examples.sh
