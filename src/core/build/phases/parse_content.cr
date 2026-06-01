@@ -273,7 +273,8 @@ module Hwaro::Core::Build::Phases::ParseContent
           effective_dir = target
           break
         elsif directory_path.starts_with?("#{source}/")
-          effective_dir = target + directory_path[source.size..]
+          rest = directory_path[(source.size + 1)..]
+          effective_dir = target.empty? ? rest : "#{target}/#{rest}"
           break
         end
       end
