@@ -265,6 +265,43 @@ describe Hwaro::Core::Build::Builder do
 
         page.url.should eq("/archive/2023/wip/")
       end
+
+      it "maps a flat file under an empty-target source to root" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"pages" => ""}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("pages/about.md")
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/about/")
+      end
+
+      it "maps a nested subdirectory under an empty-target source to root without doubling slashes" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"pages" => ""}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("pages/contact/info.md")
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/contact/info/")
+      end
+
+      it "maps a nested section index under an empty-target source to root without doubling slashes" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"pages" => ""}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("pages/contact/_index.md")
+        page.is_index = true
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/contact/")
+      end
     end
 
     # -----------------------------------------------------------------------

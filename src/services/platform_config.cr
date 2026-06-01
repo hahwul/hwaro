@@ -326,7 +326,8 @@ module Hwaro
             effective_dir = target
             break
           elsif directory_path.starts_with?("#{source}/")
-            effective_dir = directory_path.sub(/^#{Regex.escape(source)}\//, "#{target}/")
+            rest = directory_path[(source.size + 1)..]
+            effective_dir = target.empty? ? rest : "#{target}/#{rest}"
             break
           end
         end
