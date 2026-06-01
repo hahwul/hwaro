@@ -318,19 +318,9 @@ module Hwaro
       # Handles slug overrides, custom_path, permalinks, and index pages.
       private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?) : String
         directory_path = Path[relative_path].dirname.to_s
-        effective_dir = directory_path
 
         # Apply permalinks mapping from config
-        @config.permalinks.each do |source, target|
-          if directory_path == source
-            effective_dir = target
-            break
-          elsif directory_path.starts_with?("#{source}/")
-            rest = directory_path[(source.size + 1)..]
-            effective_dir = target.empty? ? rest : "#{target}/#{rest}"
-            break
-          end
-        end
+        effective_dir = @config.resolve_permalink_dir(directory_path)
 
         if custom_path
           custom = custom_path.lchop("/")
