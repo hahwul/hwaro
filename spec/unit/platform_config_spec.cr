@@ -208,6 +208,23 @@ describe Hwaro::Services::PlatformConfig do
           end
         end
       end
+
+      it "maps a nested alias to root for an empty-target permalink without doubling slashes" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/pages/contact")
+            File.write("content/pages/contact/form.md", "---\ntitle: Contact\naliases:\n  - /old-contact/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.permalinks["pages"] = ""
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should contain("to = \"/contact/form/\"")
+            result.should_not contain("to = \"//contact/form/\"")
+          end
+        end
+      end
     end
 
     describe "codeberg-pages" do

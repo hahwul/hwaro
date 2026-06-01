@@ -42,6 +42,33 @@ describe Hwaro::Content::Hooks::MarkdownHooks do
       end
     end
 
+    it "maps a nested path to root for an empty-target permalink without doubling slashes" do
+      Dir.mktmpdir do |tmpdir|
+        content_dir = File.join(tmpdir, "content", "pages", "contact")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "form.md"), "---\ntitle: Contact\n---\nReach me")
+
+        Dir.cd(tmpdir) do
+          manager = Hwaro::Core::Lifecycle::Manager.new
+          hooks = Hwaro::Content::Hooks::MarkdownHooks.new
+          hooks.register_hooks(manager)
+
+          options = Hwaro::Config::Options::BuildOptions.new
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+          site_config = Hwaro::Models::Config.new
+          site_config.permalinks["pages"] = ""
+          ctx.config = site_config
+
+          page = Hwaro::Models::Page.new("pages/contact/form.md")
+          ctx.pages << page
+
+          manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterReadContent, ctx)
+
+          page.url.should eq("/contact/form/")
+        end
+      end
+    end
+
     it "filters drafts when drafts option is false" do
       Dir.mktmpdir do |tmpdir|
         content_dir = File.join(tmpdir, "content")
