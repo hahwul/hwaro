@@ -1477,6 +1477,53 @@ describe Hwaro::Models::Config do
       ja.build_search_index.should be_false
     end
 
+    it "inherits the global taxonomy set when a language omits the taxonomies key" do
+      # A `[languages.<code>]` block without a `taxonomies` key must inherit the
+      # full global `[[taxonomies]]` set, not the hardcoded `["tags",
+      # "categories"]` default — otherwise a third taxonomy (e.g. `authors`)
+      # silently vanishes from that language's output (a regression for the
+      # default language served at the root).
+      config = load_config(<<-TOML)
+        title = "Test"
+        default_language = "en"
+
+        [[taxonomies]]
+        name = "tags"
+        [[taxonomies]]
+        name = "categories"
+        [[taxonomies]]
+        name = "authors"
+
+        [languages.en]
+        language_name = "English"
+
+        [languages.ko]
+        language_name = "한국어"
+        taxonomies = ["tags"]
+        TOML
+
+      # Omitted key → inherit every global taxonomy.
+      config.languages["en"].taxonomies.should eq(["tags", "categories", "authors"])
+      # Explicit key → honored verbatim (narrowing is still possible).
+      config.languages["ko"].taxonomies.should eq(["tags"])
+    end
+
+    it "honors an explicit empty taxonomies list (no inheritance)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[taxonomies]]
+        name = "tags"
+
+        [languages.ko]
+        language_name = "한국어"
+        taxonomies = []
+        TOML
+
+      # Explicit `[]` means "no taxonomies", distinct from an omitted key.
+      config.languages["ko"].taxonomies.should eq([] of String)
+    end
+
     it "loads language generate_feed = false from TOML (overrides default true)" do
       config = load_config(<<-TOML)
         title = "Test"

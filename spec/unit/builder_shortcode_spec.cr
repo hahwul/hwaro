@@ -745,6 +745,12 @@ describe Hwaro::Core::Build::Builder do
       output.scan("alert").size.should eq(1)
       output.should contain("youtube")
       output.should contain("Crinja syntax")
+      # The message must show BOTH conversion forms: self-closing shortcodes
+      # (youtube/figure/gist) map to `{{ name(...) }}`, paired ones to the
+      # block `{% name(...) %}…{% end %}`. Advising the block form for a
+      # self-closing shortcode yields an unclosed tag that renders literally.
+      output.should contain("{{ name(arg=\"v\") }}")
+      output.should contain("{% name(arg=\"v\") %}")
     end
 
     it "stays silent when content has no Hugo-style shortcodes" do

@@ -262,7 +262,7 @@ module Hwaro
               str << "[languages]\n"
               lang_blocks = multilingual_languages.map_with_index do |lang, index|
                 lang_name = language_display_name(lang)
-                tax_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\"]"
+                tax_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\", \"authors\"]"
                 "  [languages.#{lang}]\n" \
                 "  language_name = \"#{lang_name}\"\n" \
                 "  weight = #{index + 1}\n" \

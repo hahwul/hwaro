@@ -1697,11 +1697,15 @@ module Hwaro::Core::Build::Phases::Render
 
   # Hugo-style `{{< name >}}` shortcodes aren't a Hwaro syntax — they'd
   # otherwise reach Markdown unchanged and ship as HTML-escaped literals
-  # (`{{&lt; alert &gt;}}`) in the rendered page. The conversion is
-  # mechanical (`{{< name args >}}` → `{% name(args) %}`), but doing it
-  # silently would hide the migration step from the author. Warn once
-  # per page and list the distinct shortcode names so the message is
-  # actionable in a `hwaro build` log even with hundreds of pages.
+  # (`{{&lt; alert &gt;}}`) in the rendered page. The conversion depends on
+  # whether the shortcode wraps a body: self-closing Hugo shortcodes
+  # (`{{< youtube id="v" >}}`) map to the direct-call form `{{ youtube(id="v") }}`,
+  # while paired ones (`{{< alert >}}…{{< /alert >}}`) map to the block form
+  # `{% alert(…) %}…{% end %}`. Emitting `{% youtube(…) %}` for a self-closing
+  # shortcode produces an unclosed block tag that still ships as literal text,
+  # so the warning must show both forms. Warn once per page and list the
+  # distinct shortcode names so the message is actionable in a `hwaro build`
+  # log even with hundreds of pages.
   HUGO_SHORTCODE_RE = /\{\{<\s*\/?\s*([a-zA-Z_][\w\-]*)/
 
   private def warn_hugo_shortcode_syntax(raw : String, path : String) : Nil
@@ -1710,8 +1714,9 @@ module Hwaro::Core::Build::Phases::Render
     return if names.empty?
     sorted = names.to_a.sort
     Logger.warn "Hugo-style shortcode syntax `{{< … >}}` is not supported and will render as literal text in #{path}. " \
-                "Found: #{sorted.join(", ")}. Convert to Hwaro's Crinja syntax: " \
-                "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}` (or better: `{% endname %}`). Named closers are recommended."
+                "Found: #{sorted.join(", ")}. Convert to Hwaro's Crinja syntax — self-closing: " \
+                "`{{< name arg=\"v\" >}}` → `{{ name(arg=\"v\") }}`; with a body: " \
+                "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}` (named closer `{% endname %}` recommended)."
   end
 
   # Resolve the page kind into an `og:type` override. Returns "website"

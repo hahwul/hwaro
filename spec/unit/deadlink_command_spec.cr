@@ -112,6 +112,26 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
         links[0].url.should eq("https://nested.example.com")
       end
     end
+
+    it "ignores links inside fenced code blocks and inline code" do
+      Dir.mktmpdir do |dir|
+        content = <<-MD
+          Real link: [Real](https://real.example.com)
+
+          ```markdown
+          [Example](https://example.com/in-fence)
+          ```
+
+          Inline `[Inline](https://example.com/inline)` should be ignored too.
+          MD
+        File.write(File.join(dir, "test.md"), content)
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_links_for_test(dir)
+
+        links.map(&.url).should eq(["https://real.example.com"])
+      end
+    end
   end
 
   describe "#find_internal_links" do
@@ -149,6 +169,30 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
 
         links.size.should eq(1)
         links[0].url.should eq("/page/")
+      end
+    end
+
+    it "ignores internal links and images inside fenced code blocks" do
+      # Regression: the docs scaffold ships an image-syntax example
+      # `![Diagram](/images/diagram.png)` inside a ```markdown fence. It is a
+      # snippet, not a real image, so it must not be reported as a dead link.
+      Dir.mktmpdir do |dir|
+        content = <<-MD
+          Reference images like this:
+
+          ```markdown
+          ![Diagram](/images/diagram.png)
+          [Guide](/guide/missing/)
+          ```
+
+          But [this real link](/page/) should still be found.
+          MD
+        File.write(File.join(dir, "test.md"), content)
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        links.map(&.url).should eq(["/page/"])
       end
     end
   end

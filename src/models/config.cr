@@ -1325,6 +1325,16 @@ module Hwaro
 
           if taxonomies = lang_hash["taxonomies"]?.try(&.as_a?)
             lang_config.taxonomies = taxonomies.compact_map(&.as_s?)
+          else
+            # No per-language `taxonomies` key → inherit the global
+            # `[[taxonomies]]` set rather than the hardcoded `["tags",
+            # "categories"]` default. Otherwise a `[languages.<code>]` block
+            # that omits the key silently restricts that language to two
+            # taxonomies, dropping any third (e.g. `authors`) from its output —
+            # for the default language that means a taxonomy generated before
+            # this block existed would disappear at the root. `load_taxonomies`
+            # runs before `load_languages`, so `config.taxonomies` is populated.
+            lang_config.taxonomies = config.taxonomies.map(&.name)
           end
 
           config.languages[lang_code] = lang_config

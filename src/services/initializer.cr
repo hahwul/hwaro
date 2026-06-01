@@ -279,7 +279,7 @@ module Hwaro
 
         lang_configs = languages.map_with_index do |lang, index|
           lang_name = language_display_name(lang)
-          taxonomies_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\"]"
+          taxonomies_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\", \"authors\"]"
           "  [languages.#{lang}]\n" \
           "  language_name = \"#{lang_name}\"\n" \
           "  weight = #{index + 1}\n" \
