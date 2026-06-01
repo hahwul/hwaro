@@ -166,12 +166,24 @@ module Hwaro
             Logger.info "----------------------------------------"
           end
 
+          # Markdown links inside fenced code blocks or inline code spans are
+          # documentation examples (e.g. a `![Diagram](/images/diagram.png)`
+          # snippet demonstrating image syntax), not real links. Strip them
+          # before scanning so `check-links` doesn't report false-positive dead
+          # links — mirrors the code-stripping the scaffold link-integrity spec
+          # already performs.
+          private def strip_code(content : String) : String
+            content
+              .gsub(/```[\s\S]*?```/, "")
+              .gsub(/`[^`\n]*`/, "")
+          end
+
           private def find_external_links(dir : String) : Array(Link)
             links = [] of Link
             link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/[^\s\)]+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = File.read(file)
+              content = strip_code(File.read(file))
               content.scan(link_regex) do |match|
                 links << Link.new(file: file, url: match[1], kind: :external)
               end
@@ -183,7 +195,7 @@ module Hwaro
             links = [] of Link
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = File.read(file)
+              content = strip_code(File.read(file))
 
               # Regular links (exclude images by using negative lookbehind)
               content.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
