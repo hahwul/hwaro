@@ -1,11 +1,11 @@
 require "../spec_helper"
 require "json"
 
-private def make_site(pwa_toml : String = "") : Hwaro::Models::Site
+private def make_site(pwa_toml : String = "", base_url : String = "https://example.com") : Hwaro::Models::Site
   config_str = <<-TOML
     title = "Test Site"
     description = "A test site"
-    base_url = "https://example.com"
+    base_url = "#{base_url}"
     #{pwa_toml}
     TOML
 
@@ -230,6 +230,70 @@ describe Hwaro::Content::Seo::Pwa do
 
         content = File.read(File.join(dir, "sw.js"))
         content.should contain("/offline.html")
+      end
+    end
+
+    # GitHub/GitLab project pages serve the site under a subpath. Every
+    # site-internal root-relative PWA URL must carry that prefix or the
+    # installed app launches the wrong origin and the precache keys never
+    # match the requests the page actually makes.
+    context "with a subpath base_url" do
+      it "prefixes start_url and icon srcs in the manifest" do
+        Dir.mktmpdir do |dir|
+          site = make_site(<<-TOML, base_url: "https://user.github.io/myrepo/")
+            [pwa]
+            enabled = true
+            icons = ["static/icon-192.png", "https://cdn.example.com/icon.png"]
+            TOML
+
+          Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+          manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+          manifest["start_url"].as_s.should eq("/myrepo/")
+          icons = manifest["icons"].as_a
+          icons[0]["src"].as_s.should eq("/myrepo/icon-192.png")
+          # Absolute icon URLs are left untouched.
+          icons[1]["src"].as_s.should eq("https://cdn.example.com/icon.png")
+        end
+      end
+
+      it "prefixes precache URLs, offline page, and the navigation fallback in sw.js" do
+        Dir.mktmpdir do |dir|
+          site = make_site(<<-TOML, base_url: "https://user.github.io/myrepo/")
+            [pwa]
+            enabled = true
+            offline_page = "/offline.html"
+            precache_urls = ["/", "/css/main.css"]
+            cache_strategy = "network-first"
+            TOML
+
+          Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+          content = File.read(File.join(dir, "sw.js"))
+          content.should contain(%("/myrepo/"))
+          content.should contain(%("/myrepo/css/main.css"))
+          content.should contain(%("/myrepo/offline.html"))
+          # The hardcoded root fallback must follow the subpath too.
+          content.should contain(%(caches.match("/myrepo/offline.html") || caches.match("/myrepo/")))
+          # No bare-root key should leak through.
+          content.should_not contain(%(caches.match("/")))
+        end
+      end
+
+      it "leaves URLs untouched for a domain-root base_url" do
+        Dir.mktmpdir do |dir|
+          site = make_site(<<-TOML, base_url: "https://example.com")
+            [pwa]
+            enabled = true
+            precache_urls = ["/css/main.css"]
+            TOML
+
+          Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+          manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+          manifest["start_url"].as_s.should eq("/")
+          File.read(File.join(dir, "sw.js")).should contain(%("/css/main.css"))
+        end
       end
     end
   end

@@ -821,6 +821,7 @@ module Hwaro
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
+      @base_path : String? = nil
 
       def initialize
         @title = "Hwaro Site"
@@ -863,11 +864,46 @@ module Hwaro
       def base_url=(value : String)
         @base_url = value.rstrip("/")
         @base_url_stripped = nil
+        @base_path = nil
       end
 
       # Cached base_url with trailing slash stripped (avoids repeated rstrip per page)
       def base_url_stripped : String
         @base_url_stripped ||= @base_url.rstrip("/")
+      end
+
+      # Path component of `base_url`, used to make root-relative links work when
+      # the site is deployed under a subpath (e.g. GitHub/GitLab project pages
+      # served at `https://user.github.io/repo/`). For `https://x.com/repo` this
+      # returns `/repo`; for a domain-root deployment (`https://x.com`) or an
+      # empty `base_url` it returns `""`. Trailing slashes are stripped so callers
+      # can build `base_path + page.url` without producing `//`.
+      def base_path : String
+        @base_path ||= begin
+          stripped = base_url_stripped
+          if stripped.empty?
+            ""
+          else
+            path = URI.parse(stripped).path.rstrip("/")
+            path == "/" ? "" : path
+          end
+        rescue URI::Error
+          ""
+        end
+      end
+
+      # Prefix a site-internal root-relative path (e.g. `/posts/x/`) with
+      # `base_path` so generated URLs resolve under a subpath deployment.
+      # Absolute `http(s)://` URLs and paths that are not root-relative are
+      # returned unchanged; a no-op when `base_path` is "" (domain-root deploy).
+      # Callers that may hold a path without a leading slash (e.g. some
+      # `page.url` values) should normalize it first — this helper only
+      # prefixes values that already start with "/".
+      def with_base_path(path : String) : String
+        return path if base_path.empty?
+        return path if path.starts_with?("http://") || path.starts_with?("https://")
+        return path unless path.starts_with?("/")
+        "#{base_path}#{path}"
       end
 
       # Check if site is multilingual

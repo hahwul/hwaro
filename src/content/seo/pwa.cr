@@ -20,7 +20,7 @@ module Hwaro
 
           icons = pwa.icons.map do |icon_path|
             size = extract_icon_size(icon_path)
-            url_path = normalize_icon_path(icon_path)
+            url_path = config.with_base_path(normalize_icon_path(icon_path))
             {
               "src"   => url_path,
               "sizes" => size,
@@ -33,7 +33,7 @@ module Hwaro
               json.field "name", pwa.name || config.title
               json.field "short_name", pwa.short_name || pwa.name || config.title
               json.field "description", config.description unless config.description.empty?
-              json.field "start_url", pwa.start_url
+              json.field "start_url", config.with_base_path(pwa.start_url)
               json.field "display", pwa.display
               json.field "theme_color", pwa.theme_color
               json.field "background_color", pwa.background_color
@@ -64,28 +64,36 @@ module Hwaro
           config = site.config
           pwa = config.pwa
 
-          # Build precache URL list
-          precache_urls = pwa.precache_urls.dup
-          precache_urls << pwa.start_url unless precache_urls.includes?(pwa.start_url)
+          # Resolve the launch URL against base_url's path so the precache key
+          # and the navigation fallback match what the page actually loads from
+          # on a subpath deployment (e.g. `/myrepo/` rather than `/`).
+          resolved_start = config.with_base_path(pwa.start_url)
+
+          # Build precache URL list (each entry is a site-internal root-relative
+          # path that must carry the subpath prefix, same as start_url).
+          precache_urls = pwa.precache_urls.map { |u| config.with_base_path(u) }
+          precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
           if offline = pwa.offline_page
-            precache_urls << offline unless precache_urls.includes?(offline)
+            resolved_offline = config.with_base_path(offline)
+            precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
 
           precache_json = precache_urls.map(&.inspect).join(",\n  ")
           offline_url = if op = pwa.offline_page
-                          op.inspect
+                          config.with_base_path(op).inspect
                         else
-                          pwa.start_url.inspect
+                          resolved_start.inspect
                         end
+          root_url = resolved_start.inspect
           cache_version = Time.utc.to_unix
 
           fetch_handler = case pwa.cache_strategy
                           when "network-first"
-                            network_first_handler(offline_url)
+                            network_first_handler(offline_url, root_url)
                           when "stale-while-revalidate"
-                            stale_while_revalidate_handler(offline_url)
+                            stale_while_revalidate_handler(offline_url, root_url)
                           else
-                            cache_first_handler(offline_url)
+                            cache_first_handler(offline_url, root_url)
                           end
 
           sw_content = <<-JS
@@ -121,13 +129,13 @@ module Hwaro
 
         # --- Fetch handler strategies ---
 
-        private def self.cache_first_handler(offline_url : String) : String
+        private def self.cache_first_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
               if (event.request.mode === 'navigate') {
                 event.respondWith(
                   fetch(event.request).catch(() =>
-                    caches.match(#{offline_url}) || caches.match('/')
+                    caches.match(#{offline_url}) || caches.match(#{root_url})
                   )
                 );
                 return;
@@ -147,7 +155,7 @@ module Hwaro
             JS
         end
 
-        private def self.network_first_handler(offline_url : String) : String
+        private def self.network_first_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
               event.respondWith(
@@ -160,7 +168,7 @@ module Hwaro
                 }).catch(() =>
                   caches.match(event.request).then(cached =>
                     cached || (event.request.mode === 'navigate'
-                      ? caches.match(#{offline_url}) || caches.match('/')
+                      ? caches.match(#{offline_url}) || caches.match(#{root_url})
                       : undefined)
                   )
                 )
@@ -169,7 +177,7 @@ module Hwaro
             JS
         end
 
-        private def self.stale_while_revalidate_handler(offline_url : String) : String
+        private def self.stale_while_revalidate_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
               event.respondWith(
@@ -182,7 +190,7 @@ module Hwaro
                     return response;
                   }).catch(() => {
                     if (event.request.mode === 'navigate') {
-                      return caches.match(#{offline_url}) || caches.match('/');
+                      return caches.match(#{offline_url}) || caches.match(#{root_url});
                     }
                     return undefined;
                   });

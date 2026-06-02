@@ -149,6 +149,40 @@ describe Hwaro::Models::Config do
     end
   end
 
+  describe "#base_path" do
+    it "returns the path component for a subpath deployment" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/myblog/"
+      config.base_path.should eq("/myblog")
+    end
+
+    it "returns a nested path component" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/a/b"
+      config.base_path.should eq("/a/b")
+    end
+
+    it "returns an empty string for a domain-root base_url" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.base_path.should eq("")
+    end
+
+    it "returns an empty string for an empty base_url" do
+      config = Hwaro::Models::Config.new
+      config.base_url = ""
+      config.base_path.should eq("")
+    end
+
+    it "recomputes after base_url is reassigned" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/one"
+      config.base_path.should eq("/one")
+      config.base_url = "https://example.com/two"
+      config.base_path.should eq("/two")
+    end
+  end
+
   describe "#initialize" do
     it "has default values" do
       config = Hwaro::Models::Config.new
