@@ -1,4 +1,5 @@
 require "file_utils"
+require "html"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
@@ -337,29 +338,34 @@ module Hwaro
         end
 
         # Summary text for `<description>` / atom `<summary>`. Prefers
-        # frontmatter `description`, falls back to a rendered `summary`
-        # (if the markdown processor produced one), and finally to a
-        # plain-text excerpt of the body (gh#526).
+        # frontmatter `description`, falls back to a plain-text rendering of
+        # the `<!-- more -->` summary, and finally to a plain-text excerpt
+        # of the body (gh#526). The summary is stripped of markup so raw
+        # markdown (`##` headings, code fences, math) never leaks into the
+        # feed `<description>` (gh#491).
         private def self.summary_for_feed(page : Models::Page, config : Models::Config) : String
           if desc = page.description
             return desc unless desc.empty?
           end
 
-          if summary = page.summary
-            return summary unless summary.empty?
+          limit = config.feeds.truncate > 0 ? config.feeds.truncate : 300
+
+          if summary_html = page.summary_html
+            text = HTML.unescape(Utils::TextUtils.strip_html(summary_html)).strip
+            return truncate_for_feed(text, limit) unless text.empty?
           end
 
           # Fall back to a stripped + truncated body. Prefer the
           # already-rendered HTML; degrade to the raw markdown only if
           # render hasn't run.
           html = page.content.empty? ? Processor::Markdown.render(page.raw_content)[0] : page.content
-          text = Utils::TextUtils.strip_html(html).strip
-          limit = config.feeds.truncate > 0 ? config.feeds.truncate : 300
-          if text.size > limit
-            "#{text[0...limit]}..."
-          else
-            text
-          end
+          text = HTML.unescape(Utils::TextUtils.strip_html(html)).strip
+          truncate_for_feed(text, limit)
+        end
+
+        # Hard-truncate plain text to `limit` characters with an ellipsis.
+        private def self.truncate_for_feed(text : String, limit : Int32) : String
+          text.size > limit ? "#{text[0...limit]}..." : text
         end
 
         # Full HTML body suitable for `<content:encoded>` / atom

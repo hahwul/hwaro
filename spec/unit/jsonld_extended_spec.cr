@@ -211,4 +211,30 @@ describe Hwaro::Content::Seo::JsonLd do
       result.should contain("FAQPage")
     end
   end
+
+  describe "script-context escaping" do
+    it "escapes <, >, & as \\uXXXX so JSON-LD can't break out of <script> (dogfooding find)" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/post/"
+      # The `<!--<script>` prefix triggers the HTML "script data double
+      # escape" trap; a later real </script> would not close the element.
+      page.title = "Break <!--<script>out</script> attempt & more"
+
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      result = Hwaro::Content::Seo::JsonLd.article(page, config)
+
+      # No raw HTML-significant characters survive inside the <script> body.
+      body = result.sub(%(<script type="application/ld+json">), "").sub("</script>", "")
+      body.should_not contain("<")
+      body.should_not contain(">")
+      body.should contain("\\u003c")
+      body.should contain("\\u003e")
+      body.should contain("\\u0026")
+
+      # …and it still decodes back to the original title.
+      json = JSON.parse(body)
+      json["headline"].as_s.should eq("Break <!--<script>out</script> attempt & more")
+    end
+  end
 end

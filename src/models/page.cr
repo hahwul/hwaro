@@ -1,3 +1,6 @@
+require "html"
+require "../utils/text_utils"
+
 module Hwaro
   module Models
     # Recursive value type for `page.extra`. Keeps `Array(String)` in the union
@@ -274,6 +277,34 @@ module Hwaro
       # Get effective summary (summary or description fallback)
       def effective_summary : String?
         @summary || @description
+      end
+
+      # Plain-text rendering of the `<!-- more -->` summary, safe to embed
+      # in single-line contexts like `og:description`,
+      # `twitter:description`, or a feed `<description>`. Uses the
+      # already-rendered `summary_html` and strips markup so raw markdown
+      # (`##` headings, code fences, math, literal newlines) never leaks
+      # into meta tags — see https://github.com/hahwul/hwaro/issues/491.
+      # Returns nil when the page has no summary. Soft-truncates to `limit`
+      # characters on a word boundary.
+      def plain_summary(limit : Int32 = 200) : String?
+        # Prefer the rendered summary HTML (populated during parsing); fall
+        # back to the raw markdown chunk only if render hasn't run yet —
+        # strip_html still removes any inline HTML there.
+        source = @summary_html || @summary
+        return unless source
+        # Strip tags, then decode entities so escaped chars from rendered
+        # HTML (e.g. `&gt;` inside code blocks) become real characters —
+        # the meta-tag layer re-escapes them, avoiding `&amp;gt;` artifacts.
+        text = HTML.unescape(Hwaro::Utils::TextUtils.strip_html(source)).strip
+        return if text.empty?
+        return text if text.size <= limit
+
+        truncated = text[0, limit]
+        if (idx = truncated.rindex(' ')) && idx > limit // 2
+          truncated = truncated[0, idx]
+        end
+        "#{truncated.rstrip}…"
       end
     end
   end

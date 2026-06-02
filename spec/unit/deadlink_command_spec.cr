@@ -317,6 +317,44 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    # Regression (dogfooding find): the checker treated Zola-style `@/`
+    # content-root links as paths relative to the source file, so a valid
+    # `@/index.md` resolved to `content/@/index.md` and was reported dead
+    # even though the build resolves it fine.
+    it "resolves Zola-style @/ content-root links" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.md"), "home")
+        FileUtils.mkdir_p(File.join(dir, "posts"))
+        File.write(File.join(dir, "posts", "hello.md"), "post")
+
+        links = [
+          Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+            file: File.join(dir, "posts", "other.md"), url: "@/index.md", kind: :internal
+          ),
+          Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+            file: File.join(dir, "posts", "other.md"), url: "@/posts/hello.md", kind: :internal
+          ),
+        ]
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.check_internal_links_for_test(links, dir).should be_empty
+      end
+    end
+
+    it "still flags missing @/ content-root links" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.md"), "home")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "index.md"), url: "@/does-not-exist.md", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("not found")
+      end
+    end
+
     it "detects broken image paths" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "content")

@@ -1603,11 +1603,14 @@ module Hwaro::Core::Build::Phases::Render
     # which breaks link previews (gh issue list, fix #1).
     effective_og_title = page.title.empty? ? config.title : page.title
 
-    # Use page.description if present, otherwise the auto-generated summary
-    # (first paragraph-ish), finally fall back to site description. This
-    # gives social cards much better per-post text without requiring every
-    # author to write a description in frontmatter.
-    effective_og_desc = page.description.presence || page.summary.presence || config.description
+    # Use page.description if present, otherwise a plain-text rendering of
+    # the `<!-- more -->` summary, finally fall back to site description.
+    # `plain_summary` strips markup so raw markdown (headings, code fences,
+    # literal newlines) never breaks the single-line meta attribute — using
+    # `page.summary` directly here dumped the raw chunk into og/twitter
+    # tags (gh#491). This gives social cards good per-post text without
+    # requiring every author to write a description in frontmatter.
+    effective_og_desc = page.description.presence || page.plain_summary || config.description
 
     og_tags = config.og.og_tags(effective_og_title, effective_og_desc, effective_url, page.image, config.base_url, og_type_override)
     twitter_tags = config.og.twitter_tags(effective_og_title, effective_og_desc, page.image, config.base_url)

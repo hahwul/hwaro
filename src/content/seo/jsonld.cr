@@ -292,7 +292,18 @@ module Hwaro
         end
 
         private def wrap_script(json : String) : String
-          %(<script type="application/ld+json">#{json.gsub("</", "<\\/")}</script>)
+          %(<script type="application/ld+json">#{escape_for_script(json)}</script>)
+        end
+
+        # Escape HTML-significant characters as `\uXXXX` so JSON can never
+        # break out of the surrounding `<script>` element. `<` etc. are
+        # valid JSON escapes that decode back to the original characters in
+        # any JSON parser, so the structured data stays intact. This mirrors
+        # Go's `encoding/json` HTML escaping and defends against both
+        # `</script>` injection and the "script data double escape" trap a
+        # bare `<!--<script` would otherwise spring (gh: dogfooding find).
+        private def escape_for_script(json : String) : String
+          json.gsub('<', "\\u003c").gsub('>', "\\u003e").gsub('&', "\\u0026")
         end
 
         # Coerce a `page.extra[key]` value to `Array(String)` regardless of whether

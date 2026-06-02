@@ -1527,6 +1527,26 @@ describe Hwaro::Content::Seo::Feeds do
       rss.should_not contain("<description>&lt;h1&gt;Hello")
     end
 
+    it "strips markup from a <!-- more --> summary instead of dumping raw markdown (gh#491)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      # No frontmatter description: the feed should use the summary, but as
+      # plain text — not the raw markdown chunk with `##` and code fences.
+      page.summary = "## Intro\n\nHello world"
+      page.summary_html = "<h2>Intro</h2>\n<p>Hello world</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<description>Intro Hello world</description>")
+      rss.should_not contain("##")
+    end
+
     it "emits <content:encoded> with the full body when full_content is on (gh#526)" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"
