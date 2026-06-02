@@ -45,6 +45,8 @@ cache_strategy = "cache-first"
 | precache_urls | array | [] | URLs to cache during service worker install |
 | cache_strategy | string | `"cache-first"` | Asset fetch strategy: `cache-first`, `network-first`, or `stale-while-revalidate` |
 
+> Write `start_url`, `icons`, `offline_page`, and `precache_urls` as plain root-relative paths **without** your `base_url` prefix (e.g. `start_url = "/"`, not `"/repo/"`). When `base_url` includes a subpath (GitHub Pages project sites), Hwaro prepends it automatically in the generated `manifest.json` and `sw.js`.
+
 ## Icon Sizing
 
 Icon sizes are automatically extracted from filenames:

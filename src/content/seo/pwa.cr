@@ -17,11 +17,10 @@ module Hwaro
         private def self.generate_manifest(site : Models::Site, output_dir : String, verbose : Bool)
           config = site.config
           pwa = config.pwa
-          base_path = config.base_path
 
           icons = pwa.icons.map do |icon_path|
             size = extract_icon_size(icon_path)
-            url_path = with_base_path(normalize_icon_path(icon_path), base_path)
+            url_path = config.with_base_path(normalize_icon_path(icon_path))
             {
               "src"   => url_path,
               "sizes" => size,
@@ -34,7 +33,7 @@ module Hwaro
               json.field "name", pwa.name || config.title
               json.field "short_name", pwa.short_name || pwa.name || config.title
               json.field "description", config.description unless config.description.empty?
-              json.field "start_url", with_base_path(pwa.start_url, base_path)
+              json.field "start_url", config.with_base_path(pwa.start_url)
               json.field "display", pwa.display
               json.field "theme_color", pwa.theme_color
               json.field "background_color", pwa.background_color
@@ -64,25 +63,24 @@ module Hwaro
         private def self.generate_service_worker(site : Models::Site, output_dir : String, verbose : Bool)
           config = site.config
           pwa = config.pwa
-          base_path = config.base_path
 
           # Resolve the launch URL against base_url's path so the precache key
           # and the navigation fallback match what the page actually loads from
           # on a subpath deployment (e.g. `/myrepo/` rather than `/`).
-          resolved_start = with_base_path(pwa.start_url, base_path)
+          resolved_start = config.with_base_path(pwa.start_url)
 
           # Build precache URL list (each entry is a site-internal root-relative
           # path that must carry the subpath prefix, same as start_url).
-          precache_urls = pwa.precache_urls.map { |u| with_base_path(u, base_path) }
+          precache_urls = pwa.precache_urls.map { |u| config.with_base_path(u) }
           precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
           if offline = pwa.offline_page
-            resolved_offline = with_base_path(offline, base_path)
+            resolved_offline = config.with_base_path(offline)
             precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
 
           precache_json = precache_urls.map(&.inspect).join(",\n  ")
           offline_url = if op = pwa.offline_page
-                          with_base_path(op, base_path).inspect
+                          config.with_base_path(op).inspect
                         else
                           resolved_start.inspect
                         end
@@ -201,18 +199,6 @@ module Hwaro
               );
             });
             JS
-        end
-
-        # Prefix a site-internal root-relative path with `base_url`'s path
-        # component so manifest/service-worker URLs resolve on subpath
-        # deployments (e.g. GitHub Pages project sites under `/repo/`). Absolute
-        # URLs and non-root-relative values are returned unchanged; `base_path`
-        # is "" for a domain-root deployment, so this is a no-op there.
-        private def self.with_base_path(path : String, base_path : String) : String
-          return path if base_path.empty?
-          return path if path.starts_with?("http://") || path.starts_with?("https://")
-          return path unless path.starts_with?("/")
-          "#{base_path}#{path}"
         end
 
         # Normalize icon path to a URL path.

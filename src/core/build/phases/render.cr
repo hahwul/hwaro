@@ -695,11 +695,11 @@ module Hwaro::Core::Build::Phases::Render
 
       # Prefix the page's root-relative URL with `base_url`'s path component so
       # the redirect still resolves when the site is deployed under a subpath
-      # (e.g. GitHub Pages project sites at `/repo/`). `base_path` is "" for a
-      # domain-root deployment, leaving `/posts/x/` unchanged.
-      target = page.url
-      target = "/#{target}" unless target.starts_with?('/')
-      redirect_url = "#{site.config.base_path}#{target}"
+      # (e.g. GitHub Pages project sites at `/repo/`). `page.url` may arrive
+      # without a leading slash (see sitemap), so normalize before prefixing;
+      # `with_base_path` is a no-op for a domain-root deployment.
+      target = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+      redirect_url = site.config.with_base_path(target)
       File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
       Logger.action :create, dest_path, :yellow if verbose
     end

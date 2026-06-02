@@ -892,6 +892,20 @@ module Hwaro
         end
       end
 
+      # Prefix a site-internal root-relative path (e.g. `/posts/x/`) with
+      # `base_path` so generated URLs resolve under a subpath deployment.
+      # Absolute `http(s)://` URLs and paths that are not root-relative are
+      # returned unchanged; a no-op when `base_path` is "" (domain-root deploy).
+      # Callers that may hold a path without a leading slash (e.g. some
+      # `page.url` values) should normalize it first — this helper only
+      # prefixes values that already start with "/".
+      def with_base_path(path : String) : String
+        return path if base_path.empty?
+        return path if path.starts_with?("http://") || path.starts_with?("https://")
+        return path unless path.starts_with?("/")
+        "#{base_path}#{path}"
+      end
+
       # Check if site is multilingual
       def multilingual? : Bool
         codes = @languages.keys
