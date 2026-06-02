@@ -448,7 +448,7 @@ module Hwaro::Core::Build::Phases::Render
     # Handle redirect_to for pages AND sections
     if page.has_redirect?
       generate_redirect_page(page, output_dir, verbose)
-      generate_aliases(page, output_dir, verbose)
+      generate_aliases(page, site, output_dir, verbose)
       return
     end
 
@@ -547,7 +547,7 @@ module Hwaro::Core::Build::Phases::Render
       write_output(page, output_dir, final_html, verbose)
     end
 
-    generate_aliases(page, output_dir, verbose)
+    generate_aliases(page, site, output_dir, verbose)
   end
 
   private def generate_redirect_page(
@@ -676,7 +676,7 @@ module Hwaro::Core::Build::Phases::Render
     "page"
   end
 
-  private def generate_aliases(page : Models::Page, output_dir : String, verbose : Bool)
+  private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
     page.aliases.each do |alias_path|
       alias_clean = Utils::PathUtils.sanitize_path(alias_path.lchop("/"))
       # An alias that already names an HTML file (`/legacy.html`,
@@ -693,7 +693,13 @@ module Hwaro::Core::Build::Phases::Render
 
       ensure_dir(File.dirname(dest_path))
 
-      redirect_url = page.url
+      # Prefix the page's root-relative URL with `base_url`'s path component so
+      # the redirect still resolves when the site is deployed under a subpath
+      # (e.g. GitHub Pages project sites at `/repo/`). `base_path` is "" for a
+      # domain-root deployment, leaving `/posts/x/` unchanged.
+      target = page.url
+      target = "/#{target}" unless target.starts_with?('/')
+      redirect_url = "#{site.config.base_path}#{target}"
       File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
       Logger.action :create, dest_path, :yellow if verbose
     end

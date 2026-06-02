@@ -421,6 +421,22 @@ describe "Build Integration: Redirects" do
       File.exists?("public/promo.html/index.html").should be_false
     end
   end
+
+  it "prefixes alias redirects with base_url's path for subpath deployments" do
+    # GitHub/GitLab project pages serve the site under a subpath. The alias
+    # redirect must include that prefix or it 404s (it previously emitted a
+    # bare `/posts/.../` that resolved against the domain root).
+    build_site(
+      "title = \"T\"\nbase_url = \"https://example.com/myblog\"\n",
+      content_files: {
+        "posts/new.md" => "---\ntitle: New\naliases:\n  - /old/\n  - /legacy.html\n---\nNew",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.read("public/old/index.html").should contain("url=/myblog/posts/new/")
+      File.read("public/legacy.html").should contain("url=/myblog/posts/new/")
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

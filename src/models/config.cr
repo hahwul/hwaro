@@ -821,6 +821,7 @@ module Hwaro
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
+      @base_path : String? = nil
 
       def initialize
         @title = "Hwaro Site"
@@ -863,11 +864,32 @@ module Hwaro
       def base_url=(value : String)
         @base_url = value.rstrip("/")
         @base_url_stripped = nil
+        @base_path = nil
       end
 
       # Cached base_url with trailing slash stripped (avoids repeated rstrip per page)
       def base_url_stripped : String
         @base_url_stripped ||= @base_url.rstrip("/")
+      end
+
+      # Path component of `base_url`, used to make root-relative links work when
+      # the site is deployed under a subpath (e.g. GitHub/GitLab project pages
+      # served at `https://user.github.io/repo/`). For `https://x.com/repo` this
+      # returns `/repo`; for a domain-root deployment (`https://x.com`) or an
+      # empty `base_url` it returns `""`. Trailing slashes are stripped so callers
+      # can build `base_path + page.url` without producing `//`.
+      def base_path : String
+        @base_path ||= begin
+          stripped = base_url_stripped
+          if stripped.empty?
+            ""
+          else
+            path = URI.parse(stripped).path.rstrip("/")
+            path == "/" ? "" : path
+          end
+        rescue URI::Error
+          ""
+        end
       end
 
       # Check if site is multilingual
