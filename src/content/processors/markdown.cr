@@ -63,15 +63,23 @@ module Hwaro
         # Warn about unknown front-matter keys that look like typos of known keys.
         # Uses Levenshtein distance ≤ 2 to detect likely misspellings while ignoring
         # intentional custom fields (which tend to differ significantly from known keys).
+        # Suggests the *closest* known key, not merely the first within the threshold —
+        # otherwise `tag` (a typo of `tags`, distance 1) would resolve to whichever
+        # distance-2 key happens to appear earlier in the set (e.g. `toc`).
         private def warn_typo_keys(unknown_keys : Array(String), file_path : String)
           return if file_path.empty?
           unknown_keys.each do |key|
+            best : String? = nil
+            best_distance = Int32::MAX
             KNOWN_FRONT_MATTER_KEYS.each do |known|
               dist = levenshtein(key, known)
-              if dist > 0 && dist <= 2
-                Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{known}'?"
-                break
+              if dist < best_distance
+                best_distance = dist
+                best = known
               end
+            end
+            if (suggestion = best) && best_distance > 0 && best_distance <= 2
+              Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{suggestion}'?"
             end
           end
         end

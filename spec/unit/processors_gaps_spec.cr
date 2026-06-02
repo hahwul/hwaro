@@ -169,6 +169,25 @@ describe Hwaro::Content::Processors::Markdown do
       end
     end
 
+    it "suggests the closest known key, not merely the first within threshold" do
+      # `tag` is distance 1 from `tags` but distance 2 from `toc`. Because
+      # `toc` precedes `tags` in KNOWN_FRONT_MATTER_KEYS, a first-match scan
+      # would wrongly suggest `toc`; the suggester must pick the closest key.
+      previous_io = Hwaro::Logger.io
+      sink = IO::Memory.new
+      Hwaro::Logger.io = sink
+
+      begin
+        md = Hwaro::Content::Processors::Markdown.new
+        md.parse("---\ntag: x\n---\nbody", "test.md")
+        out = sink.to_s
+        out.should contain("did you mean 'tags'")
+        out.should_not contain("'toc'")
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+    end
+
     it "does not warn for keys far from any known key (likely intentional)" do
       previous_io = Hwaro::Logger.io
       sink = IO::Memory.new

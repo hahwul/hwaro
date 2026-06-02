@@ -1059,6 +1059,13 @@ describe Hwaro::Services::Creator do
       Hwaro::Services::Creator.sanitize_url_path("!foo!/!bar!").should eq("foo/bar")
     end
 
+    it "does not leave a hyphen dangling against an extension dot" do
+      # Punctuation right before the extension used to leave `foo-.md`
+      # because strip('-') can't reach a hyphen that sits before `.md`.
+      Hwaro::Services::Creator.sanitize_url_path("posts/my post!.md").should eq("posts/my-post.md")
+      Hwaro::Services::Creator.sanitize_url_path("a!.b").should eq("a.b")
+    end
+
     it "preserves path separators and the RFC 3986 unreserved set" do
       Hwaro::Services::Creator.sanitize_url_path("posts/my_post.v2.md").should eq("posts/my_post.v2.md")
       Hwaro::Services::Creator.sanitize_url_path("a/b/c~d.md").should eq("a/b/c~d.md")
