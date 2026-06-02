@@ -188,6 +188,43 @@ describe Hwaro::Models::Page do
     end
   end
 
+  describe "#plain_summary" do
+    it "returns nil when the page has no summary" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.plain_summary.should be_nil
+    end
+
+    it "strips markup and collapses whitespace from the rendered summary (gh#491)" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.summary = "## Heading\n\nbody"
+      page.summary_html = "<h2>Heading</h2>\n<p>body</p>"
+      # No literal newlines, headings, or tags — safe for a meta attribute.
+      page.plain_summary.should eq("Heading body")
+    end
+
+    it "decodes HTML entities so escaped chars aren't double-escaped (gh#491)" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.summary = "code"
+      page.summary_html = "<pre><code>A--&gt;B</code></pre>"
+      page.plain_summary.should eq("A-->B")
+    end
+
+    it "soft-truncates on a word boundary with an ellipsis" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.summary_html = "<p>#{"word " * 60}</p>"
+      result = page.plain_summary(20).not_nil!
+      result.size.should be <= 21 # 20 chars + ellipsis, trimmed at a space
+      result.ends_with?("…").should be_true
+      result.should_not contain("  ")
+    end
+
+    it "falls back to the raw summary when summary_html is unset" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.summary = "Just plain text."
+      page.plain_summary.should eq("Just plain text.")
+    end
+  end
+
   describe "#generate_permalink" do
     it "generates permalink from base_url and page url" do
       page = Hwaro::Models::Page.new("test.md")

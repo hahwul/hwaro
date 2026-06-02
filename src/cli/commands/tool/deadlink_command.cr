@@ -220,7 +220,13 @@ module Hwaro
 
             links.each do |link|
               base_dir = File.dirname(link.file)
-              target = if link.url.starts_with?("/")
+              target = if link.url.starts_with?("@/")
+                         # Zola-style content-root link (`@/posts/hello.md`).
+                         # The build resolves these against the content dir,
+                         # so the checker must too — otherwise valid links
+                         # like `@/index.md` were reported dead (dogfooding find).
+                         File.join(content_dir, link.url[2..])
+                       elsif link.url.starts_with?("/")
                          File.join(content_dir, link.url.lstrip("/"))
                        else
                          File.join(base_dir, link.url)
