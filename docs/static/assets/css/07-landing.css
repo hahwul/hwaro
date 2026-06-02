@@ -650,16 +650,163 @@
     margin-bottom: 2.5rem;
 }
 
-.cta-install code {
+.install-picker {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    background: #0a0a0c;
+    border: 1px solid #1a1a1e;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.install-method {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #1a1a1e;
+    color: #ccc;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-radius: 8px 0 0 8px;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.install-method:hover {
+    background: #121216;
+    color: #fff;
+}
+
+.install-method-caret {
+    color: #666;
+    transition: transform 0.2s ease;
+}
+
+.install-method[aria-expanded="true"] .install-method-caret {
+    transform: rotate(180deg);
+}
+
+.install-command {
+    display: flex;
+    align-items: center;
     font-family: var(--font-mono);
     font-size: 0.9rem;
     color: #999;
-    background: #0a0a0c;
-    border: 1px solid #1a1a1e;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    display: inline-block;
+    padding: 0.75rem 1.25rem;
     letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.install-copy {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-left: 1px solid #1a1a1e;
+    color: #666;
+    padding: 0 1rem;
+    cursor: pointer;
+    border-radius: 0 8px 8px 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.install-copy:hover {
+    background: #121216;
+    color: #fff;
+}
+
+.install-copy.is-copied {
+    color: #4ade80;
+}
+
+.install-copy-check {
+    display: none;
+}
+
+.install-copy.is-copied .install-copy-icon {
+    display: none;
+}
+
+.install-copy.is-copied .install-copy-check {
+    display: block;
+}
+
+.install-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    background: #0c0c0f;
+    border: 1px solid #1f1f24;
+    border-radius: 10px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.install-picker.is-open .install-menu {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.install-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.install-option:hover,
+.install-option.is-selected {
+    background: #16161b;
+}
+
+.install-option-name {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #eee;
+}
+
+.install-option-cmd {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: #777;
+}
+
+.install-more {
+    margin: 1.25rem 0 0 0;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+}
+
+.install-more a {
+    color: #666;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.install-more a:hover {
+    color: #fff;
+    border-bottom-color: #444;
 }
 
 .cta-buttons {
@@ -748,5 +895,37 @@
 
     .landing-cta p {
         font-size: 1.2rem;
+    }
+
+    .install-more {
+        font-size: 0.85rem;
+    }
+
+    .install-picker {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+    }
+
+    .install-method {
+        justify-content: space-between;
+        border-right: none;
+        border-bottom: 1px solid #1a1a1e;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .install-command {
+        justify-content: center;
+        font-size: 0.82rem;
+        overflow-x: auto;
+    }
+
+    .install-copy {
+        border-left: none;
+        border-top: 1px solid #1a1a1e;
+        border-radius: 0 0 8px 8px;
+        padding: 0.6rem;
     }
 }

@@ -409,7 +409,149 @@
                     One command to install. Three lines to deploy.
                 </p>
                 <div class="cta-install">
-                    <code>brew install hwaro/hwaro/hwaro</code>
+                    <div class="install-picker" id="install-picker">
+                        <button
+                            type="button"
+                            class="install-method"
+                            id="install-method-btn"
+                            aria-haspopup="listbox"
+                            aria-expanded="false"
+                        >
+                            <span
+                                class="install-method-name"
+                                id="install-method-name"
+                                >Homebrew</span
+                            >
+                            <svg
+                                class="install-method-caret"
+                                width="10"
+                                height="6"
+                                viewBox="0 0 10 6"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M1 1l4 4 4-4"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </button>
+                        <code class="install-command" id="install-command"
+                            >brew install hahwul/hwaro/hwaro</code
+                        >
+                        <button
+                            type="button"
+                            class="install-copy"
+                            id="install-copy"
+                            aria-label="Copy command"
+                        >
+                            <svg
+                                class="install-copy-icon"
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="9"
+                                    y="9"
+                                    width="11"
+                                    height="11"
+                                    rx="2"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                />
+                                <path
+                                    d="M5 15V5a2 2 0 0 1 2-2h10"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                />
+                            </svg>
+                            <svg
+                                class="install-copy-check"
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M4 12.5l5 5 11-11"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </button>
+                        <ul
+                            class="install-menu"
+                            id="install-menu"
+                            role="listbox"
+                            aria-label="Installation method"
+                        >
+                            <li
+                                class="install-option is-selected"
+                                role="option"
+                                aria-selected="true"
+                                data-label="Homebrew"
+                                data-command="brew install hahwul/hwaro/hwaro"
+                            >
+                                <span class="install-option-name">Homebrew</span>
+                                <span class="install-option-cmd"
+                                    >brew install hahwul/hwaro/hwaro</span
+                                >
+                            </li>
+                            <li
+                                class="install-option"
+                                role="option"
+                                aria-selected="false"
+                                data-label="Snap"
+                                data-command="sudo snap install hwaro"
+                            >
+                                <span class="install-option-name">Snap</span>
+                                <span class="install-option-cmd"
+                                    >sudo snap install hwaro</span
+                                >
+                            </li>
+                            <li
+                                class="install-option"
+                                role="option"
+                                aria-selected="false"
+                                data-label="AUR"
+                                data-command="yay -S hwaro"
+                            >
+                                <span class="install-option-name"
+                                    >AUR (Arch)</span
+                                >
+                                <span class="install-option-cmd"
+                                    >yay -S hwaro</span
+                                >
+                            </li>
+                            <li
+                                class="install-option"
+                                role="option"
+                                aria-selected="false"
+                                data-label="Nix"
+                                data-command="nix profile install github:hahwul/hwaro"
+                            >
+                                <span class="install-option-name">Nix</span>
+                                <span class="install-option-cmd"
+                                    >nix profile install github:hahwul/hwaro</span
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <p class="install-more">
+                        <a href="{{ base_url }}/start/installation/"
+                            >DEB · RPM · APK · build from source &amp; more →</a
+                        >
+                    </p>
                 </div>
                 <div class="cta-buttons">
                     <a href="{{ base_url }}/start/" class="btn btn-primary"
@@ -511,6 +653,74 @@
                 requestAnimationFrame(loop);
             }
             loop();
+        })();
+        </script>
+        <script>
+        (function() {
+            var picker = document.getElementById('install-picker');
+            if (!picker) return;
+            var btn = document.getElementById('install-method-btn');
+            var nameEl = document.getElementById('install-method-name');
+            var cmdEl = document.getElementById('install-command');
+            var copyBtn = document.getElementById('install-copy');
+            var options = picker.querySelectorAll('.install-option');
+            var copyTimer;
+
+            function close() {
+                picker.classList.remove('is-open');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var open = picker.classList.toggle('is-open');
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+
+            for (var i = 0; i < options.length; i++) {
+                options[i].addEventListener('click', function() {
+                    for (var j = 0; j < options.length; j++) {
+                        options[j].classList.remove('is-selected');
+                        options[j].setAttribute('aria-selected', 'false');
+                    }
+                    this.classList.add('is-selected');
+                    this.setAttribute('aria-selected', 'true');
+                    nameEl.textContent = this.getAttribute('data-label');
+                    cmdEl.textContent = this.getAttribute('data-command');
+                    close();
+                });
+            }
+
+            copyBtn.addEventListener('click', function() {
+                var text = cmdEl.textContent.trim();
+                var done = function() {
+                    copyBtn.classList.add('is-copied');
+                    clearTimeout(copyTimer);
+                    copyTimer = setTimeout(function() {
+                        copyBtn.classList.remove('is-copied');
+                    }, 1600);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done, function() {});
+                } else {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'absolute';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); done(); } catch (e) {}
+                    document.body.removeChild(ta);
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!picker.contains(e.target)) close();
+            });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') close();
+            });
         })();
         </script>
     </body>
