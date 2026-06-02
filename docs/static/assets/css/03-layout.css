@@ -145,11 +145,16 @@
     padding: 1.25rem 0.75rem;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
+    /* Hidden until you interact with the panel; color matches the global scrollbar. */
+    scrollbar-color: transparent transparent;
+}
+
+.docs-sidebar:hover {
+    scrollbar-color: var(--border) transparent;
 }
 
 .docs-sidebar::-webkit-scrollbar {
-    width: 5px;
+    width: 3px;
 }
 
 .docs-sidebar::-webkit-scrollbar-track {
@@ -157,12 +162,17 @@
 }
 
 .docs-sidebar::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
+    background: transparent;
     border-radius: var(--radius-pill);
+    transition: background 0.2s ease;
 }
 
-.docs-sidebar::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
+.docs-sidebar:hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+}
+
+.docs-sidebar:hover::-webkit-scrollbar-thumb:hover {
+    background: var(--border-light);
 }
 
 .sidebar-section {
