@@ -127,6 +127,11 @@ module Hwaro
             end
           end
         end.strip('-')
+          # Drop hyphens that landed next to a dot — e.g. punctuation right
+          # before an extension (`foo!.md` → `foo-.md`) leaves a dangling
+          # hyphen that `strip('-')` cannot reach because the trailing char
+          # is the extension, not the hyphen. Collapse both `-.` and `.-`.
+          .gsub("-.", ".").gsub(".-", ".")
       end
 
       private def self.url_safe_char?(char : Char) : Bool
