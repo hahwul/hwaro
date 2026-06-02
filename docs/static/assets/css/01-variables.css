@@ -37,6 +37,29 @@
     --primary-light: #c87a7a;
     --success: #22c55e;
 
+    /* Ember — warm accent glow (the Hwaro "brazier" signature) */
+    --ember: rgba(179, 84, 84, 0.45);
+    --ember-soft: rgba(179, 84, 84, 0.16);
+    --ember-faint: rgba(179, 84, 84, 0.07);
+    --primary-gradient: linear-gradient(135deg, #c46262, #944545);
+    --rail-gradient: linear-gradient(180deg, #c46262, #944545);
+
+    /* Scrollbar — thin, ember-tinted (used by sidebar + TOC) */
+    --scrollbar-thumb: rgba(179, 84, 84, 0.3);
+    --scrollbar-thumb-hover: rgba(179, 84, 84, 0.55);
+
+    /* Surface elevation — white overlays stepped on the near-black canvas */
+    --surface-1: rgba(255, 255, 255, 0.022);
+    --surface-2: rgba(255, 255, 255, 0.04);
+    --surface-3: rgba(255, 255, 255, 0.06);
+    --hair: rgba(255, 255, 255, 0.06);
+    --hair-strong: rgba(255, 255, 255, 0.1);
+
+    /* Elevation shadows (ember-tinted, used sparingly on hover) */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 4px 16px -8px rgba(0, 0, 0, 0.6);
+    --glow-ember: 0 10px 30px -12px rgba(179, 84, 84, 0.45);
+
     /* Layout Dimensions */
     --header-h: 56px;
     --sidebar-w: 260px;
@@ -53,8 +76,11 @@
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-pill: 999px;
 
     /* Transitions */
     --transition-fast: 0.12s ease;
     --transition-normal: 0.2s ease;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
