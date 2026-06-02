@@ -45,43 +45,7 @@
    Section List — Card Style
    ============================================================================= */
 
-ul.section-list {
-    list-style: none;
-    padding: 0;
-    display: grid;
-    gap: 0.5rem;
-    margin: 1.5rem 0;
-}
-
-ul.section-list li {
-    padding: 0.875rem 1.125rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    transition: all 0.15s ease;
-    position: relative;
-}
-
-ul.section-list li:hover {
-    border-color: var(--border-light);
-    background: var(--bg-hover);
-}
-
-ul.section-list li a {
-    font-weight: 500;
-    color: var(--text);
-    font-size: 0.9rem;
-    border-bottom: none;
-}
-
-ul.section-list li a:hover {
-    color: var(--primary);
-}
-
-/* =============================================================================
-   Page List — Section index pages
-   ============================================================================= */
-
+ul.section-list,
 ul.page-list {
     list-style: none;
     padding: 0;
@@ -90,19 +54,51 @@ ul.page-list {
     margin: 1.5rem 0;
 }
 
+ul.section-list li,
 ul.page-list li {
-    padding: 0.875rem 1.125rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    transition: all 0.15s ease;
+    position: relative;
+    padding: 0.95rem 2.5rem 0.95rem 1.125rem;
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-lg);
+    transition:
+        transform 0.2s var(--ease-out),
+        border-color 0.2s var(--ease-out),
+        background 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
 }
 
+ul.section-list li:hover,
 ul.page-list li:hover {
-    border-color: var(--border-light);
-    background: var(--bg-hover);
+    transform: translateY(-2px);
+    border-color: var(--ember);
+    background: var(--surface-2);
+    box-shadow: var(--glow-ember);
 }
 
+/* Sliding arrow affordance */
+ul.section-list li::after,
+ul.page-list li::after {
+    content: "→";
+    position: absolute;
+    right: 1.125rem;
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    color: var(--primary);
+    font-size: 0.95rem;
+    opacity: 0;
+    transition:
+        opacity 0.2s var(--ease-out),
+        transform 0.2s var(--ease-out);
+}
+
+ul.section-list li:hover::after,
+ul.page-list li:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+ul.section-list li a,
 ul.page-list li a {
     font-weight: 500;
     color: var(--text);
@@ -110,8 +106,17 @@ ul.page-list li a {
     border-bottom: none;
 }
 
-ul.page-list li a:hover {
-    color: var(--primary);
+/* Let the whole card be the click target */
+ul.section-list li a::after,
+ul.page-list li a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+ul.section-list li:hover a,
+ul.page-list li:hover a {
+    color: var(--primary-light);
 }
 
 /* =============================================================================
@@ -121,7 +126,14 @@ ul.page-list li a:hover {
 .docs-footer {
     margin-top: 4rem;
     padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid transparent;
+    border-image: linear-gradient(
+            90deg,
+            var(--hair-strong),
+            var(--border) 40%,
+            transparent
+        )
+        1;
     color: var(--text-dim);
     font-size: 0.8rem;
     display: flex;
@@ -165,20 +177,29 @@ ul.page-list li a:hover {
 }
 
 .feature-card {
-    background: var(--bg-card);
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-lg);
     padding: 1.25rem;
-    transition: all 0.15s ease;
+    transition:
+        transform 0.2s var(--ease-out),
+        border-color 0.2s var(--ease-out),
+        background 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
 }
 
 .feature-card:hover {
-    border-color: var(--border-light);
-    background: var(--bg-hover);
+    transform: translateY(-2px);
+    border-color: var(--ember);
+    background: var(--surface-2);
+    box-shadow: var(--glow-ember);
 }
 
 .feature-icon {
     font-size: 1.35rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
     line-height: 1;
+    filter: drop-shadow(0 0 10px var(--ember-soft));
 }
 
 .feature-card h3 {
@@ -209,18 +230,24 @@ ul.page-list li a:hover {
 
 .doc-card {
     display: block;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-xl);
     padding: 1.25rem;
     text-decoration: none;
-    transition: all 0.15s ease;
+    transition:
+        transform 0.2s var(--ease-out),
+        border-color 0.2s var(--ease-out),
+        background 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
     border-bottom: none;
 }
 
 .doc-card:hover {
-    border-color: var(--primary-dark);
-    background: var(--bg-hover);
+    transform: translateY(-2px);
+    border-color: var(--ember);
+    background: var(--surface-2);
+    box-shadow: var(--glow-ember);
     border-bottom: none;
 }
 
