@@ -121,10 +121,11 @@ module Hwaro::Core::Build::Phases::Initialize
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
 
     Dir.glob(File.join(src_dir, "**", "*"), match: glob_match) do |src_path|
-      next if File.directory?(src_path)
-      # Skip dangling symlinks so the copy worker doesn't log a spurious
-      # failure (parity with the serve-watch path's existence guard).
-      next unless File.exists?(src_path)
+      # One stat for both checks: skip directories, and skip dangling symlinks
+      # (`info?` is nil when the target is missing) so the copy worker doesn't
+      # log a spurious failure.
+      info = File.info?(src_path, follow_symlinks: true)
+      next if info.nil? || info.directory?
 
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)

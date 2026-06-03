@@ -195,6 +195,8 @@ static/
 └── .domains
 ```
 
+Hwaro copies hidden dot-paths from `static/` verbatim into `public/` on every build — cold or `--cache`/incremental — so `static/.domains` always reaches the served branch. See [Static Files](/start/config/#static-files) for details.
+
 ### 2. Configure DNS
 
 Pick **one** of the three options below.

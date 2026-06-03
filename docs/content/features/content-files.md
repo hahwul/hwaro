@@ -120,12 +120,12 @@ For page bundles, colocated assets are also available via `page.assets`:
 | Feature | Content Files (`content/`) | Static Files (`static/`) |
 |---------|---------------------------|--------------------------|
 | Colocated with content | ✅ Yes | ❌ No |
-| Requires configuration | ✅ Yes | ❌ No (always copied) |
+| Requires configuration | ✅ Yes | ❌ No (copied by default, cruft filtered) |
 | Extension filtering | ✅ Yes | ❌ No |
-| Path filtering | ✅ Yes | ❌ No |
+| Path filtering | ✅ Yes (`disallow_paths`) | ✅ Yes (`[static]` `exclude`) |
 | Best for | Per-page assets | Site-wide assets |
 
-Use **content files** for assets that belong to specific pages (screenshots, diagrams, attachments). Use **static files** for site-wide assets (CSS, JS, logos, favicons).
+Use **content files** for assets that belong to specific pages (screenshots, diagrams, attachments). Use **static files** for site-wide assets (CSS, JS, logos, favicons) — see [`[static]`](/start/config/#static-files) to exclude cruft or specific paths.
 
 ## Tips
 

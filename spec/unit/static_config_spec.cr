@@ -42,11 +42,23 @@ describe Hwaro::Models::StaticConfig do
       config.excluded?("nested/.git/HEAD").should be_true
     end
 
-    it "excludes transient editor files by suffix, including hidden variants" do
+    it "excludes vim swap files by leaf-name suffix, including hidden variants" do
       config = Hwaro::Models::StaticConfig.new
-      config.excluded?("notes.txt~").should be_true
       config.excluded?(".index.html.swp").should be_true
       config.excluded?("dir/file.swo").should be_true
+    end
+
+    it "does not treat a trailing tilde as default cruft" do
+      # `foo~` is a legal file name, so the default denylist must not drop it.
+      config = Hwaro::Models::StaticConfig.new
+      config.excluded?("changelog~").should be_false
+      config.excluded?("downloads/snapshot~").should be_false
+    end
+
+    it "applies the swap-file suffix to the leaf name only, not directories" do
+      # A directory whose name ends in a swap suffix must not drop its subtree.
+      config = Hwaro::Models::StaticConfig.new
+      config.excluded?("assets.swp/logo.png").should be_false
     end
 
     it "honors use_default_excludes = false" do
@@ -76,6 +88,21 @@ describe Hwaro::Models::StaticConfig do
       config.exclude = ["drafts/**"]
       config.excluded?("drafts/a/b.txt").should be_true
       config.excluded?("published/note.txt").should be_false
+    end
+
+    it "anchors a literal name so it does not over-exclude same-named files" do
+      config = Hwaro::Models::StaticConfig.new
+      config.exclude = ["config"]
+      config.excluded?("config").should be_true      # exact top-level file
+      config.excluded?("sub/config").should be_false # same name elsewhere is kept
+    end
+
+    it "treats a literal directory name as a subtree" do
+      config = Hwaro::Models::StaticConfig.new
+      config.exclude = ["drafts"]
+      config.excluded?("drafts/wip.txt").should be_true # whole folder dropped
+      config.excluded?("drafts").should be_true
+      config.excluded?("draftsman.txt").should be_false # prefix, not a subtree
     end
 
     it "keeps default excludes active alongside custom excludes" do

@@ -125,6 +125,23 @@ feed = true
 | sitemap | bool | true | Include taxonomy pages in sitemap |
 | paginate | int | — | Pages per pagination page |
 
+## Static Files
+
+Everything under `static/` is copied verbatim into the site root, preserving its directory structure — `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
+
+```toml
+[static]
+use_default_excludes = true              # filter built-in cruft (default)
+exclude = ["*.bak", "drafts/**"]         # extra patterns to skip
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| use_default_excludes | bool | true | Filter the built-in cruft denylist (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `.git`, vim swap files, …) |
+| exclude | array | [] | Extra patterns to skip. A glob like `*.bak` matches at any depth, `drafts/**` scopes a subtree, and a literal name is anchored to an exact file or directory (`drafts` drops `drafts/…`) |
+
+The built-in denylist only removes cruft — legitimate dot-paths such as `.well-known/` and `.domains` are **never** filtered and are always published, identically for cold and `--cache`/incremental builds. Set `use_default_excludes = false` to disable the built-in filtering entirely.
+
 ## Feature Configuration Reference
 
 Each feature has its own documentation with full configuration details. Below is a quick reference of all `config.toml` sections.
@@ -144,6 +161,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
+| `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
 | `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |

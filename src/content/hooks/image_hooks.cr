@@ -344,7 +344,11 @@ module Hwaro
         )
           return unless Dir.exists?("static")
 
-          Dir.glob(File.join("static", "**", "*")).each do |file|
+          # Match the static copy path: include hidden entries so images under
+          # published dot-dirs (e.g. `static/.well-known/`) get resize variants
+          # too. Excluded cruft is filtered out just below.
+          glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+          Dir.glob(File.join("static", "**", "*"), match: glob_match).each do |file|
             next unless File.file?(file)
             next unless Processors::ImageProcessor.image?(file)
             next unless safe_path?(file, "static")

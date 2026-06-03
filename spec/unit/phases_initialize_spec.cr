@@ -188,7 +188,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
             File.write("static/.DS_Store", "junk")
             File.write("static/css/.DS_Store", "junk")
             File.write("static/.git/config", "[core]")
-            File.write("static/notes.txt~", "backup")
+            File.write("static/.main.css.swp", "swap")
             FileUtils.mkdir_p("public")
 
             builder = Hwaro::Core::Build::Builder.new
@@ -198,7 +198,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
             File.exists?("public/.DS_Store").should be_false
             File.exists?("public/css/.DS_Store").should be_false
             File.exists?("public/.git/config").should be_false
-            File.exists?("public/notes.txt~").should be_false
+            File.exists?("public/.main.css.swp").should be_false
           end
         end
       end

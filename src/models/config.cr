@@ -793,9 +793,9 @@ module Hwaro
     # `static/` is copied verbatim into the site root, so OS/editor/VCS cruft
     # placed there (`.DS_Store`, `Thumbs.db`, `.git/`, vim swap files, …) would
     # otherwise be deployed. A built-in denylist filters the common offenders;
-    # `exclude` adds project-specific shell-glob patterns (matched against both
-    # the path relative to `static/` and the bare file name, so `*.bak` filters
-    # at any depth while `drafts/**` scopes to a subtree), and
+    # `exclude` adds project-specific patterns — a glob like `*.bak` filters at
+    # any depth, `drafts/**` scopes a subtree, and a literal name is anchored to
+    # an exact file or directory (`drafts` drops `drafts/…`) — and
     # `use_default_excludes = false` opts out of the built-in list entirely.
     #
     # Note: this only filters *cruft*. Legitimate dot-paths such as
@@ -813,10 +813,17 @@ module Hwaro
         ".svn", ".hg", ".bzr",
       }
 
-      # Suffixes for transient editor files (vim swap, emacs/backup). Matched
-      # against each path segment so hidden variants (e.g. `.foo.txt.swp`) are
-      # caught too — a plain `*.swp` glob would miss the leading dot.
-      DEFAULT_EXCLUDE_SUFFIXES = [".swp", ".swo", "~"]
+      # Suffixes for vim swap files, matched against the leaf file name only.
+      # Kept deliberately narrow: a name ending in `.swp`/`.swo` is never a
+      # legitimate published asset, so the always-on default denylist can't
+      # silently drop real content. Emacs-style `~` backups are intentionally
+      # NOT here — a trailing tilde is a legal file name, so filtering it is
+      # left to an explicit `exclude` pattern.
+      DEFAULT_EXCLUDE_SUFFIXES = [".swp", ".swo"]
+
+      # Glob metacharacters that distinguish an `exclude` glob from a literal
+      # path/name.
+      GLOB_METACHARS = /[*?\[{]/
 
       property exclude : Array(String)
       property use_default_excludes : Bool
@@ -827,29 +834,44 @@ module Hwaro
       end
 
       # Whether `relative_path` (relative to `static/`) should be filtered out
-      # of the published output. `exclude` entries are shell globs matched
-      # against the POSIX-normalized relative path and the bare file name, so a
-      # pattern like `*.bak` filters at any depth (Crystal's `*` does not cross
-      # `/`) while a path pattern like `drafts/**` scopes to a subtree.
+      # of the published output.
+      #
+      # `exclude` entries match two ways depending on their shape:
+      # - a glob (contains `* ? [ {`) matches the relative path, and — when it
+      #   has no `/` — the bare file name too, so `*.bak` filters at any depth
+      #   while `drafts/**` scopes to a subtree;
+      # - a literal is anchored: it matches that exact path or, when it names a
+      #   directory, the whole subtree under it. So `drafts` drops `drafts/...`
+      #   but `config` only drops a top-level `config`, never a same-named file
+      #   nested elsewhere.
       def excluded?(relative_path : String) : Bool
         normalized = Path[relative_path].to_posix.to_s
         return false if normalized.empty? || normalized == "."
 
         if @use_default_excludes
           segments = normalized.split('/')
-          return true if segments.any? { |segment| default_excluded_segment?(segment) }
+          # Exact-name cruft (`.git`, `.DS_Store`, …) filters at any depth; the
+          # swap-file suffix check applies to the leaf name only, so a directory
+          # whose name happens to end in `.swp` doesn't take its subtree with it.
+          return true if segments.any? { |segment| DEFAULT_EXCLUDE_NAMES.includes?(segment) }
+          return true if DEFAULT_EXCLUDE_SUFFIXES.any? { |suffix| segments.last.ends_with?(suffix) }
         end
 
         return false if @exclude.empty?
         basename = File.basename(normalized)
-        @exclude.any? do |pattern|
-          File.match?(pattern, normalized) || File.match?(pattern, basename)
-        end
+        @exclude.any? { |pattern| pattern_matches?(pattern, normalized, basename) }
       end
 
-      private def default_excluded_segment?(segment : String) : Bool
-        return true if DEFAULT_EXCLUDE_NAMES.includes?(segment)
-        DEFAULT_EXCLUDE_SUFFIXES.any? { |suffix| segment.ends_with?(suffix) }
+      private def pattern_matches?(pattern : String, normalized : String, basename : String) : Bool
+        if GLOB_METACHARS.matches?(pattern)
+          # Glob: match the full relative path, plus the bare name for a
+          # path-less glob so it applies at any depth.
+          File.match?(pattern, normalized) ||
+            (!pattern.includes?('/') && File.match?(pattern, basename))
+        else
+          # Literal: an exact file, or a directory subtree rooted at it.
+          normalized == pattern || normalized.starts_with?("#{pattern}/")
+        end
       end
     end
 
