@@ -788,6 +788,71 @@ module Hwaro
       end
     end
 
+    # `[static]` — controls which files under `static/` get published.
+    #
+    # `static/` is copied verbatim into the site root, so OS/editor/VCS cruft
+    # placed there (`.DS_Store`, `Thumbs.db`, `.git/`, vim swap files, …) would
+    # otherwise be deployed. A built-in denylist filters the common offenders;
+    # `exclude` adds project-specific shell-glob patterns (matched against both
+    # the path relative to `static/` and the bare file name, so `*.bak` filters
+    # at any depth while `drafts/**` scopes to a subtree), and
+    # `use_default_excludes = false` opts out of the built-in list entirely.
+    #
+    # Note: this only filters *cruft*. Legitimate dot-paths such as
+    # `.well-known/` are NOT in the denylist and are always published.
+    class StaticConfig
+      # Exact file/dir names that should essentially never be published.
+      # Matched per path segment, so an entry like `.git` filters that
+      # directory (and everything under it) at any depth.
+      DEFAULT_EXCLUDE_NAMES = Set{
+        ".DS_Store", ".AppleDouble", ".LSOverride", ".Spotlight-V100",
+        ".Trashes", ".fseventsd", ".DocumentRevisions-V100", ".TemporaryItems",
+        ".VolumeIcon.icns", "__MACOSX",
+        "Thumbs.db", "ehthumbs.db", "ehthumbs_vista.db", "desktop.ini", ".directory",
+        ".git", ".gitignore", ".gitattributes", ".gitmodules", ".gitkeep",
+        ".svn", ".hg", ".bzr",
+      }
+
+      # Suffixes for transient editor files (vim swap, emacs/backup). Matched
+      # against each path segment so hidden variants (e.g. `.foo.txt.swp`) are
+      # caught too — a plain `*.swp` glob would miss the leading dot.
+      DEFAULT_EXCLUDE_SUFFIXES = [".swp", ".swo", "~"]
+
+      property exclude : Array(String)
+      property use_default_excludes : Bool
+
+      def initialize
+        @exclude = [] of String
+        @use_default_excludes = true
+      end
+
+      # Whether `relative_path` (relative to `static/`) should be filtered out
+      # of the published output. `exclude` entries are shell globs matched
+      # against the POSIX-normalized relative path and the bare file name, so a
+      # pattern like `*.bak` filters at any depth (Crystal's `*` does not cross
+      # `/`) while a path pattern like `drafts/**` scopes to a subtree.
+      def excluded?(relative_path : String) : Bool
+        normalized = Path[relative_path].to_posix.to_s
+        return false if normalized.empty? || normalized == "."
+
+        if @use_default_excludes
+          segments = normalized.split('/')
+          return true if segments.any? { |segment| default_excluded_segment?(segment) }
+        end
+
+        return false if @exclude.empty?
+        basename = File.basename(normalized)
+        @exclude.any? do |pattern|
+          File.match?(pattern, normalized) || File.match?(pattern, basename)
+        end
+      end
+
+      private def default_excluded_segment?(segment : String) : Bool
+        return true if DEFAULT_EXCLUDE_NAMES.includes?(segment)
+        DEFAULT_EXCLUDE_SUFFIXES.any? { |suffix| segment.ends_with?(suffix) }
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -818,6 +883,7 @@ module Hwaro
       property amp : AmpConfig
       property image_processing : ImageProcessingConfig
       property doctor : DoctorConfig
+      property static : StaticConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -853,6 +919,7 @@ module Hwaro
         @amp = AmpConfig.new
         @image_processing = ImageProcessingConfig.new
         @doctor = DoctorConfig.new
+        @static = StaticConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1049,6 +1116,7 @@ module Hwaro
         load_amp(config)
         load_image_processing(config)
         load_doctor(config)
+        load_static(config)
         load_deployment(config)
 
         config
@@ -1538,6 +1606,15 @@ module Hwaro
 
         if ignore = s["ignore"]?.try(&.as_a?)
           config.doctor.ignore = ignore.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_static(config : Config)
+        return unless s = config.raw["static"]?.try(&.as_h?)
+
+        config.static.use_default_excludes = bool_value(s["use_default_excludes"]?, config.static.use_default_excludes)
+        if exclude_any = s["exclude"]?
+          config.static.exclude = string_or_array(exclude_any)
         end
       end
 

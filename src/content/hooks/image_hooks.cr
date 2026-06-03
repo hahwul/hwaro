@@ -130,7 +130,7 @@ module Hwaro
           collect_page_asset_jobs(ctx, output_dir, resolved_output, jobs, seen, fast_start_priority)
           if fast_start_priority.nil?
             collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen) if config.content_files.enabled?
-            collect_static_jobs(output_dir, resolved_output, jobs, seen)
+            collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
           return if jobs.empty?
@@ -336,6 +336,7 @@ module Hwaro
         end
 
         private def collect_static_jobs(
+          config : Models::Config,
           output_dir : String,
           resolved_output : String,
           jobs : Array(ImageJob),
@@ -349,6 +350,11 @@ module Hwaro
             next unless safe_path?(file, "static")
 
             relative = Path[file].relative_to("static").to_s
+            # Don't emit resized variants for files the static copy filters out
+            # (`[static] exclude`), otherwise excluded images would leak into
+            # the output even though their originals are never published.
+            next if config.static.excluded?(relative)
+
             original_url = "/" + relative
             next if seen.includes?(original_url)
             dest_dir = File.join(output_dir, File.dirname(relative))

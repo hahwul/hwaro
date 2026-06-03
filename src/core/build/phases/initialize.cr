@@ -82,40 +82,71 @@ module Hwaro::Core::Build::Phases::Initialize
   private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
     return unless Dir.exists?("static")
 
-    if incremental
-      # Incremental mode: only copy files that are newer than their destination
-      copy_static_files_incremental("static", output_dir, verbose)
-    else
-      FileUtils.cp_r("static/.", "#{output_dir}/")
-      Logger.action :copy, "static files", :blue if verbose
-    end
-  end
-
-  # Copy only changed static files by comparing mtime, using parallel I/O
-  private def copy_static_files_incremental(src_dir : String, output_dir : String, verbose : Bool)
-    # First pass: collect files that need copying (sequential, fast stat calls)
-    files_to_copy = [] of {String, String} # {src, dest}
-    Dir.glob(File.join(src_dir, "**", "*")) do |src_path|
-      next if File.directory?(src_path)
-
-      relative = Path[src_path].relative_to(src_dir).to_s
-      dest_path = File.join(output_dir, relative)
-
-      needs_copy = if File.exists?(dest_path)
-                     File.info(src_path).modification_time > File.info(dest_path).modification_time
-                   else
-                     true
-                   end
-
-      files_to_copy << {src_path, dest_path} if needs_copy
-    end
-
+    # Single source of truth for both cold and incremental builds: walk
+    # `static/` once (including hidden entries like `.well-known/`), drop
+    # excluded cruft, then copy the survivors in parallel. Keeping both modes
+    # on the same path guarantees `--cache` and cold builds publish exactly
+    # the same files (see issues #610/#611).
+    files_to_copy = collect_static_files("static", output_dir, static_publish_config, incremental)
     return if files_to_copy.empty?
 
-    # Ensure destination directories exist (must be sequential to avoid races)
+    copy_static_pairs(files_to_copy)
+
+    label = incremental ? "static files (#{files_to_copy.size} updated)" : "static files"
+    Logger.action :copy, label, :blue if verbose
+  end
+
+  # The effective `[static]` publishing config, falling back to defaults (which
+  # keep the built-in cruft denylist on) when config hasn't loaded yet — e.g.
+  # in unit tests that exercise the copy directly. Shared by both the full
+  # build and the serve-watch copy so they filter identically.
+  private def static_publish_config : Models::StaticConfig
+    @config.try(&.static) || Models::StaticConfig.new
+  end
+
+  # Walk `static/` and return the `{src, dest}` pairs that need copying.
+  #
+  # Hidden files/dirs are matched explicitly via `DotFiles` — Crystal's glob
+  # skips them by default, which previously dropped `.well-known/` from cached
+  # builds (#610). Excluded paths (`StaticConfig#excluded?`) are filtered out
+  # for both modes (#611). In incremental mode, files whose destination is
+  # newer-or-equal are skipped.
+  private def collect_static_files(
+    src_dir : String,
+    output_dir : String,
+    static_config : Models::StaticConfig,
+    incremental : Bool,
+  ) : Array({String, String})
+    files_to_copy = [] of {String, String}
+    glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+
+    Dir.glob(File.join(src_dir, "**", "*"), match: glob_match) do |src_path|
+      next if File.directory?(src_path)
+      # Skip dangling symlinks so the copy worker doesn't log a spurious
+      # failure (parity with the serve-watch path's existence guard).
+      next unless File.exists?(src_path)
+
+      relative = Path[src_path].relative_to(src_dir).to_s
+      next if static_config.excluded?(relative)
+
+      dest_path = File.join(output_dir, relative)
+      if incremental && File.exists?(dest_path) &&
+         File.info(src_path).modification_time <= File.info(dest_path).modification_time
+        next
+      end
+
+      files_to_copy << {src_path, dest_path}
+    end
+
+    files_to_copy
+  end
+
+  # Copy the given `{src, dest}` pairs using a parallel worker pool. Directory
+  # creation stays sequential to avoid the check-then-create race that fires
+  # under the multi-threaded runtime.
+  private def copy_static_pairs(files_to_copy : Array({String, String}))
     files_to_copy.each { |_, dest| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
 
-    # Second pass: copy files in parallel using worker pool
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
 
@@ -142,8 +173,6 @@ module Hwaro::Core::Build::Phases::Initialize
       end
     end
     worker_count.times { done.receive }
-
-    Logger.action :copy, "static files (#{files_to_copy.size} updated)", :blue if verbose
   end
 
   private def load_templates : Hash(String, String)
