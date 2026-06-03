@@ -19,6 +19,8 @@ hwaro build --minify
 
 This performs conservative optimization — HTML comments and trailing whitespace are removed, JSON/XML whitespace is compacted. All code blocks and content structure are preserved.
 
+Everything in `static/` is copied into `public/` and deployed — including hidden dot-paths such as `.well-known/security.txt` and `.domains` — identically for cold and `--cache`/incremental builds. Common OS/editor/VCS cruft (`.DS_Store`, `.git/`, …) is filtered out automatically; see [Static Files](/start/config/#static-files) to tune it.
+
 ## General Steps
 
 1. Build the site: `hwaro build`

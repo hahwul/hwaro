@@ -788,6 +788,93 @@ module Hwaro
       end
     end
 
+    # `[static]` — controls which files under `static/` get published.
+    #
+    # `static/` is copied verbatim into the site root, so OS/editor/VCS cruft
+    # placed there (`.DS_Store`, `Thumbs.db`, `.git/`, vim swap files, …) would
+    # otherwise be deployed. A built-in denylist filters the common offenders;
+    # `exclude` adds project-specific patterns — a glob like `*.bak` filters at
+    # any depth, `drafts/**` scopes a subtree, and a literal name is anchored to
+    # an exact file or directory (`drafts` drops `drafts/…`) — and
+    # `use_default_excludes = false` opts out of the built-in list entirely.
+    #
+    # Note: this only filters *cruft*. Legitimate dot-paths such as
+    # `.well-known/` are NOT in the denylist and are always published.
+    class StaticConfig
+      # Exact file/dir names that should essentially never be published.
+      # Matched per path segment, so an entry like `.git` filters that
+      # directory (and everything under it) at any depth.
+      DEFAULT_EXCLUDE_NAMES = Set{
+        ".DS_Store", ".AppleDouble", ".LSOverride", ".Spotlight-V100",
+        ".Trashes", ".fseventsd", ".DocumentRevisions-V100", ".TemporaryItems",
+        ".VolumeIcon.icns", "__MACOSX",
+        "Thumbs.db", "ehthumbs.db", "ehthumbs_vista.db", "desktop.ini", ".directory",
+        ".git", ".gitignore", ".gitattributes", ".gitmodules", ".gitkeep",
+        ".svn", ".hg", ".bzr",
+      }
+
+      # Suffixes for vim swap files, matched against the leaf file name only.
+      # Kept deliberately narrow: a name ending in `.swp`/`.swo` is never a
+      # legitimate published asset, so the always-on default denylist can't
+      # silently drop real content. Emacs-style `~` backups are intentionally
+      # NOT here — a trailing tilde is a legal file name, so filtering it is
+      # left to an explicit `exclude` pattern.
+      DEFAULT_EXCLUDE_SUFFIXES = [".swp", ".swo"]
+
+      # Glob metacharacters that distinguish an `exclude` glob from a literal
+      # path/name.
+      GLOB_METACHARS = /[*?\[{]/
+
+      property exclude : Array(String)
+      property use_default_excludes : Bool
+
+      def initialize
+        @exclude = [] of String
+        @use_default_excludes = true
+      end
+
+      # Whether `relative_path` (relative to `static/`) should be filtered out
+      # of the published output.
+      #
+      # `exclude` entries match two ways depending on their shape:
+      # - a glob (contains `* ? [ {`) matches the relative path, and — when it
+      #   has no `/` — the bare file name too, so `*.bak` filters at any depth
+      #   while `drafts/**` scopes to a subtree;
+      # - a literal is anchored: it matches that exact path or, when it names a
+      #   directory, the whole subtree under it. So `drafts` drops `drafts/...`
+      #   but `config` only drops a top-level `config`, never a same-named file
+      #   nested elsewhere.
+      def excluded?(relative_path : String) : Bool
+        normalized = Path[relative_path].to_posix.to_s
+        return false if normalized.empty? || normalized == "."
+
+        if @use_default_excludes
+          segments = normalized.split('/')
+          # Exact-name cruft (`.git`, `.DS_Store`, …) filters at any depth; the
+          # swap-file suffix check applies to the leaf name only, so a directory
+          # whose name happens to end in `.swp` doesn't take its subtree with it.
+          return true if segments.any? { |segment| DEFAULT_EXCLUDE_NAMES.includes?(segment) }
+          return true if DEFAULT_EXCLUDE_SUFFIXES.any? { |suffix| segments.last.ends_with?(suffix) }
+        end
+
+        return false if @exclude.empty?
+        basename = File.basename(normalized)
+        @exclude.any? { |pattern| pattern_matches?(pattern, normalized, basename) }
+      end
+
+      private def pattern_matches?(pattern : String, normalized : String, basename : String) : Bool
+        if GLOB_METACHARS.matches?(pattern)
+          # Glob: match the full relative path, plus the bare name for a
+          # path-less glob so it applies at any depth.
+          File.match?(pattern, normalized) ||
+            (!pattern.includes?('/') && File.match?(pattern, basename))
+        else
+          # Literal: an exact file, or a directory subtree rooted at it.
+          normalized == pattern || normalized.starts_with?("#{pattern}/")
+        end
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -818,6 +905,7 @@ module Hwaro
       property amp : AmpConfig
       property image_processing : ImageProcessingConfig
       property doctor : DoctorConfig
+      property static : StaticConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -853,6 +941,7 @@ module Hwaro
         @amp = AmpConfig.new
         @image_processing = ImageProcessingConfig.new
         @doctor = DoctorConfig.new
+        @static = StaticConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1049,6 +1138,7 @@ module Hwaro
         load_amp(config)
         load_image_processing(config)
         load_doctor(config)
+        load_static(config)
         load_deployment(config)
 
         config
@@ -1538,6 +1628,15 @@ module Hwaro
 
         if ignore = s["ignore"]?.try(&.as_a?)
           config.doctor.ignore = ignore.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_static(config : Config)
+        return unless s = config.raw["static"]?.try(&.as_h?)
+
+        config.static.use_default_excludes = bool_value(s["use_default_excludes"]?, config.static.use_default_excludes)
+        if exclude_any = s["exclude"]?
+          config.static.exclude = string_or_array(exclude_any)
         end
       end
 

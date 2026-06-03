@@ -631,6 +631,7 @@ module Hwaro
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
+          static_config = static_publish_config
           copied = 0
           changed_files.each do |src_path|
             next unless File.exists?(src_path)
@@ -641,6 +642,7 @@ module Hwaro
             rescue ArgumentError
               src_path.lchop("static/")
             end
+            next if static_config.excluded?(relative)
             dest_path = File.join(output_dir, relative)
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))

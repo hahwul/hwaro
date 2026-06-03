@@ -154,6 +154,95 @@ describe Hwaro::Core::Build::Phases::Initialize do
         end
       end
     end
+
+    # Regression: hidden dot-directories such as `.well-known/` must be
+    # published. Crystal's `Dir.glob` skips hidden entries by default, which
+    # previously dropped them from cached builds (issue #610).
+    {true, false}.each do |incremental|
+      mode = incremental ? "incremental" : "non-incremental"
+
+      it "copies hidden dot-directories like .well-known in #{mode} mode" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("static/.well-known")
+            File.write("static/.well-known/security.txt", "Contact: mailto:x@y.z")
+            File.write("static/robots.txt", "User-agent: *")
+            FileUtils.mkdir_p("public")
+
+            builder = Hwaro::Core::Build::Builder.new
+            builder.test_copy_static_files("public", incremental: incremental)
+
+            File.exists?("public/.well-known/security.txt").should be_true
+            File.read("public/.well-known/security.txt").should eq("Contact: mailto:x@y.z")
+            File.exists?("public/robots.txt").should be_true
+          end
+        end
+      end
+
+      it "excludes OS/VCS cruft like .DS_Store and .git in #{mode} mode" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("static/css")
+            FileUtils.mkdir_p("static/.git")
+            File.write("static/css/main.css", "body{}")
+            File.write("static/.DS_Store", "junk")
+            File.write("static/css/.DS_Store", "junk")
+            File.write("static/.git/config", "[core]")
+            File.write("static/.main.css.swp", "swap")
+            FileUtils.mkdir_p("public")
+
+            builder = Hwaro::Core::Build::Builder.new
+            builder.test_copy_static_files("public", incremental: incremental)
+
+            File.exists?("public/css/main.css").should be_true
+            File.exists?("public/.DS_Store").should be_false
+            File.exists?("public/css/.DS_Store").should be_false
+            File.exists?("public/.git/config").should be_false
+            File.exists?("public/.main.css.swp").should be_false
+          end
+        end
+      end
+    end
+
+    it "honors a custom [static] exclude list from config" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          File.write("static/keep.txt", "keep")
+          File.write("static/secret.bak", "drop")
+          FileUtils.mkdir_p("public")
+
+          config = Hwaro::Models::Config.new
+          config.static.exclude = ["*.bak"]
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_set_config_for_init(config)
+          builder.test_copy_static_files("public")
+
+          File.exists?("public/keep.txt").should be_true
+          File.exists?("public/secret.bak").should be_false
+        end
+      end
+    end
+
+    it "publishes cruft when use_default_excludes is disabled" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          File.write("static/.DS_Store", "junk")
+          FileUtils.mkdir_p("public")
+
+          config = Hwaro::Models::Config.new
+          config.static.use_default_excludes = false
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_set_config_for_init(config)
+          builder.test_copy_static_files("public")
+
+          File.exists?("public/.DS_Store").should be_true
+        end
+      end
+    end
   end
 
   describe "#load_templates" do
