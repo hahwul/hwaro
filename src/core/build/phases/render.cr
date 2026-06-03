@@ -1655,7 +1655,7 @@ module Hwaro::Core::Build::Phases::Render
     # invalid empty `headline`. Use the WebSite schema for the homepage, and
     # for any other untitled page skip the Article entirely rather than emit
     # one with an empty headline.
-    is_homepage = page.is_index && page.section.empty?
+    is_homepage = home?(page)
     jsonld_article = if is_homepage || page.title.empty?
                        ""
                      else
@@ -1737,11 +1737,28 @@ module Hwaro::Core::Build::Phases::Render
     return "website" if page.path == "404.html"
     # Taxonomy listings (`/tags/`, `/tags/<term>/`, …).
     return "website" if page.taxonomy_name
-    # Section indexes (`/posts/`, `/`, …) — `is_index` covers both root
-    # `_index.md` and per-section `_index.md`.
-    return "website" if page.is_index
-    # Bare homepage URL fallback in case nothing else flagged it.
+    # Section landings come from `_index.md`, which read_content parses into
+    # a `Models::Section`. Key off the *type*, not `page.is_index`: a
+    # page-bundle leaf (`some/post/index.md`) is a `Models::Page` with
+    # `is_index = true` as well, yet it is ordinary article content. Keying
+    # off `is_index` rendered og:type="website" for every page-bundle post
+    # (gh#601).
+    return "website" if page.is_a?(Models::Section)
+    # Site / per-language homepage (`/`, `/<lang>/`). See `home?`.
+    return "website" if home?(page)
+    # Defensive fallback for a custom-permalink homepage remapped to root.
     return "website" if effective_url == "/" || effective_url.empty?
     nil
+  end
+
+  # Is this the site (or per-language) homepage — the root `index.md` /
+  # `_index.md`? Such a page is an index whose source file sits directly
+  # under `content/` with no parent directory, so `page.path` has no `/`
+  # (`index.md`, `index.ko.md`, `_index.md`, …). This deliberately does NOT
+  # use `page.is_index && page.section.empty?`: one-level page bundles like
+  # `content/about/index.md` also resolve to an empty section, so that test
+  # mislabels them as the homepage (gh#601).
+  private def home?(page : Models::Page) : Bool
+    page.is_index && !page.path.includes?('/')
   end
 end
