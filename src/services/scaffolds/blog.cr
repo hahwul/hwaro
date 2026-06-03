@@ -873,8 +873,8 @@ module Hwaro
                           loop. It shows only the current language's sections;
                           s.url already carries the language prefix, so do NOT
                           add lang_prefix. Sort by "weight" for explicit order.
-                       (Wrapped in {% raw %} so this example isn't executed
-                       while it lives in the comment.)
+                       (The example below is wrapped in a raw block so it
+                       isn't executed while it lives in the comment.)
                        {% raw %}
                        {% for s in site.sections | sort(attribute="title") %}
                          {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}

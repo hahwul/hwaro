@@ -519,7 +519,8 @@ module Hwaro
                    s.url already includes the language prefix, so do NOT add
                    lang_prefix. For custom ordering, set `weight` in each
                    section's front matter and use sort(attribute="weight").
-                   (Wrapped in {% raw %} so the example isn't executed here.)
+                   (The example below is wrapped in a raw block so it
+                   isn't executed here.)
                    {% raw %}
                    {% for s in site.sections | sort(attribute="title") %}
                      {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}
