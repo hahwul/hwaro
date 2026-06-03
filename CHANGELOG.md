@@ -1,12 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## v0.15.2
 
 ### Added
-- `[static]` config: control which files under `static/` get published. A built-in denylist drops OS/editor/VCS cruft (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `.git/`, vim swap files); `exclude = [...]` adds patterns — a glob like `*.bak` matches at any depth, `drafts/**` scopes a subtree, a literal name is anchored to an exact file/directory — and `use_default_excludes = false` opts out (#611)
+- `[static]` config: filter which `static/` files get published — built-in cruft denylist (`.DS_Store`, `.git/`, etc.), `exclude` glob patterns, and `use_default_excludes = false` to opt out (#611)
 
 ### Fixed
-- Static files: hidden dot-paths under `static/` (e.g. `.well-known/`) are now published in cached (`--cache`) builds. The incremental copy path used Crystal's `Dir.glob`, which skips hidden entries by default, so the GitHub Action (which always builds with `--cache`) dropped `security.txt`/`humans.txt`/ACME challenges from deployed sites. Both cold and cached builds now share one copy path and publish identical files (#610)
+- Static files: hidden dot-paths (e.g. `.well-known/`) now published in cached (`--cache`) builds, matching cold builds (#610)
 
 ## v0.15.1
 
