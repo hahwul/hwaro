@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.15.1
+
+### Fixed
+- SEO: `og:type` and JSON-LD schema selection now distinguish page-bundle leaves from section landings. `og_type_for` keyed the `og:type="website"` override off `page.is_index`, but `read_content` sets `is_index = true` for page-bundle leaves (`some/post/index.md`) just as it does for `_index.md` section landings — so on sites authored as page bundles *every* content page rendered `og:type="website"`, ignoring the configured `[og].type`. The override now keys off whether the page parsed into a `Models::Section` (a true section landing), and the homepage is detected by a root-index path check (a new `home?` helper), so per-language homepages (`/`, `/ko/`) stay `website` while one-level bundles like `content/about/index.md` are not mislabeled. The same flawed `is_index && section.empty?` test drove JSON-LD schema selection — a one-level page bundle was served the `WebSite` schema instead of an `Article` — and now routes through the shared `home?` helper (#608, #601).
+- Scaffold nav: the section-loop hint comment in the `blog`/base nav no longer leaks a `{% raw %}` delimiter into every generated page. The explanatory prose *named* the tag with a bare `{% raw %}` ("Wrapped in {% raw %} so…"); Crinja has no concept of HTML comments, so it treated that bare tag as a real raw-block open — swallowing the prose after it and leaking the inner `{% raw %}` verbatim into the page source. The prose is reworded to "wrapped in a raw block" so it contains no bare tag; the real `{% raw %}…{% endraw %}` pair around the example is unchanged (#609).
+
 ## v0.15.0
 
 ### Added
