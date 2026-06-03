@@ -1737,10 +1737,19 @@ module Hwaro::Core::Build::Phases::Render
     return "website" if page.path == "404.html"
     # Taxonomy listings (`/tags/`, `/tags/<term>/`, …).
     return "website" if page.taxonomy_name
-    # Section indexes (`/posts/`, `/`, …) — `is_index` covers both root
-    # `_index.md` and per-section `_index.md`.
-    return "website" if page.is_index
-    # Bare homepage URL fallback in case nothing else flagged it.
+    # Section landings come from `_index.md`, which read_content parses into
+    # a `Models::Section`. Key off the *type*, not `page.is_index`: a
+    # page-bundle leaf (`some/post/index.md`) is a `Models::Page` with
+    # `is_index = true` as well, yet it is ordinary article content. Keying
+    # off `is_index` rendered og:type="website" for every page-bundle post
+    # (gh#601).
+    return "website" if page.is_a?(Models::Section)
+    # Site / per-language homepage: the root `index.md`, i.e. an index page
+    # whose source file sits directly under `content/` with no parent
+    # directory. Covers `/` and `/<lang>/` without mislabeling one-level
+    # page bundles such as `content/about/index.md`.
+    return "website" if page.is_index && !page.path.includes?('/')
+    # Defensive fallback for a custom-permalink homepage remapped to root.
     return "website" if effective_url == "/" || effective_url.empty?
     nil
   end
