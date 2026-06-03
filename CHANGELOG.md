@@ -3,119 +3,119 @@
 ## v0.15.1
 
 ### Fixed
-- SEO: `og:type` and JSON-LD schema selection now distinguish page-bundle leaves from section landings. `og_type_for` keyed the `og:type="website"` override off `page.is_index`, but `read_content` sets `is_index = true` for page-bundle leaves (`some/post/index.md`) just as it does for `_index.md` section landings — so on sites authored as page bundles *every* content page rendered `og:type="website"`, ignoring the configured `[og].type`. The override now keys off whether the page parsed into a `Models::Section` (a true section landing), and the homepage is detected by a root-index path check (a new `home?` helper), so per-language homepages (`/`, `/ko/`) stay `website` while one-level bundles like `content/about/index.md` are not mislabeled. The same flawed `is_index && section.empty?` test drove JSON-LD schema selection — a one-level page bundle was served the `WebSite` schema instead of an `Article` — and now routes through the shared `home?` helper (#608, #601).
-- Scaffold nav: the section-loop hint comment in the `blog`/base nav no longer leaks a `{% raw %}` delimiter into every generated page. The explanatory prose *named* the tag with a bare `{% raw %}` ("Wrapped in {% raw %} so…"); Crinja has no concept of HTML comments, so it treated that bare tag as a real raw-block open — swallowing the prose after it and leaking the inner `{% raw %}` verbatim into the page source. The prose is reworded to "wrapped in a raw block" so it contains no bare tag; the real `{% raw %}…{% endraw %}` pair around the example is unchanged (#609).
+- SEO: `og:type` and JSON-LD schema now distinguish page-bundle leaves from section landings, so bundle sites no longer label every page `website`/`WebSite`; a new `home?` helper detects homepages (#608, #601)
+- Scaffold nav: nav-hint comment no longer leaks a `{% raw %}` delimiter into generated pages (#609)
 
 ## v0.15.0
 
 ### Added
-- `hwaro serve`: custom response headers via `--header 'Name: Value'` (repeatable) and `[serve.headers]` config table.
-- Shortcodes: full named closer support (`{% alert %}...{% endalert %}`) with mismatch diagnostics and improved unclosed warnings.
-- `[og.auto_image] lazy_generate = true`: defer expensive OG PNG/SVG generation during `hwaro serve` (especially effective with `--fast-start`).
-- `hwaro init --full-config`: emit verbose recommended config for maximum discoverability.
-- New OG image styles: geometric (`split`, `band`, `brutalist`) and modern/production (`artistic`, `hero`, `surreal`, `monument`), each rendered in both PNG and SVG with its own distinct generated background signature (vertical accent rule, inset frame, two-color diagonal gradient, radial spotlight glow, aurora orbs, oversized type). New `[og.auto_image]` options: `secondary_color` for two-tone styles (auto-derived as a complementary HSL tone when omitted), plus `text_panel` and `accent_bars`.
-- Responsive content images: when `[image_processing]` is enabled, markdown `![]()` images that have generated width variants are auto-rewritten with `srcset` + `sizes` so browsers pick an appropriate size instead of always loading the full-resolution source (previously the variants were only used via the `resize_image()` template helper) (#587).
-- Blog theme: the post template now renders a Related Posts block when `[related]` is enabled (the engine computed `related_posts` but no scaffold surfaced it) (#593).
+- `hwaro serve`: custom response headers via `--header 'Name: Value'` (repeatable) and `[serve.headers]`
+- Shortcodes: named closer support (`{% alert %}...{% endalert %}`) with mismatch diagnostics
+- `[og.auto_image] lazy_generate = true`: defer OG image generation during `hwaro serve` (great with `--fast-start`)
+- `hwaro init --full-config`: emit verbose recommended config for discoverability
+- New OG styles (`split`, `band`, `brutalist`, `artistic`, `hero`, `surreal`, `monument`) in PNG and SVG; new `secondary_color`, `text_panel`, `accent_bars` options
+- Responsive content images: markdown images with width variants auto-rewritten with `srcset`/`sizes` when `[image_processing]` is on (#587)
+- Blog theme: post template renders a Related Posts block when `[related]` is enabled (#593)
 
 ### Changed
-- `hwaro init` / `doctor`: Hybrid config strategy (C). Default `init` now emits a balanced, much shorter config (~67 lines vs ~389). Doctor is less aggressive by default.
-- `doctor`: `--fix` performs real corrective fixes only; new `--approve` adds recommended optional sections; `--full` is shorthand for `--fix --approve`. Removed confusing `--minimal` flag.
-- Auto OG images now default to PNG instead of SVG. Social platforms (Facebook, X/Twitter, LinkedIn, Slack, Discord, iMessage) do not render an SVG `og:image`, so the previous default silently produced shares with no preview image. PNG generation falls back to SVG automatically when PNG font initialization is unavailable (#583).
-- OG images: the thin top/bottom accent bars on the pattern styles (`default`, `dots`, `grid`, `diagonal`, `gradient`, `waves`) are now off by default for a cleaner look (set `accent_bars = true` to restore them); the SVG renderer now honors the `accent_bars` flag, which it previously ignored.
+- `hwaro init`/`doctor`: hybrid config strategy — `init` emits a much shorter config (~67 vs ~389 lines); doctor less aggressive by default
+- `doctor`: `--fix` does corrective fixes only; new `--approve` adds optional sections; `--full` = `--fix --approve`; removed `--minimal`
+- Auto OG images default to PNG instead of SVG (social platforms don't render SVG `og:image`), falling back to SVG (#583)
+- OG images: pattern-style accent bars off by default (`accent_bars = true` to restore); SVG renderer now honors the flag
 
 ### Fixed
-- `hwaro init`/`doctor`: restored multilingual support (`default_language` + `[languages.*]`) and eliminated duplicate `[sitemap]`/`[feeds]` emission after Hybrid C changes.
-- `tool check-links`: recognizes assets in `static/` and `public/` (including image-processed outputs), removing false positives.
-- Render: `site.sections` Crinja values now expose `weight`, `draft`, `transparent`, `sort_by` etc. (prevents sort/compare crashes in scaffold templates).
-- `hwaro new`: `--section` override now properly takes precedence over path-based section inference.
-- Multiple authoring UX fixes from real-site testing (multilingual nav, doctor dedup, draft messaging, default `new` dates, social meta fallbacks).
-- OG hex colors, HTML minifier, and cache save hardening: 3-digit CSS shorthand hex (`#fff`) and 8-digit alpha hex are now parsed correctly in OG images (shorthand previously rendered as the wrong color); the HTML minifier no longer raises `IndexError` when content contains a literal preserve-block sentinel; and `CacheManager#save` snapshots its entries under the mutex, fixing a thread-safety violation that could corrupt the cache under `-Dpreview_mt` (#568).
-- OG images: long titles in the `band` style are capped to the lines that fit the band instead of overflowing invisibly (background-on-background) into the description; PNG generation warns once when page text contains CJK but no `[og.auto_image].font_path` is set (Latin-only fonts otherwise render blank "tofu" boxes); and the Twitter card downgrades from `summary_large_image` to `summary` when a page resolves to no image, avoiding a blank social preview (#569).
-- A section's `page_template` is now applied to its child pages. `determine_template` never consulted the parent section, so the documented per-section default template was a no-op and child pages always fell back to `page.html` (which also meant the blog scaffold's `post.html` date/meta block was never used). Explicit page-level templates still take precedence (#570).
-- `tool convert`: date-only front-matter values (e.g. `2026-05-20`) keep their calendar day across formats. They were serialized via RFC 3339 in UTC, so in any positive-offset zone (e.g. KST) the day rolled back and a spurious time was grafted on, which then leaked into sitemap/RSS output. Date-only values now serialize as a bare `YYYY-MM-DD` while genuine timestamps still round-trip as RFC 3339 (#571).
-- `hwaro build --memory-limit`: a zero limit (`0`, `0G`) and absurdly large values are now rejected with clear messages instead of degrading to a batch size of 1 or surfacing a raw `Arithmetic overflow` (#572).
-- Multilingual search: client-side search is now scoped to the current language. `search.json` tags every entry with its `lang`, the scaffolds filter results to the page's `<html lang>`, and the per-language `build_search_index` key is now honored (it was parsed but never consumed), so a Korean visitor on `/ko/` no longer gets mixed `en` + `ko` hits (#575).
-- `.html` aliases are written to that exact path instead of a directory. `generate_aliases` appended `/index.html` to every alias, so `/promo.html` became `public/promo.html/index.html`; aliases ending in `.html`/`.htm` now write to the exact file (Hugo-compatible) while pretty aliases (`/old/`) still get an `index.html` (#576).
-- Default themes now emit JSON-LD structured data. The build generated `{{ jsonld }}` (Article, BreadcrumbList, FAQ, HowTo, Website, Organization) but no built-in scaffold included it, so the advertised feature produced zero output; `{{ jsonld }}` is now wired into the `<head>` of the simple/blog/docs/book headers (`bare` stays markup-only by design) (#577).
-- AMP: disallowed external stylesheets are stripped from generated AMP pages. The converter left every `<link rel="stylesheet">` in place (site CSS plus the highlight.js/KaTeX CDN links), failing AMP validation; non-font-provider stylesheets are now dropped while allowlisted font stylesheets (Google Fonts, Typekit, Font Awesome, …) are kept (#578).
-- Multilingual: default-language taxonomy pages are no longer duplicated under the `/<default_language>/` prefix. They were emitted both at the site root (`/tags/`) and again under e.g. `/en/tags/` as orphaned URLs — absent from the sitemap, without a canonical, and missing the cross-language links the root copies carried (#579).
-- `blog` scaffold: posts now render with the shipped `post.html` (article layout, publish date, post meta, series navigation). The `posts` section wasn't wired to the template via `page_template`, so every post fell back to the bare `page.html` and showed no date or meta — and edits to `post.html` had no effect (#580).
-- Alert shortcode: the body is now rendered as Markdown, so `**bold**`, `` `code` ``, and `[links](…)` inside an alert render as HTML instead of appearing as literal markup (#581).
-- Homepage JSON-LD: the homepage now emits `WebSite` structured data instead of an `Article` with an empty `headline` (invalid per Google's Article guidelines); other untitled pages no longer emit an empty-headline Article either (#582).
-- `docs` and `book` themes now render the in-page table of contents when a page sets `toc = true`. The `{{ toc }}` data was exposed by the engine but no built-in theme referenced it, so the documented option silently did nothing; the `book` archetype now enables `toc` by default (#584).
-- `[highlight] use_cdn = false` now warns at build time when the self-hosted highlight.js assets (`static/assets/js/highlight.min.js` + theme CSS) are missing, instead of silently emitting 404 references and shipping a site with no syntax highlighting (#585).
-- `hwaro build --cache`: a no-op rebuild (all pages cached) no longer prints the false "No content found" hint. The hint keyed off pages *rendered* this build, which is 0 when everything is served from cache; it now also requires zero cache hits, so it only fires for a genuinely empty site (#586).
-- AMP: self-closing markdown images (`<img … />`) no longer produce an invalid `<amp-img … / layout="fill">` (stray slash mid-tag) that failed AMP validation. The conversion now strips the trailing slash before appending the layout attribute (#588).
-- `base_url` with a trailing slash (from `config.toml` or `--base-url`) no longer produces `//` in links, canonical, and OG URLs. The value is normalized (trailing slash stripped) on assignment, so `{{ base_url }}/path` and the sitemap agree; `doctor` still flags/`--fix`es a trailing slash in the config file (#589).
-- `hwaro new`: a title or date containing a double quote (e.g. `-t 'My "Quoted" Post'`) is now escaped in archetype-generated front matter, so the new file is valid TOML instead of failing the next build. Tags were already escaped; title/date now match (#590).
-- Blog series navigation now orders prev/next by `series_weight` (walking `series_pages` via `series_index`) instead of the section's flat date-ordered neighbours, which mis-ordered chapters, showed prev/next on the first/last chapter, and could link non-series posts (#591).
-- Multilingual: root taxonomy term pages now list only the default language's posts. Previously the English `/tags/foo/` page also listed the other languages' posts (translated titles, `/<lang>/` links) — a cross-language leak; the per-language `/<lang>/tags/foo/` pages were already correctly scoped (#592).
-- Pagination SEO: theme headers now render `{{ pagination_seo_links }}`, so paginated section/taxonomy pages emit `<link rel="prev">`/`<link rel="next">` (with correct per-language prefixes on multilingual sites). The engine built these links but no scaffold surfaced them (#594).
-- Scaffold nav: the dynamic-section-loop example in the `blog`/`simple` nav comment is now wrapped in `{% raw %}` (Crinja executes tags even inside HTML comments, so it was running — emitting hidden malformed `/<lang>/<lang>/…` links on multilingual sites) and the example is corrected to list only the current language's sections via `{{ base_url }}{{ s.url }}` (no doubled `lang_prefix`) (#595).
-- Permalinks: a `[permalinks]` entry mapping a path to an empty target (e.g. `"pages" = ""`) now maps everything under that prefix to the site root instead of producing a doubled slash (`//contact/`) (#596).
-- Three multilingual/tooling bugs found by dogfooding: (1) on a multilingual site the default language (served at the root) now honors its own `[languages.<default>].taxonomies` list instead of always using the global `[[taxonomies]]` set, and a `[languages.<code>]` block that omits `taxonomies` inherits the global set rather than the hardcoded `["tags", "categories"]`; (2) `tool check-links` skips links inside fenced and inline code so Markdown examples aren't reported as dead links; (3) the Hugo-shortcode migration warning now shows both conversions — self-closing `{{< name >}}` → `{{ name() }}` and paired → `{% name() %}body{% end %}` (#600).
-- `base_url` subpath deploys: alias redirects and the PWA manifest/service worker now include the `base_url` path prefix. `generate_aliases` wrote bare-root meta-refresh targets, and the PWA's `start_url`, icon `src`, `precache_urls`, `offline_page`, and navigation fallback all assumed a domain-root deploy, so project-page sites (`https://user.github.io/repo/`) got 404ing redirects and a PWA that launched the wrong origin. A new `Config#base_path` / `with_base_path` helper routes both; domain-root deploys are unaffected (#603).
-- Three SEO/tooling bugs found by dogfooding: (1) raw Markdown no longer leaks into `og:description` / `twitter:description` / RSS `<description>` when a post has a `<!-- more -->` summary but no explicit `description` — a new `Page#plain_summary` strips tags, decodes entities, and soft-truncates; (2) JSON-LD can no longer break out of its `<script>` block — `<`, `>`, `&` are escaped as `\uXXXX` so a title containing `<!--<script` can't trigger the script-data-double-escape state (XSS hardening); (3) `check-links` no longer false-positives on Zola-style `@/` links, resolving them against the content root like the build does (#606).
-- `hwaro init`/`new`: the front-matter typo hint now suggests the *closest* known key by Levenshtein distance (so `tag` → `tags`, not `toc`), and `sanitize_url_segment` no longer leaves a dangling hyphen when punctuation precedes a file extension (`foo!.md` → `foo.md`, not `foo-.md`) (#607).
+- `hwaro init`/`doctor`: restored multilingual support and removed duplicate `[sitemap]`/`[feeds]` emission
+- `tool check-links`: recognizes assets in `static/`/`public/`, removing false positives
+- Render: `site.sections` Crinja values expose `weight`, `draft`, `transparent`, `sort_by`, etc.
+- `hwaro new`: `--section` takes precedence over path-based inference
+- Authoring UX fixes (multilingual nav, doctor dedup, draft messaging, default `new` dates, social meta fallbacks)
+- OG hex colors (3-/8-digit), HTML minifier `IndexError`, and `CacheManager#save` mutex hardening (#568)
+- OG images: `band`-style long titles capped to fitting lines; CJK-without-font warning; Twitter card downgrades to `summary` when imageless (#569)
+- Section `page_template` now applied to child pages; explicit page templates still win (#570)
+- `tool convert`: date-only values keep their calendar day across formats; timestamps still round-trip as RFC 3339 (#571)
+- `hwaro build --memory-limit`: zero and absurd values rejected with clear messages (#572)
+- Multilingual search: scoped to the current language via per-entry `lang` (#575)
+- `.html` aliases write to the exact path; pretty aliases still get `index.html` (#576)
+- Default themes emit JSON-LD — `{{ jsonld }}` wired into simple/blog/docs/book `<head>` (#577)
+- AMP: disallowed external stylesheets stripped; allowlisted font stylesheets kept (#578)
+- Multilingual: default-language taxonomy pages no longer duplicated under `/<default_language>/` (#579)
+- `blog` scaffold: posts render with `post.html` instead of falling back to `page.html` (#580)
+- Alert shortcode: body renders as Markdown (#581)
+- Homepage JSON-LD: emits `WebSite` instead of an empty-headline `Article` (#582)
+- `docs`/`book` themes render the in-page TOC when `toc = true`; `book` archetype enables it by default (#584)
+- `[highlight] use_cdn = false` warns when self-hosted highlight.js assets are missing (#585)
+- `hwaro build --cache`: fully-cached rebuild no longer prints the false "No content found" hint (#586)
+- AMP: self-closing markdown images no longer emit an invalid `<amp-img … / layout="fill">` (#588)
+- `base_url` trailing slash no longer produces `//` in links/canonical/OG URLs (#589)
+- `hwaro new`: double quotes in title/date escaped in generated front matter (#590)
+- Blog series navigation orders prev/next by `series_weight` (#591)
+- Multilingual: root taxonomy term pages list only the default language's posts (#592)
+- Pagination SEO: headers render `{{ pagination_seo_links }}` (`rel="prev"`/`"next"`) (#594)
+- Scaffold nav: dynamic-section-loop example wrapped in `{% raw %}` and scoped to the current language (#595)
+- Permalinks: empty `[permalinks]` target maps to the site root instead of `//contact/` (#596)
+- Multilingual/tooling: per-language `taxonomies` honored; `check-links` skips code spans; Hugo-shortcode warning shows both conversions (#600)
+- `base_url` subpath deploys: alias redirects and PWA manifest/service worker include the path prefix via `Config#base_path` (#603)
+- SEO/tooling: `Page#plain_summary` keeps raw Markdown out of descriptions; JSON-LD escapes `<>&`; `check-links` resolves `@/` links (#606)
+- `hwaro init`/`new`: typo hint suggests the closest key (`tag`→`tags`); `sanitize_url_segment` drops dangling hyphen before extensions (#607)
 
 ### Performance
-- Markdown: combined regex passes for common extension sets (task lists, strikethrough, heading IDs, admonitions).
-- Shortcodes: fence + inline-code aware pre-filter to skip unnecessary processing on docs pages.
-- OG / profiling: base-layer caching, batched yielding, full hook + asset + Markdown timing in `--profile`.
-- Streaming: reduced cache invalidation / GC frequency under `--stream` / `--memory-limit`.
+- Markdown: combined regex passes for common extension sets
+- Shortcodes: fence + inline-code aware pre-filter
+- OG / profiling: base-layer caching, batched yielding, full timing in `--profile`
+- Streaming: reduced cache invalidation / GC frequency under `--stream`/`--memory-limit`
 
 ## v0.14.2
 
 ### Fixed
-- Security: the GitHub Action no longer leaks the workflow token into the `hwaro build` environment. The composite action previously defaulted the `token` input to `${{ github.token }}` and the Docker entrypoint exported it as `GITHUB_TOKEN` for the duration of the build, so user-defined pre/post-build hooks could read the workflow token from environment-driven site configuration even on `build_only` runs. The action now only falls back to `github.token` when the run actually deploys (`build_only != 'true'`), masks the value, and the entrypoint scopes the credential to a local `DEPLOY_TOKEN` used only by the OG cache restore and final `git push`; `GITHUB_TOKEN` / `INPUT_TOKEN` are unset before `hwaro build` runs (gh#550).
-- Security: `redirect_to` pages no longer escape the configured output directory. A content file whose front-matter `path` traversed upward (e.g. `../../poc`) bypassed the `PathUtils` / `OutputGuard` normalization that regular pages go through and could plant `index.html` outside `output_dir`. The redirect writer now routes through the same `sanitize_path` + `safe_output_path` guard used by `get_output_path` and skips writing entirely if the resolved path is still outside `output_dir` (gh#549).
-- Multi-threaded builds: `Hwaro::Utils::FileSafe.mkdir_p` no longer surfaces `Unable to create directory: '...': File exists` when parallel render workers race on shared parent directories (`/ko/development/page1`, `/ko/development/page2`, …). The previous wrapper deferred to Crystal's `Dir.mkdir_p` with a single whole-call retry, but the retry could re-race on a *different* shared parent and the post-hoc `Dir.exists?(leaf)` check returned false because the walk never reached the leaf. The wrapper now walks components itself and absorbs `EEXIST` per component; a 50×64-fiber MT stress test goes from 129 failures to 0.
+- Security: the GitHub Action no longer leaks the workflow token into `hwaro build`; the credential is scoped to a deploy-only `DEPLOY_TOKEN` (gh#550)
+- Security: `redirect_to` pages can no longer escape `output_dir` via a traversing front-matter `path` (gh#549)
+- Multi-threaded builds: `FileSafe.mkdir_p` no longer raises `File exists` when workers race on shared parent directories
 
 ### Changed
-- `hwaro build --minify` actually shrinks HTML now (~-12% on the docs site, 1223 KB → 1077 KB). The flag was deliberately conservative after a past revert — only comments, trailing whitespace, and blank lines were touched — because aggressive minification broke pages. Two longstanding bugs are addressed directly: (1) the protected-tag regex used `<(pre|script|...)>...</(pre|script|...)>` alternation that did not enforce opener/closer pairing, so a `<pre>` could pair with a `</script>` if both appeared on the page; each whitespace-sensitive tag now runs in its own pass, with `<style>` processed before `<script>` so a literal `<script>` string inside CSS can't false-pair with a real `</script>`. (2) Indiscriminate whitespace stripping removed the visible gap between adjacent inline siblings; collapse now classifies both neighbours against an HTML block-level list, so inter-tag whitespace is stripped whenever *either* neighbour is block-level while inline neighbours keep a single space (`<a>x</a> <a>y</a>` stays visually identical). Protected-block placeholders carry their original display class, so a sealed `<pre>` next to a `<div>` is also stripped while a `<code>` between two inline siblings still keeps a space on each side. Runs of whitespace inside tag openings shrink via a byte-level, quote-aware scan (`<a   href="x"   >` → `<a href="x">`), preserving quoted values that contain `>` (`title="x > y"`) and UTF-8 in `alt="안녕 세계"`. Protected blocks cover `<pre>`, `<code>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<textarea>`, and `<noscript>` (gh#411).
+- `hwaro build --minify` now actually shrinks HTML (~-12%): per-tag protected passes, block-vs-inline whitespace collapse, quote-aware tag-opening shrink (gh#411)
 
 ### Performance
-- OG image generation: pre-render the config-only background fill, optional background-image blit, overlay, style pattern, and top accent bar once into a ~3MB base layer buffer and `memcpy` it into each per-page buffer; only text, logo, and the bottom accent bar are layered per page. The per-page loop is split into a serial cache-check pass and a parallel render pass dispatched through the existing `Hwaro::Core::Build::Parallel` worker pool (the stb bindings have no global state and each worker owns its own pixel buffer and output file). Output is bit-identical to the previous renderer. Measured on a 200-page PNG site: `style="default"` 6056ms → 1345ms (~4.5x), `style="gradient"` 6151ms → 932ms (~6.6x).
+- OG image generation: shared base layer `memcpy`'d per page with a parallel render pass; bit-identical output, ~4.5–6.6x faster on a 200-page site
 
 ## v0.14.1
 
 ### Fixed
-- Multilingual: `section.pages`, `get_section(...).pages`, `series_pages`, `related_posts`, and the global pages array now expose `translations` on each item. The per-page Crinja value cache was omitting the field, so sibling-navigation templates iterating `section.pages` saw empty translation arrays even when the same page exposed populated translations as `page.translations` (gh#540).
-- `page.lower` / `page.higher` are now populated for page bundles. The transform step skipped any page with `is_index = true`, but `ctx.pages` only contains regular files and page-bundle leaves (`index.md`) — section indexes (`_index.md`) live in `ctx.sections`. Page bundles set `is_index` for URL generation, so the filter silently excluded them and left their flat-navigation neighbors always `nil` (gh#539).
+- Multilingual: `section.pages`, `series_pages`, `related_posts`, and the global pages array now expose `translations` per item (gh#540)
+- `page.lower`/`page.higher` now populated for page bundles (gh#539)
 
 ## v0.14.0
 
 ### Behavior changes
-- `hwaro new <path>.md` now honors the path the user typed instead of silently rerouting bare filenames to `content/drafts/`. `hwaro new foo.md` lands at `content/foo.md`; explicit `hwaro new drafts/foo.md` still drops into drafts and marks the file as draft.
-- `hwaro new` refuses to run outside a Hwaro project (missing `config.toml`) with `HWARO_E_CONFIG`, matching `hwaro build`'s contract.
-- `hwaro build --drafts` no longer includes drafts in `sitemap.xml`, matching the existing behavior of feeds, llms.txt, and the search index.
+- `hwaro new <path>.md` honors the typed path instead of rerouting bare filenames to `content/drafts/`
+- `hwaro new` refuses to run outside a Hwaro project (`HWARO_E_CONFIG`)
+- `hwaro build --drafts` no longer includes drafts in `sitemap.xml`
 
 ### Fixed
-- `tool list drafts`: column header no longer renders `TitlePath` glued together when the only draft has a short title.
-- `tool convert`: round-tripping front matter (TOML↔YAML) no longer strips the blank line between the closing delimiter and the body. Also doesn't invent one when none existed.
-- `tool export jekyll`: produce a Jekyll-conventional layout. Dated content lands flat in `_posts/<YYYY-MM-DD>-<slug>.md` (subdirectories used to nest under `_posts/posts/…`, which Jekyll reads as a category hint). Non-dated content like `about.md` / `index.md` / `archives.md` stays at the export root as regular pages instead of being buried in `_posts/`.
-- `Logger.progress` no longer emits `\r`-overwriting animation when stdout isn't a TTY (CI logs, pipes, file redirects). Per-step output is suppressed and a single completion line is emitted, so logs stay readable.
-- `doctor`: stop reporting niche optional sections (`[pwa]`, `[amp]`, `[build]`, etc.) as missing — `doctor --fix` in its minimal mode wouldn't add them anyway, so the advice was a dead end. Freshly-init'd `bare` sites are now doctor-clean.
-- `book` scaffold: emit `[related]` commented (book ships no `[[taxonomies]]`, so the default enabled snippet referenced an undefined taxonomy and tripped doctor on a fresh init).
-- All shipped scaffolds (`simple`/`bare`/`blog[-dark]`/`docs[-dark]`/`book[-dark]`) now populate `description` in scaffolded content so freshly-init'd sites pass `tool validate` cleanly.
+- `tool list drafts`: `TitlePath` header no longer glued together for short titles
+- `tool convert`: TOML↔YAML round-trip preserves (and doesn't invent) the delimiter/body blank line
+- `tool export jekyll`: dated content lands flat in `_posts/<YYYY-MM-DD>-<slug>.md`; non-dated pages stay at the root
+- `Logger.progress` emits a single completion line instead of `\r` animation when stdout isn't a TTY
+- `doctor`: stop reporting niche optional sections as missing; `bare` sites are doctor-clean
+- `book` scaffold: `[related]` shipped commented out (no taxonomies to reference)
+- All scaffolds populate `description` so freshly-init'd sites pass `tool validate`
 
 ### Changed
-- Build summary: `Generated N pages` → `Generated N content pages` (taxonomy/archive/section index files weren't in the count, and the bare wording misled users diffing against `find public -name '*.html'`).
-- `hwaro build` now surfaces a one-line hint when a build produces zero content pages, so empty sites don't deploy silently.
-- `hwaro init` now prints a `Tip: update base_url in config.toml before deploying` line so the localhost default doesn't ship unchanged. The inconsistent "Added N optional config section(s)" line was demoted to debug.
-- `--env <name>`: the warning when `config.<name>.toml` is missing now names both the env and the file we looked for, and explains the recovery (create the file or fix the typo). Catches the common "shipped localhost build to prod because `--env prdo`" foot-gun.
-- `hwaro build` now warns once per page when Hugo-style `{{< … >}}` shortcode syntax is found in content. Hwaro uses Crinja syntax (`{% name(args) %}body{% end %}`); unconverted Hugo shortcodes would otherwise reach Markdown and ship as HTML-escaped literals (`{{&lt; alert &gt;}}`) in the rendered page.
-- `[markdown] math = true` and `mermaid = true` now actually render math/diagrams in the browser. Hwaro emits the right wrapper markup (`<span class="math math-*">` for math, `<div class="mermaid">` for diagrams) but didn't load the renderer, so users saw literal TeX (`\(E=mc^2\)`) or DOT source. The default header partials in `simple`/`blog[-dark]`/`docs[-dark]`/`book[-dark]` scaffolds now pull in KaTeX (or MathJax, per `math_engine`) and Mermaid.js from a CDN when the corresponding flag is on. Templates can opt out via `{{ math_tags }}` / `{{ mermaid_tags }}`.
-- Importers (Hugo, Jekyll, Obsidian, Hexo, Eleventy, Astro, Notion, WordPress) now strip the imported body's leading `# Title` when it matches the front-matter title, so imported pages don't render two `<h1>` elements (the Hwaro page template renders one from `page.title` already). Same rationale as the existing `hwaro new` behavior (gh#525).
-- `tool import obsidian` now resolves `[[Wiki-Link]]`, `[[Wiki-Link|alias]]`, and `[[Wiki-Link#anchor]]` to absolute site URLs (`/posts/note-two/#section`) by pre-scanning the vault for filenames, titles, and `aliases:`. Previously the importer produced `[Note](note)`, which the browser resolved relative to the current page and 404'd. Inline-tag stripping no longer eats URL fragments either.
+- Build summary: `Generated N pages` → `Generated N content pages`
+- `hwaro build` hints when a build produces zero content pages
+- `hwaro init` prints a `Tip: update base_url` line; "Added N optional config section(s)" demoted to debug
+- `--env <name>`: missing-`config.<name>.toml` warning names the env and file and explains recovery
+- `hwaro build` warns once per page on Hugo-style `{{< … >}}` shortcode syntax
+- `[markdown] math`/`mermaid` now render in-browser — headers pull KaTeX/MathJax and Mermaid.js from a CDN; opt out via `{{ math_tags }}`/`{{ mermaid_tags }}`
+- Importers strip the body's leading `# Title` when it matches the front-matter title (gh#525)
+- `tool import obsidian` resolves `[[Wiki-Link]]`, `|alias`, and `#anchor` to absolute URLs
 
 ### Performance
-- Multi-threaded build is now enabled by default. All release/dev/CI build paths compile with Crystal's `-Dpreview_mt`, so `hwaro build` actually uses multiple OS threads instead of running every fiber on one core. On a 1000-page site with `CRYSTAL_WORKERS=8` this is roughly **~30% wall-clock faster** (0.39s → 0.28s on an M1 Pro; CPU utilization jumps from ~1 core to ~3 cores). Smaller sites are mostly startup-bound and see little change. Tune the worker count via the `CRYSTAL_WORKERS` env var (default: 4). Spec suite runs under MT in CI to catch fiber-race regressions.
-- New `Hwaro::Utils::FileSafe.mkdir_p` wrapper replaces `FileUtils.mkdir_p` in the build hot path. Crystal's stdlib `Dir.mkdir_p` is check-then-create, which races under MT (two workers can both pass `Dir.exists?` and then both `mkdir`, the loser getting `File::AlreadyExistsError`). The wrapper retries once and then verifies the directory exists, which is the post-condition `mkdir -p` semantics already promise.
-- Shortcode template cache and the missing-shortcode warning Set are now mutex-protected. Both had check-then-write patterns that race under MT — a shared cache resize during concurrent writes could corrupt the underlying Hash.
-- `Hwaro::Models::MarkdownConfig#math_tags` and `#mermaid_tags` plus the matching scaffold header partials skip output entirely when the feature flag is off (cheap fast path that avoids string concat per build).
-- `Hwaro::Utils::TextUtils.escape_xml` now short-circuits when no XML-special bytes are present in the input — sitemap/feed/llms.txt URL escaping skips a `String.build` allocation for the common case where escaping isn't needed.
-- `related_posts` Crinja value lookup skips the cache mutex entirely when the page has no related posts. The cache key is per-page (unique), so for sites without `[related]` enabled the cache could never hit anyway — the lock acquire was pure overhead.
+- Multi-threaded build on by default (`-Dpreview_mt`): ~30% faster on a 1000-page site (`CRYSTAL_WORKERS=8`); tune via `CRYSTAL_WORKERS`
+- New `Utils::FileSafe.mkdir_p` survives the check-then-create race under MT
+- Shortcode template cache and missing-shortcode warning Set are mutex-protected
+- `MarkdownConfig#math_tags`/`#mermaid_tags` and header partials skip output when the flag is off
+- `TextUtils.escape_xml` short-circuits when no XML-special bytes are present
+- `related_posts` lookup skips the cache mutex when the page has no related posts
 
 ## v0.13.1
 
