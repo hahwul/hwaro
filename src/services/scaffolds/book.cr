@@ -144,6 +144,7 @@ module Hwaro
               {{ auto_includes_css }}
             </head>
             <body data-section="{{ page.section }}">
+              <a class="skip-link" href="#main">Skip to content</a>
             HTML
         end
 
@@ -858,6 +859,10 @@ module Hwaro
               color: var(--text);
               background: transparent;
             }
+            :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link:focus { top: 0; }
 
             .search-input-wrap input::placeholder {
               color: var(--text-muted);
@@ -1274,7 +1279,7 @@ module Hwaro
               <div class="search-modal">
                 <div class="search-input-wrap">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <input type="text" id="searchInput" placeholder="Search this book..." autocomplete="off">
+                  <input type="search" id="searchInput" aria-label="Search" placeholder="Search this book..." autocomplete="off">
                   <kbd onclick="closeSearch()">ESC</kbd>
                 </div>
                 <div class="search-results" id="searchResults"></div>
@@ -1293,7 +1298,7 @@ module Hwaro
                 </button>
               </div>
               <div class="header-center">
-                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title | e }}</a>
               </div>
               <div class="header-right">
                 <button class="icon-btn" onclick="openSearch()" title="Search (⌘K)" aria-label="Search">
@@ -1342,15 +1347,15 @@ module Hwaro
         private def book_nav_html : String
           <<-HTML
             {% if page.lower %}
-            <a href="{{ page.lower.url }}" class="book-nav-arrow book-nav-arrow--prev" title="{{ page.lower.title }}">
+            <a href="{{ base_url }}{{ page.lower.url }}" class="book-nav-arrow book-nav-arrow--prev" title="{{ page.lower.title | e }}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-              <span class="book-nav-tooltip">{{ page.lower.title }}</span>
+              <span class="book-nav-tooltip">{{ page.lower.title | e }}</span>
             </a>
             {% endif %}
             {% if page.higher %}
-            <a href="{{ page.higher.url }}" class="book-nav-arrow book-nav-arrow--next" title="{{ page.higher.title }}">
+            <a href="{{ base_url }}{{ page.higher.url }}" class="book-nav-arrow book-nav-arrow--next" title="{{ page.higher.title | e }}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              <span class="book-nav-tooltip">{{ page.higher.title }}</span>
+              <span class="book-nav-tooltip">{{ page.higher.title | e }}</span>
             </a>
             {% endif %}
             HTML
@@ -1370,7 +1375,7 @@ module Hwaro
             {% include "partials/page-arrows.html" %}
             <div class="book-container">
             {% include "partials/sidebar.html" %}
-              <main class="book-main">
+              <main id="main" class="book-main">
                 <div class="book-content">
                   {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                   {% if toc %}<nav class="book-toc" aria-label="On this page"><p class="book-toc-title">On this page</p>{{ toc }}</nav>{% endif %}
@@ -1389,7 +1394,7 @@ module Hwaro
             {% include "partials/page-arrows.html" %}
             <div class="book-container">
             {% include "partials/sidebar.html" %}
-              <main class="book-main">
+              <main id="main" class="book-main">
                 <div class="book-content">
                   {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                   {{ content }}
@@ -1415,7 +1420,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="book-container">
             {% include "partials/sidebar.html" %}
-              <main class="book-main">
+              <main id="main" class="book-main">
                 <div class="book-content">
                   <h1>404 Not Found</h1>
                   <p>The page you are looking for does not exist.</p>

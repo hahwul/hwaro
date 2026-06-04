@@ -2190,4 +2190,57 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
   end
+
+  describe "item title fallback" do
+    it "falls back to the site title for a title-less RSS item (homepage)" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "rss"
+      config.feeds.filename = "rss.xml"
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+      config.description = "desc"
+
+      home = Hwaro::Models::Page.new("index.md")
+      home.title = "" # title-less root index
+      home.url = "/"
+      home.draft = false
+      home.render = true
+      home.is_index = true
+      home.raw_content = "Welcome"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([home], config, output_dir)
+        feed = File.read(File.join(output_dir, "rss.xml"))
+        feed.scan(/<item>/).size.should eq(1)
+        feed.should_not contain("<title></title>")
+        feed.should contain("<title>My Site</title>")
+      end
+    end
+
+    it "falls back to the site title for a title-less Atom entry" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "atom"
+      config.feeds.filename = "atom.xml"
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+      config.description = "desc"
+
+      home = Hwaro::Models::Page.new("index.md")
+      home.title = ""
+      home.url = "/"
+      home.draft = false
+      home.render = true
+      home.is_index = true
+      home.raw_content = "Welcome"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([home], config, output_dir)
+        feed = File.read(File.join(output_dir, "atom.xml"))
+        feed.scan(/<entry>/).size.should eq(1)
+        feed.should_not contain("<title></title>")
+      end
+    end
+  end
 end

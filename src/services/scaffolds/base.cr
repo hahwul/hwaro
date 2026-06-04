@@ -315,8 +315,12 @@ module Hwaro
         # of appearing as literal markup. (Crinja autoescaping is off here, the
         # same way `{{ content }}` emits rendered HTML.)
         protected def alert_shortcode : String
+          # A translucent accent tint (not a hardcoded light grey) so the alert
+          # stays readable on both light and dark scaffolds — the inherited text
+          # colour was previously near-invisible on the dark themes' light
+          # `#f9f9f9` background. `color: inherit` keeps it on the theme palette.
           <<-HTML
-            <div class="alert" style="padding: 1rem; border: 1px solid #ddd; background-color: #f9f9f9; border-left: 5px solid #0070f3; margin: 1rem 0;">
+            <div class="alert" style="padding: 1rem; border: 1px solid rgba(0, 112, 243, 0.25); background-color: rgba(0, 112, 243, 0.08); border-left: 5px solid #0070f3; margin: 1rem 0; color: inherit;">
               <strong>{{ type | upper }}:</strong> {{ body | markdownify }}
             </div>
             HTML
@@ -350,9 +354,10 @@ module Hwaro
               {{ auto_includes_css }}
             </head>
             <body data-section="{{ page.section }}">
+              <a class="skip-link" href="#main">Skip to content</a>
               <div class="site-wrapper">
                 <header class="site-header">
-                  <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title }}</a>
+                  <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title | e }}</a>
                   #{navigation}
                 </header>
 
@@ -382,7 +387,7 @@ module Hwaro
         protected def page_template : String
           <<-HTML
             {% include "header.html" %}
-              <main class="site-main">
+              <main id="main" class="site-main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
               </main>
@@ -394,7 +399,7 @@ module Hwaro
         protected def section_template : String
           <<-HTML
             {% include "header.html" %}
-              <main class="site-main">
+              <main id="main" class="site-main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
                 <ul class="section-list">
@@ -410,7 +415,7 @@ module Hwaro
         protected def not_found_template : String
           <<-HTML
             {% include "header.html" %}
-              <main class="site-main">
+              <main id="main" class="site-main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
                 <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to Home</a></p>
@@ -423,7 +428,7 @@ module Hwaro
         protected def taxonomy_template : String
           <<-HTML
             {% include "header.html" %}
-              <main class="site-main">
+              <main id="main" class="site-main">
                 <h1>{{ page.title | e }}</h1>
                 <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
                 {{ content }}
@@ -436,7 +441,7 @@ module Hwaro
         protected def taxonomy_term_template : String
           <<-HTML
             {% include "header.html" %}
-              <main class="site-main">
+              <main id="main" class="site-main">
                 <h1>{{ page.title | e }}</h1>
                 <p class="taxonomy-desc">Posts tagged with this term:</p>
                 {{ content }}
@@ -505,6 +510,11 @@ module Hwaro
                 .site-header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
                 .site-wrapper { padding: 0 1rem; }
               }
+
+              /* Accessibility */
+              :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+              .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; border-radius: 0 0 6px 0; }
+              .skip-link:focus { top: 0; }
             </style>
             CSS
         end

@@ -81,11 +81,12 @@ module Hwaro
         private def css_content : String
           <<-CSS
             :root {
+              color-scheme: dark;
               --primary: #e8a468;
               --primary-hover: #f0b87a;
               --text: #d4d0cc;
               --text-secondary: #9a9590;
-              --text-muted: #6b6560;
+              --text-muted: #968c80;
               --border: #2e2a27;
               --border-light: #252220;
               --bg: #1a1816;
@@ -456,6 +457,10 @@ module Hwaro
 
             .search-input-wrap svg { flex-shrink: 0; color: var(--text-muted); }
 
+            :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link:focus { top: 0; }
             .search-input-wrap input {
               flex: 1;
               border: none;

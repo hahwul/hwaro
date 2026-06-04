@@ -180,6 +180,7 @@ module Hwaro
               {{ auto_includes_css }}
             </head>
             <body data-section="{{ page.section }}">
+              <a class="skip-link" href="#main">Skip to content</a>
             HTML
         end
 
@@ -725,6 +726,10 @@ module Hwaro
               color: var(--text-muted);
             }
 
+            :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link:focus { top: 0; }
             .search-input-wrap input {
               flex: 1;
               border: none;
@@ -1013,7 +1018,7 @@ module Hwaro
               <div class="search-modal">
                 <div class="search-input-wrap">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <input type="text" id="searchInput" placeholder="Search documentation..." autocomplete="off">
+                  <input type="search" id="searchInput" aria-label="Search" placeholder="Search documentation..." autocomplete="off">
                   <kbd onclick="closeSearch()">ESC</kbd>
                 </div>
                 <div class="search-results" id="searchResults"></div>
@@ -1031,7 +1036,7 @@ module Hwaro
         private def docs_nav_html : String
           <<-HTML
             <header class="docs-header">
-              <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title }} <span>Documentation</span></a>
+              <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title | e }} <span>Documentation</span></a>
               <nav>
                 <a href="{{ base_url }}{{ lang_prefix }}/getting-started/">Getting Started</a>
                 <a href="{{ base_url }}{{ lang_prefix }}/guide/">Guide</a>
@@ -1041,7 +1046,7 @@ module Hwaro
                 {% if page.translations | length > 0 %}
                 <nav class="lang-switcher" aria-label="Language">
                   {% for t in page.translations %}
-                  <a href="{{ t.url }}" hreflang="{{ t.code }}"{% if t.is_current %} aria-current="true"{% endif %}>{{ t.code | upper }}</a>
+                  <a href="{{ base_url }}{{ t.url }}" hreflang="{{ t.code }}"{% if t.is_current %} aria-current="true"{% endif %}>{{ t.code | upper }}</a>
                   {% endfor %}
                 </nav>
                 {% endif %}
@@ -1097,7 +1102,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
-              <main class="docs-main">
+              <main id="main" class="docs-main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {% if toc %}<nav class="docs-toc" aria-label="On this page"><p class="docs-toc-title">On this page</p>{{ toc }}</nav>{% endif %}
                 {{ content }}
@@ -1113,7 +1118,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
-              <main class="docs-main">
+              <main id="main" class="docs-main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
 
@@ -1137,7 +1142,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
-              <main class="docs-main">
+              <main id="main" class="docs-main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
                 <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to home</a></p>
@@ -1154,7 +1159,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
-              <main class="docs-main">
+              <main id="main" class="docs-main">
                 <h1>{{ page.title | e }}</h1>
                 <p class="taxonomy-desc">Browse all terms in this taxonomy:</p>
                 {{ content }}
@@ -1169,7 +1174,7 @@ module Hwaro
             {% include "partials/search.html" %}
             <div class="docs-container">
             {% include "partials/sidebar.html" %}
-              <main class="docs-main">
+              <main id="main" class="docs-main">
                 <h1>{{ page.title | e }}</h1>
                 <p class="taxonomy-desc">Pages tagged with this term:</p>
                 {{ content }}

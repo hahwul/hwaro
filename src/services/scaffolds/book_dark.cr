@@ -72,12 +72,13 @@ module Hwaro
         private def css_content : String
           <<-CSS
             :root {
+              color-scheme: dark;
               --primary: #b0b0b0;
               --primary-hover: #d0d0d0;
               --primary-subtle: rgba(255, 255, 255, 0.03);
               --text: #c0c0c0;
               --text-secondary: #777777;
-              --text-muted: #4a4a4a;
+              --text-muted: #8a8a8a;
               --border: #2a2a2a;
               --border-light: #1f1f1f;
               --bg: #111111;
@@ -359,6 +360,10 @@ module Hwaro
             .search-modal { width: 520px; max-width: 90vw; max-height: 70vh; background: var(--bg-secondary); border-radius: var(--radius); box-shadow: 0 16px 70px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; overflow: hidden; align-self: flex-start; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
             .search-input-wrap { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-light); }
             .search-input-wrap svg { flex-shrink: 0; color: var(--text-muted); }
+            :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link:focus { top: 0; }
             .search-input-wrap input { flex: 1; border: none; outline: none; font-size: 0.95rem; font-family: inherit; color: var(--text); background: transparent; }
             .search-input-wrap input::placeholder { color: var(--text-muted); }
             .search-input-wrap kbd { font-size: 0.6rem; padding: 0.1rem 0.35rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--text-muted); font-family: inherit; cursor: pointer; line-height: 1.4; }

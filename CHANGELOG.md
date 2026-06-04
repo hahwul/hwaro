@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Subpath deploys (GitHub/GitLab project pages): root-relative content links (e.g. a scaffold or author-written `[Posts](/posts/)`) are now prefixed with the `base_url` path during the build, so they resolve under `https://user.github.io/repo/` instead of 404ing. Because feeds and the search index reuse the rendered body, this also fixes the same broken links in RSS `<content:encoded>` and `search.json`. No-op on domain-root deploys
+- Scaffold nav: the book prev/next arrows and the blog/docs language switcher now carry `base_url`, so they no longer 404 under a subpath deploy (dark variants inherit the fix)
+- Book scaffold: the site root index (`content/index.md`, "Introduction") now leads the prev/next reading order instead of being appended last — the first chapter regains its "previous" link and the chain is no longer circular
+- Feeds & search: a title-less root index (common for homepages) no longer emits an empty `<title></title>` in RSS/Atom or a blank `title` in `search.json`; it falls back to the site title (matching `llms.txt`)
+- Alert shortcode: uses a translucent accent tint instead of a hardcoded `#f9f9f9` background, so its text is readable on the dark scaffolds (was near-invisible light-on-light)
+- Scaffold HTML escaping: the site-logo link (all scaffolds) and the book prev/next arrow `title`/tooltip now run author titles through `| e`, so a title containing `&`, `<`, `>` or `"` (e.g. `Tom & Jerry <Co>`) no longer breaks the markup
+- Scaffold accessibility: every scaffold now ships a skip-to-content link targeting `<main id="main">` (WCAG 2.4.1); the styled scaffolds add a visible `:focus-visible` outline and a search-field focus ring instead of the old `outline: none` with no replacement (WCAG 2.4.7); the search input gains an `aria-label` + `type="search"`
+- Dark scaffolds: `--text-muted` raised to meet WCAG AA contrast (blog-dark/book-dark/docs-dark were 2.0–3.3:1 for body/meta text), and `color-scheme: dark` is declared so form controls, scrollbars and the initial paint match the theme
+- Taxonomies: a configured taxonomy now always renders its index page even with zero terms, so the default scaffold's `/tags/` & `/categories/` links no longer 404 after a user removes the sample tags (an empty index lists no terms instead of vanishing)
+
 ## v0.15.2
 
 ### Added

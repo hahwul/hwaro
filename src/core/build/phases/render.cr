@@ -499,6 +499,12 @@ module Hwaro::Core::Build::Phases::Render
       html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
     end
 
+    # Prefix plain root-relative content links (e.g. `[Posts](/posts/)`) with the
+    # base_url path so they resolve under a subpath deploy. No-op on root deploys;
+    # also keeps RSS `<content:encoded>` and the search index subpath-correct
+    # because both reuse `page.content` set below.
+    html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url)
+
     # Make content images responsive: when image_processing generated width
     # variants for an <img>, add srcset/sizes so browsers pick an appropriate
     # size instead of always loading the full-resolution source.
