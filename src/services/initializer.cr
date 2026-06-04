@@ -6,6 +6,7 @@
 require "file_utils"
 require "../config/options/init_options"
 require "../utils/errors"
+require "../utils/file_safe"
 require "../utils/logger"
 require "../services/scaffolds/registry"
 require "../services/scaffolds/remote"
@@ -73,14 +74,15 @@ module Hwaro
         end
 
         unless Dir.exists?(target_path)
-          Dir.mkdir_p(target_path)
+          Hwaro::Utils::FileSafe.mkdir_p(target_path)
         end
 
-        # --clean wipes the dir up front; --force keeps existing files in
-        # place and writes on top. Either one allows a non-empty target.
+        # --clean wipes the dir up front; --force allows non-empty target but
+        # keeps any existing files in place (only adds missing scaffold files).
+        # Neither blindly overwrites user content.
         unless force || clean || Dir.empty?(target_path)
           Logger.error "Directory '#{target_path}' is not empty."
-          Logger.error "Use --force to overwrite, or --clean to remove existing files first."
+          Logger.error "Use --force to proceed (keeps existing files, adds missing scaffold files), or --clean to remove existing files first."
           exit(1)
         end
 
@@ -127,7 +129,12 @@ module Hwaro
         # - minimal_config : bare essentials, no comments
         # - full_config    : maximum discoverability (current verbose behavior + doctor injection)
         # - default        : balanced (core + commonly useful sections with light comments)
-        if minimal_config
+        if scaffold.is_a?(Scaffolds::Remote)
+          # Remote scaffolds provide their own config.toml (fetched from upstream).
+          # We always use it as-is, ignoring --minimal-config / --full-config
+          # (those flags are for built-in scaffolds that generate config).
+          config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
+        elsif minimal_config
           config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
         elsif full_config
           config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
@@ -151,11 +158,8 @@ module Hwaro
         end
 
         # Auto-add missing optional config sections (commented out).
-        # Hybrid behavior (C):
-        # - minimal_config: never auto-inject
-        # - full_config: inject everything for maximum discoverability
-        # - default: do not inject (keeps generated config much cleaner)
-        if full_config
+        # Only for built-in scaffolds + full_config (remote provides its own config).
+        if full_config && !scaffold.is_a?(Scaffolds::Remote)
           config_path = File.join(target_path, "config.toml")
           doctor = Services::Doctor.new(
             content_dir: File.join(target_path, "content"),
@@ -204,14 +208,17 @@ module Hwaro
           create_file(full_path, content)
         end
 
-        # Create shortcodes directory and files
-        shortcodes_dir = File.join(templates_dir, "shortcodes")
-        create_directory(shortcodes_dir)
-
+        # Create shortcodes directory and files only if the scaffold ships any.
+        # (Bare scaffold returns empty to stay truly minimal.)
         shortcode_files = scaffold.shortcode_files
-        shortcode_files.each do |relative_path, content|
-          full_path = File.join(templates_dir, relative_path)
-          create_file(full_path, content)
+        unless shortcode_files.empty?
+          shortcodes_dir = File.join(templates_dir, "shortcodes")
+          create_directory(shortcodes_dir)
+
+          shortcode_files.each do |relative_path, content|
+            full_path = File.join(templates_dir, relative_path)
+            create_file(full_path, content)
+          end
         end
       end
 
@@ -573,7 +580,7 @@ module Hwaro
         if Dir.exists?(path)
           Logger.action :exist, path, :blue
         else
-          Dir.mkdir_p(path)
+          Hwaro::Utils::FileSafe.mkdir_p(path)
           Logger.action :create, path
         end
       end

@@ -21,7 +21,7 @@ module Hwaro
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
           # Project setup
-          FlagInfo.new(short: "-f", long: "--force", description: "Force creation even if directory is not empty"),
+          FlagInfo.new(short: "-f", long: "--force", description: "Allow init even if directory is not empty (keeps existing files, adds missing scaffold files)"),
           FlagInfo.new(short: nil, long: "--clean", description: "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)"),
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
           FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
@@ -118,7 +118,7 @@ module Hwaro
             parser.banner = "Usage: hwaro init [path] [options]"
 
             # Project setup
-            parser.on("-f", "--force", "Force creation even if directory is not empty") { force = true }
+            parser.on("-f", "--force", "Allow init even if directory is not empty (keeps existing files)") { force = true }
             parser.on("--clean", "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)") { clean = true }
             parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
               if Services::Scaffolds::Remote.remote?(type)
