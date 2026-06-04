@@ -179,12 +179,30 @@ module Hwaro
           # **and did not pass an explicit --section**, their clear intent is almost
           # always "create a post at /posts/my-cool-post/", not a nested directory.
           # Default to single-file mode unless they explicitly pass --bundle.
+          # If the path contains a directory separator, the user is explicitly
+          # specifying the on-disk location (e.g. posts/my-post or even when
+          # they also passed a conflicting --section). Honor the path as the
+          # target file location (flat) unless they explicitly asked for --bundle.
           user_intends_file_under_section = !path.nil? && !path.ends_with?(".md") &&
-                                            path.includes?("/") && options.bundle != true && options.section.nil?
+                                            path.includes?("/") && options.bundle != true
 
-          # With explicit --no-bundle (or the section-path heuristic above), treat the
+          # A bare single-segment path (e.g. `hwaro new design-lab --title "..."`)
+          # without --section and without forcing --bundle should also be treated
+          # as the desired page stem (producing content/design-lab.md → /design-lab/).
+          # However, if a directory named after the path already exists under content/
+          # (e.g. content/news/ pre-created), treat the bare path as "target container dir"
+          # and derive the filename from --title (preserves "new <dir> -t 'Name'" workflow).
+          # Only --bundle (or config bundle=true) should interpret the bare path as
+          # "the bundle directory name".
+          target_dir_for_bare = path && (path.starts_with?("content/") ? path : File.join("content", path))
+          bare_dir_exists = target_dir_for_bare ? Dir.exists?(target_dir_for_bare) : false
+          user_intends_bare_flat = !path.nil? && !path.ends_with?(".md") &&
+                                   !path.includes?("/") && options.bundle != true && options.section.nil? &&
+                                   !bare_dir_exists
+
+          # With explicit --no-bundle (or the section-path / bare-path heuristics above), treat the
           # provided path as the desired file location.
-          is_no_bundle_flat = (!path.nil? && options.bundle == false && !path.ends_with?(".md")) || user_intends_file_under_section
+          is_no_bundle_flat = (!path.nil? && options.bundle == false && !path.ends_with?(".md")) || user_intends_file_under_section || user_intends_bare_flat
 
           if is_file_path && path
             # Honor the path the user typed. Previously a bare `foo.md`
@@ -301,7 +319,19 @@ module Hwaro
 
         if bundle_mode && !bundle_path?(full_path)
           candidate = if path_is_dir_bundle
-                        File.join(File.dirname(full_path), "index.md")
+                        # For bare paths (no /) that resolve to bundle mode (via CLI, archetype, or config),
+                        # the original path segment is the name of the bundle directory itself.
+                        # Construct directly from it. This avoids broken collapse when the early
+                        # flat-path heuristic (for default non-bundle) set full_path to content/xxx.md
+                        # and File.dirname would incorrectly yield "content/index.md".
+                        bare = options.path
+                        if bare && bare.starts_with?("content/")
+                          File.join(bare, "index.md")
+                        elsif bare
+                          File.join("content", bare, "index.md")
+                        else
+                          bundle_path_for(full_path)
+                        end
                       else
                         bundle_path_for(full_path)
                       end
@@ -330,6 +360,32 @@ module Hwaro
             message: "File already exists: #{full_path}",
             hint: "Pass a different <path>, or edit the existing file directly.",
           )
+        end
+
+        # Prevent creating a page that would produce a duplicate URL with an
+        # existing section index in the same directory (e.g. posts/index.md
+        # next to posts/_index.md both want to be /posts/).
+        dir = File.dirname(full_path)
+        base = File.basename(full_path, ".md")
+        if base == "index"
+          sibling = File.join(dir, "_index.md")
+          if File.exists?(sibling)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create #{full_path}: would collide with existing section index #{sibling} (both resolve to the same URL).",
+              hint: "Use a different title or path, or remove the _index.md if this is meant to replace the section index.",
+            )
+          end
+        end
+        if base == "_index"
+          sibling = File.join(dir, "index.md")
+          if File.exists?(sibling)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create #{full_path}: would collide with existing page #{sibling}.",
+              hint: "Remove #{sibling} first if you intend to make this the section index.",
+            )
+          end
         end
 
         File.write(full_path, content)

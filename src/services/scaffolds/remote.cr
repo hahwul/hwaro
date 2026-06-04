@@ -73,6 +73,16 @@ module Hwaro
           @config_data
         end
 
+        # If the remote provided a config.toml, use it as-is (even for --minimal-config).
+        # If not (remote can be templates-only), fall back to the built-in minimal generator.
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          if @config_data.strip.empty?
+            super
+          else
+            @config_data
+          end
+        end
+
         # Check if a scaffold source string represents a remote scaffold
         def self.remote?(source : String) : Bool
           source.starts_with?("github:") ||

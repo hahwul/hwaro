@@ -83,22 +83,23 @@ describe Hwaro::Services::Creator do
       end
     end
 
-    it "creates a file when path is a directory and title is provided" do
+    it "treats a bare path without .md as the page stem (title only populates front matter, not the filename on disk)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          FileUtils.mkdir_p("content/blog")
+          FileUtils.mkdir_p("content")
 
-          options = Hwaro::Config::Options::NewOptions.new(path: "blog", title: "My Blog Post")
+          options = Hwaro::Config::Options::NewOptions.new(path: "contact", title: "Get In Touch")
           creator = Hwaro::Services::Creator.new
 
           creator.run(options)
 
-          # "My Blog Post" -> "my-blog-post.md"
-          expected_path = "content/blog/my-blog-post.md"
+          # Bare path "contact" (no .md, no --section, default no-bundle) becomes the stem:
+          # content/contact.md (URL /contact/), title is only for front matter.
+          expected_path = "content/contact.md"
           File.exists?(expected_path).should be_true
 
           content = File.read(expected_path)
-          content.should contain("title = \"My Blog Post\"")
+          content.should contain("title = \"Get In Touch\"")
         end
       end
     end
@@ -812,6 +813,30 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "respects [content.new] bundle = true for bare paths (does not collapse to content/index.md)" do
+        # Regression: when bundle default comes from config (not CLI --bundle),
+        # bare paths like `new mypage -t "..."` used to go through the flat
+        # heuristic then the path_is_dir_bundle collapse, producing
+        # content/index.md instead of content/mypage/index.md.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            config = Hwaro::Models::Config.new
+            config.content_new.bundle = true
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "my-bare-bundle", title: "Bare Bundle Via Config")
+            Hwaro::Services::Creator.new.run(options, config)
+
+            File.exists?("content/my-bare-bundle/index.md").should be_true
+            File.exists?("content/index.md").should be_false
+
+            content = File.read("content/my-bare-bundle/index.md")
+            content.should contain("title = \"Bare Bundle Via Config\"")
+          end
+        end
+      end
+
       it "works with --section + --bundle together" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
@@ -876,10 +901,12 @@ describe Hwaro::Services::Creator do
               Hwaro::Logger.io = previous_io
             end
 
-            # Section branch discarded; directory fallback takes over and
-            # produces <path>/<slug>.md under the path's own leading dir.
-            File.exists?("content/posts/nope/nope.md").should be_true
-            File.exists?("content/docs/posts/nope.md").should be_false
+            # Section branch discarded due to conflict; we still honor the
+            # directory part of the path the user typed and place a flat file
+            # using the last segment as stem (better UX than falling back to
+            # title-slug-inside-dir).
+            File.exists?("content/posts/nope.md").should be_true
+            File.exists?("content/posts/nope/nope.md").should be_false
             File.exists?("content/docs/nope.md").should be_false
 
             buffer.to_s.should contain("ignoring --section")
