@@ -1,17 +1,20 @@
 # Changelog
 
-## Unreleased
+## v0.15.3
+
+### Changed
+- Homebrew: tap now ships a prebuilt-binary formula; macOS binary pinned to `openssl@3` (was EOL `openssl@1.1`) so it launches on a clean machine (#615)
 
 ### Fixed
-- Subpath deploys (GitHub/GitLab project pages): root-relative content links (e.g. a scaffold or author-written `[Posts](/posts/)`) are now prefixed with the `base_url` path during the build, so they resolve under `https://user.github.io/repo/` instead of 404ing. Because feeds and the search index reuse the rendered body, this also fixes the same broken links in RSS `<content:encoded>` and `search.json`. No-op on domain-root deploys
-- Scaffold nav: the book prev/next arrows and the blog/docs language switcher now carry `base_url`, so they no longer 404 under a subpath deploy (dark variants inherit the fix)
-- Book scaffold: the site root index (`content/index.md`, "Introduction") now leads the prev/next reading order instead of being appended last — the first chapter regains its "previous" link and the chain is no longer circular
-- Feeds & search: a title-less root index (common for homepages) no longer emits an empty `<title></title>` in RSS/Atom or a blank `title` in `search.json`; it falls back to the site title (matching `llms.txt`)
-- Alert shortcode: uses a translucent accent tint instead of a hardcoded `#f9f9f9` background, so its text is readable on the dark scaffolds (was near-invisible light-on-light)
-- Scaffold HTML escaping: the site-logo link (all scaffolds) and the book prev/next arrow `title`/tooltip now run author titles through `| e`, so a title containing `&`, `<`, `>` or `"` (e.g. `Tom & Jerry <Co>`) no longer breaks the markup
-- Scaffold accessibility: every scaffold now ships a skip-to-content link targeting `<main id="main">` (WCAG 2.4.1); the styled scaffolds add a visible `:focus-visible` outline and a search-field focus ring instead of the old `outline: none` with no replacement (WCAG 2.4.7); the search input gains an `aria-label` + `type="search"`
-- Dark scaffolds: `--text-muted` raised to meet WCAG AA contrast (blog-dark/book-dark/docs-dark were 2.0–3.3:1 for body/meta text), and `color-scheme: dark` is declared so form controls, scrollbars and the initial paint match the theme
-- Taxonomies: a configured taxonomy now always renders its index page even with zero terms, so the default scaffold's `/tags/` & `/categories/` links no longer 404 after a user removes the sample tags (an empty index lists no terms instead of vanishing)
+- Subpath deploys: root-relative content links are prefixed with the `base_url` path, fixing 404s in pages, feeds, and `search.json` (#616)
+- Book scaffold: site root index now leads prev/next order; nav links carry `base_url` under subpath deploys (#616)
+- Taxonomies: a configured taxonomy always renders its index page, even with zero terms (#616)
+- Feeds & search: title-less root index falls back to the site title instead of emitting an empty title (#616)
+- Scaffold a11y & safety: skip-to-content link, focus rings, search `aria-label`, AA-contrast dark text, and `| e`-escaped author titles (#616)
+- Alert shortcode: translucent accent tint so it's readable on dark scaffolds (#616)
+- Parallel render: shortcode templates cached per-worker, fixing an intermittent `HWARO_E_TEMPLATE` race (#619)
+- `hwaro new`: bundle bare paths no longer collapse to `index.md`; `--section` path handling improved (#617)
+- `hwaro init`: remote scaffolds without `config.toml` fall back to a generated config; MT-safe directory creation (#617)
 
 ## v0.15.2
 
