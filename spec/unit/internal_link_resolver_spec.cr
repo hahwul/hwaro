@@ -113,4 +113,60 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="/a/b/docs/">docs</a>)
     end
   end
+
+  describe ".prefix_root_relative_links" do
+    it "prefixes plain root-relative href with the base_url subpath" do
+      html = %(<a href="/posts/">Posts</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/myrepo"
+      ).should eq %(<a href="/myrepo/posts/">Posts</a>)
+    end
+
+    it "prefixes root-relative src too" do
+      html = %(<img src="/img/logo.png">)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/myrepo"
+      ).should eq %(<img src="/myrepo/img/logo.png">)
+    end
+
+    it "prefixes a bare root link" do
+      html = %(<a href="/">Home</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://example.com/docs"
+      ).should eq %(<a href="/docs/">Home</a>)
+    end
+
+    it "is a no-op when base_url has no subpath (domain-root deploy)" do
+      html = %(<a href="/posts/">Posts</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://example.com"
+      ).should eq html
+    end
+
+    it "is a no-op when base_url is empty" do
+      html = %(<a href="/posts/">Posts</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "").should eq html
+    end
+
+    it "leaves protocol-relative, absolute, and anchor links untouched" do
+      html = %(<a href="//cdn.example.com/x.js">cdn</a> <a href="https://x.io/y">abs</a> <a href="#top">anchor</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://example.com/repo"
+      ).should eq html
+    end
+
+    it "does not double-prefix links already carrying the base_path" do
+      html = %(<a href="/repo/posts/">Posts</a> <a href="/repo/">Home</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/repo"
+      ).should eq html
+    end
+
+    it "prefixes a multi-segment nested base path" do
+      html = %(<a href="/guide/intro/">Intro</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://example.com/a/b"
+      ).should eq %(<a href="/a/b/guide/intro/">Intro</a>)
+    end
+  end
 end

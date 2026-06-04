@@ -21,6 +21,11 @@ module Hwaro
         # Matches href="@/path" and href="@/path#anchor"
         INTERNAL_LINK_REGEX = /href="@\/([^"#]*)(?:#([^"]*))?"/
 
+        # Matches a plain root-relative href/src value (e.g. href="/posts/").
+        # `\/[^\/"]` excludes protocol-relative `//host` URLs; the alternation
+        # also allows a bare `/` (the homepage link).
+        ROOT_RELATIVE_ATTR_REGEX = /\b(href|src)="(\/(?:[^\/"][^"]*)?)"/
+
         # Resolve internal `@/` links in HTML to actual page URLs.
         #
         # - `html` — rendered HTML string
@@ -61,6 +66,44 @@ module Hwaro
               match
             end
           end
+        end
+
+        # Prefix plain root-relative links in rendered content (e.g. a scaffold
+        # or author-written `[Posts](/posts/)` -> `<a href="/posts/">`) with the
+        # base_url path component so they resolve under a subpath deployment
+        # (GitHub/GitLab project pages served at `https://user.github.io/repo/`).
+        #
+        # This mirrors `Config#with_base_path` for content-body anchors that the
+        # template layer never touches. Because `page.content` is reused by the
+        # feed and search generators, fixing it here also keeps RSS
+        # `<content:encoded>` and the search index subpath-correct.
+        #
+        # A complete no-op when `base_url` has no subpath (the common
+        # domain-root deploy), so root-relative links are preserved there.
+        # Protocol-relative (`//host`), absolute (`http(s)://`), anchor (`#`),
+        # and already-prefixed links are left untouched.
+        def prefix_root_relative_links(html : String, base_url : String) : String
+          return html if base_url.empty?
+          return html unless html.includes?("=\"/")
+
+          base_path = URI.parse(base_url).path.rstrip("/")
+          return html if base_path.empty?
+
+          prefix_slash = "#{base_path}/"
+
+          html.gsub(ROOT_RELATIVE_ATTR_REGEX) do |match|
+            attr = $1
+            value = $2
+            # Leave values that already carry the base_path (e.g. links the
+            # InternalLinkResolver pass above already resolved) untouched.
+            if value == base_path || value.starts_with?(prefix_slash)
+              match
+            else
+              "#{attr}=\"#{base_path}#{value}\""
+            end
+          end
+        rescue URI::Error
+          html
         end
       end
     end

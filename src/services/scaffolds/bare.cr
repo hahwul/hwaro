@@ -82,8 +82,9 @@ module Hwaro
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
             </head>
             <body>
+              <a href="#main">Skip to content</a>
               <header>
-                <a href="{{ base_url }}{{ lang_prefix }}/">{{ site.title }}</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/">{{ site.title | e }}</a>
                 <nav>
                   <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
@@ -108,7 +109,7 @@ module Hwaro
         private def bare_section_template : String
           <<-HTML
             {% include "header.html" %}
-              <main>
+              <main id="main">
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {{ content }}
                 <ul>
@@ -124,7 +125,7 @@ module Hwaro
         private def bare_not_found_template : String
           <<-HTML
             {% include "header.html" %}
-              <main>
+              <main id="main">
                 <h1>404 Not Found</h1>
                 <p>The page you are looking for does not exist.</p>
                 <p><a href="{{ base_url }}{{ lang_prefix }}/">Return to Home</a></p>

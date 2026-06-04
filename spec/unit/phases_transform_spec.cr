@@ -160,6 +160,39 @@ describe Hwaro::Core::Build::Phases::Transform do
       bar.lower.should eq(foo)
       bar.higher.should be_nil
     end
+
+    it "leads the reading order with the site root index, not trailing it (book prev/next)" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      # Site root index (content/index.md): is_index with an empty section.
+      # Previously it was appended as a generic orphan and landed LAST, making
+      # the book scaffold's prev/next chain wrap (home got a prev, chapter-1
+      # lost its prev). It must lead the reading order instead.
+      home = make_page("index.md", "")
+      home.title = "Introduction"
+      home.is_index = true
+      home.weight = 0
+
+      chapter = make_section("chapter-1/_index.md", "chapter-1")
+      chapter.is_index = true
+      chapter.weight = 1
+      lesson = make_page("chapter-1/intro.md", "chapter-1")
+      lesson.title = "Intro"
+      lesson.weight = 1
+
+      ctx.sections = [chapter]
+      ctx.pages = [home, lesson]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_link_page_navigation(ctx)
+
+      # Flat order: home → chapter-1 index → lesson
+      home.lower.should be_nil
+      home.higher.should eq(chapter)
+      chapter.lower.should eq(home)
+      lesson.higher.should be_nil
+    end
   end
 
   describe "#populate_taxonomies / #rebuild_taxonomies" do

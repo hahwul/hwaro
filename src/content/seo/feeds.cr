@@ -238,7 +238,10 @@ module Hwaro
 
             pages.each do |page|
               str << "    <item>\n"
-              str << "      <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
+              # The root index commonly has an empty title; fall back to the site
+              # title so the feed item is never `<title></title>` (mirrors llms.cr).
+              item_title = page.title.empty? ? config.title : page.title
+              str << "      <title>#{Utils::TextUtils.escape_xml(item_title)}</title>\n"
 
               full_url = page_full_url(page, base_url)
               escaped_url = Utils::TextUtils.escape_xml(full_url)
@@ -316,7 +319,8 @@ module Hwaro
 
             pages.each do |page|
               str << "  <entry>\n"
-              str << "    <title>#{Utils::TextUtils.escape_xml(page.title)}</title>\n"
+              entry_title = page.title.empty? ? config.title : page.title
+              str << "    <title>#{Utils::TextUtils.escape_xml(entry_title)}</title>\n"
 
               full_url = page_full_url(page, base_url)
               escaped_url = Utils::TextUtils.escape_xml(full_url)

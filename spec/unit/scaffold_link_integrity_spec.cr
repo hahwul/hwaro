@@ -108,3 +108,89 @@ describe "scaffold multilingual taxonomy config integrity" do
     end
   end
 end
+
+# Subpath / base_path regression: a site deployed under a subpath (GitHub Pages
+# project pages, e.g. https://user.github.io/repo/) only works when every
+# site-internal link is prefixed with `base_url`. The book prev/next nav
+# (page.lower/higher.url) and the language switcher (t.url) previously emitted
+# bare root-relative URLs like `/chapter-2/` or `/ko/`, which 404 under a
+# subpath. Any template href/src that interpolates a page `*.url` value must
+# also carry the `base_url` prefix (or an absolute_url/relative_url filter).
+describe "scaffold template links are base_url-prefixed (subpath safety)" do
+  # Capture every href/src attribute value, then in code keep only the ones
+  # that interpolate a dotted `*.url` Jinja expression (e.g. `{{ t.url }}`,
+  # `{{ base_url }}{{ p.url }}`). JS string concatenation like `' + r.url + '`
+  # is excluded because it lacks `{{`, and its source (search.json) is already
+  # base_path-aware.
+  attr_re = /(?:href|src)="([^"]*)"/
+
+  scaffold_fixtures.each do |name, scaffold|
+    it "#{name}: every templated *.url link carries base_url" do
+      templates = scaffold.template_files(skip_taxonomies: false)
+      offenders = [] of String
+      templates.each do |path, body|
+        body.scan(attr_re).each do |m|
+          value = m[1]
+          next unless value.includes?("{{") && value.includes?(".url")
+          next if value.includes?("base_url") ||
+                  value.includes?("absolute_url") ||
+                  value.includes?("relative_url")
+          offenders << "#{path}: #{value}"
+        end
+      end
+
+      offenders.should(
+        eq([] of String),
+        "#{name} has site-internal links missing a base_url prefix " \
+        "(they would 404 under a subpath deploy): #{offenders.join(", ")}"
+      )
+    end
+  end
+end
+
+# Escaping regression: the site logo and the book prev/next arrows interpolate
+# author-controlled titles into HTML. Without an `| e` filter a title containing
+# `&`, `<`, `>` or `"` breaks the markup (e.g. `Tom & Jerry <Co>` emitted a
+# phantom `<Co>` tag). The `<title>` element already escapes, so every other
+# `something.title` interpolation in a template must too.
+describe "scaffold templates escape interpolated titles" do
+  scaffold_fixtures.each do |name, scaffold|
+    it "#{name}: no unescaped {{ x.title }} in template HTML" do
+      templates = scaffold.template_files(skip_taxonomies: false)
+      offenders = [] of String
+      templates.each do |path, body|
+        # Drop {% raw %}…{% endraw %} example blocks (they show template syntax
+        # literally and are never executed).
+        sanitized = body.gsub(/\{%\s*raw\s*%\}.*?\{%\s*endraw\s*%\}/m, "")
+        # Match dotted title accessors like site.title / page.lower.title, with
+        # whatever filters follow, and flag any lacking an escape filter.
+        sanitized.scan(/\{\{\s*[\w]+\.[\w.]*title\s*([^}]*)\}\}/) do |m|
+          filters = m[1]
+          next if filters.includes?("| e") || filters.includes?("escape") || filters.includes?("| upper")
+          offenders << "#{path}: #{m[0]}"
+        end
+      end
+      offenders.should(
+        eq([] of String),
+        "#{name} interpolates author titles into HTML without an `| e` filter " \
+        "(breaks markup for titles containing &, <, >, \"): #{offenders.join(", ")}"
+      )
+    end
+  end
+end
+
+# Accessibility regression: every scaffold must ship a skip-to-content link as
+# an early-focusable bypass (WCAG 2.4.1) pointing at a `<main id="main">` target.
+describe "scaffold templates provide a skip-to-content link + #main target" do
+  scaffold_fixtures.each do |name, scaffold|
+    it "#{name}: header has a #main skip link and a <main id=\"main\">" do
+      all = scaffold.template_files(skip_taxonomies: false).values.join("\n")
+      all.includes?(%(href="#main")).should(
+        be_true, "#{name} ships no skip-to-content link (href=\"#main\")"
+      )
+      all.matches?(/<main[^>]*\bid="main"/).should(
+        be_true, "#{name} has no <main id=\"main\"> skip target"
+      )
+    end
+  end
+end

@@ -87,8 +87,13 @@ module Hwaro
         taxonomies.each do |taxonomy|
           next if taxonomy.name.strip.empty?
 
-          terms_map = lang_taxonomies.try(&.[taxonomy.name]?) || site.taxonomies[taxonomy.name]?
-          next unless terms_map
+          # A configured taxonomy always renders its index page, even with zero
+          # terms, so site-internal links to it (e.g. the scaffold homepage's
+          # `/tags/`, `/categories/`) don't 404 after a user removes the sample
+          # terms. An empty index lists no terms rather than 404ing.
+          terms_map = lang_taxonomies.try(&.[taxonomy.name]?) ||
+                      site.taxonomies[taxonomy.name]? ||
+                      {} of String => Array(Models::Page)
 
           base_path = "#{lang_prefix}/#{taxonomy.name}/"
           index_page = build_taxonomy_index_page(taxonomy, base_path)

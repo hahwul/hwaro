@@ -56,6 +56,34 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "still renders a configured taxonomy's index when it has zero terms (no 404)" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      # The taxonomy is configured but no page carries a tag, so it collects no
+      # terms. The index must still be generated so site-internal links like the
+      # scaffold homepage's `/tags/` don't 404 after a user removes the samples.
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/blog/post/"
+      page.draft = false
+      page.generated = false
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        File.exists?(File.join(output_dir, "tags", "index.html")).should be_true
+        # No term pages, just the (empty) index.
+        Dir.glob(File.join(output_dir, "tags", "*", "index.html")).should be_empty
+      end
+    end
+
     it "excludes draft pages from taxonomy" do
       config = Hwaro::Models::Config.new
       taxonomy_config = Hwaro::Models::TaxonomyConfig.new("tags")

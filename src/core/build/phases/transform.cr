@@ -71,17 +71,39 @@ module Hwaro::Core::Build::Phases::Transform
     flat_list = [] of Models::Page
     flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
 
-    # Add any orphan pages not belonging to any section
+    # Add any orphan pages not belonging to any section, leading with the
+    # site root index so prev/next starts at the homepage.
     section_names = sections_by_path.keys.to_set
-    ctx.pages.each do |page|
-      next if section_names.includes?(page.section)
-      flat_list << page unless flat_list.includes?(page)
-    end
+    append_orphan_pages(ctx.pages, section_names, flat_list)
 
     # Link lower (previous) and higher (next) across the entire flat list
     flat_list.each_with_index do |page, idx|
       page.lower = idx > 0 ? flat_list[idx - 1] : nil
       page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
+    end
+  end
+
+  # Append pages that belong to no rendered section to the reading-order list.
+  #
+  # The site root index (`content/index.md`, whose `section` is "") is the
+  # entry point of the reading order, not a trailing page — without this it was
+  # pushed to the END, so the book scaffold's prev/next chain wrapped (the home
+  # "Introduction" page landed last and the first chapter lost its prev link).
+  # Prepend such root index pages; keep every other true orphan in source order
+  # at the tail.
+  private def append_orphan_pages(
+    pages : Array(Models::Page),
+    section_names : Set(String),
+    flat_list : Array(Models::Page),
+  )
+    pages.each do |page|
+      next if section_names.includes?(page.section)
+      next if flat_list.includes?(page)
+      if page.is_index && page.section.empty?
+        flat_list.unshift(page)
+      else
+        flat_list << page
+      end
     end
   end
 
@@ -276,10 +298,7 @@ module Hwaro::Core::Build::Phases::Transform
     flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
 
     section_names = sections_by_path.keys.to_set
-    site.pages.each do |page|
-      next if section_names.includes?(page.section)
-      flat_list << page unless flat_list.includes?(page)
-    end
+    append_orphan_pages(site.pages, section_names, flat_list)
 
     flat_list.each_with_index do |page, idx|
       page.lower = idx > 0 ? flat_list[idx - 1] : nil

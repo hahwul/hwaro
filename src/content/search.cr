@@ -101,7 +101,10 @@ module Hwaro
           fields.each do |field|
             case field
             when "title"
-              title = Utils::TextUtils.strip_html(page.title)
+              # The root index commonly has an empty title; fall back to the
+              # site title so the search entry isn't blank (mirrors llms.cr/feeds).
+              raw_title = page.title.empty? ? config.title : page.title
+              title = Utils::TextUtils.strip_html(raw_title)
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               # Convert markdown to plain text
