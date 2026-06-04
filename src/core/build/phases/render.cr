@@ -469,7 +469,7 @@ module Hwaro::Core::Build::Phases::Render
     processed_content = if has_shortcodes
                           shortcode_context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
                           process_shortcodes_jinja(raw, templates, shortcode_context, shortcode_results,
-                            crinja_env_override: crinja_env_override)
+                            crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                         else
                           raw
                         end
@@ -851,7 +851,7 @@ module Hwaro::Core::Build::Phases::Render
       # Process shortcodes in template directly (skip per-line fence detection
       # since templates don't contain markdown fenced code blocks)
       processed_template = process_shortcodes_in_text(template, templates, vars,
-        crinja_env_override: crinja_env_override)
+        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
 
       # Cache compiled Crinja templates by content hash.
       # Most pages share the same base template string, so this avoids

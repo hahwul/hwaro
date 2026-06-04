@@ -102,7 +102,7 @@ module Hwaro
         # Supports two syntax patterns:
         # 1. Explicit: {{ shortcode("name", arg1="value1", arg2="value2") }}
         # 2. Direct:   {{ name(arg1="value1", arg2="value2") }}
-        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil) : String
+        private def process_shortcodes_jinja(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil) : String
           # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
           # so documentation can show literal `{{ ... }}` examples safely.
           String.build do |io|
@@ -123,7 +123,7 @@ module Hwaro
               end
 
               if match = line.match(/^\s*(`{3,}|~{3,})/)
-                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override)
+                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
@@ -135,11 +135,11 @@ module Hwaro
               end
             end
 
-            io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override)
+            io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
           end
         end
 
-        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, depth : Int32 = 0) : String
+        private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, depth : Int32 = 0) : String
           # Inline code spans (`…`, ``…``) are opaque to the shortcode
           # processor — running shortcodes inside `<code>` would both
           # change the visible source the author meant to display and
@@ -148,21 +148,21 @@ module Hwaro
           # Mirror the protection that fenced code blocks already get
           # in `process_shortcodes_jinja`.
           process_outside_inline_code(content) do |chunk|
-            process_shortcodes_in_chunk(chunk, templates, context, shortcode_results, crinja_env_override, depth)
+            process_shortcodes_in_chunk(chunk, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth)
           end
         end
 
-        private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, depth : Int32) : String
+        private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32) : String
           # Localized normalization for named closers (only affects shortcode block content).
           # Avoid touching real Jinja/Crinja control tags (endif, endfor, etc.).
           normalized = content.gsub(/\{\%\s*end\s*(?!if|for|macro|block|call|set|with|autoescape|raw|filter|trans|pluralize|comment)[a-zA-Z_][\w\-]*\s*\%\}/i, "{% end %}")
 
           # 1. Block shortcodes
-          processed = process_block_shortcodes(normalized, templates, context, shortcode_results, crinja_env_override, depth)
+          processed = process_block_shortcodes(normalized, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth)
 
           # 2. Explicit call: {{ shortcode("name", args) }}
           processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
-            render_shortcode_result($1, $2?, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override)
+            render_shortcode_result($1, $2?, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
           end
 
           # 3. Direct call: {{ name(args) }}
@@ -172,7 +172,7 @@ module Hwaro
           # Crinja function — that way real typos surface while legitimate
           # template-function calls in content pass through silently.
           processed.gsub(/\{\{\s*([a-zA-Z_][\w\-]*)\s*\((.*?)\)\s*\}\}/) do |match|
-            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override)
+            render_shortcode_result($1, $2, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
           end
         end
 
@@ -196,7 +196,7 @@ module Hwaro
         # Stack-based block shortcode parser that correctly handles nested
         # block shortcodes of the same type. Scans for opening tags {% name(...) %}
         # and closing tags {% end %}, tracking nesting depth to pair them correctly.
-        private def process_block_shortcodes(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, depth : Int32) : String
+        private def process_block_shortcodes(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32) : String
           open_re = BLOCK_OPEN_RE
           close_re = BLOCK_CLOSE_RE
 
@@ -285,12 +285,12 @@ module Hwaro
 
             # Recursively process nested shortcodes in body (with depth limit)
             if depth < MAX_SHORTCODE_NESTING && (body.includes?("{{") || body.includes?("{%"))
-              body = process_shortcodes_in_text(body, templates, context, shortcode_results, crinja_env_override: crinja_env_override, depth: depth + 1)
+              body = process_shortcodes_in_text(body, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, depth: depth + 1)
             end
 
             extra_args = {"body" => body}
             original_text = content[open_start...pos]
-            result << render_shortcode_result(name, args_str, templates, context, shortcode_results, original_text, warn_missing: true, extra_args: extra_args, crinja_env_override: crinja_env_override)
+            result << render_shortcode_result(name, args_str, templates, context, shortcode_results, original_text, warn_missing: true, extra_args: extra_args, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
           end
 
           result.to_s
@@ -309,6 +309,7 @@ module Hwaro
           warn_missing : Bool = true,
           extra_args : Hash(String, String)? = nil,
           crinja_env_override : Crinja? = nil,
+          template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
         ) : String
           template_key = "shortcodes/#{name}"
           template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
@@ -353,7 +354,7 @@ module Hwaro
             end
           end
 
-          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name)
+          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, shortcode_name: name)
 
           if results = shortcode_results
             placeholder = "#{SHORTCODE_PLACEHOLDER_PREFIX}#{results.size}#{SHORTCODE_PLACEHOLDER_SUFFIX}"
@@ -402,7 +403,7 @@ module Hwaro
         end
 
         # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, shortcode_name : String? = nil) : String
+        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, shortcode_name : String? = nil) : String
           env = crinja_env_override || crinja_env
 
           # Use a local copy of context with args merged to avoid mutating
@@ -415,20 +416,33 @@ module Hwaro
             # Cache compiled shortcode templates by content hash to avoid
             # re-parsing the template AST on every shortcode invocation.
             # XOR with a salt to avoid collisions with page template cache entries
-            # that share @compiled_templates_cache.
+            # that share the same cache map.
             #
-            # Under MT (`-Dpreview_mt`), the cache is reached from multiple OS
-            # threads concurrently — a plain Hash read+write would race during
-            # resize. Reuse the existing crinja cache mutex (reentrant) so
-            # callers that nest into other cached accessors don't self-deadlock.
+            # A `Crinja::Template` is permanently bound to the env it was parsed
+            # with (`Template#render` swaps `@context` on *that* env), so a
+            # cached template MUST only ever be rendered on the env that
+            # compiled it. In the parallel path each worker passes its own env
+            # AND its own cache (`template_cache_override`); using that
+            # worker-local cache keeps every template bound to, and rendered on,
+            # the worker's own env — no cross-worker env mutation, and no mutex
+            # needed since a single fiber owns the cache. Only the shared
+            # fallback cache (sequential path) needs the reentrant mutex.
             cache_key = template.hash ^ 0x5C0DE_CAFE_u64
-            crinja_template = @crinja_cache_mutex.synchronize do
-              @compiled_templates_cache[cache_key]? || begin
-                compiled = env.from_string(template)
-                @compiled_templates_cache[cache_key] = compiled
-                compiled
-              end
-            end
+            crinja_template = if wcache = template_cache_override
+                                wcache[cache_key]? || begin
+                                  compiled = env.from_string(template)
+                                  wcache[cache_key] = compiled
+                                  compiled
+                                end
+                              else
+                                @crinja_cache_mutex.synchronize do
+                                  @compiled_templates_cache[cache_key]? || begin
+                                    compiled = env.from_string(template)
+                                    @compiled_templates_cache[cache_key] = compiled
+                                    compiled
+                                  end
+                                end
+                              end
             crinja_template.render(local_context)
           rescue ex : Crinja::TemplateError
             label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
