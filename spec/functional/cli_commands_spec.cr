@@ -72,8 +72,10 @@ describe "CLI Tool Commands" do
           chdir: project_dir, output: new_output, error: new_error)
 
         status.success?.should be_true
-        # The sanitized directory lands on disk; the raw one does not.
-        Dir.exists?(File.join(project_dir, "content", "special-chars")).should be_true
+        # The sanitized path is used as the stem for the content file (flat, since no pre-existing dir and no --bundle).
+        # The raw unsafe name does not land on disk.
+        File.exists?(File.join(project_dir, "content", "special-chars.md")).should be_true
+        File.exists?(File.join(project_dir, "content", "special chars!@#.md")).should be_false
         Dir.exists?(File.join(project_dir, "content", "special chars!@#")).should be_false
         new_output.to_s.should contain("Sanitized path")
       ensure

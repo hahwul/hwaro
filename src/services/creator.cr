@@ -324,11 +324,13 @@ module Hwaro
                         # Construct directly from it. This avoids broken collapse when the early
                         # flat-path heuristic (for default non-bundle) set full_path to content/xxx.md
                         # and File.dirname would incorrectly yield "content/index.md".
-                        bare = options.path.not_nil!
-                        if bare.starts_with?("content/")
+                        bare = options.path
+                        if bare && bare.starts_with?("content/")
                           File.join(bare, "index.md")
-                        else
+                        elsif bare
                           File.join("content", bare, "index.md")
+                        else
+                          bundle_path_for(full_path)
                         end
                       else
                         bundle_path_for(full_path)
