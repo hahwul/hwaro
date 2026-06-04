@@ -130,10 +130,24 @@ module Hwaro
         # - full_config    : maximum discoverability (current verbose behavior + doctor injection)
         # - default        : balanced (core + commonly useful sections with light comments)
         if scaffold.is_a?(Scaffolds::Remote)
-          # Remote scaffolds provide their own config.toml (fetched from upstream).
-          # We always use it as-is, ignoring --minimal-config / --full-config
-          # (those flags are for built-in scaffolds that generate config).
-          config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
+          remote_config = scaffold.config_content(skip_taxonomies, multilingual_languages)
+          if remote_config.strip.empty?
+            # Remote scaffold had no config.toml (allowed for content/templates-only remotes).
+            # Fall back to normal generation logic so we don't write an empty config.toml.
+            Logger.warn "Remote scaffold did not include a config.toml; generating a default one."
+            if minimal_config
+              config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
+            elsif full_config
+              # For --full-config without upstream config, use the balanced discoverable default
+              # (we can't easily reconstruct a "full" from a non-remote scaffold here).
+              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+            else
+              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+            end
+          else
+            # Use the remote's config as-is (respecting its custom settings), ignore --min/--full.
+            config_content = remote_config
+          end
         elsif minimal_config
           config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
         elsif full_config

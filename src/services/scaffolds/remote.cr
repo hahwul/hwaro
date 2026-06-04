@@ -73,11 +73,14 @@ module Hwaro
           @config_data
         end
 
-        # For remote scaffolds the fetched config.toml from upstream is the
-        # source of truth; we do not regenerate a "minimal" version on top
-        # of it (that would lose the remote's custom settings).
+        # If the remote provided a config.toml, use it as-is (even for --minimal-config).
+        # If not (remote can be templates-only), fall back to the built-in minimal generator.
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
-          @config_data
+          if @config_data.strip.empty?
+            super
+          else
+            @config_data
+          end
         end
 
         # Check if a scaffold source string represents a remote scaffold
