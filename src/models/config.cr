@@ -1203,7 +1203,9 @@ module Hwaro
       # would abort the build with an unclassified crash instead of running.
       private def self.int_value(raw : TOML::Any?, default : Int32) : Int32
         return default unless raw
-        val = raw.as_i64? || raw.as_f?.try { |f| f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 }
+        # `finite?` guard: NaN.clamp is NaN and NaN.to_i64 raises OverflowError,
+        # so a `nan`/`-nan` float in config would otherwise crash the build.
+        val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
         return default unless val
         val.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32
       end
@@ -1220,7 +1222,7 @@ module Hwaro
       # non-numeric). Clamps to Int32 range like int_value so an oversized value
       # never raises OverflowError out of as_i?/to_i at the inline call sites.
       private def self.int_or_nil(raw : TOML::Any) : Int32?
-        val = raw.as_i64? || raw.as_f?.try { |f| f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 }
+        val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
         val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
       end
 

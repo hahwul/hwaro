@@ -38,6 +38,14 @@ module Hwaro
         # form, block_depth would never return to zero and fence protection would
         # silently break for the rest of the document.
         BLOCK_ANY_CLOSE_RE = /\{\%\s*end[\s\w\-]*\%\}/i
+        # Crinja/Jinja control-statement tags (and their `end*` forms). These
+        # legitimately appear in markdown content (e.g. `{% set x = 1 %}`,
+        # `{% if c %}…{% endif %}`) and must NOT count toward block-shortcode
+        # depth — otherwise an unbalanced `{% set %}` would pin block_depth > 0
+        # and permanently disable fenced-code-block protection in the outer loop.
+        # `\b` keeps shortcodes that merely start with a keyword (e.g. `setup`,
+        # `endorsement`) from matching.
+        CRINJA_CONTROL_TAG_RE = /\A\{\%-?\s*(?:if|elif|else|endif|for|endfor|set|endset|with|endwith|raw|endraw|filter|endfilter|block|endblock|macro|endmacro|call|endcall|autoescape|endautoescape|trans|endtrans|pluralize|comment|endcomment|include|import|from|extends|do)\b/i
 
         # Placeholder left in the content stream for each rendered shortcode
         # before Markdown runs. HTML-comment form so CommonMark treats it as
@@ -140,13 +148,18 @@ module Hwaro
                 next
               end
 
-              # Track block-shortcode open/close tags on this line. An open is a
-              # BLOCK_OPEN_RE match that is not itself a close tag (BLOCK_OPEN_RE
-              # also matches `{% end %}` / `{% endname %}`).
+              # Track block-shortcode open/close tags on this line so a fence
+              # inside a block-shortcode body doesn't split the block. Crinja
+              # control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …) are
+              # ignored — counting them would desync the depth (an unbalanced
+              # `{% set %}` would pin depth > 0 and break fence protection).
               line.scan(BLOCK_OPEN_RE) do |m|
-                block_depth += 1 unless BLOCK_ANY_CLOSE_RE.matches?(m[0])
+                tag = m[0]
+                next if CRINJA_CONTROL_TAG_RE.matches?(tag) || BLOCK_ANY_CLOSE_RE.matches?(tag)
+                block_depth += 1
               end
-              line.scan(BLOCK_ANY_CLOSE_RE) do
+              line.scan(BLOCK_ANY_CLOSE_RE) do |m|
+                next if CRINJA_CONTROL_TAG_RE.matches?(m[0])
                 block_depth -= 1 if block_depth > 0
               end
 

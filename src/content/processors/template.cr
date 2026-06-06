@@ -444,8 +444,10 @@ module Hwaro
             term = arguments["term"].to_s
             base_url = env.resolve("base_url").to_s
 
-            # Generate slug from term (use TextUtils for consistency with taxonomy pages)
-            slug = Utils::TextUtils.slugify(term)
+            # Generate slug from term. Must match the on-disk term page path,
+            # which uses safe_slugify — plain slugify("🎉") is "" → "/tags//"
+            # (a dead double-slash link) for all-symbol/emoji terms.
+            slug = Utils::TextUtils.safe_slugify(term)
 
             url = "/#{kind}/#{slug}/"
             Crinja::Value.new(base_url.rstrip("/") + url)

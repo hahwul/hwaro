@@ -85,8 +85,10 @@ module Hwaro
               # XML 1.0 forbids C0 control chars except tab/LF/CR. A stray
               # control byte (e.g. \f or \v sneaked in via JSON/quoted-YAML
               # frontmatter) would otherwise make the whole feed/sitemap
-              # unparseable — drop the illegal ones, keep the allowed three.
-              io << char if char == '\t' || char == '\n' || char == '\r'
+              # unparseable — drop those. DEL (0x7F) is a legal XML char, so
+              # keep it; this also matches contains_xml_special?'s gate exactly.
+              o = char.ord
+              io << char unless o < 0x20 && o != 0x09 && o != 0x0A && o != 0x0D
             else io << char
             end
           end

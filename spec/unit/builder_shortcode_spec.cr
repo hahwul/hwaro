@@ -159,6 +159,37 @@ describe Hwaro::Core::Build::Builder do
       result.should contain("<p>after</p>")
     end
 
+    it "still skips fenced shortcodes after a Crinja control tag (block_depth regression)" do
+      # A `{% set %}` (and other Crinja control tags) must NOT count toward
+      # block-shortcode depth; otherwise the unbalanced tag pins depth > 0 and
+      # the following code fence is never recognized, expanding the fenced
+      # shortcode example instead of showing it verbatim.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div>{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      content = "{% set x = \"1\" %}\n\n```\n{{ shortcode(\"note\", text=\"skip\") }}\n```"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("{{ shortcode(\"note\", text=\"skip\") }}")
+      result.should_not contain("<div>skip</div>")
+    end
+
+    it "keeps a fenced code block inside a block shortcode body intact" do
+      # The original block-shortcode-wraps-a-fence fix must still hold: the
+      # whole block (including its fenced body) stays together and renders.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      content = "{% note %}\nintro\n\n```ruby\nputs 1\n```\n{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div class=\"note\">")
+      result.should_not contain("{% note %}")
+      result.should_not contain("{% end %}")
+    end
+
     it "stores results in shortcode_results when provided" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new

@@ -24,9 +24,12 @@ module Hwaro
                              Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%dT%H:%M", Time::Location::UTC) rescue nil
                            end
                          elsif value.size > 10
-                           # Try seconds, then minute precision, then date-only so
-                           # space-separated datetimes without seconds still parse.
-                           Time.parse(value, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d %H:%M", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
+                           # Try full datetime, then minute precision (no seconds).
+                           # No date-only fallback here: `%Y-%m-%d` consumes only
+                           # the first 10 chars, which would silently reformat
+                           # garbage like "2024-01-15xxx" instead of passing it
+                           # through unchanged.
+                           Time.parse(value, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d %H:%M", Time::Location::UTC) rescue nil
                          else
                            Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
                          end

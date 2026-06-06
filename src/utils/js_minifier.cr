@@ -151,9 +151,14 @@ module Hwaro
         lines.reject!(&.empty?)
         cleaned = lines.join("\n").strip
 
-        # Restore protected template literals verbatim.
+        # Restore protected template literals verbatim. Bounds-guard the index
+        # so an adversarial literal `\x00JSPLn\x00` sequence in the source (NUL
+        # is not valid JS) can't raise IndexError — emit it unchanged instead.
         return cleaned if protected_spans.empty?
-        cleaned.gsub(/\x00JSPL(\d+)\x00/) { protected_spans[$1.to_i] }
+        cleaned.gsub(/\x00JSPL(\d+)\x00/) do
+          idx = $1.to_i
+          idx < protected_spans.size ? protected_spans[idx] : $0
+        end
       end
 
       # Determine whether a `/` at position `pos` in `chars` is likely a regex

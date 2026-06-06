@@ -5,7 +5,6 @@ require "../../src/content/processors/template"
 require "../../src/utils/text_utils"
 require "../../src/utils/js_minifier"
 require "../../src/utils/html_minifier"
-require "../../src/utils/frontmatter_scanner"
 
 # Regression coverage for latent bugs fixed during the source-code audit.
 # Each block names the class of defect it guards against.
@@ -81,6 +80,11 @@ describe "bugfix regressions" do
       Hwaro::Utils::TextUtils.escape_xml("a\tb\nc\rd").should eq("a\tb\nc\rd")
     end
 
+    it "preserves DEL (0x7F, a legal XML char) on both fast and slow paths" do
+      Hwaro::Utils::TextUtils.escape_xml("ab").should eq("ab")      # fast path
+      Hwaro::Utils::TextUtils.escape_xml("a<b").should eq("a&lt;b") # slow path agrees
+    end
+
     it "still escapes the five XML special characters" do
       Hwaro::Utils::TextUtils.escape_xml("a & b < c > \"d\" 'e'").should eq("a &amp; b &lt; c &gt; &quot;d&quot; &apos;e&apos;")
     end
@@ -89,6 +93,10 @@ describe "bugfix regressions" do
   describe "JsMinifier template literals" do
     it "preserves blank lines inside a template literal" do
       Hwaro::Utils::JsMinifier.minify("const t = `line1\n\nline2`; var a=1;").should contain("line1\n\nline2")
+    end
+
+    it "preserves significant trailing whitespace inside a template literal" do
+      Hwaro::Utils::JsMinifier.minify("const css = `body {\n  color: red;   \n}`;").should contain("color: red;   ")
     end
 
     it "still collapses blank lines in plain code" do
@@ -122,6 +130,15 @@ describe "bugfix regressions" do
       vars = {"items" => Crinja::Value.new(arr)}
       result = render_filter("{% for item in items | sort_by(attribute='w') %}{{ item.w }},{% endfor %}", vars)
       result.should eq("1,2,10,20,100,")
+    end
+  end
+
+  describe "get_taxonomy_url (slug consistency)" do
+    it "uses safe_slugify so symbol-only terms don't yield dead // links" do
+      vars = {"base_url" => Crinja::Value.new("https://e.com")}
+      url = render_filter(%({{ get_taxonomy_url(kind="tags", term="🎉") }}), vars)
+      url.should_not contain("tags//")
+      url.should contain("/tags/term-")
     end
   end
 end

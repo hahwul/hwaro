@@ -315,13 +315,15 @@ module Hwaro
                 skipped += 1
                 Logger.debug "  OG image: #{page.image} (cached)" if verbose
                 next
-              elsif File.exists?(expected_svg)
-                # A previous build fell back to SVG for this page (PNG render
-                # failed). Treat that emitted SVG as a valid cache hit so a
-                # stably-failing page doesn't re-render the SVG on every build.
+              elsif ext == "svg" && File.exists?(expected_svg)
+                # SVG-mode build (PNG unavailable or format=svg): a previously
+                # emitted SVG is a valid hit. Gated on ext=="svg" so that when
+                # PNG becomes available again (ext flips to "png") a page that
+                # only has a stale SVG falls through to re-render as PNG instead
+                # of being pinned to the old SVG.
                 page.image = "/#{ai.output_dir}/#{slug}.svg"
                 skipped += 1
-                Logger.debug "  OG image: #{page.image} (cached, svg fallback)" if verbose
+                Logger.debug "  OG image: #{page.image} (cached, svg)" if verbose
                 next
               end
             end
