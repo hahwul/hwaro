@@ -2243,4 +2243,34 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
   end
+
+  describe "atom entry dates" do
+    it "emits the same calendar date for date-only frontmatter on a non-UTC host" do
+      # Regression: date-only frontmatter parses as local midnight; the Atom
+      # <updated> used a raw .to_utc which rolls the calendar date back a day
+      # on a UTC+ host (e.g. 2026-03-05 → 2026-03-04T15:00:00Z). It must
+      # re-anchor to UTC of the same wall-clock date like the RSS path does.
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "atom"
+      config.feeds.filename = "atom.xml"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      page = Hwaro::Models::Page.new("posts/hello.md")
+      page.title = "Hello"
+      page.url = "/posts/hello/"
+      page.render = true
+      page.is_index = false
+      page.raw_content = "body"
+      # Local midnight in a +09:00 zone (independent of the host's real zone).
+      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], config, output_dir)
+        feed = File.read(File.join(output_dir, "atom.xml"))
+        feed.should contain("<updated>2026-03-05T00:00:00Z</updated>")
+      end
+    end
+  end
 end

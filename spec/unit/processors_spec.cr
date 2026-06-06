@@ -629,6 +629,18 @@ describe Hwaro::Processor::Markdown do
       html, _ = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, emoji: true)
       html.should_not contain(":smile:")
     end
+
+    it "converts shortcodes correctly when the document contains multibyte text" do
+      # Byte-oriented scan regression: with multibyte chars (accented/CJK)
+      # present, conversion must still apply to text and skip code blocks.
+      content = "café :wave: 日本語 :smile:\n\n```\n:tada: in code\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: true)
+      html.should_not contain(":wave:")
+      html.should_not contain(":smile:")
+      html.should contain("café")
+      html.should contain("日本語")
+      html.should contain(":tada:") # code block untouched
+    end
   end
 
   describe "extra values extraction" do

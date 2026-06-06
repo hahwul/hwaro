@@ -224,6 +224,29 @@ describe Hwaro::Utils::JsMinifier do
       result.should contain("${fn(c)}")
     end
 
+    it "does not terminate early on a string containing '}' inside interpolation" do
+      # The '}' inside the string literal must not be counted as the
+      # interpolation's closing brace, which would close the template early
+      # and strip the trailing `/* ... */` as a comment.
+      js = "let a = `A${ ('}') + 'x' }B`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("`A${ ('}') + 'x' }B`")
+    end
+
+    it "preserves object literals inside interpolation" do
+      js = "let a = `v=${ {x: 1}.x }`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("`v=${ {x: 1}.x }`")
+    end
+
+    it "preserves nested template literals and their comment-like content" do
+      js = "let a = `A${ ('}') + `/* not a comment */` }B`;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      # The nested template and its `/* ... */` body must survive intact.
+      result.should contain("`/* not a comment */`")
+      result.should contain("}B`")
+    end
+
     # =========================================================================
     # Consecutive string and comment
     # =========================================================================

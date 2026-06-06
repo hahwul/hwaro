@@ -736,49 +736,57 @@ module Hwaro
           {result, roots}
         end
 
-        # Apply emoji shortcode conversion to HTML, skipping <code> and <pre> blocks
+        # Apply emoji shortcode conversion to HTML, skipping <code> and <pre> blocks.
+        #
+        # Scans by BYTE offset rather than char index. The tag/fence markers
+        # ('<', '>', '<code', '<pre', '</code>', '</pre>') and the ':' shortcode
+        # delimiters are all ASCII, so byte offsets land exactly on the same
+        # boundaries even for UTF-8 text. Char-indexed scanning (`html[pos]`,
+        # `html.index(_, pos)`) is O(n) per access on any string containing a
+        # multibyte codepoint, which turned this loop into O(n^2) — a single
+        # accented/CJK character on a long page caused a ~1500x slowdown.
         private def apply_emoji(html : String) : String
           return html unless html.includes?(":")
 
           result = String::Builder.new(html.bytesize)
+          bytes = html.to_slice
+          len = bytes.size
           pos = 0
-          len = html.size
+          lt = '<'.ord.to_u8
 
           while pos < len
             # Check for <code or <pre tags (bounded check avoids O(n) substring)
-            if html[pos] == '<' && pos + 1 < len
-              is_code = pos + 5 <= len && html[pos, 5] == "<code"
-              is_pre = !is_code && pos + 4 <= len && html[pos, 4] == "<pre"
+            if bytes[pos] == lt && pos + 1 < len
+              is_code = pos + 5 <= len && bytes[pos, 5] == "<code".to_slice
+              is_pre = !is_code && pos + 4 <= len && bytes[pos, 4] == "<pre".to_slice
               if is_code || is_pre
                 close_tag = is_code ? "</code>" : "</pre>"
-                end_pos = html.index(close_tag, pos)
+                end_pos = html.byte_index(close_tag, pos)
                 if end_pos
-                  block_end = end_pos + close_tag.size
-                  result << html[pos, block_end - pos]
+                  block_end = end_pos + close_tag.bytesize
+                  result.write(bytes[pos, block_end - pos])
                   pos = block_end
                   next
                 end
               end
             end
 
-            # Find next tag or end
-            next_tag = html.index('<', pos + 1)
-            chunk_end = next_tag || len
-
-            if html[pos] == '<'
+            if bytes[pos] == lt
               # Inside a tag, don't transform
-              tag_end = html.index('>', pos)
+              tag_end = html.byte_index('>', pos)
               if tag_end
-                result << html[pos..tag_end]
+                result.write(bytes[pos, tag_end - pos + 1])
                 pos = tag_end + 1
               else
-                result << html[pos]
+                result.write_byte(bytes[pos])
                 pos += 1
               end
             else
-              # Text content — apply emoji conversion
-              chunk = html[pos...chunk_end]
-              result << Emoji.emojize(chunk)
+              # Text content — apply emoji conversion. Boundaries sit on ASCII
+              # '<' marks, so byte_slice never splits a multibyte codepoint.
+              next_tag = html.byte_index('<', pos + 1)
+              chunk_end = next_tag || len
+              result << Emoji.emojize(html.byte_slice(pos, chunk_end - pos))
               pos = chunk_end
             end
           end

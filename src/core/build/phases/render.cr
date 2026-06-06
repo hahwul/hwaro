@@ -725,7 +725,10 @@ module Hwaro::Core::Build::Phases::Render
     return html unless config.image_processing.enabled
     return html unless html.includes?("<img")
 
-    resize_map = Content::Hooks::ImageHooks.resize_map
+    # Read-only view: apply_responsive_images only looks up keys, never
+    # mutates. Using the live map avoids a per-page full-map copy plus a
+    # contended global mutex on the parallel render hot path.
+    resize_map = Content::Hooks::ImageHooks.resize_map_readonly
     return html if resize_map.empty?
 
     html.gsub(IMG_TAG_RE) do |tag|
@@ -1006,6 +1009,14 @@ module Hwaro::Core::Build::Phases::Render
     site.pages.each { |p| map[p.path] ||= p }
     site.sections.each { |s| map[s.path] ||= s }
     map
+  end
+
+  # Public accessor so callers that render many pages through one Builder
+  # (e.g. taxonomy generation) can compute the shared, site-wide template vars
+  # ONCE and thread them into apply_template, instead of rebuilding the whole
+  # set — iterating every page/section and re-hashing static assets — per page.
+  def global_template_vars(site : Models::Site, cache_busting : Bool = true) : Hash(String, Crinja::Value)
+    build_global_vars(site, cache_busting)
   end
 
   private def build_global_vars(site : Models::Site, cache_busting : Bool = true) : Hash(String, Crinja::Value)

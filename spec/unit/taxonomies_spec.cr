@@ -56,6 +56,47 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "disambiguates distinct terms that slugify identically (no silent overwrite)" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      # "C++" and "C#" both slugify to "c"; without disambiguation one term
+      # page overwrites the other and the index links both to the same URL.
+      page1 = Hwaro::Models::Page.new("post1.md")
+      page1.title = "Post 1"
+      page1.url = "/blog/post1/"
+      page1.tags = ["C++"]
+      page1.draft = false
+      page1.generated = false
+
+      page2 = Hwaro::Models::Page.new("post2.md")
+      page2.title = "Post 2"
+      page2.url = "/blog/post2/"
+      page2.tags = ["C#"]
+      page2.draft = false
+      page2.generated = false
+
+      site.pages = [page1, page2]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        # Both distinct term pages must be written, not collapsed onto one.
+        term_dirs = Dir.children(File.join(output_dir, "tags")).reject { |c| c == "index.html" }
+        term_dirs.size.should eq(2)
+
+        # The index lists both raw terms.
+        index = File.read(File.join(output_dir, "tags", "index.html"))
+        index.should contain("C++")
+        index.should contain("C#")
+      end
+    end
+
     it "still renders a configured taxonomy's index when it has zero terms (no 404)" do
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]

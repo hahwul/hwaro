@@ -291,6 +291,8 @@ module Hwaro
           # parallelising. Only the cache-miss renders go into the
           # worker pool below.
           pending = [] of Tuple(Models::Page, String)
+          # slug => page.url that owns it, so colliding slugs get disambiguated.
+          seen_slugs = {} of String => String
           pages.each do |page|
             next if page.draft
             next if page.generated
@@ -302,6 +304,18 @@ module Hwaro
             url_slug = page.url.gsub("/", "-").strip("-")
             slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
             slug = "page" if slug.empty?
+
+            # The gsub("/", "-") collapses distinct URLs that differ only in
+            # slash-vs-hyphen placement (e.g. /posts/foo/ and /posts-foo/) onto
+            # the same slug. Left unresolved, the second page overwrites the
+            # first's manifest entry and both Pass-2 workers issue a concurrent
+            # File.write to the SAME .png/.svg path (torn file under -Dpreview_mt),
+            # and one page advertises an OG image rendered for the other. Append
+            # a short stable hash of the URL so each distinct URL owns a path.
+            if (owner = seen_slugs[slug]?) && owner != page.url
+              slug = "#{slug}-#{Digest::SHA256.hexdigest(page.url)[0, 8]}"
+            end
+            seen_slugs[slug] = page.url
 
             page_hash = compute_page_hash(page)
             new_entries[slug] = page_hash

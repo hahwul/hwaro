@@ -43,6 +43,16 @@ module Hwaro
           @@resize_map_mutex.synchronize { @@resize_map.dup }
         end
 
+        # Read-only access to the resize map for the render phase. The map is
+        # populated once by the BeforeRender `image:resize` hook and is never
+        # mutated during rendering, so render workers can read it directly
+        # instead of paying a full `.dup` of the (potentially large, site-wide)
+        # map per image-bearing page and serializing on the mutex. Concurrent
+        # reads of the unmutated Hash under -Dpreview_mt are safe.
+        def self.resize_map_readonly : Hash(String, Hash(Int32, String))
+          @@resize_map_mutex.synchronize { @@resize_map }
+        end
+
         # Replace the resize map (used by tests)
         def self.set_resize_map(map : Hash(String, Hash(Int32, String)))
           @@resize_map_mutex.synchronize { @@resize_map = map }

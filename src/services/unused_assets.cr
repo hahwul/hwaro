@@ -54,14 +54,24 @@ module Hwaro
         assets = collect_assets
         return UnusedAssetsResult.new if assets.empty?
 
-        referenced = build_referenced_basenames
+        scanned_text = collect_scan_text
+        referenced = build_referenced_basenames(scanned_text)
 
         unused = [] of String
         assets.each do |asset_path|
           basename = File.basename(asset_path)
-          unless referenced.includes?(basename)
-            unused << asset_path
-          end
+          next if referenced.includes?(basename)
+          # Safety net against the `delete_unused` data-loss path: the
+          # reference regex only captures filenames built from [\w\-.], so a
+          # referenced asset whose name contains a space or parenthesis (e.g.
+          # `team photo.png`, `logo(1).png`) is NOT in `referenced` and would
+          # be flagged — and deleted — despite being in active use. Before
+          # declaring an asset unused, confirm its full basename does not
+          # appear literally anywhere in the scanned source. Coincidental
+          # substring matches only make us MORE conservative, which is the
+          # safe direction for a destructive operation.
+          next if scanned_text.includes?(basename)
+          unused << asset_path
         end
 
         UnusedAssetsResult.new(
@@ -106,13 +116,10 @@ module Hwaro
         assets
       end
 
-      # Extract referenced asset filenames from content and template files.
-      # Uses regex to find filenames with known asset extensions, avoiding
-      # substring false positives from plain string matching.
-      private def build_referenced_basenames : Set(String)
-        refs = Set(String).new
-        ext_pattern = /[\w\-\.]+\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|tiff?|css|js|woff2?|ttf|eot|otf|mp[34]|webm|ogg|wav|pdf|zip)\b/i
-
+      # Concatenate every content/template file we scan for references into a
+      # single blob, so both the regex pass and the literal-substring safety
+      # net in `run` work off the same source text.
+      private def collect_scan_text : String
         scan_files = [] of String
 
         if Dir.exists?(@content_dir)
@@ -126,15 +133,27 @@ module Hwaro
           Dir.glob(File.join(@templates_dir, "**", "*.js")) { |f| scan_files << f }
         end
 
-        scan_files.each do |file|
-          text = begin
-            File.read(file)
-          rescue IO::Error
-            next
+        String.build do |sb|
+          scan_files.each do |file|
+            text = begin
+              File.read(file)
+            rescue IO::Error
+              next
+            end
+            sb << text << '\n'
           end
-          text.scan(ext_pattern) do |match|
-            refs << match[0]
-          end
+        end
+      end
+
+      # Extract referenced asset filenames from content and template files.
+      # Uses regex to find filenames with known asset extensions, avoiding
+      # substring false positives from plain string matching.
+      private def build_referenced_basenames(scanned_text : String) : Set(String)
+        refs = Set(String).new
+        ext_pattern = /[\w\-\.]+\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|tiff?|css|js|woff2?|ttf|eot|otf|mp[34]|webm|ogg|wav|pdf|zip)\b/i
+
+        scanned_text.scan(ext_pattern) do |match|
+          refs << match[0]
         end
 
         # Files declared in `config.toml` (`[[assets.bundles]] files`,

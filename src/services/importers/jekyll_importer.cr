@@ -191,7 +191,12 @@ module Hwaro
               end
             end
 
-            if header = yaml["header"]?
+            # `header:` may be a hash (Minimal-Mistakes style `header: {image: …}`)
+            # or a plain scalar string path. `YAML::Any#[]?` RAISES on a scalar
+            # ("Expected Array or Hash, not String"), which the per-file rescue
+            # would swallow — silently dropping the whole post. Guard on `as_h?`
+            # first; indexing the YAML::Any is then safe (it's a hash).
+            if (header = yaml["header"]?) && header.as_h?
               if header_image = header["image"]?
                 fields["image"] = (header_image.as_s? || header_image.raw.to_s) unless fields.has_key?("image")
               end

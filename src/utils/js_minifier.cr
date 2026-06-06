@@ -52,34 +52,16 @@ module Hwaro
               next
             end
 
-            # Template literals — track ${...} nesting depth. Captured into a
-            # placeholder so the trailing line-cleanup pass can't alter newlines
-            # or whitespace that are part of the literal's value.
+            # Template literals — captured verbatim into a placeholder so the
+            # trailing line-cleanup pass can't alter newlines/whitespace that
+            # belong to the literal's value. The scan must track string state,
+            # balanced braces, and nested template literals inside `${...}`
+            # interpolations (see scan_template_literal); a naive single-depth
+            # counter terminated the literal early on `${ '}' }`, `${ {a:1} }`,
+            # or nested templates and stripped the rest as comments.
             if c == '`'
               lit = String.build do |lb|
-                lb << c
-                i += 1
-                depth = 0
-                while i < len
-                  sc = chars[i]
-                  lb << sc
-                  if sc == '\\' && i + 1 < len
-                    i += 1
-                    lb << chars[i]
-                  elsif sc == '$' && i + 1 < len && chars[i + 1] == '{'
-                    lb << chars[i + 1]
-                    i += 1
-                    depth += 1
-                  elsif sc == '{' && depth > 0
-                    # Nested brace inside ${...}
-                  elsif sc == '}' && depth > 0
-                    depth -= 1
-                  elsif sc == '`' && depth == 0
-                    break
-                  end
-                  i += 1
-                end
-                i += 1
+                i = scan_template_literal(chars, i, len, lb)
               end
               protected_spans << lit
               io << "\x00JSPL#{protected_spans.size - 1}\x00"
@@ -184,6 +166,87 @@ module Hwaro
                         prev == ')' || prev == ']'
         # Everything else (operators, punctuation, keywords ending with these) → regex
         true
+      end
+
+      # Scan a template literal beginning at chars[i] == '`'. Appends the whole
+      # literal — including every nested `${...}` interpolation — to `lb` and
+      # returns the index just past the closing backtick. Correctly handles
+      # strings, balanced braces, and nested template literals inside an
+      # interpolation, so a `}`/backtick that belongs to the interpolation can
+      # never be mistaken for the outer literal's terminator.
+      private def scan_template_literal(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+        lb << chars[i] # opening backtick
+        i += 1
+        while i < len
+          c = chars[i]
+          if c == '\\' && i + 1 < len
+            lb << c << chars[i + 1]
+            i += 2
+          elsif c == '`'
+            lb << c
+            return i + 1 # closing backtick
+          elsif c == '$' && i + 1 < len && chars[i + 1] == '{'
+            lb << '$' << '{'
+            i = scan_interpolation(chars, i + 2, len, lb)
+          else
+            lb << c
+            i += 1
+          end
+        end
+        i
+      end
+
+      # Scan the body of a `${ ... }` interpolation; the opening `{` is already
+      # emitted and `i` points just past it. Tracks nested braces, string
+      # literals, and nested template literals so the matching `}` is found
+      # correctly. Returns the index just past that `}`.
+      private def scan_interpolation(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+        depth = 1
+        while i < len
+          c = chars[i]
+          if c == '\\' && i + 1 < len
+            lb << c << chars[i + 1]
+            i += 2
+          elsif c == '"' || c == '\''
+            i = scan_quoted(chars, i, len, lb)
+          elsif c == '`'
+            i = scan_template_literal(chars, i, len, lb)
+          elsif c == '{'
+            depth += 1
+            lb << c
+            i += 1
+          elsif c == '}'
+            depth -= 1
+            lb << c
+            i += 1
+            return i if depth == 0
+          else
+            lb << c
+            i += 1
+          end
+        end
+        i
+      end
+
+      # Scan a quoted string beginning at chars[i] (a `"` or `'`). Appends it
+      # verbatim (honoring backslash escapes) and returns the index just past
+      # the closing quote.
+      private def scan_quoted(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+        quote = chars[i]
+        lb << quote
+        i += 1
+        while i < len
+          c = chars[i]
+          lb << c
+          if c == '\\' && i + 1 < len
+            i += 1
+            lb << chars[i]
+          elsif c == quote
+            return i + 1
+          end
+          i += 1
+        end
+        i
       end
     end
   end

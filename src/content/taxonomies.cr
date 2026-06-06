@@ -27,6 +27,12 @@ module Hwaro
         # Reuse a single Builder instance across all taxonomy renders
         builder = Core::Build::Builder.new
 
+        # Compute the site-wide template vars ONCE. apply_template otherwise
+        # falls back to build_global_vars(site) on every taxonomy term/page,
+        # re-iterating all pages/sections (and re-hashing assets) per page —
+        # O(terms × site_size) of redundant work on a site with many terms.
+        global_vars = builder.global_template_vars(site)
+
         # Generate root taxonomies. On a multilingual site the root is the
         # default language's space (its content pages live at the root), so
         # scope the term listings to default-language pages — otherwise the
@@ -47,7 +53,7 @@ module Hwaro
         if root_language && (default_cfg = config.languages[root_language]?)
           root_taxonomies = config.taxonomies.select { |t| default_cfg.taxonomies.includes?(t.name) }
         end
-        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, language: root_language, lang_prefix: "")
+        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, global_vars, language: root_language, lang_prefix: "")
 
         # For multilingual sites, also generate language-prefixed taxonomy pages
         # (e.g. /en/tags/, /en/categories/) using only pages of that language.
@@ -66,7 +72,7 @@ module Hwaro
             next if lang_taxonomies.empty?
 
             lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
-            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose,
+            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars,
               language: lang_code, lang_prefix: "/#{lang_code}", lang_taxonomies: lang_taxonomies)
           end
         end
@@ -80,6 +86,7 @@ module Hwaro
         templates : Hash(String, String),
         builder : Core::Build::Builder,
         verbose : Bool,
+        global_vars : Hash(String, Crinja::Value),
         language : String?,
         lang_prefix : String,
         lang_taxonomies : Hash(String, Hash(String, Array(Models::Page)))? = nil,
@@ -108,6 +115,13 @@ module Hwaro
             index_page.language = language
           end
 
+          # Assign each term a UNIQUE slug shared by both the index links and
+          # the term-page file paths. Distinct terms can slugify identically
+          # (e.g. "C++"/"C#" → "c", "Hello World"/"hello-world" → "hello-world");
+          # without disambiguation the second term page overwrites the first's
+          # index.html and the index emits two links to the same URL.
+          slug_map = build_term_slug_map(terms_map.keys)
+
           # Only list terms whose term pages are actually written for this
           # language, so the index never links to a term page that the
           # language-filtered loop below skips (dead /tags/<term>/ links).
@@ -116,7 +130,7 @@ module Hwaro
                         else
                           terms_map.keys
                         end
-          render_taxonomy_index(index_page, index_terms.sort!, templates, site, output_dir, builder, verbose)
+          render_taxonomy_index(index_page, index_terms.sort!, templates, site, output_dir, builder, verbose, global_vars, slug_map)
 
           terms_map.each do |term, pages|
             # Filter pages to the requested language when doing per-lang generation
@@ -127,7 +141,7 @@ module Hwaro
                              end
             next if filtered_pages.empty?
 
-            render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, lang_prefix: lang_prefix, language: language)
+            render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug_map[term], lang_prefix: lang_prefix, language: language)
           end
         end
       end
@@ -212,6 +226,27 @@ module Hwaro
         end
       end
 
+      # Build a term → unique-slug map. Iterates terms in sorted order so the
+      # disambiguation suffix is deterministic across builds; on a slug clash
+      # the later term gets a numeric suffix (and re-checks for further clashes,
+      # including against real terms that already use that suffix).
+      private def self.build_term_slug_map(terms : Array(String)) : Hash(String, String)
+        slug_map = {} of String => String
+        used = Set(String).new
+        terms.sort.each do |term|
+          base = Utils::TextUtils.safe_slugify(term)
+          slug = base
+          n = 2
+          while used.includes?(slug)
+            slug = "#{base}-#{n}"
+            n += 1
+          end
+          used << slug
+          slug_map[term] = slug
+        end
+        slug_map
+      end
+
       private def self.render_taxonomy_index(
         page : Models::Section,
         terms : Array(String),
@@ -219,12 +254,14 @@ module Hwaro
         site : Models::Site,
         output_dir : String,
         builder : Core::Build::Builder,
-        verbose : Bool = false,
+        verbose : Bool,
+        global_vars : Hash(String, Crinja::Value),
+        slug_map : Hash(String, String),
       )
         template_content = templates["taxonomy"]? || templates["page"]?
-        html_content = build_term_list(terms, page.url, site.config.base_url)
+        html_content = build_term_list(terms, page.url, site.config.base_url, slug_map)
 
-        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder)
+        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars)
         write_output(page, output_dir, final_html, verbose)
       end
 
@@ -236,11 +273,12 @@ module Hwaro
         site : Models::Site,
         output_dir : String,
         builder : Core::Build::Builder,
-        verbose : Bool = false,
+        verbose : Bool,
+        global_vars : Hash(String, Crinja::Value),
+        slug : String,
         lang_prefix : String = "",
         language : String? = nil,
       )
-        slug = Utils::TextUtils.safe_slugify(term)
         base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
 
         index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
@@ -268,7 +306,7 @@ module Hwaro
           pagination_html = Content::Pagination::Renderer.new(site.config).render_pagination_nav(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
@@ -366,6 +404,7 @@ module Hwaro
         templates : Hash(String, String),
         paginator : Content::Pagination::PaginatedPage? = nil,
         builder : Core::Build::Builder? = nil,
+        global_vars : Hash(String, Crinja::Value)? = nil,
       ) : String
         return html_content unless template_content
 
@@ -391,7 +430,8 @@ module Hwaro
           templates: templates,
           pagination: "", # We don't pass pre-rendered pagination here as it is embedded in content? Wait.
           page_url_override: current_url,
-          paginator: paginator
+          paginator: paginator,
+          global_vars: global_vars
         )
       end
 
@@ -436,11 +476,11 @@ module Hwaro
         end
       end
 
-      private def self.build_term_list(terms : Array(String), base_path : String, base_url : String) : String
+      private def self.build_term_list(terms : Array(String), base_path : String, base_url : String, slug_map : Hash(String, String)) : String
         String.build do |str|
           str << "<ul class=\"taxonomy-terms\">\n"
           terms.each do |term|
-            term_slug = Utils::TextUtils.safe_slugify(term)
+            term_slug = slug_map[term]? || Utils::TextUtils.safe_slugify(term)
             term_url = join_url(base_url, base_path, term_slug + "/")
             str << "  <li><a href=\"#{HTML.escape(term_url)}\">#{HTML.escape(term)}</a></li>\n"
           end

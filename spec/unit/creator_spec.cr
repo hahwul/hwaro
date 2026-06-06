@@ -67,6 +67,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "does not mark content draft just because the path contains 'drafts' as a substring" do
+      # Regression: `base_dir.includes?("drafts")` matched a path SEGMENT only
+      # by accident — `content/draftsmanship/...` was silently published as a
+      # draft. Match a real path segment instead.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/draftsmanship")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "draftsmanship/post.md")
+          creator = Hwaro::Services::Creator.new
+          creator.run(options)
+
+          content = File.read("content/draftsmanship/post.md")
+          content.should_not contain("draft = true")
+        end
+      end
+    end
+
     it "creates a file in a subdirectory" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

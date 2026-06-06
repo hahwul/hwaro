@@ -44,11 +44,14 @@ module Hwaro
           # second-pass `[[Wiki-Link]]` resolution can produce absolute URLs
           # instead of slugs that resolve relative to the current page.
           # Keys are case-insensitive matches on filename, title, and aliases.
-          link_map = build_link_map(files, path)
+          # The pass also caches each file's raw bytes so the second pass below
+          # reuses them instead of re-reading every note from disk (2N → N reads).
+          content_cache = {} of String => String
+          link_map = build_link_map(files, path, content_cache)
 
           files.each do |file_path|
             begin
-              result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map)
+              result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
               case result
               when :imported
                 imported += 1
@@ -85,11 +88,12 @@ module Hwaro
         # The lookup is case-insensitive because Obsidian itself treats
         # wiki-links that way (`[[Note]]` and `[[note]]` resolve to the same
         # file), and Hwaro authors typically lowercase slugs on publish.
-        private def build_link_map(files : Array(String), base_path : String) : Hash(String, String)
+        private def build_link_map(files : Array(String), base_path : String, content_cache : Hash(String, String) = {} of String => String) : Hash(String, String)
           map = Hash(String, String).new
           files.each do |file_path|
             begin
               raw = File.read(file_path)
+              content_cache[file_path] = raw
               fm_yaml, _ = parse_markdown_file(raw)
 
               # Section mirrors `import_file`'s computation so the URL we
@@ -178,8 +182,9 @@ module Hwaro
           verbose : Bool,
           force : Bool,
           link_map : Hash(String, String) = {} of String => String,
+          content_cache : Hash(String, String) = {} of String => String,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = content_cache[file_path]? || File.read(file_path)
           frontmatter_yaml, body = parse_markdown_file(raw)
 
           fields = Hash(String, (String | Bool | Array(String))?).new

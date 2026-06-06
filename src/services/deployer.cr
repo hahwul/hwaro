@@ -762,15 +762,26 @@ module Hwaro
 
       private def validate_strip_index_html_for_filesystem(target : Models::DeploymentTarget, dest_paths : Array(String)) : Nil
         return unless target.strip_index_html
+        # A conflict is a path that is BOTH a file and a directory prefix of
+        # another path. The previous `dest_paths.any?(&.starts_with?)` made this
+        # O(n^2) (millions of comparisons on a large site). Instead, for each
+        # path walk its ancestor prefixes and check membership in a Set — the
+        # same O(n) technique validate_destination_paths uses.
+        dest_set = dest_paths.to_set
         dest_paths.each do |path|
           next if path.empty?
-          prefix = "#{path}/"
-          if dest_paths.any?(&.starts_with?(prefix))
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: "stripIndexHTML cannot be used with file:// deployments when both '#{path}' and '#{prefix}...' exist.",
-              hint: "Disable stripIndexHTML for target '#{target.name}', or deploy via an object store.",
-            )
+          parts = path.split('/')
+          next if parts.size <= 1
+          prefix = ""
+          parts[0...-1].each do |part|
+            prefix = prefix.empty? ? part : "#{prefix}/#{part}"
+            if dest_set.includes?(prefix)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONFIG,
+                message: "stripIndexHTML cannot be used with file:// deployments when both '#{prefix}' and '#{prefix}/...' exist.",
+                hint: "Disable stripIndexHTML for target '#{target.name}', or deploy via an object store.",
+              )
+            end
           end
         end
       end

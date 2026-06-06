@@ -183,24 +183,27 @@ module Hwaro
           base_url.empty? ? path : base_url + path
         end
 
+        # Convert a feed timestamp to UTC, but re-anchor "midnight in a non-UTC
+        # zone" to UTC of the same wall-clock date. Date-only TOML/YAML values
+        # (e.g. `date = 2026-03-05`) are parsed as local midnight; a naive
+        # `.to_utc` on a `+09:00` host pushes the calendar date back a day
+        # (`2026-03-04T15:00:00Z`). Both RSS `<pubDate>` and Atom `<updated>`
+        # route through here so the two feeds report the same calendar date.
+        private def self.normalize_feed_time(time : Time) : Time
+          if time.location != Time::Location::UTC &&
+             time.hour == 0 && time.minute == 0 &&
+             time.second == 0 && time.nanosecond == 0
+            Time.utc(time.year, time.month, time.day)
+          else
+            time.to_utc
+          end
+        end
+
         # Format a Time as an RFC 822/2822 datetime suitable for RSS `<pubDate>`.
         # `Time#to_rfc2822` omits the leading zero on day-of-month, which some
         # readers reject; force `two_digit_day: true`.
-        #
-        # Date-only TOML/YAML values (e.g. `date = 2026-03-05`) are anchored to
-        # the build host's local zone by the parsers. Naively converting those
-        # to UTC pushes the calendar date back by the host's offset, so a
-        # `+09:00` host would emit `Wed, 04 Mar 2026 15:00:00 +0000` for a date
-        # the author wrote as 5 Mar. Detect "midnight in a non-UTC zone" and
-        # re-anchor to UTC of the same wall-clock date instead.
         private def self.format_rfc822(time : Time) : String
-          normalized = if time.location != Time::Location::UTC &&
-                          time.hour == 0 && time.minute == 0 &&
-                          time.second == 0 && time.nanosecond == 0
-                         Time.utc(time.year, time.month, time.day)
-                       else
-                         time.to_utc
-                       end
+          normalized = normalize_feed_time(time)
           String.build do |io|
             formatter = Time::Format::Formatter.new(normalized, io)
             formatter.rfc_2822(time_zone_gmt: false, two_digit_day: true)
@@ -327,7 +330,7 @@ module Hwaro
               str << "    <link href=\"#{escaped_url}\" />\n"
               str << "    <id>#{escaped_url}</id>\n"
 
-              entry_date = (page.updated || page.date || now).to_utc
+              entry_date = normalize_feed_time(page.updated || page.date || now)
               str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
 
               content = get_content_for_feed(page, config)

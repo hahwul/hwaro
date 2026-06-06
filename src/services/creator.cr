@@ -280,9 +280,12 @@ module Hwaro
 
         Hwaro::Utils::FileSafe.mkdir_p(base_dir) unless Dir.exists?(base_dir)
 
-        # Draft: CLI flag > path-based detection
+        # Draft: CLI flag > path-based detection. Match a path SEGMENT, not a
+        # raw substring — `base_dir.includes?("drafts")` flagged unrelated dirs
+        # like `content/draftsmanship` or `content/early-drafts-archive` as
+        # drafts, silently publishing them as unpublished.
         is_draft = if options.draft.nil?
-                     base_dir.includes?("drafts")
+                     Path[base_dir].parts.includes?("drafts")
                    else
                      options.draft == true
                    end

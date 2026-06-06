@@ -1547,7 +1547,12 @@ module Hwaro
         return unless s = config.raw["related"]?.try(&.as_h?)
 
         config.related.enabled = bool_value(s["enabled"]?, config.related.enabled)
-        config.related.limit = int_value(s["limit"]?, config.related.limit)
+        # Clamp at the source so every consumer sees a sane value. A negative
+        # limit reaches `Array#first(limit)` in the incremental related-posts
+        # rebuild (transform.cr) and raises `ArgumentError: Negative count`,
+        # crashing `serve` watch rebuilds (the full build guards `limit <= 0`,
+        # the incremental path did not — clamping fixes both uniformly).
+        config.related.limit = int_value(s["limit"]?, config.related.limit).clamp(0, Int32::MAX)
         if taxonomies = s["taxonomies"]?.try(&.as_a?)
           config.related.taxonomies = taxonomies.compact_map(&.as_s?)
         end

@@ -172,6 +172,22 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    it "strips an optional CommonMark title from the destination" do
+      # Regression: `[t](/url "title")` captured `/url "title"`, which never
+      # resolves on disk — every titled internal link was falsely flagged dead.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), %([Titled](/posts/b/ "Go to B")\n![Alt](/img/a.png 'Image title')))
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        urls = links.map(&.url)
+        urls.should contain("/posts/b/")
+        urls.should contain("/img/a.png")
+        urls.none?(&.includes?("\"")).should be_true
+      end
+    end
+
     it "ignores internal links and images inside fenced code blocks" do
       # Regression: the docs scaffold ships an image-syntax example
       # `![Diagram](/images/diagram.png)` inside a ```markdown fence. It is a

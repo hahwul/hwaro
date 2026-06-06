@@ -78,8 +78,28 @@ module Hwaro
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool check-links [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| target_dir = v }
-              parser.on("--timeout SECONDS", "HTTP request timeout in seconds (default: #{DEFAULT_TIMEOUT})") { |v| timeout = v.to_i }
-              parser.on("--concurrency N", "Max concurrent requests (default: #{DEFAULT_CONCURRENCY})") { |v| concurrency = v.to_i.clamp(1, 128) }
+              parser.on("--timeout SECONDS", "HTTP request timeout in seconds (default: #{DEFAULT_TIMEOUT})") do |v|
+                parsed = v.to_i?
+                unless parsed && parsed > 0
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "Invalid --timeout value: #{v}",
+                    hint: "Pass a positive integer number of seconds, e.g. --timeout 10.",
+                  )
+                end
+                timeout = parsed
+              end
+              parser.on("--concurrency N", "Max concurrent requests (default: #{DEFAULT_CONCURRENCY})") do |v|
+                parsed = v.to_i?
+                unless parsed && parsed > 0
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "Invalid --concurrency value: #{v}",
+                    hint: "Pass a positive integer, e.g. --concurrency 8.",
+                  )
+                end
+                concurrency = parsed.clamp(1, 128)
+              end
               parser.on("--external-only", "Check external links only") { external_only = true }
               parser.on("--internal-only", "Check internal links only") { internal_only = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
@@ -144,6 +164,9 @@ module Hwaro
                 "dead_internal" => dead_internal,
                 "dead_external" => dead_external,
               }.to_json)
+              # Exit non-zero so CI can gate on broken links (the JSON payload
+              # has already been emitted to stdout for tooling to consume).
+              exit(Hwaro::Errors::EXIT_GENERIC) if dead_total > 0
               return
             end
 
@@ -164,6 +187,11 @@ module Hwaro
               end
             end
             Logger.info "----------------------------------------"
+
+            # A dead-links result must fail the process so `check-links` is
+            # usable as a CI gate; previously it always exited 0 regardless of
+            # how many broken links were reported.
+            exit(Hwaro::Errors::EXIT_GENERIC) if dead_total > 0
           end
 
           # Markdown links inside fenced code blocks or inline code spans are
@@ -191,6 +219,19 @@ module Hwaro
             links
           end
 
+          # Normalize a Markdown link/image destination to a bare URL.
+          # CommonMark allows an optional title after the destination
+          # (`[t](/url "title")` / `![a](/img 'title')`); the capturing regex
+          # `([^\)]+)` includes that title, so without stripping it the resolved
+          # target became e.g. `/posts/b/ "title"` and every titled internal link
+          # was falsely reported dead. A non-`<…>` destination cannot contain a
+          # space (CommonMark ends it at the first whitespace), so taking the
+          # first whitespace-delimited token yields the real destination.
+          private def clean_link_target(raw : String) : String
+            dest = raw.strip.split(/\s/, 2).first
+            dest.split("#").first.split("?").first.strip
+          end
+
           private def find_internal_links(dir : String) : Array(Link)
             links = [] of Link
 
@@ -199,14 +240,14 @@ module Hwaro
 
               # Regular links (exclude images by using negative lookbehind)
               content.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
-                url = match[2].split("#").first.split("?").first.strip
+                url = clean_link_target(match[2])
                 next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://") || url.starts_with?("mailto:") || url.starts_with?("#")
                 links << Link.new(file: file, url: url, kind: :internal)
               end
 
               # Image links
               content.scan(/!\[([^\]]*)\]\(([^\)]+)\)/) do |match|
-                url = match[2].split("#").first.split("?").first.strip
+                url = clean_link_target(match[2])
                 next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://")
                 links << Link.new(file: file, url: url, kind: :image)
               end

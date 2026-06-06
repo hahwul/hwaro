@@ -2247,4 +2247,26 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
     config_with({"a.b" => "x"}).resolve_permalink_dir("a.b/c").should eq("x/c")
     config_with({"a.b" => "x"}).resolve_permalink_dir("axb/c").should eq("axb/c")
   end
+
+  describe "related config" do
+    it "clamps a negative limit to zero" do
+      # A negative limit reaches Array#first(limit) in the incremental
+      # related-posts rebuild and raises "Negative count"; clamp at the source.
+      config = load_config(<<-TOML)
+        [related]
+        enabled = true
+        limit = -1
+        TOML
+      config.related.limit.should eq(0)
+    end
+
+    it "keeps a valid positive limit" do
+      config = load_config(<<-TOML)
+        [related]
+        enabled = true
+        limit = 7
+        TOML
+      config.related.limit.should eq(7)
+    end
+  end
 end

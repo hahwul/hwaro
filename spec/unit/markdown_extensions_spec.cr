@@ -73,6 +73,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should_not contain("<dl>")
       result.should contain("Normal paragraph")
     end
+
+    it "does not emit an empty <dl> when a blank line precedes a ': ' line" do
+      # An orphan definition (blank term line) must pass through unchanged
+      # rather than producing a stray empty <dl></dl>.
+      content = "\n: orphan def\n\nReal paragraph"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should_not contain("<dl>")
+      result.should contain(": orphan def")
+      result.should contain("Real paragraph")
+    end
   end
 
   describe "footnotes" do

@@ -53,6 +53,38 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
+    it "imports a post whose `header` frontmatter is a scalar string" do
+      # Regression: `header: banner.jpg` (scalar, not a hash) made
+      # `header["image"]?` raise "Expected Array or Hash, not String", which
+      # the per-file rescue swallowed — silently dropping the whole post.
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        post_content = <<-JEKYLL
+          ---
+          title: "Scalar Header"
+          header: banner.jpg
+          ---
+          Post body.
+          JEKYLL
+
+        File.write(File.join(posts_dir, "2024-02-02-scalar-header.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        result = Hwaro::Services::Importers::JekyllImporter.new.run(options)
+        result.imported_count.should eq(1)
+        result.error_count.should eq(0)
+        File.exists?(File.join(output_dir, "posts", "scalar-header.md")).should be_true
+      end
+    end
+
     it "extracts slug from Jekyll filename" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")

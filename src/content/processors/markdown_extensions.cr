@@ -124,8 +124,12 @@ module Hwaro
           while i < lines.size
             line = lines[i]
 
-            # Check if next line starts with ": " (definition)
-            if i + 1 < lines.size && lines[i + 1].lstrip.starts_with?(": ")
+            # Check if next line starts with ": " (definition). The term line
+            # (lines[i]) must be non-empty: a blank line followed by a ": "
+            # line is an orphan definition, not a definition list — entering
+            # the branch there emitted a stray empty <dl></dl> and leaked the
+            # ": " line through as literal text.
+            if i + 1 < lines.size && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
               result << "<dl>"
               while i < lines.size

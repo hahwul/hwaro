@@ -10,6 +10,13 @@ module Hwaro
       LIVE_RELOAD_PATH = "/__hwaro_livereload"
 
       @sockets : Array(HTTP::WebSocket) = [] of HTTP::WebSocket
+      # Guards every access to @sockets and @current_error. Under -Dpreview_mt
+      # (the CI/release build flag) HTTP::Server runs each connection in its own
+      # fiber across worker threads, so the per-client `<<`/`delete` callbacks
+      # race with the watcher fiber's broadcast. Array#<< triggering a resize
+      # concurrently with a read/delete corrupts the buffer. Mirrors the mutex
+      # pattern already used in builder.cr.
+      @sockets_mutex = Mutex.new
       # Latest unresolved build-error message, replayed to any new
       # WebSocket so a tab opened mid-failure still gets the overlay
       # without waiting for the next save.
@@ -37,12 +44,15 @@ module Hwaro
           end
 
           ws = HTTP::WebSocketHandler.new do |socket, _ctx|
-            @sockets << socket
+            message = @sockets_mutex.synchronize do
+              @sockets << socket
+              @current_error
+            end
             # Replay the current build-error so a tab opened while the
             # build is broken sees the overlay immediately instead of
             # silently rendering whatever stale HTML happens to be on
             # disk.
-            if message = @current_error
+            if message
               begin
                 socket.send("error:#{{"message" => message}.to_json}")
               rescue IO::Error | Socket::Error
@@ -50,7 +60,7 @@ module Hwaro
               end
             end
             socket.on_close do
-              @sockets.delete(socket)
+              @sockets_mutex.synchronize { @sockets.delete(socket) }
             end
           end
           ws.call(context)
@@ -62,7 +72,7 @@ module Hwaro
       def notify_reload
         # A successful reload implicitly clears any previous error —
         # the client script removes the overlay before reloading.
-        @current_error = nil
+        @sockets_mutex.synchronize { @current_error = nil }
         broadcast("reload")
       end
 
@@ -72,7 +82,7 @@ module Hwaro
       # using JSON keeps the schema extensible (we may want to add
       # `file`, `line`, etc. later) without ad-hoc string parsing.
       def notify_build_error(message : String)
-        @current_error = message
+        @sockets_mutex.synchronize { @current_error = message }
         payload = {"message" => message}.to_json
         broadcast("error:#{payload}")
       end
@@ -81,14 +91,15 @@ module Hwaro
       # right before a successful reload so the UI clears even if the
       # rebuild produced no other visible change.
       def notify_clear_error
-        @current_error = nil
+        @sockets_mutex.synchronize { @current_error = nil }
         broadcast("clear-error")
       end
 
       private def broadcast(message : String)
-        # Snapshot to avoid race: on_close can delete from @sockets
-        # while we yield in socket.send during iteration.
-        snapshot = @sockets.dup
+        # Snapshot under the lock: a connection fiber may `<<`/`delete` from
+        # @sockets concurrently. We send outside the lock so a slow/blocked
+        # socket doesn't stall connection handling.
+        snapshot = @sockets_mutex.synchronize { @sockets.dup }
         dead = [] of HTTP::WebSocket
         snapshot.each do |socket|
           begin
@@ -97,7 +108,9 @@ module Hwaro
             dead << socket
           end
         end
-        dead.each { |s| @sockets.delete(s) }
+        unless dead.empty?
+          @sockets_mutex.synchronize { dead.each { |s| @sockets.delete(s) } }
+        end
       end
     end
 
