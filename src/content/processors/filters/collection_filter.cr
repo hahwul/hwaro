@@ -36,12 +36,22 @@ module Hwaro
                 attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 reverse = arguments["reverse"].truthy?
 
-                sorted = arr.sort_by do |item|
+                # Compare values directly so numeric attributes (weight,
+                # word_count, numeric extra) sort numerically instead of
+                # lexicographically ("1","10","2"). Strings/dates fall back to
+                # string comparison; a missing attribute sorts as "".
+                sorted = arr.sort do |a, b|
                   begin
-                    item_hash = item.as_h
-                    item_hash[attr_key]?.try(&.to_s) || ""
+                    av = a.as_h[attr_key]? || Crinja::Value.new("")
+                    bv = b.as_h[attr_key]? || Crinja::Value.new("")
+                    cmp = if av.number? && bv.number?
+                            av.as_number <=> bv.as_number
+                          else
+                            av.to_s <=> bv.to_s
+                          end
+                    cmp || 0
                   rescue Exception
-                    ""
+                    0
                   end
                 end
 

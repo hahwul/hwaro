@@ -139,7 +139,17 @@ module Hwaro
             parser.on("--dry-run", "Show planned changes without writing") { dry_run = true }
             parser.on("--confirm", "Ask for confirmation before deploying") { confirm = true }
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
-            parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") { |n| max_deletes = n.to_i }
+            parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") do |n|
+              parsed = n.to_i?
+              if parsed.nil?
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "Invalid --max-deletes value: #{n}",
+                  hint: "Pass an integer (use -1 to disable the delete cap).",
+                )
+              end
+              max_deletes = parsed
+            end
             parser.on("--list-targets", "List configured deployment targets and exit") { list_targets = true }
             CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }

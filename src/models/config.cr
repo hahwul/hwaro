@@ -991,6 +991,10 @@ module Hwaro
       def with_base_path(path : String) : String
         return path if base_path.empty?
         return path if path.starts_with?("http://") || path.starts_with?("https://")
+        # Protocol-relative URLs (`//cdn.example.com/x`) are external — leave
+        # them untouched, matching how render.cr / internal_link_resolver treat
+        # `//host`. Without this they'd become `/base//cdn.example.com/x`.
+        return path if path.starts_with?("//")
         return path unless path.starts_with?("/")
         "#{base_path}#{path}"
       end
@@ -1193,15 +1197,33 @@ module Hwaro
       end
 
       # Safe integer loader: handles both integer and float TOML values.
+      # Uses the 64-bit accessor and clamps to Int32 range so an oversized
+      # config value (e.g. `per_page = 9999999999` or `1e30`) yields a clamped
+      # Int32 instead of raising OverflowError out of `as_i?`/`to_i` — which
+      # would abort the build with an unclassified crash instead of running.
       private def self.int_value(raw : TOML::Any?, default : Int32) : Int32
         return default unless raw
-        raw.as_i? || raw.as_f?.try(&.to_i) || default
+        # `finite?` guard: NaN.clamp is NaN and NaN.to_i64 raises OverflowError,
+        # so a `nan`/`-nan` float in config would otherwise crash the build.
+        val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
+        return default unless val
+        val.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32
       end
 
       # Safe float loader: handles both float and integer TOML values.
+      # Uses as_i64? (Int64#to_f never overflows) to avoid the OverflowError
+      # that as_i? raises for integers above Int32::MAX.
       private def self.float_value(raw : TOML::Any?, default : Float64) : Float64
         return default unless raw
-        raw.as_f? || raw.as_i?.try(&.to_f) || default
+        raw.as_f? || raw.as_i64?.try(&.to_f) || default
+      end
+
+      # Non-raising Int32 extraction from a single TOML value (nil if absent or
+      # non-numeric). Clamps to Int32 range like int_value so an oversized value
+      # never raises OverflowError out of as_i?/to_i at the inline call sites.
+      private def self.int_or_nil(raw : TOML::Any) : Int32?
+        val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
+        val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
       end
 
       # Extracts a string-or-array TOML value into an Array(String).
@@ -1432,7 +1454,7 @@ module Hwaro
           taxonomy = TaxonomyConfig.new(name)
           taxonomy.feed = bool_value(taxonomy_hash["feed"]?, taxonomy.feed)
           taxonomy.sitemap = bool_value(taxonomy_hash["sitemap"]?, taxonomy.sitemap)
-          taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+          taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| int_or_nil(v) }
           taxonomy
         end
       end
@@ -1610,7 +1632,7 @@ module Hwaro
         config.image_processing.quality = int_value(s["quality"]?, config.image_processing.quality).clamp(1, 100)
         if widths = s["widths"]?.try(&.as_a?)
           config.image_processing.widths = widths.compact_map { |w|
-            val = w.as_i? || w.as_f?.try(&.to_i)
+            val = int_or_nil(w)
             val && val > 0 ? val : nil
           }
         end
@@ -1656,11 +1678,11 @@ module Hwaro
         end
 
         max_deletes_any = s["maxDeletes"]? || s["max_deletes"]?
-        if max_deletes_val = max_deletes_any.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+        if max_deletes_val = max_deletes_any.try { |v| int_or_nil(v) }
           config.deployment.max_deletes = max_deletes_val
         end
 
-        if workers_val = s["workers"]?.try { |v| v.as_i? || v.as_f?.try(&.to_i) }
+        if workers_val = s["workers"]?.try { |v| int_or_nil(v) }
           config.deployment.workers = workers_val
         end
 

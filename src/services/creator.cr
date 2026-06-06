@@ -266,7 +266,15 @@ module Hwaro
               hint: "Pass a non-empty --title.",
             )
           end
-          filename = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-") + ".md"
+          slug = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
+          if slug.empty?
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Title '#{title}' contains no filename-safe characters.",
+              hint: "Use a --title with ASCII letters/digits or CJK characters, or pass an explicit <path>.md.",
+            )
+          end
+          filename = slug + ".md"
           full_path = File.join(base_dir, filename)
         end
 
@@ -466,6 +474,18 @@ module Hwaro
       private def find_archetype(explicit_archetype : String?, path : String) : String?
         # 1. If explicit archetype is given, use it
         if explicit_archetype
+          # Keep the archetype name inside archetypes/. `<path>` and `--section`
+          # are already traversal-guarded; --archetype must be too, or it can
+          # read arbitrary on-disk `.md` files (e.g. ../../etc/passwd.md).
+          # Nested archetypes (tools/develop) stay allowed — only block `..`
+          # and absolute paths.
+          if explicit_archetype.includes?("..") || Path[explicit_archetype].absolute?
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Invalid archetype name: #{explicit_archetype}",
+              hint: "Archetype names are relative to archetypes/; '..' and absolute paths are not allowed.",
+            )
+          end
           archetype_path = File.join(ARCHETYPES_DIR, "#{explicit_archetype}.md")
           if File.exists?(archetype_path)
             Logger.debug "Using archetype: #{archetype_path}"
@@ -587,7 +607,10 @@ module Hwaro
         String.build do |str|
           str << "---\n"
           str << "title: \"#{safe_title}\"\n"
-          str << "date: #{date}\n"
+          # Quote+escape the date so an unusual --date (e.g. "2024: weird") is
+          # valid YAML, and a normal date parses back as a String scalar (an
+          # unquoted YYYY-MM-DD parses as a Time node and is silently dropped).
+          str << "date: \"#{escape_string(date)}\"\n"
           extra_fields.each { |f| str << "#{f}: \"\"\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
@@ -611,7 +634,10 @@ module Hwaro
       end
 
       private def escape_string(value : String) : String
-        value.gsub("\"", "\\\"").gsub("\n", " ")
+        # Escape backslash FIRST, then quotes — otherwise a value like `C:\path`
+        # or a trailing `\` produces invalid TOML/YAML basic strings (e.g. a
+        # trailing `\"` escapes the closing quote).
+        value.gsub("\\", "\\\\").gsub("\"", "\\\"").gsub("\n", " ")
       end
     end
   end

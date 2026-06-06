@@ -252,8 +252,10 @@ module Hwaro
           ai = config.og.auto_image
 
           # Build a cheap cache key from the things that affect the base pixels.
+          # accent_bars gates the baked-in top accent bar, so it must be part of
+          # the key — otherwise a serve-session toggle reuses a stale base layer.
           key = "#{ai.background}|#{ai.accent_color}|#{ai.secondary_color}|#{ai.style}|#{ai.pattern_opacity}|" \
-                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}"
+                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}|#{ai.accent_bars}"
 
           if @@last_base_key == key && (cached = @@last_base_layer)
             return cached

@@ -111,8 +111,34 @@ module Hwaro
           lines = content.split("\n")
           result = [] of String
           i = 0
+          # Track fenced code blocks so verbatim pipe-table syntax shown inside
+          # ``` / ~~~ fences (common in docs) isn't converted to a real <table>.
+          # Mirrors MarkdownExtensions.process_lines_fence_aware.
+          in_fence = false
+          fence_marker = "```"
 
           while i < lines.size
+            stripped = lines[i].lstrip
+
+            if in_fence
+              in_fence = false if stripped.starts_with?(fence_marker)
+              result << lines[i]
+              i += 1
+              next
+            elsif stripped.starts_with?("```")
+              in_fence = true
+              fence_marker = "```"
+              result << lines[i]
+              i += 1
+              next
+            elsif stripped.starts_with?("~~~")
+              in_fence = true
+              fence_marker = "~~~"
+              result << lines[i]
+              i += 1
+              next
+            end
+
             # Check if this could be the start of a table
             if table_row?(lines[i]) && i + 1 < lines.size && separator_row?(lines[i + 1])
               # Try to parse the table

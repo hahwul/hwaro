@@ -7,6 +7,7 @@
 require "digest/md5"
 require "json"
 require "../../utils/logger"
+require "../../models/config"
 
 module Hwaro
   module Core
@@ -333,6 +334,24 @@ module Hwaro
           else
             ""
           end
+        end
+
+        # Compute a checksum for the *effective* (env-merged, env-substituted)
+        # config plus the active env name and resolved base_url. Hashing the
+        # parsed `config.raw` rather than the raw config.toml bytes means an
+        # env override file (config.<env>.toml), changed ${ENV_VAR}
+        # substitutions, or a --base-url override all invalidate the per-page
+        # cache — none of which the file-bytes hash above can detect — while a
+        # formatting-only edit to config.toml no longer forces a full rebuild.
+        def self.compute_config_hash(config : Models::Config, env : String? = nil) : String
+          digest = Digest::MD5.new
+          digest.update(env || "")
+          digest.update(config.base_url)
+          config.raw.keys.sort!.each do |key|
+            digest.update(key)
+            digest.update(config.raw[key].to_s)
+          end
+          digest.final.hexstring
         end
       end
     end

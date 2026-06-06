@@ -341,10 +341,13 @@ module Hwaro
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = Set(Models::Page).new(changed_pages)
 
-          # Section index pages whose content lists include the changed pages
+          # Section index pages whose content lists include the changed pages.
+          # Include every language variant of the section (multilingual sites
+          # have one `_index.<lang>.md` per language under the same path).
           affected_sections.each do |section_name|
-            section = site.sections_by_name[section_name]?
-            pages_to_render << section if section
+            site.sections.each do |section|
+              pages_to_render << section if section.section == section_name
+            end
           end
 
           # Previous / next pages (both old and new neighbors after re-linking)

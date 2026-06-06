@@ -19,12 +19,33 @@ module Hwaro
     module Build
       module ShortcodeProcessor
         SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+        # Detects a named argument (`key=`) at an argument boundary (string start
+        # or just after a comma). Used instead of a bare `includes?("=")` so an
+        # `=` inside a positional value (e.g. a query-string URL `?t=10`) doesn't
+        # get misparsed as named args. See issue: youtube()/figure() with URLs.
+        NAMED_ARG_RE = /(?:\A|,)\s*[A-Za-z_]\w*\s*=/
         # NOTE: POSITIONAL_ARG_REGEX is reserved for future use
         # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
         MAX_SHORTCODE_NESTING = 5
         BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
         BLOCK_CLOSE_RE = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
+        # Broader close matcher for the outer fence loop's depth tracking: it
+        # must recognize every closer the normalization step collapses to
+        # `{% end %}` — bare `{% end %}` and named `{% endNAME %}` / `{% end NAME %}`
+        # with OR without a space — so it stays balanced against BLOCK_OPEN_RE
+        # (which also matches `{% endalert %}` as an opener). Without the no-space
+        # form, block_depth would never return to zero and fence protection would
+        # silently break for the rest of the document.
+        BLOCK_ANY_CLOSE_RE = /\{\%\s*end[\s\w\-]*\%\}/i
+        # Crinja/Jinja control-statement tags (and their `end*` forms). These
+        # legitimately appear in markdown content (e.g. `{% set x = 1 %}`,
+        # `{% if c %}…{% endif %}`) and must NOT count toward block-shortcode
+        # depth — otherwise an unbalanced `{% set %}` would pin block_depth > 0
+        # and permanently disable fenced-code-block protection in the outer loop.
+        # `\b` keeps shortcodes that merely start with a keyword (e.g. `setup`,
+        # `endorsement`) from matching.
+        CRINJA_CONTROL_TAG_RE = /\A\{\%-?\s*(?:if|elif|else|endif|for|endfor|set|endset|with|endwith|raw|endraw|filter|endfilter|block|endblock|macro|endmacro|call|endcall|autoescape|endautoescape|trans|endtrans|pluralize|comment|endcomment|include|import|from|extends|do)\b/i
 
         # Placeholder left in the content stream for each rendered shortcode
         # before Markdown runs. HTML-comment form so CommonMark treats it as
@@ -110,6 +131,11 @@ module Hwaro
             fence_marker = ""
             fence_close_regex : Regex? = nil
             buffer = String::Builder.new
+            # Nesting depth of open block shortcodes. While > 0 we must NOT treat
+            # a fence line as a buffer boundary, otherwise a block shortcode whose
+            # body contains a fenced code block gets split across chunks and its
+            # `{% name %}` / `{% end %}` tags leak as literal text.
+            block_depth = 0
 
             content.each_line(chomp: false) do |line|
               if in_fence
@@ -122,7 +148,22 @@ module Hwaro
                 next
               end
 
-              if match = line.match(/^\s*(`{3,}|~{3,})/)
+              # Track block-shortcode open/close tags on this line so a fence
+              # inside a block-shortcode body doesn't split the block. Crinja
+              # control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …) are
+              # ignored — counting them would desync the depth (an unbalanced
+              # `{% set %}` would pin depth > 0 and break fence protection).
+              line.scan(BLOCK_OPEN_RE) do |m|
+                tag = m[0]
+                next if CRINJA_CONTROL_TAG_RE.matches?(tag) || BLOCK_ANY_CLOSE_RE.matches?(tag)
+                block_depth += 1
+              end
+              line.scan(BLOCK_ANY_CLOSE_RE) do |m|
+                next if CRINJA_CONTROL_TAG_RE.matches?(m[0])
+                block_depth -= 1 if block_depth > 0
+              end
+
+              if block_depth == 0 && (match = line.match(/^\s*(`{3,}|~{3,})/))
                 io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                 buffer = String::Builder.new
                 in_fence = true
@@ -373,8 +414,10 @@ module Hwaro
           return args unless args_str
           return args if args_str.strip.empty?
 
-          # First try named arguments
-          has_named = args_str.includes?("=")
+          # First try named arguments. Require an identifier-equals at an arg
+          # boundary so an `=` embedded in a positional/quoted value (a URL
+          # query string like `?v=2`) doesn't trip the named-arg branch.
+          has_named = args_str.matches?(NAMED_ARG_RE)
           if has_named
             args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
               key = match[1]

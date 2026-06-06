@@ -449,10 +449,12 @@ describe "Deployer private helpers" do
       result.should eq("gsutil -m rsync -r -d {source}/ {url}")
     end
 
-    it "returns az command for az:// URL" do
+    it "returns az command for az:// URL with the container name inlined" do
       deployer = Hwaro::Services::Deployer.new
       result = deployer.test_auto_command_for_url("az://my-container", "/tmp")
-      result.should eq("az storage blob sync --source {source} --container {url}")
+      # The container name (uri.host) is inlined+shell-escaped; {url} would
+      # otherwise expand to the full az:// URL, which the az CLI rejects.
+      result.should eq("az storage blob sync --source {source} --container 'my-container'")
     end
 
     it "returns nil for unknown scheme" do
@@ -497,6 +499,18 @@ describe "Deployer private helpers" do
       deployer = Hwaro::Services::Deployer.new
       result = deployer.test_local_directory_destination("file://")
       result.should be_nil
+    end
+
+    it "treats file://./out as project-relative, not filesystem root" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file://./out")
+      result.should eq("./out")
+    end
+
+    it "preserves the leading segment of file://relative/path" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file://relative/path")
+      result.should eq("relative/path")
     end
   end
 

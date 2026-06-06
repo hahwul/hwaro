@@ -18,7 +18,12 @@ module Hwaro
       # Lookup indices for performance
       property pages_by_section : Hash(String, Array(Page))
       property sections_by_parent : Hash(String, Array(Section))
-      property sections_by_name : Hash(String, Section)
+      # Keyed by (section path, language) so a multilingual site's per-language
+      # `_index.<lang>.md` files don't collide — previously a single
+      # `Hash(String, Section)` kept only the first-globbed language, making
+      # section title/description/sort_by/page_template resolve to the wrong
+      # language. Use `section_for(name, language)` to look up with fallback.
+      property sections_by_name : Hash(Tuple(String, String?), Section)
       property pages_for_section_cache : Hash(Tuple(String, String?), Array(Page))
       @lookup_index_built : Bool = false
       @all_content_cache : Array(Page)?
@@ -33,8 +38,17 @@ module Hwaro
 
         @pages_by_section = {} of String => Array(Page)
         @sections_by_parent = {} of String => Array(Section)
-        @sections_by_name = {} of String => Section
+        @sections_by_name = {} of Tuple(String, String?) => Section
         @pages_for_section_cache = {} of Tuple(String, String?) => Array(Page)
+      end
+
+      # Resolve a section by path for a given language, falling back to the
+      # language-neutral (default-language) index when no language-specific
+      # `_index.<lang>.md` exists, then to the configured default language.
+      def section_for(name : String, language : String?) : Section?
+        @sections_by_name[{name, language}]? ||
+          @sections_by_name[{name, nil}]? ||
+          @sections_by_name[{name, @config.default_language}]?
       end
 
       def taxonomy_terms(name : String) : Array(String)
@@ -68,8 +82,8 @@ module Hwaro
         end
 
         @sections.each do |s|
-          # Index by section name for O(1) lookup
-          @sections_by_name[s.section] ||= s
+          # Index by (section name, language) for O(1) language-aware lookup
+          @sections_by_name[{s.section, s.language}] ||= s
 
           # s.section is the section this object represents (e.g. "blog").
           # We want to index it by its PARENT section (e.g. "").

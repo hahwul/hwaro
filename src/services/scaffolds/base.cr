@@ -78,16 +78,19 @@ module Hwaro
         # untouched.
         protected def localize_internal_links(body : String, lang : String) : String
           prefix = "/#{lang}/"
-          body.gsub(/(!?)\[([^\]]*)\]\((\/[^)\s]+)\)/) do |match|
+          # Allow an optional Markdown link title (`(/posts/ "All posts")`) and
+          # preserve it — otherwise titled links keep the default-language URL.
+          body.gsub(/(!?)\[([^\]]*)\]\((\/[^)\s]+)(\s+"[^"]*")?\)/) do |match|
             bang = $~[1]
             label = $~[2]
             target = $~[3]
+            title = $~[4]? || ""
             if !bang.empty?
               match
             elsif target.starts_with?(prefix) || target == "/#{lang}"
               match
             else
-              "[#{label}](#{prefix}#{target.lchop("/")})"
+              "[#{label}](#{prefix}#{target.lchop("/")}#{title})"
             end
           end
         end

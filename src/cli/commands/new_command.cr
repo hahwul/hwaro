@@ -134,11 +134,16 @@ module Hwaro
           if section = options.section
             begin
               sanitized_section = Services::Creator.sanitize_url_path(section)
+              # `sanitize_url_path` treats `.` as URL-safe, so it does NOT strip
+              # `..`. The section becomes an on-disk directory under content/, so
+              # run it through the same traversal guard as <path> — otherwise
+              # `--section ..` writes outside content/.
+              Services::Creator.validate_and_normalize_path!(File.join(sanitized_section, "x.md"))
             rescue ex : ArgumentError
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,
                 message: ex.message || "Invalid --section argument",
-                hint: "Sections become directory names; use ASCII letters/digits, CJK, or `- . _ ~`.",
+                hint: "Sections become directory names under content/; use ASCII letters/digits, CJK, or `- . _ ~`, and they cannot escape it with '..'.",
               )
             end
             if sanitized_section != section

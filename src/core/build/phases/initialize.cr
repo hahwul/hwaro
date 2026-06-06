@@ -60,7 +60,10 @@ module Hwaro::Core::Build::Phases::Initialize
       # Compute global checksums for invalidation graph
       if cache_enabled
         template_hash = Cache.compute_templates_hash(ctx.templates)
-        config_hash = Cache.compute_config_hash
+        # Hash the effective merged config (+ env + base_url override), not the
+        # raw config.toml bytes, so env-override files and ${ENV_VAR} changes
+        # correctly invalidate the per-page cache.
+        config_hash = Cache.compute_config_hash(config, ctx.options.env)
         build_cache.set_global_checksums(template_hash, config_hash)
       end
     end

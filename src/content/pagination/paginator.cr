@@ -149,8 +149,10 @@ module Hwaro
 
         # Check if pagination is enabled for a section
         private def pagination_enabled_for_section?(section : Models::Section) : Bool
-          # Section-level override takes precedence
-          if enabled = section.pagination_enabled
+          # Section-level override takes precedence. Distinguish an explicit
+          # `false` (disable) from `nil` (no override) — `if enabled = false`
+          # would treat a deliberate disable like "not set" and fall through.
+          unless (enabled = section.pagination_enabled).nil?
             return enabled
           end
 

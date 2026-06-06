@@ -434,8 +434,12 @@ module Hwaro
 
           # Truncate if needed
           if truncate > 0
-            # Strip HTML tags to get plain text for safe truncation
-            text_content = Utils::TextUtils.strip_html(html_content)
+            # Strip HTML tags to get plain text for safe truncation, then decode
+            # entities: this plain-text branch ends up in a `type="text"` Atom
+            # element (and an RSS description), which consumers decode exactly
+            # once — leaving `&amp;` here would double-escape to `&amp;amp;`.
+            # Mirrors summary_for_feed's HTML.unescape.
+            text_content = HTML.unescape(Utils::TextUtils.strip_html(html_content))
             if text_content.size > truncate
               text_content[0...truncate] + "..."
             else

@@ -25,6 +25,8 @@ module Hwaro
           .gsub("\"", "\\\"")
           .gsub("\n", "\\n")
           .gsub("\r", "\\r")
+          .gsub("\u2028", "\\u2028") # JS line terminators: would otherwise
+          .gsub("\u2029", "\\u2029") # break the string literal on pre-ES2019 engines
           .gsub("</", "<\\/")
 
         <<-HTML

@@ -48,8 +48,12 @@ module Hwaro
           result = result.gsub(INLINE_IMAGE_RE) do
             alt = $1
             url = $2
+            # `result` was already HTML.escaped at the top, so `url`/`alt` are
+            # captured in their escaped form — emit them as-is (re-escaping here
+            # would double-encode `&` into `&amp;amp;`). Matches the link branch
+            # below, which already inserts `link_text` without re-escaping.
             if safe_url?(url)
-              %(<img src="#{HTML.escape(url)}" alt="#{HTML.escape(alt)}">)
+              %(<img src="#{url}" alt="#{alt}">)
             else
               "![#{alt}](#{url})"
             end
@@ -59,7 +63,7 @@ module Hwaro
             link_text = $1
             url = $2
             if safe_url?(url)
-              %(<a href="#{HTML.escape(url)}">#{link_text}</a>)
+              %(<a href="#{url}">#{link_text}</a>)
             else
               "[#{link_text}](#{url})"
             end
@@ -81,8 +85,13 @@ module Hwaro
         # Returns true for URLs we're willing to emit in a generated `href`/`src`.
         # Reject `javascript:`, `vbscript:`, `file:`, and non-image `data:` URIs.
         # Percent-decode first so encodings like `java%73cript:` don't slip past.
+        # Also strip ASCII control/whitespace bytes (NUL–space and DEL) anywhere
+        # in the decoded value: browsers ignore tabs/newlines/NULs inside a URL
+        # scheme, so `java%09script:` would otherwise execute as `javascript:`.
+        # The unsafe regexes are anchored at `^`, so stripping these from the
+        # whole string only affects scheme detection, never legitimate URLs.
         def safe_url?(url : String) : Bool
-          decoded = URI.decode(url.strip)
+          decoded = URI.decode(url.strip).gsub(/[\x00-\x20\x7f]/, "")
           return true if UNSAFE_DATA_PROTOCOL_RE.matches?(decoded)
           !UNSAFE_PROTOCOL_RE.matches?(decoded)
         end

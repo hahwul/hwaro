@@ -204,7 +204,17 @@ module Hwaro
 
             # Server
             parser.on("-b HOST", "--bind HOST", "Bind address (default: 127.0.0.1)") { |h| host = h }
-            parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") { |p| port = p.to_i }
+            parser.on("-p PORT", "--port PORT", "Port to listen on (default: 3000)") do |p|
+              parsed = p.to_i?
+              if parsed.nil? || parsed < 1 || parsed > 65535
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "Invalid --port value: #{p}",
+                  hint: "Pass a port between 1 and 65535, e.g. -p 3000.",
+                )
+              end
+              port = parsed
+            end
             CLI.register_flag(parser, OPEN_BROWSER_FLAG) { |_| open_browser = true }
             CLI.register_flag(parser, NO_OPEN_BROWSER_FLAG) { |_| open_browser = false }
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }

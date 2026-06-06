@@ -173,7 +173,9 @@ module Hwaro
             return
           end
           begin
-            json_data = JSON.parse(content[0, end_idx])
+            # find_json_end returns a BYTE offset; byte_slice avoids flagging
+            # valid multibyte JSON frontmatter as a parse error.
+            json_data = JSON.parse(content.byte_slice(0, end_idx))
             if h = json_data.as_h?
               result = {} of String => FrontmatterValue
               h.each do |k, value|
