@@ -54,6 +54,13 @@ module Hwaro
         "public"
       end
 
+      # Escape a value for a TOML basic string. Front-matter aliases are
+      # arbitrary user input; an unescaped quote/backslash would produce an
+      # unparseable netlify.toml.
+      private def toml_escape(s : String) : String
+        s.gsub('\\', "\\\\").gsub('"', "\\\"")
+      end
+
       private def generate_netlify : String
         lines = [] of String
         lines << "[build]"
@@ -70,8 +77,8 @@ module Hwaro
           lines << ""
           redirects.each do |from, to|
             lines << "[[redirects]]"
-            lines << "  from = \"#{from}\""
-            lines << "  to = \"#{to}\""
+            lines << "  from = \"#{toml_escape(from)}\""
+            lines << "  to = \"#{toml_escape(to)}\""
             lines << "  status = 301"
             lines << ""
           end
@@ -147,6 +154,9 @@ module Hwaro
           lines << ""
           lines << "# Redirects: Create a `#{output_dir}/_redirects` file with:"
           redirects.each do |from, to|
+            # _redirects is space-delimited; an alias with whitespace or a quote
+            # would silently corrupt the rule, so skip malformed entries.
+            next if from.matches?(/\s|"/) || to.matches?(/\s|"/)
             lines << "# #{from} #{to} 301"
           end
         end

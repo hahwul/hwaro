@@ -178,8 +178,10 @@ module Hwaro
             # certainly a truncated/mistyped JSON header — surface it as a
             # content error rather than silently treating it as body text.
             if end_idx = Utils::FrontmatterScanner.find_json_end(raw_content)
-              result = extract_from_json(raw_content[0, end_idx], file_path)
-              body = raw_content[end_idx..]
+              # find_json_end returns a BYTE offset; slice on bytes so multibyte
+              # (CJK/emoji/accented) JSON frontmatter isn't split mid-codepoint.
+              result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path)
+              body = raw_content.byte_slice(end_idx)
               markdown_content = body.lchop("\r\n").lchop("\n")
             elsif !file_path.empty?
               raise Hwaro::HwaroError.new(

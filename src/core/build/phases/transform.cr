@@ -141,18 +141,22 @@ module Hwaro::Core::Build::Phases::Transform
       path_parts = section.section.split("/")
       next if path_parts.size <= 1
 
-      # Find parent section
+      # Link to the immediate parent section when it exists.
       parent_path = path_parts[0..-2].join("/")
       if parent = sections_by_path[parent_path]?
         parent.add_subsection(section)
+      end
 
-        # Build ancestors chain
-        current_path = ""
-        path_parts[0..-2].each do |part|
-          current_path = current_path.empty? ? part : "#{current_path}/#{part}"
-          if ancestor = sections_by_path[current_path]?
-            section.ancestors << ancestor
-          end
+      # Build the ancestors chain from every EXISTING ancestor section, even
+      # when an intermediate `_index.md` is missing — otherwise a gap in the
+      # tree (e.g. `a/_index.md` + `a/b/c/_index.md`, no `a/b/_index.md`) drops
+      # all ancestors and the subsection link. Walk only path_parts[0..-2] so a
+      # section never becomes its own ancestor.
+      current_path = ""
+      path_parts[0..-2].each do |part|
+        current_path = current_path.empty? ? part : "#{current_path}/#{part}"
+        if ancestor = sections_by_path[current_path]?
+          section.ancestors << ancestor
         end
       end
     end

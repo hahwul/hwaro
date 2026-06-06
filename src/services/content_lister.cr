@@ -238,7 +238,9 @@ module Hwaro
           # Try JSON Front Matter (balanced {...} at file start)
         elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
           begin
-            json_fm = JSON.parse(content[0, end_idx])
+            # find_json_end returns a BYTE offset; byte_slice keeps multibyte
+            # JSON frontmatter intact so title/date aren't silently lost.
+            json_fm = JSON.parse(content.byte_slice(0, end_idx))
             if json_fm.as_h?
               title = json_fm["title"]?.try(&.as_s?) || title
               draft = json_fm["draft"]?.try(&.as_bool?) || false

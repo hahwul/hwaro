@@ -90,7 +90,11 @@ module Hwaro
         end
 
         words_total = word_counts.sum
-        words_avg = published_items.empty? ? 0 : words_total // published_items.size
+        # Divide by the number of files actually read (word_counts), not the
+        # published count — a file unreadable between listing and read is skipped
+        # from word_counts but would otherwise dilute the average. Matches the
+        # population used by words_min/words_max below.
+        words_avg = word_counts.empty? ? 0 : words_total // word_counts.size
         words_min = word_counts.min? || 0
         words_max = word_counts.max? || 0
 

@@ -48,14 +48,21 @@ module Hwaro
             content_path = $1
             anchor = $2?
 
-            if content_path.empty?
+            # Split off a query string so `@/path.md?x=y` resolves on the path
+            # alone (pages_by_path keys never contain `?`), then re-append it.
+            # partition leaves path_part == content_path / query == "" when
+            # there's no `?`, preserving existing behavior.
+            path_part, _, query = content_path.partition('?')
+
+            if path_part.empty?
               Logger.warn "Empty internal link '@/' in '#{source_path}'"
               next match
             end
 
-            if page = pages_by_path[content_path]?
+            if page = pages_by_path[path_part]?
               page_url = page.url.starts_with?("/") ? page.url : "/#{page.url}"
               url = HTML.escape("#{base_path}#{page_url}")
+              url += "?#{HTML.escape(query)}" unless query.empty?
               if anchor && !anchor.empty?
                 "href=\"#{url}##{HTML.escape(anchor)}\""
               else

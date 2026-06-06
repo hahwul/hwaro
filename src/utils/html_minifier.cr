@@ -151,11 +151,22 @@ module Hwaro
         result
       end
 
+      # Restore in a fixed-point loop: a protected block (e.g. a `<style>`
+      # extracted before `<script>`) can be captured *inside* a later block, so
+      # the first restore leaves an inner placeholder behind. Re-scan until no
+      # token remains. Terminates because restored content is original author
+      # HTML, which cannot contain a valid \x00-delimited token (NUL is illegal
+      # in author input), and a dangling index returns $0 unchanged.
       private def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
-        html.gsub(REGEX_PRESERVE_TOKEN) do
-          idx = $1.to_i
-          idx < preserves.size ? preserves[idx] : $0
+        loop do
+          replaced = html.gsub(REGEX_PRESERVE_TOKEN) do
+            idx = $1.to_i
+            idx < preserves.size ? preserves[idx] : $0
+          end
+          break if replaced == html
+          html = replaced
         end
+        html
       end
 
       # Collapse whitespace between two structural tokens. The token

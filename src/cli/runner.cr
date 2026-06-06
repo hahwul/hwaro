@@ -113,9 +113,11 @@ module Hwaro
       rescue ex : Hwaro::HwaroError
         Runner.emit_hwaro_error(ex)
         exit(ex.exit_code)
-      rescue ex : OptionParser::InvalidOption
-        # Treat bad flags as classified usage errors so exit codes stay
-        # consistent with the documented taxonomy.
+      rescue ex : OptionParser::Exception
+        # Treat bad/missing flags as classified usage errors so exit codes stay
+        # consistent with the documented taxonomy. Catching the shared
+        # OptionParser::Exception superclass covers both InvalidOption and
+        # MissingOption (e.g. a value-taking flag passed with no value).
         err = Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_USAGE,
           message: ex.message || "invalid option",

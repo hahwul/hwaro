@@ -8,7 +8,10 @@ module Hwaro
           def self.register(env : Crinja)
             # Truncate words filter
             env.filters["truncate_words"] = Crinja.filter({length: 50, end: "..."}) do
-              text = target.to_s
+              # Strip first: a leading-whitespace input would otherwise split into
+              # a leading "" token, consuming a word slot and emitting a stray
+              # leading space (off-by-one truncation).
+              text = target.to_s.strip
               length = (arguments["length"].as_number rescue 50).to_i
               ending = arguments["end"].to_s
 

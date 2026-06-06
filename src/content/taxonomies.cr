@@ -91,9 +91,16 @@ module Hwaro
           # terms, so site-internal links to it (e.g. the scaffold homepage's
           # `/tags/`, `/categories/`) don't 404 after a user removes the sample
           # terms. An empty index lists no terms rather than 404ing.
-          terms_map = lang_taxonomies.try(&.[taxonomy.name]?) ||
-                      site.taxonomies[taxonomy.name]? ||
-                      {} of String => Array(Models::Page)
+          # When a language-scoped map is in play (per-language call), a missing
+          # taxonomy key must mean an empty index for that language — never the
+          # global all-language map, which would leak foreign-language terms and
+          # 404 links into /<lang>/<taxonomy>/. The root call (lang_taxonomies
+          # == nil) keeps the global fallback.
+          terms_map = if lt = lang_taxonomies
+                        lt[taxonomy.name]? || {} of String => Array(Models::Page)
+                      else
+                        site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page)
+                      end
 
           base_path = "#{lang_prefix}/#{taxonomy.name}/"
           index_page = build_taxonomy_index_page(taxonomy, base_path)
@@ -101,7 +108,15 @@ module Hwaro
             index_page.language = language
           end
 
-          render_taxonomy_index(index_page, terms_map.keys.sort!, templates, site, output_dir, builder, verbose)
+          # Only list terms whose term pages are actually written for this
+          # language, so the index never links to a term page that the
+          # language-filtered loop below skips (dead /tags/<term>/ links).
+          index_terms = if language
+                          terms_map.select { |_term, pgs| pgs.any? { |p| (p.language || site.config.default_language) == language } }.keys
+                        else
+                          terms_map.keys
+                        end
+          render_taxonomy_index(index_page, index_terms.sort!, templates, site, output_dir, builder, verbose)
 
           terms_map.each do |term, pages|
             # Filter pages to the requested language when doing per-lang generation
@@ -225,7 +240,7 @@ module Hwaro
         lang_prefix : String = "",
         language : String? = nil,
       )
-        slug = Utils::TextUtils.slugify(term)
+        slug = Utils::TextUtils.safe_slugify(term)
         base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
 
         index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
@@ -425,7 +440,7 @@ module Hwaro
         String.build do |str|
           str << "<ul class=\"taxonomy-terms\">\n"
           terms.each do |term|
-            term_slug = Utils::TextUtils.slugify(term)
+            term_slug = Utils::TextUtils.safe_slugify(term)
             term_url = join_url(base_url, base_path, term_slug + "/")
             str << "  <li><a href=\"#{HTML.escape(term_url)}\">#{HTML.escape(term)}</a></li>\n"
           end

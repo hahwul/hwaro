@@ -80,7 +80,10 @@ module Hwaro
                 }
               end
               puts({"findings" => findings}.to_json)
-              return
+              # Exit non-zero on hard errors so CI can gate on broken content
+              # (mirrors `tool doctor`'s exit-code behavior).
+              errors = issues.count { |i| i.level == :error }
+              exit(errors > 0 ? Hwaro::Errors::EXIT_CONTENT : Hwaro::Errors::EXIT_SUCCESS)
             end
 
             Logger.info "Validating content in '#{content_dir}'..."
@@ -106,6 +109,9 @@ module Hwaro
             infos = issues.count { |i| i.level == :info }
 
             Logger.info "Found #{errors} error(s), #{warnings} warning(s), #{infos} info(s)"
+
+            # Gate CI on hard errors (matches `tool doctor`).
+            exit(Hwaro::Errors::EXIT_CONTENT) if errors > 0
           end
 
           private def print_issue(issue : Services::Issue)

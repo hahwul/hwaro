@@ -672,7 +672,7 @@ module Hwaro::Core::Build::Phases::Render
     # child pages that did not set an explicit `template`. Sections render with
     # their own "section" template (handled above), so they are excluded here.
     unless page.is_a?(Models::Section)
-      if section = site.sections_by_name[page.section]?
+      if section = site.section_for(page.section, page.language)
         if pt = section.effective_page_template
           return pt if templates.has_key?(pt)
         end
@@ -987,7 +987,7 @@ module Hwaro::Core::Build::Phases::Render
         pages = site.pages_for_section(section_name, language)
 
         # Use section's sort_by setting if available, otherwise sort by title
-        section = site.sections_by_name[section_name]?
+        section = site.section_for(section_name, language)
         sort_by = section.try(&.sort_by) || "title"
         reverse = section.try(&.reverse) || false
         pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
@@ -1114,7 +1114,7 @@ module Hwaro::Core::Build::Phases::Render
         end
         Crinja::Value.new({
           "name"  => Crinja::Value.new(term),
-          "slug"  => Crinja::Value.new(Utils::TextUtils.slugify(term)),
+          "slug"  => Crinja::Value.new(Utils::TextUtils.safe_slugify(term)),
           "pages" => Crinja::Value.new(term_pages_array),
           "count" => Crinja::Value.new(term_pages.size),
         })
@@ -1479,7 +1479,7 @@ module Hwaro::Core::Build::Phases::Render
       section_assets_val = assets_crinja
     elsif !page.section.empty?
       # For regular pages, find the parent section via O(1) lookup
-      section_page = site.sections_by_name[page.section]?
+      section_page = site.section_for(page.section, page.language)
       if section_page
         section_title = section_page.title
         section_description = section_page.description || ""
@@ -1644,7 +1644,7 @@ module Hwaro::Core::Build::Phases::Render
     seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
     seo_obj = {
       "canonical_url"   => Crinja::Value.new(canonical_url),
-      "og_type"         => Crinja::Value.new(config.og.og_type),
+      "og_type"         => Crinja::Value.new(og_type_override || config.og.og_type),
       "og_image"        => Crinja::Value.new(seo_image),
       "twitter_card"    => Crinja::Value.new(config.og.twitter_card),
       "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),

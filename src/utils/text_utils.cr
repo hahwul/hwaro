@@ -42,6 +42,17 @@ module Hwaro
         end.rstrip('-')
       end
 
+      # Like `slugify` but never returns "". An all-symbol/emoji input (e.g. a
+      # tag of "!!!" or "🎉") slugifies to "", which would make distinct terms
+      # collide onto the same URL/output path and create a `//` path segment.
+      # Falls back to a deterministic, stable token derived from the input's
+      # UTF-8 bytes so distinct inputs stay distinct and the slug is identical
+      # across builds (unlike `String#hash`, which is per-process seeded).
+      def safe_slugify(text : String) : String
+        s = slugify(text)
+        s.empty? ? "term-#{text.to_slice.hexstring}" : s
+      end
+
       # Check if a character is a Unicode letter (non-ASCII)
       private def unicode_letter?(char : Char) : Bool
         !char.ascii? && char.letter?
@@ -70,19 +81,28 @@ module Hwaro
             when '>'  then io << "&gt;"
             when '"'  then io << "&quot;"
             when '\'' then io << "&apos;"
-            else           io << char
+            when .ascii_control?
+              # XML 1.0 forbids C0 control chars except tab/LF/CR. A stray
+              # control byte (e.g. \f or \v sneaked in via JSON/quoted-YAML
+              # frontmatter) would otherwise make the whole feed/sitemap
+              # unparseable — drop the illegal ones, keep the allowed three.
+              io << char if char == '\t' || char == '\n' || char == '\r'
+            else io << char
             end
           end
         end
       end
 
-      # Byte-level scan for the five XML special chars. Avoids the regex
-      # engine and Unicode decoding — all targets are 7-bit ASCII so the
-      # byte view is exact even for UTF-8 input.
+      # Byte-level scan for the five XML special chars plus XML-illegal C0
+      # control bytes (so the fast path doesn't skip the control-char cleanup).
+      # Avoids the regex engine and Unicode decoding — all targets are 7-bit
+      # ASCII so the byte view is exact even for UTF-8 input.
       private def contains_xml_special?(text : String) : Bool
         text.each_byte do |b|
           case b
           when 0x26, 0x3C, 0x3E, 0x22, 0x27 # & < > " '
+            return true
+          when 0x00..0x08, 0x0B, 0x0C, 0x0E..0x1F # XML-illegal C0 controls
             return true
           end
         end

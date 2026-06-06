@@ -893,6 +893,10 @@ module Hwaro
         a = a.rstrip('/')
         b = b.rstrip('/')
         return false if a.empty? || b.empty?
+        # Identical directories also count as overlap — otherwise a
+        # source == destination config slips past the overlap refusal and a
+        # strip_index_html target can mutate/delete the source tree.
+        return true if a == b
         b.starts_with?(a + "/")
       end
 
@@ -989,8 +993,12 @@ module Hwaro
         when "gs"
           "gsutil -m rsync -r -d {source}/ {url}"
         when "az"
-          # az://container → Azure Blob Storage
-          "az storage blob sync --source {source} --container {url}"
+          # az://container → Azure Blob Storage. Inline the container name
+          # (uri.host), shell-escaped — `{url}` would expand to the full
+          # `az://container` URL, which the az CLI rejects as a container name.
+          container = uri.host
+          return if container.nil? || container.empty?
+          "az storage blob sync --source {source} --container #{shell_escape(container)}"
         end
       end
 
@@ -999,11 +1007,12 @@ module Hwaro
           uri = URI.parse(url)
           return unless uri.scheme == "file"
           # Allow both file:///abs/path and file://relative/path forms.
+          # For a relative form (file://./out, file://relative/path) URI puts the
+          # first segment in `host`; prepend it so the path isn't silently
+          # rooted at the filesystem root (file://./out must be ./out, not /out).
           path = uri.path
-          if path.empty?
-            if host = uri.host
-              path = host unless host.empty?
-            end
+          if host = uri.host
+            path = host + path unless host.empty?
           end
           return if path.empty?
           return path

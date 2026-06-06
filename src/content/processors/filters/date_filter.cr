@@ -20,10 +20,13 @@ module Hwaro
                            if value.size > 19 && (value.includes?('+') || value.includes?('Z') || value.ends_with?("00"))
                              Time.parse_rfc3339(value) rescue Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue nil
                            else
-                             Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue nil
+                             # Fall back to minute precision (no seconds), e.g. "2024-01-15T10:30".
+                             Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%dT%H:%M", Time::Location::UTC) rescue nil
                            end
                          elsif value.size > 10
-                           Time.parse(value, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue nil
+                           # Try seconds, then minute precision, then date-only so
+                           # space-separated datetimes without seconds still parse.
+                           Time.parse(value, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d %H:%M", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
                          else
                            Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
                          end

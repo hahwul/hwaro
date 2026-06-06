@@ -6,10 +6,33 @@ module Hwaro
     module Processors
       module Filters
         module MiscFilters
+          # Recursively serialize a Crinja value tree into a JSON::Builder.
+          # Direct `target.to_json(io)` cannot be used here — Crinja::Value#to_json
+          # opens its own document and raises inside an already-open builder.
+          def self.build_json(json : JSON::Builder, value : Crinja::Value)
+            build_json(json, value.raw)
+          end
+
+          def self.build_json(json : JSON::Builder, raw)
+            case raw
+            when Crinja::Value      then build_json(json, raw.raw)
+            when Crinja::SafeString then json.string(raw.to_s)
+            when Array              then json.array { raw.each { |v| build_json(json, v) } }
+            when Hash               then json.object { raw.each { |k, v| json.field(k.to_s) { build_json(json, v) } } }
+            when String, Int32, Int64, Float64, Bool, Nil
+              raw.to_json(json)
+            else
+              json.string(raw.to_s)
+            end
+          end
+
           def self.register(env : Crinja)
-            # JSON encode filter (escapes </ to prevent script-tag breakout in inline JS)
+            # JSON encode filter (escapes </ to prevent script-tag breakout in inline JS).
+            # Serialize the actual value tree — `target.to_s.to_json` would stringify
+            # the Crinja::Value first and emit broken JSON (e.g. "[Crinja::Value<...>]")
+            # for arrays/hashes/numbers.
             env.filters["jsonify"] = Crinja.filter do
-              target.to_s.to_json.gsub("</", "<\\/")
+              JSON.build { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
             end
 
             # Default filter — returns fallback when target is nil/undefined or empty string

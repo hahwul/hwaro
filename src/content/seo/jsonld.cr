@@ -303,7 +303,11 @@ module Hwaro
         # `</script>` injection and the "script data double escape" trap a
         # bare `<!--<script` would otherwise spring (gh: dogfooding find).
         private def escape_for_script(json : String) : String
+          # U+2028/U+2029 are valid in JSON strings but are JS line terminators;
+          # escaping them (as Go's encoding/json does) keeps the JSON-LD payload
+          # parseable by stricter/older consumers embedding it in inline script.
           json.gsub('<', "\\u003c").gsub('>', "\\u003e").gsub('&', "\\u0026")
+            .gsub('\u2028', "\\u2028").gsub('\u2029', "\\u2029")
         end
 
         # Coerce a `page.extra[key]` value to `Array(String)` regardless of whether
@@ -316,6 +320,17 @@ module Hwaro
           when Array
             raw.compact_map { |v| v.as?(String) }
           end
+        end
+
+        # Read an array-of-tables `extra` value. A TOML `[[extra.faq]]` block (or
+        # equivalent JSON/YAML array of objects) parses to Array(ExtraValue) whose
+        # elements are Hash(String, ExtraValue); the flat-string helper above
+        # discards those. Returns nil when the value isn't a non-empty hash array.
+        private def extra_hash_array(page : Models::Page, key : String) : Array(Hash(String, Models::ExtraValue))?
+          raw = page.extra[key]?
+          return unless raw.is_a?(Array)
+          out = raw.compact_map { |v| v.as?(Hash(String, Models::ExtraValue)) }
+          out.empty? ? nil : out
         end
 
         private def extract_faq_items(page : Models::Page) : Array(NamedTuple(question: String, answer: String))
@@ -341,6 +356,15 @@ module Hwaro
             end
           end
 
+          # Table-array form documented above: [[extra.faq]] with question/answer.
+          if hash_items = extra_hash_array(page, "faq")
+            hash_items.each do |h|
+              q = h["question"]?.try(&.as?(String))
+              a = h["answer"]?.try(&.as?(String))
+              items << {question: q, answer: a} if q && a
+            end
+          end
+
           items
         end
 
@@ -362,6 +386,15 @@ module Hwaro
               names.zip(texts).each do |n, t|
                 steps << {name: n, text: t}
               end
+            end
+          end
+
+          # Table-array form documented above: [[extra.howto_steps]] name/text.
+          if hash_steps = extra_hash_array(page, "howto_steps")
+            hash_steps.each do |h|
+              n = h["name"]?.try(&.as?(String))
+              t = h["text"]?.try(&.as?(String))
+              steps << {name: n, text: t} if n && t
             end
           end
 

@@ -17,6 +17,13 @@ module Hwaro
 
       # Perform conservative JS minification
       def minify(js : String) : String
+        # Multi-line template literals are stashed as NUL-delimited placeholders
+        # so the final per-line rstrip / blank-line pass can't mutate bytes that
+        # are part of a string value (a blank line or significant trailing
+        # whitespace inside a `...` literal). Restored verbatim at the end.
+        # (Plain "" / '' strings and /regex/ literals can't contain raw newlines,
+        # so the line pass never touches them.)
+        protected_spans = [] of String
         result = String.build do |io|
           i = 0
           len = js.size
@@ -45,31 +52,37 @@ module Hwaro
               next
             end
 
-            # Template literals — track ${...} nesting depth
+            # Template literals — track ${...} nesting depth. Captured into a
+            # placeholder so the trailing line-cleanup pass can't alter newlines
+            # or whitespace that are part of the literal's value.
             if c == '`'
-              io << c
-              i += 1
-              depth = 0
-              while i < len
-                sc = chars[i]
-                io << sc
-                if sc == '\\' && i + 1 < len
+              lit = String.build do |lb|
+                lb << c
+                i += 1
+                depth = 0
+                while i < len
+                  sc = chars[i]
+                  lb << sc
+                  if sc == '\\' && i + 1 < len
+                    i += 1
+                    lb << chars[i]
+                  elsif sc == '$' && i + 1 < len && chars[i + 1] == '{'
+                    lb << chars[i + 1]
+                    i += 1
+                    depth += 1
+                  elsif sc == '{' && depth > 0
+                    # Nested brace inside ${...}
+                  elsif sc == '}' && depth > 0
+                    depth -= 1
+                  elsif sc == '`' && depth == 0
+                    break
+                  end
                   i += 1
-                  io << chars[i]
-                elsif sc == '$' && i + 1 < len && chars[i + 1] == '{'
-                  io << chars[i + 1]
-                  i += 1
-                  depth += 1
-                elsif sc == '{' && depth > 0
-                  # Nested brace inside ${...}
-                elsif sc == '}' && depth > 0
-                  depth -= 1
-                elsif sc == '`' && depth == 0
-                  break
                 end
                 i += 1
               end
-              i += 1
+              protected_spans << lit
+              io << "\x00JSPL#{protected_spans.size - 1}\x00"
               next
             end
 
@@ -132,10 +145,15 @@ module Hwaro
           end
         end
 
-        # Collapse multiple blank lines
+        # Collapse multiple blank lines (placeholders survive: they contain no
+        # trailing whitespace and are never empty).
         lines = result.lines.map(&.rstrip)
         lines.reject!(&.empty?)
-        lines.join("\n").strip
+        cleaned = lines.join("\n").strip
+
+        # Restore protected template literals verbatim.
+        return cleaned if protected_spans.empty?
+        cleaned.gsub(/\x00JSPL(\d+)\x00/) { protected_spans[$1.to_i] }
       end
 
       # Determine whether a `/` at position `pos` in `chars` is likely a regex

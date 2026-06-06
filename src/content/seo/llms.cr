@@ -110,7 +110,11 @@ module Hwaro
                 # The root index commonly has `title = ""` so its heading
                 # falls through to the site title; without this fallback
                 # the homepage rendered as `- [](url)` (no link label).
-                label = p.title.empty? ? config.title : p.title
+                raw_label = p.title.empty? ? config.title : p.title
+                # Escape link-label metacharacters so a title with a stray
+                # `[`/`]` doesn't break the `- [label](url)` Markdown link.
+                # (escape backslash first, then the brackets)
+                label = raw_label.gsub('\\', "\\\\").gsub('[', "\\[").gsub(']', "\\]")
                 str << "- [" << label << "](" << link << ")"
                 if d = p.description
                   str << ": " << d unless d.empty?

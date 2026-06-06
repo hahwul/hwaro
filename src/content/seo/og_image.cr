@@ -306,13 +306,24 @@ module Hwaro
             page_hash = compute_page_hash(page)
             new_entries[slug] = page_hash
 
-            expected_file = File.join(img_dir, "#{slug}.#{ext}")
+            expected_png = File.join(img_dir, "#{slug}.png")
+            expected_svg = File.join(img_dir, "#{slug}.svg")
 
-            if !config_changed && old_entries[slug]? == page_hash && File.exists?(expected_file)
-              page.image = "/#{ai.output_dir}/#{slug}.#{ext}"
-              skipped += 1
-              Logger.debug "  OG image: #{page.image} (cached)" if verbose
-              next
+            if !config_changed && old_entries[slug]? == page_hash
+              if ext == "png" && File.exists?(expected_png)
+                page.image = "/#{ai.output_dir}/#{slug}.png"
+                skipped += 1
+                Logger.debug "  OG image: #{page.image} (cached)" if verbose
+                next
+              elsif File.exists?(expected_svg)
+                # A previous build fell back to SVG for this page (PNG render
+                # failed). Treat that emitted SVG as a valid cache hit so a
+                # stably-failing page doesn't re-render the SVG on every build.
+                page.image = "/#{ai.output_dir}/#{slug}.svg"
+                skipped += 1
+                Logger.debug "  OG image: #{page.image} (cached, svg fallback)" if verbose
+                next
+              end
             end
 
             pending << {page, slug}
@@ -367,6 +378,15 @@ module Hwaro
                 Fiber.yield
               end
               true
+            end
+            # Surface render/I-O failures (e.g. File.write raising on disk full /
+            # permission). Without this, an exception is swallowed by the worker
+            # pool, page.image stays nil (no og:image tag), and the only signal
+            # is a silently lower "Generated N" count.
+            results.each do |result|
+              next if result.success
+              failed_slug = pending[result.index]?.try(&.[1])
+              Logger.warn "  OG image generation failed for #{failed_slug || "page ##{result.index}"}: #{result.error}"
             end
             generated = results.count(&.success)
           end
@@ -819,7 +839,8 @@ module Hwaro
             "#{config.title}|#{ai.background}|#{ai.text_color}|#{ai.accent_color}|" \
             "#{ai.secondary_color}|#{ai.font_size}|#{ai.logo}|#{ai.logo_position}|#{ai.show_title}|" \
             "#{ai.style}|#{ai.pattern_opacity}|#{ai.pattern_scale}|" \
-            "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}"
+            "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}|" \
+            "#{ai.accent_bars}|#{ai.text_panel}" # pixel-affecting; toggling them must invalidate the cache
           )
         end
 

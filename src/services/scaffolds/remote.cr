@@ -93,7 +93,9 @@ module Hwaro
 
         # Parse a remote source string into {owner, repo, subpath}
         def self.parse_source(source : String) : {String, String, String}
-          if source.starts_with?("github:") || source.starts_with?("git:")
+          # `git://github.com/owner/repo` is a protocol URL, not the `git:owner/repo`
+          # shorthand — route it to the URL parser below, which handles it correctly.
+          if source.starts_with?("github:") || (source.starts_with?("git:") && !source.starts_with?("git://"))
             raw = source.sub(/^(?:github|git):/, "")
             parts = raw.split("/")
             if parts.size < 2 || parts[0].empty? || parts[1].empty?
@@ -304,6 +306,12 @@ module Hwaro
           end
 
           data = JSON.parse(response.body)
+          # GitHub sets `truncated` when the recursive tree exceeds its size
+          # limit and returns a PARTIAL listing — warn so silently-dropped
+          # scaffold files don't read as a clean checkout.
+          if data["truncated"]?.try(&.as_bool?)
+            Logger.warn "GitHub truncated the recursive tree for #{owner}/#{repo}@#{branch}; the scaffold may be incomplete (large repository)."
+          end
           data["tree"]?.try(&.as_a?) || raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_NETWORK,
             message: "GitHub tree response for #{owner}/#{repo}@#{branch} is missing 'tree'",

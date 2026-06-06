@@ -32,6 +32,13 @@ module Hwaro
 
           amp_config = config.amp
           prefix = amp_config.path_prefix.strip('/')
+          # A blank/slash-only prefix would make amp_output_path collapse to the
+          # canonical path (File.join drops empty components), overwriting every
+          # canonical page with its AMP variant. Refuse rather than destroy output.
+          if prefix.empty?
+            Logger.warn "AMP path_prefix resolves to empty; skipping AMP generation to avoid overwriting canonical pages."
+            return
+          end
           generated = 0
 
           pages.each do |page|
@@ -76,7 +83,12 @@ module Hwaro
 
           # Remove disallowed tags: <script> (except application/ld+json and amp scripts)
           # Use [\s\S]*? instead of .*? to match across newlines
-          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*(?:async|custom-element|src=["']https:\/\/cdn\.ampproject\.org))[^>]*>[\s\S]*?<\/script>/mi, "")
+          # The `async`/`custom-element` exceptions must be anchored to real
+          # attribute boundaries (preceded by whitespace, followed by a value /
+          # tag terminator); otherwise a substring match like `id="async"` would
+          # cause an author `<script>` to survive into the AMP page. The
+          # cdn.ampproject.org src allowlist stays in its own lookahead.
+          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*\s(?:async|custom-element)(?:\s|=|>|\/))(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;
@@ -140,13 +152,24 @@ module Hwaro
               <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}</style>
               <script async src="https://cdn.ampproject.org/v0.js"></script>
               HTML
-            result = result.sub(/<\/head>/i, "#{amp_boilerplate}\n</head>")
+            # The AMP runtime/boilerplate is mandatory. If the theme rendered no
+            # </head>, fall back to </body> (then end-of-doc) and warn rather than
+            # silently emitting an invalid AMP page.
+            if result.matches?(/<\/head>/i)
+              result = result.sub(/<\/head>/i, "#{amp_boilerplate}\n</head>")
+            elsif result.matches?(/<\/body>/i)
+              Logger.warn "AMP: no </head> in #{page.url}; injecting AMP boilerplate before </body>."
+              result = result.sub(/<\/body>/i, "#{amp_boilerplate}\n</body>")
+            else
+              Logger.warn "AMP: no </head> or </body> in #{page.url}; AMP page may be invalid."
+              result = "#{result}\n#{amp_boilerplate}"
+            end
           end
 
           # Add canonical link to the original page
           base_url = config.base_url.rstrip('/')
           canonical_url = Utils::TextUtils.escape_xml("#{base_url}#{page.url}")
-          unless result.includes?("rel=\"canonical\"")
+          if !result.includes?("rel=\"canonical\"") && result.matches?(/<\/head>/i)
             result = result.sub(/<\/head>/i, %(<link rel="canonical" href="#{canonical_url}">\n</head>))
           end
 
@@ -167,8 +190,12 @@ module Hwaro
           amp_url = Utils::TextUtils.escape_xml("#{base_url}/#{prefix}#{page.url}")
           link_tag = %(<link rel="amphtml" href="#{amp_url}">)
 
-          updated = html.sub(/<\/head>/i, "#{link_tag}\n</head>")
-          File.write(canonical_path, updated)
+          if html.matches?(/<\/head>/i)
+            updated = html.sub(/<\/head>/i, "#{link_tag}\n</head>")
+            File.write(canonical_path, updated)
+          else
+            Logger.warn "AMP: no </head> in #{canonical_path}; cannot inject rel=amphtml link."
+          end
         end
 
         private def self.output_path_for(page : Models::Page, output_dir : String) : String

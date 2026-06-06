@@ -220,8 +220,10 @@ module Hwaro
         end_idx = Utils::FrontmatterScanner.find_json_end(content)
         return unless end_idx
 
-        json_str = content[0, end_idx]
-        body = content[end_idx..].lchop("\r\n").lchop("\n")
+        # find_json_end returns a BYTE offset; slice on bytes so multibyte
+        # JSON frontmatter isn't corrupted/truncated mid-codepoint.
+        json_str = content.byte_slice(0, end_idx)
+        body = content.byte_slice(end_idx).lchop("\r\n").lchop("\n")
         {json_str, body}
       end
 
