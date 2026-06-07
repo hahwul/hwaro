@@ -57,6 +57,27 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
 
+    it "still flags an unused asset whose name is a suffix of a referenced one" do
+      # The space/paren safety net must be boundary-aware: an unused
+      # `header.png` must NOT be hidden just because a referenced
+      # `page-header.png` literally contains the substring `header.png`.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        static_dir = File.join(dir, "static")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(static_dir)
+
+        File.write(File.join(static_dir, "header.png"), "png data")
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\n---\n\n![Banner](/page-header.png)\n")
+
+        service = Hwaro::Services::UnusedAssets.new(content_dir: content_dir, static_dir: static_dir, templates_dir: File.join(dir, "templates"))
+        result = service.run
+
+        result.unused_count.should eq(1)
+        result.unused_files.should contain(File.join(static_dir, "header.png"))
+      end
+    end
+
     it "counts template references" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

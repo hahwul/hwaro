@@ -66,11 +66,13 @@ module Hwaro
           # referenced asset whose name contains a space or parenthesis (e.g.
           # `team photo.png`, `logo(1).png`) is NOT in `referenced` and would
           # be flagged — and deleted — despite being in active use. Before
-          # declaring an asset unused, confirm its full basename does not
-          # appear literally anywhere in the scanned source. Coincidental
-          # substring matches only make us MORE conservative, which is the
-          # safe direction for a destructive operation.
-          next if scanned_text.includes?(basename)
+          # declaring an asset unused, confirm its basename does not appear in
+          # the scanned source delimited by non-[\w\-.] boundaries — the same
+          # token model the reference regex uses. A boundary-anchored match (not
+          # a raw substring) still rescues the space/paren names while keeping a
+          # genuinely-unused `header.png` flagged when only `page-header.png` is
+          # referenced (their shared suffix is preceded by `-`, inside the token).
+          next if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(basename)}(?![\w\-.])/)
           unused << asset_path
         end
 

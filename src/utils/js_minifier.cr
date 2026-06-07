@@ -198,8 +198,12 @@ module Hwaro
 
       # Scan the body of a `${ ... }` interpolation; the opening `{` is already
       # emitted and `i` points just past it. Tracks nested braces, string
-      # literals, and nested template literals so the matching `}` is found
-      # correctly. Returns the index just past that `}`.
+      # literals, comments, regex literals, and nested template literals so the
+      # matching `}` is found correctly. Returns the index just past that `}`.
+      # Comments and regex bodies are skipped verbatim because a `}`, backtick,
+      # or quote inside them is content, not structure — interpreting it (e.g.
+      # treating a comment's backtick as a nested template) misaligns the scan
+      # and corrupts the literal's boundary.
       private def scan_interpolation(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
         depth = 1
         while i < len
@@ -211,6 +215,28 @@ module Hwaro
             i = scan_quoted(chars, i, len, lb)
           elsif c == '`'
             i = scan_template_literal(chars, i, len, lb)
+          elsif c == '/' && i + 1 < len && chars[i + 1] == '/'
+            # Line comment (only reachable in a multiline template, where the
+            # closing `}` sits on a later line) — copy verbatim to end of line.
+            while i < len && chars[i] != '\n'
+              lb << chars[i]
+              i += 1
+            end
+          elsif c == '/' && i + 1 < len && chars[i + 1] == '*'
+            # Block comment — copy verbatim through the closing `*/`.
+            lb << '/' << '*'
+            i += 2
+            while i < len
+              if chars[i] == '*' && i + 1 < len && chars[i + 1] == '/'
+                lb << '*' << '/'
+                i += 2
+                break
+              end
+              lb << chars[i]
+              i += 1
+            end
+          elsif c == '/' && regex_context?(chars, i)
+            i = scan_regex(chars, i, len, lb)
           elsif c == '{'
             depth += 1
             lb << c
@@ -243,6 +269,33 @@ module Hwaro
             lb << chars[i]
           elsif c == quote
             return i + 1
+          end
+          i += 1
+        end
+        i
+      end
+
+      # Scan a regex literal beginning at chars[i] == '/'. Appends it (and its
+      # flags) verbatim and returns the index just past the literal. Mirrors the
+      # main loop's regex handling, including its limitation of not modelling
+      # `[...]` character classes (an unescaped `/` inside a class still ends the
+      # literal) — kept identical so behaviour matches the top-level scanner.
+      private def scan_regex(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+        lb << chars[i] # opening /
+        i += 1
+        while i < len
+          c = chars[i]
+          lb << c
+          if c == '\\' && i + 1 < len
+            i += 1
+            lb << chars[i]
+          elsif c == '/'
+            i += 1
+            while i < len && chars[i].ascii_letter?
+              lb << chars[i]
+              i += 1
+            end
+            return i
           end
           i += 1
         end

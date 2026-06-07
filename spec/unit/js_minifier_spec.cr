@@ -247,6 +247,23 @@ describe Hwaro::Utils::JsMinifier do
       result.should contain("}B`")
     end
 
+    it "is not misaligned by a backtick inside a block comment in an interpolation" do
+      # The backtick inside the `/* ` */` comment must not be treated as a
+      # nested template start; the template ends at its real backtick and the
+      # trailing standalone comment is still stripped.
+      js = "fn(`${a + /* ` */ 1}`); /* strip */ var x = 1;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("`${a + /* ` */ 1}`")
+      result.should_not contain("strip")
+    end
+
+    it "is not misaligned by a backtick inside a line comment in an interpolation" do
+      js = "var s = `${a // ` b\n}`; /* gone */ var z = 1;"
+      result = Hwaro::Utils::JsMinifier.minify(js)
+      result.should contain("`${a // ` b\n}`")
+      result.should_not contain("gone")
+    end
+
     # =========================================================================
     # Consecutive string and comment
     # =========================================================================
