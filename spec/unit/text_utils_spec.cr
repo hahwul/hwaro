@@ -109,7 +109,7 @@ describe Hwaro::Utils::TextUtils do
     it "gives distinct terms that slugify identically unique slugs" do
       map = Hwaro::Utils::TextUtils.disambiguated_slugs(["C++", "C#"])
       # Both base-slugify to "c"; the sorted-first term keeps the base slug.
-      map.values.sort.should eq(["c", "c-2"])
+      map.values.sort!.should eq(["c", "c-2"])
       map["C++"].should_not eq(map["C#"])
     end
 
@@ -122,8 +122,9 @@ describe Hwaro::Utils::TextUtils do
     it "does not collide a generated suffix with a real term that already uses it" do
       # "A"/"A " both slugify to "a"; a real "a-2" must not be overwritten.
       map = Hwaro::Utils::TextUtils.disambiguated_slugs(["A", "A ", "a-2"])
-      map.values.sort.should eq(map.values.uniq.sort)
-      map.values.size.should eq(3)
+      values = map.values
+      values.size.should eq(values.uniq.size)
+      values.size.should eq(3)
     end
   end
 
