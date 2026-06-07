@@ -212,19 +212,26 @@ module Hwaro
       # Note: @raw_content already has front matter stripped during parsing,
       # so we only need to remove HTML tags and markdown syntax.
       def calculate_word_count : Int32
-        # Single pass: count words while skipping tags and markdown syntax
+        # Single pass: count words while skipping tags and markdown syntax.
         in_tag = false
         in_word = false
         count = 0
 
-        @raw_content.each_char do |char|
+        reader = Char::Reader.new(@raw_content)
+        while reader.has_next?
+          char = reader.current_char
           if char == '<'
-            in_tag = true
+            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`).
+            # A bare `<` in prose/math ("n < 1000", "if 0 < x") is a literal
+            # less-than, not a tag — treating it as one set in_tag with no closing
+            # `>` and swallowed the rest of the document, collapsing the count.
+            nxt = reader.peek_next_char
+            in_tag = true if nxt.ascii_letter? || nxt == '/' || nxt == '!'
             in_word = false
           elsif char == '>'
             in_tag = false
           elsif !in_tag
-            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '|')
+            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
             if is_word_char
               count += 1 unless in_word
               in_word = true
@@ -232,6 +239,7 @@ module Hwaro
               in_word = false
             end
           end
+          reader.next_char
         end
 
         @word_count = count

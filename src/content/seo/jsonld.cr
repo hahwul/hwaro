@@ -9,7 +9,7 @@ module Hwaro
         extend self
 
         # Generate Article JSON-LD for a page
-        def article(page : Models::Page, config : Models::Config) : String
+        def article(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
           base = config.base_url_stripped
           url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
 
@@ -19,7 +19,19 @@ module Hwaro
           image_url = if image = page.image
                         image.starts_with?("http") ? image : "#{base}#{image.starts_with?("/") ? image : "/#{image}"}"
                       end
+          # Prefer the resolved display name from site.authors (data/authors
+          # enrichment) so the schema.org author matches the visible author name
+          # used on /authors/ pages, not the raw frontmatter id. Falls back to the
+          # raw value when no data entry (or no site) is available.
           author_name = page.authors.first?
+          if (raw_id = author_name) && (s = site)
+            if author = s.authors[raw_id.strip.downcase]?
+              author_raw = author.raw
+              if author_raw.is_a?(Hash) && (name_val = author_raw["name"]?)
+                author_name = name_val.to_s
+              end
+            end
+          end
 
           json = JSON.build do |j|
             j.object do

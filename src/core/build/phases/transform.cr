@@ -207,6 +207,25 @@ module Hwaro::Core::Build::Phases::Transform
           site.taxonomies[name][term] << page
         end
       end
+
+      # "authors" (and any future configured taxonomy whose terms live on a
+      # dedicated Page property rather than in page.taxonomies — see
+      # NON_TAXONOMY_ARRAY_KEYS in markdown.cr) is not merged into page.taxonomies
+      # the way "tags" is, so it is missing here. Add it from taxonomy_values so
+      # the render-phase site.taxonomies matches what the generator writes —
+      # otherwise get_taxonomy("authors") is empty at render and get_taxonomy_url
+      # falls back to undisambiguated slugs that miss colliding author pages.
+      site.config.taxonomies.each do |tax|
+        name = tax.name
+        next if name.strip.empty?
+        next if page.taxonomies.has_key?(name) # already merged in the loop above
+        page.taxonomy_values(name).each do |term|
+          next if term.strip.empty?
+          site.taxonomies[name] ||= {} of String => Array(Models::Page)
+          site.taxonomies[name][term] ||= [] of Models::Page
+          site.taxonomies[name][term] << page
+        end
+      end
     end
 
     # Sort pages in taxonomies in-place (default by date)
@@ -470,8 +489,12 @@ module Hwaro::Core::Build::Phases::Transform
       pages: Array(Models::Page),
       extra: Hash(String, Crinja::Value))
 
-    # 1. Collect authors from all pages
+    # 1. Collect authors from all pages. Skip drafts/generated to match the
+    # /authors/ taxonomy generator (build_taxonomy_index skips both); otherwise
+    # under `--drafts` site.authors would list draft posts the generated author
+    # page omits — two views of the same author disagreeing.
     site.pages.each do |page|
+      next if page.draft || page.generated
       page.authors.each do |author_id|
         # Normalize ID: lower case, stripped
         id = author_id.strip.downcase
@@ -520,11 +543,22 @@ module Hwaro::Core::Build::Phases::Transform
       sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
 
       page_values = sorted_pages.map do |p|
+        # Expose the same common leaf fields a section/term page list provides,
+        # so a post-card partial reused over `author.pages` renders the same as
+        # over `section.pages` instead of silently blanking. (series_index is
+        # computed after this phase, and permalink lazily during render, so both
+        # are intentionally omitted.)
         Crinja::Value.new({
-          "title"       => Crinja::Value.new(p.title),
-          "url"         => Crinja::Value.new(p.url),
-          "date"        => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-          "description" => Crinja::Value.new(p.description || ""),
+          "title"        => Crinja::Value.new(p.title),
+          "url"          => Crinja::Value.new(p.url),
+          "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+          "description"  => Crinja::Value.new(p.description || ""),
+          "image"        => Crinja::Value.new(p.image || ""),
+          "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+          "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
+          "reading_time" => Crinja::Value.new(p.reading_time),
+          "word_count"   => Crinja::Value.new(p.word_count),
+          "language"     => Crinja::Value.new(p.language || site.config.default_language),
         })
       end
 

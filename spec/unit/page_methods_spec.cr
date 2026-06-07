@@ -25,6 +25,24 @@ describe Hwaro::Models::Page do
       count.should eq(3)
     end
 
+    it "treats a bare '<' as a literal, not an unterminated tag" do
+      # Regression: a lone less-than ("n < 1000") used to flip into tag mode
+      # with no closing '>', swallowing the rest of the document and collapsing
+      # the count (here it returned 3 instead of counting every word).
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "The value a < b is true and here are many more words"
+      count = page.calculate_word_count
+      count.should eq(12)
+    end
+
+    it "still skips a real tag that follows a bare '<' earlier in the line" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "if 0 < x then <b>bold</b> word"
+      count = page.calculate_word_count
+      # if 0 x then bold word  (the <b>..</b> tag is stripped, '<' literal)
+      count.should eq(6)
+    end
+
     it "strips markdown syntax elements" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "# Heading\n\n**bold** _italic_ `code` [link](url)"

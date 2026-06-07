@@ -32,6 +32,10 @@ module Hwaro::Core::Build
       compute_series(site)
     end
 
+    def test_aggregate_site_authors(site : Models::Site)
+      aggregate_site_authors(site)
+    end
+
     def test_recompute_series_for_pages(site, changed, old_names = {} of String => String?)
       recompute_series_for_pages(site, changed, old_names)
     end
@@ -220,6 +224,40 @@ describe Hwaro::Core::Build::Phases::Transform do
       site.taxonomies.has_key?("stale").should be_false
     end
 
+    it "includes a configured 'authors' taxonomy sourced from page.authors" do
+      # "authors" lives on @authors, not page.taxonomies, so the render-phase
+      # map omitted it — making get_taxonomy("authors") empty even though the
+      # generator writes /authors/ pages. It must be present here.
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("authors")]
+      site = Hwaro::Models::Site.new(config)
+      page1 = make_page("p1.md")
+      page1.authors = ["Jane Doe"]
+      page2 = make_page("p2.md")
+      page2.authors = ["Jane Doe"]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [page1, page2])
+
+      site.taxonomies.has_key?("authors").should be_true
+      site.taxonomies["authors"]["Jane Doe"].size.should eq(2)
+    end
+
+    it "does not double-count a configured 'tags' taxonomy already in page.taxonomies" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+      page = make_page("p.md")
+      page.taxonomies = {"tags" => ["crystal"]} # merged at parse like the real flow
+      page.tags = ["crystal"]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [page])
+
+      # The authors-union pass must skip "tags" (already in page.taxonomies).
+      site.taxonomies["tags"]["crystal"].size.should eq(1)
+    end
+
     it "populates taxonomies via the context-aware variant" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -234,6 +272,26 @@ describe Hwaro::Core::Build::Phases::Transform do
       builder.test_populate_taxonomies(ctx)
 
       site.taxonomies["categories"]["news"].size.should eq(1)
+    end
+  end
+
+  describe "#aggregate_site_authors" do
+    it "excludes draft pages so site.authors matches the /authors/ generator" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      published = make_page("pub.md")
+      published.authors = ["Alice"]
+      published.draft = false
+      drafted = make_page("draft.md")
+      drafted.authors = ["Alice"]
+      drafted.draft = true
+      site.pages = [published, drafted]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_aggregate_site_authors(site)
+
+      site.authors.has_key?("alice").should be_true
+      pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
+      pages_raw.size.should eq(1) # only the published page, not the draft
     end
   end
 

@@ -163,6 +163,40 @@ describe Hwaro::Content::Seo::JsonLd do
     end
   end
 
+  describe ".article" do
+    it "resolves the author display name from site.authors" do
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Hello"
+      page.url = "/blog/hello/"
+      page.authors = ["jdoe"] # raw frontmatter id
+
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      site = Hwaro::Models::Site.new(config)
+      site.authors["jdoe"] = Crinja::Value.new({
+        "key"  => Crinja::Value.new("jdoe"),
+        "name" => Crinja::Value.new("Jane Doe"),
+      })
+
+      result = Hwaro::Content::Seo::JsonLd.article(page, config, site)
+      result.should contain("Jane Doe")
+      result.should_not contain("\"name\":\"jdoe\"")
+    end
+
+    it "falls back to the raw id when no site/author data is available" do
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Hello"
+      page.url = "/blog/hello/"
+      page.authors = ["jdoe"]
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      result = Hwaro::Content::Seo::JsonLd.article(page, config)
+      result.should contain("jdoe")
+    end
+  end
+
   describe ".for_page" do
     it "auto-detects FAQ schema type" do
       page = Hwaro::Models::Page.new("test.md")

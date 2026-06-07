@@ -952,10 +952,20 @@ module Hwaro::Core::Build::Phases::Render
           "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
           "word_count"   => Crinja::Value.new(p.word_count),
           "reading_time" => Crinja::Value.new(p.reading_time),
-          "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
-          "authors"      => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
-          "assets"       => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
-          "extra"        => Crinja::Value.new(
+          # Leaf fields a full page_obj also exposes, so iterated lists
+          # (section.pages / site.pages / term.pages) match the documented Page
+          # shape. Only PAGE-LOCAL fields are cached here. `permalink` is omitted
+          # (computed lazily per-page during render), and `series_index` is
+          # omitted because it is recomputed from OTHER pages in the series — a
+          # cross-page value @page_crinja_value_cache cannot keep fresh on the
+          # incremental `serve` path, where only the changed page is invalidated.
+          "updated"         => Crinja::Value.new(p.updated.try(&.to_s("%Y-%m-%d")) || ""),
+          "in_search_index" => Crinja::Value.new(p.in_search_index),
+          "series"          => Crinja::Value.new(p.series || ""),
+          "tags"            => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
+          "authors"         => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+          "assets"          => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
+          "extra"           => Crinja::Value.new(
             p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
               h[k] = Utils::CrinjaUtils.from_extra(v)
             }),
@@ -1708,7 +1718,7 @@ module Hwaro::Core::Build::Phases::Render
     jsonld_article = if is_homepage || page.title.empty?
                        ""
                      else
-                       Content::Seo::JsonLd.article(page, config)
+                       Content::Seo::JsonLd.article(page, config, site)
                      end
     needs_breadcrumb = !page.ancestors.empty? || !page.is_index
     jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config) : ""
