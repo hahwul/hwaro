@@ -50,7 +50,11 @@ module Hwaro
           changefreq = site.config.sitemap.changefreq
           has_changefreq = !changefreq.empty?
           escaped_changefreq = has_changefreq ? Utils::TextUtils.escape_xml(changefreq) : ""
-          priority = site.config.sitemap.priority
+          # Clamp to the sitemap protocol's [0.0, 1.0] at the emit site so an
+          # out-of-range configured value can't produce an invalid sitemap. The
+          # loaded config value is left raw on purpose so `hwaro doctor` can still
+          # detect and warn about the misconfiguration (and offer to fix it).
+          priority = site.config.sitemap.priority.clamp(0.0, 1.0)
           priority_str = "    <priority>#{priority}</priority>\n"
 
           # Multilingual sites benefit from `<xhtml:link rel="alternate"

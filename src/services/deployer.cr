@@ -736,11 +736,24 @@ module Hwaro
 
       private def included_by_target?(rel : String, target : Models::DeploymentTarget) : Bool
         normalized = rel.gsub('\\', '/')
+        # A malformed include/exclude glob raises File::BadPatternError. Treat a
+        # bad `include` as not-matching (file excluded) and a bad `exclude` as
+        # not-matching (file kept), so a config typo doesn't crash the deploy.
         if inc = target.include
-          return false unless File.match?(inc, normalized)
+          matched = begin
+            File.match?(inc, normalized)
+          rescue File::BadPatternError
+            false
+          end
+          return false unless matched
         end
         if exc = target.exclude
-          return false if File.match?(exc, normalized)
+          excluded = begin
+            File.match?(exc, normalized)
+          rescue File::BadPatternError
+            false
+          end
+          return false if excluded
         end
         true
       end

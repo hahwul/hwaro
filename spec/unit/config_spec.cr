@@ -110,6 +110,17 @@ describe Hwaro::Models::Config do
       end
     end
 
+    it "rejects a base_url carrying a query string or fragment" do
+      # base_path drops query/fragment, so the raw base_url and derived base_path
+      # would silently disagree and corrupt absolute links.
+      expect_raises(ArgumentError, /query string or fragment/) do
+        Hwaro::Models::Config.validate_base_url!("https://x.com/repo?utm=1")
+      end
+      expect_raises(ArgumentError, /query string or fragment/) do
+        Hwaro::Models::Config.validate_base_url!("https://x.com/repo#section")
+      end
+    end
+
     it "rejects non-http schemes" do
       expect_raises(ArgumentError, /Invalid base_url/) do
         Hwaro::Models::Config.validate_base_url!("ftp://example.com")
@@ -2267,6 +2278,34 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
         limit = 7
         TOML
       config.related.limit.should eq(7)
+    end
+  end
+
+  describe "config value hardening" do
+    it "does not crash on a malformed glob in [static] exclude" do
+      config = load_config(<<-TOML)
+        [static]
+        exclude = ["[bad"]
+        TOML
+      # File.match? raises File::BadPatternError on the bad glob; excluded? must
+      # treat it as non-matching instead of aborting the whole build.
+      config.static.excluded?("foo/bar.txt").should be_false
+    end
+
+    it "keeps [sitemap] priority raw at load (doctor warns; the emitter clamps)" do
+      # The loaded value is preserved so `hwaro doctor` can detect the
+      # out-of-range value; the sitemap emitter clamps it to [0.0, 1.0].
+      load_config("[sitemap]\npriority = 5.0").sitemap.priority.should eq(5.0)
+    end
+
+    it "clamps [og.auto_image] pattern_scale to a sane range" do
+      # An oversized scale overflows Int32 in the pattern renderer; clamp it.
+      load_config("[og.auto_image]\npattern_scale = 1e12").og.auto_image.pattern_scale.should eq(10.0)
+      load_config("[og.auto_image]\npattern_scale = -3.0").og.auto_image.pattern_scale.should eq(0.1)
+    end
+
+    it "falls back to the default for a wrong-typed numeric value" do
+      load_config("[pagination]\nper_page = \"twenty\"").pagination.per_page.should eq(10)
     end
   end
 end

@@ -28,6 +28,27 @@ describe Hwaro::Content::Seo::Sitemap do
       end
     end
 
+    it "clamps an out-of-range priority to [0.0, 1.0] in the emitted XML" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        config.sitemap.priority = 5.0 # out of range (raw, as the doctor would see)
+        site = Hwaro::Models::Site.new(config)
+
+        page = Hwaro::Models::Page.new("a.md")
+        page.url = "/a/"
+        page.in_sitemap = true
+        page.render = true
+
+        Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<priority>1.0</priority>")
+        content.should_not contain("<priority>5.0</priority>")
+      end
+    end
+
     it "skips when sitemap is disabled" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new

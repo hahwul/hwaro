@@ -159,7 +159,11 @@ module Hwaro
               end
               return result
             end
-            return
+            # Empty or non-mapping YAML frontmatter (e.g. `---\n---`) is valid
+            # YAML but carries no title/description. Return an empty hash (not
+            # nil) so the missing-field checks still fire — matching empty TOML,
+            # which already reaches them via its `{}` result.
+            return {} of String => FrontmatterValue
           rescue ex
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
@@ -290,6 +294,13 @@ module Hwaro
       end
 
       private def strip_code_blocks(text : String) : String
+        # Strip fenced blocks then inline spans. NOTE: indented (4-space/tab)
+        # code blocks are intentionally NOT stripped — a regex can't tell an
+        # indented code block from a list-item continuation (which is also
+        # indented), so stripping them silently dropped genuine broken-link /
+        # alt-text warnings inside list items, and a long contiguous indented
+        # run blew PCRE2's JIT stack. The minor false positive on example
+        # markdown shown via an indented block is the lesser evil.
         text.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
           .gsub(/`[^`]+`/, "")
       end

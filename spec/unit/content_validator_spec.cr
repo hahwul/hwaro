@@ -52,6 +52,17 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "flags missing title for EMPTY YAML frontmatter (symmetric with TOML)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "empty-fm.md"), "---\n---\n# Body\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.any? { |i| i.id == "content-title-missing" }.should be_true
+      end
+    end
+
     it "detects Untitled title" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

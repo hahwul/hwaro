@@ -161,7 +161,13 @@ module Hwaro
         return false unless @allow_extensions.includes?(ext)
         return false if @disallow_extensions.includes?(ext)
         @disallow_paths.each do |pattern|
-          return false if File.match?(pattern, normalized_path)
+          # A malformed glob raises File::BadPatternError; skip it rather than
+          # crashing the build, so other disallow patterns still apply.
+          begin
+            return false if File.match?(pattern, normalized_path)
+          rescue File::BadPatternError
+            next
+          end
         end
         true
       end
@@ -865,9 +871,16 @@ module Hwaro
       private def pattern_matches?(pattern : String, normalized : String, basename : String) : Bool
         if GLOB_METACHARS.matches?(pattern)
           # Glob: match the full relative path, plus the bare name for a
-          # path-less glob so it applies at any depth.
-          File.match?(pattern, normalized) ||
-            (!pattern.includes?('/') && File.match?(pattern, basename))
+          # path-less glob so it applies at any depth. A malformed glob (e.g.
+          # an unclosed `[` class) makes File.match? raise File::BadPatternError;
+          # treat it as non-matching rather than crashing the whole build on a
+          # single config typo.
+          begin
+            File.match?(pattern, normalized) ||
+              (!pattern.includes?('/') && File.match?(pattern, basename))
+          rescue File::BadPatternError
+            false
+          end
         else
           # Literal: an exact file, or a directory subtree rooted at it.
           normalized == pattern || normalized.starts_with?("#{pattern}/")
@@ -1064,6 +1077,13 @@ module Hwaro
         if scheme.nil? || !%w[http https].includes?(scheme.downcase) || host.nil? || host.empty?
           raise ArgumentError.new("Invalid base_url: '#{value}'. Expected http(s)://host[/path].")
         end
+        # A query/fragment is not part of the origin+path that page URLs append
+        # to. base_path parses with URI#path (dropping query/fragment), so the
+        # raw base_url and the derived base_path would silently disagree and
+        # corrupt absolute (base_url + page.url) links. Reject it at the source.
+        unless (uri.query.nil? || uri.query.try(&.empty?)) && (uri.fragment.nil? || uri.fragment.try(&.empty?))
+          raise ArgumentError.new("Invalid base_url: '#{value}'. base_url must not contain a query string or fragment.")
+        end
       end
 
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config
@@ -1206,7 +1226,12 @@ module Hwaro
         # `finite?` guard: NaN.clamp is NaN and NaN.to_i64 raises OverflowError,
         # so a `nan`/`-nan` float in config would otherwise crash the build.
         val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
-        return default unless val
+        unless val
+          # Present but not a usable number (e.g. a quoted "20", a bool, NaN) —
+          # warn instead of silently using the default with zero feedback.
+          Logger.warn "Ignoring non-numeric config value #{raw.raw.inspect}; using default #{default}"
+          return default
+        end
         val.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32
       end
 
@@ -1215,7 +1240,12 @@ module Hwaro
       # that as_i? raises for integers above Int32::MAX.
       private def self.float_value(raw : TOML::Any?, default : Float64) : Float64
         return default unless raw
-        raw.as_f? || raw.as_i64?.try(&.to_f) || default
+        val = raw.as_f? || raw.as_i64?.try(&.to_f)
+        unless val
+          Logger.warn "Ignoring non-numeric config value #{raw.raw.inspect}; using default #{default}"
+          return default
+        end
+        val
       end
 
       # Non-raising Int32 extraction from a single TOML value (nil if absent or
@@ -1244,6 +1274,10 @@ module Hwaro
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
           config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
           config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
+          # Keep the priority raw here (NOT clamped) so `hwaro doctor` can detect
+          # an out-of-range value and warn/offer a fix. The sitemap EMITTER
+          # (sitemap.cr) clamps to [0.0, 1.0] so the generated XML stays valid
+          # even for users who never run doctor.
           config.sitemap.priority = float_value(s["priority"]?, config.sitemap.priority)
           if exclude_arr = s["exclude"]?.try(&.as_a?)
             config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
@@ -1425,7 +1459,12 @@ module Hwaro
           config.og.auto_image.show_title = bool_value(ai["show_title"]?, config.og.auto_image.show_title)
           config.og.auto_image.style = ai["style"]?.try(&.as_s?) || config.og.auto_image.style
           config.og.auto_image.pattern_opacity = float_value(ai["pattern_opacity"]?, config.og.auto_image.pattern_opacity)
-          config.og.auto_image.pattern_scale = float_value(ai["pattern_scale"]?, config.og.auto_image.pattern_scale)
+          # Clamp to a sane range: the pattern renderer multiplies scale into
+          # Int32 expressions (e.g. (80 * scale).to_i), so a huge value overflows
+          # Int32 and crashes OG generation. 0.1..10.0 covers every visible scale;
+          # a non-finite (nan) value falls back to the default.
+          ps = float_value(ai["pattern_scale"]?, config.og.auto_image.pattern_scale)
+          config.og.auto_image.pattern_scale = ps.finite? ? ps.clamp(0.1, 10.0) : 1.0
           config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?)
           config.og.auto_image.overlay_opacity = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
