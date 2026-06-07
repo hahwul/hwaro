@@ -119,8 +119,10 @@ module Hwaro
           # the term-page file paths. Distinct terms can slugify identically
           # (e.g. "C++"/"C#" → "c", "Hello World"/"hello-world" → "hello-world");
           # without disambiguation the second term page overwrites the first's
-          # index.html and the index emits two links to the same URL.
-          slug_map = build_term_slug_map(terms_map.keys)
+          # index.html and the index emits two links to the same URL. The same
+          # helper backs the get_taxonomy / get_taxonomy_url template functions
+          # (via build_global_vars) so their links match these written paths.
+          slug_map = Utils::TextUtils.disambiguated_slugs(terms_map.keys)
 
           # Only list terms whose term pages are actually written for this
           # language, so the index never links to a term page that the
@@ -224,27 +226,6 @@ module Hwaro
             pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
           end
         end
-      end
-
-      # Build a term → unique-slug map. Iterates terms in sorted order so the
-      # disambiguation suffix is deterministic across builds; on a slug clash
-      # the later term gets a numeric suffix (and re-checks for further clashes,
-      # including against real terms that already use that suffix).
-      private def self.build_term_slug_map(terms : Array(String)) : Hash(String, String)
-        slug_map = {} of String => String
-        used = Set(String).new
-        terms.sort.each do |term|
-          base = Utils::TextUtils.safe_slugify(term)
-          slug = base
-          n = 2
-          while used.includes?(slug)
-            slug = "#{base}-#{n}"
-            n += 1
-          end
-          used << slug
-          slug_map[term] = slug
-        end
-        slug_map
       end
 
       private def self.render_taxonomy_index(

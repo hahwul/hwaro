@@ -444,10 +444,25 @@ module Hwaro
             term = arguments["term"].to_s
             base_url = env.resolve("base_url").to_s
 
-            # Generate slug from term. Must match the on-disk term page path,
-            # which uses safe_slugify — plain slugify("🎉") is "" → "/tags//"
-            # (a dead double-slash link) for all-symbol/emoji terms.
-            slug = Utils::TextUtils.safe_slugify(term)
+            # Resolve the slug from the disambiguated term→slug map built in
+            # build_global_vars, so a collision (e.g. "C++"/"C#" → "c") links to
+            # the SAME unique path the taxonomy generator wrote, not a shared
+            # base slug. Fall back to safe_slugify when the map is absent or the
+            # term is unknown — plain slugify("🎉") is "" → "/tags//" (a dead
+            # double-slash link), so safe_slugify is the right fallback.
+            slug = nil
+            slugs_raw = env.resolve("__taxonomy_slugs__").raw
+            if slugs_raw.is_a?(Hash)
+              if kind_map = slugs_raw[kind]?
+                kind_raw = kind_map.raw
+                if kind_raw.is_a?(Hash)
+                  if mapped = kind_raw[term]?
+                    slug = mapped.to_s
+                  end
+                end
+              end
+            end
+            slug ||= Utils::TextUtils.safe_slugify(term)
 
             url = "/#{kind}/#{slug}/"
             Crinja::Value.new(base_url.rstrip("/") + url)

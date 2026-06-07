@@ -1116,16 +1116,25 @@ module Hwaro::Core::Build::Phases::Render
     vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
     vars["__sections_by_key__"] = Crinja::Value.new(sections_by_key)
 
-    # Build taxonomies hash for get_taxonomy function
+    # Build taxonomies hash for get_taxonomy function. Term slugs are
+    # disambiguated with the SAME helper the taxonomy generator uses, so a
+    # collision (e.g. "C++"/"C#" → "c") yields unique slugs that match the
+    # written term-page paths. __taxonomy_slugs__ exposes the term→slug map so
+    # get_taxonomy_url() can resolve a single term without recomputing the map.
     taxonomies_hash = {} of String => Crinja::Value
+    taxonomy_slugs = {} of String => Crinja::Value
     site.taxonomies.each do |name, terms|
+      slug_map = Utils::TextUtils.disambiguated_slugs(terms.keys)
+      term_slug_values = {} of String => Crinja::Value
       terms_array = terms.map do |term, term_pages|
         term_pages_array = term_pages.map do |tp|
           cached_page_crinja_value(tp, default_lang)
         end
+        slug = slug_map[term]? || Utils::TextUtils.safe_slugify(term)
+        term_slug_values[term] = Crinja::Value.new(slug)
         Crinja::Value.new({
           "name"  => Crinja::Value.new(term),
-          "slug"  => Crinja::Value.new(Utils::TextUtils.safe_slugify(term)),
+          "slug"  => Crinja::Value.new(slug),
           "pages" => Crinja::Value.new(term_pages_array),
           "count" => Crinja::Value.new(term_pages.size),
         })
@@ -1134,8 +1143,10 @@ module Hwaro::Core::Build::Phases::Render
         "name"  => Crinja::Value.new(name),
         "items" => Crinja::Value.new(terms_array),
       })
+      taxonomy_slugs[name] = Crinja::Value.new(term_slug_values)
     end
     vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
+    vars["__taxonomy_slugs__"] = Crinja::Value.new(taxonomy_slugs)
 
     # Site object with full data
     site_obj = {

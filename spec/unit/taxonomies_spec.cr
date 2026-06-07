@@ -97,6 +97,45 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "exposes get_taxonomy slugs (__taxonomy_slugs__) that match the written term-page paths" do
+      # The slug map build_global_vars exposes to get_taxonomy / get_taxonomy_url
+      # must point at the pages the generator actually wrote, even on a collision.
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      page1 = Hwaro::Models::Page.new("post1.md")
+      page1.title = "Post 1"
+      page1.url = "/blog/post1/"
+      page1.tags = ["C++"]
+      page2 = Hwaro::Models::Page.new("post2.md")
+      page2.title = "Post 2"
+      page2.url = "/blog/post2/"
+      page2.tags = ["C#"]
+      site.pages = [page1, page2]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        # Writes the term pages and populates site.taxonomies.
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+        slugs_raw = vars["__taxonomy_slugs__"].raw
+        slugs_raw.should be_a(Hash(Crinja::Value, Crinja::Value))
+        tags_raw = slugs_raw.as(Hash(Crinja::Value, Crinja::Value))["tags"].raw.as(Hash(Crinja::Value, Crinja::Value))
+        cpp_slug = tags_raw["C++"].to_s
+        cs_slug = tags_raw["C#"].to_s
+
+        cpp_slug.should_not eq(cs_slug)
+        # Each exposed slug resolves to a real written term page (no dead link).
+        File.exists?(File.join(output_dir, "tags", cpp_slug, "index.html")).should be_true
+        File.exists?(File.join(output_dir, "tags", cs_slug, "index.html")).should be_true
+      end
+    end
+
     it "still renders a configured taxonomy's index when it has zero terms (no 404)" do
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]

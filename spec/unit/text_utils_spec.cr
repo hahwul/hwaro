@@ -99,6 +99,34 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".disambiguated_slugs" do
+    it "leaves non-colliding terms unchanged" do
+      map = Hwaro::Utils::TextUtils.disambiguated_slugs(["Crystal", "Ruby"])
+      map["Crystal"].should eq("crystal")
+      map["Ruby"].should eq("ruby")
+    end
+
+    it "gives distinct terms that slugify identically unique slugs" do
+      map = Hwaro::Utils::TextUtils.disambiguated_slugs(["C++", "C#"])
+      # Both base-slugify to "c"; the sorted-first term keeps the base slug.
+      map.values.sort.should eq(["c", "c-2"])
+      map["C++"].should_not eq(map["C#"])
+    end
+
+    it "is deterministic regardless of input order" do
+      a = Hwaro::Utils::TextUtils.disambiguated_slugs(["C#", "C++"])
+      b = Hwaro::Utils::TextUtils.disambiguated_slugs(["C++", "C#"])
+      a.should eq(b)
+    end
+
+    it "does not collide a generated suffix with a real term that already uses it" do
+      # "A"/"A " both slugify to "a"; a real "a-2" must not be overwritten.
+      map = Hwaro::Utils::TextUtils.disambiguated_slugs(["A", "A ", "a-2"])
+      map.values.sort.should eq(map.values.uniq.sort)
+      map.values.size.should eq(3)
+    end
+  end
+
   describe ".escape_xml" do
     it "escapes ampersand" do
       Hwaro::Utils::TextUtils.escape_xml("Tom & Jerry").should eq("Tom &amp; Jerry")

@@ -53,6 +53,34 @@ module Hwaro
         s.empty? ? "term-#{text.to_slice.hexstring}" : s
       end
 
+      # Map a set of terms to UNIQUE slugs. Distinct terms can slugify to the
+      # same value ("C++"/"C#" → "c", "Hello World"/"hello-world" → "hello-world");
+      # on a clash the later term (in sorted order) gets a numeric suffix, and the
+      # candidate is re-checked so it never collides with another generated slug or
+      # a real term whose base slug already ends in "-2". Sorting makes the result
+      # deterministic across builds regardless of input order.
+      #
+      # This is the single source of truth for taxonomy term slugs: the taxonomy
+      # generator (term-page paths + index links) and the `get_taxonomy` /
+      # `get_taxonomy_url` template helpers must all run terms through here so the
+      # links they emit point at the pages that were actually written.
+      def disambiguated_slugs(terms : Array(String)) : Hash(String, String)
+        slug_map = {} of String => String
+        used = Set(String).new
+        terms.sort.each do |term|
+          base = safe_slugify(term)
+          slug = base
+          n = 2
+          while used.includes?(slug)
+            slug = "#{base}-#{n}"
+            n += 1
+          end
+          used << slug
+          slug_map[term] = slug
+        end
+        slug_map
+      end
+
       # Check if a character is a Unicode letter (non-ASCII)
       private def unicode_letter?(char : Char) : Bool
         !char.ascii? && char.letter?

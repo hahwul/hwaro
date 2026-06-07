@@ -140,5 +140,30 @@ describe "bugfix regressions" do
       url.should_not contain("tags//")
       url.should contain("/tags/term-")
     end
+
+    it "resolves the disambiguated slug from __taxonomy_slugs__ on a collision" do
+      # build_global_vars exposes the same disambiguated map the taxonomy
+      # generator wrote, so colliding terms link to their distinct pages.
+      slugs = Crinja::Value.new({
+        "tags" => Crinja::Value.new({
+          "C++" => Crinja::Value.new("c"),
+          "C#"  => Crinja::Value.new("c-2"),
+        }),
+      })
+      vars = {
+        "base_url"           => Crinja::Value.new("https://e.com"),
+        "__taxonomy_slugs__" => slugs,
+      }
+      render_filter(%({{ get_taxonomy_url(kind="tags", term="C++") }}), vars).should eq("https://e.com/tags/c/")
+      render_filter(%({{ get_taxonomy_url(kind="tags", term="C#") }}), vars).should eq("https://e.com/tags/c-2/")
+    end
+
+    it "falls back to safe_slugify when the term is absent from the map" do
+      vars = {
+        "base_url"           => Crinja::Value.new("https://e.com"),
+        "__taxonomy_slugs__" => Crinja::Value.new({"tags" => Crinja::Value.new({} of String => Crinja::Value)}),
+      }
+      render_filter(%({{ get_taxonomy_url(kind="tags", term="Crystal") }}), vars).should eq("https://e.com/tags/crystal/")
+    end
   end
 end
