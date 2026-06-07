@@ -1121,17 +1121,38 @@ module Hwaro::Core::Build::Phases::Render
     # collision (e.g. "C++"/"C#" → "c") yields unique slugs that match the
     # written term-page paths. __taxonomy_slugs__ exposes the term→slug map so
     # get_taxonomy_url() can resolve a single term without recomputing the map.
+    multilingual = config.multilingual?
     taxonomies_hash = {} of String => Crinja::Value
     taxonomy_slugs = {} of String => Crinja::Value
     site.taxonomies.each do |name, terms|
-      slug_map = Utils::TextUtils.disambiguated_slugs(terms.keys)
+      # Disambiguate over the SAME term set the taxonomy generator uses to write
+      # pages — build_taxonomy_index counts only non-draft, non-generated pages.
+      # Under `--drafts`, the render-phase site.taxonomies (rebuild_taxonomies)
+      # also carries draft-only terms; including them here would let a draft term
+      # steal a base slug and shift a published term to a `-N` slug the generator
+      # never wrote, breaking its get_taxonomy link. Normal builds are already
+      # draft-free, so this filter is a no-op there.
+      written_terms = terms.compact_map do |term, term_pages|
+        term if term_pages.any? { |p| !p.draft && !p.generated }
+      end
+      slug_map = Utils::TextUtils.disambiguated_slugs(written_terms)
       term_slug_values = {} of String => Crinja::Value
       terms_array = terms.map do |term, term_pages|
         term_pages_array = term_pages.map do |tp|
           cached_page_crinja_value(tp, default_lang)
         end
-        slug = slug_map[term]? || Utils::TextUtils.safe_slugify(term)
-        term_slug_values[term] = Crinja::Value.new(slug)
+        # A ROOT term page (what get_taxonomy_url targets) is written only when
+        # the term has a non-draft page in the default language; on a
+        # multilingual site a term that exists only in a non-default language
+        # gets no root page, so exposing its disambiguated `-N` slug would point
+        # at a 404. Only publish disambiguated slugs for terms with a root page;
+        # others fall back to safe_slugify (the pre-centralization behavior).
+        has_root = term_pages.any? do |p|
+          next false if p.draft || p.generated
+          !multilingual || (p.language || default_lang) == default_lang
+        end
+        slug = (has_root ? slug_map[term]? : nil) || Utils::TextUtils.safe_slugify(term)
+        term_slug_values[term] = Crinja::Value.new(slug) if has_root
         Crinja::Value.new({
           "name"  => Crinja::Value.new(term),
           "slug"  => Crinja::Value.new(slug),

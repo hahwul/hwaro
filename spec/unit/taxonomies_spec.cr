@@ -136,6 +136,88 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "keeps a published term's slug stable when a draft-only term collides (--drafts)" do
+      # Under --drafts the render-phase taxonomy map includes draft pages, but
+      # the generator skips drafts. The exposed slug for the PUBLISHED term must
+      # match the page the generator actually writes — a draft-only colliding
+      # term must not steal the base slug and shift the published term to a
+      # never-written "-N" path.
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      published = Hwaro::Models::Page.new("pub.md")
+      published.title = "Published"
+      published.url = "/blog/pub/"
+      published.tags = ["C++"]
+      published.draft = false
+      draft = Hwaro::Models::Page.new("draft.md")
+      draft.title = "Draft"
+      draft.url = "/blog/draft/"
+      draft.tags = ["C#"]
+      draft.draft = true
+      site.pages = [published, draft]
+
+      # Simulate the render-phase map under --drafts: the draft term IS present
+      # (rebuild_taxonomies does not filter drafts) and sorts before "C++".
+      site.taxonomies["tags"] = {
+        "C#"  => [draft] of Hwaro::Models::Page,
+        "C++" => [published] of Hwaro::Models::Page,
+      }
+
+      vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+      tags_raw = vars["__taxonomy_slugs__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"].raw.as(Hash(Crinja::Value, Crinja::Value))
+      cpp_slug = tags_raw["C++"].to_s
+      # Published term keeps the base slug (draft excluded from disambiguation).
+      cpp_slug.should eq("c")
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        # generate rebuilds site.taxonomies draft-free and writes /tags/c/.
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        File.exists?(File.join(output_dir, "tags", cpp_slug, "index.html")).should be_true
+      end
+    end
+
+    it "does not expose a root slug for a term present only in a non-default language" do
+      # On a multilingual site the root term page is written only for terms with
+      # a default-language page. A non-default-only colliding term gets no root
+      # page, so its disambiguated "-N" slug must NOT be exposed — get_taxonomy_url
+      # falls back to safe_slugify (the existing base-slug page) instead of a 404.
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      en = Hwaro::Models::Page.new("en.md")
+      en.title = "En"
+      en.url = "/blog/en/"
+      en.tags = ["C"]
+      en.language = "en"
+      ko = Hwaro::Models::Page.new("ko.md")
+      ko.title = "Ko"
+      ko.url = "/ko/blog/ko/"
+      ko.tags = ["C#"] # collides with "C" -> base slug "c"
+      ko.language = "ko"
+      site.pages = [en, ko]
+      site.taxonomies["tags"] = {
+        "C"  => [en] of Hwaro::Models::Page,
+        "C#" => [ko] of Hwaro::Models::Page,
+      }
+
+      vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+      tags_raw = vars["__taxonomy_slugs__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"].raw.as(Hash(Crinja::Value, Crinja::Value))
+
+      # Default-language term is exposed with the base slug it was written at.
+      tags_raw["C"].to_s.should eq("c")
+      # Non-default-only term is omitted (falls back to safe_slugify downstream).
+      tags_raw.has_key?(Crinja::Value.new("C#")).should be_false
+    end
+
     it "still renders a configured taxonomy's index when it has zero terms (no 404)" do
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
