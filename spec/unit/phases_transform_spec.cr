@@ -40,6 +40,14 @@ module Hwaro::Core::Build
       recompute_series_for_pages(site, changed, old_names)
     end
 
+    def test_relink_navigation_for_sections(site, affected = Set(String).new)
+      relink_navigation_for_sections(site, affected)
+    end
+
+    def test_recompute_related_posts_for_pages(site, changed, removed = Set(String).new)
+      recompute_related_posts_for_pages(site, changed, removed)
+    end
+
     def test_run_transform(ctx : Lifecycle::BuildContext, profiler : Profiler)
       execute_transform_phase(ctx, profiler)
     end
@@ -304,6 +312,61 @@ describe Hwaro::Core::Build::Phases::Transform do
       builder.test_populate_taxonomies(ctx)
 
       site.taxonomies["categories"]["news"].size.should eq(1)
+    end
+  end
+
+  describe "#relink_navigation_for_sections" do
+    it "reports the set of pages whose prev/next changed (block reorder)" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      section = make_section("blog/_index.md", "blog")
+      section.sort_by = "weight"
+      p1 = make_page("blog/p1.md", "blog")
+      p1.weight = 1
+      p2 = make_page("blog/p2.md", "blog")
+      p2.weight = 2
+      p3 = make_page("blog/p3.md", "blog")
+      p3.weight = 3
+      site.sections = [section]
+      site.pages = [p1, p2, p3]
+
+      builder = Hwaro::Core::Build::Builder.new
+      # First relink establishes pointers; a second no-op relink reports nothing.
+      builder.test_relink_navigation_for_sections(site)
+      builder.test_relink_navigation_for_sections(site).empty?.should be_true
+
+      # Reorder the block: p3 moves to the front. Pages whose neighbors flipped
+      # must be reported — including p1, which is neither p3 nor a changed page.
+      p3.weight = 0
+      changed = builder.test_relink_navigation_for_sections(site)
+      changed.empty?.should be_false
+      changed.map(&.path).should contain("blog/p1.md")
+    end
+  end
+
+  describe "#recompute_related_posts_for_pages" do
+    it "drops a removed page from referrers' related_posts via removed_paths" do
+      config = Hwaro::Models::Config.new
+      config.related.enabled = true
+      config.related.taxonomies = ["tags"]
+      config.related.limit = 5
+      site = Hwaro::Models::Site.new(config)
+
+      a = make_page("a.md")
+      a.tags = ["crystal"]
+      b = make_page("b.md")
+      b.tags = ["crystal"]
+      site.pages = [a, b]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_recompute_related_posts_for_pages(site, [a, b])
+      b.related_posts.map(&.path).should contain("a.md") # a and b are related
+
+      # `a` turns draft/future -> removed from site.pages. Without seeding the
+      # removed path, b would keep a stale related link to a (a now-deleted page).
+      site.pages = [b]
+      updated = builder.test_recompute_related_posts_for_pages(site, [] of Hwaro::Models::Page, Set{"a.md"})
+      updated.should contain("b.md")
+      b.related_posts.map(&.path).should_not contain("a.md")
     end
   end
 

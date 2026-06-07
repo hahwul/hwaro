@@ -316,10 +316,17 @@ module Hwaro::Core::Build::Phases::Transform
 
   # Re-link lower/higher navigation for the entire site.
   # Since navigation is now cross-section (flat), any change requires a full relink.
+  # Re-link lower/higher across the whole global reading order and RETURN the set
+  # of pages whose lower/higher pointer actually changed, so the incremental
+  # rebuild can re-render exactly those. The `affected_sections` arg is no longer
+  # used to scope the relink (the reading order is global), but the changed-set
+  # return is what callers need: a section `_index.md` weight/sort_by/reverse edit
+  # reorders an entire BLOCK of pages, flipping prev/next on many pages that are
+  # neither the changed page nor its immediate neighbors.
   private def relink_navigation_for_sections(
     site : Models::Site,
     affected_sections : Set(String),
-  )
+  ) : Set(Models::Page)
     # Build a BuildContext-compatible structure for reuse
     sections_by_path = {} of String => Models::Section
     site.sections.each { |s| sections_by_path[s.section] = s }
@@ -347,10 +354,24 @@ module Hwaro::Core::Build::Phases::Transform
     section_names = sections_by_path.keys.to_set
     append_orphan_pages(site.pages, section_names, flat_list)
 
+    # Snapshot the old prev/next before re-linking so we can report exactly which
+    # pages had a neighbor change (compared by file path — unique per page).
+    old = {} of String => {String?, String?}
+    flat_list.each { |p| old[p.path] = {p.lower.try(&.path), p.higher.try(&.path)} }
+
     flat_list.each_with_index do |page, idx|
       page.lower = idx > 0 ? flat_list[idx - 1] : nil
       page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
     end
+
+    changed = Set(Models::Page).new
+    flat_list.each do |page|
+      prev = old[page.path]
+      if page.lower.try(&.path) != prev[0] || page.higher.try(&.path) != prev[1]
+        changed << page
+      end
+    end
+    changed
   end
 
   # Recompute series only for series that contain changed pages.
@@ -417,6 +438,7 @@ module Hwaro::Core::Build::Phases::Transform
   private def recompute_related_posts_for_pages(
     site : Models::Site,
     changed_pages : Array(Models::Page),
+    removed_paths : Set(String) = Set(String).new,
   ) : Set(String)
     config = site.config.related
     return Set(String).new unless config.enabled
@@ -443,13 +465,19 @@ module Hwaro::Core::Build::Phases::Transform
 
     # Collect paths of pages that need related_posts recomputed:
     # 1. Changed pages themselves
-    # 2. Pages that previously referenced a changed page
+    # 2. Pages that previously referenced a changed OR REMOVED page
     # 3. Pages sharing any taxonomy term with changed pages (may become newly related)
     changed_paths = changed_pages.map(&.path).to_set
     pages_to_update = Set(String).new(changed_paths)
 
+    # A page turned draft/future/expired is removed from site.pages, so it is
+    # neither a changed page nor in the inverted index — but pages that listed it
+    # as a related post still link to a now-deleted output. Seed discovery with
+    # the removed paths so those referrers are found and recomputed (the removed
+    # page is not in the index, so scoring correctly drops it).
+    discovery_paths = removed_paths.empty? ? changed_paths : (changed_paths | removed_paths)
     all_pages.each do |page|
-      if page.related_posts.any? { |rp| changed_paths.includes?(rp.path) }
+      if page.related_posts.any? { |rp| discovery_paths.includes?(rp.path) }
         pages_to_update << page.path
       end
     end

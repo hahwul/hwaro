@@ -102,6 +102,37 @@ describe Hwaro::Core::Build::Builder do
         File.exists?("public/about/index.html").should be_true
       end
     end
+
+    it "re-renders a nested subsection index's breadcrumb after a parent section title edit" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content/blog/news")
+          File.write("content/blog/_index.md", "---\ntitle: BlogOld\n---\n")
+          File.write("content/blog/news/_index.md", "---\ntitle: News\n---\n")
+          File.write("content/blog/news/post.md", "---\ntitle: Post\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          # Breadcrumb from page.ancestors in every template the build may pick.
+          bc = "BC:{% for a in page.ancestors %}{{ a.title }};{% endfor %}|{{ content }}"
+          ["page.html", "section.html", "index.html"].each { |t| File.write("templates/#{t}", bc) }
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+
+          # First call falls back to a full build (no prior state).
+          builder.run_incremental(["content/blog/news/_index.md"], options)
+          File.read("public/blog/news/index.html").should contain("BC:BlogOld;")
+
+          # Edit ONLY the parent section's title, then incrementally rebuild.
+          File.write("content/blog/_index.md", "---\ntitle: BlogNew\n---\n")
+          builder.run_incremental(["content/blog/_index.md"], options)
+
+          # The nested SUBSECTION index (a site.sections page, not a site.pages
+          # page) must pick up the parent's new title in its breadcrumb.
+          File.read("public/blog/news/index.html").should contain("BC:BlogNew;")
+        end
+      end
+    end
   end
 
   describe "#run_rerender" do

@@ -318,8 +318,10 @@ module Hwaro
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
 
-          # Re-link navigation only for affected sections
-          relink_navigation_for_sections(site, affected_sections)
+          # Re-link the global reading order; `renav_pages` is every page whose
+          # prev/next pointer actually changed (a section weight/sort/reverse edit
+          # reorders a whole block, not just the edited page's neighbors).
+          renav_pages = relink_navigation_for_sections(site, affected_sections)
 
           # Recompute series for affected series (if enabled), including old memberships
           affected_series = if site.config.series.enabled
@@ -328,14 +330,28 @@ module Hwaro
                               Set(String).new
                             end
 
-          # Recompute related posts selectively (if enabled)
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages)
+          # Recompute related posts selectively (if enabled). Pass the excluded
+          # pages' paths so pages that listed a now-removed page as related drop it.
+          excluded_related_paths = excluded_pages.map(&.path).to_set
+          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_related_paths)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
           @crinja_cache_mutex.synchronize do
             affected_series.each { |s| @series_crinja_cache.delete(s) }
             related_pages_updated.each { |path| @related_posts_crinja_cache.delete(path) }
+
+            # A changed SECTION's title/url is embedded in every descendant's
+            # breadcrumb, which is served from @ancestors_crinja_cache keyed
+            # "section:language". affected_sections only covers the section itself
+            # and its UPWARD ancestors, so drop the whole DESCENDANT subtree
+            # ("sec:..." and "sec/...") too, or re-rendered descendants would read
+            # a cached ancestors array still carrying the old title/url.
+            changed_pages.each do |page|
+              next unless page.is_a?(Models::Section)
+              sec = page.section
+              @ancestors_crinja_cache.reject! { |k, _| k.starts_with?("#{sec}:") || k.starts_with?("#{sec}/") }
+            end
           end
 
           # --- 3. Determine the full set of pages that need re-rendering ---
@@ -350,7 +366,31 @@ module Hwaro
             end
           end
 
-          # Previous / next pages (both old and new neighbors after re-linking)
+          # When a SECTION `_index` itself changed, its own title/url can appear
+          # in every descendant page's breadcrumb (page.ancestors) and its sort
+          # settings reorder the section's listings — so re-render the whole
+          # subtree. Cover BOTH descendant content pages (site.pages) AND nested
+          # section index pages (site.sections — `_index.md` files never live in
+          # site.pages), or a nested subsection's breadcrumb stays stale. Bounded
+          # by the edited section's size, and only triggered by the rarer section
+          # edits.
+          changed_pages.each do |page|
+            next unless page.is_a?(Models::Section)
+            sec = page.section
+            prefix = "#{sec}/"
+            site.pages.each do |p|
+              pages_to_render << p if p.section == sec || p.section.starts_with?(prefix)
+            end
+            site.sections.each do |s|
+              pages_to_render << s if s.section == sec || s.section.starts_with?(prefix)
+            end
+          end
+
+          # Previous / next pages. `renav_pages` is every page whose lower/higher
+          # pointer changed in the global re-link (covers block reorders from a
+          # section weight/sort/reverse edit); the explicit old/new neighbors of
+          # each changed page are a subset but kept for clarity.
+          renav_pages.each { |p| pages_to_render << p }
           changed_pages.each do |page|
             # New neighbors (after re-link)
             page.lower.try { |l| pages_to_render << l }
@@ -376,6 +416,14 @@ module Hwaro
               pages_to_render << p
             end
           end
+
+          # KNOWN LIMITATION (serve preview only): a page that renders ANOTHER
+          # section's listing via `get_section(X).pages` or a global `site.pages`
+          # widget (e.g. a sidebar "recent posts") is NOT re-rendered when a page
+          # in X changes, so its on-disk HTML can show a stale list until that
+          # page is itself touched. Bounding this would require tracking which
+          # pages reference which section lists; a full `hwaro build` is always
+          # correct, so this is left as a documented preview-mode gap.
 
           render_list = pages_to_render.to_a
 

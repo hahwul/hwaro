@@ -86,7 +86,7 @@ module Hwaro
       property content : String
       property raw_content : String
       property path : String      # Relative path from content/ (e.g. "projects/a.md")
-      property section : String   # First directory component (e.g. "projects")
+      property section : String   # Parent directory path (e.g. "blog/news"), not just the first component
       property url : String       # Calculated relative URL (e.g. "/projects/a/")
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
