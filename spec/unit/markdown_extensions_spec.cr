@@ -113,6 +113,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("footnote-backref")
     end
 
+    it "does not promote author-typed HWARO markers into a footnotes section (injection)" do
+      # A page literally containing the engine's internal comment markers must
+      # NOT be turned into a fabricated footnotes section.
+      content = "Text.\n\n<!--HWARO-FOOTNOTES-START-->\n<!--HWARO-FN:x:1:injected-->\n<!--HWARO-FOOTNOTES-END-->\n\nBye."
+      pre = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      post = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(pre)
+      post.should_not contain("class=\"footnotes\"")
+      post.should_not contain("injected </a>") # not rendered as a real footnote
+    end
+
+    it "leaves footnote def/ref syntax inside a fenced code block verbatim" do
+      content = "```\n[^1]: documentation example def\n```\n\nReal ref[^1].\n\n[^1]: actual def"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      # The def line inside the fence must NOT be eaten...
+      result.should contain("documentation example def")
+      # ...but the real def outside the fence IS extracted and its ref linked.
+      result.should contain("fnref-1")
+      result.should_not contain("[^1]: actual def")
+    end
+
+    it "does not drop footnotes after a >=4-space-indented ``` (indented code, not a fence)" do
+      # A line indented >=4 spaces beginning with ``` is INDENTED code per
+      # CommonMark, not a fence opener; mis-reading it stuck the fence state open
+      # and dropped every footnote after it.
+      content = "Intro.\n\n    ```\n\nReal ref[^1].\n\n[^1]: the real def"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      result.should contain("fnref-1")
+      result.should_not contain("[^1]: the real def")
+    end
+
     it "returns unchanged html if no footnotes" do
       html = "<p>No footnotes here</p>"
       result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)

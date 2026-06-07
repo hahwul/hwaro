@@ -24,14 +24,23 @@ module Hwaro
         UNSAFE_PROTOCOL_RE      = /^\s*(javascript|vbscript|file|data):/i
         UNSAFE_DATA_PROTOCOL_RE = /^\s*data:image\/(?:png|gif|jpeg|webp)/i
 
-        INLINE_CODE_SPAN_RE         = /`([^`]+)`/
-        INLINE_IMAGE_RE             = /!\[([^\]]*)\]\(([^)]*)\)/
-        INLINE_LINK_RE              = /\[([^\]]+)\]\(([^)]*)\)/
-        INLINE_BOLD_ASTERISK_RE     = /\*\*(.+?)\*\*/
-        INLINE_BOLD_UNDERSCORE_RE   = /__(.+?)__/
-        INLINE_ITALIC_ASTERISK_RE   = /\*(.+?)\*/
-        INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/
-        INLINE_STRIKETHROUGH_RE     = /~~(.+?)~~/
+        INLINE_CODE_SPAN_RE = /`([^`]+)`/
+        INLINE_IMAGE_RE     = /!\[([^\]]*)\]\(([^)]*)\)/
+        INLINE_LINK_RE      = /\[([^\]]+)\]\(([^)]*)\)/
+        # Flanking guards (`(?=\S)` … `(?<=\S)`): a delimiter run that touches
+        # whitespace on the inside must NOT open/close emphasis, so literal
+        # `2 * 3 and 4 * 5` (arithmetic in a table cell or footnote) is left
+        # alone instead of becoming `2 <em> 3 and 4 </em> 5`. This approximates
+        # CommonMark's left/right-flanking rule that the body markd uses.
+        INLINE_BOLD_ASTERISK_RE   = /\*\*(?=\S)(.+?)(?<=\S)\*\*/
+        INLINE_BOLD_UNDERSCORE_RE = /__(?=\S)(.+?)(?<=\S)__/
+        # The italic delimiter must be a LONE `*`/`_` (not part of a `**`/`__`
+        # run) — `(?<!\*)…(?!\*)` and `[^\s*]` neighbours — otherwise a spaced
+        # `2 ** 3 and 4 ** 5` (which the bold regex correctly declines) would be
+        # re-matched across the two `**` runs into `<em>* 3 and 4 *</em>`.
+        INLINE_ITALIC_ASTERISK_RE   = /(?<!\*)\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?!\*)/
+        INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![a-zA-Z0-9_])/
+        INLINE_STRIKETHROUGH_RE     = /~~(?=\S)(.+?)(?<=\S)~~/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives

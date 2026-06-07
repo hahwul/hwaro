@@ -39,6 +39,31 @@ describe "bugfix regressions" do
     end
   end
 
+  describe "InlineMarkdown.render (emphasis flanking)" do
+    it "does not turn spaced asterisks (arithmetic) into emphasis" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("Compute 2 * 3 and 4 * 5")
+      out.should_not contain("<em>")
+      out.should contain("2 * 3")
+    end
+
+    it "still renders real emphasis and strikethrough" do
+      Hwaro::Content::Processors::InlineMarkdown.render("a *italic* b").should contain("<em>italic</em>")
+      Hwaro::Content::Processors::InlineMarkdown.render("a **bold** b").should contain("<strong>bold</strong>")
+      Hwaro::Content::Processors::InlineMarkdown.render("a ~~del~~ b").should contain("<del>del</del>")
+    end
+
+    it "leaves spaced double-asterisk runs literal (no leaked glyphs)" do
+      # The lone-* italic delimiter must not match across two `**` runs and leak
+      # `*` glyphs (e.g. `2 ** 3 and 4 ** 5`, Python `**kwargs`, `x **= 2`).
+      ["2 ** 3 and 4 ** 5", "kwargs: **kwargs and **args", "x **= 2 and y **= 3"].each do |s|
+        out = Hwaro::Content::Processors::InlineMarkdown.render(s)
+        out.should_not contain("<em>")
+        out.should_not contain("<strong>")
+        out.should contain(s)
+      end
+    end
+  end
+
   describe "TableParser fenced code blocks" do
     it "does not convert a pipe table inside a fenced code block" do
       md = "```\n| H1 | H2 |\n|----|----|\n| a  | b  |\n```"

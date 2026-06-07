@@ -32,7 +32,10 @@ module Hwaro
         # Matches <h1>…</h1> through <h6>…</h6>, capturing tag name, level digit, attributes, and inner HTML
         HEADING_TAG_REGEX = /<(h([1-6]))(\s[^>]*)?>(.+?)<\/h\2>/mi
         # Matches <img ...> tags that do NOT already have a loading= attribute
-        IMG_LAZY_REGEX = /<img(?![^>]*\bloading\s*=)([^>]*?)\s*\/?>/i
+        # Quote-aware attribute scan: a `>` inside a quoted attribute value
+        # (legal HTML5, e.g. alt="Home > Docs") must not be treated as the tag
+        # end, or the lazy-load rewrite corrupts the raw <img> into broken markup.
+        IMG_LAZY_REGEX = /<img(?![^>]*\bloading\s*=)((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/i
         # Extracts id="value" from an attribute string
         ID_ATTR_REGEX = /\bid\s*=\s*["']([^"']+)["']/
         # Strips HTML tags to get plain text
@@ -344,9 +347,9 @@ module Hwaro
           end
           return unless yaml_fm.as_h?
 
-          date = parse_time(yaml_fm["date"]?.try(&.as_s?))
-          updated = parse_time(yaml_fm["updated"]?.try(&.as_s?))
-          expires = parse_time(yaml_fm["expires"]?.try(&.as_s?))
+          date = parse_yaml_time(yaml_fm["date"]?)
+          updated = parse_yaml_time(yaml_fm["updated"]?)
+          expires = parse_yaml_time(yaml_fm["expires"]?)
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
@@ -800,6 +803,19 @@ module Hwaro
           raw = val.raw
           if raw.is_a?(Time)
             raw
+          else
+            parse_time(val.as_s?)
+          end
+        end
+
+        # Parse a YAML value that may be a native Time or a String. An UNQUOTED
+        # YAML date (`date: 2024-03-15`) resolves to a native Time node, so the
+        # old `.as_s?` returned nil and silently dropped the date — breaking
+        # sorting/feeds/sitemap. Mirrors parse_toml_time and content_lister.cr.
+        private def parse_yaml_time(val : YAML::Any?) : Time?
+          return unless val
+          if t = val.as_time?
+            t
           else
             parse_time(val.as_s?)
           end

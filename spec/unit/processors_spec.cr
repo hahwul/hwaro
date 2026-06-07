@@ -581,6 +581,16 @@ describe Hwaro::Processor::Markdown do
       html.should_not contain("loading=\"lazy\"")
     end
 
+    it "does not corrupt a raw <img> with a '>' inside a quoted attribute" do
+      # A '>' inside a quoted attribute value is legal HTML5; the old regex
+      # treated it as the tag end and mangled the tag.
+      content = "<img src=\"a.png\" alt=\"a > b\">"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)
+      html.should contain("loading=\"lazy\"")
+      html.should contain("alt=\"a > b\"")
+      html.should_not contain("/> b")
+    end
+
     it "preserves existing loading attribute" do
       content = "<img src='image.jpg' loading='eager'>"
       html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)

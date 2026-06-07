@@ -484,6 +484,27 @@ describe Hwaro::Content::Processors::Markdown do
       result[:date].should_not be_nil
     end
 
+    it "parses UNQUOTED date/updated/expires (YAML native timestamps)" do
+      # Unquoted YAML dates resolve to native Time nodes; the old `.as_s?` read
+      # returned nil and silently dropped them, breaking sort/feeds/sitemap.
+      raw = <<-MD
+        ---
+        title: Post
+        date: 2024-03-15
+        updated: 2024-04-01
+        expires: 2025-01-01
+        ---
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:date].should_not be_nil
+      result[:updated].should_not be_nil
+      result[:expires].should_not be_nil
+      result[:date].not_nil!.year.should eq(2024)
+      result[:date].not_nil!.month.should eq(3)
+    end
+
     it "parses toc field" do
       raw = <<-MD
         ---

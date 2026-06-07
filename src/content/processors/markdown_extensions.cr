@@ -178,29 +178,48 @@ module Hwaro
         FOOTNOTE_BLOCK_RE   = /\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m
 
         def preprocess_footnotes(content : String) : String
-          # Extract and remove footnote definitions
+          # Neutralize any author-typed HWARO FOOTNOTE markers up front so page
+          # content that literally contains the engine's internal comment markers
+          # (e.g. docs about hwaro, or a malicious multi-author contributor) can't
+          # be promoted into a fabricated <section class="footnotes"> — in-band
+          # signaling injection. Inserting a space keeps them valid, inert HTML
+          # comments while preventing FOOTNOTE_*_RE from matching them; the engine
+          # then emits its OWN markers (no space) below, which postprocess matches.
+          # Scoped to the FN/FOOTNOTES markers so the unrelated shortcode
+          # placeholder comment (<!--HWARO-SHORTCODE-...-->) is left untouched.
+          content = content
+            .gsub("<!--HWARO-FN", "<!-- HWARO-FN")
+            .gsub("<!--HWARO-FOOTNOTES-", "<!-- HWARO-FOOTNOTES-")
+
+          # Extract and remove footnote definitions — but only OUTSIDE fenced code
+          # blocks, so a ``` [^1]: ... ``` syntax example isn't silently eaten.
           footnotes = {} of String => String
-          cleaned = content.gsub(FOOTNOTE_DEF_RE) do |_|
-            footnotes[$~[1]] = $~[2]
-            "" # Remove definition from content
+          cleaned = process_lines_fence_aware(content) do |line, _|
+            line.gsub(FOOTNOTE_DEF_RE) do |_|
+              footnotes[$~[1]] = $~[2]
+              "" # Remove definition from content
+            end
           end
 
           return cleaned if footnotes.empty?
 
-          # Replace references with superscript HTML placeholders
+          # Replace references with superscript HTML placeholders, also fence-aware
+          # so a `[^1]` shown inside a code block stays verbatim.
           counter = 0
           ref_order = {} of String => Int32
-          result = cleaned.gsub(FOOTNOTE_REF_RE) do |full_match|
-            key = $~[1]
-            next full_match unless footnotes.has_key?(key)
+          result = process_lines_fence_aware(cleaned) do |line, _|
+            line.gsub(FOOTNOTE_REF_RE) do |full_match|
+              key = $~[1]
+              next full_match unless footnotes.has_key?(key)
 
-            unless ref_order.has_key?(key)
-              counter += 1
-              ref_order[key] = counter
+              unless ref_order.has_key?(key)
+                counter += 1
+                ref_order[key] = counter
+              end
+              num = ref_order[key]
+              escaped_key = HTML.escape(key)
+              "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
             end
-            num = ref_order[key]
-            escaped_key = HTML.escape(key)
-            "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
@@ -252,8 +271,18 @@ module Hwaro
             str << "</ol>\n</section>\n"
           end
 
-          # Replace the comment block with the rendered section
-          html.sub(FOOTNOTE_BLOCK_RE, section)
+          # Replace the comment block with the rendered section. gsub (not sub)
+          # so the section is emitted once and any additional marker block is
+          # removed rather than leaking the raw engine comments into output.
+          first = true
+          html.gsub(FOOTNOTE_BLOCK_RE) do
+            if first
+              first = false
+              section
+            else
+              ""
+            end
+          end
         end
 
         # --- Math ---
@@ -370,16 +399,23 @@ module Hwaro
             content.each_line(chomp: false) do |line|
               stripped = line.lstrip
 
+              # A code fence may be indented at most 3 spaces (CommonMark). A line
+              # indented >=4 spaces or with a leading tab is INDENTED-code content,
+              # where ``` / ~~~ is literal text, not a fence — mis-reading it as a
+              # fence opener left in_fence stuck to end-of-document and dropped
+              # every footnote/heading after it.
+              fence_eligible = !(line.starts_with?("    ") || line.starts_with?('\t'))
+
               if in_fence
-                if stripped.starts_with?(fence_marker)
+                if fence_eligible && stripped.starts_with?(fence_marker)
                   in_fence = false
                 end
                 io << line
-              elsif stripped.starts_with?(FENCE_BACKTICKS)
+              elsif fence_eligible && stripped.starts_with?(FENCE_BACKTICKS)
                 in_fence = true
                 fence_marker = FENCE_BACKTICKS
                 io << line
-              elsif stripped.starts_with?(FENCE_TILDES)
+              elsif fence_eligible && stripped.starts_with?(FENCE_TILDES)
                 in_fence = true
                 fence_marker = FENCE_TILDES
                 io << line
