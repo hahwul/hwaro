@@ -867,7 +867,9 @@ module Hwaro
             end
 
             affected_sections.each do |section_name|
-              @ancestors_crinja_cache.delete(section_name)
+              # Keyed by "section:language" now (see build_template_variables), so
+              # drop every language's entry for the section, like section_pages.
+              @ancestors_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
               @section_pages_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
               @section_assets_crinja_cache.delete(section_name)
             end

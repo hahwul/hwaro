@@ -31,8 +31,11 @@ module Hwaro::Core::Build
       @related_posts_crinja_cache["a.md"] = Crinja::Value.new("ra")
       @series_crinja_cache["tutorial"] = Crinja::Value.new("series")
       # Seed with non-empty arrays so the eviction tests can distinguish
-      # "key removed" from "key emptied".
-      @ancestors_crinja_cache["blog"] = [Crinja::Value.new("blog-anc")]
+      # "key removed" from "key emptied". The ancestors cache is keyed by
+      # "section:language" (like section_pages), so it is invalidated by prefix.
+      @ancestors_crinja_cache["blog:en"] = [Crinja::Value.new("blog-en-anc")]
+      @ancestors_crinja_cache["blog:ko"] = [Crinja::Value.new("blog-ko-anc")]
+      @ancestors_crinja_cache["other:en"] = [Crinja::Value.new("other-en-anc")]
       @section_pages_crinja_cache["blog:en"] = [Crinja::Value.new("blog-en-1")]
       @section_pages_crinja_cache["blog:ko"] = [Crinja::Value.new("blog-ko-1")]
       @section_pages_crinja_cache["other:en"] = [Crinja::Value.new("other-en-1")]
@@ -198,7 +201,9 @@ describe Hwaro::Core::Build::Builder do
       )
 
       caches = builder.test_get_internal_caches
-      caches[:ancestors].has_key?("blog").should be_false
+      caches[:ancestors].has_key?("blog:en").should be_false
+      caches[:ancestors].has_key?("blog:ko").should be_false
+      caches[:ancestors].has_key?("other:en").should be_true
       caches[:section_pages].has_key?("blog:en").should be_false
       caches[:section_pages].has_key?("blog:ko").should be_false
       caches[:section_pages].has_key?("other:en").should be_true

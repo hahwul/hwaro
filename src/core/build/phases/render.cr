@@ -264,6 +264,13 @@ module Hwaro::Core::Build::Phases::Render
     worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
     worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
 
+    # Warm the built-in shortcode template memo on THIS fiber before any worker
+    # spawns. BuiltinShortcodes.templates is `@@templates ||= build_templates`,
+    # an unsynchronized check-then-build; first-touched concurrently by two
+    # workers under -Dpreview_mt it races. Building it once here makes it
+    # read-only for the workers (identical content, negligible cost).
+    BuiltinShortcodes.templates
+
     results = Channel(Bool).new(pages.size)
     work_queue = Channel({Models::Page, Int32}).new(pages.size)
 
@@ -1388,8 +1395,12 @@ module Hwaro::Core::Build::Phases::Render
     lower_obj = page.lower.try { |l| cached_page_crinja_value(l, default_lang) }
     higher_obj = page.higher.try { |h| cached_page_crinja_value(h, default_lang) }
 
-    # Build ancestors array (cached per section — pages in the same section share ancestors)
-    ancestors_cache_key = page.section
+    # Build ancestors array (cached per section+language — pages in the same
+    # section AND language share ancestors). The language is part of the key
+    # because a multilingual section has per-language ancestors; omitting it
+    # served whichever language rendered first to every language (mirrors the
+    # section_pages cache key).
+    ancestors_cache_key = "#{page.section}:#{page.language}"
     ancestors_array = @crinja_cache_mutex.synchronize do
       if cached = @ancestors_crinja_cache[ancestors_cache_key]?
         @cache_manager.record_hit("ancestors_crinja")

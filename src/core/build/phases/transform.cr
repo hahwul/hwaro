@@ -132,18 +132,42 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Resolve a section by path using the requested language, with the same
+  # fallback chain as Site#section_for: exact language → language-neutral
+  # (default-language `_index.md`) → configured default language. Keeps
+  # single-language sites (language nil everywhere) on the existing behavior.
+  private def lookup_ancestor_section(
+    map : Hash({String, String?}, Models::Section),
+    path : String,
+    language : String?,
+    default_language : String,
+  ) : Models::Section?
+    map[{path, language}]? ||
+      map[{path, nil}]? ||
+      map[{path, default_language}]?
+  end
+
   # Build subsections hierarchy
   private def build_subsections(ctx : Lifecycle::BuildContext)
-    sections_by_path = {} of String => Models::Section
-    ctx.sections.each { |s| sections_by_path[s.section] = s }
+    default_lang = ctx.site.try(&.config.default_language) || ""
+
+    # Key by {section path, language}. `section` is language-blind (the language
+    # suffix lives in the filename basename, stripped before section is computed),
+    # so `posts/_index.md` and `posts/_index.ko.md` both have section "posts". A
+    # plain `Hash(String, Section)` made the second overwrite the first, so every
+    # page's breadcrumb ancestors came from whichever language's _index loaded
+    # last — an English post linking to `/ko/posts/`. `||=` mirrors the
+    # first-write-wins of Site#build_lookup_index.
+    sections_by_path = {} of {String, String?} => Models::Section
+    ctx.sections.each { |s| sections_by_path[{s.section, s.language}] ||= s }
 
     ctx.sections.each do |section|
       path_parts = section.section.split("/")
       next if path_parts.size <= 1
 
-      # Link to the immediate parent section when it exists.
+      # Link to the immediate parent section when it exists (same-language first).
       parent_path = path_parts[0..-2].join("/")
-      if parent = sections_by_path[parent_path]?
+      if parent = lookup_ancestor_section(sections_by_path, parent_path, section.language, default_lang)
         parent.add_subsection(section)
       end
 
@@ -155,13 +179,13 @@ module Hwaro::Core::Build::Phases::Transform
       current_path = ""
       path_parts[0..-2].each do |part|
         current_path = current_path.empty? ? part : "#{current_path}/#{part}"
-        if ancestor = sections_by_path[current_path]?
+        if ancestor = lookup_ancestor_section(sections_by_path, current_path, section.language, default_lang)
           section.ancestors << ancestor
         end
       end
     end
 
-    # Also build ancestors for regular pages
+    # Also build ancestors for regular pages, resolved in the page's own language.
     ctx.pages.each do |page|
       next if page.section.empty?
 
@@ -169,7 +193,7 @@ module Hwaro::Core::Build::Phases::Transform
       current_path = ""
       path_parts.each do |part|
         current_path = current_path.empty? ? part : "#{current_path}/#{part}"
-        if ancestor = sections_by_path[current_path]?
+        if ancestor = lookup_ancestor_section(sections_by_path, current_path, page.language, default_lang)
           page.ancestors << ancestor
         end
       end

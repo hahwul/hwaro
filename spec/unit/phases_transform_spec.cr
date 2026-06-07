@@ -96,6 +96,38 @@ describe Hwaro::Core::Build::Phases::Transform do
 
       page.ancestors.map(&.section).should eq(["docs", "docs/guide"])
     end
+
+    it "resolves per-language ancestors for multilingual section indexes" do
+      # posts/_index.md (default) and posts/_index.ko.md both have section
+      # "posts"; a language-blind lookup made the last one win, so every page's
+      # breadcrumb pointed at one language's section. Each page must get its OWN
+      # language's section.
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      site = Hwaro::Models::Site.new(config)
+      ctx.site = site
+
+      en_index = make_section("posts/_index.md", "posts")
+      en_index.url = "/posts/"
+      ko_index = make_section("posts/_index.ko.md", "posts")
+      ko_index.language = "ko"
+      ko_index.url = "/ko/posts/"
+      ctx.sections = [en_index, ko_index]
+
+      en_page = make_page("posts/a.md", "posts")
+      ko_page = make_page("posts/a.ko.md", "posts")
+      ko_page.language = "ko"
+      ctx.pages = [en_page, ko_page]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_build_subsections(ctx)
+
+      en_page.ancestors.map(&.url).should eq(["/posts/"])
+      ko_page.ancestors.map(&.url).should eq(["/ko/posts/"])
+    end
   end
 
   describe "#link_page_navigation" do
