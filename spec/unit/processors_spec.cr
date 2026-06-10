@@ -566,6 +566,33 @@ describe Hwaro::Processor::Markdown do
       result[:sort_by].should be_nil
       result[:reverse].should be_nil
     end
+
+    it "accepts Zola's paginate_by as an alias for paginate" do
+      content = <<-MARKDOWN
+        ---
+        title: Posts
+        paginate_by: 5
+        ---
+
+        All posts.
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:paginate].should eq(5)
+    end
+
+    it "prefers paginate over paginate_by when both are set" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+        paginate = 3
+        paginate_by = 7
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:paginate].should eq(3)
+    end
   end
 
   describe "lazy loading images" do

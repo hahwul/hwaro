@@ -60,7 +60,7 @@ module Hwaro
           "transparent", "generate_feeds", "paginate", "pagination_enabled",
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
-          "series", "series_weight", "expires",
+          "series", "series_weight", "expires", "paginate_by",
         }
 
         # Warn about unknown front-matter keys that look like typos of known keys.
@@ -481,22 +481,25 @@ module Hwaro
           tags : Array(String),
         )
           {
-            title:               fm["title"]?.try(&.as_s?) || "Untitled",
-            description:         fm["description"]?.try(&.as_s?),
-            image:               fm["image"]?.try(&.as_s?),
-            draft:               fm_bool(fm, "draft", false),
-            template:            fm["template"]?.try(&.as_s?),
-            in_sitemap:          fm_bool(fm, "in_sitemap", true),
-            toc:                 fm_bool(fm, "toc", false),
-            date:                date,
-            updated:             updated,
-            render:              fm_bool(fm, "render", true),
-            slug:                fm["slug"]?.try(&.as_s?),
-            custom_path:         fm["path"]?.try(&.as_s?),
-            aliases:             fm_string_array(fm, "aliases"),
-            transparent:         fm_bool(fm, "transparent", false),
-            generate_feeds:      fm_bool(fm, "generate_feeds", false),
-            paginate:            fm_int?(fm, "paginate"),
+            title:          fm["title"]?.try(&.as_s?) || "Untitled",
+            description:    fm["description"]?.try(&.as_s?),
+            image:          fm["image"]?.try(&.as_s?),
+            draft:          fm_bool(fm, "draft", false),
+            template:       fm["template"]?.try(&.as_s?),
+            in_sitemap:     fm_bool(fm, "in_sitemap", true),
+            toc:            fm_bool(fm, "toc", false),
+            date:           date,
+            updated:        updated,
+            render:         fm_bool(fm, "render", true),
+            slug:           fm["slug"]?.try(&.as_s?),
+            custom_path:    fm["path"]?.try(&.as_s?),
+            aliases:        fm_string_array(fm, "aliases"),
+            transparent:    fm_bool(fm, "transparent", false),
+            generate_feeds: fm_bool(fm, "generate_feeds", false),
+            # `paginate_by` is Zola's spelling (also exposed on `paginator` in
+            # templates); accept it as an alias so migrated sites paginate
+            # instead of silently rendering one unbounded page.
+            paginate:            fm_int?(fm, "paginate") || fm_int?(fm, "paginate_by"),
             pagination_enabled:  fm_bool?(fm, "pagination_enabled"),
             sort_by:             fm["sort_by"]?.try(&.as_s?),
             reverse:             fm_bool?(fm, "reverse"),

@@ -227,6 +227,56 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain(%(``a `b` {{ youtube(id="x") }}``))
       result.should_not contain("<iframe")
     end
+
+    # Regression: inline code spans used to SPLIT the content into chunks,
+    # so a block shortcode whose body contained `code` had its opener and
+    # closer land in different chunks — the pair never matched and both
+    # tags leaked into the rendered HTML as literal text. Spans are now
+    # masked during pairing and restored before the body is rendered.
+    it "processes a block shortcode whose body contains an inline code span" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/alert" => %(<div class="alert">{{ body }}</div>)}
+      content = "{% alert %}\nuse `code` here.\n{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should_not contain("{% alert %}")
+      result.should_not contain("{% end %}")
+      result.should_not contain("HWARO-INLINE-CODE")
+      result.should contain(%(<div class="alert">use `code` here.</div>))
+    end
+
+    it "restores the inline code span verbatim inside the rendered body" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/alert" => %(<div class="alert">{{ body }}</div>)}
+      results = {} of String => String
+      content = "{% alert %}\nuse `code` here.\n{% end %}"
+      builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      results.size.should eq(1)
+      results.values.first.should contain("use `code` here.")
+      results.values.first.should_not contain("HWARO-INLINE-CODE")
+    end
+
+    it "keeps a literal shortcode example inside inline code within a block body" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/alert"   => %(<div class="alert">{{ body }}</div>),
+        "shortcodes/youtube" => %(<iframe></iframe>),
+      }
+      results = {} of String => String
+      content = %({% alert %}\nliteral `{{ youtube(id="x") }}` example.\n{% end %})
+      builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      results.size.should eq(1)
+      results.values.first.should contain(%(`{{ youtube(id="x") }}`))
+      results.values.first.should_not contain("<iframe")
+    end
+
+    it "restores inline code spans in shortcode arguments" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/echo" => %(<span>{{ msg }}</span>)}
+      results = {} of String => String
+      content = %({{ echo(msg="tick `x` tock") }})
+      builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      results.values.first.should_not contain("HWARO-INLINE-CODE")
+    end
   end
 
   describe "nested shortcodes" do

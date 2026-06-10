@@ -64,6 +64,25 @@ describe Hwaro::Core::Build::Phases::ParseContent do
       end
     end
 
+    it "strips known template extensions from template/page_template (Zola spelling)" do
+      with_content_dir({
+        "blog/_index.md" => "---\ntitle: Blog\ntemplate: section.html\npage_template: post.j2\n---\nx",
+        "post.md"        => "---\ntitle: P\ntemplate: fancy\n---\nx",
+      }) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(Hwaro::Models::Config.new)
+
+        section = Hwaro::Models::Section.new("blog/_index.md")
+        builder.test_parse_single_page(section)
+        section.template.should eq("section")
+        section.page_template.should eq("post")
+
+        page = Hwaro::Models::Page.new("post.md")
+        builder.test_parse_single_page(page)
+        page.template.should eq("fancy")
+      end
+    end
+
     it "computes word count and reading time" do
       with_content_dir({
         "p.md" => "---\ntitle: P\n---\n#{"word " * 50}",

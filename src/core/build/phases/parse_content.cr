@@ -118,6 +118,14 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # Template lookups are keyed by extension-stripped names ("section", not
+  # "section.html"), but users coming from Zola write `template = "section.html"`
+  # in frontmatter. Strip the known template extensions here so both spellings
+  # resolve to the same template.
+  private def normalize_template_name(name : String?) : String?
+    name.try(&.sub(Builder::TEMPLATE_EXTENSION_REGEX, ""))
+  end
+
   # Parse a single page: read file, parse frontmatter, assign properties
   private def parse_single_page(page : Models::Page)
     source_path = File.join("content", page.path)
@@ -131,7 +139,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.image = data[:image]
     page.raw_content = data[:content]
     page.draft = data[:draft]
-    page.template = data[:template]
+    page.template = normalize_template_name(data[:template])
     page.in_sitemap = data[:in_sitemap]
     page.toc = data[:toc]
     page.date = data[:date]
@@ -183,7 +191,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       page.pagination_enabled = data[:pagination_enabled]
       page.sort_by = data[:sort_by]
       page.reverse = data[:reverse]
-      page.page_template = data[:page_template]
+      page.page_template = normalize_template_name(data[:page_template])
       page.paginate_path = data[:paginate_path]
     end
 

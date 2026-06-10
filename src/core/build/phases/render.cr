@@ -663,8 +663,12 @@ module Hwaro::Core::Build::Phases::Render
     if custom = page.template
       return custom if templates.has_key?(custom)
       msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
-      Logger.warn "#{msg}"
-      page.build_warnings << msg unless page.build_warnings.includes?(msg)
+      # determine_template runs again after render for profiler bookkeeping;
+      # only log/record the first time so the warning isn't printed twice.
+      unless page.build_warnings.includes?(msg)
+        Logger.warn "#{msg}"
+        page.build_warnings << msg
+      end
     end
 
     if page.is_a?(Models::Section)
