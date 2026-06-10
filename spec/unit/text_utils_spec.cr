@@ -128,6 +128,34 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".encode_url_path" do
+    it "leaves plain ASCII URLs unchanged" do
+      Hwaro::Utils::TextUtils.encode_url_path("https://example.com/posts/hello/").should eq("https://example.com/posts/hello/")
+    end
+
+    it "percent-encodes non-ASCII path segments, keeping scheme and host" do
+      Hwaro::Utils::TextUtils.encode_url_path("https://example.com/posts/한글-포스트/")
+        .should eq("https://example.com/posts/%ED%95%9C%EA%B8%80-%ED%8F%AC%EC%8A%A4%ED%8A%B8/")
+    end
+
+    it "encodes spaces in paths" do
+      Hwaro::Utils::TextUtils.encode_url_path("https://example.com/a b/").should eq("https://example.com/a%20b/")
+    end
+
+    it "encodes root-relative paths without a scheme" do
+      Hwaro::Utils::TextUtils.encode_url_path("/tags/한국어/rss.xml").should eq("/tags/%ED%95%9C%EA%B5%AD%EC%96%B4/rss.xml")
+    end
+
+    it "does not double-encode already-encoded URLs" do
+      pre = "https://example.com/posts/%ED%95%9C%EA%B8%80/"
+      Hwaro::Utils::TextUtils.encode_url_path(pre).should eq(pre)
+    end
+
+    it "leaves a bare domain without path unchanged" do
+      Hwaro::Utils::TextUtils.encode_url_path("https://한글.example").should eq("https://한글.example")
+    end
+  end
+
   describe ".escape_xml" do
     it "escapes ampersand" do
       Hwaro::Utils::TextUtils.escape_xml("Tom & Jerry").should eq("Tom &amp; Jerry")

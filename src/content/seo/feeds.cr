@@ -173,14 +173,16 @@ module Hwaro
         private def self.build_feed_url(config : Models::Config, base_path : String, filename : String) : {String, String}
           base_url = config.base_url.rstrip('/')
           feed_url_path = base_path.empty? ? filename : File.join(base_path, filename)
-          feed_url = "#{base_url}/#{feed_url_path.lchop("/")}"
+          # RSS/Atom require RFC 3986 URIs — percent-encode non-ASCII paths
+          # (e.g. a taxonomy term feed under `/tags/한국어/`).
+          feed_url = Utils::TextUtils.encode_url_path("#{base_url}/#{feed_url_path.lchop("/")}")
           {base_url, feed_url}
         end
 
         # Build the full absolute URL for a page.
         private def self.page_full_url(page : Models::Page, base_url : String) : String
           path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-          base_url.empty? ? path : base_url + path
+          Utils::TextUtils.encode_url_path(base_url.empty? ? path : base_url + path)
         end
 
         # Convert a feed timestamp to UTC, but re-anchor "midnight in a non-UTC

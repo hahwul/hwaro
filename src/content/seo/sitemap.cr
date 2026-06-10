@@ -75,7 +75,9 @@ module Hwaro
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base.empty? ? path : base + path
 
-              escaped_url = Utils::TextUtils.escape_xml(full_url)
+              # Percent-encode before XML-escaping: the sitemap protocol
+              # requires RFC 3986 URIs, so non-ASCII paths must be escaped.
+              escaped_url = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path(full_url))
 
               str << "  <url>\n"
               str << "    <loc>#{escaped_url}</loc>\n"
@@ -89,7 +91,7 @@ module Hwaro
                 str << "    <xhtml:link rel=\"alternate\" hreflang=\""
                 str << Utils::TextUtils.escape_xml(t.code)
                 str << "\" href=\""
-                str << Utils::TextUtils.escape_xml(t_full)
+                str << Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path(t_full))
                 str << "\" />\n"
               end
 

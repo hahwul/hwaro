@@ -422,6 +422,28 @@ describe Hwaro::Content::Search do
       end
     end
 
+    # Titles are plain frontmatter text, not HTML: stripping "tags" from
+    # them destroyed legitimate angle-bracket text (`Using <canvas>`,
+    # `Vec<T>` …). The bundled search UIs escape titles at render time.
+    it "stores titles with literal angle brackets verbatim" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Using <canvas> with Vec<T>"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "x"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Using <canvas> with Vec<T>")
+      end
+    end
+
     it "handles multiple pages" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true

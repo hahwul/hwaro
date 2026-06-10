@@ -103,8 +103,12 @@ module Hwaro
             when "title"
               # The root index commonly has an empty title; fall back to the
               # site title so the search entry isn't blank (mirrors llms.cr/feeds).
-              raw_title = page.title.empty? ? config.title : page.title
-              title = Utils::TextUtils.strip_html(raw_title)
+              # Store the title verbatim: it is plain frontmatter text, and
+              # stripping "tags" from it destroyed titles like `Using <canvas>`.
+              # XSS safety is the renderer's job — every bundled search UI
+              # escapes via escapeHtml() before innerHTML (like feeds escape
+              # via escape_xml), so defense belongs there, not in the data.
+              title = page.title.empty? ? config.title : page.title
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               # Convert markdown to plain text

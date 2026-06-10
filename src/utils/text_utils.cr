@@ -4,6 +4,8 @@
 # - slugify: Convert text to URL-friendly slugs
 # - escape_xml: Escape XML special characters
 
+require "uri"
+
 module Hwaro
   module Utils
     module TextUtils
@@ -120,6 +122,29 @@ module Hwaro
             else io << char
             end
           end
+        end
+      end
+
+      # Percent-encode the path component of a URL for spec-strict XML
+      # outputs (sitemap `<loc>`, RSS/Atom `<link>`/`<id>`): the sitemap
+      # protocol and RSS require RFC 3986 URIs, so non-ASCII paths like
+      # `/posts/한글/` must become `/posts/%ED%95%9C%EA%B8%80/`.
+      #
+      # The scheme/host prefix (if any) is left untouched, and paths that
+      # already contain a percent-escape are passed through unchanged so
+      # pre-encoded URLs don't get double-encoded.
+      def encode_url_path(url : String) : String
+        return url if url.ascii_only? && !url.includes?(' ')
+        return url if url.matches?(/%[0-9A-Fa-f]{2}/)
+
+        if scheme_end = url.index("://")
+          host_end = url.index('/', scheme_end + 3)
+          return url unless host_end
+          prefix = url[0...host_end]
+          path = url[host_end..]
+          prefix + URI.encode_path(path)
+        else
+          URI.encode_path(url)
         end
       end
 
