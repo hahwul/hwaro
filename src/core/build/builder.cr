@@ -749,6 +749,35 @@ module Hwaro
           Logger.success "Copied #{copied} content file(s)." if copied > 0
         end
 
+        # Map source paths that were removed from disk to the output files
+        # they produced in the last build. A rebuild rewrites surviving pages
+        # but never deletes what's gone, so the serve watcher captures this
+        # BEFORE rebuilding (while @site still knows the page's URL/slug) and
+        # removes the orphans after — otherwise a deleted page keeps serving
+        # 200 and ships with the next deploy of `public/`.
+        def stale_outputs_for_removed(removed_paths : Array(String), output_dir : String) : Array(String)
+          outputs = [] of String
+          site = @site
+          removed_paths.each do |path|
+            if path.starts_with?("static/")
+              dest = File.join(output_dir, path.lchop("static/"))
+              outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
+            elsif path.starts_with?("content/")
+              if path.downcase.ends_with?(".md")
+                next unless site
+                rel = path.lchop("content/")
+                if page = site.pages.find { |p| p.path == rel }
+                  outputs << get_output_path(page, output_dir)
+                end
+              else
+                dest = File.join(output_dir, path.lchop("content/"))
+                outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
+              end
+            end
+          end
+          outputs
+        end
+
         def run(
           output_dir : String = "public",
           base_url : String? = nil,

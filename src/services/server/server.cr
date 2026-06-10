@@ -753,6 +753,14 @@ module Hwaro
         strategy = changeset.rebuild_strategy
         Logger.info "\n[Watch] Change detected (#{changeset.description}). Strategy: #{strategy}..."
 
+        # Resolve removed sources to their output files BEFORE the rebuild
+        # swaps in a site that no longer knows the deleted page's URL.
+        stale_outputs = if changeset.removed_files.empty?
+                          [] of String
+                        else
+                          @builder.stale_outputs_for_removed(changeset.removed_files, sanitize_output_dir(build_options.output_dir))
+                        end
+
         case strategy
         when :full
           @builder.run(build_options)
@@ -782,7 +790,28 @@ module Hwaro
           copy_content_files(changeset, build_options)
         end
 
+        remove_stale_outputs(stale_outputs, sanitize_output_dir(build_options.output_dir))
+
         @live_reload_handler.try(&.notify_reload)
+      end
+
+      # Delete output files orphaned by removed sources, pruning any
+      # directories the deletion leaves empty (e.g. `public/guide/old-page/`).
+      private def remove_stale_outputs(paths : Array(String), output_dir : String)
+        paths.each do |path|
+          next unless File.exists?(path)
+          next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+          File.delete(path)
+          Logger.info "  Removed stale output: #{path}"
+
+          dir = File.dirname(path)
+          while dir != output_dir && Utils::OutputGuard.within_output_dir?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
+            Dir.delete(dir)
+            dir = File.dirname(dir)
+          end
+        rescue ex
+          Logger.debug "  Could not remove stale output #{path}: #{ex.message}"
+        end
       end
 
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions)

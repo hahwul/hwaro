@@ -27,6 +27,10 @@ module Hwaro
       def self.test_watcher_ignored?(path : String) : Bool
         watcher_ignored?(path)
       end
+
+      def test_remove_stale_outputs(paths : Array(String), output_dir : String)
+        remove_stale_outputs(paths, output_dir)
+      end
     end
   end
 end
@@ -300,6 +304,49 @@ describe Hwaro::Services::DevCorsHandler do
     handler.call(context)
 
     response.headers["Access-Control-Allow-Headers"].should eq("*")
+  end
+end
+
+describe "stale output cleanup on file removal" do
+  it "maps removed static and content-asset paths to their output files" do
+    builder = Hwaro::Core::Build::Builder.new
+    outputs = builder.stale_outputs_for_removed(["static/img/logo.png", "content/posts/photo.jpg"], "public")
+    outputs.should eq([File.join("public", "img/logo.png"), File.join("public", "posts/photo.jpg")])
+  end
+
+  it "ignores removed markdown files when no site has been built yet" do
+    builder = Hwaro::Core::Build::Builder.new
+    builder.stale_outputs_for_removed(["content/posts/gone.md"], "public").should be_empty
+  end
+
+  it "deletes stale outputs and prunes empty parent directories" do
+    Dir.mktmpdir do |dir|
+      stale = File.join(dir, "guide", "old-page", "index.html")
+      FileUtils.mkdir_p(File.dirname(stale))
+      File.write(stale, "x")
+      keep = File.join(dir, "guide", "index.html")
+      File.write(keep, "y")
+
+      Hwaro::Services::Server.new.test_remove_stale_outputs([stale], dir)
+
+      File.exists?(stale).should be_false
+      Dir.exists?(File.join(dir, "guide", "old-page")).should be_false
+      # Sibling content (and the shared parent) must survive the pruning.
+      File.exists?(keep).should be_true
+    end
+  end
+
+  it "refuses to delete files outside the output directory" do
+    Dir.mktmpdir do |dir|
+      outside = File.join(dir, "outside.txt")
+      File.write(outside, "precious")
+      output_dir = File.join(dir, "public")
+      FileUtils.mkdir_p(output_dir)
+
+      Hwaro::Services::Server.new.test_remove_stale_outputs([outside], output_dir)
+
+      File.exists?(outside).should be_true
+    end
   end
 end
 
