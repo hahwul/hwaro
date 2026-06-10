@@ -567,6 +567,59 @@ describe Hwaro::Processor::Markdown do
       result[:reverse].should be_nil
     end
 
+    it "parses a Zola-style [taxonomies] table in TOML frontmatter" do
+      content = <<-MARKDOWN
+        +++
+        title = "Work"
+        [taxonomies]
+        tech = ["crystal", "security"]
+        tags = ["tool"]
+        authors = ["hahwul"]
+        +++
+        Body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:taxonomies]["tech"].should eq(["crystal", "security"])
+      result[:taxonomies]["tags"].should eq(["tool"])
+      # tags/authors under the table also populate the dedicated fields
+      result[:tags].should eq(["tool"])
+      result[:authors].should eq(["hahwul"])
+      # and the table must not leak into extra
+      result[:extra].has_key?("taxonomies").should be_false
+    end
+
+    it "parses a taxonomies map in YAML frontmatter" do
+      content = <<-MARKDOWN
+        ---
+        title: Work
+        taxonomies:
+          tech: [crystal]
+        ---
+        Body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:taxonomies]["tech"].should eq(["crystal"])
+    end
+
+    it "prefers top-level tags over a [taxonomies] tags entry" do
+      content = <<-MARKDOWN
+        +++
+        title = "Work"
+        tags = ["primary"]
+        [taxonomies]
+        tags = ["secondary"]
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      # The explicit top-level key wins everywhere — dedicated fields and
+      # the taxonomies hash stay consistent.
+      result[:taxonomies]["tags"].should eq(["primary"])
+      result[:tags].should eq(["primary"])
+    end
+
     it "accepts Zola's paginate_by as an alias for paginate" do
       content = <<-MARKDOWN
         ---

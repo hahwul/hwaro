@@ -45,6 +45,22 @@ authors = ["Alice"]
 +++
 ```
 
+A Zola-style `[taxonomies]` table works too (both spellings are equivalent;
+an explicit top-level key wins if both are present):
+
+```markdown
++++
+title = "My Post"
+[taxonomies]
+tags = ["crystal", "tutorial"]
+tech = ["crystal", "security"]
++++
+```
+
+In templates, a page's own terms are available as `page.taxonomies.<name>`
+(e.g. `{% for t in page.taxonomies.tech %}`) — also on the page objects
+inside `section.pages`, `site.pages`, and term page lists.
+
 ## Generated URLs
 
 For a taxonomy named `tags` with term `crystal`:

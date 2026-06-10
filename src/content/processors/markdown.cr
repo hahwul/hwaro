@@ -60,7 +60,7 @@ module Hwaro
           "transparent", "generate_feeds", "paginate", "pagination_enabled",
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
-          "series", "series_weight", "expires", "paginate_by",
+          "series", "series_weight", "expires", "paginate_by", "taxonomies",
         }
 
         # Warn about unknown front-matter keys that look like typos of known keys.
@@ -315,6 +315,7 @@ module Hwaro
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
           tags = fm_string_array(toml_fm, "tags")
+          tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
           result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
@@ -375,6 +376,7 @@ module Hwaro
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
           tags = fm_string_array(yaml_fm, "tags")
+          tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
           result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
@@ -426,6 +428,7 @@ module Hwaro
           front_matter_keys = fm_hash.keys
           taxonomies = extract_taxonomies(json_fm, front_matter_keys)
           tags = fm_string_array(json_fm, "tags")
+          tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
           result = build_front_matter_result(json_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
@@ -480,6 +483,10 @@ module Hwaro
           taxonomies : Hash(String, Array(String)),
           tags : Array(String),
         )
+          # Authors may arrive via the top-level `authors` key or a Zola-style
+          # `[taxonomies]` table — mirror the tags fallback at the call sites.
+          authors = fm_string_array(fm, "authors")
+          authors = taxonomies["authors"]? || authors if authors.empty?
           {
             title:          fm["title"]?.try(&.as_s?) || "Untitled",
             description:    fm["description"]?.try(&.as_s?),
@@ -503,7 +510,7 @@ module Hwaro
             pagination_enabled:  fm_bool?(fm, "pagination_enabled"),
             sort_by:             fm["sort_by"]?.try(&.as_s?),
             reverse:             fm_bool?(fm, "reverse"),
-            authors:             fm_string_array(fm, "authors"),
+            authors:             authors,
             extra:               extra,
             in_search_index:     fm_bool(fm, "in_search_index", true),
             insert_anchor_links: fm_bool(fm, "insert_anchor_links", false),
@@ -868,6 +875,30 @@ module Hwaro
             if arr = front_matter[key]?.try(&.as_a?)
               values = arr.compact_map(&.as_s?)
               taxonomies[key] = values
+            end
+          end
+
+          # Zola compat: terms may also live under a `[taxonomies]` table
+          # (`[taxonomies]` / `taxonomies:` followed by `tech = ["crystal"]`).
+          # These used to fall through to `extra` silently. Nested entries
+          # overwrite a same-named top-level array key here, but the call
+          # sites re-assert explicit top-level `tags` afterwards, so for
+          # `tags` the dedicated key still wins overall.
+          if table = front_matter["taxonomies"]?
+            case table
+            when TOML::Any, JSON::Any
+              table.as_h?.try &.each do |k, v|
+                if arr = v.as_a?
+                  taxonomies[k] = arr.compact_map(&.as_s?)
+                end
+              end
+            when YAML::Any
+              table.as_h?.try &.each do |k, v|
+                next unless key_str = k.as_s?
+                if arr = v.as_a?
+                  taxonomies[key_str] = arr.compact_map(&.as_s?)
+                end
+              end
             end
           end
 

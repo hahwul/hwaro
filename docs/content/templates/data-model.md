@@ -289,6 +289,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.weight | Int | Sort weight |
 | page.image | String? | Featured image path |
 | page.authors | Array<String> | Author names |
+| page.taxonomies | Object | This page's taxonomy terms (`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | Custom front matter fields |
 
 ### Computed Properties

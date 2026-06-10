@@ -163,6 +163,7 @@ module Hwaro
             | slug | string | Custom URL slug |
             | aliases | array | Redirect URLs to this page |
             | authors | array | Author names |
+            | taxonomies | table | Taxonomy terms by name (access via `page.taxonomies.<name>`) |
             | extra | table | Custom metadata (access via `page.extra`) |
 
             ### Sections

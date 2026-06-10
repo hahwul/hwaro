@@ -975,6 +975,7 @@ module Hwaro::Core::Build::Phases::Render
           "series"          => Crinja::Value.new(p.series || ""),
           "tags"            => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
           "authors"         => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+          "taxonomies"      => taxonomies_crinja_for(p),
           "assets"          => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
           "extra"           => Crinja::Value.new(
             p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
@@ -985,6 +986,20 @@ module Hwaro::Core::Build::Phases::Render
         val
       end
     end
+  end
+
+  # Per-page taxonomy terms as `{ name => [terms] }` so templates can read
+  # `page.taxonomies.tech` (or iterate `w.taxonomies.<name>` in section
+  # lists). `tags`/`authors` live on dedicated model fields rather than in
+  # `Page#taxonomies`, so mirror `taxonomy_values`' special-casing — an
+  # explicit `[taxonomies] tags = […]` entry still wins.
+  private def taxonomies_crinja_for(p : Models::Page) : Crinja::Value
+    h = p.taxonomies.each_with_object({} of String => Crinja::Value) do |(k, v), acc|
+      acc[k] = Crinja::Value.new(v.map { |t| Crinja::Value.new(t) })
+    end
+    h["tags"] = Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }) unless h.has_key?("tags")
+    h["authors"] = Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }) unless h.has_key?("authors")
+    Crinja::Value.new(h)
   end
 
   # Convert a Page to a Crinja::Value hash for use in section page lists and paginator.
@@ -1441,6 +1456,7 @@ module Hwaro::Core::Build::Phases::Render
       # New properties
       "authors"         => authors_crinja,
       "tags"            => tags_crinja,
+      "taxonomies"      => cached_raw["taxonomies"].as(Crinja::Value),
       "assets"          => assets_crinja,
       "extra"           => extra_crinja,
       "summary"         => Crinja::Value.new(page.summary_html || page.effective_summary || ""),
