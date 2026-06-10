@@ -1098,10 +1098,11 @@ module Hwaro::Core::Build::Phases::Render
     section_data_by_path = {} of String => {pages: Array(Crinja::Value), hash: Hash(String, Crinja::Value)}
 
     site.sections.each do |s|
-      live_pages = site.pages_for_section(s.section, s.language)
-      section_pages = live_pages.map do |sp|
-        cached_page_crinja_value(sp, default_lang)
-      end
+      # Reuse the sorted-per-sort_by cached list so `get_section(...).pages`
+      # returns the same order as `section.pages` inside section templates —
+      # the raw `pages_for_section` list is discovery-ordered, which made a
+      # homepage "featured" loop disagree with the section listing.
+      section_pages = cached_section_pages_crinja(s.section, s.language, site)
       hash = {
         "path"               => Crinja::Value.new(s.path),
         "name"               => Crinja::Value.new(s.section),

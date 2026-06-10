@@ -1234,6 +1234,27 @@ describe "Build Integration: Sort by weight" do
       basics_html.should contain("HIGHER=Advanced")
     end
   end
+
+  it "returns the same sorted order from get_section().pages as section.pages" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "index.md"         => "---\ntitle: Home\ntemplate: home\n---\n",
+        "docs/_index.md"   => "---\ntitle: Docs\nsort_by: weight\n---\n",
+        "docs/intro.md"    => "---\ntitle: Intro\nweight: 1\n---\nIntro",
+        "docs/advanced.md" => "---\ntitle: Advanced\nweight: 3\n---\nAdvanced",
+        "docs/basics.md"   => "---\ntitle: Basics\nweight: 2\n---\nBasics",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "home.html"    => "{% for p in get_section(\"docs\").pages %}{{ p.title }},{% endfor %}",
+        "section.html" => "{% for p in section.pages %}{{ p.title }},{% endfor %}",
+      },
+    ) do
+      home_html = File.read("public/index.html")
+      home_html.should contain("Intro,Basics,Advanced,")
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------
