@@ -48,6 +48,39 @@ Welcome to my blog.
 | redirect_to | string | — | Redirect URL |
 | draft | bool | false | Exclude from production |
 | weight | int | 0 | Section sort order |
+| cascade | table | — | Defaults inherited by descendants (see [Cascade](#cascade)) |
+
+## Cascade
+
+A section's `[cascade]` table sets front matter defaults for every page and
+section below it. A page's own front matter always wins, and deeper cascades
+override shallower ones. The section declaring the cascade is not affected.
+
+```toml
++++
+title = "Blog"
+
+[cascade]
+template = "post"
+tags = ["blog"]
+
+[cascade.extra]
+banner = "default-banner.png"
++++
+```
+
+Every page under the section now renders with the `post` template, carries the
+`blog` tag, and exposes `page.extra.banner` — unless it sets those fields
+itself. `extra` and `taxonomies` merge per key: the page's own keys win,
+cascaded keys fill the gaps.
+
+Cascadable keys: `template`, `draft`, `render`, `toc`, `insert_anchor_links`,
+`in_sitemap`, `in_search_index`, `tags`, `taxonomies`, `authors`, `extra`.
+URL-affecting keys (`slug`, `path`, `aliases`) cannot cascade and are ignored
+with a warning.
+
+On multilingual sites, a cascade only applies within its own language tree —
+`_index.ko.md` cascades to `.ko` pages, `_index.md` to default-language pages.
 
 ## Sort direction
 

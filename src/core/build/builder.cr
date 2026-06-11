@@ -252,6 +252,10 @@ module Hwaro
           # Snapshot old neighbors before re-linking (for render set)
           old_neighbors = {} of String => {Models::Page?, Models::Page?}
 
+          # Cascade context for re-applying section defaults to re-parsed pages
+          # (parse_single_page resets fields from front matter only).
+          cascade_map = build_cascade_map(site.sections)
+
           changed_content_files.each do |file|
             relative_path = begin
               Path[file].relative_to("content").to_s
@@ -266,10 +270,21 @@ module Hwaro
             old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
             old_series_names[page.path] = page.series
             old_neighbors[page.path] = {page.lower, page.higher}
+            old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
 
             # Re-read, re-parse front-matter and recalculate URL
             parse_single_page(page)
             page.generate_permalink(config.base_url)
+
+            # A changed [cascade] affects descendant pages that are NOT in the
+            # changed set — incremental bookkeeping can't reach them, so
+            # escalate to a full rebuild (rare event, correctness first).
+            if (previous_cascade = old_cascade) && page.is_a?(Models::Section) && page.cascade != previous_cascade
+              Logger.info "  Section cascade changed in #{page.path} — running full rebuild."
+              return run(options)
+            end
+
+            apply_cascade_to(page, cascade_map)
 
             changed_pages << page
             affected_sections << page.section
@@ -442,7 +457,7 @@ module Hwaro
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path)
+            cache.update(source_path, output_path, page.cascade_fingerprint)
           end
 
           cache.save if options.cache

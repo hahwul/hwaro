@@ -26,6 +26,13 @@ module Hwaro
         @[JSON::Field(key: "config_hash", emit_null: false)]
         property config_hash : String
 
+        # Fingerprint of the merged section [cascade] values that applied to
+        # this page when it was built. A parent _index.md cascade edit changes
+        # the fingerprint and invalidates the page even though its own source
+        # file is untouched.
+        @[JSON::Field(key: "cascade_hash", emit_null: false)]
+        property cascade_hash : String
+
         def initialize(
           @path : String,
           @mtime : Int64,
@@ -33,6 +40,7 @@ module Hwaro
           @output_path : String,
           @template_hash : String = "",
           @config_hash : String = "",
+          @cascade_hash : String = "",
         )
         end
 
@@ -44,6 +52,7 @@ module Hwaro
           output_path = ""
           template_hash = ""
           config_hash = ""
+          cascade_hash = ""
 
           pull.read_object do |key|
             case key
@@ -53,12 +62,13 @@ module Hwaro
             when "output_path"   then output_path = pull.read_string
             when "template_hash" then template_hash = pull.read_string
             when "config_hash"   then config_hash = pull.read_string
+            when "cascade_hash"  then cascade_hash = pull.read_string
             else                      pull.skip
             end
           end
 
           new(path: path, mtime: mtime, hash: hash, output_path: output_path,
-            template_hash: template_hash, config_hash: config_hash)
+            template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash)
         end
       end
 
@@ -136,7 +146,7 @@ module Hwaro
         end
 
         # Check if a file has changed since last build
-        def changed?(file_path : String, output_path : String = "") : Bool
+        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "") : Bool
           return true unless @enabled
           return true unless File.exists?(file_path)
 
@@ -147,6 +157,10 @@ module Hwaro
           if !output_path.empty? && !File.exists?(output_path)
             return true
           end
+
+          # A parent section's [cascade] changed what this page inherits —
+          # the source file is unchanged but the rendered output isn't.
+          return true if entry.cascade_hash != cascade_hash
 
           # Fast path: check modification time first
           begin
@@ -173,7 +187,7 @@ module Hwaro
 
         # Update cache entry for a file.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "")
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "")
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -183,7 +197,8 @@ module Hwaro
             # Fast path: skip update if entry is unchanged (protected by mutex)
             @mutex.synchronize do
               existing = @entries[file_path]?
-              if existing && existing.mtime == mtime && existing.output_path == output_path
+              if existing && existing.mtime == mtime && existing.output_path == output_path &&
+                 existing.cascade_hash == cascade_hash
                 return
               end
             end
@@ -198,6 +213,7 @@ module Hwaro
               output_path: output_path,
               template_hash: @current_template_hash,
               config_hash: @current_config_hash,
+              cascade_hash: cascade_hash,
             )
 
             @mutex.synchronize do

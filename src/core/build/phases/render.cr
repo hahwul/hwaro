@@ -230,7 +230,7 @@ module Hwaro::Core::Build::Phases::Render
     pages.select do |page|
       source_path = File.join("content", page.path)
       output_path = get_output_path(page, output_dir)
-      cache.changed?(source_path, output_path)
+      cache.changed?(source_path, output_path, page.cascade_fingerprint)
     end
   end
 
@@ -308,7 +308,7 @@ module Hwaro::Core::Build::Phases::Render
             end
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path)
+            cache.update(source_path, output_path, page.cascade_fingerprint)
             results.send(true)
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
@@ -426,7 +426,7 @@ module Hwaro::Core::Build::Phases::Render
       end
       source_path = File.join("content", page.path)
       output_path = get_output_path(page, output_dir)
-      cache.update(source_path, output_path)
+      cache.update(source_path, output_path, page.cascade_fingerprint)
       count += 1
     end
     count

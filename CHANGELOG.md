@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Section `[cascade]` front matter: defaults inherited by descendant pages and sections (Hugo-style). Deeper cascades override shallower ones; a page's own front matter wins; `extra`/`taxonomies` merge per key. Cached builds invalidate descendants when a parent cascade changes; `hwaro serve` escalates to a full rebuild on cascade edits
+
+### Changed
+- Template errors now report `templates/<file>:line:col` with a caret-marked source excerpt instead of an anonymous `<string>` template — applies to syntax errors, runtime errors, and user shortcode templates
+
 ## v0.15.3
 
 ### Changed

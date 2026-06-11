@@ -46,6 +46,11 @@ module Hwaro::Core::Build::Phases::ParseContent
       parse_content_sequential(pages)
     end
 
+    # Apply section [cascade] defaults to descendants before draft/expiry
+    # filtering so cascaded `draft` participates in the filters, and before
+    # populate_taxonomies so cascaded tags/taxonomies are aggregated.
+    apply_cascades(ctx.all_pages, ctx.sections)
+
     # Single-pass filtering: remove parse-failed, draft, and expired pages.
     # Combines multiple reject! calls into one pass per array to avoid
     # repeated traversals, and calls invalidate_all_pages_cache at most once.
@@ -193,6 +198,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       page.reverse = data[:reverse]
       page.page_template = normalize_template_name(data[:page_template])
       page.paginate_path = data[:paginate_path]
+      page.cascade = data[:cascade]
+    elsif !data[:cascade].empty?
+      Logger.warn "#{page.path}: [cascade] is only honored on section _index files — ignored."
     end
 
     # Calculate URL
@@ -264,6 +272,198 @@ module Hwaro::Core::Build::Phases::ParseContent
     # so the build aborts predictably after the parallel phase completes.
     if err = classified_error
       raise err
+    end
+  end
+
+  # Front-matter keys a section [cascade] may set on descendants. URL-affecting
+  # keys (slug, path, aliases) are excluded: URLs are computed during parsing,
+  # before cascades apply, so cascading them would silently not affect URLs.
+  CASCADABLE_KEYS = Set{
+    "template", "draft", "render", "toc", "insert_anchor_links",
+    "in_sitemap", "in_search_index", "tags", "taxonomies", "authors", "extra",
+  }
+
+  # Apply section [cascade] tables to descendant pages and sections.
+  # Deeper cascades override shallower ones; a page's own front matter
+  # (tracked via front_matter_keys) always wins.
+  private def apply_cascades(all_pages : Array(Models::Page), sections : Array(Models::Section))
+    cascade_map = build_cascade_map(sections)
+    return if cascade_map.empty?
+
+    all_pages.each do |page|
+      apply_cascade_to(page, cascade_map)
+    end
+  end
+
+  # Build {directory, language} => validated cascade map from sections.
+  protected def build_cascade_map(sections : Array(Models::Section)) : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))
+    map = {} of Tuple(String, String) => Hash(String, Models::ExtraValue)
+    sections.each do |section|
+      next if section.cascade.empty?
+
+      validated = {} of String => Models::ExtraValue
+      section.cascade.each do |key, value|
+        if CASCADABLE_KEYS.includes?(key)
+          validated[key] = value
+        else
+          Logger.warn "#{section.path}: cascade key '#{key}' is not cascadable — ignored. Cascadable keys: #{CASCADABLE_KEYS.join(", ")}"
+        end
+      end
+      next if validated.empty?
+
+      dir = Path[section.path].dirname.to_s
+      dir = "" if dir == "."
+      map[{dir, effective_cascade_language(section)}] = validated
+    end
+    map
+  end
+
+  # Merge ancestor cascades (root → leaf) for `page` and apply the values the
+  # page did not set itself. Also stamps `page.cascade_fingerprint` so the
+  # build cache invalidates descendants when a parent cascade changes.
+  protected def apply_cascade_to(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)))
+    merged = merged_cascade_for(page, cascade_map)
+    page.cascade_fingerprint = merged.empty? ? "" : cascade_fingerprint(merged)
+    return if merged.empty?
+
+    merged.each do |key, value|
+      case key
+      when "extra", "taxonomies"
+        # Table keys merge per-subkey even when the page declares its own
+        # table — page subkeys win, cascaded subkeys fill the gaps.
+      else
+        next if page.front_matter_keys.includes?(key)
+      end
+
+      case key
+      when "template"
+        if name = value.as?(String)
+          page.template = normalize_template_name(name)
+        end
+      when "draft"
+        value.as?(Bool).try { |b| page.draft = b }
+      when "render"
+        value.as?(Bool).try { |b| page.render = b }
+      when "toc"
+        value.as?(Bool).try { |b| page.toc = b }
+      when "insert_anchor_links"
+        value.as?(Bool).try { |b| page.insert_anchor_links = b }
+      when "in_sitemap"
+        value.as?(Bool).try { |b| page.in_sitemap = b }
+      when "in_search_index"
+        value.as?(Bool).try { |b| page.in_search_index = b }
+      when "tags"
+        # Skip when the page already has tags from a [taxonomies] table —
+        # front_matter_keys only guards the top-level `tags` key.
+        if (tags = cascade_string_array(value)) && page.tags.empty?
+          page.tags = tags
+          page.taxonomies["tags"] = tags unless tags.empty?
+        end
+      when "taxonomies"
+        if taxonomies = value.as?(Hash(String, Models::ExtraValue))
+          taxonomies.each do |taxonomy_name, terms|
+            next if page.taxonomies.has_key?(taxonomy_name)
+            next unless term_list = cascade_string_array(terms)
+            page.taxonomies[taxonomy_name] = term_list
+            page.tags = term_list if taxonomy_name == "tags" && page.tags.empty?
+            page.authors = term_list if taxonomy_name == "authors" && page.authors.empty?
+          end
+        end
+      when "authors"
+        if (authors = cascade_string_array(value)) && page.authors.empty?
+          page.authors = authors
+        end
+      when "extra"
+        if extra = value.as?(Hash(String, Models::ExtraValue))
+          extra.each do |extra_key, extra_value|
+            page.extra[extra_key] = extra_value unless page.extra.has_key?(extra_key)
+          end
+        end
+      end
+    end
+  end
+
+  # Collect cascades from the page's ancestor directories, shallowest first,
+  # restricted to sections in the same language tree.
+  private def merged_cascade_for(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Hash(String, Models::ExtraValue)
+    dir = Path[page.path].dirname.to_s
+    dir = "" if dir == "."
+
+    chain = [""]
+    unless dir.empty?
+      acc = ""
+      dir.split('/').each do |part|
+        acc = acc.empty? ? part : "#{acc}/#{part}"
+        chain << acc
+      end
+    end
+    # Cascade applies to descendants only — a section's own cascade must not
+    # apply to itself.
+    chain.pop if page.is_a?(Models::Section)
+
+    language = effective_cascade_language(page)
+    merged = {} of String => Models::ExtraValue
+    chain.each do |ancestor_dir|
+      if cascade = cascade_map[{ancestor_dir, language}]?
+        merged.merge!(cascade)
+      end
+    end
+    merged
+  end
+
+  # Pages in the default language may carry nil or the default code —
+  # normalize so cascade matching doesn't depend on which form a page got.
+  private def effective_cascade_language(page : Models::Page) : String
+    page.language || @config.try(&.default_language) || ""
+  end
+
+  # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain
+  # string arrays. Non-string elements are skipped.
+  private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
+    if value.is_a?(Array(String))
+      value
+    elsif value.is_a?(Array(Models::ExtraValue))
+      value.compact_map(&.as?(String))
+    end
+  end
+
+  # Stable fingerprint of a merged cascade for cache invalidation:
+  # hash keys sorted recursively so insertion order never changes the digest.
+  protected def cascade_fingerprint(merged : Hash(String, Models::ExtraValue)) : String
+    digest = Digest::MD5.new
+    fingerprint_cascade_value(digest, merged)
+    digest.final.hexstring
+  end
+
+  private def fingerprint_cascade_value(digest : Digest::MD5, value : Models::ExtraValue | Hash(String, Models::ExtraValue))
+    case value
+    when Hash(String, Models::ExtraValue)
+      digest.update("{")
+      value.keys.sort!.each do |key|
+        digest.update(key)
+        digest.update("=")
+        fingerprint_cascade_value(digest, value[key])
+        digest.update(";")
+      end
+      digest.update("}")
+    when Array(String)
+      digest.update("[")
+      value.each do |item|
+        digest.update(item)
+        digest.update(",")
+      end
+      digest.update("]")
+    when Array(Models::ExtraValue)
+      digest.update("[")
+      value.each do |item|
+        fingerprint_cascade_value(digest, item)
+        digest.update(",")
+      end
+      digest.update("]")
+    else
+      digest.update(value.class.name)
+      digest.update(":")
+      digest.update(value.to_s)
     end
   end
 

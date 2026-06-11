@@ -61,6 +61,7 @@ module Hwaro
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
           "series", "series_weight", "expires", "paginate_by", "taxonomies",
+          "cascade",
         }
 
         # Warn about unknown front-matter keys that look like typos of known keys.
@@ -231,6 +232,7 @@ module Hwaro
               series:              result[:series],
               series_weight:       result[:series_weight],
               expires:             result[:expires],
+              cascade:             result[:cascade],
             }
           else
             # No front matter found — return defaults
@@ -269,6 +271,7 @@ module Hwaro
               series:              nil.as(String?),
               series_weight:       0,
               expires:             nil.as(Time?),
+              cascade:             {} of String => Models::ExtraValue,
             }
           end
         end
@@ -487,6 +490,14 @@ module Hwaro
           # `[taxonomies]` table — mirror the tags fallback at the call sites.
           authors = fm_string_array(fm, "authors")
           authors = taxonomies["authors"]? || authors if authors.empty?
+
+          # Section [cascade] table — defaults inherited by descendant pages.
+          cascade = {} of String => Models::ExtraValue
+          if cascade_value = fm["cascade"]?
+            if extracted = extract_extra_value(cascade_value).as?(Hash(String, Models::ExtraValue))
+              cascade = extracted
+            end
+          end
           {
             title:          fm["title"]?.try(&.as_s?) || "Untitled",
             description:    fm["description"]?.try(&.as_s?),
@@ -524,6 +535,7 @@ module Hwaro
             front_matter_keys:   front_matter_keys,
             taxonomies:          taxonomies,
             tags:                tags,
+            cascade:             cascade,
           }
         end
 

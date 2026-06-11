@@ -76,6 +76,12 @@ module Hwaro
       # New: Insert anchor links - whether to add anchor links to headings
       property insert_anchor_links : Bool
 
+      # Fingerprint of the merged section [cascade] values applied to this
+      # page (empty when none apply). Stored in the build cache so editing a
+      # parent _index.md's cascade invalidates descendant pages whose own
+      # source files did not change.
+      property cascade_fingerprint : String
+
       # Build warnings collected during rendering (used for error overlay in serve mode)
       property build_warnings : Array(String)
 
@@ -161,6 +167,7 @@ module Hwaro
         @series_pages = [] of Page
         @related_posts = [] of Page
         @redirect_to = nil
+        @cascade_fingerprint = ""
         @build_warnings = [] of String
         @parse_failed = false
       end
