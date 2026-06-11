@@ -955,8 +955,10 @@ module Hwaro
       # default arguments, so it is shared by content digest.
       #
       # Mutex-guarded — feeds and search run as parallel fibers. The byte
-      # cap keeps streaming mode's memory bound: once full, renders still
-      # happen, they just stop being remembered.
+      # cap keeps streaming mode's memory bound; on overflow the memo is
+      # cleared rather than frozen (matching the syntax highlighter's result
+      # memo) so a long-lived `serve` process keeps caching freshly edited
+      # content instead of stalling once the cap is first reached.
       @@body_cache = {} of String => String
       @@body_cache_bytes = 0_i64
       @@body_cache_mutex = Mutex.new
@@ -973,7 +975,11 @@ module Hwaro
         html, _ = render(content)
 
         @@body_cache_mutex.synchronize do
-          unless @@body_cache.has_key?(key) || @@body_cache_bytes + html.bytesize > BODY_CACHE_MAX_BYTES
+          unless @@body_cache.has_key?(key)
+            if @@body_cache_bytes + html.bytesize > BODY_CACHE_MAX_BYTES
+              @@body_cache.clear
+              @@body_cache_bytes = 0_i64
+            end
             @@body_cache[key] = html
             @@body_cache_bytes += html.bytesize
           end

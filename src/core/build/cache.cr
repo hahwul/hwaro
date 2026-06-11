@@ -326,6 +326,10 @@ module Hwaro
               Logger.warn "Cache: corrupt cache file, rebuilding from scratch: #{ex.message}"
               @entries.clear
               @metadata = CacheMetadata.new
+              # Mark dirty so save() overwrites the corrupt file even if the
+              # delete below fails — save() now early-returns unless dirty,
+              # so it can no longer be relied on as the unconditional fallback.
+              @dirty = true
               delete_corrupt_cache
             end
           end

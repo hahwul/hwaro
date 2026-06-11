@@ -140,9 +140,13 @@ module Hwaro
         # lifetime, which is exactly one template (re)load — invalidation
         # is automatic.
         def closure_hash(entry_template : String, shortcode_templates : Set(String) = Set(String).new) : String
+          # NUL-separated: template names come from the filesystem and so
+          # can never contain '\0', making the key collision-free. A visible
+          # separator like '|' would let entry "a" + shortcode "b" collide
+          # with an entry template literally named "a|b".
           memo_key = String.build do |io|
             io << entry_template
-            shortcode_templates.to_a.sort!.each { |sc| io << '|' << sc }
+            shortcode_templates.to_a.sort!.each { |sc| io << '\0' << sc }
           end
 
           @lazy_mutex.synchronize do
