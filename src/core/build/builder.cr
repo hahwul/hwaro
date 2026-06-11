@@ -159,6 +159,15 @@ module Hwaro
           @cache_manager
         end
 
+        # Profiler to thread into per-page render loops, or nil when
+        # profiling is off. The record_* methods already no-op when
+        # disabled, but callers test the reference before taking
+        # timestamps — passing nil skips two Time.instant calls and a
+        # redundant determine_template per rendered page.
+        private def active_profiler : Profiler?
+          @profiler.try { |p| p.enabled? ? p : nil }
+        end
+
         # Access build context for external inspection (e.g. emitting JSON
         # output after a build). Returns nil before `run` has been invoked.
         def context : Lifecycle::BuildContext?
@@ -487,7 +496,7 @@ module Hwaro
           error_overlay = options.error_overlay
           render_list.each do |page|
             next unless page.render
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
             if cache.enabled?
               source_path = File.join("content", page.path)
               output_path = get_output_path(page, output_dir)
@@ -685,9 +694,9 @@ module Hwaro
           count = if pages_to_render.empty?
                     0
                   elsif options.parallel && pages_to_render.size > 1
-                    process_files_parallel(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+                    process_files_parallel(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   else
-                    process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+                    process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
 
           # Re-generate 404 page with new template
@@ -790,9 +799,9 @@ module Hwaro
           renderable = pages.select(&.render)
 
           count = if options.parallel && renderable.size > 1
-                    process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: @profiler)
+                    process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   else
-                    process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: @profiler)
+                    process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   end
 
           # Refresh feeds / sitemap / search now that every page has rendered

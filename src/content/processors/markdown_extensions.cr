@@ -31,7 +31,16 @@ module Hwaro
           do_strikethrough = true
           do_heading_ids = config.heading_ids
 
-          if do_task_lists || do_strikethrough || do_heading_ids
+          # Whole-content marker pre-check (memchr-fast): with none of the
+          # enabled extensions' markers present, the line pass is the
+          # identity transform and only rebuilds the string — skip it. The
+          # per-line includes? guards below are unchanged, so any page that
+          # passes this check transforms exactly as before.
+          markers_present = (do_task_lists && (result.includes?("[ ]") || result.includes?("[x]") || result.includes?("[X]"))) ||
+                            (do_strikethrough && result.includes?("~~")) ||
+                            (do_heading_ids && result.includes?("{#"))
+
+          if markers_present
             result = process_lines_fence_aware(result) do |line, _in_fence|
               transformed = line
 

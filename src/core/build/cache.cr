@@ -110,6 +110,11 @@ module Hwaro
         @current_template_hash : String = ""
         @current_config_hash : String = ""
 
+        # True when in-memory state diverges from what's on disk, so #save
+        # can skip rewriting the whole JSON on no-op warm builds. Set under
+        # @mutex wherever entries or metadata actually change.
+        @dirty : Bool = false
+
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
           @entries = {} of String => CacheEntry
           @metadata = CacheMetadata.new
@@ -145,6 +150,9 @@ module Hwaro
             @mutex.synchronize { @entries.clear }
           end
 
+          if invalidated || @metadata.template_hash != template_hash || @metadata.config_hash != config_hash
+            @dirty = true
+          end
           @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash)
         end
 
@@ -235,6 +243,7 @@ module Hwaro
               current = @entries[file_path]?
               if current.nil? || current.mtime <= mtime
                 @entries[file_path] = entry
+                @dirty = true
               end
             end
           rescue ex
@@ -245,7 +254,7 @@ module Hwaro
         # Remove entry from cache
         def invalidate(file_path : String)
           @mutex.synchronize do
-            @entries.delete(file_path)
+            @dirty = true if @entries.delete(file_path)
           end
         end
 
@@ -254,14 +263,18 @@ module Hwaro
           @mutex.synchronize do
             @entries.clear
             @metadata = CacheMetadata.new
+            @dirty = true
           end
           File.delete(@cache_path) if File.exists?(@cache_path)
         end
 
         # Save cache to disk using atomic write (temp file + rename)
         # to prevent corruption from partial writes (e.g. disk full, crash).
+        # No-op when nothing changed since load — a warm all-hits build
+        # otherwise re-serializes every entry just to write identical bytes.
         def save
           return unless @enabled
+          return unless @dirty
           tmp_path = "#{@cache_path}.tmp"
           begin
             # Snapshot shared state under the mutex: parallel fibers may still
@@ -272,6 +285,7 @@ module Hwaro
             end
             File.write(tmp_path, data.to_json)
             File.rename(tmp_path, @cache_path)
+            @dirty = false
           rescue ex
             Logger.warn "Cache: failed to save cache file: #{ex.message}"
             # Clean up temp file if rename failed
@@ -300,11 +314,14 @@ module Hwaro
             @metadata = data.metadata
             data.entries.each { |e| @entries[e.path] = e }
           rescue JSON::ParseException | JSON::SerializableError
-            # Fall back to legacy format (plain array of entries)
+            # Fall back to legacy format (plain array of entries); mark dirty
+            # so the next save upgrades the file to the metadata format even
+            # on an otherwise no-op build.
             begin
               entries = Array(CacheEntry).from_json(content)
               entries.each { |e| @entries[e.path] = e }
               @metadata = CacheMetadata.new
+              @dirty = true
             rescue ex : JSON::ParseException | JSON::SerializableError
               Logger.warn "Cache: corrupt cache file, rebuilding from scratch: #{ex.message}"
               @entries.clear
