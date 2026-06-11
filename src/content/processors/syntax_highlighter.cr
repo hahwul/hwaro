@@ -16,6 +16,7 @@
 
 require "markd"
 require "tartrazine"
+require "digest/md5"
 require "./table_parser"
 require "./markdown_extensions"
 require "set"
@@ -88,6 +89,31 @@ module Hwaro
         @@unknown_languages = Set(String).new
         @@unknown_mutex = Mutex.new
 
+        # Serializes ALL Tartrazine work (lexer acquisition + tokenization).
+        # The shard's compiled rules each hold a single PCRE2 match_data
+        # buffer reused by every match() call (bytes_regex.cr), and those
+        # rules are shared across lexer instances via the template cache —
+        # so two -Dpreview_mt workers tokenizing the same language corrupt
+        # each other's matches. That raised intermittently, and the rescue
+        # below silently degraded random code blocks to plain output,
+        # making build output nondeterministic.
+        @@tartrazine_mutex = Mutex.new
+
+        # Highlighted-output memo keyed by (language, code digest). Output
+        # is a pure function of the input pair, so identical code blocks —
+        # repeated install snippets, shortcode bodies, serve-mode rebuilds —
+        # skip tokenization entirely. Also keeps the serialized section
+        # above from becoming a bottleneck on code-heavy sites. `nil`
+        # (tokenization failed, deterministic now) is cached too.
+        @@result_cache = {} of String => String?
+        @@result_mutex = Mutex.new
+        # Blocks larger than this are highlighted but not cached, keeping
+        # memory bounded; the entry cap guards pathological unique-block
+        # counts (clear-on-full is deterministic for output, only a speed
+        # hit).
+        MAX_CACHED_BLOCK_BYTES = 65_536
+        MAX_CACHE_ENTRIES      =  2_048
+
         # Highlight `code` as `lang`, returning HTML-escaped markup with
         # hljs-class spans — or nil when no lexer exists for the language
         # (callers fall back to plain client-style output).
@@ -95,28 +121,48 @@ module Hwaro
           normalized = lang.downcase
           return if @@unknown_mutex.synchronize { @@unknown_languages.includes?(normalized) }
 
-          lexer = begin
-            Tartrazine.lexer(normalized)
-          rescue
-            @@unknown_mutex.synchronize { @@unknown_languages << normalized }
-            Logger.debug "Server highlight: no lexer for '#{normalized}', falling back to plain output"
-            return
-          end
-
-          String.build do |io|
-            lexer.tokenizer(code).each do |token|
-              value = HTML.escape(token[:value])
-              if css_class = class_for(token[:type])
-                io << %(<span class=") << css_class << %(">) << value << "</span>"
-              else
-                io << value
-              end
+          cacheable = code.bytesize <= MAX_CACHED_BLOCK_BYTES
+          cache_key = "#{normalized}\0#{Digest::MD5.hexdigest(code)}" if cacheable
+          if cache_key
+            @@result_mutex.synchronize do
+              return @@result_cache[cache_key] if @@result_cache.has_key?(cache_key)
             end
           end
-        rescue ex
-          # A lexer bug must never take down the build — degrade to plain.
-          Logger.debug "Server highlight failed for '#{lang}': #{ex.message}"
-          nil
+
+          result = @@tartrazine_mutex.synchronize do
+            lexer = begin
+              Tartrazine.lexer(normalized)
+            rescue
+              @@unknown_mutex.synchronize { @@unknown_languages << normalized }
+              Logger.debug "Server highlight: no lexer for '#{normalized}', falling back to plain output"
+              return
+            end
+
+            begin
+              String.build do |io|
+                lexer.tokenizer(code).each do |token|
+                  value = HTML.escape(token[:value])
+                  if css_class = class_for(token[:type])
+                    io << %(<span class=") << css_class << %(">) << value << "</span>"
+                  else
+                    io << value
+                  end
+                end
+              end
+            rescue ex
+              # A lexer bug must never take down the build — degrade to plain.
+              Logger.debug "Server highlight failed for '#{lang}': #{ex.message}"
+              nil
+            end
+          end
+
+          if cache_key
+            @@result_mutex.synchronize do
+              @@result_cache.clear if @@result_cache.size >= MAX_CACHE_ENTRIES
+              @@result_cache[cache_key] = result
+            end
+          end
+          result
         end
 
         private def class_for(token_type : String) : String?
