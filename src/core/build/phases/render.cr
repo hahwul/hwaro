@@ -1080,9 +1080,45 @@ module Hwaro::Core::Build::Phases::Render
         default_lang = site.config.default_language
         arr = pages.map { |p| page_to_crinja_list_value(p, default_lang) }
         @section_pages_crinja_cache[cache_key] = arr
+        @section_pages_url_index_cache[cache_key] = build_section_pages_url_index(arr)
         arr
       end
     end
+  end
+
+  # The cached section list plus its url→index map, for O(1) current-page
+  # exclusion. Both caches are filled and invalidated together under
+  # @crinja_cache_mutex (reentrant), so the index is rebuilt here only as
+  # a defensive fallback.
+  private def cached_section_pages_with_index(
+    section_name : String,
+    language : String?,
+    site : Models::Site,
+  ) : {Array(Crinja::Value), Hash(String, Int32)}
+    cache_key = "#{section_name}:#{language}"
+    @crinja_cache_mutex.synchronize do
+      arr = cached_section_pages_crinja(section_name, language, site)
+      index = @section_pages_url_index_cache[cache_key]?
+      unless index
+        index = build_section_pages_url_index(arr)
+        @section_pages_url_index_cache[cache_key] = index
+      end
+      {arr, index}
+    end
+  end
+
+  # First occurrence wins, mirroring the Array#index scan this replaces.
+  private def build_section_pages_url_index(pages : Array(Crinja::Value)) : Hash(String, Int32)
+    index = Hash(String, Int32).new(initial_capacity: pages.size)
+    pages.each_with_index do |value, i|
+      raw = value.raw
+      next unless raw.is_a?(Hash)
+      if url = raw["url"]?
+        key = url.to_s
+        index[key] = i unless index.has_key?(key)
+      end
+    end
+    index
   end
 
   # Build a lookup map from content path → Page for internal link resolution.
@@ -1639,13 +1675,10 @@ module Hwaro::Core::Build::Phases::Render
         section_pages_array = paginator.pages.map { |p| page_to_crinja_list_value(p, default_lang) }
       else
         # Non-paginated: use per-section cache, then exclude current page.
-        # Find index once, then build result skipping that slot (pre-sized array avoids realloc).
-        all_section = cached_section_pages_crinja(current_section, page.language, site)
-        page_url_str = page.url
-        skip_idx = all_section.index do |v|
-          raw = v.raw
-          raw.is_a?(Hash) && raw["url"]?.try(&.to_s) == page_url_str
-        end
+        # O(1) lookup via the cached url→index map, then build result
+        # skipping that slot (pre-sized array avoids realloc).
+        all_section, url_index = cached_section_pages_with_index(current_section, page.language, site)
+        skip_idx = url_index[page.url]?
         section_pages_array = if skip_idx
                                 arr = Array(Crinja::Value).new(all_section.size - 1)
                                 all_section.each_with_index { |v, i| arr << v unless i == skip_idx }

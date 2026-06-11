@@ -118,6 +118,12 @@ module Hwaro
         @i18n_translations : Content::I18n::TranslationData = Content::I18n::TranslationData.new
         # Per-section cache of Crinja::Value arrays, keyed by "section_name:language"
         @section_pages_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
+        # Companion url→index map per section list, populated together with
+        # (and invalidated exactly like) @section_pages_crinja_cache. Used
+        # for O(1) current-page exclusion in build_template_variables —
+        # the previous per-page linear Array#index scan made rendering a
+        # flat N-page section O(N²).
+        @section_pages_url_index_cache : Hash(String, Hash(String, Int32)) = {} of String => Hash(String, Int32)
         # Per-section cache of Crinja::Value arrays for section assets, keyed by section name
         @section_assets_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
         # Track created directories to avoid redundant mkdir_p syscalls
@@ -169,6 +175,7 @@ module Hwaro
           end
           @cache_manager.register("section_pages_crinja", "Section page lists as Crinja values", runtime: true) do
             @section_pages_crinja_cache.clear
+            @section_pages_url_index_cache.clear
           end
           @cache_manager.register("section_assets_crinja", "Section asset lists as Crinja values", runtime: true) do
             @section_assets_crinja_cache.clear
@@ -1087,6 +1094,7 @@ module Hwaro
               # drop every language's entry for the section, like section_pages.
               @ancestors_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
               @section_pages_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
+              @section_pages_url_index_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
               @section_assets_crinja_cache.delete(section_name)
             end
           end
