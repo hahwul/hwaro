@@ -238,12 +238,26 @@ module Hwaro::Core::Build::Phases::Render
   # dependency tracking off (config, or a dynamic include in the graph),
   # returns the whole-site templates checksum — matching the previous
   # invalidate-everything behavior.
+  #
+  # Memoized per page for the duration of a build: cached builds need this
+  # twice per page (filter_changed_pages, then cache.update after render)
+  # and the shortcode scan walks the full raw content per shortcode
+  # template. A racy duplicate computation is harmless — both fibers store
+  # the same deterministic value.
   protected def page_template_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String
     deps = @template_deps
     return @global_templates_hash unless @per_page_template_hash && deps
 
+    @page_template_hash_mutex.synchronize do
+      if cached = @page_template_hash_memo[page.path]?
+        return cached
+      end
+    end
+
     entry_template = determine_template(page, templates, site)
-    deps.closure_hash(entry_template, deps.shortcodes_used_in(page.raw_content))
+    hash = deps.closure_hash(entry_template, deps.shortcodes_used_in(page.raw_content))
+    @page_template_hash_mutex.synchronize { @page_template_hash_memo[page.path] = hash }
+    hash
   end
 
   private def get_output_path(page : Models::Page, output_dir : String) : String

@@ -45,12 +45,19 @@ module Hwaro
         @direct : Hash(String, Set(String))
         @content_hashes : Hash(String, String)
         @closures : Hash(String, Set(String))
+        @closure_hashes : Hash(String, String)
         @shortcode_usage_patterns : Hash(String, Regex)
+        # @closures and @closure_hashes fill lazily, and parallel render
+        # workers reach them through cache.update → closure_hash — an
+        # unsynchronized Hash insert under -Dpreview_mt.
+        @lazy_mutex : Mutex
 
         def initialize(templates : Hash(String, String))
           @direct = {} of String => Set(String)
           @content_hashes = {} of String => String
           @closures = {} of String => Set(String)
+          @closure_hashes = {} of String => String
+          @lazy_mutex = Mutex.new
           @dynamic = false
 
           @shortcode_names = templates.keys
@@ -105,6 +112,10 @@ module Hwaro
         # Unknown references stay in the set: they hash as "absent", so a
         # template appearing later changes the closure hash and re-renders.
         def closure(name : String) : Set(String)
+          @lazy_mutex.synchronize { closure_unlocked(name) }
+        end
+
+        private def closure_unlocked(name : String) : Set(String)
           if cached = @closures[name]?
             return cached
           end
@@ -122,18 +133,35 @@ module Hwaro
         # Stable fingerprint of everything that influences a page's rendered
         # template output: the entry template's closure plus the closures of
         # every shortcode template the page content invokes.
+        #
+        # Memoized: sites have a handful of distinct (entry template,
+        # shortcode set) combinations but compute this once or twice per
+        # page on cached builds. The memo lives for this instance's
+        # lifetime, which is exactly one template (re)load — invalidation
+        # is automatic.
         def closure_hash(entry_template : String, shortcode_templates : Set(String) = Set(String).new) : String
-          names = closure(entry_template).dup
-          shortcode_templates.each { |sc| names.concat(closure(sc)) }
-
-          digest = Digest::MD5.new
-          names.to_a.sort!.each do |name|
-            digest.update(name)
-            digest.update("=")
-            digest.update(@content_hashes[name]? || "<missing>")
-            digest.update(";")
+          memo_key = String.build do |io|
+            io << entry_template
+            shortcode_templates.to_a.sort!.each { |sc| io << '|' << sc }
           end
-          digest.final.hexstring
+
+          @lazy_mutex.synchronize do
+            if cached = @closure_hashes[memo_key]?
+              return cached
+            end
+
+            names = closure_unlocked(entry_template).dup
+            shortcode_templates.each { |sc| names.concat(closure_unlocked(sc)) }
+
+            digest = Digest::MD5.new
+            names.to_a.sort!.each do |name|
+              digest.update(name)
+              digest.update("=")
+              digest.update(@content_hashes[name]? || "<missing>")
+              digest.update(";")
+            end
+            @closure_hashes[memo_key] = digest.final.hexstring
+          end
         end
 
         # All templates whose closure intersects `changed` — i.e. every

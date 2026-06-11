@@ -136,6 +136,14 @@ module Hwaro
         @ancestors_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
         # Per-page related_posts Crinja::Value cache (avoids rebuilding the array on each build_template_variables call)
         @related_posts_crinja_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
+        # Per-page template closure hash memo (page.path → hash). On cached
+        # builds the hash is needed twice per page (filter_changed_pages and
+        # cache.update) and costs shortcode regex scans over the raw content.
+        # Cleared with the runtime caches; incremental builds drop entries
+        # for re-parsed pages (their content — hence shortcode usage — may
+        # have changed).
+        @page_template_hash_memo : Hash(String, String) = {} of String => String
+        @page_template_hash_mutex : Mutex = Mutex.new
         # Mutex to protect shared Crinja value caches during parallel rendering.
         # Crystal fibers are single-threaded by default, but this guards against
         # future multi-threaded mode (-Dpreview_mt) and ensures correctness.
@@ -197,6 +205,9 @@ module Hwaro
           end
           @cache_manager.register("related_posts_crinja", "Related posts as Crinja values", runtime: true) do
             @related_posts_crinja_cache.clear
+          end
+          @cache_manager.register("page_template_hash", "Per-page template closure hashes", runtime: true) do
+            @page_template_hash_mutex.synchronize { @page_template_hash_memo.clear }
           end
           @cache_manager.register("build_cache", "Persistent file-change tracking (.hwaro_cache.json)", runtime: false) do
             @cache.try(&.clear)
@@ -317,6 +328,8 @@ module Hwaro
             # Re-read, re-parse front-matter and recalculate URL
             parse_single_page(page)
             page.generate_permalink(config.base_url)
+            # Content (shortcode usage) or front-matter template may have changed
+            @page_template_hash_mutex.synchronize { @page_template_hash_memo.delete(page.path) }
 
             # A changed [cascade] affects descendant pages that are NOT in the
             # changed set — incremental bookkeeping can't reach them, so
@@ -575,6 +588,7 @@ module Hwaro
 
             parse_single_page(page)
             page.generate_permalink(config.base_url)
+            @page_template_hash_mutex.synchronize { @page_template_hash_memo.delete(page.path) }
 
             # A changed [cascade] affects descendants outside the changed set
             # — escalate to a full rebuild, mirroring run_incremental.
