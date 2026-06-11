@@ -54,6 +54,10 @@ module Hwaro::Core::Build::Phases::Initialize
       ctx.site = @site
       ctx.config = config
 
+      # Propagate the highlighting mode to the markdown renderer once per
+      # build — read-only afterwards, including by parallel render fibers.
+      Content::Processors::SyntaxHighlighter.server_mode = config.highlight.server?
+
       ctx.templates = load_templates
       @templates = ctx.templates
 

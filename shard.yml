@@ -21,6 +21,9 @@ dependencies:
     github: straight-shoota/crinja
   emoji:
     github: veelenga/emoji.cr
+  tartrazine:
+    github: ralsina/tartrazine
+    version: ~> 0.20.0
 
 development_dependencies:
   ameba:

@@ -49,6 +49,7 @@ Configure in `config.toml`:
 enabled = true
 theme = "github-dark"
 use_cdn = true
+mode = "client"
 ```
 
 | Key | Type | Default | Description |
@@ -56,6 +57,27 @@ use_cdn = true
 | enabled | bool | true | Enable syntax highlighting |
 | theme | string | "github" | Highlight.js theme name |
 | use_cdn | bool | true | Load assets from CDN (false = local files) |
+| mode | string | "client" | `"client"` highlights in the browser via Highlight.js; `"server"` highlights at build time |
+
+## Server-Side Highlighting
+
+With `mode = "server"`, code blocks are highlighted during the build —
+no JavaScript ships to the browser, and code is colored even with
+JavaScript disabled:
+
+```toml
+[highlight]
+mode = "server"
+theme = "github-dark"
+```
+
+The build-time highlighter emits Highlight.js-compatible CSS classes, so
+every theme above keeps working unchanged: `{{ highlight_css }}` still
+injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
+
+Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
+lexers, ported from Pygments/Chroma). Code blocks in languages without a
+lexer fall back to plain, unhighlighted output.
 
 ## Themes
 

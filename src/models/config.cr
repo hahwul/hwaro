@@ -497,11 +497,21 @@ module Hwaro
       property enabled : Bool
       property theme : String
       property use_cdn : Bool
+      # "client" injects Highlight.js and highlights in the browser;
+      # "server" highlights at build time (Tartrazine lexers, hljs-compatible
+      # CSS classes) so no JavaScript ships — theme CSS keeps working either way.
+      property mode : String
 
       def initialize
         @enabled = true
         @theme = "github"
         @use_cdn = true
+        @mode = "client"
+      end
+
+      # True when code is highlighted at build time (no client-side JS).
+      def server? : Bool
+        @mode == "server"
       end
 
       # Generate the CSS link tag for highlighting
@@ -516,9 +526,11 @@ module Hwaro
         end
       end
 
-      # Generate the JS script tag for highlighting
+      # Generate the JS script tag for highlighting.
+      # Server-side highlighting needs no JavaScript at all.
       def js_tag(cache_bust : String = "") : String
         return "" unless @enabled
+        return "" if server?
         if @use_cdn
           %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
         else
@@ -530,7 +542,8 @@ module Hwaro
       # Generate both CSS and JS tags
       def tags(cache_bust : String = "") : String
         return "" unless @enabled
-        "#{css_tag(cache_bust)}\n#{js_tag(cache_bust)}"
+        js = js_tag(cache_bust)
+        js.empty? ? css_tag(cache_bust) : "#{css_tag(cache_bust)}\n#{js}"
       end
     end
 
@@ -1426,6 +1439,13 @@ module Hwaro
         config.highlight.enabled = bool_value(s["enabled"]?, config.highlight.enabled)
         config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
+        if mode = s["mode"]?.try(&.as_s?)
+          if mode == "client" || mode == "server"
+            config.highlight.mode = mode
+          else
+            Logger.warn "Unknown highlight.mode '#{mode}' — expected \"client\" or \"server\". Using \"client\"."
+          end
+        end
       end
 
       private def self.load_auto_includes(config : Config)

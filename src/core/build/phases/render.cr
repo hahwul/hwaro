@@ -1317,7 +1317,10 @@ module Hwaro::Core::Build::Phases::Render
     css_rel = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
     js_rel = File.join("static", "assets", "js", "highlight.min.js")
     missing << "/assets/css/highlight/#{config.highlight.theme}.min.css" unless File.exists?(css_rel)
-    missing << "/assets/js/highlight.min.js" unless File.exists?(js_rel)
+    # Server-side highlighting references no JS at all — only the theme CSS.
+    unless config.highlight.server?
+      missing << "/assets/js/highlight.min.js" unless File.exists?(js_rel)
+    end
     missing
   end
 

@@ -4,9 +4,25 @@ shards:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.7.0-dev+git.commit.77bf37bb5d3f7751bb531d2e5e67d66a28474579
 
+  baked_file_system:
+    git: https://github.com/ralsina/baked_file_system.git
+    version: 0.10.0+git.commit.beb373124c7a235cfb9cd94e36849d8168eaa04b
+
+  base58:
+    git: https://github.com/crystal-china/base58.cr.git
+    version: 0.1.0+git.commit.0e2c44d16a8098b00d8bf0b74add8bb9ea2f1c5f
+
+  crimage:
+    git: https://github.com/naqvis/crimage.git
+    version: 1.0.5+git.commit.7d3244a3850646e3d398cef071f7c3e3f52c7518
+
   crinja:
     git: https://github.com/straight-shoota/crinja.git
     version: 0.9.0
+
+  docopt:
+    git: https://github.com/ralsina/docopt.cr.git
+    version: 0.3.1
 
   emoji:
     git: https://github.com/veelenga/emoji.cr.git
@@ -15,6 +31,14 @@ shards:
   markd:
     git: https://github.com/icyleaf/markd.git
     version: 0.5.0
+
+  sixteen:
+    git: https://github.com/ralsina/sixteen.git
+    version: 0.7.0
+
+  tartrazine:
+    git: https://github.com/ralsina/tartrazine.git
+    version: 0.20.1
 
   toml:
     git: https://github.com/crystal-community/toml.cr.git

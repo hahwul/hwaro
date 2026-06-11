@@ -4,6 +4,7 @@
 
 ### Added
 - Section `[cascade]` front matter: defaults inherited by descendant pages and sections (Hugo-style). Deeper cascades override shallower ones; a page's own front matter wins; `extra`/`taxonomies` merge per key. Cached builds invalidate descendants when a parent cascade changes; `hwaro serve` escalates to a full rebuild on cascade edits
+- `[highlight] mode = "server"`: build-time syntax highlighting via Tartrazine lexers (250+ languages, pure Crystal, no external libraries). Emits Highlight.js-compatible CSS classes so existing hljs themes keep working, and ships zero JavaScript — `highlight_js` becomes empty. Default remains `"client"`
 
 ### Changed
 - Template errors now report `templates/<file>:line:col` with a caret-marked source excerpt instead of an anonymous `<string>` template — applies to syntax errors, runtime errors, and user shortcode templates
