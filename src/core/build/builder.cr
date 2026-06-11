@@ -23,6 +23,7 @@ require "crinja"
 require "./cache"
 require "./cache_manager"
 require "./parallel"
+require "./template_deps"
 require "./shortcode_processor"
 require "./phases/initialize"
 require "./phases/read_content"
@@ -89,6 +90,15 @@ module Hwaro
         # Lets compiled templates carry their filename so Crinja errors report
         # file:line:col with a source excerpt instead of an anonymous string.
         @template_paths : Hash(String, String) = {} of String => String
+        # Static extends/include/import graph over the loaded templates.
+        # Rebuilt whenever templates reload; nil before the first load.
+        @template_deps : TemplateDeps?
+        # Combined checksum of all templates for the current build — the
+        # fallback per-entry template hash when dependency tracking is off.
+        @global_templates_hash : String = ""
+        # True when per-page template closure hashes drive cache invalidation
+        # (config build.template_deps on and the graph is fully static).
+        @per_page_template_hash : Bool = false
         @cache : Cache?
         @config : Models::Config?
         @lifecycle : Lifecycle::Manager
@@ -457,7 +467,7 @@ module Hwaro
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path, page.cascade_fingerprint)
+            cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
           end
 
           cache.save if options.cache
@@ -534,8 +544,12 @@ module Hwaro
           run_rerender(options)
         end
 
-        # Re-render all pages using reloaded templates without re-parsing
-        # content.  Useful when only template files have been modified.
+        # Re-render pages using reloaded templates without re-parsing content.
+        # Useful when only template files have been modified. With template
+        # dependency tracking active, only the pages whose template closure
+        # includes an edited template are re-rendered; otherwise (tracking
+        # off, a dynamic include in the graph, or templates added/removed)
+        # every page re-renders as before.
         def run_rerender(options : Config::Options::BuildOptions)
           config = @config
           site = @site
@@ -544,14 +558,21 @@ module Hwaro
             return run(options)
           end
 
-          Logger.info "Template change detected. Re-rendering all pages..."
           start_time = Time.instant
 
-          # Reload templates from disk & reset all runtime caches
+          # Reload templates from disk & reset all runtime caches.
+          # Keep the old sources so the dependency graph can diff them.
+          old_templates = @templates
           @templates = nil
           @cache_manager.clear_runtime
           templates = load_templates
           @templates = templates
+
+          # Refresh invalidation mode for the reloaded template set
+          deps = @template_deps
+          @global_templates_hash = Cache.compute_templates_hash(templates)
+          @per_page_template_hash = config.build.template_deps &&
+                                    (deps.try { |d| !d.dynamic? } || false)
 
           output_dir = options.output_dir
           minify = options.minify
@@ -561,22 +582,63 @@ module Hwaro
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           renderable_pages = all_pages.select(&.render)
 
+          # Selective re-render: same template set, fully static graph
+          affected_templates : Set(String)? = nil
+          if @per_page_template_hash && deps && old_templates &&
+             old_templates.keys.sort! == templates.keys.sort!
+            changed = Set(String).new
+            templates.each do |name, source|
+              changed << name if old_templates[name]? != source
+            end
+            if changed.empty?
+              Logger.info "Template change detected, but contents are identical — nothing to re-render."
+              return
+            end
+            affected_templates = deps.dependents_closure(changed)
+            Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..."
+          else
+            Logger.info "Template change detected. Re-rendering all pages..."
+          end
+
+          pages_to_render = if affected_templates && deps
+                              renderable_pages.select do |page|
+                                entry = determine_template(page, templates, site)
+                                affected_templates.includes?(entry) ||
+                                  deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) }
+                              end
+                            else
+                              renderable_pages
+                            end
+
+          if affected_templates && pages_to_render.size < renderable_pages.size
+            Logger.info "  #{pages_to_render.size} of #{renderable_pages.size} pages affected."
+          end
+
           global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
           error_overlay = options.error_overlay
-          count = if options.parallel && renderable_pages.size > 1
-                    process_files_parallel(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+          count = if pages_to_render.empty?
+                    0
+                  elsif options.parallel && pages_to_render.size > 1
+                    process_files_parallel(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
                   else
-                    process_files_sequential(renderable_pages, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
+                    process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
                   end
 
           # Re-generate 404 page with new template
-          generate_404_page(site, templates, output_dir, minify, verbose)
+          if affected_templates.nil? || affected_templates.includes?("404")
+            generate_404_page(site, templates, output_dir, minify, verbose)
+          end
 
-          # Re-generate taxonomy pages with new templates
-          Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          # Re-generate taxonomy pages with new templates. Their template
+          # resolution falls back taxonomy_term -> taxonomy -> page, so any
+          # of those being affected triggers the regeneration.
+          if affected_templates.nil? ||
+             ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
+            Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          end
 
           cache.save if options.cache
 

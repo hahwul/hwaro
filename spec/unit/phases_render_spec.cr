@@ -13,8 +13,10 @@ module Hwaro::Core::Build
       determine_template(page, templates, site)
     end
 
-    def test_filter_changed_pages(pages, output_dir, cache)
-      filter_changed_pages(pages, output_dir, cache)
+    def test_filter_changed_pages(pages, output_dir, cache,
+                                  templates = {} of String => String,
+                                  site = Models::Site.new(Models::Config.new))
+      filter_changed_pages(pages, output_dir, cache, templates, site)
     end
 
     def test_build_pages_by_path(site : Models::Site)

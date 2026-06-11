@@ -61,14 +61,24 @@ module Hwaro::Core::Build::Phases::Initialize
       ctx.templates = load_templates
       @templates = ctx.templates
 
+      # Per-page template closure hashes replace the invalidate-everything
+      # template checksum when dependency tracking is on AND every template
+      # reference resolved statically (no variable includes).
+      @global_templates_hash = Cache.compute_templates_hash(ctx.templates)
+      @per_page_template_hash = config.build.template_deps &&
+                                (@template_deps.try { |deps| !deps.dynamic? } || false)
+      if (deps = @template_deps) && deps.dynamic? && config.build.template_deps
+        Logger.debug "Template deps: dynamic include/extends found — falling back to whole-site template invalidation."
+      end
+
       # Compute global checksums for invalidation graph
       if cache_enabled
-        template_hash = Cache.compute_templates_hash(ctx.templates)
         # Hash the effective merged config (+ env + base_url override), not the
         # raw config.toml bytes, so env-override files and ${ENV_VAR} changes
         # correctly invalidate the per-page cache.
         config_hash = Cache.compute_config_hash(config, ctx.options.env)
-        build_cache.set_global_checksums(template_hash, config_hash)
+        build_cache.set_global_checksums(@global_templates_hash, config_hash,
+          invalidate_on_template_change: !@per_page_template_hash)
       end
     end
     profiler.end_phase
@@ -216,6 +226,9 @@ module Hwaro::Core::Build::Phases::Initialize
         end
       end
     end
+
+    # (Re)build the template dependency graph for selective invalidation
+    @template_deps = TemplateDeps.new(templates)
 
     # Initialize Crinja environment with file system loader
     @crinja_env = setup_crinja_env

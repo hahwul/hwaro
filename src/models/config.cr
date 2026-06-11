@@ -575,6 +575,12 @@ module Hwaro
     class BuildConfig
       property hooks : BuildHooksConfig
 
+      # Track template extends/include/import dependencies so a template
+      # edit only invalidates the pages that actually render it (cached
+      # builds and `hwaro serve`). Set to false to restore the previous
+      # behavior: any template change rebuilds every page.
+      property template_deps : Bool = true
+
       def initialize
         @hooks = BuildHooksConfig.new
       end
@@ -1550,6 +1556,8 @@ module Hwaro
 
       private def self.load_build(config : Config)
         return unless s = config.raw["build"]?.try(&.as_h?)
+
+        config.build.template_deps = bool_value(s["template_deps"]?, config.build.template_deps)
 
         if hooks_section = s["hooks"]?.try(&.as_h?)
           if pre_hooks = hooks_section["pre"]?.try(&.as_a?)

@@ -27,7 +27,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Filter pages for caching
     pages_to_build = if cache_enabled
-                       filter_changed_pages(all_pages, output_dir, build_cache)
+                       filter_changed_pages(all_pages, output_dir, build_cache, templates, site)
                      else
                        all_pages
                      end
@@ -226,12 +226,24 @@ module Hwaro::Core::Build::Phases::Render
     total_count
   end
 
-  private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache) : Array(Models::Page)
+  private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site) : Array(Models::Page)
     pages.select do |page|
       source_path = File.join("content", page.path)
       output_path = get_output_path(page, output_dir)
-      cache.changed?(source_path, output_path, page.cascade_fingerprint)
+      cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
     end
+  end
+
+  # Template closure fingerprint stored in this page's cache entry. With
+  # dependency tracking off (config, or a dynamic include in the graph),
+  # returns the whole-site templates checksum — matching the previous
+  # invalidate-everything behavior.
+  protected def page_template_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String
+    deps = @template_deps
+    return @global_templates_hash unless @per_page_template_hash && deps
+
+    entry_template = determine_template(page, templates, site)
+    deps.closure_hash(entry_template, deps.shortcodes_used_in(page.raw_content))
   end
 
   private def get_output_path(page : Models::Page, output_dir : String) : String
@@ -308,7 +320,7 @@ module Hwaro::Core::Build::Phases::Render
             end
             source_path = File.join("content", page.path)
             output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path, page.cascade_fingerprint)
+            cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
             results.send(true)
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
@@ -426,7 +438,7 @@ module Hwaro::Core::Build::Phases::Render
       end
       source_path = File.join("content", page.path)
       output_path = get_output_path(page, output_dir)
-      cache.update(source_path, output_path, page.cascade_fingerprint)
+      cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
       count += 1
     end
     count

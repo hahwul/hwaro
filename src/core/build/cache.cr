@@ -118,9 +118,12 @@ module Hwaro
         end
 
         # Set the current build's template and config checksums.
-        # If either differs from the previous build's metadata, all entries
-        # are invalidated so every page is rebuilt.
-        def set_global_checksums(template_hash : String, config_hash : String)
+        # A config change always invalidates all entries. A template change
+        # invalidates all entries only when `invalidate_on_template_change`
+        # is true — with template dependency tracking active, the builder
+        # passes false and per-page closure hashes (see `changed?`) decide
+        # which pages a template edit actually affects.
+        def set_global_checksums(template_hash : String, config_hash : String, invalidate_on_template_change : Bool = true)
           @current_template_hash = template_hash
           @current_config_hash = config_hash
 
@@ -128,7 +131,7 @@ module Hwaro
 
           invalidated = false
 
-          if !@metadata.template_hash.empty? && @metadata.template_hash != template_hash
+          if invalidate_on_template_change && !@metadata.template_hash.empty? && @metadata.template_hash != template_hash
             Logger.info "  Cache: templates changed — invalidating all entries."
             invalidated = true
           end
@@ -145,8 +148,10 @@ module Hwaro
           @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash)
         end
 
-        # Check if a file has changed since last build
-        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "") : Bool
+        # Check if a file has changed since last build.
+        # `template_hash` is the page's template closure fingerprint; nil
+        # skips the comparison (non-page entries, or dependency tracking off).
+        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil) : Bool
           return true unless @enabled
           return true unless File.exists?(file_path)
 
@@ -161,6 +166,11 @@ module Hwaro
           # A parent section's [cascade] changed what this page inherits —
           # the source file is unchanged but the rendered output isn't.
           return true if entry.cascade_hash != cascade_hash
+
+          # A template in this page's dependency closure changed.
+          if template_hash && entry.template_hash != template_hash
+            return true
+          end
 
           # Fast path: check modification time first
           begin
@@ -186,10 +196,14 @@ module Hwaro
         end
 
         # Update cache entry for a file.
+        # `template_hash` is the page's template closure fingerprint; nil
+        # stores the global templates checksum (non-page entries).
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "")
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil)
           return unless @enabled
           return unless File.exists?(file_path)
+
+          effective_template_hash = template_hash || @current_template_hash
 
           begin
             mtime = File.info(file_path).modification_time.to_unix_ms
@@ -198,7 +212,7 @@ module Hwaro
             @mutex.synchronize do
               existing = @entries[file_path]?
               if existing && existing.mtime == mtime && existing.output_path == output_path &&
-                 existing.cascade_hash == cascade_hash
+                 existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash
                 return
               end
             end
@@ -211,7 +225,7 @@ module Hwaro
               mtime: mtime,
               hash: content_hash,
               output_path: output_path,
-              template_hash: @current_template_hash,
+              template_hash: effective_template_hash,
               config_hash: @current_config_hash,
               cascade_hash: cascade_hash,
             )
