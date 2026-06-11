@@ -481,9 +481,11 @@ module Hwaro
           render_list.each do |page|
             next unless page.render
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: @profiler)
-            source_path = File.join("content", page.path)
-            output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+            if cache.enabled?
+              source_path = File.join("content", page.path)
+              output_path = get_output_path(page, output_dir)
+              cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+            end
           end
 
           cache.save if options.cache

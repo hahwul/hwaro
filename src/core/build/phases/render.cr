@@ -318,9 +318,15 @@ module Hwaro::Core::Build::Phases::Render
               template_name = determine_template(page, templates, site)
               profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
             end
-            source_path = File.join("content", page.path)
-            output_path = get_output_path(page, output_dir)
-            cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+            # Guard argument evaluation, not just the call: update is a no-op
+            # when the cache is disabled (the default build), but its
+            # arguments cost a template-hash computation — shortcode regex
+            # scans over the raw content plus an MD5 — per page.
+            if cache.enabled?
+              source_path = File.join("content", page.path)
+              output_path = get_output_path(page, output_dir)
+              cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+            end
             results.send(true)
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
@@ -436,9 +442,13 @@ module Hwaro::Core::Build::Phases::Render
         template_name = determine_template(page, templates, site)
         profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
       end
-      source_path = File.join("content", page.path)
-      output_path = get_output_path(page, output_dir)
-      cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+      # See the parallel worker: skip argument evaluation entirely when the
+      # cache is disabled — the template-hash computation is per-page work.
+      if cache.enabled?
+        source_path = File.join("content", page.path)
+        output_path = get_output_path(page, output_dir)
+        cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+      end
       count += 1
     end
     count
