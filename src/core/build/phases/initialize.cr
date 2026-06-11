@@ -185,6 +185,7 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     templates = {} of String => String
+    @template_paths.clear
     if Dir.exists?("templates")
       # Single glob for all supported template extensions.
       # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
@@ -196,13 +197,19 @@ module Hwaro::Core::Build::Phases::Initialize
         relative = Path[path].relative_to("templates")
         name = relative.to_s.gsub(Builder::TEMPLATE_EXTENSION_REGEX, "")
         # Don't overwrite if already loaded (higher priority extensions loaded first)
-        templates[name] ||= File.read(path)
+        unless templates.has_key?(name)
+          templates[name] = File.read(path)
+          @template_paths[name] = path
+        end
       end
     end
 
     unless templates.has_key?("page")
       if templates.has_key?("default")
         templates["page"] = templates["default"]
+        if default_path = @template_paths["default"]?
+          @template_paths["page"] = default_path
+        end
       end
     end
 

@@ -168,9 +168,10 @@ module Hwaro
           @env.loader = loader
         end
 
-        # Render a template string with the given context
-        def render(template_string : String, context : TemplateContext) : String
-          template = @env.from_string(template_string)
+        # Render a template string with the given context. Pass `name`/`filename`
+        # when the string came from a file so Crinja errors report file:line:col.
+        def render(template_string : String, context : TemplateContext, name : String = "", filename : String? = nil) : String
+          template = Crinja::Template.new(template_string, @env, name, filename)
           template.render(context.to_crinja_vars)
         rescue ex : Crinja::Error
           raise Hwaro::HwaroError.new(
@@ -180,9 +181,10 @@ module Hwaro
           )
         end
 
-        # Render a template string with raw hash
-        def render(template_string : String, variables : Hash(String, Crinja::Value)) : String
-          template = @env.from_string(template_string)
+        # Render a template string with raw hash. Pass `name`/`filename`
+        # when the string came from a file so Crinja errors report file:line:col.
+        def render(template_string : String, variables : Hash(String, Crinja::Value), name : String = "", filename : String? = nil) : String
+          template = Crinja::Template.new(template_string, @env, name, filename)
           template.render(variables)
         rescue ex : Crinja::Error
           raise Hwaro::HwaroError.new(

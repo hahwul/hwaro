@@ -43,7 +43,7 @@ module Hwaro::Core::Build::Phases::Write
     section_list = ""
     toc = ""
 
-    final_html = apply_template(template, content, page, site, section_list, toc, templates)
+    final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404")
 
     final_html = minify_html(final_html) if minify
 

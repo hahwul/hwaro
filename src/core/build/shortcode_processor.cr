@@ -492,16 +492,20 @@ module Hwaro
             # needed since a single fiber owns the cache. Only the shared
             # fallback cache (sequential path) needs the reentrant mutex.
             cache_key = template.hash ^ 0x5C0DE_CAFE_u64
+            # User shortcodes live at templates/shortcodes/<name>.html; resolving
+            # that key through compile_template attaches the filename so errors
+            # point at the file. Builtins aren't on disk and stay anonymous.
+            template_key = shortcode_name.try { |n| "shortcodes/#{n}" }
             crinja_template = if wcache = template_cache_override
                                 wcache[cache_key]? || begin
-                                  compiled = env.from_string(template)
+                                  compiled = compile_template(env, template, template_key)
                                   wcache[cache_key] = compiled
                                   compiled
                                 end
                               else
                                 @crinja_cache_mutex.synchronize do
                                   @compiled_templates_cache[cache_key]? || begin
-                                    compiled = env.from_string(template)
+                                    compiled = compile_template(env, template, template_key)
                                     @compiled_templates_cache[cache_key] = compiled
                                     compiled
                                   end

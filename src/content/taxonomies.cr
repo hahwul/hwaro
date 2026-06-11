@@ -239,10 +239,11 @@ module Hwaro
         global_vars : Hash(String, Crinja::Value),
         slug_map : Hash(String, String),
       )
-        template_content = templates["taxonomy"]? || templates["page"]?
+        template_name = ["taxonomy", "page"].find { |n| templates.has_key?(n) }
+        template_content = template_name.try { |n| templates[n] }
         html_content = build_term_list(terms, page.url, site.config.base_url, slug_map)
 
-        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars)
+        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars, template_name: template_name)
         write_output(page, output_dir, final_html, verbose)
       end
 
@@ -280,14 +281,15 @@ module Hwaro
 
         paginated_pages = paginate_taxonomy(taxonomy, pages, index_page)
 
-        template_content = templates["taxonomy_term"]? || templates["taxonomy"]? || templates["page"]?
+        template_name = ["taxonomy_term", "taxonomy", "page"].find { |n| templates.has_key?(n) }
+        template_content = template_name.try { |n| templates[n] }
 
         paginated_pages.each do |paginated_page|
           list_html = build_page_list(paginated_page.pages, site.config.base_url)
           pagination_html = Content::Pagination::Renderer.new(site.config).render_pagination_nav(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
@@ -386,6 +388,7 @@ module Hwaro
         paginator : Content::Pagination::PaginatedPage? = nil,
         builder : Core::Build::Builder? = nil,
         global_vars : Hash(String, Crinja::Value)? = nil,
+        template_name : String? = nil,
       ) : String
         return html_content unless template_content
 
@@ -412,7 +415,8 @@ module Hwaro
           pagination: "", # We don't pass pre-rendered pagination here as it is embedded in content? Wait.
           page_url_override: current_url,
           paginator: paginator,
-          global_vars: global_vars
+          global_vars: global_vars,
+          template_name: template_name
         )
       end
 

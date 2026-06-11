@@ -536,14 +536,15 @@ module Hwaro::Core::Build::Phases::Render
     # Handle section pages with pagination
     if (template_name == "section" || page.template == "section") && page.is_a?(Models::Section)
       render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, toc_headers, verbose, global_vars,
-        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, error_overlay: error_overlay)
+        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, error_overlay: error_overlay,
+        template_name: template_name)
     else
       section_list_html = ""
 
       final_html = if template_content
                      apply_template(template_content, html_content, page, site, section_list_html, toc_html, templates, toc_headers, global_vars: global_vars,
                        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
-                       prebuilt_vars: shortcode_context)
+                       prebuilt_vars: shortcode_context, template_name: template_name)
                    else
                      msg = "No template found for #{page.path}. Using raw content."
                      Logger.warn "#{msg}"
@@ -599,6 +600,7 @@ module Hwaro::Core::Build::Phases::Render
     crinja_env_override : Crinja? = nil,
     template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
     error_overlay : Bool = false,
+    template_name : String? = nil,
   )
     # Get pages in this section using the site utility method
     # Note: sorting is handled by Paginator.paginate (uses section.sort_by setting)
@@ -626,7 +628,8 @@ module Hwaro::Core::Build::Phases::Render
 
       final_html = if template_content
                      apply_template(template_content, html_content, section, site, section_list_html, toc_html, templates, toc_headers, pagination_nav_html, current_url, paginated_page, global_vars,
-                       crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links)
+                       crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links,
+                       template_name: template_name)
                    else
                      msg = "No template found for #{section.path}. Using raw content."
                      Logger.warn "#{msg}"
@@ -848,6 +851,7 @@ module Hwaro::Core::Build::Phases::Render
     template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
     pagination_seo_links : String = "",
     prebuilt_vars : Hash(String, Crinja::Value)? = nil,
+    template_name : String? = nil,
   ) : String
     # Use per-worker env when provided (parallel path), otherwise shared env
     env = crinja_env_override || crinja_env
@@ -876,7 +880,7 @@ module Hwaro::Core::Build::Phases::Render
                           cached
                         else
                           @cache_manager.record_miss("compiled_templates")
-                          compiled = env.from_string(processed_template)
+                          compiled = compile_template(env, processed_template, template_name)
                           cache[cache_key] = compiled
                           compiled
                         end
@@ -891,6 +895,26 @@ module Hwaro::Core::Build::Phases::Render
         message: "Template error for #{page.path}: #{ex.message}",
         cause: ex,
       )
+    end
+  end
+
+  # Compile a template string, attaching its source filename when the template
+  # came from disk. Crinja errors then report `templates/foo.html:line:col`
+  # with a source excerpt instead of an anonymous `<string>` template.
+  protected def compile_template(env : Crinja, source : String, template_name : String?) : Crinja::Template
+    if template_name && (path = @template_paths[template_name]?)
+      begin
+        Crinja::Template.new(source, env, template_name, path)
+      rescue ex : Crinja::Error
+        # Crinja attaches the template to parse-time TemplateErrors itself, but
+        # other parse-time errors (e.g. unknown-tag library lookups raise a
+        # RuntimeError) escape without one — attach a non-parsed stub so the
+        # message still names the source file.
+        ex.template ||= Crinja::Template.new(source, env, template_name, path, run_parser: false)
+        raise ex
+      end
+    else
+      env.from_string(source)
     end
   end
 

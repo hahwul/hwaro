@@ -85,6 +85,10 @@ module Hwaro
 
         @site : Models::Site?
         @templates : Hash(String, String)?
+        # Template name → source file path (e.g. "page" => "templates/page.html").
+        # Lets compiled templates carry their filename so Crinja errors report
+        # file:line:col with a source excerpt instead of an anonymous string.
+        @template_paths : Hash(String, String) = {} of String => String
         @cache : Cache?
         @config : Models::Config?
         @lifecycle : Lifecycle::Manager
