@@ -116,7 +116,7 @@ module Hwaro
               if !page.content.empty?
                 html_content = page.content
               else
-                html_content, _ = Processor::Markdown.render(page.raw_content)
+                html_content = Processor::Markdown.render_body_cached(page.raw_content)
               end
 
               # Strip HTML tags AND decode entities so the index stores

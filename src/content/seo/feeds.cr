@@ -367,7 +367,7 @@ module Hwaro
           # Fall back to a stripped + truncated body. Prefer the
           # already-rendered HTML; degrade to the raw markdown only if
           # render hasn't run.
-          html = page.content.empty? ? Processor::Markdown.render(page.raw_content)[0] : page.content
+          html = page.content.empty? ? Processor::Markdown.render_body_cached(page.raw_content) : page.content
           text = HTML.unescape(Utils::TextUtils.strip_html(html)).strip
           truncate_for_feed(text, limit)
         end
@@ -383,8 +383,7 @@ module Hwaro
         # (gh#526).
         private def self.full_content_for_feed(page : Models::Page) : String
           return page.content unless page.content.empty?
-          rendered, _ = Processor::Markdown.render(page.raw_content)
-          rendered
+          Processor::Markdown.render_body_cached(page.raw_content)
         end
 
         # Collect taxonomy terms that should appear as `<category>`
@@ -433,8 +432,7 @@ module Hwaro
           html_content = if !page.content.empty?
                            page.content
                          else
-                           rendered, _ = Processor::Markdown.render(page.raw_content)
-                           rendered
+                           Processor::Markdown.render_body_cached(page.raw_content)
                          end
 
           # Truncate if needed

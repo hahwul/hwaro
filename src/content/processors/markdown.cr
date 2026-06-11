@@ -11,6 +11,7 @@ require "yaml"
 require "toml"
 require "json"
 require "xml"
+require "digest/md5"
 require "./base"
 require "./syntax_highlighter"
 require "./markdown_extensions"
@@ -943,6 +944,41 @@ module Hwaro
       # @param emoji - if true, converts emoji shortcodes to emoji characters
       def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
         @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config)
+      end
+
+      # Memoized default-options body render for the Generate-phase
+      # fallbacks: on warm --cache builds (and in streaming mode) feeds and
+      # search hit pages whose `page.content` is empty because the Render
+      # phase skipped them, and the same page can be re-rendered up to four
+      # times in one build (feed summary + full body + section feed +
+      # search index). Output is a pure function of the raw content for the
+      # default arguments, so it is shared by content digest.
+      #
+      # Mutex-guarded — feeds and search run as parallel fibers. The byte
+      # cap keeps streaming mode's memory bound: once full, renders still
+      # happen, they just stop being remembered.
+      @@body_cache = {} of String => String
+      @@body_cache_bytes = 0_i64
+      @@body_cache_mutex = Mutex.new
+      BODY_CACHE_MAX_BYTES = 32_i64 * 1024 * 1024
+
+      def render_body_cached(content : String) : String
+        key = Digest::MD5.hexdigest(content)
+        @@body_cache_mutex.synchronize do
+          if cached = @@body_cache[key]?
+            return cached
+          end
+        end
+
+        html, _ = render(content)
+
+        @@body_cache_mutex.synchronize do
+          unless @@body_cache.has_key?(key) || @@body_cache_bytes + html.bytesize > BODY_CACHE_MAX_BYTES
+            @@body_cache[key] = html
+            @@body_cache_bytes += html.bytesize
+          end
+        end
+        html
       end
 
       # Returns parsed metadata and content
