@@ -49,7 +49,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Apply section [cascade] defaults to descendants before draft/expiry
     # filtering so cascaded `draft` participates in the filters, and before
     # populate_taxonomies so cascaded tags/taxonomies are aggregated.
-    apply_cascades(ctx.all_pages, ctx.sections)
+    # Sections the AfterReadContent hook already filtered out (draft/expired
+    # _index files) still cascade to their descendants — include them.
+    apply_cascades(ctx.all_pages, ctx.sections + ctx.excluded_cascade_sections)
 
     # Single-pass filtering: remove parse-failed, draft, and expired pages.
     # Combines multiple reject! calls into one pass per array to avoid
@@ -288,6 +290,10 @@ module Hwaro::Core::Build::Phases::ParseContent
   # (tracked via front_matter_keys) always wins.
   private def apply_cascades(all_pages : Array(Models::Page), sections : Array(Models::Section))
     cascade_map = build_cascade_map(sections)
+    # Keep the pre-filter map for incremental passes: sections filtered out
+    # later (draft/expired _index) still cascade to their descendants, and
+    # reusing the map avoids re-warning about non-cascadable keys per save.
+    @cascade_map = cascade_map
     return if cascade_map.empty?
 
     all_pages.each do |page|
@@ -363,10 +369,21 @@ module Hwaro::Core::Build::Phases::ParseContent
         if taxonomies = value.as?(Hash(String, Models::ExtraValue))
           taxonomies.each do |taxonomy_name, terms|
             next if page.taxonomies.has_key?(taxonomy_name)
+            # tags/authors also live on dedicated properties, and a top-level
+            # `authors` key is never mirrored into page.taxonomies — without
+            # these guards a cascaded [cascade.taxonomies] entry would shadow
+            # the page's own values in taxonomy aggregation (taxonomy_values
+            # prefers the hash). An explicitly declared key wins even when
+            # its value is an empty array.
+            if taxonomy_name == "tags"
+              next if !page.tags.empty? || page.front_matter_keys.includes?("tags")
+            elsif taxonomy_name == "authors"
+              next if !page.authors.empty? || page.front_matter_keys.includes?("authors")
+            end
             next unless term_list = cascade_string_array(terms)
             page.taxonomies[taxonomy_name] = term_list
-            page.tags = term_list if taxonomy_name == "tags" && page.tags.empty?
-            page.authors = term_list if taxonomy_name == "authors" && page.authors.empty?
+            page.tags = term_list if taxonomy_name == "tags"
+            page.authors = term_list if taxonomy_name == "authors"
           end
         end
       when "authors"
@@ -440,7 +457,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     when Hash(String, Models::ExtraValue)
       digest.update("{")
       value.keys.sort!.each do |key|
-        digest.update(key)
+        fingerprint_string(digest, key)
         digest.update("=")
         fingerprint_cascade_value(digest, value[key])
         digest.update(";")
@@ -449,7 +466,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     when Array(String)
       digest.update("[")
       value.each do |item|
-        digest.update(item)
+        fingerprint_string(digest, item)
         digest.update(",")
       end
       digest.update("]")
@@ -463,8 +480,16 @@ module Hwaro::Core::Build::Phases::ParseContent
     else
       digest.update(value.class.name)
       digest.update(":")
-      digest.update(value.to_s)
+      fingerprint_string(digest, value.to_s)
     end
+  end
+
+  # Length-prefix strings so values containing the structural delimiters
+  # (`=`, `;`, `,`) can't make two different cascades digest identically.
+  private def fingerprint_string(digest : Digest::MD5, value : String)
+    digest.update(value.bytesize.to_s)
+    digest.update(":")
+    digest.update(value)
   end
 
   private def calculate_page_url(page : Models::Page)

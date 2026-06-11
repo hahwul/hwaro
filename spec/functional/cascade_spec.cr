@@ -290,3 +290,107 @@ describe "Cascade: cache invalidation" do
     end
   end
 end
+
+describe "Cascade: review regressions" do
+  it "keeps a page's own top-level authors over [cascade.taxonomies] authors" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [[taxonomies]]
+      name = "authors"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\n\n[cascade.taxonomies]\nauthors = [\"bob\"]\n+++",
+        "blog/mine.md"   => "+++\ntitle = \"Mine\"\nauthors = [\"alice\"]\n+++\nbody",
+        "blog/other.md"  => "+++\ntitle = \"Other\"\n+++\nbody",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "<p>section</p>",
+      },
+    ) do
+      # alice's page keeps its own author; only the author-less page gets bob
+      File.exists?("public/authors/alice/index.html").should be_true
+      File.exists?("public/authors/bob/index.html").should be_true
+      bob_page = File.read("public/authors/bob/index.html")
+      bob_page.should contain("Other")
+      bob_page.should_not contain("Mine")
+    end
+  end
+
+  it "applies a draft section's cascade to its non-draft descendants (cold build)" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "hidden/_index.md" => "+++\ntitle = \"Hidden\"\ndraft = true\n\n[cascade.extra]\nbanner = \"from-draft-section.png\"\n+++",
+        "hidden/post.md"   => "+++\ntitle = \"Post\"\n+++\nbody",
+      },
+      template_files: {
+        "page.html"    => "<p>banner={{ page.extra.banner | default(\"none\") }}</p>",
+        "section.html" => "<p>section</p>",
+      },
+    ) do
+      File.exists?("public/hidden/index.html").should be_false
+      File.read("public/hidden/post/index.html").should contain("banner=from-draft-section.png")
+    end
+  end
+
+  it "retains a draft section's cascade across incremental rebuilds" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content/hidden")
+        FileUtils.mkdir_p("templates")
+        File.write("content/hidden/_index.md", "+++\ntitle = \"Hidden\"\ndraft = true\n\n[cascade.extra]\nbanner = \"from-draft-section.png\"\n+++")
+        File.write("content/hidden/post.md", "+++\ntitle = \"Post\"\n+++\nbody")
+        File.write("templates/page.html", "<p>banner={{ page.extra.banner | default(\"none\") }} {{ content }}</p>")
+        File.write("templates/section.html", "<p>section</p>")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        builder.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+        File.read("public/hidden/post/index.html").should contain("banner=from-draft-section.png")
+
+        # Incremental re-parse must re-apply the draft section's cascade —
+        # site.sections no longer holds the filtered-out _index.
+        File.write("content/hidden/post.md", "+++\ntitle = \"Post\"\n+++\nUPDATED body")
+        builder.run_incremental(["content/hidden/post.md"], options)
+
+        html = File.read("public/hidden/post/index.html")
+        html.should contain("UPDATED body")
+        html.should contain("banner=from-draft-section.png")
+      end
+    end
+  end
+
+  it "escalates to a full rebuild when an excluded section's _index is edited" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content/hidden")
+        FileUtils.mkdir_p("templates")
+        File.write("content/hidden/_index.md", "+++\ntitle = \"Hidden\"\ndraft = true\n\n[cascade.extra]\nbanner = \"v1.png\"\n+++")
+        File.write("content/hidden/post.md", "+++\ntitle = \"Post\"\n+++\nbody")
+        File.write("templates/page.html", "<p>banner={{ page.extra.banner | default(\"none\") }}</p>")
+        File.write("templates/section.html", "<p>section</p>")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        builder.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+
+        # The draft _index isn't in the site model; editing its cascade must
+        # trigger a full rebuild so descendants pick up the new value.
+        File.write("content/hidden/_index.md", "+++\ntitle = \"Hidden\"\ndraft = true\n\n[cascade.extra]\nbanner = \"v2.png\"\n+++")
+        builder.run_incremental(["content/hidden/_index.md"], options)
+
+        File.read("public/hidden/post/index.html").should contain("banner=v2.png")
+      end
+    end
+  end
+end

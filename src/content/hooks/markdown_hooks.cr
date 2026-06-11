@@ -90,6 +90,7 @@ module Hwaro
             page.reverse = data[:reverse]
             page.page_template = data[:page_template]
             page.paginate_path = data[:paginate_path]
+            page.cascade = data[:cascade]
           end
 
           # Calculate derived fields
@@ -140,7 +141,17 @@ module Hwaro
 
           before = ctx.pages.size + ctx.sections.size
           ctx.pages.reject!(&filter)
-          ctx.sections.reject!(&filter)
+          # A filtered-out section (draft/expired _index) may still cascade to
+          # its descendants — stash it so apply_cascades can include it when
+          # the ParseContent phase builds the cascade map.
+          ctx.sections.reject! do |section|
+            if filter.call(section)
+              ctx.excluded_cascade_sections << section unless section.cascade.empty?
+              true
+            else
+              false
+            end
+          end
           after = ctx.pages.size + ctx.sections.size
           ctx.invalidate_all_pages_cache if before != after
 

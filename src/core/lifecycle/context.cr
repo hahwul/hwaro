@@ -38,6 +38,12 @@ module Hwaro
         # Raw files (JSON, XML, etc.)
         property raw_files : Array(RawFile)
 
+        # Sections removed by early draft/expired/future filtering (e.g. the
+        # MarkdownHooks AfterReadContent filter) whose [cascade] must still
+        # reach their descendants. apply_cascades merges these with the
+        # surviving sections when building the cascade map.
+        property excluded_cascade_sections : Array(Models::Section)
+
         # Templates
         property templates : Hash(String, String)
 
@@ -80,6 +86,7 @@ module Hwaro
           @pages = [] of Models::Page
           @sections = [] of Models::Section
           @raw_files = [] of RawFile
+          @excluded_cascade_sections = [] of Models::Section
           @templates = {} of String => String
           @output_dir = options.output_dir
           @metadata = {} of String => String | Bool | Int32 | Float64

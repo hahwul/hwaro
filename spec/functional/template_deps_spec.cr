@@ -221,3 +221,96 @@ describe "Template deps: serve re-render (run_rerender)" do
     end
   end
 end
+
+describe "Template deps: review regressions" do
+  it "marks concatenation includes dynamic instead of recording a partial literal" do
+    deps = Hwaro::Core::Build::TemplateDeps.new({"dyn" => %({% include "partials/" ~ name %})})
+    deps.dynamic?.should be_true
+  end
+
+  it "keeps literal references with tag keywords static" do
+    templates = {
+      "a" => %({% include "x.html" ignore missing %}),
+      "b" => %({% include "x.html" with context %}),
+      "c" => %({% import "macros.html" as m %}),
+      "d" => %({% from "macros.html" import thing with context %}),
+      "x" => "x", "macros" => "m",
+    }
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates)
+    deps.dynamic?.should be_false
+    deps.closure("a").should contain("x")
+    deps.closure("c").should contain("macros")
+    deps.closure("d").should contain("macros")
+  end
+
+  it "detects all three shortcode invocation syntaxes" do
+    deps = Hwaro::Core::Build::TemplateDeps.new({"shortcodes/badge" => "<b>x</b>"})
+    deps.shortcodes_used_in("a {{ badge() }} b").should eq(Set{"shortcodes/badge"})
+    deps.shortcodes_used_in(%(a {{ shortcode("badge", color="x") }} b)).should eq(Set{"shortcodes/badge"})
+    deps.shortcodes_used_in(%(a {% badge type="x" %}body{% end %} b)).should eq(Set{"shortcodes/badge"})
+  end
+
+  it "rebuilds a page using explicit shortcode() syntax when the shortcode changes (cached)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_dep_site
+        File.write("content/explicit.md", "+++\ntitle = \"Explicit\"\n+++\nhas {{ shortcode(\"badge\") }} inline")
+        run_build(make_builder, cache: true)
+
+        File.write("templates/shortcodes/badge.html", "<span>B2</span>")
+        run_build(make_builder, cache: true)
+
+        File.read("public/explicit/index.html").should contain("B2")
+      end
+    end
+  end
+
+  it "content+template changes together re-render the content page (run_incremental_then_rerender)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_dep_site
+        builder = make_builder
+        run_build(builder)
+
+        # Edit a content file AND an unrelated template in the same batch.
+        # The selective re-render must not skip the content-changed page.
+        File.write("content/normal.md", "+++\ntitle = \"Normal\"\n+++\nUPDATED body")
+        File.write("templates/partials/footer.html", "<footer>v2</footer>")
+        builder.run_incremental_then_rerender(["content/normal.md"],
+          Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false))
+
+        File.read("public/normal/index.html").should contain("UPDATED body")
+        File.read("public/special/index.html").should contain("v2")
+      end
+    end
+  end
+
+  it "content+template changes keep cascaded values on the re-parsed page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("templates/partials")
+        File.write("templates/page.html", "<p>banner={{ page.extra.banner | default(\"none\") }} {{ content }}</p>{% include \"partials/footer.html\" %}")
+        File.write("templates/section.html", "<p>section</p>")
+        File.write("templates/partials/footer.html", "<footer>v1</footer>")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n\n[cascade.extra]\nbanner = \"inherited.png\"\n+++")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\nbody")
+
+        builder = make_builder
+        run_build(builder)
+        File.read("public/blog/post/index.html").should contain("banner=inherited.png")
+
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\nUPDATED body")
+        File.write("templates/partials/footer.html", "<footer>v2</footer>")
+        builder.run_incremental_then_rerender(["content/blog/post.md"],
+          Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false))
+
+        html = File.read("public/blog/post/index.html")
+        html.should contain("UPDATED body")
+        html.should contain("banner=inherited.png")
+        html.should contain("v2")
+      end
+    end
+  end
+end

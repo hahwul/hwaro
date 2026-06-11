@@ -99,6 +99,11 @@ module Hwaro
         # True when per-page template closure hashes drive cache invalidation
         # (config build.template_deps on and the graph is fully static).
         @per_page_template_hash : Bool = false
+        # Validated {dir, language} => cascade map captured during the cold
+        # build's parse phase — BEFORE draft/expired/future filtering, so
+        # incremental passes see the same cascades a cold build applies
+        # (a draft section's cascade still reaches its descendants).
+        @cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))?
         @cache : Cache?
         @config : Models::Config?
         @lifecycle : Lifecycle::Manager
@@ -263,8 +268,10 @@ module Hwaro
           old_neighbors = {} of String => {Models::Page?, Models::Page?}
 
           # Cascade context for re-applying section defaults to re-parsed pages
-          # (parse_single_page resets fields from front matter only).
-          cascade_map = build_cascade_map(site.sections)
+          # (parse_single_page resets fields from front matter only). Prefer
+          # the cold build's pre-filter map: it still contains cascades from
+          # draft/expired _index sections that site.sections no longer holds.
+          cascade_map = @cascade_map || build_cascade_map(site.sections)
 
           changed_content_files.each do |file|
             relative_path = begin
@@ -274,7 +281,16 @@ module Hwaro
             end
 
             page = pages_map[relative_path]?
-            next unless page
+            unless page
+              # A section _index that isn't in the site model (e.g. its own
+              # front matter says draft = true) can still cascade to its
+              # descendants — an edit to it is untrackable incrementally.
+              if File.basename(relative_path).starts_with?("_index.")
+                Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
+                return run(options)
+              end
+              next
+            end
 
             # Snapshot before re-parse
             old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
@@ -512,6 +528,10 @@ module Hwaro
           old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
           old_series_names = {} of String => String?
 
+          # Same cascade context as run_incremental — re-parsed pages must
+          # get their inherited section defaults back before rendering.
+          cascade_map = @cascade_map || build_cascade_map(site.sections)
+
           changed_content_files.each do |file|
             relative_path = begin
               Path[file].relative_to("content").to_s
@@ -520,14 +540,33 @@ module Hwaro
             end
 
             page = pages_map[relative_path]?
-            next unless page
+            unless page
+              # See run_incremental: an excluded section's _index can still
+              # cascade to descendants — escalate rather than miss it.
+              if File.basename(relative_path).starts_with?("_index.")
+                Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
+                return run(options)
+              end
+              next
+            end
 
             # Snapshot before re-parse
             old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
             old_series_names[page.path] = page.series
+            old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
 
             parse_single_page(page)
             page.generate_permalink(config.base_url)
+
+            # A changed [cascade] affects descendants outside the changed set
+            # — escalate to a full rebuild, mirroring run_incremental.
+            if (previous_cascade = old_cascade) && page.is_a?(Models::Section) && page.cascade != previous_cascade
+              Logger.info "  Section cascade changed in #{page.path} — running full rebuild."
+              return run(options)
+            end
+
+            apply_cascade_to(page, cascade_map)
+
             changed_pages << page
             affected_sections << page.section
             page.ancestors.each { |ancestor| affected_sections << ancestor.section }
@@ -540,8 +579,10 @@ module Hwaro
           recompute_series_for_pages(site, changed_pages, old_series_names) if site.config.series.enabled
           recompute_related_posts_for_pages(site, changed_pages) if site.config.related.enabled
 
-          # Now do a full re-render with reloaded templates (caches cleared there)
-          run_rerender(options)
+          # Re-render with reloaded templates. The selective path inside
+          # run_rerender only covers template-affected pages, so the content
+          # pages re-parsed above must be forced into the render set.
+          run_rerender(options, force_pages: changed_pages)
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -550,7 +591,13 @@ module Hwaro
         # includes an edited template are re-rendered; otherwise (tracking
         # off, a dynamic include in the graph, or templates added/removed)
         # every page re-renders as before.
-        def run_rerender(options : Config::Options::BuildOptions)
+        #
+        # `force_pages` are rendered regardless of template impact — callers
+        # that re-parsed content (run_incremental_then_rerender) pass them so
+        # the selective path can't skip a content-changed page. Their taxonomy
+        # membership may have changed too, so taxonomy pages regenerate
+        # whenever force_pages are present.
+        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil)
           config = @config
           site = @site
 
@@ -590,22 +637,29 @@ module Hwaro
             templates.each do |name, source|
               changed << name if old_templates[name]? != source
             end
-            if changed.empty?
+            if changed.empty? && (force_pages.nil? || force_pages.empty?)
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
               return
             end
             affected_templates = deps.dependents_closure(changed)
-            Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..."
+            Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..." unless changed.empty?
           else
             Logger.info "Template change detected. Re-rendering all pages..."
           end
 
           pages_to_render = if affected_templates && deps
-                              renderable_pages.select do |page|
+                              selected = renderable_pages.select do |page|
                                 entry = determine_template(page, templates, site)
                                 affected_templates.includes?(entry) ||
                                   deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) }
                               end
+                              if forced = force_pages
+                                seen = selected.map(&.path).to_set
+                                forced.each do |page|
+                                  selected << page if page.render && !seen.includes?(page.path)
+                                end
+                              end
+                              selected
                             else
                               renderable_pages
                             end
@@ -634,8 +688,10 @@ module Hwaro
 
           # Re-generate taxonomy pages with new templates. Their template
           # resolution falls back taxonomy_term -> taxonomy -> page, so any
-          # of those being affected triggers the regeneration.
+          # of those being affected triggers the regeneration. Forced content
+          # pages may have changed taxonomy membership — regenerate then too.
           if affected_templates.nil? ||
+             (force_pages && !force_pages.empty?) ||
              ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
             Content::Taxonomies.generate(site, output_dir, templates, verbose)
           end

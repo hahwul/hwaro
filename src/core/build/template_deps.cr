@@ -24,10 +24,15 @@ module Hwaro
       class TemplateDeps
         # `{% extends "base.html" %}`, `{% include 'partials/head.html' %}`,
         # `{% import "macros.html" as m %}`, `{% from "macros.html" import x %}`
-        REFERENCE_TAG_RE = /\{%-?\s*(?:extends|include|import|from)\s+(.+?)\s*-?%\}/m
+        REFERENCE_TAG_RE = /\{%-?\s*(extends|include|import|from)\s+(.+?)\s*-?%\}/m
 
-        # The first argument of the tag when it is a plain string literal.
-        LITERAL_NAME_RE = /\A\s*(?:"([^"]+)"|'([^']+)')/
+        # Per-tag argument shapes where the template name is a plain string
+        # literal. The literal must account for the ENTIRE argument (modulo
+        # the tag's own keywords) — a leading literal in an expression like
+        # `{% include "partials/" ~ name %}` must NOT count as static.
+        INCLUDE_ARG_RE = /\A\s*(?:"([^"]+)"|'([^']+)')\s*(?:ignore\s+missing\s*)?(?:with(?:out)?\s+context\s*)?\z/
+        IMPORT_ARG_RE  = /\A\s*(?:"([^"]+)"|'([^']+)')\s+as\s+\w+\s*(?:with(?:out)?\s+context\s*)?\z/
+        FROM_ARG_RE    = /\A\s*(?:"([^"]+)"|'([^']+)')\s+import\s+.+\z/m
 
         # True when any reference could not be resolved statically — the
         # graph is incomplete and callers must treat every template change
@@ -54,17 +59,25 @@ module Hwaro
 
           @shortcode_usage_patterns = {} of String => Regex
           @shortcode_names.each do |name|
-            # Matches `{% name(...) %}` and `{{ name(...) }}` loosely; an
-            # over-match only causes an unnecessary rebuild, never a stale page.
-            @shortcode_usage_patterns[name] = /\b#{Regex.escape(name)}\s*\(/
+            # Covers all three invocation syntaxes the shortcode processor
+            # accepts: direct/paren block `name(...)`, explicit call
+            # `shortcode("name", ...)`, and the paren-less block form
+            # `{% name key="v" %}`. Loose on purpose — an over-match only
+            # causes an unnecessary rebuild, never a stale page.
+            escaped = Regex.escape(name)
+            @shortcode_usage_patterns[name] = /\b#{escaped}\s*\(|\bshortcode\(\s*["']#{escaped}["']|\{%-?\s*#{escaped}\b/
           end
 
           templates.each do |name, source|
             @content_hashes[name] = Digest::MD5.hexdigest(source)
             deps = Set(String).new
             source.scan(REFERENCE_TAG_RE) do |match|
-              arg = match[1]
-              if literal = LITERAL_NAME_RE.match(arg)
+              literal = case match[1]
+                        when "extends", "include" then INCLUDE_ARG_RE.match(match[2])
+                        when "import"             then IMPORT_ARG_RE.match(match[2])
+                        else                           FROM_ARG_RE.match(match[2])
+                        end
+              if literal
                 deps << normalize(literal[1]? || literal[2]? || "")
               else
                 @dynamic = true

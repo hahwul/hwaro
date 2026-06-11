@@ -321,7 +321,7 @@ module Hwaro
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
-          result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
+          result = build_front_matter_result(toml_fm, date, updated, extra, front_matter_keys, taxonomies, tags, file_path)
           result.merge({expires: expires})
         rescue ex : Hwaro::HwaroError
           raise ex
@@ -382,7 +382,7 @@ module Hwaro
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
-          result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
+          result = build_front_matter_result(yaml_fm, date, updated, extra, front_matter_keys, taxonomies, tags, file_path)
           result.merge({expires: expires})
         rescue ex : Hwaro::HwaroError
           raise ex
@@ -434,7 +434,7 @@ module Hwaro
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
-          result = build_front_matter_result(json_fm, date, updated, extra, front_matter_keys, taxonomies, tags)
+          result = build_front_matter_result(json_fm, date, updated, extra, front_matter_keys, taxonomies, tags, file_path)
           result.merge({expires: expires})
         rescue ex : Hwaro::HwaroError
           raise ex
@@ -485,6 +485,7 @@ module Hwaro
           front_matter_keys : Array(String),
           taxonomies : Hash(String, Array(String)),
           tags : Array(String),
+          file_path : String = "",
         )
           # Authors may arrive via the top-level `authors` key or a Zola-style
           # `[taxonomies]` table — mirror the tags fallback at the call sites.
@@ -496,6 +497,8 @@ module Hwaro
           if cascade_value = fm["cascade"]?
             if extracted = extract_extra_value(cascade_value).as?(Hash(String, Models::ExtraValue))
               cascade = extracted
+            elsif !file_path.empty?
+              Logger.warn "#{file_path}: `cascade` must be a table ([cascade] in TOML) — ignored."
             end
           end
           {
