@@ -21,6 +21,9 @@ describe Hwaro::Core::Build::Phases::Finalize do
         Dir.cd(dir) do
           builder = Hwaro::Core::Build::Builder.new
           cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: ".hwaro_cache.json")
+          # The source file must exist: Cache#update silently skips missing
+          # files, and #save only writes when an update made the cache dirty.
+          File.write("dummy-source.md", "# dummy")
           cache.update("dummy-source.md", "dummy-output.html")
           builder.test_set_cache(cache)
 
@@ -33,6 +36,9 @@ describe Hwaro::Core::Build::Phases::Finalize do
 
           result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
           File.exists?(".hwaro_cache.json").should be_true
+
+          data = Hwaro::Core::Build::CacheData.from_json(File.read(".hwaro_cache.json"))
+          data.entries.map(&.path).should contain("dummy-source.md")
         end
       end
     end
