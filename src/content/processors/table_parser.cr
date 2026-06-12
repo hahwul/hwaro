@@ -47,8 +47,9 @@ module Hwaro
           def initialize(@headers, @alignments, @rows)
           end
 
-          # Convert table to HTML
-          def to_html : String
+          # Convert table to HTML. `math: true` keeps `$…$` spans in cells
+          # untransformed for the later math pass (see InlineMarkdown.render).
+          def to_html(math : Bool = false) : String
             html = String.build do |str|
               str << "<table>\n"
               str << "<thead>\n<tr>\n"
@@ -56,7 +57,7 @@ module Hwaro
               @headers.each_with_index do |header, i|
                 alignment = @alignments[i]? || Alignment::Left
                 align_attr = alignment_attr(alignment)
-                str << "<th#{align_attr}>#{render_inline_markdown(header.strip)}</th>\n"
+                str << "<th#{align_attr}>#{render_inline_markdown(header.strip, math)}</th>\n"
               end
 
               str << "</tr>\n</thead>\n"
@@ -68,7 +69,7 @@ module Hwaro
                   row.each_with_index do |cell, i|
                     alignment = @alignments[i]? || Alignment::Left
                     align_attr = alignment_attr(alignment)
-                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip)}</td>\n"
+                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip, math)}</td>\n"
                   end
                   # Fill missing cells if row has fewer columns than headers
                   if row.size < @headers.size
@@ -99,15 +100,17 @@ module Hwaro
             end
           end
 
-          private def render_inline_markdown(text : String) : String
-            InlineMarkdown.render(text)
+          private def render_inline_markdown(text : String, math : Bool) : String
+            InlineMarkdown.render(text, math: math)
           end
         end
 
         # Process markdown content and convert tables to HTML
         # Tables are converted to HTML placeholders, then markd processes the rest,
         # and placeholders are replaced with actual HTML tables.
-        def process(content : String) : String
+        # `math: true` keeps `$…$` spans in cells untransformed for the later
+        # math pass.
+        def process(content : String, *, math : Bool = false) : String
           return content unless has_table?(content)
 
           lines = content.split("\n")
@@ -131,7 +134,7 @@ module Hwaro
               # Try to parse the table
               table, consumed = parse_table(lines, i)
               if table
-                result << table.to_html
+                result << table.to_html(math)
                 i += consumed
                 next
               end

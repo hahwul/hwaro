@@ -20,11 +20,19 @@ module Hwaro
           # (strikethrough / footnote refs / math) run AFTER them — a <del>
           # or math span injected into a `: definition` line beforehand would
           # be escaped into visible literal markup. TableParser runs even
-          # earlier (in Markdown#render) for the same reason. Math runs last
-          # so `$…$` inside already-escaped <td>/<dd> bodies still gets
-          # wrapped.
-          result = preprocess_definition_lists(result) if config.definition_lists
+          # earlier (in Markdown#render) for the same reason. Math is split
+          # into a stash phase before the combined pass and an expand phase
+          # after it, so `$…$` inside already-escaped <td>/<dd> bodies still
+          # gets wrapped while `~~`/`[ ]` inside formulas stays verbatim.
+          result = preprocess_definition_lists(result, math: config.math) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
+
+          # Math spans become opaque placeholders before the combined pass —
+          # `$~~x~~$` must reach KaTeX verbatim, not as `$<del>x</del>$`.
+          math_store = nil
+          if config.math
+            result, math_store = stash_math(result)
+          end
 
           # Combined single fence-aware pass for per-line safe extensions
           # (task_lists + strikethrough + heading_ids) — reduces full
@@ -69,9 +77,9 @@ module Hwaro
             end
           end
 
-          # Math kept as a separate pass: display math `$$…$$` spans lines,
-          # so it works on fence-delimited chunks rather than per line.
-          result = preprocess_math(result) if config.math
+          # Expand the stashed math spans into final HTML now that the
+          # transforming passes are done.
+          result = expand_math(result, math_store) if math_store
 
           result
         end
@@ -100,7 +108,7 @@ module Hwaro
             end
           end
 
-          result = postprocess_footnotes(result) if config.footnotes
+          result = postprocess_footnotes(result, math: config.math) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
 
           result
@@ -126,7 +134,9 @@ module Hwaro
         # Converts Term\n: Definition syntax to <dl><dt><dd> HTML.
         # Fence-aware: `Term` / `: def` lines shown inside a ```/~~~ example
         # stay verbatim instead of becoming <dl> markup inside the code block.
-        def preprocess_definition_lists(content : String) : String
+        # `math: true` keeps `$…$` spans in <dt>/<dd> bodies untransformed
+        # for the later math pass (see InlineMarkdown.render).
+        def preprocess_definition_lists(content : String, *, math : Bool = false) : String
           lines = content.split("\n")
 
           tracker = FenceTracker.new
@@ -159,13 +169,13 @@ module Hwaro
                   break
                 end
 
-                result << "<dt>#{render_inline_md(term)}</dt>"
+                result << "<dt>#{render_inline_md(term, math)}</dt>"
                 i += 1
 
                 # Collect definitions for this term
                 while i < lines.size && !fenced[i] && lines[i].lstrip.starts_with?(": ")
                   definition = lines[i].lstrip.lchop(": ").strip
-                  result << "<dd>#{render_inline_md(definition)}</dd>"
+                  result << "<dd>#{render_inline_md(definition, math)}</dd>"
                   i += 1
                 end
 
@@ -264,8 +274,11 @@ module Hwaro
           result
         end
 
-        # Post-processing: convert footnote comments to HTML section
-        def postprocess_footnotes(html : String) : String
+        # Post-processing: convert footnote comments to HTML section.
+        # `math: true` keeps `$…$` spans in footnote bodies untransformed
+        # (math is not rendered in footnotes, but its internals must not be
+        # rewritten by emphasis/strikethrough either).
+        def postprocess_footnotes(html : String, *, math : Bool = false) : String
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
 
           # Extract footnote data from comments
@@ -289,7 +302,7 @@ module Hwaro
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
               escaped_key = HTML.escape(fn[:key])
-              rendered_text = InlineMarkdown.render(fn[:text])
+              rendered_text = InlineMarkdown.render(fn[:text], math: math)
               str << "<li id=\"fn-#{escaped_key}\">\n"
               str << "<p>#{rendered_text} <a href=\"#fnref-#{escaped_key}\" class=\"footnote-backref\">\u21A9</a></p>\n"
               str << "</li>\n"
@@ -312,8 +325,8 @@ module Hwaro
         end
 
         # --- Math ---
-        DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
-        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
+        DISPLAY_MATH_RE = InlineMarkdown::DISPLAY_MATH_RE
+        INLINE_MATH_RE  = InlineMarkdown::INLINE_MATH_RE
         # Code-span pattern confined to one line, for stashing inside
         # multi-line chunks: a stray lone backtick in one paragraph must not
         # absorb text from another.
@@ -325,22 +338,38 @@ module Hwaro
         # backslash escapes ship verbatim instead of collapsing.
         HTML_BLOCK_START_RE = /^ {0,3}<\/?(?:address|article|aside|blockquote|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|menu|nav|ol|p|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)(?:[\s>\/]|\r?$)/i
 
-        # Wraps math expressions in special HTML to prevent Markd from
-        # processing them. Fence-aware: `$$` is common in Makefile/shell/Perl
-        # code examples, and rewriting it inside a fence corrupts the code
-        # block. Display math can span lines, so instead of a per-line walk
-        # this buffers runs of non-fence lines and transforms each run as one
-        # chunk.
-        def preprocess_math(content : String) : String
-          return content unless content.includes?('$')
+        # A math span captured by `stash_math`, awaiting `expand_math`.
+        record MathSpan, display : Bool, body : String
 
-          String.build do |io|
+        MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
+
+        # One-shot math transform (stash + immediate expand). `preprocess`
+        # itself uses the two phases separately so the combined pass runs in
+        # between — see the ordering comment there.
+        def preprocess_math(content : String) : String
+          stashed, store = stash_math(content)
+          expand_math(stashed, store)
+        end
+
+        # Phase 1: replace `$$…$$` / `$…$` spans with opaque placeholders so
+        # the passes running in between can't rewrite formula internals
+        # (`$~~x~~$` must reach KaTeX verbatim, not as `$<del>x</del>$`).
+        #
+        # Fence-aware: `$$` is common in Makefile/shell/Perl code examples,
+        # and rewriting it inside a fence corrupts the code block. Display
+        # math can span lines, so instead of a per-line walk this buffers
+        # runs of non-fence lines and stashes each run as one chunk.
+        private def stash_math(content : String) : Tuple(String, Array(MathSpan))
+          store = [] of MathSpan
+          return {content, store} unless content.includes?('$')
+
+          result = String.build do |io|
             tracker = FenceTracker.new
             chunk = String::Builder.new
             content.each_line(chomp: false) do |line|
               if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
                 if chunk.bytesize > 0
-                  io << transform_math_chunk(chunk.to_s)
+                  io << stash_math_chunk(chunk.to_s, store)
                   chunk = String::Builder.new
                 end
                 io << line
@@ -348,62 +377,102 @@ module Hwaro
                 chunk << line
               end
             end
-            io << transform_math_chunk(chunk.to_s) if chunk.bytesize > 0
+            io << stash_math_chunk(chunk.to_s, store) if chunk.bytesize > 0
           end
+
+          {result, store}
         end
 
-        private def transform_math_chunk(text : String) : String
+        private def stash_math_chunk(text : String, store : Array(MathSpan)) : String
           return text unless text.includes?('$')
 
-          # Inline code spans are stashed so `` `$HOME` `` stays verbatim.
-          transform_outside_code_spans(text, SINGLE_LINE_CODE_SPAN_RE) do |stashed|
-            # Display math: $$...$$ (multi-line). The `<div>` is an HTML
-            # block, opaque to Markd in every context, so a single backslash
-            # reaches the browser as `\[…\]` — what KaTeX auto-render scans
-            # for.
-            result = stashed.gsub(DISPLAY_MATH_RE) do |_|
-              escaped = Utils::TextUtils.escape_xml($~[1])
-              "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+          # Inline code spans are stashed first so `` `$HOME` `` stays
+          # verbatim. Not via transform_outside_code_spans: a code span
+          # captured INSIDE a math body would leave its `\x00CS…` token in
+          # the store where the helper's restore step can't see it, so each
+          # body is restored explicitly at capture time.
+          code_spans = [] of String
+          stashed = text.gsub(SINGLE_LINE_CODE_SPAN_RE) do |match|
+            code_spans << match
+            "\x00CS#{code_spans.size - 1}\x00"
+          end
+
+          result = stashed.gsub(DISPLAY_MATH_RE) do |_|
+            store << MathSpan.new(display: true, body: restore_code_spans($~[1], code_spans))
+            "\x00MATH#{store.size - 1}\x00"
+          end
+
+          if result.includes?('$')
+            result = result.gsub(INLINE_MATH_RE) do |_|
+              store << MathSpan.new(display: false, body: restore_code_spans($~[1], code_spans))
+              "\x00MATH#{store.size - 1}\x00"
             end
+          end
 
-            next result unless result.includes?('$')
+          restore_code_spans(result, code_spans)
+        end
 
-            # Inline math: $...$ (single line, no space after opening or
-            # before closing $). The required backslash escaping depends on
-            # block context:
-            #
-            # - In normal inline context the `<span>` content participates in
-            #   CommonMark inline parsing, so the delimiters need an extra
-            #   backslash — `\\(` in the markdown source collapses to `\(`
-            #   in the HTML.
-            # - Inside a raw HTML block (a <td>/<dd> hwaro generated, or
-            #   author-written block HTML) Markd does no inline parsing and
-            #   backslashes ship verbatim, so a single backslash is correct.
-            #
-            # Walk line by line to track the HTML-block state (a type-6 block
-            # runs from its opening tag line to the next blank line).
-            String.build do |io|
-              in_html_block = false
-              result.each_line(chomp: false) do |line|
-                if in_html_block
-                  in_html_block = false if line.strip.empty?
-                elsif HTML_BLOCK_START_RE.matches?(line)
-                  in_html_block = true
-                end
+        private def restore_code_spans(text : String, code_spans : Array(String)) : String
+          return text if code_spans.empty? || !text.includes?('\0')
+          code_spans.each_with_index do |span, idx|
+            text = text.sub("\x00CS#{idx}\x00", span)
+          end
+          text
+        end
 
-                unless line.includes?('$')
-                  io << line
-                  next
-                end
+        # Phase 2: expand stashed math spans into final HTML.
+        #
+        # Display math always emits single-backslash `\[…\]`: its `<div>` is
+        # an HTML block, opaque to Markd in every context. Inline math
+        # delimiter escaping depends on block context:
+        #
+        # - In normal inline context the `<span>` content participates in
+        #   CommonMark inline parsing, so the delimiters need an extra
+        #   backslash — `\\(` in the markdown source collapses to `\(` in
+        #   the HTML.
+        # - Inside a raw HTML block (a <td>/<dd> hwaro generated, or
+        #   author-written block HTML) Markd does no inline parsing and
+        #   backslashes ship verbatim, so a single backslash is correct.
+        #
+        # Walk line by line to track the HTML-block state (a type-6 block
+        # runs from its opening tag line to the next blank line).
+        private def expand_math(content : String, store : Array(MathSpan)) : String
+          return content if store.empty?
 
-                raw_context = in_html_block
-                io << line.gsub(INLINE_MATH_RE) do |_|
-                  escaped = Utils::TextUtils.escape_xml($~[1])
-                  if raw_context
-                    "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
-                  else
-                    "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
-                  end
+          String.build do |io|
+            tracker = FenceTracker.new
+            in_html_block = false
+            content.each_line(chomp: false) do |line|
+              if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
+                # Mirrors stash_math's chunk boundaries: block state resets.
+                in_html_block = false
+                io << line
+                next
+              end
+
+              if in_html_block
+                in_html_block = false if line.strip.empty?
+              elsif HTML_BLOCK_START_RE.matches?(line)
+                in_html_block = true
+              end
+
+              unless line.includes?('\0')
+                io << line
+                next
+              end
+
+              raw_context = in_html_block
+              io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
+                span = $~[1].to_i?.try { |idx| store[idx]? }
+                next match unless span
+
+                escaped = Utils::TextUtils.escape_xml(span.body)
+                if span.display
+                  "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+                elsif raw_context
+                  "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
+                else
+                  "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
                 end
               end
             end
@@ -551,12 +620,9 @@ module Hwaro
         # and inline `` `code` `` runs on the same line are skipped via a
         # placeholder pass so e.g. `` `~~not strike~~` `` stays as code.
         #
-        # Known limitation: when math is also enabled, `$~~x~~$` is rewritten
-        # by this pass before the math pass runs, so the `<del>` tags end up
-        # escaped inside the KaTeX expression. We do not stash math spans
-        # because they can span multiple lines (display math) and the walker
-        # is line-oriented. `~~` inside math is rare and the failure is
-        # visible at render time.
+        # When math is also enabled, `preprocess` stashes `$…$`/`$$…$$`
+        # spans into opaque placeholders before this pass runs, so `$~~x~~$`
+        # reaches KaTeX verbatim instead of being rewritten here.
         STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
         STRIKETHROUGH_CODE_RE = /`[^`]+`/
 
@@ -634,8 +700,8 @@ module Hwaro
         # Inline-markdown renderer used by definition lists (and now footnote
         # bodies). Delegates to the shared `InlineMarkdown` module so the same
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
-        private def render_inline_md(text : String) : String
-          InlineMarkdown.render(text)
+        private def render_inline_md(text : String, math : Bool = false) : String
+          InlineMarkdown.render(text, math: math)
         end
       end
     end

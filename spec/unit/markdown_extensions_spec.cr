@@ -859,4 +859,61 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("&lt;del&gt;")
     end
   end
+
+  describe "strikethrough inside math" do
+    it "keeps ~~ verbatim inside inline math" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("$~~x~~$", make_config(math: true))
+      result.should contain("math-inline")
+      result.should contain("~~x~~")
+      result.should_not contain("<del>")
+    end
+
+    it "still strikes outside math on the same line" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("~~a~~ and $~~b~~$", make_config(math: true))
+      result.should contain("<del>a</del>")
+      result.should contain("~~b~~")
+    end
+
+    it "keeps ~~ verbatim inside multi-line display math" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("$$\na ~~b~~ c\n$$", make_config(math: true))
+      result.should contain("math-display")
+      result.should contain("~~b~~")
+      result.should_not contain("<del>")
+    end
+
+    it "applies strikethrough to $-delimited text when math is disabled" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("$~~x~~$", make_config)
+      result.should contain("$<del>x</del>$")
+    end
+
+    it "keeps ~~ verbatim inside math in a table cell (end-to-end)" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| $~~x~~$ |", markdown_config: make_config(math: true))
+      html.should contain("\\(~~x~~\\)")
+      html.should_not contain("<del>")
+    end
+
+    it "still strikes non-math cell text when math is enabled" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| ~~strike~~ and $x$ |", markdown_config: make_config(math: true))
+      html.should contain("<del>strike</del>")
+      html.should contain("\\(x\\)")
+    end
+
+    it "keeps ~~ verbatim inside math in a definition body" do
+      html, _ = Hwaro::Processor::Markdown.render("Term\n: value $~~x~~$ here", markdown_config: make_config(math: true, definition_lists: true))
+      html.should contain("~~x~~")
+      html.should_not contain("<del>")
+    end
+
+    it "keeps math spans untouched in footnote bodies while striking the rest" do
+      html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: formula $~~x~~$ and ~~real~~", markdown_config: make_config(math: true, footnotes: true))
+      html.should contain("$~~x~~$")
+      html.should contain("<del>real</del>")
+    end
+
+    it "leaves links inside math untouched in table cells" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| $f([x])(y)$ |", markdown_config: make_config(math: true))
+      html.should contain("\\(f([x])(y)\\)")
+      html.should_not contain("<a href")
+    end
+  end
 end

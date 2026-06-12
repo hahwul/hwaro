@@ -42,16 +42,38 @@ module Hwaro
         INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![a-zA-Z0-9_])/
         INLINE_STRIKETHROUGH_RE     = /~~(?=\S)(.+?)(?<=\S)~~/
 
+        # Math span patterns — canonical home for the whole pipeline
+        # (MarkdownExtensions aliases these, mirroring INLINE_STRIKETHROUGH_RE).
+        DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
+        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
+
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
         # the other passes verbatim.
-        def render(text : String) : String
+        #
+        # With `math: true`, `$…$`/`$$…$$` spans are stashed too and restored
+        # UNtransformed: emphasis/strikethrough/link passes must not rewrite
+        # formula internals (`$~~x~~$`, `$f([x])(y)$`), and the math
+        # preprocess wraps the still-raw span afterwards.
+        def render(text : String, *, math : Bool = false) : String
           result = HTML.escape(text)
 
           code_spans = [] of String
           result = result.gsub(INLINE_CODE_SPAN_RE) do
             code_spans << $1
             "\x00CODESPAN#{code_spans.size - 1}\x00"
+          end
+
+          math_spans = [] of String
+          if math && result.includes?('$')
+            result = result.gsub(DISPLAY_MATH_RE) do |match|
+              math_spans << match
+              "\x00MATHSPAN#{math_spans.size - 1}\x00"
+            end
+            result = result.gsub(INLINE_MATH_RE) do |match|
+              math_spans << match
+              "\x00MATHSPAN#{math_spans.size - 1}\x00"
+            end
           end
 
           result = result.gsub(INLINE_IMAGE_RE) do
@@ -83,6 +105,10 @@ module Hwaro
           result = result.gsub(INLINE_ITALIC_ASTERISK_RE) { "<em>#{$1}</em>" }
           result = result.gsub(INLINE_ITALIC_UNDERSCORE_RE) { "<em>#{$1}</em>" }
           result = result.gsub(INLINE_STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+
+          math_spans.each_with_index do |span, idx|
+            result = result.sub("\x00MATHSPAN#{idx}\x00", span)
+          end
 
           code_spans.each_with_index do |content, idx|
             result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")

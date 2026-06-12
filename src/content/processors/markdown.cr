@@ -142,8 +142,9 @@ module Hwaro
           # touched cell text yet, or their tags get escaped into visible
           # literal markup. The footnote-ref and math passes still reach the
           # generated <td> text afterwards, so refs and `$…$` inside cells
-          # keep working.
-          processed = TableParser.process(content)
+          # keep working. The math flag keeps `$~~x~~$` formula internals in
+          # cells out of InlineMarkdown's strikethrough/emphasis passes.
+          processed = TableParser.process(content, math: !!markdown_config.try(&.math))
 
           # Pre-process markdown extensions (task lists, footnotes, etc.)
           if md_cfg = markdown_config
