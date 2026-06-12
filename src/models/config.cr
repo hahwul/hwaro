@@ -1296,8 +1296,12 @@ module Hwaro
           # Keep the priority raw here (NOT clamped) so `hwaro doctor` can detect
           # an out-of-range value and warn/offer a fix. The sitemap EMITTER
           # (sitemap.cr) clamps to [0.0, 1.0] so the generated XML stays valid
-          # even for users who never run doctor.
-          config.sitemap.priority = float_value(s["priority"]?, config.sitemap.priority)
+          # even for users who never run doctor. NaN is the exception: it
+          # sails through both doctor's range checks and the emitter's clamp
+          # (NaN comparisons are all false) and lands in the XML as "NaN",
+          # so non-finite values fall back to the default here.
+          pr = float_value(s["priority"]?, config.sitemap.priority)
+          config.sitemap.priority = pr.finite? ? pr : config.sitemap.priority
           if exclude_arr = s["exclude"]?.try(&.as_a?)
             config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
           end
@@ -1484,7 +1488,13 @@ module Hwaro
           config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?) || config.og.auto_image.output_dir
           config.og.auto_image.show_title = bool_value(ai["show_title"]?, config.og.auto_image.show_title)
           config.og.auto_image.style = ai["style"]?.try(&.as_s?) || config.og.auto_image.style
-          config.og.auto_image.pattern_opacity = float_value(ai["pattern_opacity"]?, config.og.auto_image.pattern_opacity)
+          # Opacity-style floats share pattern_scale's hazard below: TOML
+          # accepts `nan`/`inf` literals, NaN survives the renderer's
+          # clamp(0.0, 1.0) (NaN comparisons are all false), and the pixel
+          # blend's `.to_u8` then raises OverflowError, aborting the build.
+          # A non-finite value falls back to the field's default.
+          po = float_value(ai["pattern_opacity"]?, config.og.auto_image.pattern_opacity)
+          config.og.auto_image.pattern_opacity = po.finite? ? po : config.og.auto_image.pattern_opacity
           # Clamp to a sane range: the pattern renderer multiplies scale into
           # Int32 expressions (e.g. (80 * scale).to_i), so a huge value overflows
           # Int32 and crashes OG generation. 0.1..10.0 covers every visible scale;
@@ -1492,7 +1502,8 @@ module Hwaro
           ps = float_value(ai["pattern_scale"]?, config.og.auto_image.pattern_scale)
           config.og.auto_image.pattern_scale = ps.finite? ? ps.clamp(0.1, 10.0) : 1.0
           config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?)
-          config.og.auto_image.overlay_opacity = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
+          oo = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
+          config.og.auto_image.overlay_opacity = oo.finite? ? oo : config.og.auto_image.overlay_opacity
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
           config.og.auto_image.font_path = ai["font_path"]?.try(&.as_s?)
           if lp = ai["logo_position"]?.try(&.as_s?)
@@ -1500,7 +1511,8 @@ module Hwaro
               config.og.auto_image.logo_position = lp
             end
           end
-          config.og.auto_image.text_panel = float_value(ai["text_panel"]?, config.og.auto_image.text_panel)
+          tp = float_value(ai["text_panel"]?, config.og.auto_image.text_panel)
+          config.og.auto_image.text_panel = tp.finite? ? tp : config.og.auto_image.text_panel
           config.og.auto_image.accent_bars = bool_value(ai["accent_bars"]?, config.og.auto_image.accent_bars)
           config.og.auto_image.lazy_generate = bool_value(ai["lazy_generate"]?, config.og.auto_image.lazy_generate)
         end

@@ -859,7 +859,10 @@ module Hwaro
             HEIGHT.times do |py|
               WIDTH.times do |px|
                 t = (px + py).to_f / diagonal
-                alpha = opacity * (1.0 - t)
+                # Clamp like every other style branch: an opacity above 1.0
+                # would push the blend past 255 (or below 0) and the `.to_u8`
+                # conversions below raise OverflowError.
+                alpha = (opacity * (1.0 - t)).clamp(0.0, 1.0)
                 next if alpha <= 0
                 idx = (py * WIDTH + px) * CHANNELS
                 dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]

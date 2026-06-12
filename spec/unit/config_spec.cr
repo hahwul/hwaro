@@ -2304,6 +2304,22 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
       load_config("[og.auto_image]\npattern_scale = -3.0").og.auto_image.pattern_scale.should eq(0.1)
     end
 
+    it "falls back to defaults for non-finite [og.auto_image] opacity values" do
+      # TOML accepts `nan`/`inf` literals. NaN survives the renderer's
+      # clamp(0.0, 1.0) (NaN comparisons are all false) and crashes the
+      # pixel blend's `.to_u8` with OverflowError, so the loader must
+      # reject non-finite values.
+      load_config("[og.auto_image]\npattern_opacity = nan").og.auto_image.pattern_opacity.should eq(0.12)
+      load_config("[og.auto_image]\noverlay_opacity = inf").og.auto_image.overlay_opacity.should eq(0.45)
+      load_config("[og.auto_image]\ntext_panel = nan").og.auto_image.text_panel.should eq(0.0)
+    end
+
+    it "falls back to the default for a non-finite [sitemap] priority" do
+      # Unlike the merely out-of-range value above, NaN passes both doctor's
+      # range checks and the emitter's clamp, and would emit "NaN" into the XML.
+      load_config("[sitemap]\npriority = nan").sitemap.priority.should eq(0.5)
+    end
+
     it "falls back to the default for a wrong-typed numeric value" do
       load_config("[pagination]\nper_page = \"twenty\"").pagination.per_page.should eq(10)
     end
