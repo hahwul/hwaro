@@ -589,6 +589,10 @@ module Hwaro
           # # style = "split"       # diagonal two-tone color block
           # # style = "band"        # magazine color band behind the title
           # # style = "brutalist"   # thick framed panel with a hard offset shadow
+          # # Signature styles (complete, self-contained compositions):
+          # # style = "terminal"    # code-editor window with prompt + cursor
+          # # style = "bauhaus"     # flat geometric art-poster shapes
+          # # style = "halftone"    # print-style halftone dot fade
           # pattern_opacity = 0.12
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)

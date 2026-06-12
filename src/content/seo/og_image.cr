@@ -53,10 +53,12 @@ module Hwaro
         #
         # "Modern" styles are typography/panel-driven and reuse the classic
         # background patterns. "Geometric" styles paint bold, distinctive
-        # background shapes (color blocks, bands, frames) and are the
-        # high-contrast, design-forward additions.
+        # background shapes (color blocks, bands, frames). "Signature" styles
+        # render a complete, self-contained composition (terminal window,
+        # bauhaus shapes, halftone fade) and ignore the soft text panel.
         MODERN_STYLES    = {"editorial", "framed", "artistic", "hero", "surreal", "monument"}
         GEOMETRIC_STYLES = {"split", "band", "brutalist"}
+        SIGNATURE_STYLES = {"terminal", "bauhaus", "halftone"}
 
         def self.modern?(style : String) : Bool
           MODERN_STYLES.includes?(style)
@@ -66,10 +68,14 @@ module Hwaro
           GEOMETRIC_STYLES.includes?(style)
         end
 
+        def self.signature?(style : String) : Bool
+          SIGNATURE_STYLES.includes?(style)
+        end
+
         # Styles that drop the classic thin top/bottom accent bars for a
         # cleaner, more modern composition.
         def self.no_accent_bars?(style : String) : Bool
-          style == "minimal" || modern?(style) || geometric?(style)
+          style == "minimal" || modern?(style) || geometric?(style) || signature?(style)
         end
 
         # --- Geometric style layout (shared by SVG + PNG so both stay in sync) ---
@@ -93,6 +99,22 @@ module Hwaro
         BRUTALIST_OFFSET = 20 # hard shadow offset (down-right)
         BRUTALIST_TEXT_X = 88 # left margin of the title inside the frame
 
+        # `terminal`: a code-editor window with a title bar + traffic lights.
+        TERMINAL_INSET  =  36                               # window inset from the canvas edge
+        TERMINAL_RADIUS =  18                               # window corner radius
+        TERMINAL_BAR_H  =  64                               # title-bar height
+        TERMINAL_TEXT_X = 110                               # left margin of the prompt/title inside the window
+        TERMINAL_LIGHTS = {"#ff5f57", "#febc2e", "#28c840"} # classic traffic lights
+
+        # `bauhaus`: flat geometric art composition on the right side.
+        BAUHAUS_TEXT_X =  90
+        BAUHAUS_TEXT_W = 600 # wrap width so the title clears the shapes
+
+        # `halftone`: print-style dot field growing toward the right edge.
+        HALFTONE_TEXT_X  =  90
+        HALFTONE_TEXT_W  = 620
+        HALFTONE_FIELD_X = 660 # dots begin here and grow rightward
+
         # Resolve the second color for two-tone geometric styles. Falls back
         # to a complementary tone auto-derived from the accent color.
         def self.resolve_secondary(ai : Models::AutoImageConfig) : String
@@ -107,6 +129,19 @@ module Hwaro
           s2 = Math.max(s, 0.45)   # keep it vivid
           l2 = l < 0.5 ? Math.min(l + 0.14, 0.74) : Math.max(l - 0.14, 0.30)
           hsl_to_hex(h2, s2, l2)
+        end
+
+        # Rotate a hex color's hue by `degrees`, optionally forcing a minimum
+        # saturation so derived tones stay vivid on flat compositions.
+        def self.shift_hue(hex : String, degrees : Float64, min_sat : Float64 = 0.0) : String
+          h, s, l = hex_to_hsl(hex)
+          hsl_to_hex(h + degrees, Math.max(s, min_sat), l)
+        end
+
+        # Lighten (positive delta) or darken (negative) a hex color in HSL space.
+        def self.adjust_lightness(hex : String, delta : Float64) : String
+          h, s, l = hex_to_hsl(hex)
+          hsl_to_hex(h, s, (l + delta).clamp(0.0, 1.0))
         end
 
         # Normalize a user-supplied hex color to a bare 6-digit "rrggbb" form.
@@ -433,16 +468,25 @@ module Hwaro
             case style
             when "brutalist", "hero", "monument" then font_size = 78
             when "artistic", "surreal"           then font_size = 64
+            when "bauhaus", "halftone"           then font_size = 64
             when "band"                          then font_size = 60
             when "split"                         then font_size = 58
+            when "terminal"                      then font_size = 54
             end
           end
           desc_size = Math.max((font_size * 0.45).to_i, 1)
+
+          # `terminal` prefixes the title with an accent "$" prompt; the title
+          # block shifts right by this advance on every line.
+          prompt_advance = style == "terminal" ? (font_size * 0.9).to_i : 0
 
           # Per-style horizontal text box (left margin + wrap width).
           text_x = case style
                    when "split"                                   then SPLIT_TEXT_X
                    when "brutalist"                               then BRUTALIST_TEXT_X
+                   when "terminal"                                then TERMINAL_TEXT_X
+                   when "bauhaus"                                 then BAUHAUS_TEXT_X
+                   when "halftone"                                then HALFTONE_TEXT_X
                    when "editorial", "framed"                     then 110
                    when "artistic", "hero", "surreal", "monument" then 140
                    else                                                80
@@ -450,6 +494,9 @@ module Hwaro
           text_w = case style
                    when "split"     then WIDTH - SPLIT_TEXT_X - 80
                    when "brutalist" then WIDTH - BRUTALIST_TEXT_X - (BRUTALIST_INSET + BRUTALIST_FRAME + 40)
+                   when "terminal"  then WIDTH - TERMINAL_TEXT_X * 2 - prompt_advance
+                   when "bauhaus"   then BAUHAUS_TEXT_W
+                   when "halftone"  then HALFTONE_TEXT_W
                    else                  WIDTH - text_x - 80
                    end
           chars_per_line = Math.max((text_w / (font_size * 0.55)).to_i, 1)
@@ -480,6 +527,9 @@ module Hwaro
             title_start_y = Math.max(font_size + 20, 180)
           when "monument"
             title_start_y = Math.max(font_size + 10, 120)
+          when "terminal"
+            # Anchored near the top of the window content area, prompt-style.
+            title_start_y = TERMINAL_INSET + TERMINAL_BAR_H + 60 + font_size
           else
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_i + font_size)
           end
@@ -528,6 +578,19 @@ module Hwaro
             geo_svg = render_style_background(style, accent, bg, secondary, has_bg)
             svg << geo_svg unless geo_svg.empty?
 
+            # Hero: oversized "ghost" echo of the title's first word behind
+            # the composition for poster-style depth.
+            if style == "hero"
+              if ghost = page.title.split(/\s+/).first?
+                ghost_size = (font_size * 2.6).to_i
+                svg << %(<text x="#{text_x - 10}" y="#{ghost_size + 30}" )
+                svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
+                svg << %(font-size="#{ghost_size}" font-weight="800" letter-spacing="4" fill="#{text_color}" opacity="0.07">)
+                svg << escape_xml(ghost.upcase)
+                svg << %(</text>\n)
+              end
+            end
+
             # Legibility scrim behind text over generated gradient/glow backdrops.
             if !has_bg && (style == "artistic" || style == "hero" || style == "surreal")
               scrim_top = (title_start_y - font_size - 28).clamp(0, HEIGHT)
@@ -540,13 +603,26 @@ module Hwaro
               svg << %(<rect width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 
+            # Terminal: accent "$" prompt on the first title line.
+            if style == "terminal"
+              svg << %(<text x="#{text_x}" y="#{title_start_y}" )
+              svg << %(font-family="ui-monospace, 'SF Mono', Menlo, monospace" )
+              svg << %(font-size="#{font_size}" font-weight="700" fill="#{accent}">$</text>\n)
+            end
+
             # Title text
+            title_text_x = text_x + prompt_advance
+            title_font = style == "terminal" ? "ui-monospace, 'SF Mono', Menlo, monospace" : "system-ui, -apple-system, 'Segoe UI', sans-serif"
             title_lines.each_with_index do |line, i|
               y = title_start_y + i * (font_size + 8)
-              svg << %(<text x="#{text_x}" y="#{y}" )
-              svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
+              svg << %(<text x="#{title_text_x}" y="#{y}" )
+              svg << %(font-family="#{title_font}" )
               svg << %(font-size="#{font_size}" font-weight="700" fill="#{title_fill}">)
               svg << escape_xml(line)
+              # Terminal: blinking-cursor block after the last title line.
+              if style == "terminal" && i == title_lines.size - 1
+                svg << %(<tspan fill="#{accent}">&#x2588;</tspan>)
+              end
               svg << %(</text>\n)
             end
 
@@ -562,12 +638,12 @@ module Hwaro
               svg << %(<rect x="#{text_x}" y="#{rule_y}" width="220" height="5" fill="#{accent}" />\n)
             end
 
-            # Description text
+            # Description text (terminal indents it under the prompt's title)
             unless desc_lines.empty?
               desc_start_y = style == "band" ? BAND_TOP + BAND_HEIGHT + desc_size + 24 : title_start_y + title_block_height + 16
               desc_lines.each_with_index do |line, i|
                 y = desc_start_y + i * (desc_size + 6)
-                svg << %(<text x="#{text_x}" y="#{y}" )
+                svg << %(<text x="#{title_text_x}" y="#{y}" )
                 svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
                 svg << %(font-size="#{desc_size}" font-weight="400" fill="#{text_color}" opacity="0.78">)
                 svg << escape_xml(line)
@@ -581,9 +657,11 @@ module Hwaro
               # must use the readable text color rather than the accent.
               site_name_fill = style == "split" ? text_color : accent
               base_margin = case style
-                            when "split"     then 80
-                            when "brutalist" then BRUTALIST_TEXT_X
-                            else                  LOGO_MARGIN
+                            when "split"               then 80
+                            when "brutalist"           then BRUTALIST_TEXT_X
+                            when "terminal"            then TERMINAL_TEXT_X
+                            when "bauhaus", "halftone" then BAUHAUS_TEXT_X
+                            else                            LOGO_MARGIN
                             end
               site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
                               base_margin + LOGO_SIZE + LOGO_TEXT_GAP
@@ -618,31 +696,75 @@ module Hwaro
           case style
           when "artistic"
             return "" if has_bg_image
+            # Mesh-gradient color field: diagonal base + hue-shifted color
+            # blobs + a dark anchor for text legibility + film grain.
+            a2 = shift_hue(accent, 45.0)
+            s2 = shift_hue(secondary, -40.0)
             String.build do |s|
               s << %(<defs><linearGradient id="ogGrad" x1="0%" y1="0%" x2="100%" y2="100%">)
               s << %(<stop offset="0%" stop-color="#{accent}" /><stop offset="100%" stop-color="#{secondary}" />)
-              s << %(</linearGradient></defs>\n)
+              s << %(</linearGradient>)
+              s << %(<radialGradient id="ogM1" cx="18%" cy="10%" r="55%"><stop offset="0%" stop-color="#{a2}" stop-opacity="0.8" /><stop offset="100%" stop-color="#{a2}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogM2" cx="88%" cy="90%" r="60%"><stop offset="0%" stop-color="#{s2}" stop-opacity="0.7" /><stop offset="100%" stop-color="#{s2}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogM3" cx="50%" cy="115%" r="75%"><stop offset="0%" stop-color="#{bg}" stop-opacity="0.85" /><stop offset="100%" stop-color="#{bg}" stop-opacity="0" /></radialGradient>)
+              s << grain_filter_def
+              s << %(</defs>\n)
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGrad)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogM1)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogM2)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogM3)" />\n)
+              s << grain_rect
             end
           when "hero"
             return "" if has_bg_image
             String.build do |s|
               s << %(<defs><radialGradient id="ogGlow" cx="50%" cy="37%" r="60%">)
-              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="0.55" />)
+              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="0.6" />)
               s << %(<stop offset="100%" stop-color="#{accent}" stop-opacity="0" />)
-              s << %(</radialGradient></defs>\n)
+              s << %(</radialGradient>)
+              s << %(<radialGradient id="ogGlow2" cx="88%" cy="95%" r="55%">)
+              s << %(<stop offset="0%" stop-color="#{secondary}" stop-opacity="0.22" />)
+              s << %(<stop offset="100%" stop-color="#{secondary}" stop-opacity="0" />)
+              s << %(</radialGradient>)
+              s << grain_filter_def
+              s << %(</defs>\n)
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGlow)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGlow2)" />\n)
+              s << grain_rect
             end
           when "surreal"
             return "" if has_bg_image
+            # Aurora: soft orbs plus blurred ribbon bands flowing across.
+            a3 = shift_hue(accent, 60.0)
             String.build do |s|
               s << %(<defs>)
-              s << %(<radialGradient id="ogO1" cx="25%" cy="32%" r="42%"><stop offset="0%" stop-color="#{accent}" stop-opacity="0.5" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
-              s << %(<radialGradient id="ogO2" cx="79%" cy="60%" r="46%"><stop offset="0%" stop-color="#{secondary}" stop-opacity="0.45" /><stop offset="100%" stop-color="#{secondary}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogO1" cx="25%" cy="30%" r="42%"><stop offset="0%" stop-color="#{accent}" stop-opacity="0.55" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogO2" cx="80%" cy="62%" r="46%"><stop offset="0%" stop-color="#{secondary}" stop-opacity="0.5" /><stop offset="100%" stop-color="#{secondary}" stop-opacity="0" /></radialGradient>)
+              s << %(<radialGradient id="ogO3" cx="52%" cy="95%" r="45%"><stop offset="0%" stop-color="#{a3}" stop-opacity="0.35" /><stop offset="100%" stop-color="#{a3}" stop-opacity="0" /></radialGradient>)
+              s << %(<filter id="ogBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18" /></filter>)
+              s << grain_filter_def
               s << %(</defs>\n)
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogO1)" />\n)
               s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogO2)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogO3)" />\n)
+              s << %(<path d="M -60 250 C 280 160, 580 320, 880 230 S 1180 180, 1280 220" fill="none" stroke="#{accent}" stroke-width="60" opacity="0.3" filter="url(#ogBlur)" />\n)
+              s << %(<path d="M -60 420 C 240 340, 540 500, 840 410 S 1160 350, 1280 410" fill="none" stroke="#{secondary}" stroke-width="90" opacity="0.25" filter="url(#ogBlur)" />\n)
+              s << grain_rect
             end
+          when "terminal"
+            render_terminal_window(bg, has_bg_image)
+          when "bauhaus"
+            # Flat geometric art composition on the right: circle, dot,
+            # triangle, quarter disc — layered in accent/secondary/derived.
+            tertiary = shift_hue(accent, 60.0, 0.45)
+            String.build do |s|
+              s << %(<circle cx="950" cy="150" r="220" fill="#{accent}" />\n)
+              s << %(<circle cx="690" cy="150" r="30" fill="#{secondary}" />\n)
+              s << %(<polygon points="690,500 830,260 970,500" fill="#{tertiary}" />\n)
+              s << %(<path d="M 1200 630 L 1200 320 A 310 310 0 0 0 890 630 Z" fill="#{secondary}" />\n)
+            end
+          when "halftone"
+            render_halftone_field(accent)
           when "framed"
             %(<rect x="#{FRAMED_INSET}" y="#{FRAMED_INSET}" width="#{WIDTH - 2 * FRAMED_INSET}" height="#{HEIGHT - 2 * FRAMED_INSET}" fill="none" stroke="#{accent}" stroke-width="#{FRAMED_WIDTH}" />\n)
           when "split"
@@ -671,6 +793,76 @@ module Hwaro
             end
           else
             ""
+          end
+        end
+
+        # Deterministic film-grain filter definition (shared by the modern
+        # generated backdrops). Breaks up gradient banding and adds texture.
+        private def self.grain_filter_def : String
+          %(<filter id="ogGrain" x="0%" y="0%" width="100%" height="100%">) +
+            %(<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7" stitchTiles="stitch" />) +
+            %(<feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 0" />) +
+            %(</filter>)
+        end
+
+        private def self.grain_rect : String
+          %(<rect width="#{WIDTH}" height="#{HEIGHT}" filter="url(#ogGrain)" opacity="0.16" />\n)
+        end
+
+        # `terminal`: code-editor window — rounded panel, title bar with
+        # traffic lights, faint scanlines. Slightly translucent over a photo.
+        private def self.render_terminal_window(bg : String, has_bg_image : Bool) : String
+          inset = TERMINAL_INSET
+          win_w = WIDTH - 2 * inset
+          win_h = HEIGHT - 2 * inset
+          bar_h = TERMINAL_BAR_H
+          window = adjust_lightness(bg, 0.045)
+          bar = adjust_lightness(bg, 0.085)
+          border = adjust_lightness(bg, 0.16)
+          fill_opacity = has_bg_image ? 0.88 : 1.0
+
+          String.build do |s|
+            s << %(<defs><pattern id="ogScan" width="4" height="4" patternUnits="userSpaceOnUse">)
+            s << %(<rect width="4" height="1" fill="#000000" /></pattern></defs>\n)
+            # Window panel with border.
+            s << %(<rect x="#{inset}" y="#{inset}" width="#{win_w}" height="#{win_h}" rx="#{TERMINAL_RADIUS}" )
+            s << %(fill="#{window}" fill-opacity="#{fill_opacity}" stroke="#{border}" stroke-width="2" />\n)
+            # Title bar (rounded top corners, square bottom).
+            s << %(<rect x="#{inset + 1}" y="#{inset + 1}" width="#{win_w - 2}" height="#{bar_h}" rx="#{TERMINAL_RADIUS - 1}" fill="#{bar}" />\n)
+            s << %(<rect x="#{inset + 1}" y="#{inset + 1 + bar_h // 2}" width="#{win_w - 2}" height="#{bar_h - bar_h // 2}" fill="#{bar}" />\n)
+            s << %(<rect x="#{inset + 1}" y="#{inset + bar_h}" width="#{win_w - 2}" height="2" fill="#{border}" />\n)
+            # Traffic lights.
+            TERMINAL_LIGHTS.each_with_index do |color, i|
+              s << %(<circle cx="#{inset + 40 + i * 34}" cy="#{inset + bar_h // 2}" r="11" fill="#{color}" />\n)
+            end
+            # Faint scanlines in the content area for a subtle CRT feel.
+            s << %(<rect x="#{inset + 2}" y="#{inset + bar_h + 6}" width="#{win_w - 4}" height="#{win_h - bar_h - 10}" fill="url(#ogScan)" opacity="0.05" />\n)
+          end
+        end
+
+        # `halftone`: print-style dot field — dots grow toward the right
+        # edge, rows staggered like a press halftone screen.
+        private def self.render_halftone_field(accent : String) : String
+          spacing = 30
+          max_r = 13.0
+          field_w = (WIDTH - HALFTONE_FIELD_X).to_f
+          String.build do |s|
+            row = 0
+            y = spacing // 2
+            while y < HEIGHT
+              x_off = row.odd? ? spacing // 2 : 0
+              x = HALFTONE_FIELD_X + x_off
+              while x < WIDTH + spacing
+                tx = ((x - HALFTONE_FIELD_X).to_f / field_w).clamp(0.0, 1.0)
+                r = max_r * (tx ** 1.6)
+                if r >= 1.0
+                  s << %(<circle cx="#{x}" cy="#{y}" r="#{r.round(1)}" fill="#{accent}" opacity="0.92" />\n)
+                end
+                x += spacing
+              end
+              y += spacing
+              row += 1
+            end
           end
         end
 

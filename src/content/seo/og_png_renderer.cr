@@ -417,7 +417,7 @@ module Hwaro
             if ai.font_size <= 48
               font_size = 78.0
             end
-          when "artistic", "surreal"
+          when "artistic", "surreal", "bauhaus", "halftone"
             if ai.font_size <= 48
               font_size = 64.0
             end
@@ -429,6 +429,10 @@ module Hwaro
             if ai.font_size <= 48
               font_size = 58.0
             end
+          when "terminal"
+            if ai.font_size <= 48
+              font_size = 54.0
+            end
           end
           desc_size = Math.max((font_size * 0.38).to_i, 1).to_f32 # smaller desc ratio for ambitious styles
 
@@ -439,17 +443,30 @@ module Hwaro
           r_info = ctx.regular_info || bold_info
           r_scale = LibStb.hwaro_font_scale_for_pixel_height(r_info, desc_size)
 
+          # `terminal` prefixes the title with an accent "$" prompt; the title
+          # block shifts right by this advance on every line.
+          prompt_advance = 0_f32
+          if ai.style == "terminal"
+            prompt_advance = LibStb.hwaro_font_measure_text(bold_info, "$", bold_scale) + font_size * 0.4_f32
+          end
+
           # Word-wrap width and margins — modern + geometric styles get tailored treatment
           margin_x = case ai.style
                      when "editorial", "framed"                     then 110
                      when "artistic", "hero", "surreal", "monument" then 140
                      when "split"                                   then OgImage::SPLIT_TEXT_X
                      when "brutalist"                               then OgImage::BRUTALIST_TEXT_X
+                     when "terminal"                                then OgImage::TERMINAL_TEXT_X
+                     when "bauhaus"                                 then OgImage::BAUHAUS_TEXT_X
+                     when "halftone"                                then OgImage::HALFTONE_TEXT_X
                      else                                                80
                      end
           wrap_width = case ai.style
                        when "split"     then WIDTH - OgImage::SPLIT_TEXT_X - 80
                        when "brutalist" then WIDTH - OgImage::BRUTALIST_TEXT_X - (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 40)
+                       when "terminal"  then WIDTH - OgImage::TERMINAL_TEXT_X * 2 - prompt_advance.to_i
+                       when "bauhaus"   then OgImage::BAUHAUS_TEXT_W
+                       when "halftone"  then OgImage::HALFTONE_TEXT_W
                        else                  WIDTH - (margin_x * 2)
                        end
 
@@ -485,6 +502,9 @@ module Hwaro
             title_start_y = (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 100).to_f32
           when "split"
             title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 10)
+          when "terminal"
+            # Anchored near the top of the window content area, prompt-style.
+            title_start_y = (OgImage::TERMINAL_INSET + OgImage::TERMINAL_BAR_H + 60).to_f32 + font_size
           else
             title_start_y = Math.max(font_size + 20, ((HEIGHT - total_text_height) / 2).to_f32 + font_size)
           end
@@ -507,8 +527,19 @@ module Hwaro
             end
           end
 
-          # Geometric styles are intentionally flat — they never use the soft panel.
-          if panel > 0.01 && !OgImage.geometric?(ai.style)
+          # Hero: oversized "ghost" echo of the title's first word behind
+          # the composition for poster-style depth.
+          if ai.style == "hero"
+            if ghost = page.title.split(/\s+/).first?
+              unless ghost.empty?
+                ghost_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size * 2.6_f32)
+                LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, (margin_x - 10).to_f32, 34_f32, ghost_scale, ghost.upcase, text_color, 0.07_f32)
+              end
+            end
+          end
+
+          # Geometric and signature styles are intentionally flat — they never use the soft panel.
+          if panel > 0.01 && !OgImage.geometric?(ai.style) && !OgImage.signature?(ai.style)
             top_offset : Float32 = ai.style == "framed" ? 48_f32 : 36_f32
             bottom_offset : Float32 = ai.style == "framed" ? 52_f32 : 40_f32
             panel_top = (title_start_y - font_size - top_offset).to_f32.clamp(16_f32, HEIGHT * 0.52_f32)
@@ -516,12 +547,26 @@ module Hwaro
             draw_text_panel(pixels, panel_top, panel_bottom, panel, bg_color, accent_color)
           end
 
+          # Terminal: accent "$" prompt before the first title line.
+          if ai.style == "terminal"
+            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, title_start_y - font_size, bold_scale, "$", accent_color, 1.0_f32)
+          end
+
           # Render title lines. `band` knocks the title out of the color band
           # using the background color for strong magazine-cover contrast.
           title_color = ai.style == "band" ? bg_color : text_color
+          title_x = margin_x.to_f32 + prompt_advance
           title_lines.each_with_index do |line, i|
             y = title_start_y + i * (font_size + 8)
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - font_size, bold_scale, line, title_color, 1.0_f32)
+            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, title_x, y - font_size, bold_scale, line, title_color, 1.0_f32)
+          end
+
+          # Terminal: block cursor after the last title line.
+          if ai.style == "terminal" && !title_lines.empty?
+            last_w = LibStb.hwaro_font_measure_text(bold_info, title_lines.last, bold_scale)
+            cursor_x = (title_x + last_w + font_size * 0.25_f32).to_i
+            cursor_y = (title_start_y + (title_lines.size - 1) * (font_size + 8) - font_size * 0.88_f32).to_i
+            fill_rect(pixels, cursor_x, cursor_y, (font_size * 0.52_f32).to_i, (font_size * 0.95_f32).to_i, accent_color)
           end
 
           # Editorial: thin vertical accent rule to the left of the title.
@@ -551,7 +596,7 @@ module Hwaro
 
             desc_lines.each_with_index do |line, i|
               y = desc_start_y + i * (desc_size + 6)
-              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, y - desc_size, r_scale, line, text_color, desc_opacity)
+              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32 + prompt_advance, y - desc_size, r_scale, line, text_color, desc_opacity)
             end
           end
 
@@ -570,6 +615,8 @@ module Hwaro
                             when "artistic", "surreal" then 140
                             when "split"               then 80
                             when "brutalist"           then OgImage::BRUTALIST_TEXT_X
+                            when "terminal"            then OgImage::TERMINAL_TEXT_X
+                            when "bauhaus", "halftone" then OgImage::BAUHAUS_TEXT_X
                             else                            OgImage::LOGO_MARGIN
                             end
               site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
@@ -928,22 +975,211 @@ module Hwaro
             # Thick accent border around the panel.
             draw_border(pixels, inset, inset, iw, ih, frame, accent)
           when "artistic"
-            # Vivid two-color diagonal gradient as a self-contained backdrop.
-            fill_linear_gradient(pixels, accent, secondary) unless has_bg_image
-          when "hero"
-            # Single dramatic spotlight glow behind the title.
-            draw_radial_glow(pixels, WIDTH // 2, 230, 640, accent, 0.55) unless has_bg_image
-          when "surreal"
-            # Aurora: several soft overlapping orbs in accent + secondary.
+            # Mesh-gradient color field: diagonal base + hue-shifted blobs +
+            # a dark anchor for text legibility + film grain.
             unless has_bg_image
-              draw_radial_glow(pixels, 300, 200, 470, accent, 0.50)
-              draw_radial_glow(pixels, 950, 380, 540, secondary, 0.45)
-              draw_radial_glow(pixels, 640, 560, 420, accent, 0.30)
+              fill_linear_gradient(pixels, accent, secondary)
+              draw_radial_glow(pixels, 210, 60, 540, shifted_hue(accent, 45.0), 0.55)
+              draw_radial_glow(pixels, 1060, 570, 580, shifted_hue(secondary, -40.0), 0.5)
+              draw_radial_glow(pixels, 600, 730, 580, bg, 0.6)
+              apply_grain(pixels, 0.05)
+            end
+          when "hero"
+            # Dramatic spotlight glow + secondary counter-glow + grain.
+            unless has_bg_image
+              draw_radial_glow(pixels, WIDTH // 2, 230, 640, accent, 0.6)
+              draw_radial_glow(pixels, 1060, 600, 480, secondary, 0.22)
+              apply_grain(pixels, 0.045)
+            end
+          when "surreal"
+            # Aurora: soft orbs + flowing ribbon bands + grain.
+            unless has_bg_image
+              draw_radial_glow(pixels, 300, 190, 470, accent, 0.55)
+              draw_radial_glow(pixels, 960, 390, 540, secondary, 0.5)
+              draw_radial_glow(pixels, 620, 600, 460, shifted_hue(accent, 60.0), 0.35)
+              draw_ribbon(pixels, 230.0, 55.0, 56.0, accent, 0.30, 760.0, 0.6)
+              draw_ribbon(pixels, 410.0, 70.0, 90.0, secondary, 0.25, 920.0, 2.4)
+              apply_grain(pixels, 0.05)
             end
           when "framed"
             # Elegant thin frame inset from the edges.
             fi = OgImage::FRAMED_INSET
             draw_border(pixels, fi, fi, WIDTH - 2 * fi, HEIGHT - 2 * fi, OgImage::FRAMED_WIDTH, accent)
+          when "terminal"
+            draw_terminal_window(pixels, bg, has_bg_image)
+          when "bauhaus"
+            # Flat geometric art composition on the right: circle, dot,
+            # triangle, quarter disc — layered in accent/secondary/derived.
+            tertiary = shifted_hue(accent, 60.0, 0.45)
+            draw_filled_circle(pixels, 950, 150, 220, accent, 1.0)
+            draw_filled_circle(pixels, 690, 150, 30, secondary, 1.0)
+            fill_triangle(pixels, 690, 500, 830, 260, 970, 500, tertiary)
+            # Quarter disc at the bottom-right corner (canvas clips it).
+            draw_filled_circle(pixels, WIDTH, HEIGHT, 310, secondary, 1.0)
+          when "halftone"
+            draw_halftone_field(pixels, accent)
+          end
+        end
+
+        # Rotate a packed RGB color's hue by `degrees` (HSL round-trip).
+        private def self.shifted_hue(color : UInt32, degrees : Float64, min_sat : Float64 = 0.0) : UInt32
+          parse_hex_color(OgImage.shift_hue("#%06x" % color, degrees, min_sat))
+        end
+
+        # Lighten (positive delta) or darken (negative) a packed RGB color.
+        private def self.shifted_lightness(color : UInt32, delta : Float64) : UInt32
+          parse_hex_color(OgImage.adjust_lightness("#%06x" % color, delta))
+        end
+
+        # Deterministic film grain — breaks up gradient banding and adds a
+        # subtle premium texture. Hash-based so builds stay byte-identical.
+        private def self.apply_grain(pixels : UInt8*, amount : Float64)
+          return if amount <= 0.0
+          max_shift = amount * 255.0
+          total = WIDTH * HEIGHT
+          i = 0
+          while i < total
+            h = i.to_u32 &* 2654435761_u32
+            h ^= h >> 13
+            h = h &* 1274126177_u32
+            h ^= h >> 16
+            n = (((h & 0xFF).to_f / 255.0) - 0.5) * 2.0 * max_shift
+            idx = i * CHANNELS
+            pixels[idx] = (pixels[idx].to_f + n).clamp(0.0, 255.0).to_u8
+            pixels[idx + 1] = (pixels[idx + 1].to_f + n).clamp(0.0, 255.0).to_u8
+            pixels[idx + 2] = (pixels[idx + 2].to_f + n).clamp(0.0, 255.0).to_u8
+            i += 1
+          end
+        end
+
+        # Soft horizontal "aurora" ribbon following a sine curve, fading
+        # out quadratically from its center line.
+        private def self.draw_ribbon(pixels : UInt8*, base_y : Float64, amplitude : Float64, thickness : Float64, color : UInt32, intensity : Float64, wavelength : Float64, phase : Float64)
+          cr = ((color >> 16) & 0xFF).to_f
+          cg = ((color >> 8) & 0xFF).to_f
+          cb = (color & 0xFF).to_f
+          half = thickness / 2.0
+          WIDTH.times do |px|
+            cy = base_y + Math.sin(px.to_f * Math::PI * 2.0 / wavelength + phase) * amplitude
+            y0 = (cy - half).to_i
+            y1 = (cy + half).to_i
+            (y0..y1).each do |py|
+              next if py < 0 || py >= HEIGHT
+              d = ((py - cy) / half).abs
+              next if d >= 1.0
+              a = intensity * (1.0 - d * d)
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
+              pixels[idx] = (dr + (cr - dr) * a).to_u8
+              pixels[idx + 1] = (dg + (cg - dg) * a).to_u8
+              pixels[idx + 2] = (db + (cb - db) * a).to_u8
+            end
+          end
+        end
+
+        # Fill a rounded rectangle (optionally translucent).
+        private def self.fill_rounded_rect(pixels : UInt8*, x : Int32, y : Int32, w : Int32, h : Int32, radius : Int32, color : UInt32, opacity : Float64 = 1.0)
+          radius = Math.min(radius, Math.min(w, h) // 2)
+          rf = radius.to_f
+          h.times do |ry|
+            py = y + ry
+            next if py < 0 || py >= HEIGHT
+            inset = 0
+            if ry < radius
+              dy = rf - ry - 0.5
+              inset = (rf - Math.sqrt(Math.max(rf * rf - dy * dy, 0.0))).round.to_i
+            elsif ry >= h - radius
+              dy = ry - (h - radius) + 0.5
+              inset = (rf - Math.sqrt(Math.max(rf * rf - dy * dy, 0.0))).round.to_i
+            end
+            row_x = x + inset
+            row_w = w - 2 * inset
+            next if row_w <= 0
+            if opacity >= 1.0
+              fill_rect(pixels, row_x, py, row_w, 1, color)
+            else
+              fill_rect_alpha(pixels, row_x, py, row_w, 1, color, opacity)
+            end
+          end
+        end
+
+        # Fill a triangle via half-plane (edge function) tests over its bbox.
+        private def self.fill_triangle(pixels : UInt8*, x1 : Int32, y1 : Int32, x2 : Int32, y2 : Int32, x3 : Int32, y3 : Int32, color : UInt32)
+          r = ((color >> 16) & 0xFF).to_u8
+          g = ((color >> 8) & 0xFF).to_u8
+          b = (color & 0xFF).to_u8
+          min_x = {x1, x2, x3}.min.clamp(0, WIDTH - 1)
+          max_x = {x1, x2, x3}.max.clamp(0, WIDTH - 1)
+          min_y = {y1, y2, y3}.min.clamp(0, HEIGHT - 1)
+          max_y = {y1, y2, y3}.max.clamp(0, HEIGHT - 1)
+          area = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+          return if area == 0
+          (min_y..max_y).each do |py|
+            (min_x..max_x).each do |px|
+              w0 = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)
+              w1 = (x3 - x2) * (py - y2) - (y3 - y2) * (px - x2)
+              w2 = (x1 - x3) * (py - y3) - (y1 - y3) * (px - x3)
+              inside = area > 0 ? (w0 >= 0 && w1 >= 0 && w2 >= 0) : (w0 <= 0 && w1 <= 0 && w2 <= 0)
+              next unless inside
+              idx = (py * WIDTH + px) * CHANNELS
+              pixels[idx] = r
+              pixels[idx + 1] = g
+              pixels[idx + 2] = b
+              pixels[idx + 3] = 255_u8
+            end
+          end
+        end
+
+        # `terminal`: code-editor window — rounded panel, title bar with
+        # traffic lights, faint scanlines. Slightly translucent over a photo.
+        private def self.draw_terminal_window(pixels : UInt8*, bg : UInt32, has_bg_image : Bool)
+          inset = OgImage::TERMINAL_INSET
+          radius = OgImage::TERMINAL_RADIUS
+          bar_h = OgImage::TERMINAL_BAR_H
+          win_w = WIDTH - 2 * inset
+          win_h = HEIGHT - 2 * inset
+          window = shifted_lightness(bg, 0.045)
+          bar = shifted_lightness(bg, 0.085)
+          border = shifted_lightness(bg, 0.16)
+
+          # Border ring, then the panel inset by 2px on top of it.
+          fill_rounded_rect(pixels, inset, inset, win_w, win_h, radius, border)
+          fill_rounded_rect(pixels, inset + 2, inset + 2, win_w - 4, win_h - 4, radius - 2, window, has_bg_image ? 0.92 : 1.0)
+          # Title bar: rounded top corners, squared bottom half.
+          fill_rounded_rect(pixels, inset + 2, inset + 2, win_w - 4, bar_h, radius - 2, bar)
+          fill_rect(pixels, inset + 2, inset + 2 + bar_h // 2, win_w - 4, bar_h - bar_h // 2, bar)
+          fill_rect(pixels, inset + 2, inset + 2 + bar_h, win_w - 4, 2, border)
+          # Traffic lights.
+          OgImage::TERMINAL_LIGHTS.each_with_index do |hex, i|
+            draw_filled_circle(pixels, inset + 40 + i * 34, inset + 2 + bar_h // 2, 11, parse_hex_color(hex), 1.0)
+          end
+          # Faint scanlines in the content area for a subtle CRT feel.
+          y = inset + bar_h + 8
+          while y < HEIGHT - inset - 4
+            fill_rect_alpha(pixels, inset + 2, y, win_w - 4, 1, 0x000000_u32, 0.05)
+            y += 4
+          end
+        end
+
+        # `halftone`: print-style dot field — dots grow toward the right
+        # edge, rows staggered like a press halftone screen.
+        private def self.draw_halftone_field(pixels : UInt8*, accent : UInt32)
+          spacing = 30
+          max_r = 13.0
+          field_x = OgImage::HALFTONE_FIELD_X
+          field_w = (WIDTH - field_x).to_f
+          row = 0
+          y = spacing // 2
+          while y < HEIGHT
+            x = field_x + (row.odd? ? spacing // 2 : 0)
+            while x < WIDTH + spacing
+              tx = ((x - field_x).to_f / field_w).clamp(0.0, 1.0)
+              r = max_r * (tx ** 1.6)
+              draw_filled_circle(pixels, x, y, r.to_i, accent, 0.92) if r >= 1.0
+              x += spacing
+            end
+            y += spacing
+            row += 1
           end
         end
 

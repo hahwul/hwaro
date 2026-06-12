@@ -23,8 +23,8 @@ echo ""
 echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
-STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "minimal" "gradient" "waves" "dots" "grid" "diagonal")
-MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist")
+STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "terminal" "bauhaus" "halftone" "minimal" "gradient" "waves" "dots" "grid" "diagonal")
+MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "terminal" "bauhaus" "halftone")
 
 mkdir -p "$OUT_DIR"
 
@@ -118,6 +118,29 @@ for style in "${STYLES[@]}"; do
             FONT_SIZE="52"
             SHOW_TITLE="true"
             ;;
+        terminal)
+            BG="#0d1117"
+            ACCENT="#2ee66b"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="54"
+            SHOW_TITLE="true"
+            ;;
+        bauhaus)
+            BG="#f4f1ea"
+            ACCENT="#e8453c"
+            TEXT="#18181b"
+            SECONDARY="#2563eb"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="64"
+            SHOW_TITLE="true"
+            ;;
+        halftone)
+            BG="#0e0e11"
+            ACCENT="#ff2e88"
+            TEXT_PANEL="0.0"
+            FONT_SIZE="64"
+            SHOW_TITLE="true"
+            ;;
         *)
             BG="#0f0f12"
             ACCENT="#ff4d6d"
@@ -191,6 +214,18 @@ for style in "${STYLES[@]}"; do
             brutalist)
                 TITLE="Raw & Loud"
                 DESC="Thick frames, hard shadows, and oversized type."
+                ;;
+            terminal)
+                TITLE="hwaro serve --fast-start"
+                DESC="Your dev server, rendered like it deserves."
+                ;;
+            bauhaus)
+                TITLE="Form Follows Function"
+                DESC="Geometry, color, and type in balance."
+                ;;
+            halftone)
+                TITLE="Print Isn't Dead"
+                DESC="Halftone texture straight from the press."
                 ;;
         esac
     else

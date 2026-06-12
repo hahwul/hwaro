@@ -576,6 +576,52 @@ describe Hwaro::Content::Seo::OgImage do
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, nil, "data:image/png;base64,AAAA")
       svg.should_not contain("linearGradient")
     end
+
+    it "renders the terminal style as a window with prompt and cursor" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Terminal"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "terminal"
+      config.og.auto_image.accent_color = "#2ee66b"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain("#ff5f57")                                 # traffic light
+      svg.should contain(%(fill="#2ee66b">$</text>))                # prompt
+      svg.should contain(%(<tspan fill="#2ee66b">&#x2588;</tspan>)) # block cursor
+    end
+
+    it "renders the bauhaus style as flat geometric shapes" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Bauhaus"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "bauhaus"
+      config.og.auto_image.accent_color = "#e8453c"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain(%(<circle cx="950" cy="150" r="220" fill="#e8453c" />))
+      svg.should contain("<polygon")
+    end
+
+    it "renders the halftone style as a growing dot field" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Halftone"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "halftone"
+      config.og.auto_image.accent_color = "#ff2e88"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain(%(fill="#ff2e88" opacity="0.92"))
+    end
+
+    it "renders a ghost echo of the first title word for hero" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Velocity matters"
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.style = "hero"
+
+      svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      svg.should contain(%(opacity="0.07">VELOCITY</text>))
+    end
   end
 
   describe ".render_style_pattern" do
@@ -663,10 +709,18 @@ describe Hwaro::Content::Seo::OgImage do
       Hwaro::Content::Seo::OgImage.geometric?("default").should be_false
     end
 
-    it "drops accent bars for minimal / modern / geometric styles" do
+    it "classifies signature styles" do
+      Hwaro::Content::Seo::OgImage.signature?("terminal").should be_true
+      Hwaro::Content::Seo::OgImage.signature?("bauhaus").should be_true
+      Hwaro::Content::Seo::OgImage.signature?("halftone").should be_true
+      Hwaro::Content::Seo::OgImage.signature?("editorial").should be_false
+    end
+
+    it "drops accent bars for minimal / modern / geometric / signature styles" do
       Hwaro::Content::Seo::OgImage.no_accent_bars?("minimal").should be_true
       Hwaro::Content::Seo::OgImage.no_accent_bars?("editorial").should be_true
       Hwaro::Content::Seo::OgImage.no_accent_bars?("split").should be_true
+      Hwaro::Content::Seo::OgImage.no_accent_bars?("terminal").should be_true
       Hwaro::Content::Seo::OgImage.no_accent_bars?("default").should be_false
       Hwaro::Content::Seo::OgImage.no_accent_bars?("dots").should be_false
     end
@@ -829,6 +883,7 @@ describe Hwaro::Content::Seo::OgImage do
       hash2 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
       hash1.should_not eq(hash2)
     end
+
   end
 
   describe ".compute_page_hash" do
