@@ -1048,8 +1048,22 @@ module Hwaro
             "#{ai.secondary_color}|#{ai.font_size}|#{ai.logo}|#{ai.logo_position}|#{ai.show_title}|" \
             "#{ai.style}|#{ai.pattern_opacity}|#{ai.pattern_scale}|" \
             "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}|" \
-            "#{ai.accent_bars}|#{ai.text_panel}" # pixel-affecting; toggling them must invalidate the cache
+            "#{ai.accent_bars}|#{ai.text_panel}|" \
+            "#{asset_digest(ai.logo)}|#{asset_digest(ai.background_image)}" # pixel-affecting; changing them must invalidate the cache
           )
+        end
+
+        # Content digest of an on-disk asset (logo / background image).
+        # Replacing the file at the same path must invalidate cached OG
+        # images — hashing only the path string left stale logos baked into
+        # cached images forever.
+        def self.asset_digest(path : String?) : String
+          return "" unless path
+          abs = path.starts_with?("/") ? path : File.join(Dir.current, path)
+          return "" unless File.exists?(abs)
+          Digest::SHA256.new.file(abs).hexfinal
+        rescue IO::Error
+          ""
         end
 
         # Compute a hash of page content that affects OG image rendering.

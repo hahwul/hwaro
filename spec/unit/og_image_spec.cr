@@ -884,6 +884,21 @@ describe Hwaro::Content::Seo::OgImage do
       hash1.should_not eq(hash2)
     end
 
+    it "returns different hash when the logo file content changes" do
+      Dir.mktmpdir do |dir|
+        logo_path = File.join(dir, "logo.png")
+        File.write(logo_path, "old logo bytes")
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.logo = logo_path
+        hash1 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+
+        # Same path, new pixels — cached OG images must be invalidated.
+        File.write(logo_path, "new logo bytes")
+        hash2 = Hwaro::Content::Seo::OgImage.compute_config_hash(config)
+        hash1.should_not eq(hash2)
+      end
+    end
   end
 
   describe ".compute_page_hash" do
