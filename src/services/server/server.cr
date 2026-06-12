@@ -618,29 +618,38 @@ module Hwaro
         loop do
           sleep POLL_INTERVAL
 
-          current_mtimes = scan_mtimes
-          if current_mtimes != last_mtimes
-            changeset = detect_changes(last_mtimes, current_mtimes)
-            last_mtimes = current_mtimes
+          # The scan/diff/debounce steps run outside the build rescue below;
+          # an exception there (filesystem churn, permission flips, …) would
+          # otherwise kill this fiber and silently stop rebuilds for the rest
+          # of the serve session while the HTTP server keeps running.
+          begin
+            current_mtimes = scan_mtimes
+            if current_mtimes != last_mtimes
+              changeset = detect_changes(last_mtimes, current_mtimes)
+              last_mtimes = current_mtimes
 
-            # Debounce: wait for changes to settle before rebuilding.
-            # This batches rapid successive saves (e.g. multi-file save,
-            # IDE format-on-save) into a single rebuild.
-            unless changeset.empty?
-              changeset, last_mtimes = debounce_changes(changeset, last_mtimes)
+              # Debounce: wait for changes to settle before rebuilding.
+              # This batches rapid successive saves (e.g. multi-file save,
+              # IDE format-on-save) into a single rebuild.
+              unless changeset.empty?
+                changeset, last_mtimes = debounce_changes(changeset, last_mtimes)
 
-              begin
-                apply_changeset(changeset, build_options)
-              rescue ex
-                # Surface the failure both in the terminal and the
-                # browser. Without the WS push the developer sees the
-                # stale page and keeps editing on top of a broken
-                # build until they happen to glance at the terminal.
-                Logger.error "[Watch] Build failed: #{ex.message}"
-                Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
-                @live_reload_handler.try(&.notify_build_error(ex.message || "Build failed"))
+                begin
+                  apply_changeset(changeset, build_options)
+                rescue ex
+                  # Surface the failure both in the terminal and the
+                  # browser. Without the WS push the developer sees the
+                  # stale page and keeps editing on top of a broken
+                  # build until they happen to glance at the terminal.
+                  Logger.error "[Watch] Build failed: #{ex.message}"
+                  Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
+                  @live_reload_handler.try(&.notify_build_error(ex.message || "Build failed"))
+                end
               end
             end
+          rescue ex
+            Logger.error "[Watch] Watcher iteration failed: #{ex.message} (retrying)"
+            Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
           end
         end
       end

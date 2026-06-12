@@ -1,6 +1,17 @@
 require "../spec_helper"
 require "../../src/services/server/live_reload_handler"
 
+# Runs the handler against a synthetic livereload request carrying the given
+# Origin (no real server needed) and returns the response status code.
+private def livereload_status_for_origin(origin : String) : Int32
+  headers = HTTP::Headers{"Origin" => origin, "Host" => "localhost:1313"}
+  request = HTTP::Request.new("GET", Hwaro::Services::LiveReloadHandler::LIVE_RELOAD_PATH, headers)
+  response = HTTP::Server::Response.new(IO::Memory.new)
+  context = HTTP::Server::Context.new(request, response)
+  Hwaro::Services::LiveReloadHandler.new.call(context)
+  context.response.status_code
+end
+
 describe Hwaro::Services::LiveReloadInjectHandler do
   describe "#inject_script" do
     it "injects script before </body>" do
@@ -90,6 +101,18 @@ describe Hwaro::Services::LiveReloadHandler do
       handler.notify_build_error("first")
       handler.notify_build_error("second")
       handler.@current_error.should eq("second")
+    end
+  end
+
+  describe "Origin validation" do
+    it "rejects an unparseable Origin with 403 instead of raising" do
+      # URI.parse raises on inputs like an oversized port; the handler must
+      # fail closed, not crash. (This used to raise OverflowError.)
+      livereload_status_for_origin("http://localhost:999999999999").should eq(403)
+    end
+
+    it "rejects a cross-site Origin with 403" do
+      livereload_status_for_origin("http://evil.example.com").should eq(403)
     end
   end
 end

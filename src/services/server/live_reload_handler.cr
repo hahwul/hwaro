@@ -29,13 +29,29 @@ module Hwaro
           origin = context.request.headers["Origin"]?
           host = context.request.headers["Host"]?
           if origin && host
-            origin_uri = URI.parse(origin)
+            # Fail closed on unparseable Origins: URI.parse raises on inputs
+            # like an oversized port ("http://h:99999999999" -> OverflowError),
+            # and an attacker-controlled header must never crash the handler
+            # or slip past the check.
+            origin_uri = begin
+              URI.parse(origin)
+            rescue
+              context.response.status_code = 403
+              context.response.print "Forbidden: invalid origin"
+              return
+            end
             origin_host = origin_uri.host
             # Strip brackets from IPv6 literals (e.g. "[::1]" -> "::1")
             if origin_host && origin_host.starts_with?('[') && origin_host.ends_with?(']')
               origin_host = origin_host[1..-2]
             end
-            server_host = host.split(":").first?
+            # Host may be a bracketed IPv6 literal ("[::1]:1313") whose colons
+            # would confuse a plain split-on-":" port strip.
+            server_host = if host.starts_with?('[') && (close = host.index(']'))
+                            host[1...close]
+                          else
+                            host.split(":").first?
+                          end
             unless origin_host == server_host || origin_host == "localhost" || origin_host == "127.0.0.1" || origin_host == "::1"
               context.response.status_code = 403
               context.response.print "Forbidden: invalid origin"
