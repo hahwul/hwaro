@@ -260,8 +260,12 @@ module Hwaro::Core::Build::Phases::ParseContent
           rescue ex
             page.parse_failed = true
             Logger.warn "Failed to parse #{page.path}: #{ex.message}"
+          ensure
+            # Must run even if a rescue handler raises: a missing send leaves
+            # the `pages.size.times { done.receive }` wait below one short and
+            # the build hangs instead of surfacing the error.
+            done.send(nil)
           end
-          done.send(nil)
         end
       end
     end

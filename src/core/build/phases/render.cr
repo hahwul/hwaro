@@ -323,6 +323,12 @@ module Hwaro::Core::Build::Phases::Render
       spawn do
         while work_item = work_queue.receive?
           page, _idx = work_item
+          # `ensure` guarantees exactly one result per dequeued page even if a
+          # rescue handler itself raises. Without it, a dying worker fiber
+          # under-delivers and the `pages.size.times { results.receive }`
+          # collector below blocks forever — the build hangs instead of
+          # failing.
+          ok = false
           begin
             page_start = profiler ? Time.instant : nil
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
@@ -341,20 +347,28 @@ module Hwaro::Core::Build::Phases::Render
               output_path = get_output_path(page, output_dir)
               cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
             end
-            results.send(true)
+            ok = true
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
               classified_error ||= ex
               failures << {page_path: page.path, message: ex.message.to_s}
             end
-            results.send(false)
           rescue ex
             error_mutex.synchronize do
               failures << {page_path: page.path, message: ex.message.to_s}
             end
-            Logger.debug "  Template: #{determine_template(page, templates, site)}, Section: #{page.section}"
+            # determine_template re-runs template resolution on the same
+            # inputs that just failed, so it may raise the same error; keep
+            # the diagnostic line from killing the worker.
+            template_name = begin
+              determine_template(page, templates, site)
+            rescue
+              "unknown"
+            end
+            Logger.debug "  Template: #{template_name}, Section: #{page.section}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
-            results.send(false)
+          ensure
+            results.send(ok)
           end
         end
       end

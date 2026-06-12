@@ -114,12 +114,16 @@ module Hwaro
             spawn do
               while work_item = work_queue.receive?
                 item, idx = work_item
-                begin
-                  value = block.call(item, idx)
-                  results.send(WorkResult(R).success(value, idx))
+                # Exactly one result per dequeued item: the rescue handler is
+                # pure construction (nothing in it can raise), so the send
+                # always runs. A skipped send would leave the items.size-times
+                # collector below short and hang the build.
+                result = begin
+                  WorkResult(R).success(block.call(item, idx), idx)
                 rescue ex
-                  results.send(WorkResult(R).failure(ex.message || "Unknown error", idx))
+                  WorkResult(R).failure(ex.message || "Unknown error", idx)
                 end
+                results.send(result)
               end
             end
           end
