@@ -261,13 +261,16 @@ module Hwaro::Core::Build::Phases::Transform
   end
 
   # Incremental taxonomy update: only remove/add entries for changed pages.
-  # Returns the set of affected "taxonomy_name:term" keys for cache invalidation.
+  # Returns the set of affected {taxonomy_name, term} pairs. Tuples rather
+  # than "name:term" strings: a taxonomy name containing ":" would make the
+  # joined form ambiguous to split back apart, silently skipping that term's
+  # re-sort below.
   private def update_taxonomies_incremental(
     site : Models::Site,
     changed_pages : Array(Models::Page),
     old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
-  ) : Set(String)
-    affected_tax_keys = Set(String).new
+  ) : Set({String, String})
+    affected_tax_keys = Set({String, String}).new
 
     changed_pages.each do |page|
       page_path = page.path
@@ -280,7 +283,7 @@ module Hwaro::Core::Build::Phases::Transform
           terms.each do |term|
             if term_pages = tax_terms[term]?
               term_pages.reject! { |p| p.path == page_path }
-              affected_tax_keys << "#{name}:#{term}"
+              affected_tax_keys << {name, term}
               # Clean up empty term
               tax_terms.delete(term) if term_pages.empty?
             end
@@ -296,16 +299,13 @@ module Hwaro::Core::Build::Phases::Transform
         terms.each do |term|
           site.taxonomies[name][term] ||= [] of Models::Page
           site.taxonomies[name][term] << page
-          affected_tax_keys << "#{name}:#{term}"
+          affected_tax_keys << {name, term}
         end
       end
     end
 
     # 3. Re-sort only affected terms
-    affected_tax_keys.each do |key|
-      parts = key.split(":", 2)
-      name = parts[0]
-      term = parts[1]
+    affected_tax_keys.each do |(name, term)|
       if pages_list = site.taxonomies[name]?.try(&.[term]?)
         site.taxonomies[name][term] = Utils::SortUtils.sort_pages(pages_list, "date", false)
       end

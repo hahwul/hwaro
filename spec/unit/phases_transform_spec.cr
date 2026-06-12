@@ -402,8 +402,8 @@ describe Hwaro::Core::Build::Phases::Transform do
       builder = Hwaro::Core::Build::Builder.new
       affected = builder.test_update_taxonomies_incremental(site, [page], snapshot)
 
-      affected.includes?("tags:old").should be_true
-      affected.includes?("tags:new").should be_true
+      affected.includes?({"tags", "old"}).should be_true
+      affected.includes?({"tags", "new"}).should be_true
       site.taxonomies["tags"].has_key?("old").should be_false
       site.taxonomies["tags"]["new"].size.should eq(1)
     end
