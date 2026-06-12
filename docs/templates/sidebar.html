@@ -1,23 +1,32 @@
 <aside class="docs-sidebar">
-  {% for section in site.data.sidebar %}
-  <div class="sidebar-section">
-    <div class="sidebar-title">{{ section.title }}</div>
+  {% for group in site.data.sidebar %}
+  <details class="sidebar-section"{% if group.section == page.section %} open{% endif %}>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">{{ group.title }}</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
     <ul class="sidebar-links">
-      {% for item in section.items %}
+      {% for item in group.items %}
       {% if item.items %}
       <li class="sidebar-group">
-        <div class="sidebar-group-title">{{ item.title }}</div>
-        <ul class="sidebar-sublinks">
-          {% for sub in item.items %}
-          <li><a href="{{ base_url }}{{ sub.url }}"{% if page.url == sub.url %} class="active"{% endif %}>{{ sub.title }}</a></li>
-          {% endfor %}
-        </ul>
+        <details class="sidebar-subgroup"{% for sub in item.items %}{% if sub.url == page.url %} open{% endif %}{% endfor %}>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">{{ item.title }}</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            {% for sub in item.items %}
+            <li><a href="{{ base_url }}{{ sub.url }}"{% if page.url == sub.url %} class="active"{% endif %}>{{ sub.title }}</a></li>
+            {% endfor %}
+          </ul>
+        </details>
       </li>
       {% else %}
       <li><a href="{{ base_url }}{{ item.url }}"{% if page.url == item.url %} class="active"{% endif %}>{{ item.title }}</a></li>
       {% endif %}
       {% endfor %}
     </ul>
-  </div>
+  </details>
   {% endfor %}
 </aside>
+<div class="sidebar-overlay"></div>

@@ -1,329 +1,318 @@
-// Load Fuse.js from CDN if not already loaded
-if (typeof Fuse === "undefined") {
-  const script = document.createElement("script");
-  script.src = "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js";
-  script.onload = initSearch;
-  document.head.appendChild(script);
-} else {
-  initSearch();
-}
+// Hwaro docs search — ⌘K command palette. Styles live in css/05-components.css.
+(function () {
+  var SECTION_NAMES = {
+    start: "Start",
+    writing: "Writing",
+    templates: "Templates",
+    features: "Features",
+    deploy: "Deploy",
+  };
 
-let fuse;
-let searchData = [];
+  var QUICK_LINKS = [
+    { title: "Start", description: "Install Hwaro and build your first site", url: "/start/" },
+    { title: "Writing", description: "Pages, sections, taxonomies, and shortcodes", url: "/writing/" },
+    { title: "Templates", description: "Template syntax, data model, and functions", url: "/templates/" },
+    { title: "Features", description: "Search, SEO, builds, and platform features", url: "/features/" },
+    { title: "Deploy", description: "Ship your site to GitHub Pages, Netlify, and more", url: "/deploy/" },
+  ];
 
-function initSearch() {
-  // Fetch search data
-  fetch("/search.json")
-    .then((response) => response.json())
-    .then((data) => {
-      searchData = data;
-      fuse = new Fuse(data, {
-        keys: ["title", "content", "description"],
-        threshold: 0.3,
-        ignoreLocation: true,
-        includeMatches: true,
-        includeScore: true,
-        minMatchCharLength: 2,
+  var ICONS = {
+    search:
+      '<svg class="search-head-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>',
+    doc:
+      '<svg class="search-result-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 1.5h-5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V4.5l-3-3z"/><path d="M9.5 1.5v3h3"/><path d="M5.5 8h5M5.5 10.5h5"/></svg>',
+    arrow:
+      '<svg class="search-result-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg>',
+    enter:
+      '<svg class="search-result-enter" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 3v4a2 2 0 0 1-2 2h-9"/><path d="M5.5 6 2.5 9l3 3"/></svg>',
+  };
+
+  var fuse = null;
+  var selectedIndex = 0;
+  var isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform || navigator.userAgent);
+
+  // Load Fuse.js from CDN if not already loaded
+  if (typeof Fuse === "undefined") {
+    var script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js";
+    script.onload = initSearch;
+    document.head.appendChild(script);
+  } else {
+    initSearch();
+  }
+
+  function initSearch() {
+    fetch("/search.json")
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        fuse = new Fuse(data, {
+          keys: ["title", "content", "description"],
+          threshold: 0.3,
+          ignoreLocation: true,
+          includeMatches: true,
+          includeScore: true,
+          minMatchCharLength: 2,
+        });
+      })
+      .catch(function (error) {
+        console.error("Error loading search data:", error);
       });
-    })
-    .catch((error) => console.error("Error loading search data:", error));
-}
+  }
 
-// Create search modal
-const searchModal = document.createElement("div");
-searchModal.id = "search-modal";
-searchModal.innerHTML = `
-  <div class="search-overlay" id="search-overlay"></div>
-  <div class="search-dialog">
-    <input type="text" id="search-input" placeholder="Search documentation..." autocomplete="off">
-    <div id="search-results"></div>
-    <button id="search-close">×</button>
-  </div>
-`;
-searchModal.style.display = "none";
-document.body.appendChild(searchModal);
-
-// Add styles
-const style = document.createElement("style");
-style.textContent = `
-  #search-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    font-family: var(--font-sans);
-  }
-  .search-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 10, 12, 0.8);
-    backdrop-filter: blur(4px);
-  }
-  .search-dialog {
-    position: absolute;
-    top: 20%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 600px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-light);
-    border-radius: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    padding: 20px;
-    max-height: 60vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-  #search-input {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 16px;
-    font-family: var(--font-mono);
-    background: var(--bg-subtle);
-    color: var(--text);
-    border: 1px solid var(--border);
-    outline: none;
-    margin-bottom: 16px;
-  }
-  #search-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-dim);
-  }
-  #search-input::placeholder {
-    color: var(--text-muted);
-  }
-  #search-results {
-    flex: 1;
-    overflow-y: auto;
-    max-height: calc(60vh - 120px);
-  }
-  .search-result {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .search-result:hover,
-  .search-result.selected {
-    background: var(--bg-hover);
-  }
-  .search-result-title {
-    font-weight: 600;
-    color: var(--accent);
-    margin-bottom: 4px;
-    font-family: var(--font-mono);
-  }
-  .search-result-description {
-    font-size: 14px;
-    color: var(--text-muted);
-  }
-  .search-result-content {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    line-height: 1.4;
-    opacity: 0.8;
-  }
-  .search-result-content mark {
-    background: var(--accent-dim);
-    color: var(--text);
-  }
-  #search-close {
-    position: absolute;
-    top: -12px;
-    right: -12px;
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    color: var(--text-muted);
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    cursor: pointer;
-    z-index: 1001;
-    font-family: var(--font-mono);
-  }
-  #search-close:hover {
-    background: var(--bg-hover);
-    color: var(--text);
-  }
-`;
-document.head.appendChild(style);
-
-// Event listeners
-document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-    e.preventDefault();
-    showSearch();
-  }
-  if (e.key === "Escape" && searchModal.style.display !== "none") {
-    hideSearch();
-  }
-});
-
-document.getElementById("search-overlay").addEventListener("click", hideSearch);
-document.getElementById("search-close").addEventListener("click", hideSearch);
-
-const searchInput = document.getElementById("search-input");
-let selectedIndex = -1;
-
-searchInput.addEventListener("input", () => {
-  selectedIndex = -1;
-  performSearch();
-});
-
-searchInput.addEventListener("keydown", (e) => {
-  const results = document.querySelectorAll(".search-result");
-  if (results.length === 0) return;
-
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    selectedIndex = (selectedIndex + 1) % results.length;
-    updateSelection(results);
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    selectedIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
-    updateSelection(results);
-  } else if (e.key === "Enter") {
-    e.preventDefault();
-    if (selectedIndex >= 0 && selectedIndex < results.length) {
-      results[selectedIndex].click();
-    } else if (results.length > 0) {
-      results[0].click();
-    }
-  }
-});
-
-function updateSelection(results) {
-  results.forEach((result, index) => {
-    if (index === selectedIndex) {
-      result.classList.add("selected");
-      result.scrollIntoView({ block: "nearest" });
-    } else {
-      result.classList.remove("selected");
-    }
-  });
-}
-
-function showSearch() {
-  searchModal.style.display = "block";
-  searchInput.focus();
-  searchInput.value = "";
-  document.getElementById("search-results").innerHTML = "";
-  selectedIndex = -1;
-}
-
-function hideSearch() {
+  // Build modal
+  var searchModal = document.createElement("div");
+  searchModal.id = "search-modal";
+  searchModal.innerHTML =
+    '<div class="search-overlay"></div>' +
+    '<div class="search-dialog" role="dialog" aria-modal="true" aria-label="Search documentation">' +
+    '<div class="search-head">' +
+    ICONS.search +
+    '<input type="text" id="search-input" placeholder="Search documentation…" autocomplete="off" spellcheck="false" aria-label="Search documentation">' +
+    '<button class="search-esc" type="button" aria-label="Close search">esc</button>' +
+    "</div>" +
+    '<div id="search-results" class="search-body"></div>' +
+    '<div class="search-foot">' +
+    '<span class="search-foot-hint"><kbd>↑</kbd><kbd>↓</kbd>navigate</span>' +
+    '<span class="search-foot-hint"><kbd>↵</kbd>open</span>' +
+    '<span class="search-foot-hint"><kbd>esc</kbd>close</span>' +
+    '<span class="search-foot-count" id="search-count"></span>' +
+    "</div>" +
+    "</div>";
   searchModal.style.display = "none";
-  selectedIndex = -1;
-}
+  document.body.appendChild(searchModal);
 
-function performSearch() {
-  const query = searchInput.value.trim();
-  const resultsDiv = document.getElementById("search-results");
+  var searchInput = document.getElementById("search-input");
+  var resultsEl = document.getElementById("search-results");
+  var countEl = document.getElementById("search-count");
 
-  if (!query) {
-    resultsDiv.innerHTML = "";
-    return;
-  }
-
-  if (!fuse) {
-    resultsDiv.innerHTML =
-      '<div class="search-result">Loading search index...</div>';
-    return;
-  }
-
-  const results = fuse.search(query).slice(0, 10);
-
-  if (results.length === 0) {
-    resultsDiv.innerHTML = '<div class="search-result">No results found</div>';
-    return;
-  }
-
-  resultsDiv.innerHTML = results
-    .map((result) => {
-      const item = result.item;
-      const contentMatch = result.matches.find((m) => m.key === "content");
-      const descriptionMatch = result.matches.find(
-        (m) => m.key === "description",
-      );
-
-      let snippet = "";
-      if (item.description) {
-        snippet = `<div class="search-result-description">${highlightMatches(
-          item.description,
-          descriptionMatch,
-        )}</div>`;
-      }
-      if (contentMatch && contentMatch.indices && contentMatch.indices.length > 0) {
-        snippet += `<div class="search-result-content">${getContentSnippet(
-          item.content,
-          contentMatch,
-        )}</div>`;
-      }
-
-      return `
-      <div class="search-result" onclick="window.location.href='${item.url}'">
-        <div class="search-result-title">${highlightMatches(
-          item.title,
-          result.matches.find((m) => m.key === "title"),
-        )}</div>
-        ${snippet}
-      </div>
-    `;
-    })
-    .join("");
-}
-
-function getContentSnippet(text, match) {
-  if (!match || !match.indices || match.indices.length === 0) return "";
-
-  // Pick the longest (most relevant) match index
-  const best = match.indices.reduce((a, b) =>
-    (b[1] - b[0]) > (a[1] - a[0]) ? b : a
-  );
-  const [start, end] = best;
-  const snippetRadius = 60;
-  const snippetStart = Math.max(0, start - snippetRadius);
-  const snippetEnd = Math.min(text.length, end + 1 + snippetRadius);
-
-  let snippet = "";
-  if (snippetStart > 0) snippet += "...";
-  snippet += escapeHtml(text.slice(snippetStart, start));
-  snippet += "<mark>" + escapeHtml(text.slice(start, end + 1)) + "</mark>";
-  snippet += escapeHtml(text.slice(end + 1, snippetEnd));
-  if (snippetEnd < text.length) snippet += "...";
-
-  return snippet;
-}
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function highlightMatches(text, match) {
-  if (!match || !match.indices) return text;
-
-  let result = "";
-  let lastIndex = 0;
-
-  match.indices.forEach(([start, end]) => {
-    result += text.slice(lastIndex, start);
-    result += "<mark>" + text.slice(start, end + 1) + "</mark>";
-    lastIndex = end + 1;
+  // Header trigger: platform-aware shortcut label + click to open
+  document.querySelectorAll(".search-trigger-mod").forEach(function (el) {
+    el.textContent = isMac ? "⌘" : "Ctrl";
+  });
+  document.querySelectorAll(".search-trigger").forEach(function (btn) {
+    btn.setAttribute(
+      "aria-label",
+      "Search documentation (" + (isMac ? "⌘K" : "Ctrl+K") + ")"
+    );
+    btn.addEventListener("click", showSearch);
   });
 
-  result += text.slice(lastIndex);
-  return result;
-}
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      showSearch();
+    }
+    if (e.key === "Escape" && searchModal.style.display !== "none") {
+      hideSearch();
+    }
+  });
+
+  searchModal.querySelector(".search-overlay").addEventListener("click", hideSearch);
+  searchModal.querySelector(".search-esc").addEventListener("click", hideSearch);
+
+  searchInput.addEventListener("input", performSearch);
+
+  searchInput.addEventListener("keydown", function (e) {
+    var results = resultsEl.querySelectorAll(".search-result");
+    if (results.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedIndex = (selectedIndex + 1) % results.length;
+      applySelection(true);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
+      applySelection(true);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      var target = results[selectedIndex] || results[0];
+      if (target) target.click();
+    }
+  });
+
+  // Hovering a row moves the selection, keeping mouse and keyboard in sync
+  resultsEl.addEventListener("mouseover", function (e) {
+    var row = e.target.closest(".search-result");
+    if (!row) return;
+    var results = Array.prototype.slice.call(
+      resultsEl.querySelectorAll(".search-result")
+    );
+    var index = results.indexOf(row);
+    if (index !== -1 && index !== selectedIndex) {
+      selectedIndex = index;
+      applySelection(false);
+    }
+  });
+
+  function applySelection(scroll) {
+    var results = resultsEl.querySelectorAll(".search-result");
+    results.forEach(function (result, index) {
+      if (index === selectedIndex) {
+        result.classList.add("selected");
+        if (scroll) result.scrollIntoView({ block: "nearest" });
+      } else {
+        result.classList.remove("selected");
+      }
+    });
+  }
+
+  function showSearch() {
+    searchModal.style.display = "block";
+    document.documentElement.style.overflow = "hidden";
+    searchInput.value = "";
+    renderQuickLinks();
+    searchInput.focus();
+  }
+
+  function hideSearch() {
+    searchModal.style.display = "none";
+    document.documentElement.style.overflow = "";
+  }
+
+  function renderQuickLinks() {
+    resultsEl.innerHTML =
+      '<div class="search-group">' +
+      '<div class="search-group-label">Jump to</div>' +
+      QUICK_LINKS.map(function (link) {
+        return resultRow(link.url, ICONS.arrow, escapeHtml(link.title), escapeHtml(link.description));
+      }).join("") +
+      "</div>";
+    countEl.textContent = "";
+    selectedIndex = 0;
+    applySelection(false);
+  }
+
+  function performSearch() {
+    var query = searchInput.value.trim();
+
+    if (!query) {
+      renderQuickLinks();
+      return;
+    }
+
+    if (!fuse) {
+      resultsEl.innerHTML = '<div class="search-empty">Loading search index…</div>';
+      countEl.textContent = "";
+      return;
+    }
+
+    var results = fuse.search(query).slice(0, 12);
+
+    if (results.length === 0) {
+      resultsEl.innerHTML =
+        '<div class="search-empty">No results for <span class="search-empty-query">&ldquo;' +
+        escapeHtml(query) +
+        '&rdquo;</span></div>';
+      countEl.textContent = "0 results";
+      return;
+    }
+
+    // Group by top-level section, preserving rank order
+    var groups = [];
+    var byName = {};
+    results.forEach(function (result) {
+      var key = (result.item.url.split("/")[1] || "").toLowerCase();
+      var name = SECTION_NAMES[key] || "Docs";
+      if (!byName[name]) {
+        byName[name] = [];
+        groups.push({ name: name, items: byName[name] });
+      }
+      byName[name].push(result);
+    });
+
+    resultsEl.innerHTML = groups
+      .map(function (group) {
+        return (
+          '<div class="search-group">' +
+          '<div class="search-group-label">' + group.name + "</div>" +
+          group.items.map(renderResult).join("") +
+          "</div>"
+        );
+      })
+      .join("");
+    countEl.textContent = results.length === 1 ? "1 result" : results.length + " results";
+    selectedIndex = 0;
+    applySelection(false);
+  }
+
+  function renderResult(result) {
+    var item = result.item;
+    var titleMatch, contentMatch, descriptionMatch;
+    (result.matches || []).forEach(function (m) {
+      if (m.key === "title") titleMatch = m;
+      else if (m.key === "content") contentMatch = m;
+      else if (m.key === "description") descriptionMatch = m;
+    });
+
+    var snippet = "";
+    if (contentMatch && contentMatch.indices && contentMatch.indices.length > 0) {
+      snippet = getContentSnippet(item.content, contentMatch);
+    } else if (item.description) {
+      snippet = highlightMatches(item.description, descriptionMatch);
+    }
+
+    return resultRow(item.url, ICONS.doc, highlightMatches(item.title, titleMatch), snippet);
+  }
+
+  // titleHtml/snippetHtml are pre-escaped by the callers
+  function resultRow(url, icon, titleHtml, snippetHtml) {
+    return (
+      '<a class="search-result" href="' + url + '">' +
+      icon +
+      '<span class="search-result-text">' +
+      '<span class="search-result-title">' + titleHtml + "</span>" +
+      (snippetHtml ? '<span class="search-result-snippet">' + snippetHtml + "</span>" : "") +
+      "</span>" +
+      ICONS.enter +
+      "</a>"
+    );
+  }
+
+  function getContentSnippet(text, match) {
+    if (!match || !match.indices || match.indices.length === 0) return "";
+
+    // Pick the longest (most relevant) match index
+    var best = match.indices.reduce(function (a, b) {
+      return b[1] - b[0] > a[1] - a[0] ? b : a;
+    });
+    var start = best[0];
+    var end = best[1];
+    var snippetRadius = 60;
+    var snippetStart = Math.max(0, start - snippetRadius);
+    var snippetEnd = Math.min(text.length, end + 1 + snippetRadius);
+
+    var snippet = "";
+    if (snippetStart > 0) snippet += "…";
+    snippet += escapeHtml(text.slice(snippetStart, start));
+    snippet += "<mark>" + escapeHtml(text.slice(start, end + 1)) + "</mark>";
+    snippet += escapeHtml(text.slice(end + 1, snippetEnd));
+    if (snippetEnd < text.length) snippet += "…";
+
+    return snippet;
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function highlightMatches(text, match) {
+    if (!match || !match.indices) return escapeHtml(text);
+
+    var result = "";
+    var lastIndex = 0;
+
+    match.indices.forEach(function (pair) {
+      result += escapeHtml(text.slice(lastIndex, pair[0]));
+      result += "<mark>" + escapeHtml(text.slice(pair[0], pair[1] + 1)) + "</mark>";
+      lastIndex = pair[1] + 1;
+    });
+
+    result += escapeHtml(text.slice(lastIndex));
+    return result;
+  }
+})();

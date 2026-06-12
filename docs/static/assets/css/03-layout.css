@@ -115,6 +115,101 @@
     fill: currentColor;
 }
 
+/* Mobile hamburger — hidden on desktop, shown ≤768px (see responsive) */
+.mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-right: 0.6rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+/* ⌘K search trigger */
+.search-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 32px;
+    padding: 0 0.45rem 0 0.65rem;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #888;
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.12s ease;
+}
+
+.search-trigger:hover {
+    color: #fff;
+    border-color: var(--border-light);
+    background: var(--surface-2);
+}
+
+.search-trigger:active {
+    transform: scale(0.97);
+}
+
+.search-trigger:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.search-trigger-icon {
+    width: 13px;
+    height: 13px;
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.search-trigger-kbd {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 2px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-sm);
+    transition: color 0.2s ease;
+}
+
+.search-trigger:hover .search-trigger-kbd {
+    color: var(--text-muted);
+}
+
+.header-divider {
+    width: 1px;
+    height: 16px;
+    margin: 0 0.45rem;
+    background: var(--hair-strong);
+}
+
 /* =============================================================================
    Layout container
    ============================================================================= */
@@ -175,8 +270,13 @@
     background: var(--border-light);
 }
 
+/* Collapsible sections — native <details>, server-rendered open state.
+   The ember dot is the state cue: lit (glowing) on the open section,
+   unlit coal on collapsed ones. */
 .sidebar-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.25rem;
+    /* Lets ::details-content animate block-size to `auto` (inherited) */
+    interpolate-size: allow-keywords;
 }
 
 .sidebar-title {
@@ -188,9 +288,32 @@
     font-weight: 600;
     text-transform: uppercase;
     color: var(--text-dim);
-    margin-bottom: 0.5rem;
     letter-spacing: 0.12em;
-    padding-left: 0.75rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    list-style: none;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+}
+
+.sidebar-title::-webkit-details-marker,
+.sidebar-group-title::-webkit-details-marker {
+    display: none;
+}
+
+.sidebar-title:hover {
+    color: var(--text-muted);
+    background: var(--surface-1);
+}
+
+.sidebar-title:focus-visible,
+.sidebar-group-title:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
 }
 
 .sidebar-title::before {
@@ -198,14 +321,70 @@
     width: 5px;
     height: 5px;
     border-radius: 1px;
+    background: var(--border-light);
+    flex-shrink: 0;
+    transition:
+        background 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.sidebar-title:hover::before {
+    background: var(--primary-dark);
+}
+
+.sidebar-section[open] > .sidebar-title {
+    color: var(--text-muted);
+}
+
+.sidebar-section[open] > .sidebar-title::before {
     background: var(--primary);
     box-shadow: 0 0 8px var(--ember);
+}
+
+.sidebar-chevron {
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    color: var(--text-dim);
+    opacity: 0.7;
     flex-shrink: 0;
+    transition: transform 0.2s var(--ease-out);
+}
+
+details[open] > summary .sidebar-chevron {
+    transform: rotate(90deg);
+}
+
+/* Fold animation — progressive: Chromium/Safari animate via ::details-content,
+   others toggle instantly. */
+.sidebar-section::details-content,
+.sidebar-subgroup::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+        block-size 0.25s var(--ease-out),
+        content-visibility 0.25s allow-discrete;
+}
+
+.sidebar-section[open]::details-content,
+.sidebar-subgroup[open]::details-content {
+    block-size: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-section::details-content,
+    .sidebar-subgroup::details-content {
+        transition: none;
+    }
+
+    .sidebar-chevron {
+        transition: none;
+    }
 }
 
 .sidebar-links {
     list-style: none;
-    padding: 0;
+    padding: 0.15rem 0 0.4rem;
     margin: 0;
 }
 
@@ -243,18 +422,44 @@
     border-bottom: none;
 }
 
-/* Nested groups (e.g., Features sub-categories) */
+/* Nested groups (e.g., Features sub-categories) — collapsible, closed unless
+   they contain the active page */
 .sidebar-group {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
 }
 
 .sidebar-group-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-family: var(--font-sans);
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-dim);
-    padding: 0.35rem 0.75rem 0.15rem;
-    letter-spacing: 0.03em;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+    letter-spacing: 0.01em;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    list-style: none;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+}
+
+.sidebar-group-title:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.sidebar-group-title .sidebar-chevron {
+    width: 11px;
+    height: 11px;
+}
+
+.sidebar-subgroup[open] > .sidebar-group-title {
+    color: var(--text-secondary);
 }
 
 .sidebar-sublinks {

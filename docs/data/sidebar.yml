@@ -1,4 +1,5 @@
 - title: Start
+  section: start
   items:
     - title: Overview
       url: /start/
@@ -13,6 +14,7 @@
     - title: Tools & Completion
       url: /start/tools/
 - title: Writing
+  section: writing
   items:
     - title: Overview
       url: /writing/
@@ -27,6 +29,7 @@
     - title: Archetypes
       url: /writing/archetypes/
 - title: Templates
+  section: templates
   items:
     - title: Overview
       url: /templates/
@@ -39,6 +42,7 @@
     - title: Filters
       url: /templates/filters/
 - title: Features
+  section: features
   items:
     - title: Overview
       url: /features/
@@ -101,6 +105,7 @@
         - title: Deployment
           url: /features/deployment/
 - title: Deploy
+  section: deploy
   items:
     - title: Overview
       url: /deploy/

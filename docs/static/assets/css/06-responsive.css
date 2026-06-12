@@ -75,6 +75,41 @@
         display: flex;
     }
 
+    .docs-header .logo {
+        margin-right: auto;
+    }
+
+    /* Search trigger collapses to an icon-only button */
+    .search-trigger {
+        width: 34px;
+        height: 34px;
+        gap: 0;
+        padding: 0;
+        justify-content: center;
+        background: transparent;
+        border: none;
+    }
+
+    .search-trigger-label,
+    .search-trigger-kbd,
+    .header-divider {
+        display: none;
+    }
+
+    .search-trigger-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Search palette: closer to the top, hide keyboard-only hints */
+    .search-dialog {
+        top: 7%;
+    }
+
+    .search-foot-hint {
+        display: none;
+    }
+
     .heading-anchor {
         position: static;
         display: inline-flex;
