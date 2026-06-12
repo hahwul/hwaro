@@ -73,18 +73,19 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #b0b0b0;
-              --primary-hover: #d0d0d0;
-              --primary-subtle: rgba(255, 255, 255, 0.03);
-              --text: #c0c0c0;
-              --text-secondary: #777777;
-              --text-muted: #8a8a8a;
-              --border: #2a2a2a;
-              --border-light: #1f1f1f;
-              --bg: #111111;
-              --bg-secondary: #181818;
-              --bg-sidebar: #0e0e0e;
-              --bg-code: #1a1a1a;
+              --primary: #c87a7a;
+              --primary-hover: #d69292;
+              --primary-subtle: rgba(200, 122, 122, 0.08);
+              --heading: #ece5dc;
+              --text: #d9d2c9;
+              --text-secondary: #a3958a;
+              --text-muted: #8f8174;
+              --border: #352d26;
+              --border-light: #2a231d;
+              --bg: #16120e;
+              --bg-secondary: #1e1813;
+              --bg-sidebar: #1b1612;
+              --bg-code: #1e1813;
               --header-h: 50px;
               --sidebar-w: 280px;
               --content-max-w: 780px;
@@ -92,13 +93,16 @@ module Hwaro
               --radius-sm: 3px;
               --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
               --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
+              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
             }
 
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
             html { scroll-behavior: smooth; }
 
             body {
-              font-family: "Georgia", "Times New Roman", "Noto Serif KR", "Noto Serif", serif;
+              font-family: var(--font-serif);
               font-size: 20px;
               line-height: 1.9;
               color: var(--text);
@@ -107,12 +111,14 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
+            ::selection { background: rgba(200, 122, 122, 0.3); }
+
             /* ── Header ── */
             .book-header {
               position: fixed;
               top: 0; left: 0; right: 0;
               height: var(--header-h);
-              background: rgba(17, 17, 17, 0.9);
+              background: rgba(22, 18, 14, 0.9);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -121,7 +127,7 @@ module Hwaro
               align-items: center;
               padding: 0 0.75rem;
               z-index: 100;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .header-left { display: flex; align-items: center; justify-content: flex-start; }
@@ -138,8 +144,8 @@ module Hwaro
             .icon-btn:hover { color: var(--text-secondary); background: rgba(255,255,255,0.04); }
 
             .book-header .logo {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              font-weight: 500; font-size: 0.82rem;
+              font-family: var(--font-serif);
+              font-weight: 700; font-size: 0.95rem;
               color: var(--text-secondary); text-decoration: none; letter-spacing: 0.01em;
             }
             .book-header .logo:hover { color: var(--text); text-decoration: none; }
@@ -168,7 +174,7 @@ module Hwaro
               scrollbar-color: var(--border) transparent;
               z-index: 50;
               transition: transform 0.25s ease, visibility 0.25s;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .book-sidebar.collapsed {
@@ -218,13 +224,13 @@ module Hwaro
 
             .chapter-links a:hover {
               color: var(--text);
-              background: rgba(255, 255, 255, 0.03);
+              background: rgba(200, 122, 122, 0.06);
             }
 
             .chapter-links a.active {
-              color: var(--text);
-              background: rgba(255, 255, 255, 0.05);
-              border-left-color: var(--text);
+              color: var(--primary-hover);
+              background: rgba(200, 122, 122, 0.1);
+              border-left-color: var(--primary);
               font-weight: 600;
             }
 
@@ -249,46 +255,70 @@ module Hwaro
             }
 
             .book-content h1, .book-content h2, .book-content h3, .book-content h4 {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-serif);
+              color: var(--heading);
+              text-wrap: balance;
             }
 
-            .book-content h1 { font-size: 2rem; font-weight: 700; margin: 0 0 1rem 0; letter-spacing: -0.02em; line-height: 1.3; }
-            .book-content h2 { font-size: 1.5rem; font-weight: 600; margin: 2.5rem 0 0.75rem 0; letter-spacing: -0.015em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-light); }
-            .book-content h3 { font-size: 1.2rem; font-weight: 600; margin: 2rem 0 0.5rem 0; }
-            .book-content h4 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem 0; }
+            .book-content h1 { font-size: 2.1rem; font-weight: 700; margin: 0 0 1rem 0; letter-spacing: -0.018em; line-height: 1.3; }
+
+            /* Page title gets a short ember rule — the one mark every
+               hwaro scaffold shares. */
+            .book-content > h1:first-child {
+              position: relative;
+              padding-bottom: 0.9rem;
+            }
+
+            .book-content > h1:first-child::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #d69292, #b35454);
+            }
+
+            .book-content h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 0.75rem 0; letter-spacing: -0.008em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-light); }
+            .book-content h3 { font-size: 1.2rem; font-weight: 700; margin: 2rem 0 0.5rem 0; }
+            .book-content h4 { font-size: 1.05rem; font-weight: 700; margin: 1.5rem 0 0.5rem 0; }
             .book-content p { margin-bottom: 1.35rem; line-height: 1.9; }
             .book-content ul, .book-content ol { margin-bottom: 1.35rem; padding-left: 1.5rem; }
             .book-content li { margin-bottom: 0.3rem; line-height: 1.85; }
             .book-content li + li { margin-top: 0.2rem; }
             .book-content strong { font-weight: 700; color: var(--text); }
 
-            a { color: var(--text); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; transition: text-decoration-color 0.15s; }
-            a:hover { text-decoration-color: var(--text-secondary); }
+            /* Links: warm ink with an ember underline that brightens on hover. */
+            a { color: var(--text); text-decoration: underline; text-decoration-color: rgba(200, 122, 122, 0.4); text-underline-offset: 3px; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
+            a:hover { color: var(--primary); text-decoration-color: currentColor; }
 
-            code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace; }
+            code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; font-family: var(--font-mono); }
             pre { background: var(--bg-code); padding: 1rem 1.25rem; border-radius: var(--radius); overflow-x: auto; border: 1px solid var(--border); margin: 1.25rem 0 1.5rem 0; line-height: 1.6; }
             pre code { background: none; padding: 0; font-size: 0.84rem; }
 
-            table { width: 100%; border-collapse: collapse; margin: 1.25rem 0 1.5rem 0; font-size: 0.9rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            table { width: 100%; border-collapse: collapse; margin: 1.25rem 0 1.5rem 0; font-size: 0.9rem; font-family: var(--font-sans); }
             th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); }
             td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border-light); vertical-align: top; }
 
-            blockquote { border-left: 2px solid var(--border); padding: 0.5rem 1.25rem; margin: 1.25rem 0; color: var(--text-secondary); font-style: italic; }
+            blockquote { border-left: 1px solid var(--primary); padding: 0.5rem 1.25rem; margin: 1.25rem 0; color: var(--text-secondary); font-style: italic; }
             blockquote p { margin-bottom: 0; }
 
-            .info-box { padding: 0.875rem 1.25rem; border-radius: var(--radius); margin: 1.25rem 0; border-left: 3px solid; font-size: 0.9rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-            .info-box.note { background: rgba(255, 255, 255, 0.03); border-color: #777777; }
-            .info-box.warning { background: rgba(200, 160, 60, 0.06); border-color: #a08840; }
-            .info-box.tip { background: rgba(100, 180, 120, 0.05); border-color: #5a9a64; }
+            /* Info boxes: tinted surfaces with a hairline border in the
+               same hue — no heavy accent bars. */
+            .info-box { padding: 0.875rem 1.25rem; border-radius: var(--radius); margin: 1.25rem 0; border: 1px solid; font-size: 0.9rem; font-family: var(--font-sans); }
+            .info-box.note { background: rgba(200, 122, 122, 0.09); border-color: rgba(200, 122, 122, 0.35); }
+            .info-box.warning { background: rgba(214, 164, 91, 0.09); border-color: rgba(214, 164, 91, 0.35); }
+            .info-box.tip { background: rgba(126, 168, 130, 0.09); border-color: rgba(126, 168, 130, 0.35); }
 
             hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 
-            ul.section-list { list-style: none; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            ul.section-list { list-style: none; padding: 0; font-family: var(--font-sans); }
             ul.section-list li { margin-bottom: 0.35rem; padding: 0.6rem 0.9rem; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-light); transition: border-color 0.15s; }
             ul.section-list li:hover { border-color: var(--border); }
             ul.section-list li a { font-weight: 500; text-decoration: none; color: var(--text); }
 
-            nav.pagination { margin: 1.5rem 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            nav.pagination { margin: 1.5rem 0; font-family: var(--font-sans); }
             nav.pagination .pagination-list { list-style: none; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
             nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius); border: 1px solid var(--border); color: var(--text-secondary); text-decoration: none; }
             nav.pagination a:hover { color: var(--text); border-color: var(--text-muted); }
@@ -326,7 +356,7 @@ module Hwaro
               white-space: nowrap;
               background: var(--text);
               color: var(--bg);
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
               font-size: 0.72rem;
               font-weight: 500;
               padding: 0.3rem 0.6rem;
@@ -351,18 +381,18 @@ module Hwaro
               border-top: 1px solid var(--border-light);
               color: var(--text-muted);
               font-size: 0.75rem;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .search-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 200; justify-content: center; padding-top: 12vh; }
             .search-overlay.active { display: flex; }
 
-            .search-modal { width: 520px; max-width: 90vw; max-height: 70vh; background: var(--bg-secondary); border-radius: var(--radius); box-shadow: 0 16px 70px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; overflow: hidden; align-self: flex-start; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            .search-modal { width: 520px; max-width: 90vw; max-height: 70vh; background: var(--bg-secondary); border-radius: var(--radius); box-shadow: 0 16px 70px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; overflow: hidden; align-self: flex-start; font-family: var(--font-sans); }
             .search-input-wrap { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-light); }
             .search-input-wrap svg { flex-shrink: 0; color: var(--text-muted); }
             :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
-            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
             .skip-link:focus { top: 0; }
             .search-input-wrap input { flex: 1; border: none; outline: none; font-size: 0.95rem; font-family: inherit; color: var(--text); background: transparent; }
             .search-input-wrap input::placeholder { color: var(--text-muted); }
@@ -373,7 +403,7 @@ module Hwaro
             .search-result-item:hover, .search-result-item.active { background: var(--bg); text-decoration: none; }
             .search-result-item .search-result-title { font-weight: 500; font-size: 0.88rem; margin-bottom: 0.1rem; }
             .search-result-item .search-result-snippet { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-            .search-result-item .search-result-snippet mark { background: rgba(255, 255, 255, 0.08); color: var(--text); border-radius: 2px; padding: 0 1px; }
+            .search-result-item .search-result-snippet mark { background: rgba(200, 122, 122, 0.22); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.88rem; }
             .search-hint { padding: 0.5rem 0.75rem; display: flex; gap: 1rem; justify-content: center; border-top: 1px solid var(--border-light); color: var(--text-muted); font-size: 0.65rem; }
             .search-hint kbd { font-size: 0.6rem; padding: 0 0.25rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); font-family: inherit; line-height: 1.4; }
@@ -389,6 +419,14 @@ module Hwaro
 
             @media (min-width: 901px) {
               .book-sidebar.open { transform: translateX(0); visibility: visible; }
+            }
+
+            /* Icon button press feedback */
+            .icon-btn:active { transform: scale(0.92); }
+
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { transition-duration: 0.01ms !important; }
+              html { scroll-behavior: auto; }
             }
             CSS
         end
