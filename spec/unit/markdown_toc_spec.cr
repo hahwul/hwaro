@@ -62,5 +62,15 @@ describe Hwaro::Content::Processors::Markdown do
       root.children[0].children[0].children[0].children[0].level.should eq(5)
       root.children[0].children[0].children[0].children[0].children[0].level.should eq(6)
     end
+
+    it "slugifies entity-escaped heading text from the decoded characters" do
+      html, toc = Hwaro::Content::Processors::Markdown.new.render("## Tom & Jerry <3\n\ntext")
+
+      toc[0].id.should eq("tom-jerry-3")
+      html.should contain(%(<h2 id="tom-jerry-3">))
+      # The TOC title keeps the escaped form — consumers interpolate it
+      # into HTML verbatim.
+      toc[0].title.should eq("Tom &amp; Jerry &lt;3")
+    end
   end
 end

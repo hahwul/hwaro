@@ -755,4 +755,108 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should_not contain("href=\"javascript:")
     end
   end
+
+  describe "nested fences (CommonMark closing-fence rules)" do
+    it "leaves ``` examples nested inside ```` fences verbatim" do
+      config = make_config(heading_ids: true)
+      content = "````markdown\n```\n~~not strike~~\n```\n## Heading {#nope}\n````\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("~~not strike~~")
+      result.should_not contain("HID:nope")
+      result.should contain("<del>real</del>")
+    end
+
+    it "does not treat a ```lang line as closing an open fence" do
+      content = "```text\n```ruby\n~~code~~\n```\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("~~code~~")
+      result.should contain("<del>real</del>")
+    end
+  end
+
+  describe "math fence and code-span awareness" do
+    it "leaves $$ inside fenced code blocks verbatim" do
+      content = "```make\nall:\n\techo $$PATH\n\techo $$HOME\n```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should eq(content)
+    end
+
+    it "leaves $...$ inside inline code spans verbatim" do
+      content = "Use `$HOME` and `$PATH` to read env vars."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should eq(content)
+    end
+
+    it "still renders math on a line that also has inline code" do
+      content = "The value `x` equals $y+1$ here."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("math-inline")
+      result.should contain("`x`")
+      result.should_not contain("$y+1$")
+    end
+
+    it "uses single-backslash delimiters inside raw HTML blocks" do
+      content = "<td>$x+y$</td>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("\\(x+y\\)")
+      result.should_not contain("\\\\(")
+    end
+  end
+
+  describe "footnote refs in inline code" do
+    it "leaves a literal `[^1]` code span verbatim" do
+      config = make_config(footnotes: true)
+      content = "Real ref[^1] and literal `[^1]` in code.\n\n[^1]: note"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("`[^1]`")
+      result.should contain("fnref-1")
+    end
+  end
+
+  describe "CRLF line endings" do
+    it "extracts heading ids from CRLF content" do
+      config = make_config(heading_ids: true)
+      content = "## Title {#custom}\r\n\r\nbody\r\n"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("<!--HID:custom-->")
+    end
+  end
+
+  describe "definition lists inside fences" do
+    it "leaves Term/: def syntax inside a fenced example verbatim" do
+      content = "```\nTerm\n: Definition\n```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should eq(content)
+    end
+  end
+
+  describe "extensions inside table cells and definitions (end-to-end)" do
+    it "renders strikethrough inside a table cell" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| ~~del me~~ |", markdown_config: make_config)
+      html.should contain("<td><del>del me</del></td>")
+      html.should_not contain("&lt;del&gt;")
+    end
+
+    it "renders inline math inside a table cell with single-backslash delimiters" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| $x+y$ |", markdown_config: make_config(math: true))
+      html.should contain("<td><span class=\"math math-inline\">\\(x+y\\)</span></td>")
+    end
+
+    it "renders footnote refs inside a table cell" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| see[^1] |\n\n[^1]: note", markdown_config: make_config(footnotes: true))
+      html.should contain("<td>see<sup class=\"footnote-ref\">")
+      html.should contain("class=\"footnotes\"")
+    end
+
+    it "renders strikethrough inside a definition body" do
+      html, _ = Hwaro::Processor::Markdown.render("Term\n: has ~~del~~ text", markdown_config: make_config(definition_lists: true))
+      html.should contain("<dd>has <del>del</del> text</dd>")
+    end
+
+    it "renders strikethrough inside an extracted footnote body" do
+      html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: has ~~del~~ text", markdown_config: make_config(footnotes: true))
+      html.should contain("has <del>del</del> text")
+      html.should_not contain("&lt;del&gt;")
+    end
+  end
 end

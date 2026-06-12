@@ -11,8 +11,10 @@ require "yaml"
 require "toml"
 require "json"
 require "xml"
+require "html"
 require "digest/md5"
 require "./base"
+require "./table_parser"
 require "./syntax_highlighter"
 require "./markdown_extensions"
 require "../../models/toc"
@@ -134,12 +136,19 @@ module Hwaro
         # @param lazy_loading - if true, adds loading="lazy" to img tags
         # @param emoji - if true, converts emoji shortcodes to emoji characters
         def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+          # Tables are converted FIRST: cell bodies render through
+          # InlineMarkdown, which HTML-escapes — so the HTML-injecting
+          # extension passes (strikethrough/footnote refs/math) must not have
+          # touched cell text yet, or their tags get escaped into visible
+          # literal markup. The footnote-ref and math passes still reach the
+          # generated <td> text afterwards, so refs and `$…$` inside cells
+          # keep working.
+          processed = TableParser.process(content)
+
           # Pre-process markdown extensions (task lists, footnotes, etc.)
-          processed = if md_cfg = markdown_config
-                        MarkdownExtensions.preprocess(content, md_cfg)
-                      else
-                        content
-                      end
+          if md_cfg = markdown_config
+            processed = MarkdownExtensions.preprocess(processed, md_cfg)
+          end
 
           # Use SyntaxHighlighter for rendering with highlighting support
           html = SyntaxHighlighter.render(processed, highlight, safe)
@@ -708,7 +717,12 @@ module Hwaro
                               id_match[1]
                             end
 
-              slug = Utils::TextUtils.slugify(title)
+              # The heading text reaches us entity-escaped (`&` → `&amp;` by
+              # Markd); unescape before slugifying so "Tom & Jerry" gets the
+              # id "tom-jerry", not "tom-amp-jerry". The TOC title keeps the
+              # escaped form — both consumers (generate_toc_html and Crinja
+              # with autoescape off) interpolate it into HTML verbatim.
+              slug = Utils::TextUtils.slugify(HTML.unescape(title))
               id = existing_id || (slug.empty? ? "heading" : slug)
 
               # Ensure uniqueness using counter map for O(1) suffix lookup

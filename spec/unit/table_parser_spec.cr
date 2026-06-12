@@ -703,4 +703,25 @@ describe Hwaro::Content::Processors::TableParser do
       Hwaro::Content::Processors::TableParser::Alignment::Right.should_not be_nil
     end
   end
+
+  describe "fence tracking" do
+    it "does not convert a table example nested inside a ```` fence" do
+      md = "````markdown\n```\n| a | b |\n|---|---|\n```\n| c | d |\n|---|---|\n````"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
+
+    it "converts a table after an indented code block containing ```" do
+      md = "text\n\n    ```\n    indented code\n\n| a | b |\n|---|---|\n| 1 | 2 |"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should contain("<table>")
+      out.should contain("    ```")
+    end
+
+    it "does not treat a ```lang line as closing an open fence" do
+      md = "```text\n```ruby\n| a | b |\n|---|---|\n```"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
+  end
 end

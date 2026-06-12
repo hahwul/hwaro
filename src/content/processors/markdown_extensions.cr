@@ -1,4 +1,5 @@
 require "html"
+require "./fence_tracker"
 require "./inline_markdown"
 require "../../models/config"
 require "../../utils/text_utils"
@@ -13,20 +14,21 @@ module Hwaro
         def preprocess(content : String, config : Models::MarkdownConfig) : String
           result = content
 
-          # === Aggressive pass reduction for #559 ===
-          # We aggressively combine as many simple regex-based extensions
-          # as possible into a *single* fence-aware line pass.
-          #
-          # Order preserved from original (important for correctness):
-          # task_lists → math → strikethrough → heading_ids
-          #
-          # Complex/structural ones (definition_lists, footnotes) are left
-          # as separate passes because they have multi-line state and
-          # different requirements.
+          # === Pass order matters ===
+          # Structural extensions whose bodies render through InlineMarkdown
+          # (which HTML-escapes) run FIRST, and the HTML-injecting passes
+          # (strikethrough / footnote refs / math) run AFTER them — a <del>
+          # or math span injected into a `: definition` line beforehand would
+          # be escaped into visible literal markup. TableParser runs even
+          # earlier (in Markdown#render) for the same reason. Math runs last
+          # so `$…$` inside already-escaped <td>/<dd> bodies still gets
+          # wrapped.
+          result = preprocess_definition_lists(result) if config.definition_lists
+          result = preprocess_footnotes(result) if config.footnotes
 
           # Combined single fence-aware pass for per-line safe extensions
-          # (task_lists + strikethrough + heading_ids). This is the aggressive
-          # optimization for #559 — reduces full document walks.
+          # (task_lists + strikethrough + heading_ids) — reduces full
+          # document walks (#559).
           do_task_lists = config.task_lists
           do_strikethrough = true
           do_heading_ids = config.heading_ids
@@ -67,12 +69,9 @@ module Hwaro
             end
           end
 
-          # Math kept as separate pass (multi-line $$ + known strikethrough interaction)
+          # Math kept as a separate pass: display math `$$…$$` spans lines,
+          # so it works on fence-delimited chunks rather than per line.
           result = preprocess_math(result) if config.math
-
-          # Structural extensions kept separate
-          result = preprocess_definition_lists(result) if config.definition_lists
-          result = preprocess_footnotes(result) if config.footnotes
 
           result
         end
@@ -124,24 +123,36 @@ module Hwaro
         end
 
         # --- Definition Lists ---
-        # Converts Term\n: Definition syntax to <dl><dt><dd> HTML
+        # Converts Term\n: Definition syntax to <dl><dt><dd> HTML.
+        # Fence-aware: `Term` / `: def` lines shown inside a ```/~~~ example
+        # stay verbatim instead of becoming <dl> markup inside the code block.
         def preprocess_definition_lists(content : String) : String
           lines = content.split("\n")
+
+          tracker = FenceTracker.new
+          fenced = lines.map { |line| tracker.fence_line?(line) }
+
           result = [] of String
           i = 0
 
           while i < lines.size
             line = lines[i]
 
+            if fenced[i]
+              result << line
+              i += 1
+              next
+            end
+
             # Check if next line starts with ": " (definition). The term line
             # (lines[i]) must be non-empty: a blank line followed by a ": "
             # line is an orphan definition, not a definition list — entering
             # the branch there emitted a stray empty <dl></dl> and leaked the
             # ": " line through as literal text.
-            if i + 1 < lines.size && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
+            if i + 1 < lines.size && !fenced[i + 1] && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
               result << "<dl>"
-              while i < lines.size
+              while i < lines.size && !fenced[i]
                 term = lines[i].strip
                 if term.empty?
                   i += 1
@@ -152,7 +163,7 @@ module Hwaro
                 i += 1
 
                 # Collect definitions for this term
-                while i < lines.size && lines[i].lstrip.starts_with?(": ")
+                while i < lines.size && !fenced[i] && lines[i].lstrip.starts_with?(": ")
                   definition = lines[i].lstrip.lchop(": ").strip
                   result << "<dd>#{render_inline_md(definition)}</dd>"
                   i += 1
@@ -160,10 +171,10 @@ module Hwaro
 
                 # Skip one or more blank lines between term groups within the same dl
                 peek = i
-                while peek < lines.size && lines[peek].strip.empty?
+                while peek < lines.size && !fenced[peek] && lines[peek].strip.empty?
                   peek += 1
                 end
-                if peek > i && peek + 1 < lines.size && lines[peek + 1].lstrip.starts_with?(": ")
+                if peek > i && peek + 1 < lines.size && !fenced[peek] && !fenced[peek + 1] && lines[peek + 1].lstrip.starts_with?(": ")
                   i = peek
                   next
                 end
@@ -205,29 +216,35 @@ module Hwaro
           footnotes = {} of String => String
           cleaned = process_lines_fence_aware(content) do |line, _|
             line.gsub(FOOTNOTE_DEF_RE) do |_|
-              footnotes[$~[1]] = $~[2]
+              # rstrip: on CRLF content the captured text carries a trailing \r
+              footnotes[$~[1]] = $~[2].rstrip
               "" # Remove definition from content
             end
           end
 
           return cleaned if footnotes.empty?
 
-          # Replace references with superscript HTML placeholders, also fence-aware
-          # so a `[^1]` shown inside a code block stays verbatim.
+          # Replace references with superscript HTML placeholders — fence-aware
+          # so a `[^1]` shown inside a code block stays verbatim, and inline
+          # code spans are stashed so a literal `` `[^1]` `` survives too.
           counter = 0
           ref_order = {} of String => Int32
           result = process_lines_fence_aware(cleaned) do |line, _|
-            line.gsub(FOOTNOTE_REF_RE) do |full_match|
-              key = $~[1]
-              next full_match unless footnotes.has_key?(key)
+            next line unless line.includes?("[^")
 
-              unless ref_order.has_key?(key)
-                counter += 1
-                ref_order[key] = counter
+            transform_outside_code_spans(line) do |stashed|
+              stashed.gsub(FOOTNOTE_REF_RE) do |full_match|
+                key = $~[1]
+                next full_match unless footnotes.has_key?(key)
+
+                unless ref_order.has_key?(key)
+                  counter += 1
+                  ref_order[key] = counter
+                end
+                num = ref_order[key]
+                escaped_key = HTML.escape(key)
+                "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
               end
-              num = ref_order[key]
-              escaped_key = HTML.escape(key)
-              "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
             end
           end
 
@@ -295,26 +312,102 @@ module Hwaro
         end
 
         # --- Math ---
-        # Wraps math expressions in special HTML to prevent Markd from processing them
+        DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
+        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
+        # Code-span pattern confined to one line, for stashing inside
+        # multi-line chunks: a stray lone backtick in one paragraph must not
+        # absorb text from another.
+        SINGLE_LINE_CODE_SPAN_RE = /`[^`\n]+`/
+        # CommonMark "type 6" HTML-block start condition (common block tags,
+        # including the <table>/<dl>/<div> markup hwaro itself generates).
+        # A line opening one of these starts a raw-HTML block that runs to
+        # the next blank line — Markd performs NO inline parsing there, so
+        # backslash escapes ship verbatim instead of collapsing.
+        HTML_BLOCK_START_RE = /^ {0,3}<\/?(?:address|article|aside|blockquote|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|menu|nav|ol|p|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)(?:[\s>\/]|\r?$)/i
+
+        # Wraps math expressions in special HTML to prevent Markd from
+        # processing them. Fence-aware: `$$` is common in Makefile/shell/Perl
+        # code examples, and rewriting it inside a fence corrupts the code
+        # block. Display math can span lines, so instead of a per-line walk
+        # this buffers runs of non-fence lines and transforms each run as one
+        # chunk.
         def preprocess_math(content : String) : String
-          # Display math: $$...$$ (multi-line)
-          result = content.gsub(/\$\$(.*?)\$\$/m) do |_|
-            escaped = Utils::TextUtils.escape_xml($~[1])
-            "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
-          end
+          return content unless content.includes?('$')
 
-          # Inline math: $...$ (single line, no space after opening or before closing $)
-          # NOTE: Inline `<span>` content participates in CommonMark inline parsing,
-          # so the KaTeX delimiters need an extra backslash to survive — `\\(` in
-          # the markdown source renders to `\(` in HTML, which KaTeX auto-render
-          # expects. Display math uses `<div>` (HTML block, opaque to Markd) and
-          # therefore keeps a single backslash.
-          result = result.gsub(/(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/) do |_|
-            escaped = Utils::TextUtils.escape_xml($~[1])
-            "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
+          String.build do |io|
+            tracker = FenceTracker.new
+            chunk = String::Builder.new
+            content.each_line(chomp: false) do |line|
+              if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
+                if chunk.bytesize > 0
+                  io << transform_math_chunk(chunk.to_s)
+                  chunk = String::Builder.new
+                end
+                io << line
+              else
+                chunk << line
+              end
+            end
+            io << transform_math_chunk(chunk.to_s) if chunk.bytesize > 0
           end
+        end
 
-          result
+        private def transform_math_chunk(text : String) : String
+          return text unless text.includes?('$')
+
+          # Inline code spans are stashed so `` `$HOME` `` stays verbatim.
+          transform_outside_code_spans(text, SINGLE_LINE_CODE_SPAN_RE) do |stashed|
+            # Display math: $$...$$ (multi-line). The `<div>` is an HTML
+            # block, opaque to Markd in every context, so a single backslash
+            # reaches the browser as `\[…\]` — what KaTeX auto-render scans
+            # for.
+            result = stashed.gsub(DISPLAY_MATH_RE) do |_|
+              escaped = Utils::TextUtils.escape_xml($~[1])
+              "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+            end
+
+            next result unless result.includes?('$')
+
+            # Inline math: $...$ (single line, no space after opening or
+            # before closing $). The required backslash escaping depends on
+            # block context:
+            #
+            # - In normal inline context the `<span>` content participates in
+            #   CommonMark inline parsing, so the delimiters need an extra
+            #   backslash — `\\(` in the markdown source collapses to `\(`
+            #   in the HTML.
+            # - Inside a raw HTML block (a <td>/<dd> hwaro generated, or
+            #   author-written block HTML) Markd does no inline parsing and
+            #   backslashes ship verbatim, so a single backslash is correct.
+            #
+            # Walk line by line to track the HTML-block state (a type-6 block
+            # runs from its opening tag line to the next blank line).
+            String.build do |io|
+              in_html_block = false
+              result.each_line(chomp: false) do |line|
+                if in_html_block
+                  in_html_block = false if line.strip.empty?
+                elsif HTML_BLOCK_START_RE.matches?(line)
+                  in_html_block = true
+                end
+
+                unless line.includes?('$')
+                  io << line
+                  next
+                end
+
+                raw_context = in_html_block
+                io << line.gsub(INLINE_MATH_RE) do |_|
+                  escaped = Utils::TextUtils.escape_xml($~[1])
+                  if raw_context
+                    "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
+                  else
+                    "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
+                  end
+                end
+              end
+            end
+          end
         end
 
         # --- Mermaid ---
@@ -386,47 +479,36 @@ module Hwaro
         # HTML id without further escaping.
         # CommonMark allows up to 3 leading spaces before an ATX heading, which
         # we capture and preserve so Markd still recognises the line as a heading.
-        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*$/
+        # `\r?` before `$`: CRLF content otherwise never matches and the id is
+        # silently dropped.
+        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*\r?$/
 
-        FENCE_BACKTICKS = "```"
-        FENCE_TILDES    = "~~~"
+        # Engine-generated marker comments (footnote data blocks, shortcode
+        # placeholders) start with this prefix and must pass through the
+        # transforming passes verbatim: a footnote body containing `~~x~~` or
+        # `$x$` lives inside a `<!--HWARO-FN:…-->` line until postprocess,
+        # and rewriting it there corrupts the data. Author-typed lookalikes
+        # are neutralized to `<!-- HWARO-` (with a space) by
+        # preprocess_footnotes before this prefix check can match them.
+        ENGINE_MARKER_PREFIX = "<!--HWARO-"
 
         # Unified fence-aware line processor.
         # This allows multiple extensions (heading_ids + strikethrough, etc.)
         # to be applied in a *single* pass over the document instead of
         # separate full-string walks. This is the main optimization for
         # reducing regex passes in MarkdownExtensions (see issue #559).
+        # Fence state (nested fences, indented code, closing-fence rules)
+        # lives in the shared FenceTracker.
         #
-        # The block is called for every line. It receives the original line
-        # and whether we are currently inside a fenced code block.
-        # The block should return the (possibly transformed) line.
+        # The block is called for every line outside fenced code; fence
+        # delimiters, fence content, and engine marker lines pass through
+        # verbatim. The second block argument is kept for call-site
+        # compatibility and is always false.
         private def process_lines_fence_aware(content : String, &) : String
           String.build do |io|
-            in_fence = false
-            fence_marker = FENCE_BACKTICKS
-
+            tracker = FenceTracker.new
             content.each_line(chomp: false) do |line|
-              stripped = line.lstrip
-
-              # A code fence may be indented at most 3 spaces (CommonMark). A line
-              # indented >=4 spaces or with a leading tab is INDENTED-code content,
-              # where ``` / ~~~ is literal text, not a fence — mis-reading it as a
-              # fence opener left in_fence stuck to end-of-document and dropped
-              # every footnote/heading after it.
-              fence_eligible = !(line.starts_with?("    ") || line.starts_with?('\t'))
-
-              if in_fence
-                if fence_eligible && stripped.starts_with?(fence_marker)
-                  in_fence = false
-                end
-                io << line
-              elsif fence_eligible && stripped.starts_with?(FENCE_BACKTICKS)
-                in_fence = true
-                fence_marker = FENCE_BACKTICKS
-                io << line
-              elsif fence_eligible && stripped.starts_with?(FENCE_TILDES)
-                in_fence = true
-                fence_marker = FENCE_TILDES
+              if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
                 io << line
               else
                 io << yield(line, false)
@@ -469,12 +551,12 @@ module Hwaro
         # and inline `` `code` `` runs on the same line are skipped via a
         # placeholder pass so e.g. `` `~~not strike~~` `` stays as code.
         #
-        # Known limitation: when math is also enabled, `$~~x~~$` runs the math
-        # preprocess first and the `~~` chars end up inside a math span,
-        # then this pass rewrites them — corrupting the KaTeX expression. We
-        # do not stash math spans because they can span multiple lines (display
-        # math) and the walker is line-oriented. `~~` inside math is rare and
-        # the failure is visible at render time.
+        # Known limitation: when math is also enabled, `$~~x~~$` is rewritten
+        # by this pass before the math pass runs, so the `<del>` tags end up
+        # escaped inside the KaTeX expression. We do not stash math spans
+        # because they can span multiple lines (display math) and the walker
+        # is line-oriented. `~~` inside math is rare and the failure is
+        # visible at render time.
         STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
         STRIKETHROUGH_CODE_RE = /`[^`]+`/
 
@@ -492,16 +574,29 @@ module Hwaro
 
         private def rewrite_strikethrough_line(line : String) : String
           # Stash inline code spans so a `~~` inside backticks is not rewritten.
+          transform_outside_code_spans(line) do |stashed|
+            stashed.gsub(STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+          end
+        end
+
+        # Stash inline code spans, transform the rest through the block, then
+        # restore the spans — so literals like `` `~~x~~` ``, `` `[^1]` ``,
+        # and `` `$x$` `` survive the HTML-injecting passes. Multi-line
+        # chunks pass SINGLE_LINE_CODE_SPAN_RE so a stray lone backtick in
+        # one paragraph can't absorb text from another.
+        private def transform_outside_code_spans(text : String, code_span_re : Regex = STRIKETHROUGH_CODE_RE, & : String -> String) : String
+          return yield text unless text.includes?('`')
+
           code_spans = [] of String
-          stashed = line.gsub(STRIKETHROUGH_CODE_RE) do |match|
+          stashed = text.gsub(code_span_re) do |match|
             code_spans << match
             "\x00CS#{code_spans.size - 1}\x00"
           end
 
-          rewritten = stashed.gsub(STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+          rewritten = yield stashed
 
           code_spans.each_with_index do |span, idx|
-            rewritten = rewritten.gsub("\x00CS#{idx}\x00", span)
+            rewritten = rewritten.sub("\x00CS#{idx}\x00", span)
           end
           rewritten
         end

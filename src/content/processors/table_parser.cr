@@ -7,7 +7,8 @@
 # Supported features:
 # - Basic pipe-delimited tables
 # - Column alignment (left, center, right)
-# - Inline formatting within cells (handled by markd after conversion)
+# - Inline formatting within cells (rendered via InlineMarkdown, which
+#   HTML-escapes cell text — markd does not reparse the generated HTML)
 #
 # Table syntax:
 #   | Header 1 | Header 2 | Header 3 |
@@ -21,6 +22,7 @@
 #   - `---:` = right align
 
 require "html"
+require "./fence_tracker"
 require "./inline_markdown"
 
 module Hwaro
@@ -111,29 +113,14 @@ module Hwaro
           lines = content.split("\n")
           result = [] of String
           i = 0
-          # Track fenced code blocks so verbatim pipe-table syntax shown inside
-          # ``` / ~~~ fences (common in docs) isn't converted to a real <table>.
-          # Mirrors MarkdownExtensions.process_lines_fence_aware.
-          in_fence = false
-          fence_marker = "```"
+          # Track fenced code blocks via the shared FenceTracker so verbatim
+          # pipe-table syntax shown inside ``` / ~~~ fences (common in docs)
+          # isn't converted to a real <table> — including ``` examples nested
+          # in ```` fences and indented-code lines where ``` is literal text.
+          tracker = FenceTracker.new
 
           while i < lines.size
-            stripped = lines[i].lstrip
-
-            if in_fence
-              in_fence = false if stripped.starts_with?(fence_marker)
-              result << lines[i]
-              i += 1
-              next
-            elsif stripped.starts_with?("```")
-              in_fence = true
-              fence_marker = "```"
-              result << lines[i]
-              i += 1
-              next
-            elsif stripped.starts_with?("~~~")
-              in_fence = true
-              fence_marker = "~~~"
+            if tracker.fence_line?(lines[i])
               result << lines[i]
               i += 1
               next
