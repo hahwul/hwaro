@@ -300,6 +300,10 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.reading_time | Int | Reading time (minutes) |
 | page.summary | String? | Rendered HTML for the chunk before `<!-- more -->`, falling back to `page.description` when no marker is present. Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.assets | Array<String> | Static files in page bundle |
+| page.series | String | Series name from front matter (empty if none) |
+| page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |
+| page.series_pages | Array<Page> | All pages in the same series, sorted by `series_weight` |
+| page.related_posts | Array<Page> | Pages sharing taxonomy terms (requires `[related]` enabled) |
 
 ### Boolean Flags
 
@@ -599,6 +603,37 @@ Only available when `toc = true` in front matter.
 
 ---
 
+### Paginator
+
+Available in section and taxonomy term templates when pagination is enabled (`paginate` in [section front matter](/writing/sections/#front-matter), `paginate_by` for taxonomies). Page 1 lives at the section URL; later pages at `{url}/{paginate_path}/{n}/`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| paginator.paginate_by | Int | Items per page |
+| paginator.base_url | String | Pager base URL (`{url}/{paginate_path}/`) |
+| paginator.number_pagers | Int | Total number of pages |
+| paginator.first | String | First page URL |
+| paginator.last | String | Last page URL |
+| paginator.previous | String? | Previous page URL (nil on first page) |
+| paginator.next | String? | Next page URL (nil on last page) |
+| paginator.pages | Array<Page> | Pages on the current pager |
+| paginator.current_index | Int | Current page number (1-based) |
+| paginator.total_pages | Int | Same as `number_pagers` |
+
+A `pagination_obj` variant exposes the same data as `previous_url`, `next_url`, `first_url`, `last_url`, `current_page`, `total_pages`, `total_items`, `per_page`, `has_previous`, `has_next`, and `html` (the pre-rendered nav, also available as the flat `pagination` variable).
+
+```jinja
+{% if paginator is defined and paginator.number_pagers > 1 %}
+<nav>
+  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
+  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+```
+
+---
+
 ### Taxonomy Variables
 
 Available in taxonomy templates:
@@ -606,9 +641,10 @@ Available in taxonomy templates:
 | Variable | Type | Description |
 |----------|------|-------------|
 | taxonomy_name | String | Taxonomy name (e.g., "tags") |
-| taxonomy_term | String | Current term name |
-| taxonomy_terms | Array | All terms (in taxonomy.html) |
-| taxonomy_pages | Array<Page> | Pages for term |
+| taxonomy_term | String | Current term name (empty on the index page) |
+| content | String | Pre-rendered listing HTML (terms or pages) |
+
+For custom listings, use `get_taxonomy()` — see [Taxonomies](/writing/taxonomies/).
 
 ---
 

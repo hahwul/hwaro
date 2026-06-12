@@ -26,22 +26,7 @@ Retrieve any page by path or URL:
 |------|------|-------------|
 | path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
 
-**Returns:** Page? (nil if not found)
-
-**Returned Properties:**
-
-| Property | Type |
-|----------|------|
-| title | String |
-| description | String? |
-| url | String |
-| date | String? |
-| section | String |
-| draft | Bool |
-| weight | Int |
-| summary | String? |
-| word_count | Int |
-| reading_time | Int |
+**Returns:** Page? (nil if not found) — exposes the standard [Page properties](/templates/data-model/#page), minus per-render computed fields (`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`).
 
 **Examples:**
 
@@ -495,4 +480,5 @@ data/
 ## See Also
 
 - [Data Model](/templates/data-model/) — Site, Section, Page types
+- [Data Model › Paginator](/templates/data-model/#paginator) — pagination object in section templates
 - [Filters](/templates/filters/) — Value transformation

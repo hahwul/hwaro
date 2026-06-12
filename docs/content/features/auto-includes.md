@@ -132,7 +132,7 @@ Given the example directory structure above, the template variables produce:
 
 - **Separate concerns**: Use `auto_includes_css` in `<head>` and `auto_includes_js` before `</body>` for optimal page loading.
 - **Multiple directories**: You can list multiple directories to scan. Each directory is scanned independently.
-- **No duplicates**: Each file is included only once, even if it appears in multiple scanned directories.
+- **Avoid overlapping directories**: results are not deduplicated — a file reachable from two configured dirs (e.g. `assets` and `assets/css`) is included once per dir, so list non-overlapping directories.
 - **Static files only**: Auto includes scan the `static/` directory. Files in `content/` are not included.
 
 ## See Also

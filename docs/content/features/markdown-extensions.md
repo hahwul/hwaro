@@ -5,7 +5,7 @@ weight = 7
 toc = true
 +++
 
-Hwaro supports optional markdown extensions beyond standard CommonMark. Each extension is disabled by default and can be enabled in `config.toml`.
+Hwaro supports optional markdown extensions beyond standard CommonMark. Each extension can be toggled in `config.toml` (see the table below for defaults).
 
 ## Configuration
 
@@ -27,6 +27,11 @@ mermaid = true
 | math | bool | false | Math expressions (`$...$` and `$$...$$`) |
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
 | mermaid | bool | false | Mermaid diagram blocks |
+| admonitions | bool | true | GitHub-style `> [!NOTE]` blockquotes become admonition blocks |
+| heading_ids | bool | true | Custom heading IDs (`## Heading {#custom-id}`) |
+| safe | bool | false | Strip raw HTML from output (replaced with comments) |
+| lazy_loading | bool | false | Add `loading="lazy"` to `<img>` tags |
+| emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
 
 ## Task Lists
 

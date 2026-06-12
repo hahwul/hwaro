@@ -36,7 +36,7 @@ weight = 3
 | language_name | string | — | Human-readable language name |
 | weight | int | 0 | Sort order (lower = first) |
 | generate_feed | bool | true | Generate RSS/Atom feed for this language |
-| build_search_index | bool | false | Include in search index |
+| build_search_index | bool | true | Include in search index |
 | taxonomies | array | [] | Taxonomies for this language |
 
 ## Content Structure

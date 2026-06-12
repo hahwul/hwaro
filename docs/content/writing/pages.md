@@ -52,7 +52,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| date | string | — | Publication date (YYYY-MM-DD) |
+| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work |
 | description | string | — | SEO description |
 | draft | bool | false | Exclude from production builds |
 | template | string | "page" | Template to use |
@@ -153,7 +153,7 @@ series_weight = 1
 First part of the series.
 ```
 
-In templates, access `page.series`, `page.series_index`, and `page.series_pages`.
+With `[series]` enabled in `config.toml`, `page.series_index` (1-based position) and `page.series_pages` (all pages in the series) are computed at build time — they are template-only values, not front matter fields. See [Data Model](/templates/data-model/#computed-properties).
 
 ### Custom Template
 

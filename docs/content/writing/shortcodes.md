@@ -100,7 +100,6 @@ Both bare and named closers are supported (named closers are recommended for com
 ```
 
 (We recommend the named closer style for clarity.)
-```
 
 | Param | Default | Description |
 |-------|---------|-------------|

@@ -7,6 +7,8 @@ toc = true
 
 Filters transform values in templates. Apply with the pipe `|` operator.
 
+Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins — `upper`, `lower`, `join`, `map`, `select`, `batch`, and friends — so both kinds work anywhere below.
+
 ## Syntax
 
 ```jinja
@@ -25,7 +27,7 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 | trim | Remove whitespace | {{ "  hi  " \| trim }} → hi |
 | replace | Replace text | {{ "hello" \| replace("l", "x") }} → hexxo |
 | slugify | URL slug | {{ "Hello World" \| slugify }} → hello-world |
-| truncate_words | Limit words | {{ text \| truncate_words(20) }} |
+| truncate_words | Limit words; `end` sets the suffix (default `...`) | {{ text \| truncate_words(20, end="…") }} |
 
 ## HTML Filters
 
@@ -135,23 +137,17 @@ Format codes:
 <img src="{{ "/logo.png" | relative_url }}">
 ```
 
-### String Processing
+### Strings and Chaining
 
 ```jinja
-{{ page.title | upper }}
-{{ page.title | slugify }}
-{{ long_text | truncate_words(50) }}
-```
+{{ page.title | lower | slugify }}
+{{ content | strip_html | truncate_words(100) }}
+{{ description | default(value="No description") | upper }}
 
-### Array Operations
-
-```jinja
 {% set tags = "a,b,c" | split(pat=",") %}
 {% for tag in tags %}
   <span>{{ tag | trim }}</span>
 {% endfor %}
-
-{{ page.authors | join(" & ") }}
 ```
 
 ### Collection Querying
@@ -168,23 +164,9 @@ Format codes:
   {% endfor %}
   </ul>
 {% endfor %}
-```
 
-### Collection Processing
-
-```jinja
-{# Remove duplicates from tags across all pages #}
+{# Unique tags across all pages #}
 {% set all_tags = site.pages | map(attribute="tags") | flatten | unique %}
-
-{# Remove empty entries #}
-{% set valid = items | compact %}
-```
-
-### Math Operations
-
-```jinja
-{# Calculate number of pages #}
-{% set total_pages = total_items / per_page | ceil %}
 ```
 
 ### Translations
@@ -198,21 +180,6 @@ Format codes:
 
 {# Pluralize based on count #}
 <p>{{ post_count }} {{ post_count | pluralize(singular="post", plural="posts") }}</p>
-```
-
-### Debugging
-
-```jinja
-{# Inspect a value for debugging #}
-<!-- {{ page.extra | inspect }} -->
-```
-
-### Chaining
-
-```jinja
-{{ page.title | lower | slugify }}
-{{ content | strip_html | truncate_words(100) }}
-{{ description | default(value="No description") | upper }}
 ```
 
 ---

@@ -192,6 +192,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | -i, --input DIR | Project directory to build (default: current directory) |
 | -o, --output DIR | Output directory (default: public) |
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
+| -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |
 | --include-future | Include future-dated content |
@@ -200,6 +201,8 @@ hwaro build -i /path/to/my-site -o ./dist
 | --cache | Enable incremental build caching (see below) |
 | --full | Force a complete rebuild, clearing the cache |
 | --skip-highlighting | Disable syntax highlighting |
+| --skip-og-image | Skip auto OG image generation |
+| --skip-image-processing | Skip image resizing and LQIP generation |
 | --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
 | --stream | Enable streaming build to reduce memory usage |
 | --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
@@ -278,9 +281,10 @@ hwaro serve -i /path/to/my-site -p 8080
 | Flag | Description |
 |------|-------------|
 | -i, --input DIR | Project directory to serve (default: current directory) |
-| -b, --bind HOST | Bind address (default: 0.0.0.0) |
+| -b, --bind HOST | Bind address (default: 127.0.0.1) |
 | -p, --port PORT | Port number (default: 3000) |
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
+| -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
 | --minify | Serve minified output |
 | --open | Open browser after starting |
 | -d, --drafts | Include draft content |
@@ -296,6 +300,8 @@ hwaro serve -i /path/to/my-site -p 8080
 | --cache | Enable build caching (skip unchanged files) |
 | --stream | Enable streaming build to reduce memory usage |
 | --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
+| --fast-start | Render homepage + latest N pages first, then background-render the rest |
+| --fast-start-count N | Number of recent pages to render up front with `--fast-start` (default: 20) |
 | --skip-cache-busting | Disable cache busting query parameters on CSS/JS resources |
 | --skip-og-image | Skip auto OG image generation |
 | --skip-image-processing | Skip image resizing and LQIP generation |

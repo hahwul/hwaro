@@ -223,7 +223,7 @@ fb_app_id = "your_fb_app_id"
 | Key | Description |
 |-----|-------------|
 | default_image | Fallback image when page has none |
-| type | OpenGraph type (website, article) |
+| type | OpenGraph type for content pages (default: `"article"`; listing pages always emit `"website"`) |
 | fb_app_id | Facebook App ID (optional) |
 
 ### Page-Level Override

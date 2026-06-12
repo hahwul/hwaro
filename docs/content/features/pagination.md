@@ -137,50 +137,27 @@ Use the pre-rendered `pagination` variable:
 
 ### Custom Pagination
 
-Build your own pagination UI:
+Build your own pagination UI with the `paginator` object:
 
 ```jinja
 {% if paginator.number_pagers > 1 %}
 <nav class="pagination">
-  {% if paginator.previous %}
-  <a href="{{ paginator.previous }}" class="prev">← Previous</a>
-  {% endif %}
-  
-  <span class="current">
-    Page {{ paginator.current_index }} of {{ paginator.number_pagers }}
-  </span>
-  
-  {% if paginator.next %}
-  <a href="{{ paginator.next }}" class="next">Next →</a>
-  {% endif %}
-</nav>
-{% endif %}
-```
-
-### Full Pagination with Page Numbers
-
-```jinja
-{% if paginator.number_pagers > 1 %}
-<nav class="pagination">
-  {# First page #}
   {% if paginator.current_index > 1 %}
   <a href="{{ paginator.first }}">« First</a>
   {% endif %}
-  
-  {# Previous #}
+
   {% if paginator.previous %}
-  <a href="{{ paginator.previous }}">‹ Prev</a>
+  <a href="{{ paginator.previous }}" class="prev">‹ Prev</a>
   {% endif %}
-  
-  {# Current #}
-  <span class="current">{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
-  
-  {# Next #}
+
+  <span class="current">
+    Page {{ paginator.current_index }} of {{ paginator.number_pagers }}
+  </span>
+
   {% if paginator.next %}
-  <a href="{{ paginator.next }}">Next ›</a>
+  <a href="{{ paginator.next }}" class="next">Next ›</a>
   {% endif %}
-  
-  {# Last page #}
+
   {% if paginator.current_index < paginator.number_pagers %}
   <a href="{{ paginator.last }}">Last »</a>
   {% endif %}
@@ -217,13 +194,15 @@ Output:
 
 ## Taxonomy Pagination
 
-Taxonomies also support pagination in `config.toml`:
+Taxonomy term pages support pagination via `paginate_by` in `config.toml`:
 
 ```toml
 [[taxonomies]]
 name = "tags"
-paginate = 20
+paginate_by = 20
 ```
+
+Each term listing (e.g. `/tags/crystal/`) is split into pages of 20 items, with later pages at `/tags/crystal/page/2/`. The same `pagination` and `paginator` template variables are available in the taxonomy template.
 
 ## CSS Example
 

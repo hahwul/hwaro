@@ -111,7 +111,7 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 [[taxonomies]]
 name = "tags"
 feed = true
-paginate = 10
+paginate_by = 10
 
 [[taxonomies]]
 name = "categories"
@@ -123,7 +123,7 @@ feed = true
 | name | string | — | Taxonomy name (used in front matter) |
 | feed | bool | false | Generate RSS feed for each term |
 | sitemap | bool | true | Include taxonomy pages in sitemap |
-| paginate | int | — | Pages per pagination page |
+| paginate_by | int | — | Items per page on term pages |
 
 ## Static Files
 
@@ -141,6 +141,26 @@ exclude = ["*.bak", "drafts/**"]         # extra patterns to skip
 | exclude | array | [] | Extra patterns to skip. A glob like `*.bak` matches at any depth, `drafts/**` scopes a subtree, and a literal name is anchored to an exact file or directory (`drafts` drops `drafts/…`) |
 
 The built-in denylist only removes cruft — legitimate dot-paths such as `.well-known/` and `.domains` are **never** filtered and are always published, identically for cold and `--cache`/incremental builds. Set `use_default_excludes = false` to disable the built-in filtering entirely.
+
+## Development Server
+
+Options for `hwaro serve` only — they never affect `hwaro build` output.
+
+```toml
+[serve]
+fast = true                          # always serve in fast dev mode
+
+[serve.headers]
+X-Frame-Options = "SAMEORIGIN"
+Cache-Control = "no-store"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| fast | bool | false | Serve as if `--fast` was passed (skips OG image generation and image processing); explicit CLI skip flags still apply |
+| headers | table | {} | Custom HTTP response headers added to every dev-server response; CLI `--header` values win on duplicate keys |
+
+See the [serve command](/start/cli/#serve) for the matching CLI flags.
 
 ## Feature Configuration Reference
 
@@ -162,6 +182,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
+| `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
 | `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |

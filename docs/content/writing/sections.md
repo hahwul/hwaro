@@ -42,10 +42,10 @@ Welcome to my blog.
 | sort_by | string | "date" | Sort by: date, weight, title (see [Sort direction](#sort-direction)) |
 | reverse | bool | false | Flip the natural sort order (see [Sort direction](#sort-direction)) |
 | paginate | int | — | Pages per page |
-| paginate_path | string | "page" | Pagination URL pattern |
+| paginate_path | string | "page" | Path segment for pager URLs (default produces `/blog/page/2/`) |
 | transparent | bool | false | Pass pages to parent |
 | generate_feeds | bool | false | Generate RSS feed |
-| redirect_to | string | — | Redirect URL |
+| redirect_to | string | — | Write an HTML redirect page to this URL instead of rendering the section |
 | draft | bool | false | Exclude from production |
 | weight | int | 0 | Section sort order |
 | cascade | table | — | Defaults inherited by descendants (see [Cascade](#cascade)) |
@@ -117,6 +117,8 @@ paginate_path = "p"
 ```
 
 Generates: `/blog/`, `/blog/p/2/`, `/blog/p/3/`
+
+With the default `paginate_path = "page"`, the URLs are `/blog/page/2/`, `/blog/page/3/`, … — page 1 always stays at the section URL.
 
 ### Documentation
 
@@ -206,7 +208,7 @@ When rendering a section page (`_index.md`), these variables are available:
 | section.redirect_to | String | Redirect target if configured |
 | section_list | String | Same as `section.list` |
 | pagination | String | Pre-rendered pagination HTML |
-| paginator | Object | Structured pagination object |
+| paginator | Object | Structured pagination object — see [Data Model › Paginator](/templates/data-model/#paginator) |
 
 Use `page.url` for the current section URL.
 
@@ -218,17 +220,7 @@ Use `page.url` for the current section URL.
 </ul>
 ```
 
-### `paginator` (custom pagination UI)
-
-```jinja
-{% if paginator is defined and paginator.number_pagers > 1 %}
-<nav>
-  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
-  <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
-  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
-</nav>
-{% endif %}
-```
+For building a custom pagination UI with `paginator`, see [Data Model › Paginator](/templates/data-model/#paginator).
 
 ## Transparent Sections
 

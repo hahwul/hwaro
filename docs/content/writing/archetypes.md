@@ -34,8 +34,9 @@ An archetype is a Markdown file with front matter and optional content. Use plac
 | Placeholder | Description |
 |-------------|-------------|
 | `{{ title }}` | Content title (from `-t` flag or filename) |
-| `{{ date }}` | Current date and time |
-| `{{ draft }}` | Draft status (`true` for drafts/ directory) |
+| `{{ date }}` | Current local date as `YYYY-MM-DD`, or the `--date` value verbatim |
+| `{{ tags }}` | Tags from `--tags` as a TOML array (`[]` if none) |
+| `{{ draft }}` | `true` if `--draft` is passed, or the target path contains a `drafts` directory; `false` otherwise |
 
 ### Example Archetype
 
@@ -219,7 +220,7 @@ draft = {{ draft }}
 - **Consistent metadata**: Define all commonly used front matter fields in archetypes
 - **Section-specific**: Create archetypes for each content section with relevant defaults
 - **Nested organization**: Use subdirectories in `archetypes/` to match your content structure
-- **Draft handling**: The `{{ draft }}` placeholder is `true` when creating in `drafts/` directory
+- **Draft handling**: `{{ draft }}` is `true` when `--draft` is passed or the target path contains a `drafts` directory — including `hwaro new -t "Title"` without a path, which defaults to `content/drafts/`
 
 ## See Also
 

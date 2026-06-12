@@ -23,8 +23,9 @@ The `hwaro tool` command provides utility subcommands for working with content f
 | [platform](/start/tools/platform/) | Generate hosting platform config files |
 | [import](/start/tools/import/) | Import content from various platforms |
 | [export](/start/tools/export/) | Export content to other platforms |
-| [ci](/start/tools/ci/) | Generate CI/CD workflow files |
 | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
+
+> **Deprecated:** [ci](/start/tools/ci/) is hidden from help and superseded by [platform](/start/tools/platform/) (e.g. `hwaro tool platform github-pages`).
 
 ---
 
