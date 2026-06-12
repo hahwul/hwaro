@@ -916,4 +916,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("<a href")
     end
   end
+
+  describe "code spans already rendered to <code> HTML (cells, definitions)" do
+    it "keeps `$x$` in a table cell as literal code, not math" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| `$x$` |", markdown_config: make_config(math: true))
+      html.should contain("<code>$x$</code>")
+      html.should_not contain("math-inline")
+    end
+
+    it "keeps `~~x~~` in a table cell as literal code" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| `~~x~~` |", markdown_config: make_config)
+      html.should contain("<code>~~x~~</code>")
+      html.should_not contain("<del>")
+    end
+
+    it "keeps `[^1]` in a table cell literal while the real ref still links" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| `[^1]` and real[^1] |\n\n[^1]: note", markdown_config: make_config(footnotes: true))
+      html.should contain("<code>[^1]</code>")
+      html.should contain("real<sup class=\"footnote-ref\">")
+    end
+
+    it "keeps `~~x~~` in a definition literal while striking outside it" do
+      html, _ = Hwaro::Processor::Markdown.render("Term\n: has `~~x~~` and ~~real~~", markdown_config: make_config(definition_lists: true))
+      html.should contain("<code>~~x~~</code>")
+      html.should contain("<del>real</del>")
+    end
+
+    it "does not mathify author-written inline <code> content" do
+      html, _ = Hwaro::Processor::Markdown.render("Author <code>$x$</code> in paragraph.", markdown_config: make_config(math: true))
+      html.should contain("<code>$x$</code>")
+      html.should_not contain("math-inline")
+    end
+  end
 end
