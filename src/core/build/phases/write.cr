@@ -121,6 +121,18 @@ module Hwaro::Core::Build::Phases::Write
 
         next unless File.exists?(source_path)
 
+        # A symlinked bundle asset whose target escapes the project would
+        # publish a file from outside the site; skip it (mirrors the static
+        # copy guard). In-repo symlinks resolve within the project and pass.
+        if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.resolves_within?(source_path, Dir.current)
+          Logger.warn "Skipping bundle asset symlink pointing outside the project: #{source_path}"
+          next
+        end
+
+        # Defense in depth: never write outside the output directory even if
+        # an asset's relative path somehow climbs out of the bundle.
+        next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
         FileUtils.cp(source_path, dest_path)
         Logger.action :copy, dest_path, :blue if verbose

@@ -28,35 +28,43 @@ module Hwaro
           # Only allow connections from the same host the dev server is bound to.
           origin = context.request.headers["Origin"]?
           host = context.request.headers["Host"]?
-          if origin && host
-            # Fail closed on unparseable Origins: URI.parse raises on inputs
-            # like an oversized port ("http://h:99999999999" -> OverflowError),
-            # and an attacker-controlled header must never crash the handler
-            # or slip past the check.
-            origin_uri = begin
-              URI.parse(origin)
-            rescue
-              context.response.status_code = 403
-              context.response.print "Forbidden: invalid origin"
-              return
-            end
-            origin_host = origin_uri.host
-            # Strip brackets from IPv6 literals (e.g. "[::1]" -> "::1")
-            if origin_host && origin_host.starts_with?('[') && origin_host.ends_with?(']')
-              origin_host = origin_host[1..-2]
-            end
-            # Host may be a bracketed IPv6 literal ("[::1]:1313") whose colons
-            # would confuse a plain split-on-":" port strip.
-            server_host = if host.starts_with?('[') && (close = host.index(']'))
-                            host[1...close]
-                          else
-                            host.split(":").first?
-                          end
-            unless origin_host == server_host || origin_host == "localhost" || origin_host == "127.0.0.1" || origin_host == "::1"
-              context.response.status_code = 403
-              context.response.print "Forbidden: invalid origin"
-              return
-            end
+          # Fail closed when either header is missing. Browsers always send an
+          # Origin on a WebSocket handshake, so a same-origin live-reload client
+          # never trips this; an absent Origin means a non-browser or crafted
+          # request, which we reject rather than letting it skip the check
+          # entirely (the previous `if origin && host` silently accepted those).
+          unless origin && host
+            context.response.status_code = 403
+            context.response.print "Forbidden: missing origin or host"
+            return
+          end
+          # Fail closed on unparseable Origins: URI.parse raises on inputs
+          # like an oversized port ("http://h:99999999999" -> OverflowError),
+          # and an attacker-controlled header must never crash the handler
+          # or slip past the check.
+          origin_uri = begin
+            URI.parse(origin)
+          rescue
+            context.response.status_code = 403
+            context.response.print "Forbidden: invalid origin"
+            return
+          end
+          origin_host = origin_uri.host
+          # Strip brackets from IPv6 literals (e.g. "[::1]" -> "::1")
+          if origin_host && origin_host.starts_with?('[') && origin_host.ends_with?(']')
+            origin_host = origin_host[1..-2]
+          end
+          # Host may be a bracketed IPv6 literal ("[::1]:1313") whose colons
+          # would confuse a plain split-on-":" port strip.
+          server_host = if host.starts_with?('[') && (close = host.index(']'))
+                          host[1...close]
+                        else
+                          host.split(":").first?
+                        end
+          unless origin_host == server_host || origin_host == "localhost" || origin_host == "127.0.0.1" || origin_host == "::1"
+            context.response.status_code = 403
+            context.response.print "Forbidden: invalid origin"
+            return
           end
 
           ws = HTTP::WebSocketHandler.new do |socket, _ctx|

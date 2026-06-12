@@ -35,6 +35,27 @@ module Hwaro
 
         parts.join("/")
       end
+
+      # True when `path`, with all symbolic links resolved, lies inside
+      # `root` (also fully resolved). Used to stop symlinked source files
+      # from publishing content that lives outside the project — e.g. a
+      # `static/leak -> ~/.ssh/id_rsa` symlink would otherwise be copied
+      # into the public output. In-repo symlinks resolve back within the
+      # root and are kept. Returns false on a dangling/unreadable path
+      # rather than raising.
+      def resolves_within?(path : String, root : String) : Bool
+        real_path = begin
+          File.realpath(path)
+        rescue File::Error
+          return false
+        end
+        real_root = begin
+          File.realpath(root)
+        rescue File::Error
+          return false
+        end
+        real_path == real_root || real_path.starts_with?(real_root + File::SEPARATOR)
+      end
     end
   end
 end

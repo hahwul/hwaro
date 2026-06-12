@@ -125,6 +125,31 @@ describe Hwaro::Core::Build::Phases::Write do
       end
     end
 
+    it "skips a bundle asset symlink whose target escapes the project" do
+      Dir.mktmpdir do |outside|
+        secret = File.join(outside, "secret.txt")
+        File.write(secret, "leak")
+
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/blog/post")
+            File.write("content/blog/post/index.md", "---\ntitle: Post\n---\n")
+            File.symlink(secret, "content/blog/post/leak.txt")
+            FileUtils.mkdir_p("public")
+
+            page = Hwaro::Models::Page.new("blog/post/index.md")
+            page.url = "/blog/post/"
+            page.assets = ["blog/post/leak.txt"]
+
+            builder = Hwaro::Core::Build::Builder.new
+            builder.test_process_assets([page], "public", false)
+
+            File.exists?("public/blog/post/leak.txt").should be_false
+          end
+        end
+      end
+    end
+
     it "skips pages with no assets" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

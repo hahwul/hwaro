@@ -86,6 +86,34 @@ describe Hwaro::Core::Build::Phases::Initialize do
         end
       end
     end
+
+    it "refuses to wipe the project directory itself (output_dir resolves to cwd)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("source.md", "important")
+
+          builder = Hwaro::Core::Build::Builder.new
+          ex = expect_raises(Hwaro::HwaroError) do
+            builder.test_setup_output_dir(".", incremental: false)
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          # The guard fires before rm_rf, so project files survive.
+          File.exists?("source.md").should be_true
+        end
+      end
+    end
+
+    it "refuses to wipe a parent of the project directory" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "sub"))
+        Dir.cd(File.join(dir, "sub")) do
+          builder = Hwaro::Core::Build::Builder.new
+          expect_raises(Hwaro::HwaroError) do
+            builder.test_setup_output_dir("..", incremental: false)
+          end
+        end
+      end
+    end
   end
 
   describe "#copy_static_files" do
@@ -199,6 +227,32 @@ describe Hwaro::Core::Build::Phases::Initialize do
             File.exists?("public/css/.DS_Store").should be_false
             File.exists?("public/.git/config").should be_false
             File.exists?("public/.main.css.swp").should be_false
+          end
+        end
+      end
+    end
+
+    it "copies an in-project symlink but skips one escaping the project" do
+      # A symlink whose target lives outside the project must not leak that
+      # file into the published output; an in-repo symlink is still copied.
+      Dir.mktmpdir do |outside|
+        secret = File.join(outside, "secret.txt")
+        File.write(secret, "leak")
+
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("static")
+            File.write("static/real.txt", "in-repo")
+            File.symlink(File.expand_path("static/real.txt"), "static/inside.txt")
+            File.symlink(secret, "static/outside.txt")
+            FileUtils.mkdir_p("public")
+
+            builder = Hwaro::Core::Build::Builder.new
+            builder.test_copy_static_files("public")
+
+            File.exists?("public/inside.txt").should be_true
+            File.read("public/inside.txt").should eq("in-repo")
+            File.exists?("public/outside.txt").should be_false
           end
         end
       end

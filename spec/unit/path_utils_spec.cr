@@ -101,4 +101,41 @@ describe Hwaro::Utils::PathUtils do
       Hwaro::Utils::PathUtils.sanitize_path("/a/b/c/../../d").should eq("a/b/c/d")
     end
   end
+
+  describe ".resolves_within?" do
+    it "accepts a plain file inside the root" do
+      Dir.mktmpdir do |root|
+        File.write(File.join(root, "asset.txt"), "x")
+        Hwaro::Utils::PathUtils.resolves_within?(File.join(root, "asset.txt"), root).should be_true
+      end
+    end
+
+    it "accepts a symlink pointing inside the root" do
+      Dir.mktmpdir do |root|
+        target = File.join(root, "real.txt")
+        File.write(target, "x")
+        link = File.join(root, "link.txt")
+        File.symlink(target, link)
+        Hwaro::Utils::PathUtils.resolves_within?(link, root).should be_true
+      end
+    end
+
+    it "rejects a symlink whose target escapes the root" do
+      Dir.mktmpdir do |outside|
+        secret = File.join(outside, "secret.txt")
+        File.write(secret, "leak")
+        Dir.mktmpdir do |root|
+          link = File.join(root, "leak.txt")
+          File.symlink(secret, link)
+          Hwaro::Utils::PathUtils.resolves_within?(link, root).should be_false
+        end
+      end
+    end
+
+    it "returns false for a dangling/unreadable path" do
+      Dir.mktmpdir do |root|
+        Hwaro::Utils::PathUtils.resolves_within?(File.join(root, "nope.txt"), root).should be_false
+      end
+    end
+  end
 end
