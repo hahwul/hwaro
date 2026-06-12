@@ -90,10 +90,38 @@ module Hwaro::Core::Build::Phases::Initialize
       # In incremental mode (--cache), keep existing output to avoid
       # re-generating unchanged pages and re-copying unchanged static files.
       unless incremental
+        guard_destructive_clean!(output_dir)
         FileUtils.rm_rf(output_dir)
       end
     end
     Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+  end
+
+  # Refuse to recursively delete a directory that isn't safely *inside* a
+  # sane workspace. A cold `hwaro build` clears `output_dir` before writing;
+  # a mistyped or hostile config value (""/"."/"/"/an absolute path/an
+  # ancestor of the project) would turn that `rm_rf` into a wipe of the
+  # filesystem root, the home directory, or the project source itself.
+  private def guard_destructive_clean!(output_dir : String)
+    expanded = File.expand_path(output_dir)
+    cwd = File.expand_path(Dir.current)
+
+    reason =
+      if expanded == "/" || Path[expanded].parent.to_s == expanded
+        "the filesystem root"
+      elsif expanded == Path.home.to_s
+        "the home directory"
+      elsif cwd == expanded || cwd.starts_with?(expanded + File::SEPARATOR)
+        "the project directory (or a parent of it)"
+      end
+
+    if reason
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_CONFIG,
+        message: "Refusing to delete #{reason}: output_dir resolves to #{expanded.inspect}.",
+        hint: "Point output_dir at a dedicated subdirectory such as \"public\"."
+      )
+    end
   end
 
   private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
@@ -143,6 +171,15 @@ module Hwaro::Core::Build::Phases::Initialize
       # log a spurious failure.
       info = File.info?(src_path, follow_symlinks: true)
       next if info.nil? || info.directory?
+
+      # A symlinked file whose target escapes the project would publish
+      # content from outside the site (e.g. `static/leak -> ~/.ssh/id_rsa`).
+      # Skip those; in-repo symlinks resolve back within the project root
+      # and are still copied. Only symlinks pay the realpath cost.
+      if File.symlink?(src_path) && !Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
+        Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+        next
+      end
 
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)

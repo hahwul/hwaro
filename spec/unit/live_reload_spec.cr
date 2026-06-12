@@ -114,5 +114,17 @@ describe Hwaro::Services::LiveReloadHandler do
     it "rejects a cross-site Origin with 403" do
       livereload_status_for_origin("http://evil.example.com").should eq(403)
     end
+
+    it "rejects a request with no Origin header with 403 (fail closed)" do
+      # A browser always sends Origin on a WebSocket handshake; an absent
+      # Origin means a non-browser or crafted request. The handler must
+      # reject it rather than skip validation entirely.
+      headers = HTTP::Headers{"Host" => "localhost:1313"}
+      request = HTTP::Request.new("GET", Hwaro::Services::LiveReloadHandler::LIVE_RELOAD_PATH, headers)
+      response = HTTP::Server::Response.new(IO::Memory.new)
+      context = HTTP::Server::Context.new(request, response)
+      Hwaro::Services::LiveReloadHandler.new.call(context)
+      context.response.status_code.should eq(403)
+    end
   end
 end
