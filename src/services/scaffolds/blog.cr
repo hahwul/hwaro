@@ -493,7 +493,10 @@ module Hwaro
             }
             .home-intro p:last-child { margin-bottom: 0; }
 
-            .home-section-title {
+            /* `.blog-main h2` (0,1,1) outranks a bare `.home-section-title`
+               (0,1,0), so the eyebrow needs the element to keep its small
+               uppercase sans look instead of inheriting the serif h2. */
+            .blog-main h2.home-section-title {
               font-family: var(--font-sans);
               font-size: 0.78rem;
               font-weight: 600;
