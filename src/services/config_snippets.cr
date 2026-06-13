@@ -274,9 +274,9 @@ module Hwaro
 
             [highlight]
             enabled = true
-            mode = "server"           # "server" = highlight at build time (no JS); "client" = Highlight.js
-            theme = "github"          # Fallback theme for "client" mode; the default ships an inlined theme
-            use_cdn = false           # "client" mode only: true loads Highlight.js from a CDN
+            mode = "server"           # "server" = highlight at build time (no JS, no external requests)
+            theme = "github"          # Only used if you switch to mode = "client"; the default theme is inlined
+            use_cdn = true            # Only used if you switch to mode = "client" (loads Highlight.js from a CDN)
 
             TOML
         end

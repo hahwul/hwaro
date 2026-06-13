@@ -378,7 +378,7 @@ module Hwaro
             str << "enabled = true\n"
             str << "mode = \"server\"\n"
             str << "theme = \"#{config_highlight_theme}\"\n"
-            str << "use_cdn = false\n"
+            str << "use_cdn = true\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"
               str << "name = \"tags\"\n"

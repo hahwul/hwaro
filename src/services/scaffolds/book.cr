@@ -1717,7 +1717,7 @@ module Hwaro
             enabled = true
             mode = "server"   # highlight at build time — no JS, no external requests
             theme = "github"
-            use_cdn = false
+            use_cdn = true    # only used if you switch to mode = "client"
             ```
 
             ## SEO
