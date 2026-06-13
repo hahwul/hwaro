@@ -67,35 +67,47 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code block syntax highlighting using Highlight.js
+            # Code blocks are highlighted in the browser by Highlight.js and themed by
+            # an inlined, ember-warm dark theme in css/style.css (so you recolor syntax
+            # by editing that CSS, not the `theme` below). `mode = "server"` can
+            # highlight at build time with no JS, but its Tartrazine backend isn't
+            # multi-thread-safe, so the scaffold default stays "client".
 
             [highlight]
             enabled = true
-            theme = "github-dark"    # Dark theme for syntax highlighting
-            use_cdn = true            # Set to false to use local assets
+            mode = "client"              # "client" = Highlight.js in the browser; "server" = build-time (no JS)
+            theme = "github-dark"        # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
+            use_cdn = true               # true loads Highlight.js from a CDN; false expects a self-hosted build
 
             TOML
         end
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
               color-scheme: dark;
-              --primary: #2997ff;
-              --primary-hover: #4dacff;
-              --text: #f5f5f7;
-              --text-secondary: #a1a1a6;
-              --text-muted: #98989d;
-              --border: #424245;
-              --border-light: #303033;
-              --bg: #1d1d1f;
-              --bg-secondary: #2c2c2e;
-              --bg-code: #2c2c2e;
+              --primary: #ec7a66;
+              --primary-hover: #f39683;
+              --heading: #f5f2ed;
+              --text: #dedad3;
+              --text-secondary: #a7a199;
+              --text-muted: #7d776e;
+              --border: #2b2926;
+              --border-light: #201e1c;
+              --bg: #0f0f0e;
+              --bg-sidebar: #151412;
+              --bg-secondary: #1a1917;
+              --bg-code: #1e1c19;
               --header-h: 52px;
               --sidebar-w: 260px;
               --content-max-w: 780px;
               --radius: 10px;
               --radius-sm: 6px;
+              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
+              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
             }
 
             *,
@@ -107,7 +119,7 @@ module Hwaro
             }
 
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+              font-family: var(--font-sans);
               font-size: 15px;
               line-height: 1.6;
               color: var(--text);
@@ -116,6 +128,8 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
+            ::selection { background: color-mix(in srgb, var(--primary) 30%, transparent); }
+
             /* Header */
             .docs-header {
               position: fixed;
@@ -123,7 +137,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(29, 29, 31, 0.8);
+              background: rgba(15, 15, 14, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -134,9 +148,10 @@ module Hwaro
             }
 
             .docs-header .logo {
-              font-weight: 600;
-              font-size: 1.05rem;
-              color: var(--text);
+              font-family: var(--font-serif);
+              font-weight: 700;
+              font-size: 1.15rem;
+              color: var(--heading);
               text-decoration: none;
               margin-right: 2rem;
               letter-spacing: -0.01em;
@@ -193,13 +208,15 @@ module Hwaro
             }
 
             /* Sidebar */
+            /* Sidebar: one luminance step above the canvas so the two
+               surfaces read as distinct without heavy borders. */
             .docs-sidebar {
               position: fixed;
               top: var(--header-h);
               left: 0;
               width: var(--sidebar-w);
               height: calc(100vh - var(--header-h));
-              background: var(--bg);
+              background: var(--bg-sidebar);
               border-right: 1px solid var(--border-light);
               padding: 1.25rem 0.75rem;
               overflow-y: auto;
@@ -249,14 +266,14 @@ module Hwaro
             }
 
             .sidebar-links a:hover {
-              background: var(--bg-secondary);
+              background: color-mix(in srgb, var(--primary) 8%, transparent);
               color: var(--text);
             }
 
             .sidebar-links a.active {
-              background: var(--primary);
-              color: white;
-              font-weight: 500;
+              background: color-mix(in srgb, var(--primary) 14%, transparent);
+              color: var(--primary-hover);
+              font-weight: 600;
             }
 
             /* Main content */
@@ -268,33 +285,56 @@ module Hwaro
             }
 
             .docs-main h1 {
-              font-size: 2rem;
+              font-family: var(--font-serif);
+              font-size: 2.1rem;
               font-weight: 700;
               margin: 0 0 0.5rem 0;
-              letter-spacing: -0.025em;
+              letter-spacing: -0.018em;
               line-height: 1.2;
+              color: var(--heading);
+              text-wrap: balance;
+            }
+
+            /* Page title gets a short ember rule — the one mark every
+               hwaro scaffold shares. */
+            .docs-main > h1:first-child {
+              position: relative;
+              padding-bottom: 0.9rem;
+            }
+
+            .docs-main > h1:first-child::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #f39683, #cc5d4b);
             }
 
             .docs-main h2 {
-              font-size: 1.4rem;
-              font-weight: 600;
+              font-family: var(--font-serif);
+              font-size: 1.45rem;
+              font-weight: 700;
               margin: 2.5rem 0 0.75rem 0;
-              letter-spacing: -0.015em;
-              color: var(--text);
+              letter-spacing: -0.008em;
+              color: var(--heading);
+              text-wrap: balance;
             }
 
             .docs-main h3 {
               font-size: 1.1rem;
               font-weight: 600;
               margin: 2rem 0 0.5rem 0;
-              color: var(--text);
+              color: var(--heading);
             }
 
             .docs-main h4 {
               font-size: 0.95rem;
               font-weight: 600;
               margin: 1.5rem 0 0.5rem 0;
-              color: var(--text);
+              color: var(--heading);
             }
 
             .docs-main p {
@@ -313,14 +353,24 @@ module Hwaro
               line-height: 1.6;
             }
 
-            /* Links */
+            /* Links: ember, with an underline that warms up on hover.
+               Navigation surfaces opt out below. */
             a {
               color: var(--primary);
-              text-decoration: none;
+              text-decoration: underline;
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
+              text-underline-offset: 3px;
+              transition: color 0.15s ease, text-decoration-color 0.15s ease;
             }
 
             a:hover {
-              text-decoration: underline;
+              color: var(--primary-hover);
+              text-decoration-color: currentColor;
+            }
+
+            .docs-header a, .skip-link, .sidebar-links a, .docs-toc a,
+            ul.section-list a, nav.pagination a, .search-result-item {
+              text-decoration: none;
             }
 
             /* Code */
@@ -329,7 +379,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border-radius: 4px;
               font-size: 0.85em;
-              font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+              font-family: var(--font-mono);
               color: var(--text);
             }
 
@@ -337,16 +387,24 @@ module Hwaro
               padding: 1rem 1.25rem;
               border-radius: var(--radius);
               overflow-x: auto;
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
+              background: var(--bg-code);
+              box-shadow: inset 0 1px 0 rgba(236, 229, 220, 0.05);
             }
 
-            pre code {
-              background: none;
+            /* Force the highlight theme's own (cold navy github-dark)
+               background off so syntax tokens sit on the warm ember card
+               instead of a clashing box. `pre code.hljs` (0,1,2) outranks
+               the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.82rem;
+              color: var(--text);
             }
+            #{highlight_theme_css(true)}
 
             /* Tables */
             table {
@@ -375,11 +433,11 @@ module Hwaro
 
             /* Blockquote */
             blockquote {
-              border-left: 3px solid var(--primary);
-              padding: 0.5rem 1rem;
-              margin: 1rem 0;
-              background: var(--bg-secondary);
-              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+              font-family: var(--font-serif);
+              font-style: italic;
+              border-left: 1px solid var(--primary);
+              padding: 0.1rem 0 0.1rem 1.25rem;
+              margin: 1.4rem 0;
               color: var(--text-secondary);
             }
 
@@ -387,28 +445,29 @@ module Hwaro
               margin-bottom: 0;
             }
 
-            /* Info boxes */
+            /* Info boxes: tinted surfaces with a hairline border in the
+               same hue — no heavy accent bars. */
             .info-box {
-              padding: 0.75rem 1rem;
+              padding: 0.875rem 1.125rem;
               border-radius: var(--radius-sm);
               margin: 1rem 0;
-              border-left: 3px solid;
+              border: 1px solid;
               font-size: 0.9rem;
             }
 
             .info-box.note {
-              background: rgba(41, 151, 255, 0.1);
-              border-color: var(--primary);
+              background: color-mix(in srgb, var(--primary) 9%, transparent);
+              border-color: color-mix(in srgb, var(--primary) 35%, transparent);
             }
 
             .info-box.warning {
-              background: rgba(255, 159, 10, 0.1);
-              border-color: #ff9f0a;
+              background: rgba(214, 164, 91, 0.09);
+              border-color: rgba(214, 164, 91, 0.35);
             }
 
             .info-box.tip {
-              background: rgba(48, 209, 88, 0.1);
-              border-color: #30d158;
+              background: rgba(126, 168, 130, 0.09);
+              border-color: rgba(126, 168, 130, 0.35);
             }
 
             /* Section list */
@@ -566,7 +625,7 @@ module Hwaro
 
             :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
-            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
             .skip-link:focus { top: 0; }
             .search-input-wrap input {
               flex: 1;
@@ -632,8 +691,8 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(41, 151, 255, 0.2);
-              color: var(--primary);
+              background: color-mix(in srgb, var(--primary) 22%, transparent);
+              color: var(--primary-hover);
               border-radius: 2px;
               padding: 0 1px;
             }
@@ -665,6 +724,11 @@ module Hwaro
               line-height: 1.4;
             }
 
+            /* Search trigger press feedback */
+            .search-trigger:active {
+              transform: scale(0.96);
+            }
+
             /* Responsive */
             @media (max-width: 768px) {
               .docs-sidebar {
@@ -674,6 +738,10 @@ module Hwaro
                 margin-left: 0;
                 padding: 1.5rem 1rem;
               }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { transition-duration: 0.01ms !important; }
             }
             CSS
         end

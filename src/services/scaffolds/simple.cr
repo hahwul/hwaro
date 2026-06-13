@@ -31,6 +31,13 @@ module Hwaro
           files
         end
 
+        # Ship the embedded Charter (Charis SIL) faces the inline
+        # stylesheet's `@font-face` blocks reference, alongside the
+        # inherited favicon.
+        def static_files : Hash(String, String)
+          super.merge(font_files)
+        end
+
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
             "header.html"  => header_template,

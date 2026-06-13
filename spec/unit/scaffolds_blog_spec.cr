@@ -9,8 +9,8 @@ describe Hwaro::Services::Scaffolds::Blog do
 
       # Check index.md
       files["index.md"].should contain("tags = [\"home\"]")
-      files["index.md"].should contain("Check out the latest posts in the [Posts](/posts/) section, or browse by:")
-      files["index.md"].should contain("- [Tags](/tags/)")
+      files["index.md"].should contain("Browse posts by [Tags](/tags/), [Categories](/categories/), or [Authors](/authors/).")
+      files["index.md"].should contain("[Tags](/tags/)")
 
       # Check about.md
       files["about.md"].should contain("tags = [\"about\"]")
@@ -29,9 +29,9 @@ describe Hwaro::Services::Scaffolds::Blog do
 
       # Check index.md
       files["index.md"].should_not contain("tags =")
-      files["index.md"].should contain("Check out the latest posts in the [Posts](/posts/) section.")
-      files["index.md"].should_not contain("or browse by:")
-      files["index.md"].should_not contain("- [Tags](/tags/)")
+      files["index.md"].should contain("A blog powered by [Hwaro](https://github.com/hahwul/hwaro) — a fast, lightweight static site generator.")
+      files["index.md"].should_not contain("Browse posts by")
+      files["index.md"].should_not contain("[Tags](/tags/)")
 
       # Check about.md
       files["about.md"].should_not contain("tags =")

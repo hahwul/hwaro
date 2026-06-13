@@ -174,7 +174,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# The syntax theme is inlined in css/style.css, so no highlight theme
+                 stylesheet link is emitted here (sub-path safe). Highlight.js itself
+                 still loads from the footer. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -195,27 +197,33 @@ module Hwaro
           super.merge({
             "css/style.css" => css_content,
             "js/search.js"  => search_js_content,
-          })
+          }).merge(font_files)
         end
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
-              --primary: #0071e3;
-              --primary-hover: #0077ed;
-              --text: #1d1d1f;
-              --text-secondary: #6e6e73;
-              --text-muted: #86868b;
-              --border: #d2d2d7;
-              --border-light: #e8e8ed;
-              --bg: #ffffff;
-              --bg-secondary: #f5f5f7;
-              --bg-code: #f5f5f7;
+              --primary: #b35454;
+              --primary-hover: #8f4040;
+              --text: #2a241f;
+              --text-secondary: #5c5248;
+              --text-muted: #8a7c6e;
+              --border: #e0d6c8;
+              --border-light: #ece4d8;
+              --bg: #fcfaf6;
+              --bg-sidebar: #f4eee5;
+              --bg-secondary: #f1eae0;
+              --bg-code: #f1eae0;
               --header-h: 52px;
               --sidebar-w: 260px;
               --content-max-w: 780px;
               --radius: 10px;
               --radius-sm: 6px;
+              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
+              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
             }
 
             *,
@@ -227,7 +235,7 @@ module Hwaro
             }
 
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+              font-family: var(--font-sans);
               font-size: 15px;
               line-height: 1.6;
               color: var(--text);
@@ -236,6 +244,8 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
+            ::selection { background: rgba(179, 84, 84, 0.18); }
+
             /* Header */
             .docs-header {
               position: fixed;
@@ -243,7 +253,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(255, 255, 255, 0.8);
+              background: rgba(252, 250, 246, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -254,8 +264,9 @@ module Hwaro
             }
 
             .docs-header .logo {
-              font-weight: 600;
-              font-size: 1.05rem;
+              font-family: var(--font-serif);
+              font-weight: 700;
+              font-size: 1.15rem;
               color: var(--text);
               text-decoration: none;
               margin-right: 2rem;
@@ -312,14 +323,15 @@ module Hwaro
               min-height: 100vh;
             }
 
-            /* Sidebar */
+            /* Sidebar: a warm background step below the main canvas so the
+               two surfaces read as distinct without heavy borders. */
             .docs-sidebar {
               position: fixed;
               top: var(--header-h);
               left: 0;
               width: var(--sidebar-w);
               height: calc(100vh - var(--header-h));
-              background: var(--bg);
+              background: var(--bg-sidebar);
               border-right: 1px solid var(--border-light);
               padding: 1.25rem 0.75rem;
               overflow-y: auto;
@@ -369,14 +381,14 @@ module Hwaro
             }
 
             .sidebar-links a:hover {
-              background: var(--bg-secondary);
+              background: rgba(179, 84, 84, 0.07);
               color: var(--text);
             }
 
             .sidebar-links a.active {
-              background: var(--primary);
-              color: white;
-              font-weight: 500;
+              background: rgba(179, 84, 84, 0.12);
+              color: var(--primary-hover);
+              font-weight: 600;
             }
 
             /* Main content */
@@ -388,11 +400,31 @@ module Hwaro
             }
 
             .docs-main h1 {
-              font-size: 2rem;
+              font-family: var(--font-serif);
+              font-size: 2.1rem;
               font-weight: 700;
               margin: 0 0 0.5rem 0;
-              letter-spacing: -0.025em;
+              letter-spacing: -0.018em;
               line-height: 1.2;
+              text-wrap: balance;
+            }
+
+            /* Page title gets a short ember rule — the one mark every
+               hwaro scaffold shares. */
+            .docs-main > h1:first-child {
+              position: relative;
+              padding-bottom: 0.9rem;
+            }
+
+            .docs-main > h1:first-child::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #c46262, #8f4040);
             }
 
             .docs-toc {
@@ -438,11 +470,13 @@ module Hwaro
             }
 
             .docs-main h2 {
-              font-size: 1.4rem;
-              font-weight: 600;
+              font-family: var(--font-serif);
+              font-size: 1.45rem;
+              font-weight: 700;
               margin: 2.5rem 0 0.75rem 0;
-              letter-spacing: -0.015em;
+              letter-spacing: -0.008em;
               color: var(--text);
+              text-wrap: balance;
             }
 
             .docs-main h3 {
@@ -475,14 +509,24 @@ module Hwaro
               line-height: 1.6;
             }
 
-            /* Links */
+            /* Links: ember, with an underline that warms up on hover.
+               Navigation surfaces opt out below. */
             a {
               color: var(--primary);
-              text-decoration: none;
+              text-decoration: underline;
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
+              text-underline-offset: 3px;
+              transition: color 0.15s ease, text-decoration-color 0.15s ease;
             }
 
             a:hover {
-              text-decoration: underline;
+              color: var(--primary-hover);
+              text-decoration-color: currentColor;
+            }
+
+            .docs-header a, .skip-link, .sidebar-links a, .docs-toc a,
+            ul.section-list a, nav.pagination a, .search-result-item {
+              text-decoration: none;
             }
 
             /* Code */
@@ -491,7 +535,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border-radius: 4px;
               font-size: 0.85em;
-              font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+              font-family: var(--font-mono);
               color: var(--text);
             }
 
@@ -499,16 +543,21 @@ module Hwaro
               padding: 1rem 1.25rem;
               border-radius: var(--radius);
               overflow-x: auto;
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
+              background: var(--bg-code);
             }
 
-            pre code {
-              background: none;
+            /* Drop the highlight theme's own white background so syntax tokens
+               sit on the warm code well instead of a white box. `pre code.hljs`
+               (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.82rem;
             }
+            #{highlight_theme_css(false)}
 
             /* Tables */
             table {
@@ -537,11 +586,11 @@ module Hwaro
 
             /* Blockquote */
             blockquote {
-              border-left: 3px solid var(--primary);
-              padding: 0.5rem 1rem;
-              margin: 1rem 0;
-              background: var(--bg-secondary);
-              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+              font-family: var(--font-serif);
+              font-style: italic;
+              border-left: 1px solid var(--primary);
+              padding: 0.1rem 0 0.1rem 1.25rem;
+              margin: 1.4rem 0;
               color: var(--text-secondary);
             }
 
@@ -549,28 +598,29 @@ module Hwaro
               margin-bottom: 0;
             }
 
-            /* Info boxes */
+            /* Info boxes: tinted surfaces with a hairline border in the
+               same hue — no heavy accent bars. */
             .info-box {
-              padding: 0.75rem 1rem;
+              padding: 0.875rem 1.125rem;
               border-radius: var(--radius-sm);
               margin: 1rem 0;
-              border-left: 3px solid;
+              border: 1px solid;
               font-size: 0.9rem;
             }
 
             .info-box.note {
-              background: #eef6ff;
-              border-color: var(--primary);
+              background: rgba(179, 84, 84, 0.06);
+              border-color: rgba(179, 84, 84, 0.3);
             }
 
             .info-box.warning {
-              background: #fff8e6;
-              border-color: #bf5600;
+              background: rgba(176, 125, 46, 0.08);
+              border-color: rgba(176, 125, 46, 0.35);
             }
 
             .info-box.tip {
-              background: #eefbf1;
-              border-color: #1a7f37;
+              background: rgba(94, 140, 97, 0.08);
+              border-color: rgba(94, 140, 97, 0.35);
             }
 
             /* Section list */
@@ -728,7 +778,7 @@ module Hwaro
 
             :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
-            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
             .skip-link:focus { top: 0; }
             .search-input-wrap input {
               flex: 1;
@@ -794,8 +844,8 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(0, 113, 227, 0.15);
-              color: var(--primary);
+              background: rgba(179, 84, 84, 0.15);
+              color: var(--primary-hover);
               border-radius: 2px;
               padding: 0 1px;
             }
@@ -827,6 +877,11 @@ module Hwaro
               line-height: 1.4;
             }
 
+            /* Search trigger press feedback */
+            .search-trigger:active {
+              transform: scale(0.96);
+            }
+
             /* Responsive */
             @media (max-width: 768px) {
               .docs-sidebar {
@@ -836,6 +891,10 @@ module Hwaro
                 margin-left: 0;
                 padding: 1.5rem 1rem;
               }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { transition-duration: 0.01ms !important; }
             }
             CSS
         end

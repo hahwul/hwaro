@@ -63,6 +63,7 @@ module Hwaro
             "footer.html"          => footer_template,
             "partials/nav.html"    => blog_nav_html,
             "partials/search.html" => search_overlay_html,
+            "index.html"           => blog_home_template,
             "page.html"            => blog_page_template,
             "section.html"         => blog_section_template,
             "post.html"            => post_template,
@@ -144,7 +145,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# The syntax theme is inlined in css/style.css, so no highlight theme
+                 stylesheet link is emitted here (sub-path safe). Highlight.js itself
+                 still loads from the footer. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -174,7 +177,7 @@ module Hwaro
           super.merge({
             "css/style.css" => css_content,
             "js/search.js"  => search_js_content,
-          })
+          }).merge(font_files)
         end
 
         # Blog ships a `posts.md` archetype in addition to `default.md` so
@@ -208,34 +211,41 @@ module Hwaro
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
-              --primary: #3b82f6;
-              --primary-hover: #2563eb;
-              --text: #1e293b;
-              --text-secondary: #475569;
-              --text-muted: #94a3b8;
-              --border: #e2e8f0;
-              --border-light: #f1f5f9;
-              --bg: #ffffff;
-              --bg-secondary: #f8fafc;
-              --bg-code: #f1f5f9;
+              --primary: #b35454;
+              --primary-hover: #8f4040;
+              --text: #2a241f;
+              --text-secondary: #5c5248;
+              --text-muted: #8a7c6e;
+              --border: #e4dacd;
+              --border-light: #efe8dd;
+              --bg: #faf7f2;
+              --bg-secondary: #f1eae0;
+              --bg-code: #f1eae0;
               --header-h: 52px;
               --content-max-w: 860px;
               --radius: 10px;
               --radius-sm: 6px;
+              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
+              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
             }
 
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-              font-size: 15px;
+              font-family: var(--font-sans);
+              font-size: 16px;
               line-height: 1.7;
               color: var(--text);
               background: var(--bg);
               -webkit-font-smoothing: antialiased;
               -moz-osx-font-smoothing: grayscale;
             }
+
+            ::selection { background: rgba(179, 84, 84, 0.18); }
 
             /* Header */
             .blog-header {
@@ -244,7 +254,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(255, 255, 255, 0.8);
+              background: rgba(250, 247, 242, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -263,8 +273,9 @@ module Hwaro
             }
 
             .blog-header .logo {
-              font-weight: 600;
-              font-size: 1.05rem;
+              font-family: var(--font-serif);
+              font-weight: 700;
+              font-size: 1.15rem;
               color: var(--text);
               text-decoration: none;
               letter-spacing: -0.01em;
@@ -316,23 +327,48 @@ module Hwaro
             }
 
             .blog-main h1 {
-              font-size: 2rem;
+              font-family: var(--font-serif);
+              font-size: 2.1rem;
               font-weight: 700;
               margin: 0 0 0.5rem 0;
-              letter-spacing: -0.025em;
+              letter-spacing: -0.018em;
               line-height: 1.2;
+              text-wrap: balance;
+            }
+
+            /* Page title gets a short ember rule — the one mark every
+               hwaro scaffold shares. */
+            .blog-main > h1:first-child,
+            .post-header h1 {
+              position: relative;
+              padding-bottom: 0.9rem;
+            }
+
+            .blog-main > h1:first-child::after,
+            .post-header h1::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #c46262, #8f4040);
             }
 
             .blog-main h2 {
-              font-size: 1.4rem;
-              font-weight: 600;
+              font-family: var(--font-serif);
+              font-size: 1.45rem;
+              font-weight: 700;
               margin: 2.5rem 0 0.75rem 0;
-              letter-spacing: -0.015em;
+              letter-spacing: -0.008em;
+              text-wrap: balance;
             }
 
             .blog-main h3 {
-              font-size: 1.1rem;
-              font-weight: 600;
+              font-family: var(--font-serif);
+              font-size: 1.15rem;
+              font-weight: 700;
               margin: 2rem 0 0.5rem 0;
             }
 
@@ -357,9 +393,17 @@ module Hwaro
               line-height: 1.6;
             }
 
-            /* Links */
-            a { color: var(--primary); text-decoration: none; }
-            a:hover { text-decoration: underline; }
+            /* Links: ember, with an underline that warms up on hover. */
+            a {
+              color: var(--primary);
+              text-decoration: underline;
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
+              text-underline-offset: 3px;
+              transition: color 0.15s ease, text-decoration-color 0.15s ease;
+            }
+            a:hover { color: var(--primary-hover); text-decoration-color: currentColor; }
+            .blog-header a, .skip-link, .post-title a, .tag,
+            ul.section-list a, nav.pagination a, .search-result-item { text-decoration: none; }
 
             /* Code */
             code {
@@ -367,7 +411,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border-radius: 4px;
               font-size: 0.85em;
-              font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+              font-family: var(--font-mono);
               color: var(--text);
             }
 
@@ -375,12 +419,17 @@ module Hwaro
               padding: 1rem 1.25rem;
               border-radius: var(--radius);
               overflow-x: auto;
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
+              background: var(--bg-code);
             }
 
-            pre code { background: none; padding: 0; font-size: 0.82rem; }
+            /* Drop the highlight theme's own white background so syntax tokens
+               sit on the warm code well instead of a white box. `pre code.hljs`
+               (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; }
+            #{highlight_theme_css(false)}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }
@@ -389,18 +438,89 @@ module Hwaro
 
             /* Blockquote */
             blockquote {
-              border-left: 3px solid var(--primary);
-              padding: 0.5rem 1rem;
-              margin: 1rem 0;
-              background: var(--bg-secondary);
-              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+              font-family: var(--font-serif);
+              font-style: italic;
+              border-left: 1px solid var(--primary);
+              padding: 0.1rem 0 0.1rem 1.25rem;
+              margin: 1.4rem 0;
               color: var(--text-secondary);
             }
 
             blockquote p { margin-bottom: 0; }
 
             /* Images */
-            img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+            img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
+
+            /* Home */
+            .home-hero {
+              padding-bottom: 1.75rem;
+              margin-bottom: 2.25rem;
+              border-bottom: 1px solid var(--border-light);
+            }
+
+            .home-title {
+              position: relative;
+              font-family: var(--font-serif);
+              font-size: 2.6rem;
+              font-weight: 700;
+              line-height: 1.1;
+              letter-spacing: -0.02em;
+              margin: 0 0 1rem 0;
+              padding-bottom: 0.9rem;
+              text-wrap: balance;
+            }
+
+            /* The shared ember rule — so the homepage carries the same mark
+               every other hwaro scaffold shows under its page title. */
+            .home-title::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #c46262, #8f4040);
+            }
+
+            .home-tagline {
+              font-family: var(--font-serif);
+              font-size: 1.2rem;
+              line-height: 1.5;
+              color: var(--text-secondary);
+              margin: 0;
+              max-width: 38rem;
+            }
+
+            .home-intro {
+              color: var(--text-secondary);
+              margin-bottom: 2.5rem;
+            }
+            .home-intro p:last-child { margin-bottom: 0; }
+
+            /* `.blog-main h2` (0,1,1) outranks a bare `.home-section-title`
+               (0,1,0), so the eyebrow needs the element to keep its small
+               uppercase sans look instead of inheriting the serif h2. */
+            .blog-main h2.home-section-title {
+              font-family: var(--font-sans);
+              font-size: 0.78rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--text-muted);
+              margin: 0 0 0.5rem 0;
+            }
+
+            .home-more {
+              margin-top: 1.25rem;
+              font-size: 0.9rem;
+            }
+            .home-more a {
+              color: var(--primary);
+              font-weight: 500;
+              text-decoration: none;
+            }
+            .home-more a:hover { color: var(--primary-hover); text-decoration: underline; }
 
             /* Post list */
             .post-list { list-style: none; padding: 0; }
@@ -414,9 +534,10 @@ module Hwaro
             .post-item:last-child { border-bottom: none; }
 
             .post-title {
+              font-family: var(--font-serif);
               margin: 0 0 0.3rem 0;
-              font-size: 1.15rem;
-              font-weight: 600;
+              font-size: 1.25rem;
+              font-weight: 700;
               line-height: 1.3;
             }
 
@@ -511,10 +632,12 @@ module Hwaro
 
             .tag:hover {
               background: var(--primary);
-              color: white;
+              color: var(--bg);
               border-color: var(--primary);
               text-decoration: none;
             }
+
+            .tag:active { transform: scale(0.96); }
 
             /* Section list */
             ul.section-list { list-style: none; padding: 0; }
@@ -619,7 +742,7 @@ module Hwaro
 
             :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
-            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
             .skip-link:focus { top: 0; }
             .search-input-wrap input {
               flex: 1;
@@ -660,7 +783,7 @@ module Hwaro
             .search-result-item:hover, .search-result-item.active { background: var(--bg-secondary); text-decoration: none; }
             .search-result-item .search-result-title { font-weight: 500; font-size: 0.9rem; margin-bottom: 0.15rem; }
             .search-result-item .search-result-snippet { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-            .search-result-item .search-result-snippet mark { background: rgba(59, 130, 246, 0.15); color: var(--primary); border-radius: 2px; padding: 0 1px; }
+            .search-result-item .search-result-snippet mark { background: rgba(179, 84, 84, 0.15); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
             .search-hint {
@@ -683,14 +806,19 @@ module Hwaro
               line-height: 1.4;
             }
 
-            /* Selection */
-            ::selection { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+            /* Search trigger press feedback */
+            .search-trigger { transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+            .search-trigger:active { transform: scale(0.96); }
 
             /* Responsive */
             @media (max-width: 640px) {
               .blog-header nav { display: none; }
               .blog-main { padding: 1.5rem 1rem; }
-              .blog-main h1 { font-size: 1.5rem; }
+              .blog-main h1 { font-size: 1.6rem; }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { transition-duration: 0.01ms !important; }
             }
             CSS
         end
@@ -915,6 +1043,41 @@ module Hwaro
         # `footer.html` closes the container the same way for all of
         # them. That symmetry is what keeps 404/taxonomy from emitting
         # dangling `</main></div>` like the previous version did.
+        # Dedicated homepage layout. The engine routes the root index page
+        # to `index.html` when it exists (see `determine_template`), so the
+        # landing page gets a proper hero + recent-posts feed instead of the
+        # bare `page.html` body that left the blog home feeling unfinished.
+        private def blog_home_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="blog-container">
+              <main id="main" class="blog-main">
+                <header class="home-hero">
+                  <h1 class="home-title">{{ site.title | e }}</h1>
+                  {% if site.description %}<p class="home-tagline">{{ site.description | e }}</p>{% endif %}
+                </header>
+                {% if content %}<div class="home-intro">{{ content }}</div>{% endif %}
+                <section class="home-latest" aria-labelledby="home-latest-title">
+                  <h2 id="home-latest-title" class="home-section-title">Latest posts</h2>
+                  <ul class="post-list">
+                    {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                    {% if loop.index <= 5 %}
+                      <li class="post-item">
+                        <div class="post-meta"><time datetime="{{ p.date }}">{{ p.date }}</time></div>
+                        <h3 class="post-title"><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h3>
+                        {% if p.description %}<p class="post-excerpt">{{ p.description | e }}</p>{% endif %}
+                      </li>
+                    {% endif %}
+                    {% endfor %}
+                  </ul>
+                  <p class="home-more"><a href="{{ base_url }}{{ lang_prefix }}/posts/">View all posts &rarr;</a></p>
+                </section>
+            {% include "footer.html" %}
+            HTML
+        end
+
         private def blog_page_template : String
           <<-HTML
             {% include "header.html" %}
@@ -1098,15 +1261,14 @@ module Hwaro
 
         private def index_content(skip_taxonomies : Bool) : String
           body = String.build do |str|
-            str << "This is a blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.\n\n"
-
+            # The homepage hero already shows the site title + description,
+            # so this intro stays short and just points readers toward the
+            # taxonomy archives. The recent-posts feed is rendered by the
+            # `index.html` template, not by this content.
             if skip_taxonomies
-              str << "Check out the latest posts in the [Posts](/posts/) section.\n"
+              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro) — a fast, lightweight static site generator.\n"
             else
-              str << "Check out the latest posts in the [Posts](/posts/) section, or browse by:\n\n"
-              str << "- [Tags](/tags/)\n"
-              str << "- [Categories](/categories/)\n"
-              str << "- [Authors](/authors/)\n"
+              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro). Browse posts by [Tags](/tags/), [Categories](/categories/), or [Authors](/authors/).\n"
             end
           end
 

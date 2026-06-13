@@ -138,7 +138,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# The syntax theme is inlined in css/style.css, so no highlight theme
+                 stylesheet link is emitted here (sub-path safe). Highlight.js itself
+                 still loads from the footer. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -158,7 +160,7 @@ module Hwaro
           super.merge({
             "css/style.css" => css_content,
             "js/book.js"    => book_js_content,
-          })
+          }).merge(font_files)
         end
 
         # `book` ships no `[[taxonomies]]` block (see `config_content`),
@@ -181,26 +183,31 @@ module Hwaro
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
-              --primary: #444444;
-              --primary-hover: #222222;
-              --primary-subtle: rgba(0, 0, 0, 0.035);
-              --text: #1a1a1a;
-              --text-secondary: #555555;
-              --text-muted: #aaaaaa;
-              --border: #e5e5e5;
-              --border-light: #f0f0f0;
-              --bg: #ffffff;
-              --bg-secondary: #f7f7f7;
-              --bg-sidebar: #f9f9f9;
-              --bg-code: #f5f5f5;
+              --primary: #b35454;
+              --primary-hover: #8f4040;
+              --primary-subtle: rgba(179, 84, 84, 0.06);
+              --text: #2a241f;
+              --text-secondary: #5c5248;
+              --text-muted: #8a7c6e;
+              --border: #e4dacd;
+              --border-light: #efe8dd;
+              --bg: #faf7f2;
+              --bg-secondary: #f1eae0;
+              --bg-sidebar: #f4eee5;
+              --bg-code: #f1eae0;
               --header-h: 50px;
               --sidebar-w: 280px;
               --content-max-w: 780px;
               --radius: 6px;
               --radius-sm: 3px;
-              --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-              --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+              --shadow-sm: 0 1px 2px rgba(42, 36, 31, 0.05);
+              --shadow: 0 2px 8px rgba(42, 36, 31, 0.08);
+              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
+              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
             }
 
             *,
@@ -216,7 +223,7 @@ module Hwaro
             }
 
             body {
-              font-family: "Georgia", "Times New Roman", "Noto Serif KR", "Noto Serif", serif;
+              font-family: var(--font-serif);
               font-size: 20px;
               line-height: 1.9;
               color: var(--text);
@@ -224,6 +231,8 @@ module Hwaro
               -webkit-font-smoothing: antialiased;
               -moz-osx-font-smoothing: grayscale;
             }
+
+            ::selection { background: rgba(179, 84, 84, 0.18); }
 
             /* ── Header ── */
             .book-header {
@@ -239,7 +248,7 @@ module Hwaro
               align-items: center;
               padding: 0 0.75rem;
               z-index: 100;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .header-left {
@@ -283,9 +292,9 @@ module Hwaro
             }
 
             .book-header .logo {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              font-weight: 500;
-              font-size: 0.82rem;
+              font-family: var(--font-serif);
+              font-weight: 700;
+              font-size: 0.95rem;
               color: var(--text-secondary);
               text-decoration: none;
               letter-spacing: 0.01em;
@@ -331,7 +340,7 @@ module Hwaro
               scrollbar-color: var(--border) transparent;
               z-index: 50;
               transition: transform 0.25s ease, visibility 0.25s;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .book-sidebar.collapsed {
@@ -397,13 +406,13 @@ module Hwaro
 
             .chapter-links a:hover {
               color: var(--text);
-              background: rgba(0, 0, 0, 0.025);
+              background: rgba(179, 84, 84, 0.05);
             }
 
             .chapter-links a.active {
-              color: var(--text);
-              background: rgba(0, 0, 0, 0.04);
-              border-left-color: var(--text);
+              color: var(--primary-hover);
+              background: rgba(179, 84, 84, 0.09);
+              border-left-color: var(--primary);
               font-weight: 600;
             }
 
@@ -477,16 +486,35 @@ module Hwaro
             .book-content h2,
             .book-content h3,
             .book-content h4 {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-serif);
+              text-wrap: balance;
             }
 
             .book-content h1 {
-              font-size: 2rem;
+              font-size: 2.1rem;
               font-weight: 700;
               margin: 0 0 1rem 0;
-              letter-spacing: -0.02em;
+              letter-spacing: -0.018em;
               line-height: 1.3;
               color: var(--text);
+            }
+
+            /* Page title gets a short ember rule — the one mark every
+               hwaro scaffold shares. */
+            .book-content > h1:first-child {
+              position: relative;
+              padding-bottom: 0.9rem;
+            }
+
+            .book-content > h1:first-child::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #c46262, #8f4040);
             }
 
             .book-content h2 {
@@ -535,17 +563,18 @@ module Hwaro
               color: var(--text);
             }
 
-            /* Links */
+            /* Links: ink with an ember underline that warms up on hover. */
             a {
               color: var(--text);
               text-decoration: underline;
-              text-decoration-color: var(--border);
-              text-underline-offset: 2px;
-              transition: text-decoration-color 0.15s;
+              text-decoration-color: rgba(179, 84, 84, 0.35);
+              text-underline-offset: 3px;
+              transition: color 0.15s ease, text-decoration-color 0.15s ease;
             }
 
             a:hover {
-              text-decoration-color: var(--text);
+              color: var(--primary);
+              text-decoration-color: currentColor;
             }
 
             /* Code */
@@ -567,11 +596,15 @@ module Hwaro
               line-height: 1.6;
             }
 
-            pre code {
-              background: none;
+            /* Drop the highlight theme's own white background so syntax tokens
+               sit on the warm code well instead of a white box. `pre code.hljs`
+               (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.84rem;
             }
+            #{highlight_theme_css(false)}
 
             /* Tables */
             table {
@@ -579,7 +612,7 @@ module Hwaro
               border-collapse: collapse;
               margin: 1.25rem 0 1.5rem 0;
               font-size: 0.9rem;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             th {
@@ -599,7 +632,7 @@ module Hwaro
 
             /* Blockquote */
             blockquote {
-              border-left: 2px solid var(--border);
+              border-left: 1px solid var(--primary);
               padding: 0.5rem 1.25rem;
               margin: 1.25rem 0;
               color: var(--text-secondary);
@@ -610,29 +643,30 @@ module Hwaro
               margin-bottom: 0;
             }
 
-            /* Info boxes */
+            /* Info boxes: tinted surfaces with a hairline border in the
+               same hue — no heavy accent bars. */
             .info-box {
               padding: 0.875rem 1.25rem;
               border-radius: var(--radius);
               margin: 1.25rem 0;
-              border-left: 3px solid;
+              border: 1px solid;
               font-size: 0.9rem;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .info-box.note {
-              background: rgba(0, 0, 0, 0.025);
-              border-color: #999999;
+              background: rgba(179, 84, 84, 0.06);
+              border-color: rgba(179, 84, 84, 0.3);
             }
 
             .info-box.warning {
-              background: rgba(180, 130, 40, 0.05);
-              border-color: #b0873a;
+              background: rgba(176, 125, 46, 0.08);
+              border-color: rgba(176, 125, 46, 0.35);
             }
 
             .info-box.tip {
-              background: rgba(60, 130, 80, 0.04);
-              border-color: #6a9a6e;
+              background: rgba(94, 140, 97, 0.08);
+              border-color: rgba(94, 140, 97, 0.35);
             }
 
             /* Horizontal rule */
@@ -646,7 +680,7 @@ module Hwaro
             ul.section-list {
               list-style: none;
               padding: 0;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             ul.section-list li {
@@ -671,7 +705,7 @@ module Hwaro
             /* Pagination */
             nav.pagination {
               margin: 1.5rem 0;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             nav.pagination .pagination-list {
@@ -765,7 +799,7 @@ module Hwaro
               white-space: nowrap;
               background: var(--text);
               color: var(--bg);
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
               font-size: 0.72rem;
               font-weight: 500;
               padding: 0.3rem 0.6rem;
@@ -803,7 +837,7 @@ module Hwaro
               border-top: 1px solid var(--border-light);
               color: var(--text-muted);
               font-size: 0.75rem;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             /* ── Search Overlay ── */
@@ -834,7 +868,7 @@ module Hwaro
               flex-direction: column;
               overflow: hidden;
               align-self: flex-start;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-family: var(--font-sans);
             }
 
             .search-input-wrap {
@@ -861,7 +895,7 @@ module Hwaro
             }
             :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             .search-input-wrap:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
-            .skip-link { position: absolute; top: -48px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
+            .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; }
             .skip-link:focus { top: 0; }
 
             .search-input-wrap input::placeholder {
@@ -918,8 +952,8 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(0, 0, 0, 0.07);
-              color: var(--text);
+              background: rgba(179, 84, 84, 0.15);
+              color: var(--primary-hover);
               border-radius: 2px;
               padding: 0 1px;
             }
@@ -986,6 +1020,16 @@ module Hwaro
                 transform: translateX(0);
                 visibility: visible;
               }
+            }
+
+            /* Icon button press feedback */
+            .icon-btn:active {
+              transform: scale(0.92);
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { transition-duration: 0.01ms !important; }
+              html { scroll-behavior: auto; }
             }
             CSS
         end
@@ -1671,6 +1715,7 @@ module Hwaro
             ```toml
             [highlight]
             enabled = true
+            mode = "client"   # Highlight.js in the browser; "server" highlights at build time
             theme = "github"
             use_cdn = true
             ```
