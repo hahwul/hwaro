@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Auto-generate Open Graph preview images from page titles">
+  <title>Auto OG Images - Hwaro</title>
+  <meta property="og:title" content="Auto OG Images">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/og-images/">
+  <meta property="og:description" content="Auto-generate Open Graph preview images from page titles">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-og-images.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Auto OG Images">
+  <meta name="twitter:description" content="Auto-generate Open Graph preview images from page titles">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-og-images.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-variables.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-responsive.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=ff248402">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=ff248402">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" style="height: 40px;">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/" class="active">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <h1>Auto OG Images</h1>
+    <p>Hwaro auto-generates 1200x630 Open Graph preview images for every page that has no custom <code>image</code> in front matter. The generated path is set as <code>page.image</code>, so <code>og:image</code> meta tags pick it up automatically — no template changes needed.</p>
+<p><img src="/og-images/features-og-images.png" alt="Auto-generated OG image for the Auto OG Images page" />
+<em>The auto-generated OG image for this page (<code>style = &quot;terminal&quot;</code>).</em></p>
+<h2 id="quick-start">Quick Start</h2>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+style = &quot;terminal&quot;
+accent_color = &quot;#2ee66b&quot;
+logo = &quot;static/logo.png&quot;
+</code></pre>
+<h2 id="configuration">Configuration</h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Enable auto OG image generation</td>
+</tr>
+<tr>
+<td>style</td>
+<td>string</td>
+<td><code>&quot;default&quot;</code></td>
+<td>Composition preset — see <a href="#style-presets">Style Presets</a></td>
+</tr>
+<tr>
+<td>background</td>
+<td>string</td>
+<td><code>&quot;#1a1a2e&quot;</code></td>
+<td>Background color (hex)</td>
+</tr>
+<tr>
+<td>text_color</td>
+<td>string</td>
+<td><code>&quot;#ffffff&quot;</code></td>
+<td>Title and description text color</td>
+</tr>
+<tr>
+<td>accent_color</td>
+<td>string</td>
+<td><code>&quot;#e94560&quot;</code></td>
+<td>Accent color for rules, site name, and color blocks</td>
+</tr>
+<tr>
+<td>secondary_color</td>
+<td>string</td>
+<td>—</td>
+<td>Second color for two-tone styles (<code>split</code>, <code>brutalist</code>, <code>bauhaus</code>, …). Auto-derived from <code>accent_color</code> when omitted</td>
+</tr>
+<tr>
+<td>font_size</td>
+<td>int</td>
+<td><code>48</code></td>
+<td>Title font size in pixels. Bold styles raise this automatically unless you set a larger value</td>
+</tr>
+<tr>
+<td>logo</td>
+<td>string</td>
+<td>—</td>
+<td>Logo file path (e.g., <code>static/logo.png</code>), embedded into the image</td>
+</tr>
+<tr>
+<td>logo_position</td>
+<td>string</td>
+<td><code>&quot;bottom-left&quot;</code></td>
+<td><code>bottom-left</code>, <code>bottom-right</code>, <code>top-left</code>, <code>top-right</code></td>
+</tr>
+<tr>
+<td>show_title</td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Show the site name at the bottom</td>
+</tr>
+<tr>
+<td>output_dir</td>
+<td>string</td>
+<td><code>&quot;og-images&quot;</code></td>
+<td>Directory for generated images</td>
+</tr>
+<tr>
+<td>format</td>
+<td>string</td>
+<td><code>&quot;png&quot;</code></td>
+<td><code>&quot;png&quot;</code> or <code>&quot;svg&quot;</code>. Social platforms don&#39;t render SVG <code>og:image</code>, so PNG is the default</td>
+</tr>
+<tr>
+<td>font_path</td>
+<td>string</td>
+<td>—</td>
+<td>Custom <code>.ttf</code>/<code>.otf</code> for PNG output. Falls back to system fonts, then bundled DejaVu Sans Bold</td>
+</tr>
+<tr>
+<td>background_image</td>
+<td>string</td>
+<td>—</td>
+<td>Background photo composited behind the text</td>
+</tr>
+<tr>
+<td>overlay_opacity</td>
+<td>float</td>
+<td><code>0.45</code></td>
+<td>How much <code>background</code> color covers the photo (0.0 = full photo, 1.0 = hidden)</td>
+</tr>
+<tr>
+<td>text_panel</td>
+<td>float</td>
+<td><code>0.0</code></td>
+<td>0.0–0.6. Soft panel behind the text for legibility on busy backgrounds</td>
+</tr>
+<tr>
+<td>pattern_opacity</td>
+<td>float</td>
+<td><code>0.12</code></td>
+<td>Opacity of the pattern styles (<code>dots</code>, <code>grid</code>, …)</td>
+</tr>
+<tr>
+<td>pattern_scale</td>
+<td>float</td>
+<td><code>1.0</code></td>
+<td>Scale multiplier for the pattern styles (min 0.1)</td>
+</tr>
+<tr>
+<td>accent_bars</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Classic thin top/bottom accent bars on the pattern styles</td>
+</tr>
+<tr>
+<td>lazy_generate</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Skip bulk generation during <code>hwaro serve</code>; images render on first request. Recommended for large sites. No effect on <code>hwaro build</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="style-presets">Style Presets</h2>
+<p>The <code>style</code> option controls the entire composition. Click any preview below to zoom.</p>
+<p><strong>Signature</strong> — complete, self-contained compositions:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>terminal</code></td>
+<td>Code-editor window with traffic lights, <code>$</code> prompt, and block cursor. Made for dev blogs and docs</td>
+</tr>
+<tr>
+<td><code>bauhaus</code></td>
+<td>Flat geometric art-poster shapes in accent/secondary/derived colors</td>
+</tr>
+<tr>
+<td><code>halftone</code></td>
+<td>Print-style halftone dot field fading in from the right edge</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Modern</strong> — typography-driven with generated backdrops:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>editorial</code></td>
+<td>Clean type with a vertical accent rule. A safe, harmonious default</td>
+</tr>
+<tr>
+<td><code>artistic</code></td>
+<td>Mesh-gradient color field with film grain. Rich, high-production feel</td>
+</tr>
+<tr>
+<td><code>hero</code></td>
+<td>Spotlight glow, oversized ghost echo of the first title word, poster typography</td>
+</tr>
+<tr>
+<td><code>surreal</code></td>
+<td>Aurora orbs and flowing ribbon bands with grain</td>
+</tr>
+<tr>
+<td><code>monument</code></td>
+<td>Extreme minimalism — massive type, huge whitespace, a single rule</td>
+</tr>
+<tr>
+<td><code>framed</code></td>
+<td>Thin inset frame for elegant separation</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Geometric</strong> — bold flat color blocking:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>split</code></td>
+<td>Diagonal two-tone color block on the left, title on the right</td>
+</tr>
+<tr>
+<td><code>band</code></td>
+<td>Full-width color band with the title knocked out of it, magazine-cover style</td>
+</tr>
+<tr>
+<td><code>brutalist</code></td>
+<td>Thick framed panel with a hard offset shadow and oversized type</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Patterns</strong> — classic background treatments:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>Solid background, no pattern</td>
+</tr>
+<tr>
+<td><code>minimal</code></td>
+<td>Solid background, no accent bars</td>
+</tr>
+<tr>
+<td><code>dots</code> / <code>grid</code> / <code>diagonal</code></td>
+<td>Repeating dot / line / stripe patterns</td>
+</tr>
+<tr>
+<td><code>gradient</code></td>
+<td>Diagonal accent-color gradient</td>
+</tr>
+<tr>
+<td><code>waves</code></td>
+<td>Horizontal wave curves</td>
+</tr>
+</tbody>
+</table>
+<h3 id="preview">Preview</h3>
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-terminal_128w.png 128w, /images/og-style-examples/style-terminal_256w.png 256w, /images/og-style-examples/style-terminal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-terminal.png" alt="terminal style" loading="lazy" />
+    <span class="og-style-label"><code>terminal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-terminal_128w.png 128w, /images/og-style-examples/style-terminal_256w.png 256w, /images/og-style-examples/style-terminal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-terminal.png" alt="terminal style" />
+        <p><code>terminal</code> — Code-editor window with prompt and cursor</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-bauhaus_128w.png 128w, /images/og-style-examples/style-bauhaus_256w.png 256w, /images/og-style-examples/style-bauhaus_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-bauhaus.png" alt="bauhaus style" loading="lazy" />
+    <span class="og-style-label"><code>bauhaus</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-bauhaus_128w.png 128w, /images/og-style-examples/style-bauhaus_256w.png 256w, /images/og-style-examples/style-bauhaus_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-bauhaus.png" alt="bauhaus style" />
+        <p><code>bauhaus</code> — Flat geometric art-poster shapes</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-halftone_128w.png 128w, /images/og-style-examples/style-halftone_256w.png 256w, /images/og-style-examples/style-halftone_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-halftone.png" alt="halftone style" loading="lazy" />
+    <span class="og-style-label"><code>halftone</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-halftone_128w.png 128w, /images/og-style-examples/style-halftone_256w.png 256w, /images/og-style-examples/style-halftone_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-halftone.png" alt="halftone style" />
+        <p><code>halftone</code> — Print-style halftone dot fade</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-editorial_128w.png 128w, /images/og-style-examples/style-editorial_256w.png 256w, /images/og-style-examples/style-editorial_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-editorial.png" alt="editorial style" loading="lazy" />
+    <span class="og-style-label"><code>editorial</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-editorial_128w.png 128w, /images/og-style-examples/style-editorial_256w.png 256w, /images/og-style-examples/style-editorial_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-editorial.png" alt="editorial style" />
+        <p><code>editorial</code> — Clean type with a vertical accent rule</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-artistic_128w.png 128w, /images/og-style-examples/style-artistic_256w.png 256w, /images/og-style-examples/style-artistic_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-artistic.png" alt="artistic style" loading="lazy" />
+    <span class="og-style-label"><code>artistic</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-artistic_128w.png 128w, /images/og-style-examples/style-artistic_256w.png 256w, /images/og-style-examples/style-artistic_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-artistic.png" alt="artistic style" />
+        <p><code>artistic</code> — Mesh-gradient color field with film grain</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-hero_128w.png 128w, /images/og-style-examples/style-hero_256w.png 256w, /images/og-style-examples/style-hero_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-hero.png" alt="hero style" loading="lazy" />
+    <span class="og-style-label"><code>hero</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-hero_128w.png 128w, /images/og-style-examples/style-hero_256w.png 256w, /images/og-style-examples/style-hero_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-hero.png" alt="hero style" />
+        <p><code>hero</code> — Spotlight glow with a ghost type echo</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-surreal_128w.png 128w, /images/og-style-examples/style-surreal_256w.png 256w, /images/og-style-examples/style-surreal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-surreal.png" alt="surreal style" loading="lazy" />
+    <span class="og-style-label"><code>surreal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-surreal_128w.png 128w, /images/og-style-examples/style-surreal_256w.png 256w, /images/og-style-examples/style-surreal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-surreal.png" alt="surreal style" />
+        <p><code>surreal</code> — Aurora orbs and flowing ribbons</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-monument_128w.png 128w, /images/og-style-examples/style-monument_256w.png 256w, /images/og-style-examples/style-monument_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-monument.png" alt="monument style" loading="lazy" />
+    <span class="og-style-label"><code>monument</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-monument_128w.png 128w, /images/og-style-examples/style-monument_256w.png 256w, /images/og-style-examples/style-monument_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-monument.png" alt="monument style" />
+        <p><code>monument</code> — Massive type with a single rule</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-framed_128w.png 128w, /images/og-style-examples/style-framed_256w.png 256w, /images/og-style-examples/style-framed_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-framed.png" alt="framed style" loading="lazy" />
+    <span class="og-style-label"><code>framed</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-framed_128w.png 128w, /images/og-style-examples/style-framed_256w.png 256w, /images/og-style-examples/style-framed_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-framed.png" alt="framed style" />
+        <p><code>framed</code> — Elegant thin inset frame</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-split_128w.png 128w, /images/og-style-examples/style-split_256w.png 256w, /images/og-style-examples/style-split_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-split.png" alt="split style" loading="lazy" />
+    <span class="og-style-label"><code>split</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-split_128w.png 128w, /images/og-style-examples/style-split_256w.png 256w, /images/og-style-examples/style-split_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-split.png" alt="split style" />
+        <p><code>split</code> — Diagonal two-tone color block</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-band_128w.png 128w, /images/og-style-examples/style-band_256w.png 256w, /images/og-style-examples/style-band_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-band.png" alt="band style" loading="lazy" />
+    <span class="og-style-label"><code>band</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-band_128w.png 128w, /images/og-style-examples/style-band_256w.png 256w, /images/og-style-examples/style-band_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-band.png" alt="band style" />
+        <p><code>band</code> — Magazine color band behind a knocked-out title</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-brutalist_128w.png 128w, /images/og-style-examples/style-brutalist_256w.png 256w, /images/og-style-examples/style-brutalist_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-brutalist.png" alt="brutalist style" loading="lazy" />
+    <span class="og-style-label"><code>brutalist</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-brutalist_128w.png 128w, /images/og-style-examples/style-brutalist_256w.png 256w, /images/og-style-examples/style-brutalist_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-brutalist.png" alt="brutalist style" />
+        <p><code>brutalist</code> — Thick framed panel with a hard offset shadow</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-default_128w.png 128w, /images/og-style-examples/style-default_256w.png 256w, /images/og-style-examples/style-default_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-default.png" alt="default style" loading="lazy" />
+    <span class="og-style-label"><code>default</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-default_128w.png 128w, /images/og-style-examples/style-default_256w.png 256w, /images/og-style-examples/style-default_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-default.png" alt="default style" />
+        <p><code>default</code> — Solid background, no pattern</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-minimal_128w.png 128w, /images/og-style-examples/style-minimal_256w.png 256w, /images/og-style-examples/style-minimal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-minimal.png" alt="minimal style" loading="lazy" />
+    <span class="og-style-label"><code>minimal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-minimal_128w.png 128w, /images/og-style-examples/style-minimal_256w.png 256w, /images/og-style-examples/style-minimal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-minimal.png" alt="minimal style" />
+        <p><code>minimal</code> — Clean layout without accent bars</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-dots_128w.png 128w, /images/og-style-examples/style-dots_256w.png 256w, /images/og-style-examples/style-dots_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-dots.png" alt="dots style" loading="lazy" />
+    <span class="og-style-label"><code>dots</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-dots_128w.png 128w, /images/og-style-examples/style-dots_256w.png 256w, /images/og-style-examples/style-dots_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-dots.png" alt="dots style" />
+        <p><code>dots</code> — Repeating dot grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-grid_128w.png 128w, /images/og-style-examples/style-grid_256w.png 256w, /images/og-style-examples/style-grid_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-grid.png" alt="grid style" loading="lazy" />
+    <span class="og-style-label"><code>grid</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-grid_128w.png 128w, /images/og-style-examples/style-grid_256w.png 256w, /images/og-style-examples/style-grid_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-grid.png" alt="grid style" />
+        <p><code>grid</code> — Repeating line grid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-diagonal_128w.png 128w, /images/og-style-examples/style-diagonal_256w.png 256w, /images/og-style-examples/style-diagonal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-diagonal.png" alt="diagonal style" loading="lazy" />
+    <span class="og-style-label"><code>diagonal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-diagonal_128w.png 128w, /images/og-style-examples/style-diagonal_256w.png 256w, /images/og-style-examples/style-diagonal_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-diagonal.png" alt="diagonal style" />
+        <p><code>diagonal</code> — Diagonal stripe pattern</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-gradient_128w.png 128w, /images/og-style-examples/style-gradient_256w.png 256w, /images/og-style-examples/style-gradient_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-gradient.png" alt="gradient style" loading="lazy" />
+    <span class="og-style-label"><code>gradient</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-gradient_128w.png 128w, /images/og-style-examples/style-gradient_256w.png 256w, /images/og-style-examples/style-gradient_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-gradient.png" alt="gradient style" />
+        <p><code>gradient</code> — Diagonal gradient using the accent color</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-waves_128w.png 128w, /images/og-style-examples/style-waves_256w.png 256w, /images/og-style-examples/style-waves_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-waves.png" alt="waves style" loading="lazy" />
+    <span class="og-style-label"><code>waves</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-waves_128w.png 128w, /images/og-style-examples/style-waves_256w.png 256w, /images/og-style-examples/style-waves_512w.png 512w" sizes="100vw" src="/images/og-style-examples/style-waves.png" alt="waves style" />
+        <p><code>waves</code> — Horizontal wave curves</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+<style>
+.og-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.og-style-card {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #1e1e24);
+  background: var(--bg-card, #111114);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.og-style-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--border-light, #2e2e36);
+}
+.og-style-card > img {
+  width: 100%;
+  display: block;
+}
+.og-style-label {
+  display: block;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.og-style-card dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+.og-style-card dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.og-style-dialog {
+  position: relative;
+  background: var(--bg-elevated, #101014);
+  border: 1px solid var(--border, #1e1e24);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.og-style-dialog > img {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.og-style-dialog > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.og-style-dialog > p {
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+</style>
+<h2 id="background-image">Background Image</h2>
+<p>Composite a photo behind the text:</p>
+<pre><code class="language-toml hljs">[og.auto_image]
+enabled = true
+style = &quot;editorial&quot;
+background_image = &quot;static/og-bg.jpg&quot;
+overlay_opacity = 0.55
+</code></pre>
+<p>Rendering order: background color → photo → color overlay → style composition → text/logo. <code>overlay_opacity</code> controls how much the background color dims the photo. Styles that generate their own backdrop (<code>artistic</code>, <code>hero</code>, <code>surreal</code>) skip it when a photo is set, so the photo shows through.</p>
+<h3 id="preview-1">Preview</h3>
+<p>The examples below differ only in <code>overlay_opacity</code> (same photo, <code>style = &quot;editorial&quot;</code>, near-black <code>background</code>). Click to zoom.</p>
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-low_128w.png 128w, /images/og-style-examples/bg-image-low_256w.png 256w, /images/og-style-examples/bg-image-low_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-low.png" alt="background image with low overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.3</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-low_128w.png 128w, /images/og-style-examples/bg-image-low_256w.png 256w, /images/og-style-examples/bg-image-low_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-low.png" alt="background image with low overlay" />
+        <p><code>overlay_opacity = 0.3</code> — Photo stays vivid</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-mid_128w.png 128w, /images/og-style-examples/bg-image-mid_256w.png 256w, /images/og-style-examples/bg-image-mid_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-mid.png" alt="background image with balanced overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.55</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-mid_128w.png 128w, /images/og-style-examples/bg-image-mid_256w.png 256w, /images/og-style-examples/bg-image-mid_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-mid.png" alt="background image with balanced overlay" />
+        <p><code>overlay_opacity = 0.55</code> — Balanced photo and text</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-high_128w.png 128w, /images/og-style-examples/bg-image-high_256w.png 256w, /images/og-style-examples/bg-image-high_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-high.png" alt="background image with high overlay" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.8</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-high_128w.png 128w, /images/og-style-examples/bg-image-high_256w.png 256w, /images/og-style-examples/bg-image-high_512w.png 512w" sizes="100vw" src="/images/og-style-examples/bg-image-high.png" alt="background image with high overlay" />
+        <p><code>overlay_opacity = 0.8</code> — Photo dimmed, text dominant</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+<h2 id="output-format">Output Format</h2>
+<p>PNG is the default — rendering is built-in via stb_truetype and stb_image_write, no external tools required. System fonts are auto-detected (Helvetica/Arial on macOS, DejaVu/Liberation/Noto on Linux), with a bundled DejaVu Sans Bold as the last resort.</p>
+<p>Titles with CJK characters need a CJK-capable <code>font_path</code> (e.g. Noto Sans CJK) — the bundled fonts cover Latin scripts only.</p>
+<p>Set <code>format = &quot;svg&quot;</code> for dependency-free SVG output instead. Note that social platforms generally don't render SVG <code>og:image</code>.</p>
+<h2 id="incremental-generation">Incremental Generation</h2>
+<p>Hwaro stores a <code>.og_manifest.json</code> next to the generated images and skips pages whose inputs haven't changed. Keep the output directory between builds (e.g. <code>--cache</code> mode) and incremental generation works automatically — the <code>hahwul/hwaro</code> GitHub Action handles this for you.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Regenerates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page title, description, or URL</td>
+<td>That page only</td>
+</tr>
+<tr>
+<td>OG config, or the logo / background image <strong>file contents</strong></td>
+<td>All pages</td>
+</tr>
+<tr>
+<td>Image file missing on disk</td>
+<td>That page only</td>
+</tr>
+</tbody>
+</table>
+<h2 id="faster-dev-server">Faster Dev Server</h2>
+<p>OG generation is one of the most expensive build steps on large sites. Two options:</p>
+<ul>
+<li><code>lazy_generate = true</code> — <code>hwaro serve</code> skips bulk generation; each image renders on the first request for its page and is cached after that. <code>hwaro build</code> is unaffected. Pairs well with <code>hwaro serve --fast-start</code>.</li>
+<li><code>hwaro build --skip-og-image</code> — skips OG images entirely.</li>
+</ul>
+<h2 id="behavior">Behavior</h2>
+<ul>
+<li>Pages with a custom <code>image</code> in front matter keep it; drafts are skipped</li>
+<li>Long titles word-wrap automatically (CJK-aware)</li>
+<li>Logo and background images are loaded once and reused across all pages</li>
+</ul>
+<h2 id="output">Output</h2>
+<p>A page at <code>/posts/hello-world/</code> produces <code>public/og-images/posts-hello-world.png</code> and:</p>
+<pre><code class="language-html hljs">&lt;meta property=&quot;og:image&quot; content=&quot;https://example.com/og-images/posts-hello-world.png&quot;&gt;
+</code></pre>
+<p>To use a custom image for a specific page, set <code>image</code> in front matter:</p>
+<pre><code class="language-toml hljs">+++
+title = &quot;My Post&quot;
+image = &quot;/images/custom-og.png&quot;
++++
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/seo/">SEO</a> — OpenGraph, Twitter Cards, and meta tags</li>
+<li><a href="/features/image-processing/">Image Processing</a> — Responsive image resizing</li>
+<li><a href="/start/config/">Configuration</a> — Full config reference</li>
+</ul>
+
+    <footer class="docs-footer">
+      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
+      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
+    </footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#quick-start">Quick Start</a></li><li><a href="#configuration">Configuration</a></li><li><a href="#style-presets">Style Presets</a><ul><li><a href="#preview">Preview</a></li></ul></li><li><a href="#background-image">Background Image</a><ul><li><a href="#preview-1">Preview</a></li></ul></li><li><a href="#output-format">Output Format</a></li><li><a href="#incremental-generation">Incremental Generation</a></li><li><a href="#faster-dev-server">Faster Dev Server</a></li><li><a href="#behavior">Behavior</a></li><li><a href="#output">Output</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=ff248402"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=ff248402"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaid.min.js?v=ff248402"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=ff248402"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=ff248402"></script>
+</body>
+</html>

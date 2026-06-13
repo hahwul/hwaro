@@ -1,0 +1,678 @@
+/* =============================================================================
+   Header — matches landing nav style
+   ============================================================================= */
+
+.docs-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-h);
+    background: rgba(8, 8, 10, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    z-index: 100;
+}
+
+.docs-header .logo {
+    text-decoration: none;
+    margin-right: 2.5rem;
+    display: flex;
+    align-items: center;
+    border-bottom: none;
+}
+
+.docs-header .logo:hover {
+    opacity: 0.8;
+    border-bottom: none;
+}
+
+.docs-header .logo img {
+    border-radius: 0;
+    border: none;
+}
+
+.docs-header nav {
+    display: flex;
+    gap: 0.125rem;
+}
+
+.docs-header nav a {
+    position: relative;
+    font-family: var(--font-sans);
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+}
+
+.docs-header nav a:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.docs-header nav a.active {
+    color: #fff;
+}
+
+.header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.header-link {
+    font-family: var(--font-sans);
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.header-link:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.github-link {
+    color: #888;
+    text-decoration: none;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: none;
+    border-bottom: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.github-link:hover {
+    color: #fff;
+    border-bottom: none;
+}
+
+.github-link svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* Mobile hamburger — hidden on desktop, shown ≤768px (see responsive) */
+.mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-right: 0.6rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+/* ⌘K search trigger */
+.search-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 32px;
+    padding: 0 0.45rem 0 0.65rem;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #888;
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.12s ease;
+}
+
+.search-trigger:hover {
+    color: #fff;
+    border-color: var(--border-light);
+    background: var(--surface-2);
+}
+
+.search-trigger:active {
+    transform: scale(0.97);
+}
+
+.search-trigger:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.search-trigger-icon {
+    width: 13px;
+    height: 13px;
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.search-trigger-kbd {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 2px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-sm);
+    transition: color 0.2s ease;
+}
+
+.search-trigger:hover .search-trigger-kbd {
+    color: var(--text-muted);
+}
+
+.header-divider {
+    width: 1px;
+    height: 16px;
+    margin: 0 0.45rem;
+    background: var(--hair-strong);
+}
+
+/* =============================================================================
+   Layout container
+   ============================================================================= */
+
+.docs-container {
+    display: flex;
+    padding-top: var(--header-h);
+    min-height: 100vh;
+}
+
+/* =============================================================================
+   Sidebar - fixed left navigation
+   ============================================================================= */
+
+.docs-sidebar {
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    width: var(--sidebar-w);
+    height: calc(100vh - var(--header-h));
+    /* Distinct nav surface — a faint white-overlay step over the canvas so the
+       panel reads as its own depth layer, brighter near the header. */
+    background: var(--bg);
+    border-right: 1px solid var(--hair-strong);
+    box-shadow:
+        inset -1px 0 0 rgba(255, 255, 255, 0.02),
+        4px 0 24px -14px rgba(0, 0, 0, 0.9);
+    padding: 1.25rem 0.75rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    /* Hidden until you interact with the panel; color matches the global scrollbar. */
+    scrollbar-color: transparent transparent;
+}
+
+.docs-sidebar:hover {
+    scrollbar-color: var(--border) transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+    width: 3px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: var(--radius-pill);
+    transition: background 0.2s ease;
+}
+
+.docs-sidebar:hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+}
+
+.docs-sidebar:hover::-webkit-scrollbar-thumb:hover {
+    background: var(--border-light);
+}
+
+/* Collapsible sections — native <details>, server-rendered open state.
+   The ember dot is the state cue: lit (glowing) on the open section,
+   unlit coal on collapsed ones. */
+.sidebar-section {
+    margin-bottom: 0.25rem;
+    /* Lets ::details-content animate block-size to `auto` (inherited) */
+    interpolate-size: allow-keywords;
+}
+
+.sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    list-style: none;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+}
+
+.sidebar-title::-webkit-details-marker,
+.sidebar-group-title::-webkit-details-marker {
+    display: none;
+}
+
+.sidebar-title:hover {
+    color: var(--text-muted);
+    background: var(--surface-1);
+}
+
+.sidebar-title:focus-visible,
+.sidebar-group-title:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+.sidebar-title::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 1px;
+    background: var(--border-light);
+    flex-shrink: 0;
+    transition:
+        background 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.sidebar-title:hover::before {
+    background: var(--primary-dark);
+}
+
+.sidebar-section[open] > .sidebar-title {
+    color: var(--text-muted);
+}
+
+.sidebar-section[open] > .sidebar-title::before {
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--ember);
+}
+
+.sidebar-chevron {
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    color: var(--text-dim);
+    opacity: 0.7;
+    flex-shrink: 0;
+    transition: transform 0.2s var(--ease-out);
+}
+
+details[open] > summary .sidebar-chevron {
+    transform: rotate(90deg);
+}
+
+/* Fold animation — progressive: Chromium/Safari animate via ::details-content,
+   others toggle instantly. */
+.sidebar-section::details-content,
+.sidebar-subgroup::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+        block-size 0.25s var(--ease-out),
+        content-visibility 0.25s allow-discrete;
+}
+
+.sidebar-section[open]::details-content,
+.sidebar-subgroup[open]::details-content {
+    block-size: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-section::details-content,
+    .sidebar-subgroup::details-content {
+        transition: none;
+    }
+
+    .sidebar-chevron {
+        transition: none;
+    }
+}
+
+.sidebar-links {
+    list-style: none;
+    padding: 0.15rem 0 0.4rem;
+    margin: 0;
+}
+
+.sidebar-links li {
+    margin-bottom: 1px;
+}
+
+.sidebar-links a {
+    position: relative;
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.4rem 0.75rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.835rem;
+    font-weight: 400;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+    border-radius: 6px;
+    border-bottom: none;
+    margin-left: 0;
+}
+
+.sidebar-links a:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    border-bottom: none;
+}
+
+.sidebar-links a.active {
+    background: linear-gradient(90deg, var(--ember-soft), transparent 88%);
+    color: var(--primary-light);
+    font-weight: 500;
+    border-bottom: none;
+}
+
+/* Nested groups (e.g., Features sub-categories) — collapsible, closed unless
+   they contain the active page */
+.sidebar-group {
+    margin-top: 0.25rem;
+}
+
+.sidebar-group-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+    letter-spacing: 0.01em;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    list-style: none;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+}
+
+.sidebar-group-title:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.sidebar-group-title .sidebar-chevron {
+    width: 11px;
+    height: 11px;
+}
+
+.sidebar-subgroup[open] > .sidebar-group-title {
+    color: var(--text-secondary);
+}
+
+.sidebar-sublinks {
+    list-style: none;
+    padding: 0;
+    /* Depth guide — a faint rail that visualises the nesting level */
+    margin: 0.1rem 0 0.1rem 1rem;
+    border-left: 1px solid var(--border);
+}
+
+.sidebar-sublinks li {
+    margin-bottom: 1px;
+}
+
+.sidebar-sublinks a {
+    position: relative;
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.3rem 0.75rem 0.3rem 0.6rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 400;
+    transition:
+        color 0.15s var(--ease-out),
+        background 0.15s var(--ease-out);
+    border-radius: 6px;
+    border-bottom: none;
+}
+
+.sidebar-sublinks a:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    border-bottom: none;
+}
+
+.sidebar-sublinks a.active {
+    background: linear-gradient(90deg, var(--ember-soft), transparent 88%);
+    color: var(--primary-light);
+    font-weight: 500;
+    border-bottom: none;
+}
+
+.sidebar-sublinks a.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 56%;
+    border-radius: var(--radius-pill);
+    background: var(--rail-gradient);
+    box-shadow: 0 0 10px var(--ember);
+}
+
+/* =============================================================================
+   TOC Sidebar - fixed right
+   ============================================================================= */
+
+.docs-toc {
+    position: fixed;
+    top: var(--header-h);
+    right: 0;
+    width: var(--toc-w);
+    height: calc(100vh - var(--header-h));
+    padding: 1.5rem 1rem 4rem 1rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.docs-toc::-webkit-scrollbar {
+    width: 5px;
+}
+
+.docs-toc::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.docs-toc::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: var(--radius-pill);
+}
+
+.docs-toc::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+.toc-title {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.12em;
+}
+
+.docs-toc > ul,
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--border);
+}
+
+.docs-toc ul ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: none;
+}
+
+.docs-toc li,
+.toc-list li {
+    margin-bottom: 0;
+}
+
+.docs-toc a,
+.toc-list a {
+    position: relative;
+    font-family: var(--font-sans);
+    display: block;
+    padding: 0.3rem 0.75rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    transition: all 0.12s ease;
+    border-left: 1px solid transparent;
+    margin-left: -1px;
+    border-bottom: none;
+}
+
+.docs-toc a:hover,
+.toc-list a:hover {
+    color: var(--text-muted);
+    border-left-color: var(--border-light);
+    border-bottom: none;
+}
+
+.docs-toc a.active,
+.toc-list a.active {
+    color: var(--text);
+    border-bottom: none;
+}
+
+/* Active marker: a tapering ember streak that runs longer than the link and
+   thins out toward both ends, so it reads as flowing along the guide line.
+   drop-shadow follows the gradient's alpha, so the glow fades with the bar. */
+.docs-toc a.active::before,
+.toc-list a.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 260%;
+    pointer-events: none;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        var(--ember) 22%,
+        var(--primary) 50%,
+        var(--ember) 78%,
+        transparent 100%
+    );
+    filter: drop-shadow(0 0 3px var(--ember));
+}
+
+/* Nested TOC levels - indentation */
+.docs-toc ul ul a {
+    padding-left: 1.25rem;
+    font-size: 0.74rem;
+}
+
+.docs-toc ul ul ul a {
+    padding-left: 1.75rem;
+    font-size: 0.74rem;
+}
+
+.toc-list .toc-h3 {
+    padding-left: 1.25rem;
+    font-size: 0.74rem;
+}
+
+.toc-list .toc-h4 {
+    padding-left: 1.75rem;
+    font-size: 0.74rem;
+}
+
+/* =============================================================================
+   Main content area
+   ============================================================================= */
+
+.docs-main {
+    flex: 1;
+    margin-left: var(--sidebar-w);
+    margin-right: var(--toc-w);
+    padding: 2.5rem 3.5rem;
+    max-width: calc(100% - var(--sidebar-w) - var(--toc-w));
+    min-width: 0;
+}
+
+.docs-main > *:not(.docs-footer) {
+    max-width: 800px;
+}
+
+/* When TOC is hidden, expand main content */
+.docs-main.no-toc {
+    margin-right: 0;
+    max-width: calc(100% - var(--sidebar-w));
+}
