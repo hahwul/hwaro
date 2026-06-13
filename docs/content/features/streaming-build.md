@@ -94,8 +94,9 @@ hwaro build --stream --verbose
 Building site...
   Streaming mode enabled (batch size: 500)
   ...
-  Streaming batch 1 (123 pages)
-
+  Streaming batch 1 (500 pages)
+  Streaming batch 2 (500 pages)
+  Streaming batch 3 (234 pages)
   ...
 ```
 
