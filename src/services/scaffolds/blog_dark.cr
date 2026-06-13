@@ -82,15 +82,15 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #c87a7a;
-              --primary-hover: #d69292;
+              --primary: #dd7064;
+              --primary-hover: #ea8a7d;
               --heading: #ece5dc;
               --text: #d9d2c9;
               --text-secondary: #a3958a;
               --text-muted: #8f8174;
               --border: #2f2822;
               --border-light: #251f1a;
-              --bg: #16120e;
+              --bg: #100e0c;
               --bg-secondary: #1e1813;
               --bg-code: #1e1813;
               --header-h: 52px;
@@ -114,7 +114,7 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(200, 122, 122, 0.3); }
+            ::selection { background: color-mix(in srgb, var(--primary) 30%, transparent); }
 
             /* Header */
             .blog-header {
@@ -123,7 +123,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(22, 18, 14, 0.85);
+              background: rgba(16, 14, 12, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -217,7 +217,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #d69292, #b35454);
+              background: linear-gradient(90deg, #e08474, #b35454);
             }
 
             .blog-main h2 {
@@ -264,7 +264,7 @@ module Hwaro
             a {
               color: var(--primary);
               text-decoration: underline;
-              text-decoration-color: rgba(200, 122, 122, 0.35);
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
               text-underline-offset: 3px;
               transition: color 0.15s ease, text-decoration-color 0.15s ease;
             }
@@ -314,6 +314,75 @@ module Hwaro
 
             /* Images */
             img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
+
+            /* Home */
+            .home-hero {
+              padding-bottom: 1.75rem;
+              margin-bottom: 2.25rem;
+              border-bottom: 1px solid var(--border-light);
+            }
+
+            .home-title {
+              position: relative;
+              font-family: var(--font-serif);
+              font-size: 2.6rem;
+              font-weight: 700;
+              line-height: 1.1;
+              letter-spacing: -0.02em;
+              margin: 0 0 1rem 0;
+              padding-bottom: 0.9rem;
+              text-wrap: balance;
+              color: var(--heading);
+            }
+
+            /* The shared ember rule — so the homepage carries the same mark
+               every other hwaro scaffold shows under its page title. */
+            .home-title::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #e08474, #b35454);
+            }
+
+            .home-tagline {
+              font-family: var(--font-serif);
+              font-size: 1.2rem;
+              line-height: 1.5;
+              color: var(--text-secondary);
+              margin: 0;
+              max-width: 38rem;
+            }
+
+            .home-intro {
+              color: var(--text-secondary);
+              margin-bottom: 2.5rem;
+            }
+            .home-intro p:last-child { margin-bottom: 0; }
+
+            .home-section-title {
+              font-family: var(--font-sans);
+              font-size: 0.78rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--text-muted);
+              margin: 0 0 0.5rem 0;
+            }
+
+            .home-more {
+              margin-top: 1.25rem;
+              font-size: 0.9rem;
+            }
+            .home-more a {
+              color: var(--primary);
+              font-weight: 500;
+              text-decoration: none;
+            }
+            .home-more a:hover { color: var(--primary-hover); text-decoration: underline; }
 
             /* Post list */
             .post-list { list-style: none; padding: 0; }
@@ -416,7 +485,7 @@ module Hwaro
             nav.pagination .pagination-list { list-style: none; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
             nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-secondary); text-decoration: none; }
             nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
-            .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: rgba(200, 122, 122, 0.12); color: var(--primary); }
+            .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
             .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); opacity: 0.5; }
 
             /* Footer */
@@ -541,7 +610,7 @@ module Hwaro
             .search-result-item:hover, .search-result-item.active { background: var(--bg); text-decoration: none; }
             .search-result-item .search-result-title { font-weight: 500; font-size: 0.9rem; margin-bottom: 0.15rem; }
             .search-result-item .search-result-snippet { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-            .search-result-item .search-result-snippet mark { background: rgba(200, 122, 122, 0.22); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
+            .search-result-item .search-result-snippet mark { background: color-mix(in srgb, var(--primary) 22%, transparent); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
             .search-hint {

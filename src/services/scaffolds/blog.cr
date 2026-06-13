@@ -63,6 +63,7 @@ module Hwaro
             "footer.html"          => footer_template,
             "partials/nav.html"    => blog_nav_html,
             "partials/search.html" => search_overlay_html,
+            "index.html"           => blog_home_template,
             "page.html"            => blog_page_template,
             "section.html"         => blog_section_template,
             "post.html"            => post_template,
@@ -440,6 +441,74 @@ module Hwaro
 
             /* Images */
             img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
+
+            /* Home */
+            .home-hero {
+              padding-bottom: 1.75rem;
+              margin-bottom: 2.25rem;
+              border-bottom: 1px solid var(--border-light);
+            }
+
+            .home-title {
+              position: relative;
+              font-family: var(--font-serif);
+              font-size: 2.6rem;
+              font-weight: 700;
+              line-height: 1.1;
+              letter-spacing: -0.02em;
+              margin: 0 0 1rem 0;
+              padding-bottom: 0.9rem;
+              text-wrap: balance;
+            }
+
+            /* The shared ember rule — so the homepage carries the same mark
+               every other hwaro scaffold shows under its page title. */
+            .home-title::after {
+              content: "";
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              width: 2.75rem;
+              height: 3px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #c46262, #8f4040);
+            }
+
+            .home-tagline {
+              font-family: var(--font-serif);
+              font-size: 1.2rem;
+              line-height: 1.5;
+              color: var(--text-secondary);
+              margin: 0;
+              max-width: 38rem;
+            }
+
+            .home-intro {
+              color: var(--text-secondary);
+              margin-bottom: 2.5rem;
+            }
+            .home-intro p:last-child { margin-bottom: 0; }
+
+            .home-section-title {
+              font-family: var(--font-sans);
+              font-size: 0.78rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--text-muted);
+              margin: 0 0 0.5rem 0;
+            }
+
+            .home-more {
+              margin-top: 1.25rem;
+              font-size: 0.9rem;
+            }
+            .home-more a {
+              color: var(--primary);
+              font-weight: 500;
+              text-decoration: none;
+            }
+            .home-more a:hover { color: var(--primary-hover); text-decoration: underline; }
 
             /* Post list */
             .post-list { list-style: none; padding: 0; }
@@ -962,6 +1031,41 @@ module Hwaro
         # `footer.html` closes the container the same way for all of
         # them. That symmetry is what keeps 404/taxonomy from emitting
         # dangling `</main></div>` like the previous version did.
+        # Dedicated homepage layout. The engine routes the root index page
+        # to `index.html` when it exists (see `determine_template`), so the
+        # landing page gets a proper hero + recent-posts feed instead of the
+        # bare `page.html` body that left the blog home feeling unfinished.
+        private def blog_home_template : String
+          <<-HTML
+            {% include "header.html" %}
+            {% include "partials/nav.html" %}
+            {% include "partials/search.html" %}
+            <div class="blog-container">
+              <main id="main" class="blog-main">
+                <header class="home-hero">
+                  <h1 class="home-title">{{ site.title | e }}</h1>
+                  {% if site.description %}<p class="home-tagline">{{ site.description | e }}</p>{% endif %}
+                </header>
+                {% if content %}<div class="home-intro">{{ content }}</div>{% endif %}
+                <section class="home-latest" aria-labelledby="home-latest-title">
+                  <h2 id="home-latest-title" class="home-section-title">Latest posts</h2>
+                  <ul class="post-list">
+                    {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                    {% if loop.index <= 5 %}
+                      <li class="post-item">
+                        <div class="post-meta"><time datetime="{{ p.date }}">{{ p.date }}</time></div>
+                        <h3 class="post-title"><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h3>
+                        {% if p.description %}<p class="post-excerpt">{{ p.description | e }}</p>{% endif %}
+                      </li>
+                    {% endif %}
+                    {% endfor %}
+                  </ul>
+                  <p class="home-more"><a href="{{ base_url }}{{ lang_prefix }}/posts/">View all posts &rarr;</a></p>
+                </section>
+            {% include "footer.html" %}
+            HTML
+        end
+
         private def blog_page_template : String
           <<-HTML
             {% include "header.html" %}
@@ -1145,15 +1249,14 @@ module Hwaro
 
         private def index_content(skip_taxonomies : Bool) : String
           body = String.build do |str|
-            str << "This is a blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.\n\n"
-
+            # The homepage hero already shows the site title + description,
+            # so this intro stays short and just points readers toward the
+            # taxonomy archives. The recent-posts feed is rendered by the
+            # `index.html` template, not by this content.
             if skip_taxonomies
-              str << "Check out the latest posts in the [Posts](/posts/) section.\n"
+              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro) — a fast, lightweight static site generator.\n"
             else
-              str << "Check out the latest posts in the [Posts](/posts/) section, or browse by:\n\n"
-              str << "- [Tags](/tags/)\n"
-              str << "- [Categories](/categories/)\n"
-              str << "- [Authors](/authors/)\n"
+              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro). Browse posts by [Tags](/tags/), [Categories](/categories/), or [Authors](/authors/).\n"
             end
           end
 

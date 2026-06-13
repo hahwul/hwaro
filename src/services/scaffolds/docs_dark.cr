@@ -81,15 +81,15 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #c87a7a;
-              --primary-hover: #d69292;
+              --primary: #dd7064;
+              --primary-hover: #ea8a7d;
               --heading: #ece5dc;
               --text: #d9d2c9;
               --text-secondary: #a3958a;
               --text-muted: #8f8174;
               --border: #352d26;
               --border-light: #2a231d;
-              --bg: #16120e;
+              --bg: #100e0c;
               --bg-sidebar: #1b1612;
               --bg-secondary: #1e1813;
               --bg-code: #1e1813;
@@ -121,7 +121,7 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(200, 122, 122, 0.3); }
+            ::selection { background: color-mix(in srgb, var(--primary) 30%, transparent); }
 
             /* Header */
             .docs-header {
@@ -130,7 +130,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(22, 18, 14, 0.85);
+              background: rgba(16, 14, 12, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -259,12 +259,12 @@ module Hwaro
             }
 
             .sidebar-links a:hover {
-              background: rgba(200, 122, 122, 0.08);
+              background: color-mix(in srgb, var(--primary) 8%, transparent);
               color: var(--text);
             }
 
             .sidebar-links a.active {
-              background: rgba(200, 122, 122, 0.14);
+              background: color-mix(in srgb, var(--primary) 14%, transparent);
               color: var(--primary-hover);
               font-weight: 600;
             }
@@ -303,7 +303,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #d69292, #b35454);
+              background: linear-gradient(90deg, #e08474, #b35454);
             }
 
             .docs-main h2 {
@@ -351,7 +351,7 @@ module Hwaro
             a {
               color: var(--primary);
               text-decoration: underline;
-              text-decoration-color: rgba(200, 122, 122, 0.35);
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
               text-underline-offset: 3px;
               transition: color 0.15s ease, text-decoration-color 0.15s ease;
             }
@@ -441,8 +441,8 @@ module Hwaro
             }
 
             .info-box.note {
-              background: rgba(200, 122, 122, 0.09);
-              border-color: rgba(200, 122, 122, 0.35);
+              background: color-mix(in srgb, var(--primary) 9%, transparent);
+              border-color: color-mix(in srgb, var(--primary) 35%, transparent);
             }
 
             .info-box.warning {
@@ -676,7 +676,7 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(200, 122, 122, 0.22);
+              background: color-mix(in srgb, var(--primary) 22%, transparent);
               color: var(--primary-hover);
               border-radius: 2px;
               padding: 0 1px;

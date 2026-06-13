@@ -73,16 +73,16 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #c87a7a;
-              --primary-hover: #d69292;
-              --primary-subtle: rgba(200, 122, 122, 0.08);
+              --primary: #dd7064;
+              --primary-hover: #ea8a7d;
+              --primary-subtle: color-mix(in srgb, var(--primary) 8%, transparent);
               --heading: #ece5dc;
               --text: #d9d2c9;
               --text-secondary: #a3958a;
               --text-muted: #8f8174;
               --border: #352d26;
               --border-light: #2a231d;
-              --bg: #16120e;
+              --bg: #100e0c;
               --bg-secondary: #1e1813;
               --bg-sidebar: #1b1612;
               --bg-code: #1e1813;
@@ -111,14 +111,14 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(200, 122, 122, 0.3); }
+            ::selection { background: color-mix(in srgb, var(--primary) 30%, transparent); }
 
             /* ── Header ── */
             .book-header {
               position: fixed;
               top: 0; left: 0; right: 0;
               height: var(--header-h);
-              background: rgba(22, 18, 14, 0.9);
+              background: rgba(16, 14, 12, 0.9);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -224,12 +224,12 @@ module Hwaro
 
             .chapter-links a:hover {
               color: var(--text);
-              background: rgba(200, 122, 122, 0.06);
+              background: color-mix(in srgb, var(--primary) 6%, transparent);
             }
 
             .chapter-links a.active {
               color: var(--primary-hover);
-              background: rgba(200, 122, 122, 0.1);
+              background: color-mix(in srgb, var(--primary) 10%, transparent);
               border-left-color: var(--primary);
               font-weight: 600;
             }
@@ -277,7 +277,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #d69292, #b35454);
+              background: linear-gradient(90deg, #e08474, #b35454);
             }
 
             .book-content h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 0.75rem 0; letter-spacing: -0.008em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-light); }
@@ -290,7 +290,7 @@ module Hwaro
             .book-content strong { font-weight: 700; color: var(--text); }
 
             /* Links: warm ink with an ember underline that brightens on hover. */
-            a { color: var(--text); text-decoration: underline; text-decoration-color: rgba(200, 122, 122, 0.4); text-underline-offset: 3px; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
+            a { color: var(--text); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent); text-underline-offset: 3px; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
             a:hover { color: var(--primary); text-decoration-color: currentColor; }
 
             code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; font-family: var(--font-mono); }
@@ -307,7 +307,7 @@ module Hwaro
             /* Info boxes: tinted surfaces with a hairline border in the
                same hue — no heavy accent bars. */
             .info-box { padding: 0.875rem 1.25rem; border-radius: var(--radius); margin: 1.25rem 0; border: 1px solid; font-size: 0.9rem; font-family: var(--font-sans); }
-            .info-box.note { background: rgba(200, 122, 122, 0.09); border-color: rgba(200, 122, 122, 0.35); }
+            .info-box.note { background: color-mix(in srgb, var(--primary) 9%, transparent); border-color: color-mix(in srgb, var(--primary) 35%, transparent); }
             .info-box.warning { background: rgba(214, 164, 91, 0.09); border-color: rgba(214, 164, 91, 0.35); }
             .info-box.tip { background: rgba(126, 168, 130, 0.09); border-color: rgba(126, 168, 130, 0.35); }
 
@@ -403,7 +403,7 @@ module Hwaro
             .search-result-item:hover, .search-result-item.active { background: var(--bg); text-decoration: none; }
             .search-result-item .search-result-title { font-weight: 500; font-size: 0.88rem; margin-bottom: 0.1rem; }
             .search-result-item .search-result-snippet { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-            .search-result-item .search-result-snippet mark { background: rgba(200, 122, 122, 0.22); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
+            .search-result-item .search-result-snippet mark { background: color-mix(in srgb, var(--primary) 22%, transparent); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.88rem; }
             .search-hint { padding: 0.5rem 0.75rem; display: flex; gap: 1rem; justify-content: center; border-top: 1px solid var(--border-light); color: var(--text-muted); font-size: 0.65rem; }
             .search-hint kbd { font-size: 0.6rem; padding: 0 0.25rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); font-family: inherit; line-height: 1.4; }

@@ -399,8 +399,9 @@ describe Hwaro::Services::Scaffolds::BlogDark do
     it "uses dark color variables" do
       scaffold = Hwaro::Services::Scaffolds::BlogDark.new
       css = scaffold.static_files["css/style.css"]
-      css.should contain("#1a1816")
-      css.should contain("#d4d0cc")
+      css.should contain("color-scheme: dark")
+      css.should contain("--bg: #100e0c")
+      css.should contain("--primary: #dd7064")
     end
   end
 end
@@ -459,8 +460,9 @@ describe Hwaro::Services::Scaffolds::DocsDark do
     it "uses dark color variables" do
       scaffold = Hwaro::Services::Scaffolds::DocsDark.new
       css = scaffold.static_files["css/style.css"]
-      css.should contain("#1d1d1f")
-      css.should contain("#f5f5f7")
+      css.should contain("color-scheme: dark")
+      css.should contain("--bg: #100e0c")
+      css.should contain("--primary: #dd7064")
     end
   end
 end
@@ -725,10 +727,10 @@ describe Hwaro::Services::Scaffolds::Registry do
         multi = scaffold.multilingual_content_files(["en", "ko"])
 
         ko_index = multi["index.ko.md"]
-        ko_index.should contain("[Posts](/ko/posts/)")
         ko_index.should contain("[Tags](/ko/tags/)")
-        ko_index.should_not contain("[Posts](/posts/)")
+        ko_index.should contain("[Categories](/ko/categories/)")
         ko_index.should_not contain("[Tags](/tags/)")
+        ko_index.should_not contain("[Categories](/categories/)")
       end
 
       # Regression: the link-rewriter used to also match Markdown
