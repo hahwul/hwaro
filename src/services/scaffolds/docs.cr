@@ -174,7 +174,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# Syntax highlighting is build-time (mode = "server") and themed by
+                 css/style.css, so no highlight stylesheet link is emitted here —
+                 zero external requests, sub-path safe. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -555,6 +557,7 @@ module Hwaro
               padding: 0;
               font-size: 0.82rem;
             }
+            #{highlight_theme_css(false)}
 
             /* Tables */
             table {

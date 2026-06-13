@@ -68,12 +68,16 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code block syntax highlighting using Highlight.js
+            # Code blocks are highlighted at build time and themed by an inlined,
+            # ember-warm dark theme in css/style.css — no JavaScript and no external
+            # requests. Switch mode to "client" (+ use_cdn = true or local assets)
+            # to highlight in the browser with Highlight.js instead.
 
             [highlight]
             enabled = true
-            theme = "github-dark"    # Dark theme for syntax highlighting
-            use_cdn = true            # Set to false to use local assets
+            mode = "server"              # "server" = highlight at build time (no JS); "client" = Highlight.js
+            theme = "github-dark"        # Fallback theme for "client" mode; the default ships an inlined theme
+            use_cdn = false              # "client" mode only: true loads Highlight.js from a CDN
 
             TOML
         end
@@ -301,6 +305,7 @@ module Hwaro
                instead of a clashing box. `pre code.hljs` (0,1,2) outranks
                the theme's `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; color: var(--text); border: none; }
+            #{highlight_theme_css(true)}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }

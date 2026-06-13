@@ -216,6 +216,47 @@ module Hwaro
             SVG
         end
 
+        # An ember-warm syntax-highlight theme, inlined into each scaffold's
+        # stylesheet. Scaffolds default to build-time highlighting
+        # (`[highlight] mode = "server"`), which emits hljs-compatible class
+        # names and needs no JavaScript; pairing that with this inlined theme
+        # means a generated site highlights code with **zero external requests
+        # and zero extra files** (the old default pulled highlight.js + a
+        # theme from cdnjs). Because the rules live in the scaffold stylesheet
+        # — loaded via `{{ base_url }}/css/style.css` — they also stay correct
+        # under sub-path deploys, unlike a root-absolute `/assets/...` link.
+        #
+        # The earthy palette (gruvbox-adjacent, retuned to the warm surfaces)
+        # keeps the syntax colors inside the ember world instead of the cold
+        # github default. `.hljs` itself stays transparent so the code sits on
+        # the warm `--bg-code` card set by `pre`.
+        protected def highlight_theme_css(dark : Bool = false) : String
+          comment = dark ? "#8a8073" : "#a1907c"
+          keyword = dark ? "#f0846f" : "#b03a2e"
+          string = dark ? "#b7c06a" : "#5f7032"
+          number = dark ? "#e8a83f" : "#9a6a14"
+          func = dark ? "#8ec5a3" : "#2f6a5a"
+          type = dark ? "#e6914f" : "#b0641c"
+          variable = dark ? "#e8b0a0" : "#8a4a3a"
+          attr = dark ? "#93b5c8" : "#45617a"
+          symbol = dark ? "#d79bb8" : "#8a4368"
+          <<-CSS
+            /* Syntax highlighting — ember-warm, inlined (no CDN, no JS). */
+            .hljs-comment, .hljs-quote { color: #{comment}; font-style: italic; }
+            .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag { color: #{keyword}; }
+            .hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: #{string}; }
+            .hljs-number, .hljs-built_in, .hljs-builtin-name, .hljs-bullet { color: #{number}; }
+            .hljs-title, .hljs-title.function_, .hljs-section .hljs-title { color: #{func}; }
+            .hljs-type, .hljs-class .hljs-title, .hljs-title.class_, .hljs-tag { color: #{type}; }
+            .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-name { color: #{variable}; }
+            .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #{attr}; }
+            .hljs-symbol, .hljs-link, .hljs-meta, .hljs-params { color: #{symbol}; }
+            .hljs-deletion { color: #{keyword}; }
+            .hljs-emphasis { font-style: italic; }
+            .hljs-strong { font-weight: 700; }
+            CSS
+        end
+
         # Returns shortcode files as a hash of path => content
         def shortcode_files : Hash(String, String)
           {
@@ -335,8 +376,9 @@ module Hwaro
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
             str << "\n[highlight]\n"
             str << "enabled = true\n"
+            str << "mode = \"server\"\n"
             str << "theme = \"#{config_highlight_theme}\"\n"
-            str << "use_cdn = true\n"
+            str << "use_cdn = false\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"
               str << "name = \"tags\"\n"
@@ -404,7 +446,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# Syntax highlighting is build-time (mode = "server") and themed by
+                 the inlined CSS above, so no highlight stylesheet link is emitted
+                 here — zero external requests, sub-path safe. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -564,10 +608,11 @@ module Hwaro
 
               code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); }
               pre { background: var(--bg-subtle); padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); line-height: 1.55; }
-              /* Drop the highlight theme's own white background so syntax tokens
-                 sit on the warm code well instead of a white box. `pre code.hljs`
-                 (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+              /* Keep `.hljs` transparent so code sits on the warm well; if a
+                 user switches to a CDN theme it won't repaint a clashing box.
+                 `pre code.hljs` (0,1,2) outranks a theme's `.hljs` (0,1,0). */
               pre code, pre code.hljs { background: transparent; padding: 0; }
+              #{highlight_theme_css(false)}
               img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
               blockquote { font-family: var(--font-serif); font-style: italic; margin: 1.4em 0; padding: 0.1rem 0 0.1rem 1.25rem; color: var(--text-muted); border-left: 1px solid var(--primary); }
               table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }

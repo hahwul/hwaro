@@ -267,12 +267,16 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code block syntax highlighting using Highlight.js
+            # Code blocks are highlighted at build time and themed by an inlined,
+            # ember-warm theme in the scaffold's CSS — no JavaScript and no external
+            # requests. Switch mode to "client" (+ use_cdn = true or local assets)
+            # to highlight in the browser with Highlight.js instead.
 
             [highlight]
             enabled = true
-            theme = "github"          # Available: github, monokai, atom-one-dark, vs2015, etc.
-            use_cdn = true            # Set to false to use local assets
+            mode = "server"           # "server" = highlight at build time (no JS); "client" = Highlight.js
+            theme = "github"          # Fallback theme for "client" mode; the default ships an inlined theme
+            use_cdn = false           # "client" mode only: true loads Highlight.js from a CDN
 
             TOML
         end

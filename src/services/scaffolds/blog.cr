@@ -145,7 +145,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {{ highlight_css }}
+              {# Syntax highlighting is build-time (mode = "server") and themed by
+                 css/style.css, so no highlight stylesheet link is emitted here —
+                 zero external requests, sub-path safe. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}
@@ -427,6 +429,7 @@ module Hwaro
                sit on the warm code well instead of a white box. `pre code.hljs`
                (0,1,2) outranks the theme's `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; }
+            #{highlight_theme_css(false)}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }
