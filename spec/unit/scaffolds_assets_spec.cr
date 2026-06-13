@@ -59,8 +59,12 @@ describe "Scaffold embedded assets" do
     end
   end
 
-  describe "internalized syntax highlighting" do
-    it "defaults to build-time highlighting (mode = \"server\")" do
+  describe "ember-warm syntax highlighting" do
+    # The default is client-side Highlight.js (`mode = "client"`): the
+    # server/Tartrazine path is not multi-thread-safe, and the release binary
+    # is built `-Dpreview_mt`, so a parallel `hwaro build` could corrupt
+    # highlighted output. The warm theme is inlined either way.
+    it "defaults to client-side highlighting (mode = \"client\")" do
       {
         Hwaro::Services::Scaffolds::Simple.new,
         Hwaro::Services::Scaffolds::Blog.new,
@@ -70,19 +74,21 @@ describe "Scaffold embedded assets" do
         Hwaro::Services::Scaffolds::DocsDark.new,
         Hwaro::Services::Scaffolds::BookDark.new,
       }.each do |scaffold|
-        scaffold.config_content.should contain(%(mode = "server"))
+        # The active setting (the explanatory comment may still mention "server").
+        scaffold.config_content.should contain(%(mode = "client"))
       end
     end
 
-    it "inlines the syntax theme into the stylesheet (no external theme link)" do
+    it "inlines the syntax theme into the stylesheet (recolor without a theme link)" do
       css = Hwaro::Services::Scaffolds::Blog.new.static_files["css/style.css"]
       css.should contain(".hljs-keyword")
       css.should contain(".hljs-string")
     end
 
-    it "drops the highlight stylesheet link and any CDN reference from the chrome" do
+    it "emits no highlight theme stylesheet link (the theme is inlined, sub-path safe)" do
       header = Hwaro::Services::Scaffolds::Blog.new.template_files["header.html"]
       header.should_not contain("{{ highlight_css }}")
+      # The theme link is gone; Highlight.js itself still loads via the footer.
       header.should_not contain("cdnjs")
     end
   end

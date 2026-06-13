@@ -174,9 +174,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {# Syntax highlighting is build-time (mode = "server") and themed by
-                 css/style.css, so no highlight stylesheet link is emitted here —
-                 zero external requests, sub-path safe. #}
+              {# The syntax theme is inlined in css/style.css, so no highlight theme
+                 stylesheet link is emitted here (sub-path safe). Highlight.js itself
+                 still loads from the footer. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}

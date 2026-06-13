@@ -217,14 +217,14 @@ module Hwaro
         end
 
         # An ember-warm syntax-highlight theme, inlined into each scaffold's
-        # stylesheet. Scaffolds default to build-time highlighting
-        # (`[highlight] mode = "server"`), which emits hljs-compatible class
-        # names and needs no JavaScript; pairing that with this inlined theme
-        # means a generated site highlights code with **zero external requests
-        # and zero extra files** (the old default pulled highlight.js + a
-        # theme from cdnjs). Because the rules live in the scaffold stylesheet
-        # — loaded via `{{ base_url }}/css/style.css` — they also stay correct
-        # under sub-path deploys, unlike a root-absolute `/assets/...` link.
+        # stylesheet. Highlight.js (loaded from a CDN, `mode = "client"`)
+        # tags code with hljs-compatible classes in the browser; this theme
+        # colors them, so we ship no separate highlight theme stylesheet —
+        # the scaffold recolors syntax by editing its own CSS. Because the
+        # rules live in the scaffold stylesheet (loaded via
+        # `{{ base_url }}/css/style.css`) they stay correct under sub-path
+        # deploys, unlike a root-absolute `/assets/...` theme link. The theme
+        # also covers `mode = "server"` output, which uses the same classes.
         #
         # The earthy palette (gruvbox-adjacent, retuned to the warm surfaces)
         # keeps the syntax colors inside the ember world instead of the cold
@@ -241,7 +241,7 @@ module Hwaro
           attr = dark ? "#93b5c8" : "#45617a"
           symbol = dark ? "#d79bb8" : "#8a4368"
           <<-CSS
-            /* Syntax highlighting — ember-warm, inlined (no CDN, no JS). */
+            /* Syntax highlighting — ember-warm, inlined (recolor here, not via a theme link). */
             .hljs-comment, .hljs-quote { color: #{comment}; font-style: italic; }
             .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag { color: #{keyword}; }
             .hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: #{string}; }
@@ -376,7 +376,7 @@ module Hwaro
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
             str << "\n[highlight]\n"
             str << "enabled = true\n"
-            str << "mode = \"server\"\n"
+            str << "mode = \"client\"\n"
             str << "theme = \"#{config_highlight_theme}\"\n"
             str << "use_cdn = true\n"
             unless skip_taxonomies
@@ -446,9 +446,9 @@ module Hwaro
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
               #{styles}
-              {# Syntax highlighting is build-time (mode = "server") and themed by
-                 the inlined CSS above, so no highlight stylesheet link is emitted
-                 here — zero external requests, sub-path safe. #}
+              {# The syntax theme is inlined in the CSS above, so no highlight
+                 theme stylesheet link is emitted here (sub-path safe). Highlight.js
+                 itself still loads from the footer. #}
               {{ math_tags }}
               {{ mermaid_tags }}
               {{ auto_includes_css }}

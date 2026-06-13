@@ -67,16 +67,17 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code blocks are highlighted at build time and themed by an inlined,
-            # ember-warm dark theme in css/style.css — no JavaScript and no external
-            # requests. Switch mode to "client" (+ use_cdn = true or local assets)
-            # to highlight in the browser with Highlight.js instead.
+            # Code blocks are highlighted in the browser by Highlight.js and themed by
+            # an inlined, ember-warm dark theme in css/style.css (so you recolor syntax
+            # by editing that CSS, not the `theme` below). `mode = "server"` can
+            # highlight at build time with no JS, but its Tartrazine backend isn't
+            # multi-thread-safe, so the scaffold default stays "client".
 
             [highlight]
             enabled = true
-            mode = "server"              # "server" = highlight at build time (no JS, no external requests)
-            theme = "github-dark"        # Only used if you switch to mode = "client"; the default theme is inlined
-            use_cdn = true               # Only used if you switch to mode = "client" (loads Highlight.js from a CDN)
+            mode = "client"              # "client" = Highlight.js in the browser; "server" = build-time (no JS)
+            theme = "github-dark"        # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
+            use_cdn = true               # true loads Highlight.js from a CDN; false expects a self-hosted build
 
             TOML
         end
