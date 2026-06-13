@@ -71,6 +71,8 @@ module Hwaro
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
               color-scheme: dark;
               --primary: #ec7a66;

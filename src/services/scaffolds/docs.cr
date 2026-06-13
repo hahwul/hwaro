@@ -195,11 +195,13 @@ module Hwaro
           super.merge({
             "css/style.css" => css_content,
             "js/search.js"  => search_js_content,
-          })
+          }).merge(font_files)
         end
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
               --primary: #b35454;
               --primary-hover: #8f4040;

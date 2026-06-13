@@ -158,7 +158,7 @@ module Hwaro
           super.merge({
             "css/style.css" => css_content,
             "js/book.js"    => book_js_content,
-          })
+          }).merge(font_files)
         end
 
         # `book` ships no `[[taxonomies]]` block (see `config_content`),
@@ -181,6 +181,8 @@ module Hwaro
 
         private def css_content : String
           <<-CSS
+            #{font_face_css("../fonts")}
+
             :root {
               --primary: #b35454;
               --primary-hover: #8f4040;

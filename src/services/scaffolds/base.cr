@@ -13,6 +13,7 @@
 
 require "../../config/options/init_options"
 require "../config_snippets"
+require "./embedded_fonts"
 
 module Hwaro
   module Services
@@ -147,6 +148,57 @@ module Hwaro
           {
             "favicon.svg" => default_favicon_svg,
           }
+        end
+
+        # The embedded Charis SIL faces (+ its OFL license), keyed by the
+        # path they're written to under `static/`. Scaffolds whose CSS
+        # declares the `@font-face` blocks merge this into `static_files`
+        # so the serif heading signature renders identically off-Apple
+        # (see `EmbeddedFonts`). `bare` intentionally skips it — it ships
+        # no stylesheet to reference the faces. The String values carry
+        # raw woff2 bytes; `File.write` emits them verbatim.
+        def font_files : Hash(String, String)
+          {
+            "fonts/charis-sil-400.woff2"    => EmbeddedFonts.regular,
+            "fonts/charis-sil-700.woff2"    => EmbeddedFonts.bold,
+            "fonts/charis-sil-italic.woff2" => EmbeddedFonts.italic,
+            "fonts/OFL.txt"                 => EmbeddedFonts.ofl_license,
+          }
+        end
+
+        # `@font-face` blocks that bind the embedded Charis SIL faces to
+        # the family name `"Charter"`. `local()` comes first so a machine
+        # that already has Charter (macOS/iOS) uses it with no download;
+        # everyone else fetches the subset woff2. `font_path_prefix`
+        # differs per scaffold: the simple scaffold inlines its CSS into a
+        # template (so it can use `{{ base_url }}`), while blog/docs/book
+        # ship an external stylesheet at `/css/style.css` and must point
+        # at the fonts relatively (`../fonts/...`) to survive sub-path
+        # deploys.
+        protected def font_face_css(font_path_prefix : String) : String
+          <<-CSS
+            @font-face {
+              font-family: "Charter";
+              font-style: normal;
+              font-weight: 400;
+              font-display: swap;
+              src: local("Charter"), local("Charis SIL"), url("#{font_path_prefix}/charis-sil-400.woff2") format("woff2");
+            }
+            @font-face {
+              font-family: "Charter";
+              font-style: normal;
+              font-weight: 700;
+              font-display: swap;
+              src: local("Charter Bold"), local("Charis SIL Bold"), url("#{font_path_prefix}/charis-sil-700.woff2") format("woff2");
+            }
+            @font-face {
+              font-family: "Charter";
+              font-style: italic;
+              font-weight: 400;
+              font-display: swap;
+              src: local("Charter Italic"), local("Charis SIL Italic"), url("#{font_path_prefix}/charis-sil-italic.woff2") format("woff2");
+            }
+            CSS
         end
 
         # 32×32 SVG favicon. Inline (no external file dep), themable
@@ -457,12 +509,15 @@ module Hwaro
         # Override in subclasses to customize styles.
         #
         # "Hwaro Ember" theme: warm paper neutrals + the hwaro brand
-        # ember red (#b35454) as the single accent, with system serif
-        # headings (Charter/Iowan) against a sans body. No webfonts —
-        # every face below ships with the OS.
+        # ember red (#b35454) as the single accent, with Charter serif
+        # headings against a sans body. Charter ships embedded (Charis
+        # SIL, OFL) via the `@font-face` blocks below, so the heading
+        # signature renders the same off-Apple; this CSS is inlined into a
+        # template, so the font URLs can use `{{ base_url }}`.
         protected def styles : String
           <<-CSS
             <style>
+              #{font_face_css("{{ base_url }}/fonts")}
               :root {
                 --primary: #b35454;
                 --primary-strong: #8f4040;
