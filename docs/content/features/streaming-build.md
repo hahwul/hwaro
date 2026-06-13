@@ -23,7 +23,7 @@ For most sites, the default build mode works well. Streaming build is useful whe
 
 ### `--stream` flag
 
-Enable streaming with a default batch size of 50 pages:
+Enable streaming with a default batch size of 500 pages:
 
 ```bash
 hwaro build --stream
@@ -64,7 +64,7 @@ hwaro build --stream --memory-limit 512M
 | `--stream` | `--memory-limit` | `HWARO_MEMORYLIMIT` | Result |
 |---|---|---|---|
 | - | - | - | Normal build |
-| yes | - | - | Streaming, batch=50 |
+| yes | - | - | Streaming, batch=500 |
 | - | 2G | - | Streaming, batch≈20000 |
 | - | - | 1G | Streaming, batch≈10000 |
 | yes | 512M | - | Streaming, batch≈5000 |
@@ -92,11 +92,11 @@ hwaro build --stream --verbose
 
 ```
 Building site...
-  Streaming mode enabled (batch size: 50)
+  Streaming mode enabled (batch size: 500)
   ...
-  Streaming batch 1 (50 pages)
-  Streaming batch 2 (50 pages)
-  Streaming batch 3 (23 pages)
+  Streaming batch 1 (500 pages)
+  Streaming batch 2 (500 pages)
+  Streaming batch 3 (234 pages)
   ...
 ```
 

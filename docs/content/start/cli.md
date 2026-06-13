@@ -214,14 +214,14 @@ hwaro build -i /path/to/my-site -o ./dist
 
 For sites with thousands of pages, loading all rendered HTML into memory at once can cause high memory usage. Streaming build processes pages in batches during the Render phase, releasing rendered HTML after each batch is written to disk.
 
-- `--stream` enables streaming with a default batch size of 50 pages.
+- `--stream` enables streaming with a default batch size of 500 pages.
 - `--memory-limit SIZE` enables streaming and calculates the batch size automatically based on the given limit (heuristic: ~50KB per page). Accepts `G`, `M`, `K` suffixes (e.g. `2G`, `512M`, `256K`).
 - You can also set the `HWARO_MEMORYLIMIT` environment variable as a fallback. The CLI flag overrides the env var.
 
 | `--stream` | `--memory-limit` | `HWARO_MEMORYLIMIT` | Result |
 |---|---|---|---|
 | - | - | - | Normal build |
-| yes | - | - | Streaming, batch=50 |
+| yes | - | - | Streaming, batch=500 |
 | - | 2G | - | Streaming, batch≈20000 |
 | - | - | 1G | Streaming, batch≈10000 |
 | yes | 512M | - | Streaming, batch≈5000 |
