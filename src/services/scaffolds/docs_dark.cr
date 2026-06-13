@@ -85,14 +85,14 @@ module Hwaro
               --primary-hover: #ea8a7d;
               --heading: #ece5dc;
               --text: #d9d2c9;
-              --text-secondary: #a3958a;
-              --text-muted: #8f8174;
+              --text-secondary: #b3a597;
+              --text-muted: #9c8d7e;
               --border: #352d26;
               --border-light: #2a231d;
               --bg: #100e0c;
               --bg-sidebar: #1b1612;
               --bg-secondary: #1e1813;
-              --bg-code: #1e1813;
+              --bg-code: #231c15;
               --header-h: 52px;
               --sidebar-w: 260px;
               --content-max-w: 780px;
@@ -380,15 +380,22 @@ module Hwaro
               padding: 1rem 1.25rem;
               border-radius: var(--radius);
               overflow-x: auto;
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
+              background: var(--bg-code);
+              box-shadow: inset 0 1px 0 rgba(236, 229, 220, 0.05);
             }
 
-            pre code {
-              background: none;
+            /* Force the highlight theme's own (cold navy github-dark)
+               background off so syntax tokens sit on the warm ember card
+               instead of a clashing box. `pre code.hljs` (0,1,2) outranks
+               the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.82rem;
+              color: var(--text);
             }
 
             /* Tables */

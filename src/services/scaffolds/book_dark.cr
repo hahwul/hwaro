@@ -78,14 +78,14 @@ module Hwaro
               --primary-subtle: color-mix(in srgb, var(--primary) 8%, transparent);
               --heading: #ece5dc;
               --text: #d9d2c9;
-              --text-secondary: #a3958a;
-              --text-muted: #8f8174;
+              --text-secondary: #b3a597;
+              --text-muted: #9c8d7e;
               --border: #352d26;
               --border-light: #2a231d;
               --bg: #100e0c;
               --bg-secondary: #1e1813;
               --bg-sidebar: #1b1612;
-              --bg-code: #1e1813;
+              --bg-code: #231c15;
               --header-h: 50px;
               --sidebar-w: 280px;
               --content-max-w: 780px;
@@ -294,8 +294,10 @@ module Hwaro
             a:hover { color: var(--primary); text-decoration-color: currentColor; }
 
             code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); font-size: 0.85em; font-family: var(--font-mono); }
-            pre { background: var(--bg-code); padding: 1rem 1.25rem; border-radius: var(--radius); overflow-x: auto; border: 1px solid var(--border); margin: 1.25rem 0 1.5rem 0; line-height: 1.6; }
-            pre code { background: none; padding: 0; font-size: 0.84rem; }
+            pre { background: var(--bg-code); padding: 1rem 1.25rem; border-radius: var(--radius); overflow-x: auto; border: 1px solid var(--border); margin: 1.25rem 0 1.5rem 0; line-height: 1.6; box-shadow: inset 0 1px 0 rgba(236, 229, 220, 0.05); }
+            /* Force the highlight theme's own (cold navy github-dark) background off so syntax
+               tokens sit on the warm card. `pre code.hljs` (0,1,2) outranks `.hljs` (0,1,0). */
+            pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.84rem; color: var(--text); }
 
             table { width: 100%; border-collapse: collapse; margin: 1.25rem 0 1.5rem 0; font-size: 0.9rem; font-family: var(--font-sans); }
             th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); }
