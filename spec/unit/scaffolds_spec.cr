@@ -400,8 +400,8 @@ describe Hwaro::Services::Scaffolds::BlogDark do
       scaffold = Hwaro::Services::Scaffolds::BlogDark.new
       css = scaffold.static_files["css/style.css"]
       css.should contain("color-scheme: dark")
-      css.should contain("--bg: #100e0c")
-      css.should contain("--primary: #dd7064")
+      css.should contain("--bg: #0f0f0e")
+      css.should contain("--primary: #ec7a66")
     end
   end
 end
@@ -461,8 +461,8 @@ describe Hwaro::Services::Scaffolds::DocsDark do
       scaffold = Hwaro::Services::Scaffolds::DocsDark.new
       css = scaffold.static_files["css/style.css"]
       css.should contain("color-scheme: dark")
-      css.should contain("--bg: #100e0c")
-      css.should contain("--primary: #dd7064")
+      css.should contain("--bg: #0f0f0e")
+      css.should contain("--primary: #ec7a66")
     end
   end
 end

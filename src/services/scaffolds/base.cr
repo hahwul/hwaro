@@ -509,7 +509,10 @@ module Hwaro
 
               code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); }
               pre { background: var(--bg-subtle); padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); line-height: 1.55; }
-              pre code { background: none; padding: 0; }
+              /* Drop the highlight theme's own white background so syntax tokens
+                 sit on the warm code well instead of a white box. `pre code.hljs`
+                 (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+              pre code, pre code.hljs { background: transparent; padding: 0; }
               img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
               blockquote { font-family: var(--font-serif); font-style: italic; margin: 1.4em 0; padding: 0.1rem 0 0.1rem 1.25rem; color: var(--text-muted); border-left: 1px solid var(--primary); }
               table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }

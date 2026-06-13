@@ -539,13 +539,17 @@ module Hwaro
               padding: 1rem 1.25rem;
               border-radius: var(--radius);
               overflow-x: auto;
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
+              background: var(--bg-code);
             }
 
-            pre code {
-              background: none;
+            /* Drop the highlight theme's own white background so syntax tokens
+               sit on the warm code well instead of a white box. `pre code.hljs`
+               (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.82rem;
             }

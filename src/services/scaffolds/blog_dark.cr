@@ -82,17 +82,17 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #dd7064;
-              --primary-hover: #ea8a7d;
-              --heading: #ece5dc;
-              --text: #d9d2c9;
-              --text-secondary: #b3a597;
-              --text-muted: #9c8d7e;
-              --border: #322a23;
-              --border-light: #251f1a;
-              --bg: #100e0c;
-              --bg-secondary: #1e1813;
-              --bg-code: #231c15;
+              --primary: #ec7a66;
+              --primary-hover: #f39683;
+              --heading: #f5f2ed;
+              --text: #dedad3;
+              --text-secondary: #a7a199;
+              --text-muted: #7d776e;
+              --border: #2b2926;
+              --border-light: #201e1c;
+              --bg: #0f0f0e;
+              --bg-secondary: #1a1917;
+              --bg-code: #1e1c19;
               --header-h: 52px;
               --content-max-w: 860px;
               --radius: 10px;
@@ -123,7 +123,7 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(16, 14, 12, 0.85);
+              background: rgba(15, 15, 14, 0.85);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -217,7 +217,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #e08474, #b35454);
+              background: linear-gradient(90deg, #f39683, #cc5d4b);
             }
 
             .blog-main h2 {
@@ -350,7 +350,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #e08474, #b35454);
+              background: linear-gradient(90deg, #f39683, #cc5d4b);
             }
 
             .home-tagline {

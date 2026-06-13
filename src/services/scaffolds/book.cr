@@ -592,8 +592,11 @@ module Hwaro
               line-height: 1.6;
             }
 
-            pre code {
-              background: none;
+            /* Drop the highlight theme's own white background so syntax tokens
+               sit on the warm code well instead of a white box. `pre code.hljs`
+               (0,1,2) outranks the theme's `.hljs` (0,1,0). */
+            pre code, pre code.hljs {
+              background: transparent;
               padding: 0;
               font-size: 0.84rem;
             }

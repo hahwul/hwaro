@@ -73,19 +73,19 @@ module Hwaro
           <<-CSS
             :root {
               color-scheme: dark;
-              --primary: #dd7064;
-              --primary-hover: #ea8a7d;
+              --primary: #ec7a66;
+              --primary-hover: #f39683;
               --primary-subtle: color-mix(in srgb, var(--primary) 8%, transparent);
-              --heading: #ece5dc;
-              --text: #d9d2c9;
-              --text-secondary: #b3a597;
-              --text-muted: #9c8d7e;
-              --border: #352d26;
-              --border-light: #2a231d;
-              --bg: #100e0c;
-              --bg-secondary: #1e1813;
-              --bg-sidebar: #1b1612;
-              --bg-code: #231c15;
+              --heading: #f5f2ed;
+              --text: #dedad3;
+              --text-secondary: #a7a199;
+              --text-muted: #7d776e;
+              --border: #2b2926;
+              --border-light: #201e1c;
+              --bg: #0f0f0e;
+              --bg-secondary: #1a1917;
+              --bg-sidebar: #151412;
+              --bg-code: #1e1c19;
               --header-h: 50px;
               --sidebar-w: 280px;
               --content-max-w: 780px;
@@ -118,7 +118,7 @@ module Hwaro
               position: fixed;
               top: 0; left: 0; right: 0;
               height: var(--header-h);
-              background: rgba(16, 14, 12, 0.9);
+              background: rgba(15, 15, 14, 0.9);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border-light);
@@ -277,7 +277,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #e08474, #b35454);
+              background: linear-gradient(90deg, #f39683, #cc5d4b);
             }
 
             .book-content h2 { font-size: 1.5rem; font-weight: 700; margin: 2.5rem 0 0.75rem 0; letter-spacing: -0.008em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-light); }
