@@ -590,3 +590,36 @@ describe "#has_redirect?" do
     page.has_redirect?.should be_true
   end
 end
+
+# test case for taxonomy_values method:
+describe "#taxonomy_values" do
+  it "returns values from @taxonomies when the key exists" do
+    page = Hwaro::Models::Page.new("test.md")
+    page.taxonomies["categories"] = ["news", "tech"]
+    page.taxonomy_values("categories").should eq(["news", "tech"])
+  end
+
+  it "falls back to @tags when name is 'tags' and not in taxonomies" do
+    page = Hwaro::Models::Page.new("test.md")
+    page.tags = ["crystal", "oss"]
+    page.taxonomy_values("tags").should eq(["crystal", "oss"])
+  end
+
+  it "falls back to @authors when name is 'authors' and not in taxonomies" do
+    page = Hwaro::Models::Page.new("test.md")
+    page.authors = ["A", "B"]
+    page.taxonomy_values("authors").should eq(["A", "B"])
+  end
+
+  it "returns an empty array for an unknown taxonomy name" do
+    page = Hwaro::Models::Page.new("test.md")
+    page.taxonomy_values("series").should eq([] of String)
+  end
+
+  it "@taxonomies entry wins over @tags when both are set" do
+    page = Hwaro::Models::Page.new("test.md")
+    page.tags = ["from-field"]
+    page.taxonomies["tags"] = ["from-taxonomies"]
+    page.taxonomy_values("tags").should eq(["from-taxonomies"])
+  end
+end
