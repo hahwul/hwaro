@@ -185,7 +185,14 @@ module Hwaro
           end
         end
 
-        # Split a table row into cells
+        # Split a table row into cells.
+        #
+        # A `|` only delimits columns when it is "bare": escaped pipes (`\|`)
+        # and pipes that sit inside an inline code span (`` `a|b` ``) are
+        # literal cell content, matching GFM / markdown-it. Without the
+        # code-span guard a cell like `` `a|b` `` gets split mid-span, which
+        # corrupts the code span (dangling backticks) and pushes a stray extra
+        # `<td>` past the column count.
         private def split_row(line : String) : Array(String)
           stripped = line.strip
 
@@ -195,7 +202,6 @@ module Hwaro
           # Remove trailing pipe if present
           stripped = stripped.rchop('|') if stripped.ends_with?('|')
 
-          # Split by pipe, handling escaped pipes
           cells = [] of String
           current = String::Builder.new
           i = 0
@@ -207,6 +213,32 @@ module Hwaro
               # Escaped pipe - include literal pipe
               current << '|'
               i += 2
+            elsif char == '`'
+              # Inline code span: keep an interior `|` from splitting the cell.
+              # An opening run of N backticks is closed by the next run of
+              # exactly N; with no closer the backtick is literal and scanning
+              # resumes from the next character. `\|` is still unescaped to a
+              # bare pipe inside the span (GFM tables collapse it before the
+              # code span is rendered — see the spec's `b `\|` az` example).
+              run_len = backtick_run_length(chars, i)
+              close = find_closing_backtick_run(chars, i + run_len, run_len)
+              if close
+                end_index = close + run_len
+                k = i
+                while k < end_index
+                  if chars[k] == '\\' && k + 1 < end_index && chars[k + 1] == '|'
+                    current << '|'
+                    k += 2
+                  else
+                    current << chars[k]
+                    k += 1
+                  end
+                end
+                i = end_index
+              else
+                run_len.times { current << '`' }
+                i += run_len
+              end
             elsif char == '|'
               cells << current.to_s
               current = String::Builder.new
@@ -219,6 +251,33 @@ module Hwaro
           cells << current.to_s
 
           cells
+        end
+
+        # Number of consecutive backticks starting at `start`.
+        private def backtick_run_length(chars : Array(Char), start : Int32) : Int32
+          run = 0
+          while start + run < chars.size && chars[start + run] == '`'
+            run += 1
+          end
+          run
+        end
+
+        # Index where a closing backtick run of exactly `run_len` backticks
+        # begins, scanning from `start`. Returns nil when the span is never
+        # closed (the opening run is then treated as literal text). Runs of a
+        # different length are skipped, per CommonMark's code-span rule.
+        private def find_closing_backtick_run(chars : Array(Char), start : Int32, run_len : Int32) : Int32?
+          i = start
+          while i < chars.size
+            if chars[i] == '`'
+              run = backtick_run_length(chars, i)
+              return i if run == run_len
+              i += run
+            else
+              i += 1
+            end
+          end
+          nil
         end
 
         # Parse alignment from separator cell

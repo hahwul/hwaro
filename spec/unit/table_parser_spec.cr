@@ -397,6 +397,64 @@ describe Hwaro::Content::Processors::TableParser do
       result.should_not contain("<strong>")
     end
 
+    it "does not split a cell on a pipe inside an inline code span" do
+      content = <<-MD
+        | A | B | C |
+        |---|---|---|
+        | p | a `b|c` d | q |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      # The pipe inside the code span is literal, so the row stays 3 columns
+      # and the code span renders intact (no dangling backticks).
+      result.should contain("<td>p</td>")
+      result.should contain("<td>a <code>b|c</code> d</td>")
+      result.should contain("<td>q</td>")
+      result.should_not contain("`b")
+      result.should_not contain("c`")
+    end
+
+    it "does not split a cell on a pipe inside a multi-backtick code span" do
+      content = <<-MD
+        | A | B |
+        |---|---|
+        | x | ``a | b`` |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      # A run of N backticks closes on the next run of N, so the interior
+      # pipe stays in one cell: the row keeps exactly two body columns
+      # instead of being split into three.
+      result.should contain("<td>x</td>")
+      result.scan(/<td/).size.should eq(2)
+      result.should contain("a | b")
+    end
+
+    it "unescapes an escaped pipe inside a code span (GFM table escape)" do
+      content = <<-MD
+        | A | B |
+        |---|---|
+        | x | `b\\|c` |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<td><code>b|c</code></td>")
+      result.should_not contain("b\\|c")
+    end
+
+    it "still splits on a bare pipe when a backtick span is never closed" do
+      content = <<-MD
+        | A | B |
+        |---|---|
+        | a `unclosed | b |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      # No closing backtick, so the `|` after it still delimits the columns.
+      result.should contain("<td>a `unclosed</td>")
+      result.should contain("<td>b</td>")
+    end
+
     it "renders underscore bold and italic" do
       content = <<-MD
         | Header |
