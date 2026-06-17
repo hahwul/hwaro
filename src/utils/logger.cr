@@ -145,7 +145,7 @@ module Hwaro
       start = Time.instant
       result = yield
       elapsed = Time.instant - start
-      info "#{message} (#{elapsed.total_milliseconds.round(2)}ms)"
+      info "#{message} (#{dur(elapsed.total_milliseconds)})"
       result
     end
 
@@ -413,21 +413,31 @@ module Hwaro
         @start = Time.instant
         @frame = 0
         @stopped = Atomic(Int32).new(0)
-        @done = Channel(Nil).new
+        # Buffered (capacity 1) so the timer fiber's final send never blocks,
+        # even if `stop` is never reached — no parked/leaked fiber.
+        @done = Channel(Nil).new(1)
         @active = false
+        # Serializes terminal writes and shared-state (@label/@frame) access
+        # between the timer fiber and the main fiber under -Dpreview_mt.
+        @mutex = Mutex.new
       end
 
       def start : Nil
         @active = true
-        io = @io
         spawn do
-          until @stopped.get == 1
-            draw
-            sleep INTERVAL
+          begin
+            until @stopped.get == 1
+              draw
+              sleep INTERVAL
+            end
+          ensure
+            # Always erase our line and signal `stop`, even if `draw` raised
+            # (e.g. the TTY went away mid-build). Without this, `stop`'s
+            # `@done.receive` — reached from the build's `ensure` — would
+            # deadlock the whole process.
+            erase
+            @done.send(nil)
           end
-          io.print "\r\e[K"
-          io.flush
-          @done.send(nil)
         end
       end
 
@@ -437,12 +447,12 @@ module Hwaro
       # points); the timer still adds animation whenever the build yields.
       def phase(label : String) : Nil
         return unless @active
-        @label = label
+        @mutex.synchronize { @label = label }
         draw
       end
 
       # Stop the timer fiber and wait for it to erase its line, so subsequent
-      # output (the receipt) prints on a clean line.
+      # output (the receipt) prints on a clean line. Idempotent.
       def stop : Nil
         return unless @active
         @active = false
@@ -455,20 +465,36 @@ module Hwaro
       # spinner simply redraws below it on its next tick.
       def clear_line : Nil
         return unless @active
-        @io.print "\r\e[K"
-        @io.flush
+        erase
+      end
+
+      private def erase : Nil
+        write "\r\e[K"
       end
 
       private def draw : Nil
-        frame = SPINNER[@frame % SPINNER.size]
-        @frame += 1
-        elapsed = Logger.dur((Time.instant - @start).total_milliseconds)
-        body = @label.empty? ? "working" : @label
-        line = "#{Logger.paint(frame, Role::Accent)} " \
-               "#{Logger.paint(body, Role::Dim)} " \
-               "#{Logger.paint("· #{elapsed}", Role::Dim)}"
-        @io.print "\r\e[K#{line}"
-        @io.flush
+        line = @mutex.synchronize do
+          frame = SPINNER[@frame % SPINNER.size]
+          @frame += 1
+          elapsed = Logger.dur((Time.instant - @start).total_milliseconds)
+          body = @label.empty? ? "working" : @label
+          "\r\e[K#{Logger.paint(frame, Role::Accent)} " \
+          "#{Logger.paint(body, Role::Dim)} " \
+          "#{Logger.paint("· #{elapsed}", Role::Dim)}"
+        end
+        write line
+      end
+
+      # Single guarded terminal writer. If the TTY disappears mid-build
+      # (SIGHUP / EPIPE / EIO), stop the spinner instead of raising into the
+      # build or spinning uselessly — the receipt still prints afterwards.
+      private def write(s : String) : Nil
+        @mutex.synchronize do
+          @io.print s
+          @io.flush
+        end
+      rescue IO::Error
+        @stopped.set(1)
       end
     end
 
