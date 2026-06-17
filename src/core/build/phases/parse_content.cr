@@ -9,6 +9,7 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def execute_parse_content_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("ParseContent")
     result = @lifecycle.run_phase(Lifecycle::Phase::ParseContent, ctx) do
+      Logger.status_phase("parse")
       # Default parsing if no hooks registered
       unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeParseContent)
         parse_content_default(ctx)
@@ -106,10 +107,16 @@ module Hwaro::Core::Build::Phases::ParseContent
       ctx.invalidate_all_pages_cache
     end
 
+    # The skipped total feeds the receipt's "parse … N skipped" emphasis; the
+    # per-reason breakdown stays available under --verbose. Parse errors remain
+    # a warning regardless, since they signal broken content.
+    ctx.stats.pages_skipped = draft_count + future_count + expired_count
     Logger.warn "  #{failed_count} page(s) skipped due to parse errors." if failed_count > 0
-    Logger.info "  #{draft_count} page(s) skipped (draft) — excluded from sitemap, feeds & search by default." if draft_count > 0
-    Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
-    Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
+    if ctx.options.verbose
+      Logger.info "  #{draft_count} page(s) skipped (draft) — excluded from sitemap, feeds & search by default." if draft_count > 0
+      Logger.info "  #{future_count} page(s) skipped (future-dated)." if future_count > 0
+      Logger.info "  Excluded #{expired_count} expired page#{"s" if expired_count > 1}" if expired_count > 0
+    end
 
     # Show included draft content paths when --drafts flag is used
     if include_drafts

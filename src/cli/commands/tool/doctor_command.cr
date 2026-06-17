@@ -192,7 +192,7 @@ module Hwaro
           private def render_human(issues : Array(Services::Issue), config_path : String)
             plain = plain_output?
 
-            Logger.info "Running diagnostics..."
+            Logger.heading("doctor")
             Logger.info ""
             Services::CHECK_GROUPS.each do |group|
               heading = group.key == :config ? config_path : group.default_heading
@@ -204,7 +204,7 @@ module Hwaro
             end
 
             if issues.empty?
-              Logger.info "#{ok_glyph(plain)} No issues found. Your site looks great!"
+              Logger.outcome("checked", "no issues found — your site looks great")
               return
             end
 
@@ -245,12 +245,17 @@ module Hwaro
               Logger.info ""
             end
 
-            # Summary
+            # Summary — one severity-aware outcome line: the lead glyph reflects
+            # the worst level found (✗ error / ⚠ warning / ▴ clean).
             errors = issues.count { |i| i.level == :error }
             warnings = issues.count { |i| i.level == :warning }
             infos = issues.count { |i| i.level == :info }
 
-            Logger.info "Found #{errors} error(s), #{warnings} warning(s), #{infos} info(s)"
+            worst = errors > 0 ? :err : (warnings > 0 ? :warn : :result)
+            summary = "#{errors} #{errors == 1 ? "error" : "errors"} · " \
+                      "#{warnings} #{warnings == 1 ? "warning" : "warnings"} · " \
+                      "#{infos} info"
+            Logger.outcome("checked", summary, worst)
             Logger.info ""
             Logger.info "Tip: Use 'hwaro tool validate' for content checks"
           end
@@ -288,17 +293,20 @@ module Hwaro
               else               "[ok]  "
               end
             else
+              # Route through the shared ember palette. Same colors as before
+              # except :info, which moves off the off-brand :cyan to a recessive
+              # dim role. truecolor terminals get the warm 24-bit tier for free.
               case level
-              when :error   then "✗".colorize(:red).to_s
-              when :warning then "⚠".colorize(:yellow).to_s
-              when :info    then "ℹ".colorize(:cyan).to_s
-              else               "✓".colorize(:green).to_s
+              when :error   then Logger.paint("✗", Logger::Role::Error)
+              when :warning then Logger.paint("⚠", Logger::Role::Warn)
+              when :info    then Logger.paint("ℹ", Logger::Role::Dim)
+              else               Logger.paint("✓", Logger::Role::Success)
               end
             end
           end
 
           private def ok_glyph(plain : Bool) : String
-            plain ? "[ok]" : "✓".colorize(:green).to_s
+            plain ? "[ok]" : Logger.paint("✓", Logger::Role::Success)
           end
 
           private def run_fix(doctor : Services::Doctor, approve_sections : Bool, dry_run : Bool, json_output : Bool)
@@ -322,7 +330,7 @@ module Hwaro
             unless summary.value_fixes.empty?
               Logger.success "#{verb_updated} #{summary.value_fixes.size} value(s) in config.toml:"
               summary.value_fixes.each do |fix|
-                arrow = plain ? "->" : "→".colorize(:green).to_s
+                arrow = plain ? "->" : Logger.paint("→", Logger::Role::Success)
                 Logger.info "  #{fix.field}: #{fix.before} #{arrow} #{fix.after}"
               end
               Logger.info ""
@@ -334,7 +342,7 @@ module Hwaro
               else
                 Logger.success "#{verb_added} #{summary.sections_added.size} config section(s):"
               end
-              plus = plain ? "+" : "＋".colorize(:green).to_s
+              plus = plain ? "+" : Logger.paint("＋", Logger::Role::Success)
               summary.sections_added.each do |key|
                 Logger.info "  #{plus} [#{key}]"
               end

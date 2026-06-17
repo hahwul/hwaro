@@ -8,6 +8,7 @@ module Hwaro::Core::Build::Phases::Write
   private def execute_write_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("Write")
     result = @lifecycle.run_phase(Lifecycle::Phase::Write, ctx) do
+      Logger.status_phase("write")
       site = @site || raise "Site not initialized"
       templates = @templates || raise "Templates not loaded"
       output_dir = ctx.options.output_dir

@@ -396,11 +396,7 @@ module Hwaro
       end
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
-        if build_options.fast_start
-          Logger.info "Performing fast-start initial build (priority pages only)..."
-        else
-          Logger.info "Performing initial build..."
-        end
+        # The initial build prints its own receipt; no preamble needed.
         @builder.run(build_options)
 
         # Watch-triggered rebuilds should preserve the already-built output
@@ -468,9 +464,15 @@ module Hwaro
         end
 
         url = "http://#{host}:#{port}"
-        Logger.success "Serving site at #{url}"
-        Logger.info "Press Ctrl+C to stop."
-        Logger.info "Live reload enabled" if live_reload
+        # Calm serve receipt: where it's live, reload state, what's watched,
+        # then the ember "ready" beat. The machine-readable ready line emitted
+        # later by `emit_ready_signal` is intentionally left untouched.
+        serve_receipt = Logger::Receipt.new("serve")
+        serve_receipt.row("url", url, Logger::Role::Accent)
+        serve_receipt.row("reload", live_reload ? "enabled" : "disabled")
+        serve_receipt.row("watch", "content · templates · static · config")
+        serve_receipt.outcome("ready", "Ctrl+C to stop", :ready)
+        serve_receipt.emit
 
         if open_browser
           spawn do
@@ -612,7 +614,7 @@ module Hwaro
       end
 
       private def watch_for_changes(build_options : Config::Options::BuildOptions)
-        Logger.info "Watching for changes in content/, templates/, static/ and config.toml..."
+        # Watched roots are shown in the serve receipt's "watch" row.
         last_mtimes = scan_mtimes
 
         loop do
@@ -760,7 +762,11 @@ module Hwaro
       # Choose the cheapest rebuild strategy for a given ChangeSet and execute it.
       private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         strategy = changeset.rebuild_strategy
-        Logger.info "\n[Watch] Change detected (#{changeset.description}). Strategy: #{strategy}..."
+        # Calm watch timeline: one ember "↻ time  changed  <what>" event, then
+        # the rebuild's own "▴ rebuilt …" outcome line below it. The strategy is
+        # implied by that outcome (incremental N/M, re-render, full).
+        timestamp = Time.local.to_s("%H:%M:%S")
+        Logger.info "\n#{Logger.glyph(:watch)} #{Logger.paint(timestamp, Logger::Role::Dim)}  changed  #{Logger.paint(changeset.description, Logger::Role::Dim)}"
 
         # Resolve removed sources to their output files BEFORE the rebuild
         # swaps in a site that no longer knows the deleted page's URL.

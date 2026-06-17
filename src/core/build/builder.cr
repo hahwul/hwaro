@@ -272,7 +272,7 @@ module Hwaro
             return run(options)
           end
 
-          Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..."
+          Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
 
           output_dir = options.output_dir
@@ -533,7 +533,7 @@ module Hwaro
           ParallelHelper.execute(seo_tasks, options.parallel)
 
           elapsed = Time.instant - start_time
-          Logger.success "Incremental build complete! Rendered #{render_list.size}/#{all_pages.size} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          Logger.outcome("rebuilt", "#{render_list.size} / #{all_pages.size} pages", :result, elapsed.total_milliseconds)
           if options.verbose
             @cache_manager.report_verbose
           else
@@ -674,9 +674,9 @@ module Hwaro
               return
             end
             affected_templates = deps.dependents_closure(changed)
-            Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..." unless changed.empty?
+            Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..." if options.verbose && !changed.empty?
           else
-            Logger.info "Template change detected. Re-rendering all pages..."
+            Logger.info "Template change detected. Re-rendering all pages..." if options.verbose
           end
 
           pages_to_render = if affected_templates && deps
@@ -696,7 +696,7 @@ module Hwaro
                               renderable_pages
                             end
 
-          if affected_templates && pages_to_render.size < renderable_pages.size
+          if options.verbose && affected_templates && pages_to_render.size < renderable_pages.size
             Logger.info "  #{pages_to_render.size} of #{renderable_pages.size} pages affected."
           end
 
@@ -731,7 +731,7 @@ module Hwaro
           cache.save if options.cache
 
           elapsed = Time.instant - start_time
-          Logger.success "Re-render complete! Rendered #{count} pages in #{elapsed.total_milliseconds.round(2)}ms."
+          Logger.outcome("rebuilt", "#{count} pages · re-render", :result, elapsed.total_milliseconds)
           if verbose
             @cache_manager.report_verbose
           else
@@ -844,7 +844,7 @@ module Hwaro
           @deferred_pages = nil
 
           elapsed = Time.instant - start_time
-          Logger.success "Fast-start: deferred render complete (#{count} pages in #{elapsed.total_milliseconds.round(2)}ms)."
+          Logger.outcome("rendered", "#{count} deferred pages", :result, elapsed.total_milliseconds)
           count
         end
 
@@ -869,7 +869,7 @@ module Hwaro
             FileUtils.cp(src_path, dest_path)
             copied += 1
           end
-          Logger.success "Copied #{copied} static file(s)." if copied > 0
+          Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
         end
 
         # Republish non-Markdown content assets (images, etc.) to the output
@@ -915,7 +915,7 @@ module Hwaro
             Logger.action :copy, dest_path, :blue if verbose
             copied += 1
           end
-          Logger.success "Copied #{copied} content file(s)." if copied > 0
+          Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0
         end
 
         # Map source paths that were removed from disk to the output files
@@ -990,7 +990,8 @@ module Hwaro
             end
           end
 
-          Logger.info "Building site..."
+          # The build runs quietly; its story is told by the closing receipt
+          # (and, under -Dpreview_mt TTY, the live status line in Phase 3).
           start_time = Time.instant
 
           # Initialize profiler
@@ -1039,8 +1040,16 @@ module Hwaro
           @cache_manager.clear_runtime
           @created_dirs.clear
 
-          # Execute build phases through lifecycle
-          result = execute_phases(ctx, profiler)
+          # Execute build phases through lifecycle. The live status region
+          # animates the current phase on a TTY; `ensure` guarantees the
+          # spinner is torn down (and its line cleared) on every exit path
+          # before the receipt prints.
+          Logger.status_start(verbose: options.verbose)
+          begin
+            result = execute_phases(ctx, profiler)
+          ensure
+            Logger.status_finish
+          end
 
           ctx.stats.end_time = Time.instant
 
@@ -1054,7 +1063,7 @@ module Hwaro
           # "content pages" rather than just "pages" — taxonomy/archive/section
           # index files are also written to disk, so a bare "N pages" count
           # misleads users who diff this number against `find public -name '*.html'`.
-          Logger.success "Build complete! Generated #{ctx.stats.pages_rendered} content pages#{raw_msg} in #{elapsed.total_milliseconds.round(2)}ms."
+          emit_build_receipt(ctx, raw_msg, elapsed.total_milliseconds)
           # Only warn about an empty site when nothing was built at all. Under
           # `--cache`, unchanged pages are skipped (counted as `cache_hits`)
           # rather than re-rendered, so `pages_rendered` is 0 on a no-op rebuild
@@ -1121,6 +1130,29 @@ module Hwaro
               @section_assets_crinja_cache.delete(section_name)
             end
           end
+        end
+
+        # Emit the calm closing receipt: an aligned per-phase summary plus the
+        # one ember "built" outcome line. Rows are skipped when their value is
+        # empty, so cached/no-op rebuilds stay terse. Falls back to plain
+        # "label: value" lines (no color, no rule) when color is off.
+        private def emit_build_receipt(ctx : Lifecycle::BuildContext, raw_msg : String, elapsed_ms : Float64)
+          stats = ctx.stats
+          receipt = Logger::Receipt.new("build")
+          receipt.row("read", stats.pages_read > 0 ? "#{stats.pages_read} content files" : "")
+          parsed = stats.pages_read - stats.pages_skipped
+          receipt.row("parse", parsed > 0 ? "#{parsed} pages" : "",
+            emphasis: stats.pages_skipped > 0 ? "#{stats.pages_skipped} skipped" : nil)
+          render_val =
+            if stats.cache_hits > 0
+              "#{stats.pages_rendered} pages · #{stats.cache_hits} cached"
+            else
+              "#{stats.pages_rendered} pages"
+            end
+          receipt.row("render", render_val)
+          receipt.row("write", stats.raw_files_processed > 0 ? "#{stats.raw_files_processed} raw files" : "")
+          receipt.outcome("built", "#{stats.pages_rendered} content pages#{raw_msg}", :result, elapsed_ms)
+          receipt.emit
         end
 
         # Execute all build phases with lifecycle hooks

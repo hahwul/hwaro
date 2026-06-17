@@ -33,8 +33,9 @@ module Hwaro::Core::Build::Phases::Render
                      end
 
     if cache_enabled && pages_to_build.size < all_pages.size
+      # Surfaced as the receipt's "render … · N cached" detail instead of an
+      # inline line.
       ctx.stats.cache_hits = all_pages.size - pages_to_build.size
-      Logger.info "  Skipping #{ctx.stats.cache_hits} unchanged pages."
     end
 
     # Determine if syntax highlighting should be used
@@ -92,6 +93,7 @@ module Hwaro::Core::Build::Phases::Render
 
     profiler.start_phase("Render")
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
+      Logger.status_phase(pages_to_build.size > 0 ? "render #{pages_to_build.size} pages" : "render")
       global_vars = build_global_vars(site, ctx.options.cache_busting)
       @pages_by_path = build_pages_by_path(site)
       count = if ctx.options.streaming?

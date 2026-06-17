@@ -2297,6 +2297,8 @@ describe "bind failure handling" do
         buffer = IO::Memory.new
         previous_io = Hwaro::Logger.io
         Hwaro::Logger.io = buffer
+        # Force plain output so the serve-receipt markers are deterministic.
+        Hwaro::Logger.color_enabled = false
 
         begin
           err = expect_raises(Hwaro::HwaroError) do
@@ -2309,12 +2311,15 @@ describe "bind failure handling" do
           err.exit_code.should eq(Hwaro::Errors::EXIT_IO)
           (err.message || "").downcase.should contain("bind")
 
+          # The serve receipt (heading + ready line) is printed only AFTER a
+          # successful bind, so a bind failure must show none of it.
           output = buffer.to_s
-          output.should_not contain("Serving site at")
-          output.should_not contain("Live reload enabled")
-          output.should_not contain("Watching for changes")
+          output.should_not contain("hwaro: serve")
+          output.should_not contain("ready: Ctrl+C to stop")
+          output.should_not contain("reload:")
         ensure
           Hwaro::Logger.io = previous_io
+          Hwaro::Logger.color_enabled = nil
           occupied.close
         end
       end

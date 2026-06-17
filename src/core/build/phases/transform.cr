@@ -8,6 +8,7 @@ module Hwaro::Core::Build::Phases::Transform
   private def execute_transform_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("Transform")
     result = @lifecycle.run_phase(Lifecycle::Phase::Transform, ctx) do
+      Logger.status_phase("transform")
       # Hooks handle transformation (Markdown → HTML)
     end
     profiler.end_phase

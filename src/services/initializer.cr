@@ -17,6 +17,10 @@ require "./config_snippets"
 module Hwaro
   module Services
     class Initializer
+      # Counts files/directories actually created so the closing receipt can
+      # report "N files" (existing entries left in place are not counted).
+      @created_count = 0
+
       def run(options : Config::Options::InitOptions)
         scaffold = if remote = options.scaffold_remote
                      Scaffolds::Remote.new(remote)
@@ -86,9 +90,8 @@ module Hwaro
           exit(1)
         end
 
-        target_label = target_path == "." ? "current directory" : "'#{target_path}'"
-        Logger.info "Initializing new Hwaro project in #{target_label}..."
-        Logger.info "Using scaffold: #{scaffold.description}"
+        Logger.heading("init", target_path == "." ? nil : target_path)
+        Logger.info "  #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
 
         is_multilingual = multilingual_languages.size > 1
 
@@ -185,8 +188,10 @@ module Hwaro
           end
         end
 
-        Logger.success "Done! Run `hwaro build` to generate the site."
-        Logger.info "Tip: update `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
+        display_target = target_path == "." ? "." : "#{target_path}/"
+        Logger.outcome("created", "#{@created_count} files · #{display_target}")
+        Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
+        Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
       end
 
       private def create_scaffold_content(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)
@@ -592,18 +597,20 @@ module Hwaro
 
       private def create_directory(path : String)
         if Dir.exists?(path)
-          Logger.action :exist, path, :blue
+          Logger.action :exist, path, :light_gray
         else
           Hwaro::Utils::FileSafe.mkdir_p(path)
+          @created_count += 1
           Logger.action :create, path
         end
       end
 
       private def create_file(path : String, content : String)
         if File.exists?(path)
-          Logger.action :exist, path, :blue
+          Logger.action :exist, path, :light_gray
         else
           File.write(path, content)
+          @created_count += 1
           Logger.action :create, path
         end
       end

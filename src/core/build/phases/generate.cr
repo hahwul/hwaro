@@ -7,6 +7,7 @@ module Hwaro::Core::Build::Phases::Generate
   private def execute_generate_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("Generate")
     result = @lifecycle.run_phase(Lifecycle::Phase::Generate, ctx) do
+      Logger.status_phase("generate")
       # Default generation if no SEO hooks registered
       unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeGenerate)
         site = @site || raise "Site not initialized"

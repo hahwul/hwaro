@@ -266,8 +266,10 @@ module Hwaro
           "                    ",
         ]
 
-        use_color = Logger.color_enabled?
-        brand = use_color ? "Hwaro".colorize(:cyan).bold.to_s : "Hwaro"
+        # Wordmark and H-art both wear the warm ember accent (the brand color),
+        # not the previous off-brand :cyan / :light_red. `paint` returns raw
+        # text when color is disabled, so the banner stays clean when piped.
+        brand = Logger.paint("Hwaro", Logger::Role::Accent, bold: true)
         info = [
           "",
           "",
@@ -285,7 +287,7 @@ module Hwaro
         Logger.info ""
         art.each_with_index do |line, i|
           right = info[i]? || ""
-          art_line = use_color ? line.colorize(:light_red).to_s : line
+          art_line = Logger.paint(line, Logger::Role::Accent)
           Logger.info "#{art_line}#{right}"
         end
 
