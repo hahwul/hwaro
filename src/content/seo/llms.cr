@@ -30,7 +30,7 @@ module Hwaro
           file_path = File.join(output_dir, filename)
           File.write(file_path, build_index(config, pages))
           Logger.action :create, file_path if verbose
-          Logger.info "  Generated #{filename}"
+          Logger.info "  Generated #{filename}" if verbose
 
           generate_full(pages, config, output_dir, verbose)
         end
@@ -140,7 +140,7 @@ module Hwaro
 
           File.write(file_path, content)
           Logger.action :create, file_path if verbose
-          Logger.info "  Generated #{filename}"
+          Logger.info "  Generated #{filename}" if verbose
         end
 
         private def self.build_full_document(pages : Array(Models::Page), config : Models::Config) : String

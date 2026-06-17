@@ -8,6 +8,7 @@
 - Template dependency tracking: a static `extends`/`include`/`import`/shortcode graph means editing a template now only rebuilds the pages that render it — in `--cache` builds (per-page closure fingerprints) and `hwaro serve` (selective re-render instead of all pages). Dynamic references (`{% include some_var %}`) or `[build] template_deps = false` restore whole-site invalidation
 
 ### Changed
+- Terminal output redesign ("ember" identity): `build`, `serve`, `init`, `new`, and `doctor` now share one warm visual language — a live status line animates the build through its phases (TTY only) then collapses into a calm, aligned receipt, ending on a single ember outcome line (`▴ built 42 pages …`). The help banner wordmark moves from off-brand cyan to the ember accent, and durations are humanized (`1.18s` / `842ms`). Machine output is unchanged: `--json` payloads, the `hwaro serve` ready line, `--quiet`, and the `NO_COLOR`/non-TTY plain path are byte-for-byte preserved (no escapes, no `\r`). `HWARO_THEME=light` tunes the accent for light terminals; `COLORTERM` enables the 24-bit tier. NOTE: scripts that grep the *human* stdout (e.g. `Build complete!`, `[Watch] Change detected`) should switch to `--json` — the wording changed, the machine contracts did not
 - Template errors now report `templates/<file>:line:col` with a caret-marked source excerpt instead of an anonymous `<string>` template — applies to syntax errors, runtime errors, and user shortcode templates
 
 ## v0.15.3

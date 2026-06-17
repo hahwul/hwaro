@@ -487,4 +487,88 @@ describe Hwaro::Logger do
       Hwaro::Logger::Level.values.size.should eq(4)
     end
   end
+
+  describe ".dur" do
+    it "formats sub-second values as whole ms" do
+      Hwaro::Logger.dur(0.0).should eq("0ms")
+      Hwaro::Logger.dur(999.4).should eq("999ms")
+    end
+
+    it "formats values >= 1s as seconds with two decimals" do
+      Hwaro::Logger.dur(1000.0).should eq("1.00s")
+      Hwaro::Logger.dur(1180.5).should eq("1.18s")
+    end
+  end
+
+  describe ".paint / .glyph fallbacks" do
+    it "returns raw text and ASCII glyphs when color is disabled" do
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.paint("x", Hwaro::Logger::Role::Accent).should eq("x")
+      Hwaro::Logger.glyph(:result).should eq("*")
+      Hwaro::Logger.glyph(:ok).should eq("[ok]")
+      Hwaro::Logger.glyph(:watch).should eq("~")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "uses unicode glyphs when color is enabled" do
+      Hwaro::Logger.color_enabled = true
+      Hwaro::Logger.glyph(:result).should contain("▴")
+      Hwaro::Logger.glyph(:heading).should contain("●")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
+
+  describe Hwaro::Logger::Receipt do
+    it "renders an escape-free plain summary, flattening · to , and skipping empty rows" do
+      r = Hwaro::Logger::Receipt.new("build")
+      r.row("read", "44 content files")
+      r.row("parse", "42 pages", emphasis: "2 skipped")
+      r.row("render", "42 pages · 0 cached")
+      r.row("write", "") # empty → skipped
+      r.outcome("built", "42 content pages", :result, 1180.5)
+
+      out = r.render_plain
+      out.should contain("hwaro: build")
+      out.should contain("read: 44 content files")
+      out.should contain("parse: 42 pages, 2 skipped")
+      out.should contain("render: 42 pages, 0 cached")
+      out.should_not contain("write:")
+      out.should contain("built: 42 content pages in 1.18s")
+      out.should_not contain("\e[")
+    end
+
+    it "includes the heading and outcome glyphs in the tty render" do
+      Hwaro::Logger.color_enabled = true
+      r = Hwaro::Logger::Receipt.new("build")
+      r.row("read", "x")
+      r.row("generate", "y")
+      r.outcome("built", "z")
+      tty = r.render_tty
+      tty.should contain("●")
+      tty.should contain("▴")
+      tty.should contain("─")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
+
+  describe ".outcome" do
+    it "prints a plain `verb: value` line when color is off" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.outcome("created", "content/x.md") }
+      out.should eq("created: content/x.md\n")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "is suppressed in quiet mode" do
+      Hwaro::Logger.quiet = true
+      out = capture_logger_output { Hwaro::Logger.outcome("created", "x") }
+      out.should eq("")
+    ensure
+      Hwaro::Logger.quiet = false
+    end
+  end
 end

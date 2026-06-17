@@ -49,7 +49,7 @@ module Hwaro
           file_path = File.join(output_dir, filename)
           File.write(file_path, content)
           Logger.action :create, file_path if verbose
-          Logger.info "  Generated robots.txt"
+          Logger.info "  Generated robots.txt" if verbose
         end
       end
     end

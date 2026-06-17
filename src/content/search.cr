@@ -80,7 +80,7 @@ module Hwaro
         search_path = File.join(output_dir, filename)
         File.write(search_path, content)
         Logger.action :create, search_path if verbose
-        Logger.info "  Generated search index with #{search_pages.size} pages."
+        Logger.info "  Generated search index with #{search_pages.size} pages." if verbose
       end
 
       private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Hash(String, String | Array(String)))

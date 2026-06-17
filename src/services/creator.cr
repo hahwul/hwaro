@@ -400,7 +400,7 @@ module Hwaro
         end
 
         File.write(full_path, content)
-        Logger.info "Created new content: #{full_path}"
+        Logger.outcome("created", full_path)
         full_path
       end
 

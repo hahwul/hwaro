@@ -10,8 +10,11 @@ module Hwaro::Core::Build::Phases::ReadContent
   private def execute_read_content_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("ReadContent")
     result = @lifecycle.run_phase(Lifecycle::Phase::ReadContent, ctx) do
+      Logger.status_phase("read")
       collect_content_paths(ctx, ctx.options.drafts)
-      Logger.info "  Found #{ctx.all_pages.size} pages."
+      # Count surfaces in the closing build receipt's "read" row instead of an
+      # inline line, keeping the build quiet until the summary.
+      ctx.stats.pages_read = ctx.all_pages.size
     end
     profiler.end_phase
     result
