@@ -59,13 +59,16 @@ describe Hwaro::Utils::SortUtils do
       Hwaro::Utils::SortUtils.compare_by_title(a, b).should be > 0
     end
 
-    it "returns zero for equal titles" do
+    it "tiebreaks equal titles by path for a deterministic order" do
       a = Hwaro::Models::Page.new("a.md")
       a.title = "Same"
       b = Hwaro::Models::Page.new("b.md")
       b.title = "Same"
 
-      Hwaro::Utils::SortUtils.compare_by_title(a, b).should eq(0)
+      # Equal titles fall back to a path comparison so ordering is stable
+      # across builds (a.md < b.md); a genuine tie (same path) still returns zero.
+      Hwaro::Utils::SortUtils.compare_by_title(a, b).should be < 0
+      Hwaro::Utils::SortUtils.compare_by_title(a, a).should eq(0)
     end
   end
 
@@ -79,13 +82,17 @@ describe Hwaro::Utils::SortUtils do
       Hwaro::Utils::SortUtils.compare_by_weight(a, b).should be < 0
     end
 
-    it "returns zero for equal weights" do
+    it "tiebreaks equal weights by path for a deterministic order" do
       a = Hwaro::Models::Page.new("a.md")
       a.weight = 5
       b = Hwaro::Models::Page.new("b.md")
       b.weight = 5
 
-      Hwaro::Utils::SortUtils.compare_by_weight(a, b).should eq(0)
+      # Equal weights (e.g. the archetype's default weight = 0) fall back to a
+      # path comparison so order is stable across builds (a.md < b.md); a true
+      # tie (same path) returns 0.
+      Hwaro::Utils::SortUtils.compare_by_weight(a, b).should be < 0
+      Hwaro::Utils::SortUtils.compare_by_weight(a, a).should eq(0)
     end
   end
 

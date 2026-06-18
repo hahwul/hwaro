@@ -65,18 +65,24 @@ Add the manifest link and service worker registration to your base template:
 
 ```html
 <head>
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="{{ base_url }}/manifest.json">
   <meta name="theme-color" content="{{ config.pwa.theme_color }}">
 </head>
 <body>
   ...
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js');
+      navigator.serviceWorker.register('{{ base_url }}/sw.js');
     }
   </script>
 </body>
 ```
+
+> The `{{ base_url }}` prefix is required so the manifest and service worker
+> resolve correctly on subpath deploys (e.g. GitHub Pages project sites served
+> at `https://user.github.io/repo/`). The generated `manifest.json`/`sw.js`
+> already carry the subpath internally, but their `<link>`/`register()` URLs do
+> not unless you add it here.
 
 ## Caching Strategy
 

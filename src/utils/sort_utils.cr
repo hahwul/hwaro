@@ -33,13 +33,17 @@ module Hwaro
       # Compare two pages by title alphabetically (A-Z)
       #
       def compare_by_title(a : Models::Page, b : Models::Page) : Int32
-        a.title <=> b.title
+        result = a.title <=> b.title
+        result == 0 ? (a.path <=> b.path) : result
       end
 
       # Compare two pages by weight value (lower weight first)
       #
       def compare_by_weight(a : Models::Page, b : Models::Page) : Int32
-        a.weight <=> b.weight
+        # Tiebreak by path so equal weights (e.g. the archetype's default
+        # weight = 0) keep a stable, deterministic order across builds.
+        result = a.weight <=> b.weight
+        result == 0 ? (a.path <=> b.path) : result
       end
 
       # Sort pages by date (newest first)

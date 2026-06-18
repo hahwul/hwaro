@@ -1,4 +1,5 @@
 require "json"
+require "digest/sha1"
 require "../../models/config"
 require "../../models/site"
 require "../../utils/logger"
@@ -85,7 +86,27 @@ module Hwaro
                           resolved_start.inspect
                         end
           root_url = resolved_start.inspect
-          cache_version = Time.utc.to_unix
+          # Derive the cache name from the precached URLs AND the bytes of the
+          # files they reference, rather than the build clock. Identical content
+          # yields a byte-identical sw.js across builds (determinism), while an
+          # edit to any precached page/asset changes the hash and busts the
+          # cache on deploy (correct invalidation). The PWA hook runs after the
+          # render/write phase, so the precached output files already exist.
+          base_path = config.base_path
+          cache_hash = Digest::SHA1.hexdigest do |ctx|
+            ctx.update(pwa.cache_strategy)
+            precache_urls.each do |u|
+              ctx.update("\n")
+              ctx.update(u)
+              rel = u
+              rel = rel[base_path.size..] if !base_path.empty? && rel.starts_with?(base_path)
+              rel = rel.lchop('/')
+              fpath = File.join(output_dir, rel)
+              fpath = File.join(fpath, "index.html") if rel.empty? || rel.ends_with?('/')
+              ctx.update(File.read(fpath)) if File.file?(fpath)
+            end
+          end
+          cache_version = cache_hash[0, 12]
 
           fetch_handler = case pwa.cache_strategy
                           when "network-first"

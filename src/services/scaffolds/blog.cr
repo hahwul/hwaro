@@ -27,6 +27,12 @@ module Hwaro
           "Welcome to my personal blog powered by Hwaro."
         end
 
+        # Limit the main feed to posts so the default/minimal config matches
+        # the full-config feed (the homepage/about/archives are not posts).
+        protected def feed_sections : Array(String)
+          ["posts"]
+        end
+
         def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {} of String => String
 
@@ -141,6 +147,7 @@ module Hwaro
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
+              {{ canonical_tag }}
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
@@ -1134,7 +1141,11 @@ module Hwaro
                      — those are the section's flat date-ordered neighbours, so
                      they ordered chapters by date and even linked non-series
                      posts. #}
-                  {% if page.series %}
+                  {# Guard on `series_pages` too: with [series] disabled (or a
+                     single-post series) the engine never populates series_pages,
+                     so without this the nav rendered as an orphan box carrying
+                     only the series name and no prev/next links. #}
+                  {% if page.series and page.series_pages %}
                   <nav class="series-nav" aria-label="Series navigation">
                     {% if page.series_index > 1 %}
                     <a href="{{ base_url }}{{ page.series_pages[page.series_index - 2].url }}" class="series-prev" rel="prev">← {{ page.series_pages[page.series_index - 2].title | e }}</a>

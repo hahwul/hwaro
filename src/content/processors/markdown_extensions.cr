@@ -202,9 +202,13 @@ module Hwaro
 
         # --- Footnotes ---
         # Pre-processing: extract footnote definitions and replace references with placeholders
-        FOOTNOTE_DEF_RE     = /^\[\^([^\]]+)\]:\s*(.+?)$/m
-        FOOTNOTE_REF_RE     = /\[\^([^\]]+)\]/
-        FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+):(.+?)-->/
+        FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.+?)$/m
+        FOOTNOTE_REF_RE = /\[\^([^\]]+)\]/
+        # Occurrence count rides on the number field as `NUM.OCC` (e.g. `1.3`).
+        # The `.` separator can't appear in the legacy 3-field `NUM:` form, so a
+        # 3-field comment whose text starts with digits+colon is never misread
+        # as a count.
+        FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+)(?:\.(\d+))?:(.+?)-->/
         FOOTNOTE_BLOCK_RE   = /\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m
 
         def preprocess_footnotes(content : String) : String
@@ -239,6 +243,10 @@ module Hwaro
           # code spans are stashed so a literal `` `[^1]` `` survives too.
           counter = 0
           ref_order = {} of String => Int32
+          # Per-key occurrence counter so repeated references of the same
+          # footnote get unique ids (fnref-KEY, fnref-KEY-2, …) instead of
+          # emitting duplicate `id` attributes (invalid HTML, ambiguous backref).
+          ref_occurrences = Hash(String, Int32).new(0)
           result = process_lines_fence_aware(cleaned) do |line, _|
             next line unless line.includes?("[^")
 
@@ -252,8 +260,11 @@ module Hwaro
                   ref_order[key] = counter
                 end
                 num = ref_order[key]
+                ref_occurrences[key] += 1
+                occ = ref_occurrences[key]
                 escaped_key = HTML.escape(key)
-                "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"fnref-#{escaped_key}\">[#{num}]</a></sup>"
+                ref_id = occ == 1 ? "fnref-#{escaped_key}" : "fnref-#{escaped_key}-#{occ}"
+                "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>"
               end
             end
           end
@@ -263,10 +274,11 @@ module Hwaro
             result += "\n<!--HWARO-FOOTNOTES-START-->\n"
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
+              occ = ref_occurrences[key]? || 1
               # Escape --> in text to prevent premature comment close, and : to prevent parsing issues
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
               safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
-              result += "<!--HWARO-FN:#{safe_key}:#{num}:#{safe_text}-->\n"
+              result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
             result += "<!--HWARO-FOOTNOTES-END-->\n"
           end
@@ -282,14 +294,17 @@ module Hwaro
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
 
           # Extract footnote data from comments
-          footnotes = [] of {key: String, num: Int32, text: String}
+          footnotes = [] of {key: String, num: Int32, occ: Int32, text: String}
           html.scan(FOOTNOTE_COMMENT_RE) do |match|
             # Unescape the comment-safe encoding
             key = match[1].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
-            text = match[3].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
+            text = match[4].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
             num = match[2].to_i? || 0
+            # Occurrence count is optional: older/hand-written 3-field comments
+            # (no count) fall back to a single backref.
+            occ = match[3]?.try(&.to_i?) || 1
             next if num <= 0
-            footnotes << {key: key, num: num, text: text}
+            footnotes << {key: key, num: num, occ: occ, text: text}
           end
 
           return html if footnotes.empty?
@@ -304,7 +319,17 @@ module Hwaro
               escaped_key = HTML.escape(fn[:key])
               rendered_text = InlineMarkdown.render(fn[:text], math: math)
               str << "<li id=\"fn-#{escaped_key}\">\n"
-              str << "<p>#{rendered_text} <a href=\"#fnref-#{escaped_key}\" class=\"footnote-backref\">\u21A9</a></p>\n"
+              # One backref per reference occurrence so every `fnref-\u2026` id is
+              # reachable (cmark-gfm/pandoc behavior): \u21A9, \u21A92, \u21A93, \u2026
+              backrefs = String.build do |b|
+                (1..fn[:occ]).each do |i|
+                  target = i == 1 ? "fnref-#{escaped_key}" : "fnref-#{escaped_key}-#{i}"
+                  label = i == 1 ? "\u21A9" : "\u21A9#{i}"
+                  b << ' ' if i > 1
+                  b << "<a href=\"##{target}\" class=\"footnote-backref\">#{label}</a>"
+                end
+              end
+              str << "<p>#{rendered_text} #{backrefs}</p>\n"
               str << "</li>\n"
             end
             str << "</ol>\n</section>\n"

@@ -243,10 +243,12 @@ describe Hwaro::Utils::SortUtils do
       Hwaro::Utils::SortUtils.compare_by_weight(heavy, light).should be > 0
     end
 
-    it "returns zero when weights are equal" do
+    it "tiebreaks equal weights by path for deterministic ordering" do
       page1 = create_test_page("Page1", nil, 5)
       page2 = create_test_page("Page2", nil, 5)
-      Hwaro::Utils::SortUtils.compare_by_weight(page1, page2).should eq(0)
+      # Equal weights fall back to a path comparison so ordering stays stable
+      # across builds (the archetype seeds weight = 0 for every new page).
+      Hwaro::Utils::SortUtils.compare_by_weight(page1, page2).should eq(page1.path <=> page2.path)
     end
   end
 

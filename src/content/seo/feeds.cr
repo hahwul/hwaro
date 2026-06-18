@@ -7,6 +7,7 @@ require "../../utils/logger"
 require "../../utils/text_utils"
 require "../../utils/sort_utils"
 require "../processors/markdown"
+require "../processors/internal_link_resolver"
 
 module Hwaro
   module Content
@@ -179,6 +180,17 @@ module Hwaro
           {base_url, feed_url}
         end
 
+        # The canonical HTML URL the feed represents — the site root for the
+        # main feed, the section page for a section feed, or the language home
+        # for a per-language feed (base_path is "/ko/" etc.). Used for the RSS
+        # channel/Atom alternate <link> and as the Atom <id>, so every feed
+        # points at the right page and carries a unique IRI (RFC 4287).
+        private def self.feed_home_url(config : Models::Config, base_path : String) : String
+          base_url = config.base_url.rstrip('/')
+          return base_url if base_path.empty?
+          Utils::TextUtils.encode_url_path("#{base_url}/#{base_path.strip("/")}/")
+        end
+
         # Build the full absolute URL for a page.
         private def self.page_full_url(page : Models::Page, base_url : String) : String
           path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
@@ -232,7 +244,7 @@ module Hwaro
             str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n"
             str << "  <channel>\n"
             str << "    <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
-            str << "    <link>#{Utils::TextUtils.escape_xml(config.base_url)}</link>\n"
+            str << "    <link>#{Utils::TextUtils.escape_xml(feed_home_url(config, base_path))}</link>\n"
             str << "    <description>#{Utils::TextUtils.escape_xml(config.description)}</description>\n"
 
             if language
@@ -263,7 +275,7 @@ module Hwaro
               # opts into full content (default). CDATA so consumers
               # don't have to double-decode entities.
               if full_content
-                full_html = full_content_for_feed(page)
+                full_html = full_content_for_feed(page, config)
                 unless full_html.empty?
                   str << "      <content:encoded><![CDATA[#{escape_cdata(full_html)}]]></content:encoded>\n"
                 end
@@ -300,8 +312,17 @@ module Hwaro
           base_path : String,
           language : String? = nil,
         ) : String
-          now = Time.utc
           base_url, feed_url = build_feed_url(config, base_path, filename)
+          home_url = feed_home_url(config, base_path)
+          # Atom <updated> must be deterministic: derive it from the newest
+          # content date (updated||date) across entries rather than the build
+          # wall-clock, so two builds of identical input stay byte-identical.
+          # Falls back to the epoch sentinel when no entry carries a date.
+          newest = pages.compact_map { |p| p.updated || p.date }.max?
+          feed_updated = newest ? normalize_feed_time(newest) : Utils::SortUtils::FALLBACK_DATE
+          # RFC 4287 §4.1.1: a feed MUST carry an author unless every entry
+          # does. Emit a feed-level author unconditionally using the site title.
+          feed_author = config.title.empty? ? feed_title : config.title
 
           String.build(500 + pages.size * 350) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -313,10 +334,14 @@ module Hwaro
             end
 
             str << "  <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
-            str << "  <link href=\"#{Utils::TextUtils.escape_xml(config.base_url)}\" />\n"
+            str << "  <link href=\"#{Utils::TextUtils.escape_xml(home_url)}\" />\n"
             str << "  <link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" />\n"
-            str << "  <updated>#{now.to_rfc3339}</updated>\n"
-            str << "  <id>#{Utils::TextUtils.escape_xml(config.base_url)}</id>\n"
+            str << "  <updated>#{feed_updated.to_rfc3339}</updated>\n"
+            str << "  <id>#{Utils::TextUtils.escape_xml(home_url)}</id>\n"
+
+            unless feed_author.empty?
+              str << "  <author><name>#{Utils::TextUtils.escape_xml(feed_author)}</name></author>\n"
+            end
 
             if !config.description.empty?
               str << "  <subtitle>#{Utils::TextUtils.escape_xml(config.description)}</subtitle>\n"
@@ -332,8 +357,16 @@ module Hwaro
               str << "    <link href=\"#{escaped_url}\" />\n"
               str << "    <id>#{escaped_url}</id>\n"
 
-              entry_date = normalize_feed_time(page.updated || page.date || now)
+              entry_src = page.updated || page.date
+              entry_date = entry_src ? normalize_feed_time(entry_src) : Utils::SortUtils::FALLBACK_DATE
               str << "    <updated>#{entry_date.to_rfc3339}</updated>\n"
+
+              # Per-entry authors (RFC 4287). Raw author ids; the feed-level
+              # author above guarantees validity for entries that carry none.
+              page.authors.each do |author|
+                next if author.strip.empty?
+                str << "    <author><name>#{Utils::TextUtils.escape_xml(author)}</name></author>\n"
+              end
 
               content = get_content_for_feed(page, config)
               content_type = is_text ? "text" : "html"
@@ -381,9 +414,14 @@ module Hwaro
         # `<content type="html">`. Uses the already-rendered HTML when
         # available so we don't pay for a second markdown pass per page
         # (gh#526).
-        private def self.full_content_for_feed(page : Models::Page) : String
-          return page.content unless page.content.empty?
-          Processor::Markdown.render_body_cached(page.raw_content)
+        private def self.full_content_for_feed(page : Models::Page, config : Models::Config) : String
+          html = page.content.empty? ? Processor::Markdown.render_body_cached(page.raw_content) : page.content
+          # Defensive: on an incremental (--cache) build the render phase only
+          # rewrites base_path into page.content for pages it re-renders, so
+          # cached pages keep root-relative links. Re-apply here (idempotent —
+          # already-prefixed links are skipped) so the feed <content:encoded>
+          # stays subpath-correct regardless of cache state.
+          Processors::InternalLinkResolver.prefix_root_relative_links(html, config.base_url)
         end
 
         # Collect taxonomy terms that should appear as `<category>`
@@ -449,7 +487,11 @@ module Hwaro
               text_content # Return plain text even if not truncated for consistency
             end
           else
-            html_content # No truncation - return full HTML
+            # Full HTML (Atom <content type="html">). Apply the subpath prefix
+            # defensively (idempotent) so cached pages — whose page.content the
+            # render phase never rewrote — still emit subpath-correct links,
+            # matching full_content_for_feed on the RSS path.
+            Processors::InternalLinkResolver.prefix_root_relative_links(html_content, config.base_url)
           end
         end
       end

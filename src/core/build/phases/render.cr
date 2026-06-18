@@ -812,12 +812,21 @@ module Hwaro::Core::Build::Phases::Render
               base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
               "#{base}#{src}".gsub("//", "/")
             end
+      # prefix_root_relative_links runs before this pass and may already have
+      # rewritten a root-relative src with the subpath, but the resize map is
+      # keyed by bare root-relative paths — strip the base_path back off so the
+      # lookup hits (then with_base_path re-adds it to the emitted candidates).
+      bp = config.base_path
+      key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
 
       widths = resize_map[key]?
       next tag unless widths
       next tag if widths.empty?
 
-      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{url} #{w}w" }.join(", ")
+      # Prefix each candidate with the subpath (base_path) so responsive
+      # images resolve on subpath deployments; the resize map stores bare
+      # root-relative paths. Mirrors the resize_image() template helper.
+      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{config.with_base_path(url)} #{w}w" }.join(", ")
       additions = %( srcset="#{srcset}")
       additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       tag.sub("<img", "<img#{additions}")
@@ -1859,8 +1868,15 @@ module Hwaro::Core::Build::Phases::Render
     # for any other untitled page skip the Article entirely rather than emit
     # one with an empty headline.
     is_homepage = home?(page)
-    jsonld_article = if is_homepage || page.title.empty?
+    jsonld_article = if is_homepage || page.title.empty? || page.path == "404.html"
+                       # The synthesized 404 page is neither an Article nor a
+                       # collection — emit no page-level JSON-LD for it.
                        ""
+                     elsif og_type_override == "website"
+                       # Listing pages (section index, taxonomy index/term,
+                       # author term) are collections, not articles — keep the
+                       # JSON-LD @type consistent with og:type="website".
+                       Content::Seo::JsonLd.collection_page(page, config)
                      else
                        Content::Seo::JsonLd.article(page, config, site)
                      end

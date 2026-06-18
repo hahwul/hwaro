@@ -147,9 +147,25 @@ module Hwaro
 
           # Inject AMP boilerplate CSS in <head> if not already present
           unless result.includes?("amp-boilerplate")
+            # AMP permits exactly one <style amp-custom> (plus the two mandatory
+            # <style amp-boilerplate> blocks). Theme templates inline a bare
+            # <style> in <head>; left in place it becomes a second custom
+            # stylesheet and fails AMP validation. Extract that CSS, drop the
+            # blocks, and fold it into the single amp-custom injected below.
+            # Done only on this path so the CSS is never stripped without being
+            # re-injected (a theme that already ships its own boilerplate keeps
+            # its <style> blocks untouched).
+            theme_css = [] of String
+            result = result.gsub(/<style(?![^>]*amp-boilerplate)(?![^>]*amp-custom)[^>]*>([\s\S]*?)<\/style>/mi) do
+              theme_css << $1
+              ""
+            end
+            # `!important` is disallowed inside amp-custom.
+            extracted_css = theme_css.join("\n").gsub(/\s*!important/i, "")
+
             amp_boilerplate = <<-HTML
               <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
-              <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}</style>
+              <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}#{extracted_css}</style>
               <script async src="https://cdn.ampproject.org/v0.js"></script>
               HTML
             # The AMP runtime/boilerplate is mandatory. If the theme rendered no
