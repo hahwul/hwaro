@@ -344,6 +344,14 @@ module Hwaro
           end
         end
 
+        # Sections the scaffold's main feed should be limited to. Empty means
+        # no filter (every renderable page). Post-oriented scaffolds override
+        # this (e.g. ["posts"]) so the default/minimal config matches the
+        # full-config feed and the homepage/about/archives don't pollute it.
+        protected def feed_sections : Array(String)
+          [] of String
+        end
+
         # Returns a minimal config.toml without comments and optional sections
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           String.build do |str|
@@ -394,6 +402,9 @@ module Hwaro
             str << "enabled = true\n"
             str << "type = \"rss\"\n"
             str << "limit = 10\n"
+            unless feed_sections.empty?
+              str << "sections = [#{feed_sections.map { |s| %("#{s}") }.join(", ")}]\n"
+            end
             # `--minimal-config` previously dropped `[search]` entirely,
             # which silently broke the search button in the blog/docs/
             # book scaffolds (their JS still fetched `/search.json`).
@@ -442,6 +453,7 @@ module Hwaro
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
+              {{ canonical_tag }}
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}

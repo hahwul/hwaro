@@ -134,6 +134,7 @@ module Hwaro
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
               {{ og_all_tags }}
+              {{ canonical_tag }}
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
@@ -171,7 +172,6 @@ module Hwaro
           <<-MD
             +++
             title = "{{ title }}"
-            date = "{{ date }}"
             draft = {{ draft }}
             description = ""
             weight = 0
@@ -1371,13 +1371,13 @@ module Hwaro
                   <li><a href="{{ base_url }}{{ lang_prefix }}/">Welcome</a></li>
                 </ul>
               </div>
-              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") %}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="weight") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>
                 <ul class="chapter-links">
                   <li><a href="{{ base_url }}{{ sec.url }}"><span class="num">{{ chapter_index }}.</span> {{ sec.title | e }}</a></li>
-                  {% for p in sec.pages | rejectattr("is_index") | sort(attribute="path") %}
+                  {% for p in sec.pages | rejectattr("is_index") | sort(attribute="weight") %}
                   <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
                   {% endfor %}
                 </ul>
@@ -1511,6 +1511,7 @@ module Hwaro
             title = "Getting Started"
             description = "Set up your book project and run the first build."
             weight = 1
+            sort_by = "weight"
             +++
 
             This chapter covers the fundamentals you need to know before diving in.
@@ -1611,6 +1612,7 @@ module Hwaro
             title = "Usage"
             description = "Day-to-day workflows for authoring and building."
             weight = 2
+            sort_by = "weight"
             +++
 
             Now that you have everything installed, let's learn how to use it effectively.
@@ -1742,6 +1744,7 @@ module Hwaro
             title = "Advanced"
             description = "Beyond the basics — power-user features and tips."
             weight = 3
+            sort_by = "weight"
             +++
 
             This chapter covers advanced topics for power users.
