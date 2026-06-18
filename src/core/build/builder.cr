@@ -1193,41 +1193,8 @@ module Hwaro
           result = execute_write_phase(ctx, profiler)
           return result if result != Lifecycle::HookResult::Continue
 
-          # Prune outputs whose source page was deleted/renamed since the prior
-          # cached build, so `build --cache` matches a clean `build --full`.
-          # Skipped under fast-start (partial_render), where rendering is
-          # deferred and not-yet-written outputs must not be removed.
-          prune_orphaned_outputs(ctx) if ctx.options.cache && !ctx.partial_render
-
           # Phase: Finalize
           execute_finalize_phase(ctx, profiler)
-        end
-
-        # Delete output files whose source page no longer exists (deleted or
-        # renamed) on a `build --cache` run, then drop their dead cache entries.
-        # Mirrors the serve watcher's stale-output removal: every delete and
-        # empty-parent-dir cleanup is guarded by OutputGuard.within_output_dir?.
-        private def prune_orphaned_outputs(ctx : Lifecycle::BuildContext)
-          cache = @cache || return
-          output_dir = ctx.options.output_dir
-          removed = 0
-          cache.orphaned_outputs.each do |source_path, output_path|
-            if File.exists?(output_path) && Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-              begin
-                File.delete(output_path)
-                removed += 1
-                dir = File.dirname(output_path)
-                while dir != output_dir && Utils::OutputGuard.within_output_dir?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
-                  Dir.delete(dir)
-                  dir = File.dirname(dir)
-                end
-              rescue ex
-                Logger.debug "  Could not remove orphaned output #{output_path}: #{ex.message}"
-              end
-            end
-            cache.invalidate(source_path)
-          end
-          Logger.info "  Removed #{removed} orphaned output(s)." if removed > 0
         end
       end
     end

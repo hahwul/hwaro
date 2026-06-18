@@ -33,7 +33,10 @@ module Hwaro::Core::Build::Phases::Render
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
-                       build_cache.record_set_fingerprints(page_set_fp, section_set_fp)
+                       # Don't record under fast-start: deferred listing pages
+                       # render in a later pass, so persisting the new fingerprint
+                       # now would let the next build skip them while stale.
+                       build_cache.record_set_fingerprints(page_set_fp, section_set_fp) unless ctx.options.fast_start
                        filtered
                      else
                        all_pages
@@ -294,7 +297,10 @@ module Hwaro::Core::Build::Phases::Render
         io << p.path << '\u0001' << p.url << '\u0001' << p.title << '\u0001'
         io << (p.description || "") << '\u0001'
         io << (p.date.try(&.to_unix) || 0_i64) << '\u0001' << p.weight << '\u0001'
-        io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0002'
+        io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0001'
+        io << p.tags.join(',') << '\u0001'
+        p.taxonomies.keys.sort!.each { |k| io << k << '=' << p.taxonomies[k].join(',') << ';' }
+        io << '\u0002'
       end
     end)
   end
@@ -303,7 +309,8 @@ module Hwaro::Core::Build::Phases::Render
   private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
     Digest::MD5.hexdigest(String.build do |io|
       sections.each do |s|
-        io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001' << s.weight << '\u0002'
+        io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001'
+        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0002'
       end
     end)
   end
