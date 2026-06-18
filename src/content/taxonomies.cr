@@ -286,10 +286,12 @@ module Hwaro
 
         paginated_pages.each do |paginated_page|
           list_html = build_page_list(paginated_page.pages, site.config.base_url)
-          pagination_html = Content::Pagination::Renderer.new(site.config).render_pagination_nav(paginated_page)
+          renderer = Content::Pagination::Renderer.new(site.config)
+          pagination_html = renderer.render_pagination_nav(paginated_page)
+          seo_links = renderer.render_seo_links(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination_seo_links: seo_links)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose)
@@ -389,6 +391,7 @@ module Hwaro
         builder : Core::Build::Builder? = nil,
         global_vars : Hash(String, Crinja::Value)? = nil,
         template_name : String? = nil,
+        pagination_seo_links : String = "",
       ) : String
         return html_content unless template_content
 
@@ -416,7 +419,8 @@ module Hwaro
           page_url_override: current_url,
           paginator: paginator,
           global_vars: global_vars,
-          template_name: template_name
+          template_name: template_name,
+          pagination_seo_links: pagination_seo_links
         )
       end
 
