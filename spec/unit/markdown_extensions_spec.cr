@@ -294,6 +294,23 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("[1]")
     end
 
+    it "produces whitespace-free, matching anchors for keys with spaces" do
+      # `[^my note]` must not emit `id="fn-my note"` (invalid id/fragment).
+      # Forward (fnref/fn) and backward (backref) anchors must still match.
+      content = "Text[^my note].\n\n[^my note]: Note with a space"
+      pre = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
+      pre.should_not contain("fn-my note")
+      pre.should_not contain("fnref-my note")
+      pre.should contain("id=\"fnref-my-note\"")
+      pre.should contain("href=\"#fn-my-note\"")
+
+      html = "<p>#{pre}</p>"
+      post = Hwaro::Content::Processors::MarkdownExtensions.postprocess_footnotes(html)
+      post.should contain("id=\"fn-my-note\"")
+      post.should contain("href=\"#fnref-my-note\"")
+      post.should_not contain("my note\"")
+    end
+
     it "ignores undefined footnote references" do
       content = "Text[^undefined] here."
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
@@ -914,6 +931,22 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| $f([x])(y)$ |", markdown_config: make_config(math: true))
       html.should contain("\\(f([x])(y)\\)")
       html.should_not contain("<a href")
+    end
+  end
+
+  describe "emphasis chars inside inline math" do
+    it "keeps * inside inline math literal (no emphasis pairing across spans)" do
+      html, _ = Hwaro::Processor::Markdown.render("Two products: $a*b$ and $c*d$.", markdown_config: make_config(math: true))
+      html.should contain("\\(a*b\\)")
+      html.should contain("\\(c*d\\)")
+      html.should_not contain("<em>")
+    end
+
+    it "keeps _ inside inline math literal" do
+      html, _ = Hwaro::Processor::Markdown.render("Indices $a_i$ and $b_j$.", markdown_config: make_config(math: true))
+      html.should contain("\\(a_i\\)")
+      html.should contain("\\(b_j\\)")
+      html.should_not contain("<em>")
     end
   end
 

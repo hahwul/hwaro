@@ -507,11 +507,10 @@ module Hwaro
             # =============================================================================
             # Permalinks (Optional)
             # =============================================================================
-            # Override the output path for specific sections or taxonomies
+            # Remap a content directory to a different output path
 
             # [permalinks]
-            # posts = "/posts/:year/:month/:slug/"
-            # tags = "/topic/:slug/"
+            # "old/posts" = "posts"
 
             TOML
         else
@@ -520,12 +519,12 @@ module Hwaro
             # =============================================================================
             # Permalinks (Optional)
             # =============================================================================
-            # Override the output path for specific sections or taxonomies.
-            # Placeholders: :year, :month, :day, :title, :slug, :section
+            # Remap a content directory to a different output path. The matched
+            # directory prefix is rewritten and any deeper path is preserved
+            # (e.g. "old/posts" => "posts" moves content/old/posts/x.md to /posts/x/).
 
             # [permalinks]
-            # posts = "/posts/:year/:month/:slug/"
-            # tags = "/topic/:slug/"
+            # "old/posts" = "posts"
 
             TOML
         end

@@ -1,6 +1,28 @@
 require "../spec_helper"
 require "json"
 
+# Write a minimal valid PNG of the given dimensions. Only the 8-byte
+# signature + IHDR chunk matter for `sizes` inference, but we include a
+# tiny IDAT/IEND so the file is a structurally valid PNG.
+private def write_png(path : String, width : UInt32, height : UInt32)
+  io = IO::Memory.new
+  io.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  ihdr = IO::Memory.new
+  ihdr.write_bytes(width, IO::ByteFormat::BigEndian)
+  ihdr.write_bytes(height, IO::ByteFormat::BigEndian)
+  ihdr.write(Bytes[8, 6, 0, 0, 0]) # bit depth, color type, compression, filter, interlace
+  ihdr_bytes = ihdr.to_slice
+  io.write_bytes(ihdr_bytes.size.to_u32, IO::ByteFormat::BigEndian)
+  io.write("IHDR".to_slice)
+  io.write(ihdr_bytes)
+  io.write_bytes(0_u32, IO::ByteFormat::BigEndian) # placeholder CRC (not validated)
+  # IEND
+  io.write_bytes(0_u32, IO::ByteFormat::BigEndian)
+  io.write("IEND".to_slice)
+  io.write_bytes(0_u32, IO::ByteFormat::BigEndian)
+  File.write(path, io.to_slice)
+end
+
 private def make_site(pwa_toml : String = "", base_url : String = "https://example.com") : Hwaro::Models::Site
   config_str = <<-TOML
     title = "Test Site"
@@ -149,6 +171,61 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    # `sizes` must reflect the icon's REAL pixel dimensions, read from the
+    # PNG IHDR — not guessed from the filename. A 200x60 logo.png whose name
+    # carries no size hint used to be declared "512x512".
+    it "reads real PNG dimensions for icon sizes instead of guessing from the filename" do
+      Dir.mktmpdir do |dir|
+        write_png(File.join(dir, "logo.png"), 200_u32, 60_u32)
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/logo.png"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("200x60")
+      end
+    end
+
+    # Real dimensions win even when the filename contains a misleading number
+    # (e.g. a year), which the filename heuristic would have used.
+    it "prefers PNG header dimensions over a year-like number in the filename" do
+      Dir.mktmpdir do |dir|
+        write_png(File.join(dir, "icon-2024.png"), 192_u32, 192_u32)
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/icon-2024.png"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("192x192")
+      end
+    end
+
+    # When the PNG bytes can't be read (missing output file), fall back to the
+    # filename heuristic rather than crashing.
+    it "falls back to the filename-derived size when the PNG can't be read" do
+      Dir.mktmpdir do |dir|
+        # No icon-512.png file written to the output dir.
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/icon-512.png"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("512x512")
+      end
+    end
+
     it "normalizes icon paths with and without static/ prefix" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
@@ -212,6 +289,12 @@ describe Hwaro::Content::Seo::Pwa do
 
     it "includes precache_urls in service worker" do
       Dir.mktmpdir do |dir|
+        # Precache entries are only emitted when their output file exists
+        # (cache.addAll is all-or-nothing), so materialize them in the dir.
+        FileUtils.mkdir_p(File.join(dir, "css"))
+        FileUtils.mkdir_p(File.join(dir, "js"))
+        File.write(File.join(dir, "css", "main.css"), "body{}")
+        File.write(File.join(dir, "js", "app.js"), "console.log(1)")
         site = make_site(<<-TOML)
           [pwa]
           enabled = true
@@ -228,6 +311,7 @@ describe Hwaro::Content::Seo::Pwa do
 
     it "includes offline_page in service worker" do
       Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "offline.html"), "<html>offline</html>")
         site = make_site(<<-TOML)
           [pwa]
           enabled = true
@@ -238,6 +322,96 @@ describe Hwaro::Content::Seo::Pwa do
 
         content = File.read(File.join(dir, "sw.js"))
         content.should contain("/offline.html")
+      end
+    end
+
+    # cache.addAll() is all-or-nothing: one 404 aborts the whole SW install.
+    # A precache URL with no backing output file must be dropped from
+    # PRECACHE_URLS (the build emits a warning).
+    it "drops precache URLs that have no matching output file" do
+      Dir.mktmpdir do |dir|
+        # Only one of the two precached files exists in the output dir.
+        File.write(File.join(dir, "real.css"), "body{}")
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          precache_urls = ["/real.css", "/ghost.css"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        content.should contain("/real.css")
+        content.should_not contain("/ghost.css")
+      end
+    end
+
+    # The launch URL is always kept even when its output file isn't present
+    # in the dir we generate into (it's the navigation fallback target).
+    it "keeps the start_url in precache even without a backing file" do
+      Dir.mktmpdir do |dir|
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        content.should contain(%("/"))
+      end
+    end
+
+    # External http(s):// precache URLs aren't our files, so they bypass the
+    # existence check and stay in the list.
+    it "keeps external precache URLs without trying to resolve them on disk" do
+      Dir.mktmpdir do |dir|
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          precache_urls = ["https://cdn.example.com/lib.js"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        content.should contain("https://cdn.example.com/lib.js")
+      end
+    end
+
+    # A missing offline_page must not become the navigation fallback (it would
+    # 404 offline). Fall back to the launch URL instead.
+    it "falls back the navigation offline target to start_url when offline_page is missing" do
+      Dir.mktmpdir do |dir|
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          offline_page = "/nope-offline.html"
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        # The missing offline page is dropped from precache...
+        content.should_not contain("/nope-offline.html")
+        # ...and the navigation fallback uses the root instead.
+        content.should contain(%(caches.match("/")))
+      end
+    end
+
+    it "uses a real offline_page as the navigation target when its file exists" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "offline.html"), "<html>offline</html>")
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          offline_page = "/offline.html"
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        content.should contain(%(caches.match("/offline.html")))
       end
     end
 
@@ -267,6 +441,10 @@ describe Hwaro::Content::Seo::Pwa do
 
       it "prefixes precache URLs, offline page, and the navigation fallback in sw.js" do
         Dir.mktmpdir do |dir|
+          # Output files are addressed by the base_path-stripped relative path.
+          FileUtils.mkdir_p(File.join(dir, "css"))
+          File.write(File.join(dir, "css", "main.css"), "body{}")
+          File.write(File.join(dir, "offline.html"), "<html>offline</html>")
           site = make_site(<<-TOML, base_url: "https://user.github.io/myrepo/")
             [pwa]
             enabled = true
@@ -290,6 +468,8 @@ describe Hwaro::Content::Seo::Pwa do
 
       it "leaves URLs untouched for a domain-root base_url" do
         Dir.mktmpdir do |dir|
+          FileUtils.mkdir_p(File.join(dir, "css"))
+          File.write(File.join(dir, "css", "main.css"), "body{}")
           site = make_site(<<-TOML, base_url: "https://example.com")
             [pwa]
             enabled = true

@@ -78,6 +78,12 @@ module Hwaro
         def self.convert_to_amp(html : String, page : Models::Page, config : Models::Config) : String
           result = html
 
+          # Strip any self-referencing <link rel="amphtml"> left over from a
+          # prior build (the on-disk canonical HTML may already carry one). An
+          # AMP page must never reference an amphtml variant of itself, so make
+          # the conversion idempotent across repeat/cached builds.
+          result = result.gsub(/<link\b[^>]*rel=["']amphtml["'][^>]*>\s*/i, "")
+
           # Add AMP boilerplate to <html> tag
           result = result.sub(/<html([^>]*)>/i, %(<html amp\\1>))
 
@@ -131,22 +137,64 @@ module Hwaro
             end
           end
 
+          # A block-level <div class="amp-img-container"> placed directly inside
+          # a <p> (Markdown wraps a standalone image in a paragraph) is invalid
+          # HTML. Unwrap any <p> whose sole child is that container div.
+          result = result.gsub(/<p>(\s*<div class="amp-img-container">[\s\S]*?<\/div>\s*)<\/p>/mi) { $1 }
+
           # Convert <video> to <amp-video>
+          needs_amp_video = false
           result = result.gsub(/<video([^>]*)>(.*?)<\/video>/mi) do
+            needs_amp_video = true
             %(<amp-video#{$1} layout="responsive">#{$2}</amp-video>)
           end
 
           # Convert <iframe> to <amp-iframe>
+          needs_amp_iframe = false
           result = result.gsub(/<iframe([^>]*)>(.*?)<\/iframe>/mi) do
+            needs_amp_iframe = true
             attrs = $1
             unless attrs.includes?("layout=")
               attrs += %( layout="responsive")
             end
+            # amp-iframe requires a sandbox attribute; add a sane default when
+            # the source <iframe> didn't carry one.
+            unless attrs.includes?("sandbox=")
+              attrs += %( sandbox="allow-scripts allow-same-origin allow-popups")
+            end
             %(<amp-iframe#{attrs}>#{$2}</amp-iframe>)
           end
 
+          # Mandatory extension scripts for amp-iframe / amp-video. These must be
+          # present in <head> whenever the corresponding element is used.
+          amp_iframe_script = %(<script async custom-element="amp-iframe" src="https://cdn.ampproject.org/v0/amp-iframe-0.1.js"></script>)
+          amp_video_script = %(<script async custom-element="amp-video" src="https://cdn.ampproject.org/v0/amp-video-0.1.js"></script>)
+          extension_scripts = ""
+          extension_scripts += "\n#{amp_iframe_script}" if needs_amp_iframe
+          extension_scripts += "\n#{amp_video_script}" if needs_amp_video
+
           # Inject AMP boilerplate CSS in <head> if not already present
-          unless result.includes?("amp-boilerplate")
+          if result.includes?("amp-boilerplate")
+            # Boilerplate already present (e.g. theme-supplied). The mandatory
+            # amp-iframe / amp-video extension scripts may still be missing —
+            # inject any that are needed but not already declared.
+            missing = ""
+            if needs_amp_iframe && !result.includes?(%(custom-element="amp-iframe"))
+              missing += "\n#{amp_iframe_script}"
+            end
+            if needs_amp_video && !result.includes?(%(custom-element="amp-video"))
+              missing += "\n#{amp_video_script}"
+            end
+            unless missing.empty?
+              if result.matches?(/<\/head>/i)
+                result = result.sub(/<\/head>/i, "#{missing}\n</head>")
+              elsif result.matches?(/<\/body>/i)
+                result = result.sub(/<\/body>/i, "#{missing}\n</body>")
+              else
+                result = "#{result}#{missing}"
+              end
+            end
+          else
             # AMP permits exactly one <style amp-custom> (plus the two mandatory
             # <style amp-boilerplate> blocks). Theme templates inline a bare
             # <style> in <head>; left in place it becomes a second custom
@@ -166,7 +214,7 @@ module Hwaro
             amp_boilerplate = <<-HTML
               <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
               <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}#{extracted_css}</style>
-              <script async src="https://cdn.ampproject.org/v0.js"></script>
+              <script async src="https://cdn.ampproject.org/v0.js"></script>#{extension_scripts}
               HTML
             # The AMP runtime/boilerplate is mandatory. If the theme rendered no
             # </head>, fall back to </body> (then end-of-doc) and warn rather than

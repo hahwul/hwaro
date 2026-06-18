@@ -346,7 +346,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
       end
     end
 
-    it "copies file for widths larger than source" do
+    it "keys an upscale-clamped variant by the true source width, not the requested width" do
       Dir.mktmpdir do |dir|
         src = File.join(dir, "tiny.png")
         pixels = Bytes.new(4 * 4 * 3, 150_u8)
@@ -355,9 +355,13 @@ describe Hwaro::Content::Processors::ImageProcessor do
         out_dir = File.join(dir, "out")
         result = Hwaro::Content::Processors::ImageProcessor.resize_multi_widths(src, out_dir, [2, 1000], 85)
 
+        # width=2 downscales; width=1000 exceeds the 4px source, so rather than a
+        # dishonest "1000w" copy it is keyed at the true intrinsic width (4) — no
+        # false srcset descriptor, no byte-identical duplicate.
         result.size.should eq(2)
-        # width=1000 should be a copy (same size as original)
-        File.size(result[1000]).should eq(File.size(src))
+        result.has_key?(2).should be_true
+        result.has_key?(1000).should be_false
+        File.size(result[4]).should eq(File.size(src)) # full-size copy keyed by src width
       end
     end
 

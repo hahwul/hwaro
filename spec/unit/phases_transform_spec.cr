@@ -452,7 +452,26 @@ describe Hwaro::Core::Build::Phases::Transform do
       builder.test_compute_series(site)
 
       published.series_index.should eq(1)
-      published.series_pages.size.should eq(1)
+      # Draft is excluded, leaving a single-member series, which renders no
+      # prev/next nav, so series_pages is left empty.
+      published.series_pages.size.should eq(0)
+    end
+
+    it "leaves series_pages empty for a single-post series" do
+      config = Hwaro::Models::Config.new
+      config.series.enabled = true
+      site = Hwaro::Models::Site.new(config)
+
+      lonely = make_page("lonely.md")
+      lonely.title = "Lonely"
+      lonely.series = "Lonely"
+
+      site.pages = [lonely]
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_compute_series(site)
+
+      lonely.series_index.should eq(1)
+      lonely.series_pages.size.should eq(0)
     end
   end
 
@@ -471,6 +490,21 @@ describe Hwaro::Core::Build::Phases::Transform do
       affected = builder.test_recompute_series_for_pages(site, [p1])
       affected.includes?("tutorial").should be_true
       affected.includes?("other").should be_false
+    end
+
+    it "leaves series_pages empty for a single-post series" do
+      config = Hwaro::Models::Config.new
+      config.series.enabled = true
+      site = Hwaro::Models::Site.new(config)
+
+      lonely = make_page("lonely.md"); lonely.title = "Lonely"; lonely.series = "Lonely"
+      site.pages = [lonely]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_recompute_series_for_pages(site, [lonely])
+
+      lonely.series_index.should eq(1)
+      lonely.series_pages.size.should eq(0)
     end
   end
 

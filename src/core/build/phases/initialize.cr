@@ -76,7 +76,13 @@ module Hwaro::Core::Build::Phases::Initialize
         # Hash the effective merged config (+ env + base_url override), not the
         # raw config.toml bytes, so env-override files and ${ENV_VAR} changes
         # correctly invalidate the per-page cache.
+        #
+        # Fold in a digest of the `data/` tree so editing a data file (which
+        # feeds `site.data` into any page) invalidates the cache the same way a
+        # config edit does. Without this, `build --cache` keeps serving stale
+        # `site.data` values and diverges from `--full` (see I-cache-data).
         config_hash = Cache.compute_config_hash(config, ctx.options.env)
+        config_hash = "#{config_hash}-#{compute_data_hash}"
         build_cache.set_global_checksums(@global_templates_hash, config_hash,
           invalidate_on_template_change: !@per_page_template_hash)
       end
@@ -310,6 +316,32 @@ module Hwaro::Core::Build::Phases::Initialize
     getter children : Hash(String, DataTreeNode) = {} of String => DataTreeNode
     property value : Crinja::Value? = nil
     property source_path : String? = nil
+  end
+
+  # Compute a content digest of the `data/` directory for cache invalidation.
+  #
+  # Globs every supported data file, sorts the paths for determinism, and folds
+  # both the path and the raw bytes of each file into an MD5. It is deliberately
+  # mtime-independent (content-only) so a touch-without-edit doesn't churn the
+  # cache, while any real edit, add, or rename changes the digest and triggers
+  # the existing "config change invalidates all entries" path. Returns "" when
+  # there is no `data/` directory.
+  private def compute_data_hash : String
+    return "" unless Dir.exists?("data")
+
+    paths = [] of String
+    Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
+      next if File.directory?(path)
+      paths << path
+    end
+    return "" if paths.empty?
+
+    digest = Digest::MD5.new
+    paths.sort!.each do |path|
+      digest.update(path)
+      digest.update(File.read(path))
+    end
+    digest.final.hexstring
   end
 
   # Load data files from `data/`, preserving directory structure.

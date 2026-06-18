@@ -1642,7 +1642,13 @@ module Hwaro
 
         s.each do |k, v|
           if target = v.as_s?
-            config.permalinks[k] = target
+            # Strip surrounding slashes from BOTH the source key and the target.
+            # resolve_permalink_dir matches against slash-free directory paths
+            # and interpolates the target as `/#{effective_dir}/`, so a key or
+            # target written with leading/trailing slashes (e.g. `"/blog/"`)
+            # would otherwise silently never match (source) or produce
+            # double-slash URLs like `http://host//blog//p/` (target).
+            config.permalinks[k.strip("/")] = target.strip("/")
           end
         end
       end

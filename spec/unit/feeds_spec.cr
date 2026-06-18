@@ -143,6 +143,35 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
 
+    it "does not generate language feed when the language has no content pages" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "rss"
+      config.feeds.filename = "rss.xml"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+      config.default_language = "en"
+
+      # fr has generate_feed=true (default) but no fr content pages — its
+      # feed's channel <link> would point at a non-existent /fr/ home (404).
+      config.languages["fr"] = Hwaro::Models::LanguageConfig.new("fr")
+
+      en_page = Hwaro::Models::Page.new("posts/hello.md")
+      en_page.title = "Hello World"
+      en_page.url = "/posts/hello/"
+      en_page.language = nil
+      en_page.draft = false
+      en_page.render = true
+      en_page.is_index = false
+      en_page.raw_content = "English content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([en_page], config, output_dir)
+
+        File.exists?(File.join(output_dir, "fr", "rss.xml")).should be_false
+      end
+    end
+
     it "generates feeds for multiple non-default languages" do
       config = Hwaro::Models::Config.new
       config.feeds.enabled = true
@@ -1903,6 +1932,28 @@ describe Hwaro::Content::Seo::Feeds do
       )
 
       atom.should contain("C++ &amp; Java: &lt;Comparison&gt;")
+    end
+
+    it "emits <category term> per tag and per taxonomy term (gh#526)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.tags = ["crystal", "atom"]
+      page.taxonomies = {
+        "categories" => ["programming"],
+      }
+      page.raw_content = "Body"
+
+      atom = Hwaro::Content::Seo::Feeds.generate_atom(
+        [page], config, "atom.xml", false, "Test", ""
+      )
+
+      atom.should contain("<category term=\"crystal\" />")
+      atom.should contain("<category term=\"atom\" />")
+      atom.should contain("<category term=\"programming\" />")
     end
 
     it "handles page URL without leading slash" do

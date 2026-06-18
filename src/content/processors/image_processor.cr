@@ -303,14 +303,22 @@ module Hwaro
               out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width, 0)
               next if out_w <= 0 || out_h <= 0
 
-              dest = File.join(dest_dir, "#{basename}_#{width}w#{ext}")
-
               if out_w >= src_w && out_h >= src_h
-                FileUtils.cp(source, dest)
-                result_map[width] = dest
+                # Source is smaller than the requested width — don't upscale.
+                # Key the variant by the TRUE intrinsic width (src_w) and write a
+                # single copy reused across all larger requested widths, so the
+                # srcset descriptor is honest (never a "1280w" pointing at a
+                # 500px file) and no byte-identical duplicates are emitted.
+                actual = src_w.to_i32
+                unless result_map.has_key?(actual)
+                  dest = File.join(dest_dir, "#{basename}_#{actual}w#{ext}")
+                  FileUtils.cp(source, dest)
+                  result_map[actual] = dest
+                end
                 next
               end
 
+              dest = File.join(dest_dir, "#{basename}_#{width}w#{ext}")
               pixel_count = out_w.to_i64 * out_h.to_i64
               next if pixel_count > MAX_PIXELS
               buf_size = pixel_count * channels.to_i64

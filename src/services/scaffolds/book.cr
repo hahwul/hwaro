@@ -1371,7 +1371,16 @@ module Hwaro
                   <li><a href="{{ base_url }}{{ lang_prefix }}/">Welcome</a></li>
                 </ul>
               </div>
-              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") %}
+              {# Iterate TOP-LEVEL sections as chapters. Nested sections also
+                 appear flat in `site.sections`, but `top_level` is false for
+                 them and they render beneath their parent below — filtering them
+                 out of the loop (rather than skipping inside) keeps `loop.index`
+                 chapter numbering contiguous even when a nested section sorts
+                 before a top-level chapter by weight. The sort is weight with a
+                 path tiebreak to match the prev/next reading chain in
+                 transform.cr; Crinja sort is stable, so sort-by-path then
+                 sort-by-weight yields weight-asc, path-tiebroken order. #}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | selectattr("top_level") | sort(attribute="path") | sort(attribute="weight") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>
@@ -1382,6 +1391,14 @@ module Hwaro
                      second Crinja sort here would be unstable on weight ties. #}
                   {% for p in sec.pages | rejectattr("is_index") %}
                   <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
+                  {% endfor %}
+                  {# Nested subsections render one level deeper, mirroring the
+                     prev/next chain's depth-first nesting. #}
+                  {% for sub in sec.subsections | sort(attribute="path") | sort(attribute="weight") %}
+                  <li><a href="{{ base_url }}{{ sub.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ sub.title | e }}</a></li>
+                  {% for sp in sub.pages | rejectattr("is_index") %}
+                  <li><a href="{{ base_url }}{{ sp.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ sp.title | e }}</a></li>
+                  {% endfor %}
                   {% endfor %}
                 </ul>
               </div>
@@ -1446,10 +1463,15 @@ module Hwaro
                   {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                   {{ content }}
 
+                  {# Only render the chapter listing when the section has at
+                     least one non-index child page — an empty chapter would
+                     otherwise show an orphan heading over an empty list. #}
+                  {% if section.pages | rejectattr("is_index") | length %}
                   <h2>In This Chapter</h2>
                   <ul class="section-list">
                     {{ section.list }}
                   </ul>
+                  {% endif %}
                   {{ pagination }}
                 </div>
             {% include "footer.html" %}

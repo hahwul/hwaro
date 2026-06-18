@@ -104,6 +104,10 @@ module Hwaro
               }
             end
 
+            # Don't emit a feed for a language with no content — its channel
+            # <link> would point at a non-existent /{lang}/ home (404).
+            next if lang_pages.empty?
+
             # Build the output directory: output_dir/{lang}/
             lang_output_dir = File.join(output_dir, lang_code)
             Hwaro::Utils::FileSafe.mkdir_p(lang_output_dir)
@@ -366,6 +370,12 @@ module Hwaro
               page.authors.each do |author|
                 next if author.strip.empty?
                 str << "    <author><name>#{Utils::TextUtils.escape_xml(author)}</name></author>\n"
+              end
+
+              # Frontmatter taxonomies become Atom <category> elements,
+              # mirroring the RSS feed's per-term <category> output (gh#526).
+              feed_categories(page).each do |term|
+                str << "    <category term=\"#{Utils::TextUtils.escape_xml(term)}\" />\n"
               end
 
               content = get_content_for_feed(page, config)

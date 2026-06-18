@@ -9,12 +9,21 @@ module Hwaro
         extend self
 
         # Compute the canonical URL for a page (absolute URL with base_url).
-        def canonical_url(page : Models::Page, config : Models::Config) : String
+        # `url_override` (the paginator's page-aware URL) self-canonicalizes
+        # paginated pages instead of collapsing them onto page 1.
+        def canonical_url(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
+          # The paginator's page-aware override wins so paginated pages
+          # self-canonicalize. `page.permalink` is the generated absolute URL
+          # (base_url + page.url), i.e. the page-1/section URL — using it for a
+          # paginated render would point every page at page 1.
+          if u = url_override
+            return "#{config.base_url_stripped}#{u.starts_with?("/") ? u : "/#{u}"}"
+          end
           page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
         end
 
-        def canonical_tag(page : Models::Page, config : Models::Config) : String
-          url = canonical_url(page, config)
+        def canonical_tag(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
+          url = canonical_url(page, config, url_override)
           # Fast path: skip HTML.escape when URL has no escapable chars (common case for URLs)
           escaped = url.includes?('&') || url.includes?('"') || url.includes?('<') || url.includes?('>') ? HTML.escape(url) : url
           %(<link rel="canonical" href="#{escaped}">)

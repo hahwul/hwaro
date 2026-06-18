@@ -211,6 +211,15 @@ module Hwaro
         FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+)(?:\.(\d+))?:(.+?)-->/
         FOOTNOTE_BLOCK_RE   = /\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m
 
+        # Derive an id-safe token from a footnote key. The key can contain ASCII
+        # whitespace (`[^my note]`), which is invalid in an `id`/fragment, so
+        # collapse runs of whitespace to a single `-` before HTML-escaping the
+        # rest. Must be applied identically on the reference side and the
+        # li/backref side so forward and backward anchors still match.
+        def footnote_id_token(key : String) : String
+          HTML.escape(key.gsub(/\s+/, "-"))
+        end
+
         def preprocess_footnotes(content : String) : String
           # Neutralize any author-typed HWARO FOOTNOTE markers up front so page
           # content that literally contains the engine's internal comment markers
@@ -262,7 +271,7 @@ module Hwaro
                 num = ref_order[key]
                 ref_occurrences[key] += 1
                 occ = ref_occurrences[key]
-                escaped_key = HTML.escape(key)
+                escaped_key = footnote_id_token(key)
                 ref_id = occ == 1 ? "fnref-#{escaped_key}" : "fnref-#{escaped_key}-#{occ}"
                 "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>"
               end
@@ -316,7 +325,7 @@ module Hwaro
           section = String.build do |str|
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
-              escaped_key = HTML.escape(fn[:key])
+              escaped_key = footnote_id_token(fn[:key])
               rendered_text = InlineMarkdown.render(fn[:text], math: math)
               str << "<li id=\"fn-#{escaped_key}\">\n"
               # One backref per reference occurrence so every `fnref-\u2026` id is
@@ -516,7 +525,19 @@ module Hwaro
                 elsif raw_context
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
                 else
-                  "<span class=\"math math-inline\">\\\\(#{escaped}\\\\)</span>"
+                  # Normal inline context: the body still flows through Markd's
+                  # CommonMark inline parser, which would (a) read `*`/`_` as
+                  # emphasis and pair them across math spans, (b) start code
+                  # spans on backticks, (c) form links on `[`/`]`, and (d)
+                  # CONSUME a backslash before any ASCII punctuation — stripping
+                  # the LaTeX escapes in e.g. `$\{x\}$` or `$a \& b$`. Backslash-
+                  # escape each of those active chars (backslash itself FIRST, so
+                  # `\{` survives as `\{` rather than being eaten) so Markd ships
+                  # the formula body verbatim to KaTeX/MathJax. (`~` is left
+                  # alone: GFM strikethrough is handled by hwaro's own
+                  # preprocessor, which already skips math spans.)
+                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
                 end
               end
             end

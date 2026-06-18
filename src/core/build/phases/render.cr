@@ -44,7 +44,7 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Detect duplicate output paths (slug collisions)
+    # Detect duplicate output paths (slug collisions and alias collisions)
     seen_urls = Hash(String, String).new
     all_pages.each do |page|
       url = page.url
@@ -52,6 +52,18 @@ module Hwaro::Core::Build::Phases::Render
         Logger.warn "Duplicate output path '#{url}' — '#{page.path}' overwrites '#{prev_path}'"
       else
         seen_urls[url] = page.path
+      end
+      # Alias destinations also produce output files; a second page claiming the
+      # same alias (or an alias clashing with a real page URL) would otherwise
+      # overwrite silently and render-order-dependently.
+      page.aliases.each do |a|
+        norm = a.starts_with?("/") ? a : "/#{a}"
+        norm = "#{norm}/" unless norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+        if prev_path = seen_urls[norm]?
+          Logger.warn "Duplicate alias output path '#{norm}' — '#{page.path}' overwrites '#{prev_path}'"
+        else
+          seen_urls[norm] = page.path
+        end
       end
     end
 
@@ -812,6 +824,9 @@ module Hwaro::Core::Build::Phases::Render
               base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
               "#{base}#{src}".gsub("//", "/")
             end
+      # Markdown emits percent-encoded URLs (spaces/unicode), but the resize map
+      # is keyed by the decoded filesystem path — decode before the lookup.
+      key = URI.decode(key)
       # prefix_root_relative_links runs before this pass and may already have
       # rewritten a root-relative src with the subpath, but the resize map is
       # keyed by bare root-relative paths — strip the base_path back off so the
@@ -826,7 +841,7 @@ module Hwaro::Core::Build::Phases::Render
       # Prefix each candidate with the subpath (base_path) so responsive
       # images resolve on subpath deployments; the resize map stores bare
       # root-relative paths. Mirrors the resize_image() template helper.
-      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{config.with_base_path(url)} #{w}w" }.join(", ")
+      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
       additions = %( srcset="#{srcset}")
       additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       tag.sub("<img", "<img#{additions}")
@@ -1227,6 +1242,7 @@ module Hwaro::Core::Build::Phases::Render
       hash = {
         "path"               => Crinja::Value.new(s.path),
         "name"               => Crinja::Value.new(s.section),
+        "top_level"          => Crinja::Value.new(!s.section.includes?("/")),
         "title"              => Crinja::Value.new(s.title),
         "description"        => Crinja::Value.new(s.description || ""),
         "url"                => Crinja::Value.new(s.url),
@@ -1839,14 +1855,16 @@ module Hwaro::Core::Build::Phases::Render
     vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
     vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
 
-    # Canonical and Hreflang tags
-    canonical_tag = Content::Seo::Tags.canonical_tag(page, config)
+    # Canonical and Hreflang tags. Pass page_url_override so paginated pages
+    # (page/2/ …) self-canonicalize instead of all pointing at page 1, keeping
+    # canonical consistent with og:url and rel=prev/next.
+    canonical_tag = Content::Seo::Tags.canonical_tag(page, config, page_url_override)
     hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
     vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
     vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
     # Structured SEO object for custom meta tag markup
-    canonical_url = Content::Seo::Tags.canonical_url(page, config)
+    canonical_url = Content::Seo::Tags.canonical_url(page, config, page_url_override)
     seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
     seo_obj = {
       "canonical_url"   => Crinja::Value.new(canonical_url),
@@ -1876,11 +1894,13 @@ module Hwaro::Core::Build::Phases::Render
                        # Listing pages (section index, taxonomy index/term,
                        # author term) are collections, not articles — keep the
                        # JSON-LD @type consistent with og:type="website".
-                       Content::Seo::JsonLd.collection_page(page, config)
+                       Content::Seo::JsonLd.collection_page(page, config, page_url_override)
                      else
                        Content::Seo::JsonLd.article(page, config, site)
                      end
-    needs_breadcrumb = !page.ancestors.empty? || !page.is_index
+    # The synthesized 404 page carries no page-level structured data (matching
+    # the Article/CollectionPage suppression above) — skip its breadcrumb too.
+    needs_breadcrumb = page.path != "404.html" && (!page.ancestors.empty? || !page.is_index)
     jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config) : ""
 
     # Extended schema types (FAQ, HowTo) auto-detected from extra.schema_type
@@ -1954,6 +1974,15 @@ module Hwaro::Core::Build::Phases::Render
   private def og_type_for(page : Models::Page, effective_url : String) : String?
     # 404 page is synthesized in write phase with `path = "404.html"`.
     return "website" if page.path == "404.html"
+    # Explicit per-page `[extra] og_type = "website"` lets a custom listing
+    # template (e.g. the blog scaffold's archives page, a plain Page with no
+    # Section/taxonomy signal) declare itself a collection. Only "website" is
+    # honored — it flips og:type AND the JSON-LD type to collection together;
+    # any other value would desync og:type from the (Article) JSON-LD, so it
+    # falls through to the default.
+    if page.extra["og_type"]?.try(&.as?(String)) == "website"
+      return "website"
+    end
     # Taxonomy listings (`/tags/`, `/tags/<term>/`, …).
     return "website" if page.taxonomy_name
     # Section landings come from `_index.md`, which read_content parses into
