@@ -44,15 +44,28 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Detect duplicate output paths (slug collisions)
-    seen_urls = Hash(String, String).new
-    all_pages.each do |page|
-      url = page.url
-      if prev_path = seen_urls[url]?
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' overwrites '#{prev_path}'"
-      else
-        seen_urls[url] = page.path
+    # Detect and resolve duplicate output paths (slug collisions). Only one
+    # file can exist per URL, so the loser(s) must not leak into feeds, the
+    # sitemap, search, or JSON-LD as links to a URL that serves different
+    # content. Pick one deterministic winner per URL (a section index owns its
+    # URL; otherwise the last-declared page) and drop the losers from both the
+    # render set and ctx.all_pages so the written file and every generated
+    # metadata output agree on what exists at that URL.
+    pages_by_url = Hash(String, Array(Models::Page)).new
+    all_pages.each { |page| (pages_by_url[page.url] ||= [] of Models::Page) << page }
+    collision_losers = Set(UInt64).new
+    pages_by_url.each do |url, group|
+      next if group.size < 2
+      winner = group.find(&.is_a?(Models::Section)) || group.last
+      group.each do |page|
+        next if page.same?(winner)
+        collision_losers << page.object_id
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' dropped; '#{winner.path}' owns this URL"
       end
+    end
+    unless collision_losers.empty?
+      all_pages.reject! { |page| collision_losers.includes?(page.object_id) }
+      pages_to_build = pages_to_build.reject { |page| collision_losers.includes?(page.object_id) }
     end
 
     # Fast-start mode: render only homepage + most recent N pages on this
@@ -817,7 +830,10 @@ module Hwaro::Core::Build::Phases::Render
       next tag unless widths
       next tag if widths.empty?
 
-      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{url} #{w}w" }.join(", ")
+      # Prefix each candidate with the subpath (base_path) so responsive
+      # images resolve on subpath deployments; the resize map stores bare
+      # root-relative paths. Mirrors the resize_image() template helper.
+      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{config.with_base_path(url)} #{w}w" }.join(", ")
       additions = %( srcset="#{srcset}")
       additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       tag.sub("<img", "<img#{additions}")
@@ -1861,6 +1877,11 @@ module Hwaro::Core::Build::Phases::Render
     is_homepage = home?(page)
     jsonld_article = if is_homepage || page.title.empty?
                        ""
+                     elsif og_type_override == "website"
+                       # Listing pages (section index, taxonomy index/term,
+                       # author term) are collections, not articles — keep the
+                       # JSON-LD @type consistent with og:type="website".
+                       Content::Seo::JsonLd.collection_page(page, config)
                      else
                        Content::Seo::JsonLd.article(page, config, site)
                      end

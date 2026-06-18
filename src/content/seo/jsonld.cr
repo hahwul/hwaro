@@ -65,6 +65,30 @@ module Hwaro
           wrap_script(json)
         end
 
+        # Generate CollectionPage JSON-LD for listing pages (section indexes,
+        # taxonomy index/term pages, author term pages). These are collections,
+        # not articles, so they use schema.org CollectionPage with a `name`
+        # instead of Article/`headline`, keeping JSON-LD consistent with the
+        # og:type="website" emitted on the same page (gh#522 follow-up).
+        def collection_page(page : Models::Page, config : Models::Config) : String
+          base = config.base_url_stripped
+          url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+
+          json = JSON.build do |j|
+            j.object do
+              j.field "@context", "https://schema.org"
+              j.field "@type", "CollectionPage"
+              j.field "name", page.title
+              j.field "url", url
+              if (d = page.description) && !d.empty?
+                j.field "description", d
+              end
+            end
+          end
+
+          wrap_script(json)
+        end
+
         # Generate BreadcrumbList JSON-LD from page ancestors
         def breadcrumb(page : Models::Page, config : Models::Config) : String
           base = config.base_url_stripped
