@@ -1640,6 +1640,20 @@ describe Hwaro::Models::Config do
       config.permalinks["old/posts"].should eq("posts")
       config.permalinks["2023/drafts"].should eq("archive/2023")
     end
+
+    it "strips surrounding slashes from both source keys and targets" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [permalinks]
+        "/posts" = "/blog/"
+        TOML
+
+      # The slash-free key matches the slash-free directory path, and the
+      # slash-free target avoids double-slash URLs (http://host//blog//p/).
+      config.permalinks.has_key?("/posts").should be_false
+      config.permalinks["posts"].should eq("blog")
+    end
   end
 
   # ---------------------------------------------------------------------------
