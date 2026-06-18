@@ -87,11 +87,21 @@ module Hwaro
         # Headers for caching. Target the configured asset output dir rather
         # than a hardcoded /assets/ so a customized [assets] output_dir is honored.
         lines << "[[headers]]"
-        lines << "  for = \"/#{assets_url_dir}/*\""
+        lines << "  for = \"#{with_base_path("/#{assets_url_dir}/*")}\""
         lines << "  [headers.values]"
         lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
 
         lines.join("\n") + "\n"
+      end
+
+      # Prefix a site-internal path with the configured `base_path` so generated
+      # redirects/headers resolve under a subpath deployment, matching the
+      # build's own redirect HTML. Normalizes to a leading slash first because
+      # Config#with_base_path only prefixes root-relative paths (aliases may be
+      # authored without one). A no-op when base_path is empty.
+      private def with_base_path(path : String) : String
+        normalized = path.starts_with?("/") ? path : "/#{path}"
+        @config.with_base_path(normalized)
       end
 
       # URL path segment where the asset pipeline emits fingerprinted files,
@@ -121,7 +131,7 @@ module Hwaro
         # Headers for caching
         header_entries = [
           JSON::Any.new({
-            "source"  => JSON::Any.new("/#{assets_url_dir}/(.*)"),
+            "source"  => JSON::Any.new(with_base_path("/#{assets_url_dir}/(.*)")),
             "headers" => JSON::Any.new([
               JSON::Any.new({
                 "key"   => JSON::Any.new("Cache-Control"),
@@ -329,7 +339,13 @@ module Hwaro
         target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path])
 
         aliases.each do |alias_path|
-          redirects << {alias_path, target_url}
+          # Carry base_path so generated redirects match the build's own
+          # redirect HTML (`url=/myrepo/moved/`) on subpath deploys. Ensure a
+          # leading slash first since with_base_path only prefixes root-relative
+          # paths; a no-op when base_path is empty (domain-root deploy).
+          from = with_base_path(alias_path)
+          to = with_base_path(target_url)
+          redirects << {from, to}
         end
       end
 

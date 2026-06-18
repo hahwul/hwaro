@@ -209,6 +209,33 @@ describe Hwaro::Services::PlatformConfig do
         end
       end
 
+      # Regression: on a subpath deploy (base_url with a path component) the
+      # build writes redirect HTML pointing at `/myrepo/...`, so the platform
+      # config's alias redirects and asset cache rule must carry base_path too,
+      # otherwise they diverge from the build and point at the domain root.
+      it "carries base_path into redirect from/to and the cache header on subpath deploys" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            File.write("content/moved.md", "---\ntitle: Moved\naliases:\n  - /old/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.base_url = "https://example.com/myrepo/"
+            generator = Hwaro::Services::PlatformConfig.new(config)
+
+            netlify = generator.generate("netlify")
+            netlify.should contain("from = \"/myrepo/old/\"")
+            netlify.should contain("to = \"/myrepo/moved/\"")
+            netlify.should contain("for = \"/myrepo/assets/*\"")
+
+            vercel = JSON.parse(generator.generate("vercel"))
+            vercel["redirects"][0]["source"].as_s.should eq("/myrepo/old/")
+            vercel["redirects"][0]["destination"].as_s.should eq("/myrepo/moved/")
+            vercel["headers"][0]["source"].as_s.should eq("/myrepo/assets/(.*)")
+          end
+        end
+      end
+
       it "maps a nested alias to root for an empty-target permalink without doubling slashes" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
