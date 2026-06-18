@@ -1,4 +1,5 @@
 require "json"
+require "digest/sha1"
 require "../../models/config"
 require "../../models/site"
 require "../../utils/logger"
@@ -85,7 +86,11 @@ module Hwaro
                           resolved_start.inspect
                         end
           root_url = resolved_start.inspect
-          cache_version = Time.utc.to_unix
+          # Derive the cache name from the precached inputs rather than the
+          # build clock, so identical content produces a byte-identical sw.js
+          # across builds while still invalidating when those inputs change.
+          cache_signature = (precache_urls + [pwa.cache_strategy, offline_url, root_url]).join('\n')
+          cache_version = Digest::SHA1.hexdigest(cache_signature)[0, 12]
 
           fetch_handler = case pwa.cache_strategy
                           when "network-first"

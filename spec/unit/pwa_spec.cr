@@ -167,7 +167,7 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
-    it "generates sw.js with build-specific cache version" do
+    it "generates sw.js with a deterministic content-derived cache version" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)
           [pwa]
@@ -177,8 +177,16 @@ describe Hwaro::Content::Seo::Pwa do
         Hwaro::Content::Seo::Pwa.generate(site, dir)
 
         content = File.read(File.join(dir, "sw.js"))
-        content.should match(/CACHE_NAME = 'hwaro-\d+'/)
+        # Cache name is a content hash (hex), not a wall-clock timestamp, so
+        # identical input yields byte-identical sw.js across builds.
+        content.should match(/CACHE_NAME = 'hwaro-[0-9a-f]+'/)
         content.should_not contain("hwaro-v1")
+
+        # Regenerating from identical input must produce the same cache name.
+        Dir.mktmpdir do |dir2|
+          Hwaro::Content::Seo::Pwa.generate(site, dir2)
+          File.read(File.join(dir2, "sw.js")).should eq(content)
+        end
       end
     end
 
