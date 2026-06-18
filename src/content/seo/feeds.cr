@@ -487,7 +487,11 @@ module Hwaro
               text_content # Return plain text even if not truncated for consistency
             end
           else
-            html_content # No truncation - return full HTML
+            # Full HTML (Atom <content type="html">). Apply the subpath prefix
+            # defensively (idempotent) so cached pages — whose page.content the
+            # render phase never rewrote — still emit subpath-correct links,
+            # matching full_content_for_feed on the RSS path.
+            Processors::InternalLinkResolver.prefix_root_relative_links(html_content, config.base_url)
           end
         end
       end
