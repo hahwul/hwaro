@@ -84,13 +84,22 @@ module Hwaro
           end
         end
 
-        # Headers for caching
+        # Headers for caching. Target the configured asset output dir rather
+        # than a hardcoded /assets/ so a customized [assets] output_dir is honored.
         lines << "[[headers]]"
-        lines << "  for = \"/assets/*\""
+        lines << "  for = \"/#{assets_url_dir}/*\""
         lines << "  [headers.values]"
         lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
 
         lines.join("\n") + "\n"
+      end
+
+      # URL path segment where the asset pipeline emits fingerprinted files,
+      # derived from config (default "assets") so cache rules follow the
+      # configured [assets] output_dir.
+      private def assets_url_dir : String
+        dir = @config.assets.output_dir.strip("/")
+        dir.empty? ? "assets" : dir
       end
 
       private def generate_vercel : String
@@ -112,7 +121,7 @@ module Hwaro
         # Headers for caching
         header_entries = [
           JSON::Any.new({
-            "source"  => JSON::Any.new("/assets/(.*)"),
+            "source"  => JSON::Any.new("/#{assets_url_dir}/(.*)"),
             "headers" => JSON::Any.new([
               JSON::Any.new({
                 "key"   => JSON::Any.new("Cache-Control"),

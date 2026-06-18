@@ -135,6 +135,16 @@ module Hwaro
           Dir.glob(File.join(@templates_dir, "**", "*.js")) { |f| scan_files << f }
         end
 
+        # Stylesheets/scripts shipped under static/ commonly reference other
+        # assets via url()/@font-face/import (e.g. the scaffold's
+        # static/css/style.css pulls in static/fonts/*.woff2). Without scanning
+        # them, those fonts are misreported as unused — and `--delete` would
+        # remove in-use files (data loss).
+        if Dir.exists?(@static_dir)
+          Dir.glob(File.join(@static_dir, "**", "*.css")) { |f| scan_files << f }
+          Dir.glob(File.join(@static_dir, "**", "*.js")) { |f| scan_files << f }
+        end
+
         String.build do |sb|
           scan_files.each do |file|
             text = begin
