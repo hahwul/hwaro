@@ -44,28 +44,15 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Detect and resolve duplicate output paths (slug collisions). Only one
-    # file can exist per URL, so the loser(s) must not leak into feeds, the
-    # sitemap, search, or JSON-LD as links to a URL that serves different
-    # content. Pick one deterministic winner per URL (a section index owns its
-    # URL; otherwise the last-declared page) and drop the losers from both the
-    # render set and ctx.all_pages so the written file and every generated
-    # metadata output agree on what exists at that URL.
-    pages_by_url = Hash(String, Array(Models::Page)).new
-    all_pages.each { |page| (pages_by_url[page.url] ||= [] of Models::Page) << page }
-    collision_losers = Set(UInt64).new
-    pages_by_url.each do |url, group|
-      next if group.size < 2
-      winner = group.find(&.is_a?(Models::Section)) || group.last
-      group.each do |page|
-        next if page.same?(winner)
-        collision_losers << page.object_id
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' dropped; '#{winner.path}' owns this URL"
+    # Detect duplicate output paths (slug collisions)
+    seen_urls = Hash(String, String).new
+    all_pages.each do |page|
+      url = page.url
+      if prev_path = seen_urls[url]?
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' overwrites '#{prev_path}'"
+      else
+        seen_urls[url] = page.path
       end
-    end
-    unless collision_losers.empty?
-      all_pages.reject! { |page| collision_losers.includes?(page.object_id) }
-      pages_to_build = pages_to_build.reject { |page| collision_losers.includes?(page.object_id) }
     end
 
     # Fast-start mode: render only homepage + most recent N pages on this
@@ -825,6 +812,12 @@ module Hwaro::Core::Build::Phases::Render
               base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
               "#{base}#{src}".gsub("//", "/")
             end
+      # prefix_root_relative_links runs before this pass and may already have
+      # rewritten a root-relative src with the subpath, but the resize map is
+      # keyed by bare root-relative paths — strip the base_path back off so the
+      # lookup hits (then with_base_path re-adds it to the emitted candidates).
+      bp = config.base_path
+      key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
 
       widths = resize_map[key]?
       next tag unless widths
@@ -1875,7 +1868,9 @@ module Hwaro::Core::Build::Phases::Render
     # for any other untitled page skip the Article entirely rather than emit
     # one with an empty headline.
     is_homepage = home?(page)
-    jsonld_article = if is_homepage || page.title.empty?
+    jsonld_article = if is_homepage || page.title.empty? || page.path == "404.html"
+                       # The synthesized 404 page is neither an Article nor a
+                       # collection — emit no page-level JSON-LD for it.
                        ""
                      elsif og_type_override == "website"
                        # Listing pages (section index, taxonomy index/term,
