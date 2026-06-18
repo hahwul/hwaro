@@ -36,7 +36,7 @@ module Hwaro
                 last_was_sep = true
               end
             elsif cjk_char?(char) || unicode_letter?(char)
-              io << char
+              io << char.downcase
               last_was_sep = false
             end
             # All other characters (punctuation, symbols) are dropped
