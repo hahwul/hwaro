@@ -79,7 +79,18 @@ module Hwaro
         property template_hash : String
         property config_hash : String
 
-        def initialize(@template_hash : String = "", @config_hash : String = "")
+        # Fingerprints of the global page/section sets. Listing pages (homepage,
+        # section indexes, archives, taxonomy widgets) render content derived
+        # from these sets even when their own source is unchanged, so a change
+        # here forces those pages to re-render on an incremental build. Default
+        # "" so older cache files (without these keys) load and rebuild once.
+        @[JSON::Field(key: "page_set_hash", emit_null: false)]
+        property page_set_hash : String = ""
+        @[JSON::Field(key: "section_set_hash", emit_null: false)]
+        property section_set_hash : String = ""
+
+        def initialize(@template_hash : String = "", @config_hash : String = "",
+                       @page_set_hash : String = "", @section_set_hash : String = "")
         end
       end
 
@@ -153,7 +164,33 @@ module Hwaro
           if invalidated || @metadata.template_hash != template_hash || @metadata.config_hash != config_hash
             @dirty = true
           end
-          @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash)
+          # Preserve the page/section-set fingerprints loaded from the prior
+          # build so the render phase can compare against them before recording
+          # the current ones.
+          @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash,
+            page_set_hash: @metadata.page_set_hash, section_set_hash: @metadata.section_set_hash)
+        end
+
+        # Has the global page set (content page metadata that listings render —
+        # path/url/title/date/weight/draft/section) changed since last build?
+        def page_set_changed?(fingerprint : String) : Bool
+          @metadata.page_set_hash != fingerprint
+        end
+
+        # Has the section set (section metadata that nav/menus render) changed?
+        def section_set_changed?(fingerprint : String) : Bool
+          @metadata.section_set_hash != fingerprint
+        end
+
+        # Record the current page/section-set fingerprints so the next build can
+        # detect a change; marks the cache dirty when either value moves.
+        def record_set_fingerprints(page_set : String, section_set : String) : Nil
+          return unless @enabled
+          if @metadata.page_set_hash != page_set || @metadata.section_set_hash != section_set
+            @dirty = true
+          end
+          @metadata = CacheMetadata.new(template_hash: @metadata.template_hash, config_hash: @metadata.config_hash,
+            page_set_hash: page_set, section_set_hash: section_set)
         end
 
         # Check if a file has changed since last build.
