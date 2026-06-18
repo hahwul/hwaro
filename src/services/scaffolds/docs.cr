@@ -1134,7 +1134,7 @@ module Hwaro
         private def docs_sidebar_html : String
           <<-HTML
             <aside class="docs-sidebar">
-              {% for sec in site.sections | sort(attribute="path") %}{% if sec.name != "" %}
+              {% for sec in site.sections | sort(attribute="path") %}{% if sec.name != "" and sec.language == page_language %}
               <div class="sidebar-section">
                 <div class="sidebar-title">{{ sec.title | e }}</div>
                 <ul class="sidebar-links">

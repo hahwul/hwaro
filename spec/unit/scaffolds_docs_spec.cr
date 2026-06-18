@@ -101,6 +101,17 @@ describe Hwaro::Services::Scaffolds::Docs do
       sidebar.should_not contain("/reference/cli/")
     end
 
+    # On a multilingual site the sidebar must only list sections for the
+    # current page's language; without a `sec.language == page_language`
+    # guard a /ko/ page listed every language's sections (3 × 3 = 9
+    # entries) with hrefs jumping across languages.
+    it "filters sidebar sections by the current page language" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      sidebar = scaffold.template_files["partials/sidebar.html"]
+
+      sidebar.should contain("sec.language == page_language")
+    end
+
     it "nav partial includes Documentation span in logo" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       nav = scaffold.template_files["partials/nav.html"]
