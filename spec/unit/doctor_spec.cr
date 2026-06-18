@@ -870,6 +870,94 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # `[pwa] offline_page` / `precache_urls` are routes, not just static
+      # files: `/about/` builds to `public/about/index.html` from
+      # `content/about.md`. Resolving against `static/` alone produced a
+      # spurious "file not found" for valid routes.
+      it "does not warn on a [pwa] offline_page route backed by a content file" do
+        Dir.mktmpdir do |dir|
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(content_dir)
+          File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\n")
+
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\noffline_page = "/about/"\n))
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: content_dir,
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" && i.message.includes?("offline_page") }.should be_false
+          end
+        end
+      end
+
+      it "does not warn on a [pwa] precache route backed by a built public page" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["/blog/"]\n))
+
+          # No content source, but the built output page exists.
+          FileUtils.mkdir_p(File.join(dir, "public", "blog"))
+          File.write(File.join(dir, "public", "blog", "index.html"), "<html></html>")
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" && i.message.includes?("precache") }.should be_false
+          end
+        end
+      end
+
+      it "still warns on a genuinely-missing [pwa] precache route" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["/ghost/"]\n))
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? do |i|
+              i.id == "config-path-missing" &&
+                i.message.includes?("precache_urls") &&
+                i.message.includes?("/ghost/")
+            end.should be_true
+          end
+        end
+      end
+
+      it "does not validate external [pwa] precache URLs" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["https://cdn.example.com/app.js"]\n))
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" && i.message.includes?("precache") }.should be_false
+          end
+        end
+      end
+
       it "strips query string and fragment before resolving referenced paths" do
         # `/images/og.png?v=2` should resolve to /images/og.png on disk.
         # Without stripping, doctor would emit a spurious config-path-missing.

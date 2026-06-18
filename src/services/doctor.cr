@@ -833,10 +833,33 @@ module Hwaro
           )
         end
 
+        # PWA offline_page / precache_urls are routes, not just static files:
+        # `/about/` builds to `public/about/index.html` from `content/about.md`,
+        # so resolving them against `static/` alone yields false "file not
+        # found" warnings. Use a route-aware check that also accepts a matching
+        # content source or a built output page.
+        emit_route = ->(label : String, value : String) do
+          stripped = strip_query_hash(value)
+          return if stripped.empty?
+          return if path_resolves?(stripped) || route_resolves?(stripped)
+          issues << Issue.new(
+            id: "config-path-missing",
+            level: :warning,
+            category: "config",
+            file: @config_path,
+            message: "#{label}: #{value} — file not found",
+          )
+        end
+
         config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }
         config.og.auto_image.logo.try { |v| emit_file.call("[og.auto_image] logo", v) }
         config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
-        config.pwa.offline_page.try { |v| emit_file.call("[pwa] offline_page", v) }
+        config.pwa.offline_page.try { |v| emit_route.call("[pwa] offline_page", v) }
+        config.pwa.precache_urls.each_with_index do |url, idx|
+          # Only validate site-internal routes; external URLs aren't ours.
+          next if url.starts_with?("http://") || url.starts_with?("https://")
+          emit_route.call("[pwa] precache_urls[#{idx}]", url)
+        end
         config.pwa.icons.each_with_index do |icon, idx|
           emit_file.call("[pwa] icons[#{idx}]", icon)
         end
@@ -895,6 +918,42 @@ module Hwaro
       # Same lookup strategy as `path_resolves?`, but for directories.
       private def dir_resolves?(path : String) : Bool
         candidates(path).any? { |c| Dir.exists?(c) }
+      end
+
+      # Decide whether a route-shaped value (e.g. `/about/`, `/offline.html`)
+      # corresponds to a page the site builds, even when no matching static
+      # file exists. A route is considered valid when:
+      #   - a content source exists (`content/about.md` or
+      #     `content/about/index.md` for `/about/`), or
+      #   - the built output page exists (`public/about/index.html`).
+      # This keeps doctor from flagging valid routes as "file not found" while
+      # still catching genuinely-missing pages.
+      private def route_resolves?(path : String) : Bool
+        # Normalize to a slug: drop a leading slash, strip a trailing slash,
+        # and remove a trailing `index.html` so `/about/` and
+        # `/about/index.html` resolve the same way.
+        slug = path.lchop("/")
+        slug = slug.rchop("index.html") if slug.ends_with?("index.html")
+        slug = slug.rstrip("/")
+
+        # Content sources that would render to this route.
+        content_candidates = if slug.empty?
+                               ["_index.md", "_index.markdown", "index.md", "index.markdown"]
+                             else
+                               [
+                                 "#{slug}.md",
+                                 "#{slug}.markdown",
+                                 File.join(slug, "index.md"),
+                                 File.join(slug, "index.markdown"),
+                                 File.join(slug, "_index.md"),
+                                 File.join(slug, "_index.markdown"),
+                               ]
+                             end
+        return true if content_candidates.any? { |c| File.exists?(File.join(@content_dir, c)) }
+
+        # The built output page (build output dir is conventionally `public/`).
+        output_file = path.ends_with?(".html") ? path.lchop("/") : File.join(slug, "index.html")
+        File.exists?(File.join("public", output_file))
       end
 
       private def candidates(path : String) : Array(String)

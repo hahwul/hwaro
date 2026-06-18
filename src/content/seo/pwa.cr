@@ -20,7 +20,7 @@ module Hwaro
           pwa = config.pwa
 
           icons = pwa.icons.map do |icon_path|
-            size = extract_icon_size(icon_path)
+            size = icon_size(icon_path, output_dir)
             url_path = config.with_base_path(normalize_icon_path(icon_path))
             {
               "src"   => url_path,
@@ -72,6 +72,7 @@ module Hwaro
 
           # Build precache URL list (each entry is a site-internal root-relative
           # path that must carry the subpath prefix, same as start_url).
+          base_path = config.base_path
           precache_urls = pwa.precache_urls.map { |u| config.with_base_path(u) }
           precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
           if offline = pwa.offline_page
@@ -79,9 +80,34 @@ module Hwaro
             precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
 
+          # cache.addAll() is all-or-nothing: a single 404 aborts the whole
+          # service-worker install. Drop any site-internal precache URL whose
+          # resolved output file does not exist (external http(s):// URLs are
+          # not our files, so we trust them) but always keep the launch URL.
+          precache_urls = precache_urls.select do |u|
+            next true if external_url?(u)
+            next true if u == resolved_start
+            if precache_file_exists?(u, output_dir, base_path)
+              true
+            else
+              Logger.warn "PWA: precache URL #{u.inspect} has no matching output file — dropping it from sw.js precache (cache.addAll is all-or-nothing)"
+              false
+            end
+          end
+
           precache_json = precache_urls.map(&.inspect).join(",\n  ")
+
+          # The navigation fallback must point at a page that actually exists,
+          # otherwise the offline experience breaks. Fall back to the launch URL
+          # when offline_page resolves to nothing on disk.
           offline_url = if op = pwa.offline_page
-                          config.with_base_path(op).inspect
+                          resolved_offline = config.with_base_path(op)
+                          if external_url?(resolved_offline) || precache_file_exists?(resolved_offline, output_dir, base_path)
+                            resolved_offline.inspect
+                          else
+                            Logger.warn "PWA: offline_page #{resolved_offline.inspect} has no matching output file — falling back to start_url #{resolved_start.inspect}"
+                            resolved_start.inspect
+                          end
                         else
                           resolved_start.inspect
                         end
@@ -92,17 +118,13 @@ module Hwaro
           # edit to any precached page/asset changes the hash and busts the
           # cache on deploy (correct invalidation). The PWA hook runs after the
           # render/write phase, so the precached output files already exist.
-          base_path = config.base_path
           cache_hash = Digest::SHA1.hexdigest do |ctx|
             ctx.update(pwa.cache_strategy)
             precache_urls.each do |u|
               ctx.update("\n")
               ctx.update(u)
-              rel = u
-              rel = rel[base_path.size..] if !base_path.empty? && rel.starts_with?(base_path)
-              rel = rel.lchop('/')
-              fpath = File.join(output_dir, rel)
-              fpath = File.join(fpath, "index.html") if rel.empty? || rel.ends_with?('/')
+              next if external_url?(u)
+              fpath = precache_file_path(u, output_dir, base_path)
               ctx.update(File.read(fpath)) if File.file?(fpath)
             end
           end
@@ -220,6 +242,71 @@ module Hwaro
               );
             });
             JS
+        end
+
+        # True for external absolute URLs we don't control (no local file to
+        # validate or hash).
+        private def self.external_url?(url : String) : Bool
+          url.starts_with?("http://") || url.starts_with?("https://")
+        end
+
+        # Map a site-internal (possibly base_path-prefixed) URL to the output
+        # file it should resolve to: strip base_path, drop the leading slash,
+        # join under output_dir, and append index.html for directory-like URLs.
+        private def self.precache_file_path(url : String, output_dir : String, base_path : String) : String
+          rel = url
+          rel = rel[base_path.size..] if !base_path.empty? && rel.starts_with?(base_path)
+          rel = rel.lchop('/')
+          fpath = File.join(output_dir, rel)
+          fpath = File.join(fpath, "index.html") if rel.empty? || rel.ends_with?('/')
+          fpath
+        end
+
+        # Does the output file backing this precache URL exist on disk?
+        private def self.precache_file_exists?(url : String, output_dir : String, base_path : String) : Bool
+          File.file?(precache_file_path(url, output_dir, base_path))
+        end
+
+        # Resolve an icon's declared `sizes`. Prefer the real pixel dimensions
+        # read from the PNG header so a 200x60 logo isn't mislabeled "512x512";
+        # fall back to the filename heuristic for non-PNG icons or unparsable
+        # bytes.
+        private def self.icon_size(icon_path : String, output_dir : String) : String
+          if File.extname(icon_path).downcase == ".png"
+            if dims = png_dimensions(resolve_icon_file(icon_path, output_dir))
+              return "#{dims[0]}x#{dims[1]}"
+            end
+            Logger.warn "PWA: could not read PNG dimensions for icon #{icon_path.inspect}; falling back to filename-derived size #{extract_icon_size(icon_path).inspect}"
+          end
+          extract_icon_size(icon_path)
+        end
+
+        # Map an icon path (config value) to the built output file it lands at.
+        # `static/foo.png` and `/foo.png` both copy to `<output>/foo.png`.
+        private def self.resolve_icon_file(icon_path : String, output_dir : String) : String
+          rel = normalize_icon_path(icon_path).lchop('/')
+          File.join(output_dir, rel)
+        end
+
+        # Read width/height from a PNG's IHDR chunk. Verifies the 8-byte PNG
+        # signature, then reads two big-endian UInt32s at offsets 16 (width)
+        # and 20 (height). Returns nil when the file is missing, too short, or
+        # not a PNG so the caller can fall back to the filename heuristic.
+        PNG_SIGNATURE = Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+        private def self.png_dimensions(path : String) : {UInt32, UInt32}?
+          return unless File.file?(path)
+          header = Bytes.new(24)
+          read = File.open(path, &.read(header))
+          return if read < 24
+          return unless header[0, 8] == PNG_SIGNATURE
+          width = IO::ByteFormat::BigEndian.decode(UInt32, header[16, 4])
+          height = IO::ByteFormat::BigEndian.decode(UInt32, header[20, 4])
+          return if width.zero? || height.zero?
+          {width, height}
+        rescue ex : IO::Error | File::Error
+          Logger.debug "PWA: failed reading PNG header for #{path}: #{ex.message}"
+          nil
         end
 
         # Normalize icon path to a URL path.
