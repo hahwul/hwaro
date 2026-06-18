@@ -123,6 +123,47 @@ describe Hwaro::Services::Scaffolds::Book do
       sidebar.should contain(%q(rejectattr("name", "equalto", "")))
       sidebar.should_not match(/{%\s*if\s+sec\.name\s*!=\s*""\s*%}/)
     end
+
+    # The sidebar's top-level chapter order must match the prev/next
+    # reading chain, which transform.cr orders by weight with a path
+    # tiebreak. Crinja sort is stable, so `sort(attribute="path")` then
+    # `sort(attribute="weight")` yields weight-asc, path-tiebroken order.
+    # A path-only sort (the old behavior) diverged from the reading chain
+    # whenever chapter weights didn't follow alphabetical paths.
+    it "orders top-level chapters by weight with a path tiebreak (matches reading chain)" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      sidebar = files["partials/sidebar.html"]
+      sidebar.should contain(%q(| sort(attribute="path") | sort(attribute="weight")))
+    end
+
+    # Nested sections (name like "parent/child") also appear flat in
+    # `site.sections`, so the outer loop skips them and renders them one
+    # level deeper from the parent's `subsections` — mirroring the
+    # depth-first nesting of the prev/next reading chain. Without the
+    # skip they rendered as bogus top-level chapter groups.
+    it "renders nested subsections beneath their parent, not as flat chapters" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      sidebar = files["partials/sidebar.html"]
+      # Skip nested sections in the top-level loop ("/" is in sec.name).
+      sidebar.should contain(%q({% if "/" is in sec.name %}))
+      # Render each parent's subsections nested beneath it.
+      sidebar.should contain("{% for sub in sec.subsections")
+      sidebar.should contain("{% for sp in sub.pages")
+    end
+  end
+
+  describe "#section_template" do
+    # An empty chapter (a section with no non-index child pages) used to
+    # render an orphan "In This Chapter" heading over an empty <ul>. The
+    # heading + list are now guarded so they only appear when the section
+    # has at least one listable child page.
+    it "guards the chapter listing so empty chapters don't show an orphan heading" do
+      files = Hwaro::Services::Scaffolds::Book.new.template_files
+      section = files["section.html"]
+      section.should contain(%q({% if section.pages | rejectattr("is_index") | length %}))
+      # The heading and list live inside the guard.
+      section.should match(/{%\s*if\s+section\.pages.*%}.*In This Chapter.*{%\s*endif\s*%}/m)
+    end
   end
 
   describe "#static_files" do
