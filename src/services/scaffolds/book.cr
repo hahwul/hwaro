@@ -1371,13 +1371,16 @@ module Hwaro
                   <li><a href="{{ base_url }}{{ lang_prefix }}/">Welcome</a></li>
                 </ul>
               </div>
-              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="weight") %}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>
                 <ul class="chapter-links">
                   <li><a href="{{ base_url }}{{ sec.url }}"><span class="num">{{ chapter_index }}.</span> {{ sec.title | e }}</a></li>
-                  {% for p in sec.pages | rejectattr("is_index") | sort(attribute="weight") %}
+                  {# sec.pages already arrives in the section's sort_by order
+                     (weight for chapters), matching the prev/next chain; a
+                     second Crinja sort here would be unstable on weight ties. #}
+                  {% for p in sec.pages | rejectattr("is_index") %}
                   <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
                   {% endfor %}
                 </ul>

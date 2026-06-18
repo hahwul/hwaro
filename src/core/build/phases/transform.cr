@@ -64,9 +64,13 @@ module Hwaro::Core::Build::Phases::Transform
       pages_by_section[section_name] = sorted
     end
 
-    # Find top-level sections (no parent) and sort by weight
+    # Find top-level sections (no parent) and sort by weight (path tiebreaker
+    # so equal weights keep a stable, deterministic reading order).
     top_sections = ctx.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort_by!(&.weight)
+    top_sections.sort! do |a, b|
+      cmp = a.weight <=> b.weight
+      cmp.zero? ? (a.path <=> b.path) : cmp
+    end
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page
