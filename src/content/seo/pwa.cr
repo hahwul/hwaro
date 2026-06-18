@@ -272,7 +272,9 @@ module Hwaro
         # fall back to the filename heuristic for non-PNG icons or unparsable
         # bytes.
         private def self.icon_size(icon_path : String, output_dir : String) : String
-          if File.extname(icon_path).downcase == ".png"
+          # A remote icon (http(s)://) has no local file to read — use the
+          # filename heuristic directly instead of warning on every build.
+          if File.extname(icon_path).downcase == ".png" && !external_url?(icon_path)
             if dims = png_dimensions(resolve_icon_file(icon_path, output_dir))
               return "#{dims[0]}x#{dims[1]}"
             end

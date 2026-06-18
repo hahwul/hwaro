@@ -332,17 +332,21 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
-    it "returns nil when any destination is missing" do
+    it "returns nil when a non-clamped variant is missing (config/output mismatch)" do
       Dir.mktmpdir do |dir|
         source = File.join(dir, "photo.jpg")
         File.write(source, "src")
         dest_dir = File.join(dir, "out")
         Dir.mkdir_p(dest_dir)
-        # Only the 320w variant exists
+        # The 320w and 1280w variants exist but the middle 640w is missing. The
+        # largest on-disk variant (1280) implies the source is >= 1280px, so
+        # 640w should exist and is NOT a clamp — the set is incomplete, so the
+        # image must be reprocessed.
         File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
+        File.write(File.join(dest_dir, "photo_1280w.jpg"), "1280")
 
         Hwaro::Content::Hooks::ImageHooks
-          .reusable_widths(source, dest_dir, [320, 640])
+          .reusable_widths(source, dest_dir, [320, 640, 1280])
           .should be_nil
       end
     end

@@ -1371,21 +1371,16 @@ module Hwaro
                   <li><a href="{{ base_url }}{{ lang_prefix }}/">Welcome</a></li>
                 </ul>
               </div>
-              {# Iterate TOP-LEVEL sections as chapters. Nested sections
-                 (name like "parent/child") also appear flat in `site.sections`,
-                 but they are rendered beneath their parent below, so they are
-                 skipped here via the `is in` test ("/" is in sec.name). The
-                 sort is weight with a path tiebreak to match the prev/next
-                 reading chain in transform.cr; Crinja sort is stable, so
-                 sorting by path then by weight yields weight-asc, path-tiebroken
-                 order. (Crinja here has no namespace/accumulator and no
-                 substring filter, so nested sections can't be dropped from the
-                 sequence up front — the inner skip keeps `loop.index` chapter
-                 numbering exact for the common case where nested sections sort
-                 last by weight, and for the default book scaffold, which has
-                 none.) #}
-              {% for sec in site.sections | rejectattr("name", "equalto", "") | sort(attribute="path") | sort(attribute="weight") %}
-              {% if "/" is in sec.name %}{% else %}
+              {# Iterate TOP-LEVEL sections as chapters. Nested sections also
+                 appear flat in `site.sections`, but `top_level` is false for
+                 them and they render beneath their parent below — filtering them
+                 out of the loop (rather than skipping inside) keeps `loop.index`
+                 chapter numbering contiguous even when a nested section sorts
+                 before a top-level chapter by weight. The sort is weight with a
+                 path tiebreak to match the prev/next reading chain in
+                 transform.cr; Crinja sort is stable, so sort-by-path then
+                 sort-by-weight yields weight-asc, path-tiebroken order. #}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | selectattr("top_level") | sort(attribute="path") | sort(attribute="weight") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>
@@ -1407,7 +1402,6 @@ module Hwaro
                   {% endfor %}
                 </ul>
               </div>
-              {% endif %}
               {% endfor %}
             </aside>
             HTML

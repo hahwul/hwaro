@@ -918,10 +918,14 @@ describe Hwaro::Services::Doctor do
         end
       end
 
-      it "still warns on a genuinely-missing [pwa] precache route" do
+      it "still warns on a genuinely-missing [pwa] precache asset (non-route path)" do
+        # Route-style values (trailing slash / no extension) are produced at
+        # build time and can't be validated pre-build, so doctor stays quiet on
+        # them and lets the authoritative build-time precache check catch misses.
+        # An asset-style path that resolves nowhere is still flagged here.
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
-          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["/ghost/"]\n))
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["/ghost.png"]\n))
 
           doctor = Hwaro::Services::Doctor.new(
             content_dir: File.join(dir, "content"),
@@ -934,7 +938,7 @@ describe Hwaro::Services::Doctor do
             issues.any? do |i|
               i.id == "config-path-missing" &&
                 i.message.includes?("precache_urls") &&
-                i.message.includes?("/ghost/")
+                i.message.includes?("/ghost.png")
             end.should be_true
           end
         end

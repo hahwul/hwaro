@@ -1242,6 +1242,7 @@ module Hwaro::Core::Build::Phases::Render
       hash = {
         "path"               => Crinja::Value.new(s.path),
         "name"               => Crinja::Value.new(s.section),
+        "top_level"          => Crinja::Value.new(!s.section.includes?("/")),
         "title"              => Crinja::Value.new(s.title),
         "description"        => Crinja::Value.new(s.description || ""),
         "url"                => Crinja::Value.new(s.url),
@@ -1973,11 +1974,14 @@ module Hwaro::Core::Build::Phases::Render
   private def og_type_for(page : Models::Page, effective_url : String) : String?
     # 404 page is synthesized in write phase with `path = "404.html"`.
     return "website" if page.path == "404.html"
-    # Explicit per-page override via `[extra] og_type` — lets a custom listing
+    # Explicit per-page `[extra] og_type = "website"` lets a custom listing
     # template (e.g. the blog scaffold's archives page, a plain Page with no
-    # Section/taxonomy signal) declare itself a "website"/collection.
-    if ot = page.extra["og_type"]?.try(&.as?(String))
-      return ot unless ot.empty?
+    # Section/taxonomy signal) declare itself a collection. Only "website" is
+    # honored — it flips og:type AND the JSON-LD type to collection together;
+    # any other value would desync og:type from the (Article) JSON-LD, so it
+    # falls through to the default.
+    if page.extra["og_type"]?.try(&.as?(String)) == "website"
+      return "website"
     end
     # Taxonomy listings (`/tags/`, `/tags/<term>/`, …).
     return "website" if page.taxonomy_name

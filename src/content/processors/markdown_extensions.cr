@@ -526,17 +526,17 @@ module Hwaro
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
                 else
                   # Normal inline context: the body still flows through Markd's
-                  # CommonMark inline parser, so `*`/`_` inside the math would be
-                  # (mis)read as emphasis delimiters and pair across math spans
-                  # (e.g. `$a*b$ and $c*d$` → `\(a<em>b\)…\(</em>d\)`).
-                  # Backslash-escape those active chars so Markd ships them
-                  # literally. (`~` is left alone: GFM strikethrough is handled
-                  # by hwaro's own preprocessor, which already skips math spans,
-                  # so escaping it here would leak a stray backslash into the
-                  # rendered body.)
-                  inline_escaped = escaped
-                    .gsub('*', "\\*")
-                    .gsub('_', "\\_")
+                  # CommonMark inline parser, which would (a) read `*`/`_` as
+                  # emphasis and pair them across math spans, (b) start code
+                  # spans on backticks, (c) form links on `[`/`]`, and (d)
+                  # CONSUME a backslash before any ASCII punctuation — stripping
+                  # the LaTeX escapes in e.g. `$\{x\}$` or `$a \& b$`. Backslash-
+                  # escape each of those active chars (backslash itself FIRST, so
+                  # `\{` survives as `\{` rather than being eaten) so Markd ships
+                  # the formula body verbatim to KaTeX/MathJax. (`~` is left
+                  # alone: GFM strikethrough is handled by hwaro's own
+                  # preprocessor, which already skips math spans.)
+                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
                   "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
                 end
               end

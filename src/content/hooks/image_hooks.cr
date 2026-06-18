@@ -254,20 +254,39 @@ module Hwaro
           widths : Array(Int32),
         ) : Hash(Int32, String)?
           return unless File.exists?(source_path)
-          source_info = File.info(source_path)
-          source_mtime = source_info.modification_time
+          return unless Dir.exists?(dest_dir)
+          source_mtime = File.info(source_path).modification_time
 
           ext = File.extname(source_path)
           basename = File.basename(source_path, ext)
+
+          # resize_and_lqip clamps any requested width larger than the source to
+          # the source's true width (writing a single `_<src_w>w` variant), so a
+          # `_<width>w` file does NOT exist for every configured width. Read the
+          # variants that ARE on disk, infer the clamp ceiling from the largest
+          # one, then require the on-disk set to match exactly what the CURRENT
+          # config would produce — otherwise the config changed and we reprocess.
+          variant_re = /\A#{Regex.escape(basename)}_(\d+)w#{Regex.escape(ext)}\z/
+          on_disk = {} of Int32 => String
+          Dir.each_child(dest_dir) do |name|
+            if m = variant_re.match(name)
+              on_disk[m[1].to_i] = name
+            end
+          end
+          return if on_disk.empty?
+
+          src_w = on_disk.keys.max
+          expected = widths.map { |w| Math.min(w, src_w) }.uniq!
+          return unless expected.sort == on_disk.keys.sort!
+
           result = {} of Int32 => String
-          widths.each do |width|
-            filename = "#{basename}_#{width}w#{ext}"
-            dest = File.join(dest_dir, filename)
-            return unless File.exists?(dest)
-            dest_info = File.info(dest)
+          expected.each do |w|
+            filename = on_disk[w]?
+            return unless filename
+            dest_info = File.info(File.join(dest_dir, filename))
             return if dest_info.modification_time < source_mtime
             return if dest_info.size == 0
-            result[width] = filename
+            result[w] = filename
           end
           result
         end

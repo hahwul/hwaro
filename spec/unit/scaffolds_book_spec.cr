@@ -144,8 +144,9 @@ describe Hwaro::Services::Scaffolds::Book do
     it "renders nested subsections beneath their parent, not as flat chapters" do
       files = Hwaro::Services::Scaffolds::Book.new.template_files
       sidebar = files["partials/sidebar.html"]
-      # Skip nested sections in the top-level loop ("/" is in sec.name).
-      sidebar.should contain(%q({% if "/" is in sec.name %}))
+      # The top-level loop filters to top_level sections (so loop.index chapter
+      # numbering stays contiguous even when a nested section sorts earlier).
+      sidebar.should contain(%q(selectattr("top_level")))
       # Render each parent's subsections nested beneath it.
       sidebar.should contain("{% for sub in sec.subsections")
       sidebar.should contain("{% for sp in sub.pages")

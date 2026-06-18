@@ -951,9 +951,20 @@ module Hwaro
                              end
         return true if content_candidates.any? { |c| File.exists?(File.join(@content_dir, c)) }
 
-        # The built output page (build output dir is conventionally `public/`).
-        output_file = path.ends_with?(".html") ? path.lchop("/") : File.join(slug, "index.html")
-        File.exists?(File.join("public", output_file))
+        # A prior build's output (conventionally `public/`): a pretty route lands
+        # at `<slug>/index.html`, while an explicit file (an `.html` alias or a
+        # pipeline-built asset such as `/css/app.css`) lands at the path itself.
+        if Dir.exists?("public")
+          return true if File.exists?(File.join("public", slug, "index.html"))
+          return true if File.exists?(File.join("public", path.lchop("/")))
+        end
+
+        # Otherwise it's a pretty route or listing (taxonomy/section page)
+        # produced at build time — doctor runs BEFORE the build (often on a clean
+        # checkout) so it can't see these. Treat route-style values as valid
+        # rather than false-positive; the build-time PWA precache validation is
+        # authoritative for genuinely-missing entries.
+        path.ends_with?("/") || File.extname(slug).empty?
       end
 
       private def candidates(path : String) : Array(String)
