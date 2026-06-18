@@ -295,6 +295,21 @@ module Hwaro
           end
         end
 
+        # Entries whose source file no longer exists on disk — i.e. a page that
+        # was deleted or renamed since the prior build. Returns {source_path,
+        # output_path} pairs so the caller can delete the orphaned output and
+        # drop the dead entry. (The cache retains the prior build's
+        # source→output map because unchanged pages are skipped, never updated.)
+        def orphaned_outputs : Array(Tuple(String, String))
+          @mutex.synchronize do
+            @entries.compact_map do |path, entry|
+              next if entry.output_path.empty?
+              next if File.exists?(path)
+              {path, entry.output_path}
+            end
+          end
+        end
+
         # Clear all cache entries
         def clear
           @mutex.synchronize do
