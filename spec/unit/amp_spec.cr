@@ -212,6 +212,95 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("<amp-iframe")
       result.should_not contain("<iframe")
     end
+
+    it "adds a sandbox attribute and amp-iframe extension script" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://example.com"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<amp-iframe")
+      result.should contain("sandbox=")
+      result.should contain(%(custom-element="amp-iframe"))
+      result.should contain("amp-iframe-0.1.js")
+    end
+
+    it "preserves an existing sandbox attribute on iframe" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://example.com" sandbox="allow-scripts"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(sandbox="allow-scripts"))
+      # No duplicate sandbox attribute was appended.
+      result.scan(/sandbox=/).size.should eq(1)
+    end
+
+    it "adds amp-video extension script when video present" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><video src="/v.mp4" width="640" height="360"></video></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<amp-video")
+      result.should contain(%(custom-element="amp-video"))
+      result.should contain("amp-video-0.1.js")
+    end
+
+    it "injects missing extension scripts when boilerplate already present" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = "<html><head><style amp-boilerplate>body{}</style>" +
+             %(<script async src="https://cdn.ampproject.org/v0.js"></script>) +
+             "</head><body><iframe src=\"https://example.com\"></iframe></body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(custom-element="amp-iframe"))
+      result.should contain("amp-iframe-0.1.js")
+    end
+
+    it "does not duplicate extension scripts already declared" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = "<html><head><style amp-boilerplate>body{}</style>" +
+             %(<script async src="https://cdn.ampproject.org/v0.js"></script>) +
+             %(<script async custom-element="amp-iframe" src="https://cdn.ampproject.org/v0/amp-iframe-0.1.js"></script>) +
+             "</head><body><iframe src=\"https://example.com\"></iframe></body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.scan(/custom-element="amp-iframe"/).size.should eq(1)
+    end
+
+    it "strips a self-referencing amphtml link (idempotent across builds)" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      # Simulate the on-disk canonical HTML from a prior run already carrying an
+      # amphtml link.
+      html = %(<html><head><link rel="amphtml" href="https://example.com/amp/test/"></head><body>Hi</body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain(%(rel="amphtml"))
+    end
+
+    it "unwraps a paragraph whose sole child is an amp-img container" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      # Markdown wraps a standalone image in <p>...</p>.
+      html = %(<html><head></head><body><p><img src="/x.png" alt="x" /></p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(<div class="amp-img-container">))
+      # The block container must not be nested directly inside <p>.
+      result.should_not match(/<p>\s*<div class="amp-img-container"/)
+    end
   end
 
   describe ".generate" do
