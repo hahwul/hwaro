@@ -116,7 +116,10 @@ describe "Series support" do
     builder.test_compute_series(site)
 
     p1.series_pages.size.should eq(2)
-    p2.series_pages.size.should eq(1)
+    # A single-post series carries no series_pages (so the scaffold renders no
+    # orphan series-nav box); Series B independence still holds — it never
+    # absorbs Series A's posts.
+    p2.series_pages.size.should eq(0)
     p3.series_pages.size.should eq(2)
   end
 
@@ -143,7 +146,10 @@ describe "Series support" do
 
     builder.test_compute_series(site)
 
-    p1.series_pages.size.should eq(1)
+    # The draft is excluded, leaving a single real member — so series_pages is
+    # empty (no nav). If the draft had leaked in, the series would have 2 members
+    # and series_pages.size would be 2, so this still guards draft exclusion.
+    p1.series_pages.size.should eq(0)
     p1.series_index.should eq(1)
   end
 

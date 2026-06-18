@@ -420,7 +420,10 @@ module Hwaro::Core::Build::Phases::Transform
 
       sorted.each_with_index do |page, idx|
         page.series_index = idx + 1
-        page.series_pages = sorted
+        # A single-post series has no prev/next, so leave series_pages empty
+        # to keep the template's `page.series_pages` guard from rendering an
+        # orphan series-nav box.
+        page.series_pages = sorted.size > 1 ? sorted : ([] of Models::Page)
       end
     end
 
@@ -653,7 +656,10 @@ module Hwaro::Core::Build::Phases::Transform
 
       sorted.each_with_index do |page, idx|
         page.series_index = idx + 1
-        page.series_pages = sorted
+        # A single-post series has no prev/next, so leave series_pages empty
+        # to keep the template's `page.series_pages` guard from rendering an
+        # orphan series-nav box.
+        page.series_pages = sorted.size > 1 ? sorted : ([] of Models::Page)
       end
     end
   end
