@@ -202,9 +202,13 @@ module Hwaro
 
         # --- Footnotes ---
         # Pre-processing: extract footnote definitions and replace references with placeholders
-        FOOTNOTE_DEF_RE     = /^\[\^([^\]]+)\]:\s*(.+?)$/m
-        FOOTNOTE_REF_RE     = /\[\^([^\]]+)\]/
-        FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+):(?:(\d+):)?(.+?)-->/
+        FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.+?)$/m
+        FOOTNOTE_REF_RE = /\[\^([^\]]+)\]/
+        # Occurrence count rides on the number field as `NUM.OCC` (e.g. `1.3`).
+        # The `.` separator can't appear in the legacy 3-field `NUM:` form, so a
+        # 3-field comment whose text starts with digits+colon is never misread
+        # as a count.
+        FOOTNOTE_COMMENT_RE = /<!--HWARO-FN:([^:]+):(\d+)(?:\.(\d+))?:(.+?)-->/
         FOOTNOTE_BLOCK_RE   = /\n?<!--HWARO-FOOTNOTES-START-->.*?<!--HWARO-FOOTNOTES-END-->\n?/m
 
         def preprocess_footnotes(content : String) : String
@@ -274,7 +278,7 @@ module Hwaro
               # Escape --> in text to prevent premature comment close, and : to prevent parsing issues
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
               safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
-              result += "<!--HWARO-FN:#{safe_key}:#{num}:#{occ}:#{safe_text}-->\n"
+              result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
             result += "<!--HWARO-FOOTNOTES-END-->\n"
           end
