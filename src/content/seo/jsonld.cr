@@ -70,9 +70,13 @@ module Hwaro
         # not articles, so they use schema.org CollectionPage with a `name`
         # instead of Article/`headline`, keeping JSON-LD consistent with the
         # og:type="website" emitted on the same page (gh#522 follow-up).
-        def collection_page(page : Models::Page, config : Models::Config) : String
+        def collection_page(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
           base = config.base_url_stripped
-          url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+          url = if u = url_override
+                  "#{base}#{u.starts_with?("/") ? u : "/#{u}"}"
+                else
+                  page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+                end
 
           json = JSON.build do |j|
             j.object do
@@ -95,12 +99,15 @@ module Hwaro
 
           items = [] of Hash(String, String | Int32)
 
-          # Home
+          # Home — language-prefixed so a non-default-language page's Home crumb
+          # points at the localized homepage (/ko/, /ja/) rather than the
+          # default-language root, matching the localized ancestor crumbs below.
+          lang_prefix = (l = page.language) && l != config.default_language && config.multilingual? ? "/#{l}" : ""
           items << {
             "@type"    => "ListItem",
             "position" => 1,
             "name"     => config.title,
-            "item"     => "#{base}/",
+            "item"     => "#{base}#{lang_prefix}/",
           }
 
           # Ancestors

@@ -484,8 +484,11 @@ module Hwaro
 
             base_url = env.resolve("base_url").to_s
 
-            # Normalize path to start with /
-            normalized = path.starts_with?("/") ? path : "/#{path}"
+            # Normalize path to start with /. The resize/LQIP maps are keyed by
+            # the decoded filesystem path, so decode any percent-encoding from
+            # the incoming URL before the lookup; the returned variant is
+            # re-encoded below so the emitted .url is a valid href.
+            normalized = URI.decode(path.starts_with?("/") ? path : "/#{path}")
 
             # Try to find a resized variant from the image hooks map
             resized_url = if width > 0
@@ -493,9 +496,9 @@ module Hwaro
                           end
 
             final_url = if resized = resized_url
-                          base_url.rstrip("/") + resized
+                          base_url.rstrip("/") + URI.encode_path(resized)
                         else
-                          base_url.rstrip("/") + normalized
+                          base_url.rstrip("/") + URI.encode_path(normalized)
                         end
 
             # Look up LQIP data
