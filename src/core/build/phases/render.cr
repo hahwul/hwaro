@@ -25,9 +25,16 @@ module Hwaro::Core::Build::Phases::Render
 
     all_pages = ctx.all_pages
 
-    # Filter pages for caching
+    # Filter pages for caching. Listing pages (homepage, section indexes,
+    # archives, taxonomy widgets) render content derived from the global
+    # page/section set even when their own source is unchanged, so fold a
+    # fingerprint of those sets into the rebuild decision.
+    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages) : ""
+    section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
     pages_to_build = if cache_enabled
-                       filter_changed_pages(all_pages, output_dir, build_cache, templates, site)
+                       filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
+                       build_cache.record_set_fingerprints(page_set_fp, section_set_fp)
+                       filtered
                      else
                        all_pages
                      end
@@ -240,12 +247,65 @@ module Hwaro::Core::Build::Phases::Render
     total_count
   end
 
-  private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site) : Array(Models::Page)
+  # Markers in a page's resolved template closure that mean it renders content
+  # derived from the global page/section set, so it must re-render when that set
+  # changes (not only when its own source changes).
+  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy"]
+  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section"]
+
+  private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
+    page_set_changed = cache.page_set_changed?(page_set_fp)
+    section_set_changed = cache.section_set_changed?(section_set_fp)
+    listing_memo = {} of String => Tuple(Bool, Bool)
     pages.select do |page|
       source_path = File.join("content", page.path)
       output_path = get_output_path(page, output_dir)
-      cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+      next true if cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+      # Page's own source is unchanged: only re-render it if a set it depends on
+      # changed. Skip the (cheap) marker scan entirely when nothing moved.
+      next false unless page_set_changed || section_set_changed
+      entry = determine_template(page, templates, site)
+      pdep, sdep = (listing_memo[entry]? || (listing_memo[entry] = listing_template_deps(entry, templates)))
+      # A section index renders its section's page list even via {{ section.list }}
+      # (no template marker), so treat every Section as page-set dependent.
+      page_dep = pdep || page.is_a?(Models::Section)
+      (page_dep && page_set_changed) || (sdep && section_set_changed)
     end
+  end
+
+  # Scan a page's resolved template-closure SOURCE for global-iteration markers.
+  # Returns {depends_on_page_set, depends_on_section_set}. With dependency
+  # tracking off, conservatively scans all templates.
+  private def listing_template_deps(entry_template : String, templates : Hash(String, String)) : Tuple(Bool, Bool)
+    sources = if deps = @template_deps
+                deps.closure(entry_template).compact_map { |n| templates[n]? }
+              else
+                templates.values
+              end
+    blob = sources.join("\n")
+    {PAGE_SET_MARKERS.any? { |m| blob.includes?(m) }, SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }}
+  end
+
+  # Fingerprint the global page set — the content-page metadata that listing
+  # pages render (membership, urls, titles, dates, weights, draft, section).
+  private def compute_page_set_fingerprint(pages : Array(Models::Page)) : String
+    Digest::MD5.hexdigest(String.build do |io|
+      pages.each do |p|
+        io << p.path << '\u0001' << p.url << '\u0001' << p.title << '\u0001'
+        io << (p.description || "") << '\u0001'
+        io << (p.date.try(&.to_unix) || 0_i64) << '\u0001' << p.weight << '\u0001'
+        io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0002'
+      end
+    end)
+  end
+
+  # Fingerprint the section set — the metadata nav/menus render.
+  private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
+    Digest::MD5.hexdigest(String.build do |io|
+      sections.each do |s|
+        io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001' << s.weight << '\u0002'
+      end
+    end)
   end
 
   # Template closure fingerprint stored in this page's cache entry. With
