@@ -54,6 +54,11 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.slugify("café résumé").should eq("café-résumé")
     end
 
+    it "lowercases uppercase Unicode letters" do
+      Hwaro::Utils::TextUtils.slugify("CAFÉ").should eq("café")
+      Hwaro::Utils::TextUtils.slugify("Über Café").should eq("über-café")
+    end
+
     it "handles empty string" do
       Hwaro::Utils::TextUtils.slugify("").should eq("")
     end
