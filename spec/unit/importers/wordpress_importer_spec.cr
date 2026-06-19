@@ -409,5 +409,44 @@ describe Hwaro::Services::Importers::WordPressImporter do
         content.should contain("Some info about me.")
       end
     end
+
+    it "rejects a WXR that declares XML entities (entity-expansion DoS guard)" do
+      Dir.mktmpdir do |tmpdir|
+        malicious = <<-XML
+          <?xml version="1.0"?>
+          <!DOCTYPE rss [
+            <!ENTITY a "aa">
+            <!ENTITY b "&a;&a;">
+            <!ENTITY c "&b;&b;">
+          ]>
+          <rss version="2.0" xmlns:wp="http://wordpress.org/export/1.2/"><channel></channel></rss>
+          XML
+        wxr_path = write_wxr(tmpdir, malicious)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+
+        result.success.should be_false
+        result.message.should contain("entit")
+      end
+    end
+
+    it "neutralises a traversal post_name so it cannot escape the output dir" do
+      Dir.mktmpdir do |tmpdir|
+        traversal = BASIC_WXR.sub("<wp:post_name>hello-world</wp:post_name>",
+          "<wp:post_name>../../../hwaro_pwn</wp:post_name>")
+        wxr_path = write_wxr(tmpdir, traversal)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        importer.run(make_options(wxr_path, output_dir))
+
+        # Must NOT have escaped the output dir.
+        File.exists?(File.join(tmpdir, "hwaro_pwn.md")).should be_false
+        # The slug collapses to its basename inside posts/.
+        File.exists?(File.join(output_dir, "posts", "hwaro_pwn.md")).should be_true
+      end
+    end
   end
 end

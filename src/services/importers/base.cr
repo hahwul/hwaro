@@ -3,6 +3,8 @@ require "../../config/options/import_options"
 require "../../utils/file_safe"
 require "../../utils/logger"
 require "../../utils/text_utils"
+require "../../utils/path_utils"
+require "../../utils/output_guard"
 
 module Hwaro
   module Services
@@ -106,11 +108,32 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
         ) : Bool
-          dir = section.empty? ? output_dir : File.join(output_dir, section)
-          Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
+          # Importers consume third-party exports, so `section` and `slug` are
+          # UNTRUSTED. A malicious WordPress `<wp:post_name>` or Hugo front
+          # matter `slug` of "../../../etc/x" would otherwise let `File.write`
+          # escape `output_dir` and plant or overwrite files anywhere the
+          # running user can write. Neutralise traversal at this single sink so
+          # every current and future importer is protected.
+          safe_section = Utils::PathUtils.sanitize_path(section)
+          safe_slug = safe_filename_component(slug)
+          if safe_slug.empty?
+            Logger.warn "Skipped (unsafe slug #{slug.inspect})" if verbose
+            return false
+          end
 
-          filename = slug.ends_with?(".md") ? slug : "#{slug}.md"
+          dir = safe_section.empty? ? output_dir : File.join(output_dir, safe_section)
+
+          filename = safe_slug.ends_with?(".md") ? safe_slug : "#{safe_slug}.md"
           path = File.join(dir, filename)
+
+          # Belt-and-suspenders: refuse to write outside output_dir even if a
+          # component slipped past the sanitisers above.
+          unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+            Logger.warn "Skipped (escapes output directory): #{path}"
+            return false
+          end
+
+          Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
 
           if File.exists?(path) && !force
             Logger.warn "Skipped (already exists): #{path}" if verbose
@@ -123,6 +146,20 @@ module Hwaro
             Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}")
           end
           true
+        end
+
+        # Collapse an untrusted slug to a single safe filename component so it
+        # can never traverse out of the section directory. Drops null bytes,
+        # splits on both `/` and `\` separators, removes "."/".."/empty
+        # segments, and keeps the last remaining segment (which may legitimately
+        # carry a trailing ".md"). Unicode is preserved. We intentionally do NOT
+        # URL-decode: the filesystem treats `%2f` as a literal, so decoding
+        # would only manufacture separators that aren't really there.
+        protected def safe_filename_component(value : String) : String
+          value.delete(Char::ZERO)
+            .split(/[\/\\]/)
+            .reject { |seg| seg.empty? || seg == "." || seg == ".." }
+            .last? || ""
         end
 
         # Parse a date string in common formats, returns nil on failure

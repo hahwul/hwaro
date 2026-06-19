@@ -33,6 +33,22 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should eq("![Alt text](/img.png)")
     end
 
+    it "drops a javascript: link href but keeps the text (no live XSS in imported content)" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(%(<a href="javascript:alert(document.cookie)">Click</a>))
+      result.should eq("Click")
+      result.should_not contain("javascript:")
+    end
+
+    it "drops a javascript: image src but keeps the alt text" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(%(<img src="javascript:alert(1)" alt="x" />))
+      result.should_not contain("javascript:")
+    end
+
+    it "drops a non-image data: link" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(%(<a href="data:text/html,<script>alert(1)</script>">x</a>))
+      result.should_not contain("data:text/html")
+    end
+
     it "converts unordered lists" do
       html = "<ul><li>One</li><li>Two</li></ul>"
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
