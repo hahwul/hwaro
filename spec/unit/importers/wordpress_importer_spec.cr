@@ -432,6 +432,42 @@ describe Hwaro::Services::Importers::WordPressImporter do
       end
     end
 
+    it "rejects entity declarations hidden behind a SYSTEM literal containing brackets" do
+      Dir.mktmpdir do |tmpdir|
+        malicious = <<-XML
+          <?xml version="1.0"?>
+          <!DOCTYPE rss SYSTEM "ignore]me[here" [
+            <!ENTITY a "aa">
+            <!ENTITY b "&a;&a;">
+          ]>
+          <rss version="2.0" xmlns:wp="http://wordpress.org/export/1.2/"><channel></channel></rss>
+          XML
+        wxr_path = write_wxr(tmpdir, malicious)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+
+        result.success.should be_false
+        result.message.should contain("entit")
+      end
+    end
+
+    it "does not reject a post whose body merely mentions <!ENTITY (no DOCTYPE)" do
+      Dir.mktmpdir do |tmpdir|
+        ok = BASIC_WXR.sub("<![CDATA[<p>This is my first post.</p>]]>",
+          "<![CDATA[<p>Docs about <!ENTITY declarations.</p>]]>")
+        wxr_path = write_wxr(tmpdir, ok)
+        output_dir = File.join(tmpdir, "content")
+
+        importer = Hwaro::Services::Importers::WordPressImporter.new
+        result = importer.run(make_options(wxr_path, output_dir))
+
+        result.success.should be_true
+        result.imported_count.should eq(1)
+      end
+    end
+
     it "neutralises a traversal post_name so it cannot escape the output dir" do
       Dir.mktmpdir do |tmpdir|
         traversal = BASIC_WXR.sub("<wp:post_name>hello-world</wp:post_name>",

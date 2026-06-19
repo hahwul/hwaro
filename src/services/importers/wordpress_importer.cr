@@ -89,19 +89,40 @@ module Hwaro
           node.children.each { |child| collect_items(child, items, depth + 1) }
         end
 
-        # True when the XML declares one or more entities in a DOCTYPE internal
-        # subset (`<!DOCTYPE ... [ <!ENTITY ... > ]>`). Scoped to the internal
-        # subset so a post that merely *mentions* the text "<!ENTITY" in its
-        # CDATA body is not a false positive. Linear-time (negated char
-        # classes only — no catastrophic backtracking on the guard itself).
+        # True when the XML declares one or more entities in its DOCTYPE
+        # (`<!DOCTYPE ... [ <!ENTITY ... > ]>`). We extract the full DOCTYPE
+        # declaration, skipping quoted SYSTEM/PUBLIC literals and tracking the
+        # `[ ... ]` internal subset so the terminating `>` is the real one, then
+        # scan only that span for `<!ENTITY`. Scoping to the DOCTYPE span (a)
+        # closes a bypass where a `]` inside a SYSTEM literal would truncate a
+        # naive `[`-to-`]` search, and (b) avoids false positives on `<!ENTITY`
+        # text in a post body, which lives after the DOCTYPE. DOCTYPE sits at
+        # the top of the file, so a bounded window keeps the scan cheap and
+        # linear.
         private def declares_xml_entities?(xml : String) : Bool
-          doctype = xml.index(/<!DOCTYPE/i)
-          return false unless doctype
-          window = xml[doctype, Math.min(xml.size - doctype, 1 << 16)]
-          open_bracket = window.index('[')
-          return false unless open_bracket
-          close = window.index(']', open_bracket) || window.size
-          window[open_bracket, close - open_bracket].matches?(/<!ENTITY/i)
+          start = xml.index(/<!DOCTYPE/i)
+          return false unless start
+
+          window = xml[start, 1 << 16]
+          in_quote : Char? = nil
+          depth = 0
+          doctype = String.build do |io|
+            window.each_char do |c|
+              io << c
+              if q = in_quote
+                in_quote = nil if c == q
+              elsif c == '"' || c == '\''
+                in_quote = c
+              elsif c == '['
+                depth += 1
+              elsif c == ']'
+                depth -= 1 if depth > 0
+              elsif c == '>' && depth == 0
+                break
+              end
+            end
+          end
+          doctype.matches?(/<!ENTITY/i)
         end
 
         CONTENT_NS = "http://purl.org/rss/1.0/modules/content/"
