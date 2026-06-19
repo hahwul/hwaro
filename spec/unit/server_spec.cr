@@ -250,60 +250,96 @@ describe Hwaro::Services::NotFoundHandler do
   end
 end
 
+private def cors_request(method : String, origin : String?, extra_headers = {} of String => String)
+  headers = HTTP::Headers.new
+  headers["Origin"] = origin if origin
+  extra_headers.each { |k, v| headers[k] = v }
+  HTTP::Request.new(method, "/search_index.json", headers)
+end
+
 describe Hwaro::Services::DevCorsHandler do
-  it "sets Access-Control-Allow-Origin on a normal request and passes through" do
+  it "reflects a loopback Origin and passes through" do
     handler = Hwaro::Services::DevCorsHandler.new
     dummy = DummyHandler.new
     handler.next = dummy
 
-    request = HTTP::Request.new("GET", "/search_index.json")
     io = IO::Memory.new
     response = HTTP::Server::Response.new(io)
-    context = HTTP::Server::Context.new(request, response)
+    context = HTTP::Server::Context.new(cors_request("GET", "http://localhost:3000"), response)
 
     handler.call(context)
 
-    response.headers["Access-Control-Allow-Origin"].should eq("*")
+    response.headers["Access-Control-Allow-Origin"].should eq("http://localhost:3000")
+    response.headers["Vary"].should eq("Origin")
     dummy.called.should be_true
   end
 
-  it "short-circuits OPTIONS preflight with 204 and CORS headers" do
+  it "does NOT grant CORS to an arbitrary internet Origin" do
     handler = Hwaro::Services::DevCorsHandler.new
     dummy = DummyHandler.new
     handler.next = dummy
 
-    request = HTTP::Request.new(
-      "OPTIONS",
-      "/search_index.json",
-      HTTP::Headers{"Access-Control-Request-Headers" => "content-type"},
-    )
     io = IO::Memory.new
     response = HTTP::Server::Response.new(io)
-    context = HTTP::Server::Context.new(request, response)
+    context = HTTP::Server::Context.new(cors_request("GET", "https://evil.example.com"), response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Origin"]?.should be_nil
+    dummy.called.should be_true
+  end
+
+  it "reflects the explicitly bound host Origin" do
+    handler = Hwaro::Services::DevCorsHandler.new(Set{"localhost", "127.0.0.1", "::1", "192.168.1.5"})
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(cors_request("GET", "http://192.168.1.5:3000"), response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Origin"].should eq("http://192.168.1.5:3000")
+  end
+
+  it "short-circuits OPTIONS preflight with 204 and CORS headers for a loopback Origin" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(
+      cors_request("OPTIONS", "http://127.0.0.1:3000", {"Access-Control-Request-Headers" => "content-type"}),
+      response,
+    )
 
     handler.call(context)
 
     response.status_code.should eq(204)
-    response.headers["Access-Control-Allow-Origin"].should eq("*")
+    response.headers["Access-Control-Allow-Origin"].should eq("http://127.0.0.1:3000")
     response.headers["Access-Control-Allow-Methods"].should eq("GET, HEAD, OPTIONS")
     response.headers["Access-Control-Allow-Headers"].should eq("content-type")
     response.headers["Access-Control-Max-Age"].should eq("86400")
     dummy.called.should be_false
   end
 
-  it "falls back to * for Access-Control-Allow-Headers when preflight omits the request" do
+  it "returns 204 for an OPTIONS preflight from a disallowed Origin without CORS headers" do
     handler = Hwaro::Services::DevCorsHandler.new
     dummy = DummyHandler.new
     handler.next = dummy
 
-    request = HTTP::Request.new("OPTIONS", "/search_index.json")
     io = IO::Memory.new
     response = HTTP::Server::Response.new(io)
-    context = HTTP::Server::Context.new(request, response)
+    context = HTTP::Server::Context.new(cors_request("OPTIONS", "https://evil.example.com"), response)
 
     handler.call(context)
 
-    response.headers["Access-Control-Allow-Headers"].should eq("*")
+    response.status_code.should eq(204)
+    response.headers["Access-Control-Allow-Origin"]?.should be_nil
+    response.headers["Access-Control-Allow-Methods"]?.should be_nil
+    dummy.called.should be_false
   end
 end
 

@@ -100,19 +100,49 @@ module Hwaro
     class DevCorsHandler
       include HTTP::Handler
 
+      # Allowed CORS origin hosts: loopback literals plus the host the server
+      # was bound to (when it's concrete, not a 0.0.0.0/:: wildcard).
+      def initialize(@allowed_hosts : Set(String) = Set{"localhost", "127.0.0.1", "::1"})
+      end
+
       def call(context)
-        context.response.headers["Access-Control-Allow-Origin"] = "*"
+        allowed_origin = allowed_cors_origin(context.request.headers["Origin"]?)
+        if allowed_origin
+          context.response.headers["Access-Control-Allow-Origin"] = allowed_origin
+          context.response.headers["Vary"] = "Origin"
+        end
 
         if context.request.method == "OPTIONS"
-          requested_headers = context.request.headers["Access-Control-Request-Headers"]?
-          context.response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
-          context.response.headers["Access-Control-Allow-Headers"] = requested_headers || "*"
-          context.response.headers["Access-Control-Max-Age"] = "86400"
+          if allowed_origin
+            requested_headers = context.request.headers["Access-Control-Request-Headers"]?
+            context.response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+            context.response.headers["Access-Control-Allow-Headers"] = requested_headers || "*"
+            context.response.headers["Access-Control-Max-Age"] = "86400"
+          end
           context.response.status_code = 204
           return
         end
 
         call_next(context)
+      end
+
+      # Reflect the request Origin only when its host is a loopback literal or
+      # the exact host the dev server was bound to. Returns nil for any other
+      # origin so the browser's default same-origin policy applies — an
+      # arbitrary website the developer visits can no longer cross-origin read
+      # served content (e.g. `--drafts`). This keeps the legitimate
+      # localhost-vs-127.0.0.1 fetch() ergonomic while denying internet/LAN
+      # origins the blanket `*` previously granted.
+      private def allowed_cors_origin(origin : String?) : String?
+        return unless origin
+        host = begin
+          URI.parse(origin).host
+        rescue
+          nil
+        end
+        return unless host
+        host = host[1..-2] if host.starts_with?('[') && host.ends_with?(']')
+        @allowed_hosts.includes?(host) ? origin : nil
       end
     end
 
@@ -413,14 +443,21 @@ module Hwaro
 
         output_dir = sanitize_output_dir(build_options.output_dir)
 
+        # Loopback literals plus the concrete bound host (a 0.0.0.0/:: wildcard
+        # bind has no single host, so it contributes nothing here). The
+        # DevCorsHandler reflects a request Origin only when its host is in
+        # this set.
+        cors_hosts = Set{"localhost", "127.0.0.1", "::1"}
+        cors_hosts << host unless host.empty? || host == "0.0.0.0" || host == "::"
+
         handlers = [] of HTTP::Handler
         handlers << HTTP::LogHandler.new if access_log
-        # Set CORS headers first so they apply to every downstream response,
-        # including 301 redirects from IndexRewriteHandler and 404s from
-        # NotFoundHandler. Without this, opening the site via `localhost`
-        # while base_url is baked as `127.0.0.1` (or vice versa) makes
-        # browser fetch() calls fail same-origin checks.
-        handlers << DevCorsHandler.new
+        # Reflect CORS for loopback/bound origins first so it applies to every
+        # downstream response, including 301 redirects from IndexRewriteHandler
+        # and 404s from NotFoundHandler. This preserves the localhost-vs-
+        # 127.0.0.1 fetch() ergonomic without granting arbitrary websites
+        # cross-origin read access (the old blanket `*`).
+        handlers << DevCorsHandler.new(cors_hosts)
         # Run before StaticFileHandler so we can append `; charset=utf-8`
         # to text-shaped Content-Type headers after the static handler
         # sets them — Crystal's `HTTP::Server::Response` buffers the

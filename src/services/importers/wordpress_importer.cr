@@ -21,6 +21,22 @@ module Hwaro
           end
 
           xml_content = File.read(wxr_path)
+
+          # Guard against XML entity-expansion / recursive-entity DoS. A
+          # malicious WXR can declare nested internal entities (e.g.
+          # `<!ENTITY a "&b;&b;">`); libxml2 (with NOENT off, NONET on — the
+          # Crystal default, so no XXE file-read/SSRF) still materialises a
+          # deeply nested / cyclic entity-reference node tree, and our recursive
+          # `collect_items` walk then overflows the stack (a fatal, unrescuable
+          # signal). Legitimate WordPress exports never declare custom entities,
+          # so refuse any WXR whose DOCTYPE internal subset declares one.
+          if declares_xml_entities?(xml_content)
+            return ImportResult.new(
+              success: false,
+              message: "WXR file declares XML entities (<!ENTITY> in DOCTYPE), which is unsupported and unsafe. Aborting import."
+            )
+          end
+
           doc = XML.parse(xml_content)
 
           imported = 0
@@ -59,11 +75,54 @@ module Hwaro
           items
         end
 
-        private def collect_items(node : XML::Node, items : Array(XML::Node))
+        # Maximum node depth for the item-collection walk. A real WXR nests
+        # only a handful of levels (rss > channel > item > field); a cap this
+        # generous never trips on legitimate input but stops a pathologically
+        # deep node tree from overflowing the stack.
+        MAX_NODE_DEPTH = 256
+
+        private def collect_items(node : XML::Node, items : Array(XML::Node), depth : Int32 = 0)
+          return if depth > MAX_NODE_DEPTH
           if node.element? && node.name == "item"
             items << node
           end
-          node.children.each { |child| collect_items(child, items) }
+          node.children.each { |child| collect_items(child, items, depth + 1) }
+        end
+
+        # True when the XML declares one or more entities in its DOCTYPE
+        # (`<!DOCTYPE ... [ <!ENTITY ... > ]>`). We extract the full DOCTYPE
+        # declaration, skipping quoted SYSTEM/PUBLIC literals and tracking the
+        # `[ ... ]` internal subset so the terminating `>` is the real one, then
+        # scan only that span for `<!ENTITY`. Scoping to the DOCTYPE span (a)
+        # closes a bypass where a `]` inside a SYSTEM literal would truncate a
+        # naive `[`-to-`]` search, and (b) avoids false positives on `<!ENTITY`
+        # text in a post body, which lives after the DOCTYPE. DOCTYPE sits at
+        # the top of the file, so a bounded window keeps the scan cheap and
+        # linear.
+        private def declares_xml_entities?(xml : String) : Bool
+          start = xml.index(/<!DOCTYPE/i)
+          return false unless start
+
+          window = xml[start, 1 << 16]
+          in_quote : Char? = nil
+          depth = 0
+          doctype = String.build do |io|
+            window.each_char do |c|
+              io << c
+              if q = in_quote
+                in_quote = nil if c == q
+              elsif c == '"' || c == '\''
+                in_quote = c
+              elsif c == '['
+                depth += 1
+              elsif c == ']'
+                depth -= 1 if depth > 0
+              elsif c == '>' && depth == 0
+                break
+              end
+            end
+          end
+          doctype.matches?(/<!ENTITY/i)
         end
 
         CONTENT_NS = "http://purl.org/rss/1.0/modules/content/"

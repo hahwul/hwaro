@@ -33,6 +33,25 @@ describe Hwaro::Utils::RedirectHtml do
       result.should contain("Redirecting to")
       result.should contain("<a href=")
     end
+
+    it "refuses a javascript: redirect (no live href, refresh, or navigation)" do
+      result = Hwaro::Utils::RedirectHtml.full_redirect("javascript:alert(document.cookie)")
+      result.should_not contain("href=\"javascript:")
+      result.should_not contain("http-equiv=\"refresh\"")
+      result.should_not contain("window.location.href")
+      result.should contain("blocked")
+    end
+
+    it "refuses a javascript: redirect even with obfuscated whitespace/case" do
+      result = Hwaro::Utils::RedirectHtml.full_redirect("JaVaScRiPt:alert(1)")
+      result.should_not contain("window.location.href")
+      result.should contain("blocked")
+    end
+
+    it "still allows ordinary http(s) and relative redirects" do
+      Hwaro::Utils::RedirectHtml.full_redirect("https://example.com/").should contain("window.location.href")
+      Hwaro::Utils::RedirectHtml.full_redirect("/blog/post/").should contain("window.location.href")
+    end
   end
 
   describe ".simple_redirect" do

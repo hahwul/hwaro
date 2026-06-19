@@ -248,4 +248,49 @@ describe Hwaro::Services::Importers::Base do
       importer.test_strip_redundant_title_h1(body, "Title").should eq(body)
     end
   end
+
+  describe "#write_content_file path-traversal safety" do
+    it "writes a normal slug inside the output dir" do
+      Dir.mktmpdir do |tmpdir|
+        out_dir = File.join(tmpdir, "content")
+        importer = TestImporter.new
+        importer.test_write_content_file(out_dir, "posts", "hello-world", "+++\n+++", "Body").should be_true
+        File.exists?(File.join(out_dir, "posts", "hello-world.md")).should be_true
+      end
+    end
+
+    it "collapses a traversal slug to a basename and never writes outside the output dir" do
+      Dir.mktmpdir do |tmpdir|
+        out_dir = File.join(tmpdir, "content")
+        Dir.mkdir_p(out_dir)
+        # Where a naive File.join + File.write would have planted the file.
+        sentinel = File.expand_path(File.join(out_dir, "..", "hwaro_pwn.md"))
+        importer = TestImporter.new
+        # A malicious WordPress <wp:post_name> / Hugo front-matter slug.
+        importer.test_write_content_file(out_dir, "posts", "../../hwaro_pwn", "+++\n+++", "Body")
+        File.exists?(sentinel).should be_false
+        # The traversal is neutralised: the file lands safely inside output_dir.
+        File.exists?(File.join(out_dir, "posts", "hwaro_pwn.md")).should be_true
+      end
+    end
+
+    it "refuses a slug that is pure traversal (no real component)" do
+      Dir.mktmpdir do |tmpdir|
+        out_dir = File.join(tmpdir, "content")
+        importer = TestImporter.new
+        importer.test_write_content_file(out_dir, "posts", "../../..", "+++\n+++", "Body").should be_false
+      end
+    end
+
+    it "strips traversal from the section so output stays inside the output dir" do
+      Dir.mktmpdir do |tmpdir|
+        out_dir = File.join(tmpdir, "content")
+        escaped = File.expand_path(File.join(out_dir, "..", "..", "evil", "note.md"))
+        importer = TestImporter.new
+        importer.test_write_content_file(out_dir, "../../evil", "note", "+++\n+++", "Body")
+        File.exists?(escaped).should be_false
+        File.exists?(File.join(out_dir, "evil", "note.md")).should be_true
+      end
+    end
+  end
 end

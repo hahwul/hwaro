@@ -176,14 +176,14 @@ module Hwaro
             else
               Logger.warn "✘ Found #{dead_total} dead links (out of #{total} total):"
               dead_external.each do |result|
-                Logger.error "[DEAD] #{result.link.file}"
-                Logger.error "  └─ URL: #{result.link.url}"
-                Logger.error "  └─ Status: #{result.status}#{result.error ? " (Error: #{result.error})" : ""}"
+                Logger.error "[DEAD] #{sanitize_for_terminal(result.link.file)}"
+                Logger.error "  └─ URL: #{sanitize_for_terminal(result.link.url)}"
+                Logger.error "  └─ Status: #{result.status}#{result.error ? " (Error: #{sanitize_for_terminal(result.error.to_s)})" : ""}"
               end
               dead_internal.each do |result|
-                Logger.error "[DEAD] #{result.link.file}"
-                Logger.error "  └─ URL: #{result.link.url} (internal)"
-                Logger.error "  └─ #{result.error}"
+                Logger.error "[DEAD] #{sanitize_for_terminal(result.link.file)}"
+                Logger.error "  └─ URL: #{sanitize_for_terminal(result.link.url)} (internal)"
+                Logger.error "  └─ #{sanitize_for_terminal(result.error.to_s)}"
               end
             end
             Logger.info "----------------------------------------"
@@ -204,6 +204,15 @@ module Hwaro
             content
               .gsub(/```[\s\S]*?```/, "")
               .gsub(/`[^`\n]*`/, "")
+          end
+
+          # Link URLs/paths come from semi-trusted content (e.g. a docs/blog
+          # PR) and are printed to the maintainer's terminal in the report.
+          # A URL carrying raw ANSI/control bytes (the link regex's `\s` does
+          # not exclude ESC) could repaint or spoof the console. Strip control
+          # characters before logging so the report can't inject escapes.
+          private def sanitize_for_terminal(s : String) : String
+            s.gsub { |c| c.control? ? "" : c }
           end
 
           private def find_external_links(dir : String) : Array(Link)

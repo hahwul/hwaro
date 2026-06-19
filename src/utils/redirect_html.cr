@@ -4,6 +4,8 @@
 # meta refresh tags, canonical links, and JavaScript fallbacks.
 
 require "html"
+require "./logger"
+require "../content/processors/inline_markdown"
 
 module Hwaro
   module Utils
@@ -18,6 +20,16 @@ module Hwaro
       #   # => "<!DOCTYPE html>..."
       #
       def full_redirect(url : String) : String
+        # `redirect_to` is read verbatim from page front matter (semi-trusted:
+        # a docs/blog PR contributor controls it). HTML-escaping alone keeps a
+        # `javascript:` scheme intact, so the emitted `<a href>` would execute
+        # script on click — stored XSS in published output. Reject dangerous
+        # schemes outright and emit an inert notice instead of a live link.
+        unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+          Logger.warn "Refusing redirect to unsafe URL scheme: #{url.inspect}"
+          return blocked_redirect(url)
+        end
+
         html_escaped_url = TextUtils.escape_xml(url)
         # For JavaScript context: escape backslashes, quotes, newlines, and </script>
         js_escaped_url = url
@@ -41,6 +53,25 @@ module Hwaro
           <body>
             <p>Redirecting to <a href="#{html_escaped_url}">#{html_escaped_url}</a>...</p>
             <script>window.location.href = "#{js_escaped_url}";</script>
+          </body>
+          </html>
+          HTML
+      end
+
+      # Inert page shown when `redirect_to` carries an unsafe URL scheme. No
+      # meta-refresh, no `window.location`, no clickable link — just escaped
+      # text so the dangerous URL can never execute or auto-navigate.
+      private def blocked_redirect(url : String) : String
+        escaped_url = TextUtils.escape_xml(url)
+        <<-HTML
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Redirect blocked</title>
+          </head>
+          <body>
+            <p>This page was configured to redirect to a URL with an unsupported scheme, so the redirect was blocked: #{escaped_url}</p>
           </body>
           </html>
           HTML

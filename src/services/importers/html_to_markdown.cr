@@ -1,4 +1,6 @@
 require "xml"
+require "../../utils/logger"
+require "../../content/processors/inline_markdown"
 
 module Hwaro
   module Services
@@ -6,8 +8,20 @@ module Hwaro
       # Lightweight HTML-to-Markdown converter.
       # Handles common HTML elements produced by WordPress and other CMS exports.
       module HtmlToMarkdown
+        # Above this size the regex pipeline's lazy quantifiers (e.g. the anchor
+        # body `(.*?)</a>`) degrade to O(n^2) on adversarial markup (many
+        # unclosed tags). Imported exports are untrusted, so fall back to a
+        # cheap linear tag-strip rather than spend minutes of CPU on a single
+        # crafted item. The threshold is far above any real blog post.
+        MAX_REGEX_HTML_BYTES = 4 * 1024 * 1024
+
         def self.convert(html : String) : String
           return "" if html.empty?
+
+          if html.bytesize > MAX_REGEX_HTML_BYTES
+            Logger.warn "HTML content is very large (#{html.bytesize} bytes); converting as plain text to avoid excessive processing time."
+            return html.gsub(/<[^>]*>/, " ").gsub(/[ \t]+/, " ").strip
+          end
 
           result = html
 
@@ -95,13 +109,17 @@ module Hwaro
 
           # Inline elements
 
-          # Images (before links to avoid nested match issues)
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\balt=["']([^"']*)["'][^>]*\/?>/i) { "![#{$2}](#{$1})" }
-          result = result.gsub(/<img[^>]*\balt=["']([^"']*)["'][^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { "![#{$1}](#{$2})" }
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { "![](#{$1})" }
+          # Images (before links to avoid nested match issues).
+          # Drop the URL (keep the alt text) when the scheme is unsafe so an
+          # untrusted export can't smuggle a live `javascript:`/`data:` src
+          # into content — the importer stays safe regardless of the markdown
+          # renderer's `safe` flag.
+          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\balt=["']([^"']*)["'][^>]*\/?>/i) { safe_media($1, $2, image: true) }
+          result = result.gsub(/<img[^>]*\balt=["']([^"']*)["'][^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($2, $1, image: true) }
+          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($1, "", image: true) }
 
-          # Links
-          result = result.gsub(/<a[^>]*\bhref=["']([^"']+)["'][^>]*>(.*?)<\/a>/mi) { "[#{$2}](#{$1})" }
+          # Links — likewise drop a dangerous href but keep the link text.
+          result = result.gsub(/<a[^>]*\bhref=["']([^"']+)["'][^>]*>(.*?)<\/a>/mi) { safe_media($1, $2, image: false) }
 
           # Bold
           result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { "**#{$1}**" }
@@ -128,6 +146,15 @@ module Hwaro
 
         private def self.strip_tags(html : String) : String
           html.gsub(/<[^>]*>/, "")
+        end
+
+        # Emit a markdown link/image only when the URL scheme is safe; otherwise
+        # drop the URL and keep just the text/alt. Reuses the single source of
+        # truth for URL-scheme sanitisation so imported content can never carry
+        # a live `javascript:`/`vbscript:`/`file:`/non-image-`data:` reference.
+        private def self.safe_media(url : String, text : String, image : Bool) : String
+          return text unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+          image ? "![#{text}](#{url})" : "[#{text}](#{url})"
         end
 
         private def self.decode_html_entities(text : String) : String
