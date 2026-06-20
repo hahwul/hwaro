@@ -93,6 +93,36 @@ describe Hwaro::Content::Search do
       end
     end
 
+    # Regression: auto-generated listing pages (taxonomy index/term pages) are
+    # registered into all_pages so they reach the sitemap, but they should not
+    # pollute the search index — mirrors the `!generated` guard in llms.cr.
+    it "excludes generated pages from search index" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      real = Hwaro::Models::Page.new("post.md")
+      real.title = "Real Post"
+      real.url = "/post/"
+      real.draft = false
+      real.raw_content = "Content"
+
+      tag_page = Hwaro::Models::Page.new("tags/crystal/index.md")
+      tag_page.title = "Tags: crystal"
+      tag_page.url = "/tags/crystal/"
+      tag_page.draft = false
+      tag_page.generated = true
+      tag_page.raw_content = "listing"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([real, tag_page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/post/")
+        content.should_not contain("/tags/crystal/")
+      end
+    end
+
     it "excludes pages matching exclude patterns" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true

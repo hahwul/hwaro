@@ -207,12 +207,14 @@ module Hwaro::Core::Build::Phases::Transform
 
   # Collect assets for each section and page
   private def collect_assets(ctx : Lifecycle::BuildContext)
+    content_files = ctx.config.try(&.content_files)
+
     ctx.sections.each do |section|
-      section.collect_assets("content")
+      section.collect_assets("content", content_files)
     end
 
     ctx.pages.each do |page|
-      page.collect_assets("content")
+      page.collect_assets("content", content_files)
     end
   end
 
