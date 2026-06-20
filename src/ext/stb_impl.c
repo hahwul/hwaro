@@ -44,6 +44,14 @@ int hwaro_font_init(stbtt_fontinfo *info, const unsigned char *data, int font_in
     return stbtt_InitFont(info, data, offset);
 }
 
+/* Returns 1 if the font defines a glyph for the given Unicode codepoint,
+   0 otherwise. Used to detect CJK coverage (a Latin-only font returns 0 for
+   e.g. Hangul, so the renderer can pick a CJK-capable font instead of
+   emitting "tofu" boxes). */
+int hwaro_font_has_glyph(const stbtt_fontinfo *info, int codepoint) {
+    return stbtt_FindGlyphIndex(info, codepoint) != 0 ? 1 : 0;
+}
+
 float hwaro_font_scale_for_pixel_height(const stbtt_fontinfo *info, float pixels) {
     return stbtt_ScaleForPixelHeight(info, pixels);
 }
