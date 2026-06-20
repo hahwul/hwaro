@@ -377,6 +377,41 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    it "reuses when a configured width exceeds the source (clamped to _<src_w>w)" do
+      # #389 clamp branch: config asks for 9999 but the source is only 640px,
+      # so resize_and_lqip wrote a single photo_640w.jpg. The on-disk set
+      # {320, 640} must still match what the current config produces (9999
+      # clamps to 640), so the image is reused — not re-decoded every rebuild.
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
+        File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640, 9999])
+        result.should_not be_nil
+        result.not_nil!.should eq({320 => "photo_320w.jpg", 640 => "photo_640w.jpg"})
+      end
+    end
+
+    it "reuses when two configured widths collapse onto one source width (.uniq!)" do
+      # Both 640 and 1280 clamp to the 640px source, so .uniq! collapses them
+      # to [640] — which matches the lone photo_640w.jpg on disk → reuse.
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [640, 1280])
+        result.should_not be_nil
+        result.not_nil!.should eq({640 => "photo_640w.jpg"})
+      end
+    end
+
     it "returns nil when a destination is zero bytes" do
       # Defends against a killed serve leaving a half-written resized file:
       # mtime is valid but the file is empty, and reusing it would serve a

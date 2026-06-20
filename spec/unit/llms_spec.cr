@@ -236,6 +236,26 @@ describe Hwaro::Content::Seo::Llms do
         content.should_not contain("Tag: foo")
       end
     end
+
+    # A title with `[`, `]`, or `\` would break the `- [label](url)` Markdown
+    # link unless escaped. Backslash is escaped first, then the brackets.
+    it "escapes brackets and backslashes in page titles for the link label" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "T"
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("guide.md")
+      page.title = "Guide [v2] \\ stuff"
+      page.url = "/guide/"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir)
+
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should contain("- [Guide \\[v2\\] \\\\ stuff](https://example.com/guide/)")
+      end
+    end
   end
 
   describe ".generate (with pages)" do

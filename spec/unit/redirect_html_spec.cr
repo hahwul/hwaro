@@ -52,6 +52,25 @@ describe Hwaro::Utils::RedirectHtml do
       Hwaro::Utils::RedirectHtml.full_redirect("https://example.com/").should contain("window.location.href")
       Hwaro::Utils::RedirectHtml.full_redirect("/blog/post/").should contain("window.location.href")
     end
+
+    it "escapes U+2028/U+2029 line terminators in the JS string literal" do
+      # A bare U+2028/U+2029 would terminate the JS string on pre-ES2019 engines,
+      # breaking the redirect. They must be \u-escaped in the <script> context.
+      r1 = Hwaro::Utils::RedirectHtml.full_redirect("/path\u{2028}x")
+      r1.should contain("\\u2028")
+      r1.should contain("window.location.href") # treated as safe relative URL
+      r2 = Hwaro::Utils::RedirectHtml.full_redirect("/path\u{2029}x")
+      r2.should contain("\\u2029")
+      r2.should contain("window.location.href")
+    end
+
+    it "escapes newline and carriage return in the JS string literal" do
+      r1 = Hwaro::Utils::RedirectHtml.full_redirect("/a\nb")
+      r1.should contain("window.location.href = \"/a\\nb\";") # JS literal escaped, no raw newline
+      r2 = Hwaro::Utils::RedirectHtml.full_redirect("/a\rb")
+      r2.should contain("\\r")
+      r2.should contain("window.location.href")
+    end
   end
 
   describe ".simple_redirect" do

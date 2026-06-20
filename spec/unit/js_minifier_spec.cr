@@ -603,5 +603,15 @@ describe Hwaro::Utils::JsMinifier do
       result = Hwaro::Utils::JsMinifier.minify(js)
       result.should contain("(a + b) / c")
     end
+
+    it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
+      # A real template literal makes protected_spans non-empty so the restore
+      # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range
+      # index, so the bounds guard emits it unchanged rather than raising.
+      # If the guard regressed, minify would raise IndexError here and fail.
+      result = Hwaro::Utils::JsMinifier.minify("var t = `hi`; var s = \"\u{0}JSPL999\u{0}\";")
+      result.should contain("\u{0}JSPL999\u{0}") # bogus token survives verbatim
+      result.should contain("`hi`")              # real template literal restored
+    end
   end
 end

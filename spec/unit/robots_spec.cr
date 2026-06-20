@@ -296,6 +296,29 @@ describe Hwaro::Content::Seo::Robots do
       end
     end
 
+    it "collapses newlines in user_agent/disallow to prevent directive injection" do
+      config = Hwaro::Models::Config.new
+      config.robots.enabled = true
+
+      rule = Hwaro::Models::RobotsRule.new("Bot\nDisallow: /secret")
+      rule.allow = [] of String
+      rule.disallow = ["/a\n/b"]
+      config.robots.rules = [rule]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Robots.generate(config, output_dir)
+
+        content = File.read(File.join(output_dir, "robots.txt"))
+        # The embedded newline collapses to a space, keeping it one line.
+        content.should contain("User-agent: Bot Disallow: /secret")
+        # No standalone injected directive line was forged.
+        content.lines.any? { |l| l.strip == "Disallow: /secret" }.should be_false
+        # The disallow path's newline collapses to a single line too.
+        content.should contain("Disallow: /a /b")
+        content.lines.any? { |l| l.strip == "/b" }.should be_false
+      end
+    end
+
     it "separates multiple rules with blank lines" do
       config = Hwaro::Models::Config.new
       config.robots.enabled = true

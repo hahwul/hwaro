@@ -286,6 +286,25 @@ describe Hwaro::Services::ContentLister do
     end
   end
 
+  describe "JSON frontmatter parsing" do
+    it "parses title, draft, and date from JSON frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "{\"title\": \"JSON Post\", \"draft\": true, \"date\": \"2024-06-15\"}\n\n# body")
+
+        lister = Hwaro::Services::ContentLister.new(content_dir)
+        result = lister.list_content(Hwaro::Services::ContentFilter::All)
+
+        result.size.should eq(1)
+        result.first.title.should eq("JSON Post")
+        result.first.draft.should be_true
+        result.first.date.should_not be_nil
+      end
+    end
+  end
+
   describe "no frontmatter" do
     it "handles files without any frontmatter" do
       Dir.mktmpdir do |dir|

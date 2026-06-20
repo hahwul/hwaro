@@ -213,6 +213,63 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     end
   end
 
+  describe "#sanitize_for_terminal (terminal-injection protection)" do
+    it "strips raw ANSI/control bytes from semi-trusted URLs/paths" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      out = cmd.sanitize_for_terminal_for_test("\e[31mred\e[0m/page")
+
+      # The ESC byte itself is a control char and is removed; the printable
+      # `[31m...` residue remains — assert on absence of the control byte.
+      out.includes?('\e').should be_false
+      out.should eq("[31mred[0m/page")
+    end
+
+    it "removes embedded CR and BEL control bytes while preserving printable text" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      out = cmd.sanitize_for_terminal_for_test("/posts\r\x07/hello")
+
+      out.includes?('\r').should be_false
+      out.includes?('\a').should be_false
+      out.should eq("/posts/hello")
+    end
+
+    it "leaves a fully-printable URL untouched" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.sanitize_for_terminal_for_test("https://example.com/path").should eq(
+        "https://example.com/path"
+      )
+    end
+  end
+
+  describe "#run option validation" do
+    it "rejects --timeout 0 with HWARO_E_USAGE" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      ex = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["--timeout", "0"])
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.not_nil!.should contain("Invalid --timeout")
+    end
+
+    it "rejects a non-numeric --concurrency with HWARO_E_USAGE" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      ex = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["--concurrency", "abc"])
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.not_nil!.should contain("Invalid --concurrency")
+    end
+
+    it "rejects a non-positive --concurrency with HWARO_E_USAGE" do
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      ex = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["--concurrency", "-1"])
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.not_nil!.should contain("Invalid --concurrency")
+    end
+  end
+
   describe "#private_host? (SSRF protection)" do
     it "blocks localhost" do
       cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
@@ -448,5 +505,9 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
 
   def private_172_for_test?(ip : String) : Bool
     private_172?(ip)
+  end
+
+  def sanitize_for_terminal_for_test(s : String) : String
+    sanitize_for_terminal(s)
   end
 end

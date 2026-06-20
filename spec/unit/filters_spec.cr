@@ -280,6 +280,16 @@ describe "StringFilters" do
       result = render_filter("{{ text | truncate_words(length=1) }}", vars)
       result.strip.should eq("hello")
     end
+
+    it "returns only the ending for a non-positive length (pinned contract)" do
+      # length <= 0 is nonsensical input (e.g. a dynamically-computed length
+      # that hits 0). Pin the current behavior so a future fix is a deliberate
+      # change rather than an accidental flip — both 0 and -1 collapse to just
+      # the ending today.
+      vars = {"text" => Crinja::Value.new("one two three")}
+      render_filter("{{ text | truncate_words(length=0) }}", vars).strip.should eq("...")
+      render_filter("{{ text | truncate_words(length=-1) }}", vars).strip.should eq("...")
+    end
   end
 
   describe "slugify" do
@@ -685,6 +695,34 @@ describe "UrlFilters" do
       result.strip.should eq("/subdir/about/")
     end
   end
+
+  describe "empty base_url (pre-deploy state)" do
+    it "absolute_url returns the path unchanged and never emits a // prefix" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = ""
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("my_url", "/about/")
+
+      result = Hwaro::Content::Processors::Template.process("{{ my_url | absolute_url }}", context).strip
+      result.should eq("/about/")
+      result.starts_with?("//").should be_false
+    end
+
+    it "relative_url returns the path unchanged and never emits a // prefix" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = ""
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("my_url", "/about/")
+
+      result = Hwaro::Content::Processors::Template.process("{{ my_url | relative_url }}", context).strip
+      result.should eq("/about/")
+      result.starts_with?("//").should be_false
+    end
+  end
 end
 
 # =============================================================================
@@ -1019,6 +1057,29 @@ describe "I18nFilters" do
       result = render_filter("{{ \"title\" | t }}", vars)
       result.should eq("Title")
     end
+
+    it "falls back to the key when a language entry is not a hash" do
+      # A translations file where a language maps to a scalar/array instead of
+      # a table must not crash render (the blanket rescue returns the key).
+      translations = {
+        Crinja::Value.new("en") => Crinja::Value.new("not-a-hash"),
+      }
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new(translations),
+        "page_language"          => Crinja::Value.new("en"),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      render_filter("{{ \"k\" | t }}", vars).should eq("k")
+    end
+
+    it "falls back to the key when the translations table itself is not a hash" do
+      vars = {
+        "_i18n_translations"     => Crinja::Value.new("not-a-hash"),
+        "page_language"          => Crinja::Value.new("en"),
+        "_i18n_default_language" => Crinja::Value.new("en"),
+      }
+      render_filter("{{ \"k\" | t }}", vars).should eq("k")
+    end
   end
 
   describe "pluralize" do
@@ -1050,6 +1111,19 @@ describe "I18nFilters" do
       vars = {"count" => Crinja::Value.new("abc")}
       result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
       result.should eq("items")
+    end
+
+    it "selects plural for a fractional count above 1 (no truncation to singular)" do
+      # 1.9 must not be truncated to 1 and wrongly rendered singular.
+      vars = {"count" => Crinja::Value.new(1.9)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("items")
+    end
+
+    it "treats an exact 1.0 as singular" do
+      vars = {"count" => Crinja::Value.new(1.0)}
+      result = render_filter("{{ count | pluralize(\"item\", \"items\") }}", vars)
+      result.should eq("item")
     end
   end
 end

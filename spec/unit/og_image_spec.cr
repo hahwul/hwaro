@@ -845,6 +845,85 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # Two distinct URLs that collapse to the same slug after gsub("/", "-")
+    # (/posts/foo/ and /posts-foo/ both -> "posts-foo") must each own a
+    # distinct on-disk path. The first to claim the slug keeps the bare slug;
+    # the second gets a SHA256(url)[0,8] suffix. Without this disambiguation,
+    # both pages would write to ONE path (torn file under -Dpreview_mt) and one
+    # page would advertise an OG image rendered for the other.
+    it "disambiguates colliding URL slugs with a stable URL-hash suffix" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+
+        page1 = Hwaro::Models::Page.new("a.md")
+        page1.title = "Slashed Foo"
+        page1.url = "/posts/foo/"
+        page1.render = true
+
+        page2 = Hwaro::Models::Page.new("b.md")
+        page2.title = "Hyphen Foo"
+        page2.url = "/posts-foo/"
+        page2.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page1, page2], config, dir)
+
+        # First-seen page keeps the bare slug.
+        bare_path = File.join(dir, "og-images", "posts-foo.svg")
+        File.exists?(bare_path).should be_true
+        page1.image.should eq("/og-images/posts-foo.svg")
+
+        # Second-seen colliding page gets the SHA256(url)[0,8] suffix.
+        suffix = Digest::SHA256.hexdigest(page2.url)[0, 8]
+        suffixed_path = File.join(dir, "og-images", "posts-foo-#{suffix}.svg")
+        File.exists?(suffixed_path).should be_true
+        page2.image.should eq("/og-images/posts-foo-#{suffix}.svg")
+
+        # The two pages own distinct files (no overwrite).
+        page1.image.should_not eq(page2.image)
+        File.read(bare_path).should contain("Slashed Foo")
+        File.read(suffixed_path).should contain("Hyphen Foo")
+      end
+    end
+
+    # When the PNG renderer fails (e.g. stbi_write_png cannot open the target
+    # path) generate() must fall back to writing an SVG, still set page.image,
+    # and log a warning. Force the failure by pre-creating <slug>.png as a
+    # directory so stbi_write_png returns 0.
+    it "falls back to SVG and warns when PNG rendering fails" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "png"
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Fallback Title"
+        page.url = "/posts/png-test/"
+        page.render = true
+
+        # Block the PNG write: create <slug>.png as a directory.
+        img_dir = File.join(dir, "og-images")
+        Dir.mkdir_p(img_dir)
+        Dir.mkdir_p(File.join(img_dir, "posts-png-test.png"))
+
+        log = with_captured_log do
+          Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+        end
+
+        page.image.not_nil!.ends_with?(".svg").should be_true
+        page.image.should eq("/og-images/posts-png-test.svg")
+
+        svg_path = File.join(img_dir, "posts-png-test.svg")
+        File.exists?(svg_path).should be_true
+        File.read(svg_path).should contain("Fallback Title")
+
+        log.should contain("PNG render failed")
+      end
+    end
+
     it "generates an image when png format is set" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new

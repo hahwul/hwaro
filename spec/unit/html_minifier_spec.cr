@@ -249,6 +249,24 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should contain("<svg><path/></svg>")
         result.should_not contain("\n  <button")
       end
+
+      it "leaves a counterfeit out-of-range preserve token intact without raising" do
+        # A real <pre> makes the preserves array non-empty so the restore gsub
+        # actually runs; the forged token's index (999) is out of range, so it
+        # must be emitted unchanged rather than indexing past the array.
+        html = "<pre>real</pre><p>\u{0}HW_HTML_PB_999\u{0}</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("<pre>real</pre>")
+        result.should contain("\u{0}HW_HTML_PB_999\u{0}")
+      end
+
+      it "does not raise on a counterfeit token whose index overflows Int32" do
+        # $1.to_i would raise ArgumentError on a 20-digit index; to_i? makes it
+        # fall through to $0 (the token left verbatim).
+        html = "<pre>real</pre><p>\u{0}HW_HTML_PB_99999999999999999999\u{0}</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should contain("\u{0}HW_HTML_PB_99999999999999999999\u{0}")
+      end
     end
 
     describe "edge cases" do

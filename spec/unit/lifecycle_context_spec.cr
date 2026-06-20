@@ -291,6 +291,16 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.set("count", 5)
       ctx.get_bool("count", false).should be_false
     end
+
+    it "returns a stored false even when the default is true" do
+      # Regression: `value || default` would collapse a stored false to the
+      # truthy default, inverting a flag a previous hook intentionally set.
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      ctx.set("flag", false)
+      ctx.get_bool("flag", true).should be_false
+    end
   end
 
   describe "#set and #get_int" do
@@ -308,6 +318,14 @@ describe Hwaro::Core::Lifecycle::BuildContext do
 
       ctx.get_int("missing").should eq(0)
       ctx.get_int("missing", 99).should eq(99)
+    end
+
+    it "returns a stored 0 even when the default is non-zero" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      ctx.set("n", 0)
+      ctx.get_int("n", 99).should eq(0)
     end
 
     it "returns default when value is not an int" do

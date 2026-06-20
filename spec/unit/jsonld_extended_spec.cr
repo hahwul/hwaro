@@ -40,6 +40,33 @@ describe Hwaro::Content::Seo::JsonLd do
 
       Hwaro::Content::Seo::JsonLd.faq_page(page, config).should eq("")
     end
+
+    # The documented primary form `[[extra.faq]]` parses to an Array of
+    # Hash(String, ExtraValue). Malformed entries (missing answer, or a
+    # non-hash element) must be silently dropped, not crash.
+    it "builds FAQPage from a table-array hash form, dropping malformed entries" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/faq/"
+
+      arr = [
+        {"question" => "A?".as(Hwaro::Models::ExtraValue), "answer" => "B".as(Hwaro::Models::ExtraValue)}.as(Hwaro::Models::ExtraValue),
+        {"question" => "C?".as(Hwaro::Models::ExtraValue)}.as(Hwaro::Models::ExtraValue), # missing answer
+        "bare-string".as(Hwaro::Models::ExtraValue),                                      # non-hash element
+      ] of Hwaro::Models::ExtraValue
+      page.extra["faq"] = arr.as(Hwaro::Models::ExtraValue)
+
+      config = Hwaro::Models::Config.new
+      result = Hwaro::Content::Seo::JsonLd.faq_page(page, config)
+
+      json_str = result.gsub(/<\/?script[^>]*>/, "")
+      json = JSON.parse(json_str)
+      json["@type"].as_s.should eq("FAQPage")
+      entities = json["mainEntity"].as_a
+      entities.size.should eq(1)
+      entities[0]["@type"].as_s.should eq("Question")
+      entities[0]["name"].as_s.should eq("A?")
+      entities[0]["acceptedAnswer"]["text"].as_s.should eq("B")
+    end
   end
 
   describe ".how_to" do
@@ -74,6 +101,35 @@ describe Hwaro::Content::Seo::JsonLd do
       config = Hwaro::Models::Config.new
 
       Hwaro::Content::Seo::JsonLd.how_to(page, config).should eq("")
+    end
+
+    # The documented primary form `[[extra.howto_steps]]` parses to an Array
+    # of Hash(String, ExtraValue). Malformed entries (missing text, or a
+    # non-hash element) must be silently dropped, not crash.
+    it "builds HowTo from a table-array hash form, dropping malformed entries" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/tutorial/"
+      page.title = "Getting Started"
+
+      arr = [
+        {"name" => "Install".as(Hwaro::Models::ExtraValue), "text" => "Run install command.".as(Hwaro::Models::ExtraValue)}.as(Hwaro::Models::ExtraValue),
+        {"name" => "Configure".as(Hwaro::Models::ExtraValue)}.as(Hwaro::Models::ExtraValue), # missing text
+        "bare-string".as(Hwaro::Models::ExtraValue),                                         # non-hash element
+      ] of Hwaro::Models::ExtraValue
+      page.extra["howto_steps"] = arr.as(Hwaro::Models::ExtraValue)
+
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      result = Hwaro::Content::Seo::JsonLd.how_to(page, config)
+
+      json_str = result.gsub(/<\/?script[^>]*>/, "")
+      json = JSON.parse(json_str)
+      json["@type"].as_s.should eq("HowTo")
+      steps = json["step"].as_a
+      steps.size.should eq(1)
+      steps[0]["@type"].as_s.should eq("HowToStep")
+      steps[0]["name"].as_s.should eq("Install")
+      steps[0]["text"].as_s.should eq("Run install command.")
     end
   end
 

@@ -54,6 +54,25 @@ describe Hwaro::Core::Build::Phases::Write do
         end
       end
     end
+
+    it "raises HWARO_E_TEMPLATE when the 404 template is malformed" do
+      # A broken templates/404.html must abort the Write phase (fail loud)
+      # rather than ship a green build. apply_template wraps the Crinja parse
+      # error as HWARO_E_TEMPLATE; generate_404_page has no rescue around it.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("public")
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          templates = {"404" => "{{ unclosed"}
+
+          builder = Hwaro::Core::Build::Builder.new
+          err = expect_raises(Hwaro::HwaroError) do
+            builder.test_generate_404_page(site, templates, "public", false, false)
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+        end
+      end
+    end
   end
 
   describe "#process_raw_files" do

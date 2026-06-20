@@ -1673,6 +1673,63 @@ describe Hwaro::Content::Processors::Markdown do
       result = processor.parse(raw)
       result[:date].should be_nil
     end
+
+    it "treats an out-of-range YAML date as nil without dropping the rest of the front matter" do
+      # "2024-13-45" is format-valid but value-invalid, so Time.parse raises
+      # ArgumentError (not Time::Format::Error). parse_time must swallow it and
+      # return nil for the date while title/tags survive — one bad date must
+      # not blank out the whole page (which previously fell through to the
+      # broad rescue and produced an "Untitled" page).
+      raw = <<-MD
+        ---
+        title: Post
+        date: "2024-13-45"
+        ---
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:date].should be_nil
+      result[:title].should eq("Post")
+    end
+
+    it "treats an impossible calendar date (Feb 30) as nil and keeps the title" do
+      raw = <<-MD
+        ---
+        title: Feb
+        date: "2024-02-30"
+        ---
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:date].should be_nil
+      result[:title].should eq("Feb")
+    end
+
+    it "treats an out-of-range TOML quoted date as nil and keeps the title" do
+      raw = <<-MD
+        +++
+        title = "T"
+        date = "2024-13-45"
+        +++
+        Body
+        MD
+
+      result = processor.parse(raw, "content/post.md")
+      result[:date].should be_nil
+      result[:title].should eq("T")
+    end
+  end
+
+  describe "malformed cascade" do
+    it "warns and ignores a scalar cascade value instead of raising" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"S\"\ncascade = \"oops\"\n+++\nbody", "content/_index.md")
+        result[:cascade].empty?.should be_true
+      end
+      log.should contain("`cascade` must be a table")
+    end
   end
 
   # ---------------------------------------------------------------------------

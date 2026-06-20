@@ -474,6 +474,94 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # The default generators (no archetype) hand-roll escape_string for
+    # backslash-before-quote ordering. An adversarial title (`C:\` style
+    # backslash + embedded quote) must still produce front matter that
+    # round-trips through a real parser back to the original string —
+    # otherwise the next `hwaro build` chokes on unparseable TOML/YAML.
+    it "round-trips an adversarial title through the default TOML generator" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          adversarial = %(My "Quoted" \\ Post)
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: adversarial)
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/post.md")
+          fm = content.lines.reject { |l| l.strip == "+++" }.join("\n")
+          parsed = TOML.parse(fm)
+          parsed["title"].as_s.should eq(adversarial)
+        end
+      end
+    end
+
+    it "round-trips an adversarial title through the default YAML generator" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "yaml"
+
+          adversarial = %(My "Quoted" \\ Post)
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: adversarial)
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/post.md")
+          fm = content.lines.reject { |l| l.strip == "---" }.join("\n")
+          parsed = YAML.parse(fm)
+          parsed["title"].as_s.should eq(adversarial)
+        end
+      end
+    end
+
+    # JSON is correct by construction (JSON::Any.to_pretty_json), but keep a
+    # cheap round-trip as an extra guard.
+    it "round-trips an adversarial title through the default JSON generator" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "json"
+
+          adversarial = %(My "Quoted" \\ Post)
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: adversarial)
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/post.md")
+          end_idx = content.index!("}\n") + 1
+          parsed = JSON.parse(content[0, end_idx])
+          parsed["title"].as_s.should eq(adversarial)
+        end
+      end
+    end
+
+    # When no <path> is given and the title slugifies to empty (all
+    # punctuation/emoji), the slug-empty guard must raise a classified usage
+    # error rather than writing a stray hidden `content/.md` file.
+    it "fails fast with HwaroError(HWARO_E_USAGE) when title slugifies to empty (no path)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/drafts")
+
+          options = Hwaro::Config::Options::NewOptions.new(title: "!!!")
+          creator = Hwaro::Services::Creator.new
+
+          err = expect_raises(Hwaro::HwaroError) do
+            creator.run(options)
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should match(/filename-safe/)
+
+          # No stray hidden file written.
+          File.exists?("content/.md").should be_false
+          File.exists?("content/drafts/.md").should be_false
+        end
+      end
+    end
+
     it "honours custom default_fields from config" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

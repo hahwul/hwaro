@@ -844,4 +844,89 @@ describe Hwaro::Assets::Pipeline do
       end
     end
   end
+
+  # ===========================================================================
+  # Source-path traversal guard — files must stay within source_dir
+  # ===========================================================================
+  describe "source path traversal guard" do
+    it "skips a `../`-traversal source file and warns" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        # File written one level ABOVE source_dir; referenced via `../`.
+        File.write(File.join(dir, "outside.css"), ".secret { color: leak; }")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "evil.css", files: ["../outside.css"]
+        )
+
+        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        log = with_captured_log do
+          pipeline.process(output_dir)
+        end
+
+        # Only file was traversal-skipped → empty bundle → not created.
+        pipeline.manifest.has_key?("evil.css").should be_false
+        File.exists?(File.join(output_dir, "assets", "evil.css")).should be_false
+        log.should contain("outside source directory")
+      end
+    end
+
+    it "does not include outside-source content when mixed with a valid file" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(dir, "outside.css"), ".secret { color: leak; }")
+        File.write(File.join(static_dir, "inside.css"), ".ok { color: green; }")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "mixed.css", files: ["../outside.css", "inside.css"]
+        )
+
+        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        log = with_captured_log do
+          pipeline.process(output_dir)
+        end
+
+        pipeline.manifest.has_key?("mixed.css").should be_true
+        content = File.read(File.join(output_dir, "assets", "mixed.css"))
+        content.should contain("color: green")
+        content.should_not contain("color: leak")
+        log.should contain("outside source directory")
+      end
+    end
+
+    it "allows legitimate nested files within source_dir" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(File.join(static_dir, "css", "vendor"))
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "css", "vendor", "lib.css"), ".lib { color: blue; }")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "nested.css", files: ["css/vendor/lib.css"]
+        )
+
+        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        log = with_captured_log do
+          pipeline.process(output_dir)
+        end
+
+        pipeline.manifest.has_key?("nested.css").should be_true
+        File.read(File.join(output_dir, "assets", "nested.css")).should contain("color: blue")
+        log.should_not contain("outside source directory")
+      end
+    end
+  end
 end

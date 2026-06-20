@@ -712,5 +712,14 @@ describe Hwaro::Utils::CssMinifier do
       result = Hwaro::Utils::CssMinifier.minify(css)
       result.should contain("color:red")
     end
+
+    it "leaves a counterfeit out-of-range PRESERVE placeholder token intact" do
+      # The counterfeit token sits inside a real string literal so Step 2 stashes
+      # the surrounding string; Step 7's restore regex then re-matches the embedded
+      # \x00PRESERVE_999\x00 with an out-of-range index. The bounds guard emits it
+      # unchanged rather than raising IndexError (which would crash the pipeline).
+      result = Hwaro::Utils::CssMinifier.minify("a{content:\"\u{0}PRESERVE_999\u{0}\"}")
+      result.should contain("PRESERVE_999") # bogus token survives verbatim
+    end
   end
 end

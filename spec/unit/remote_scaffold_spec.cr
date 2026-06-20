@@ -55,6 +55,20 @@ describe Hwaro::Services::Scaffolds::Remote do
       subpath.should eq("docs")
     end
 
+    it "routes git://github.com/owner/repo through the URL parser (not git: shorthand)" do
+      owner, repo, subpath = Hwaro::Services::Scaffolds::Remote.parse_source("git://github.com/hahwul/hwaro-starter-blog")
+      owner.should eq("hahwul")
+      repo.should eq("hwaro-starter-blog")
+      subpath.should eq("")
+    end
+
+    it "parses git://github.com/owner/repo/subpath via the URL parser" do
+      owner, repo, subpath = Hwaro::Services::Scaffolds::Remote.parse_source("git://github.com/owner/repo/docs")
+      owner.should eq("owner")
+      repo.should eq("repo")
+      subpath.should eq("docs")
+    end
+
     it "parses https://github.com/owner/repo URL" do
       owner, repo, subpath = Hwaro::Services::Scaffolds::Remote.parse_source("https://github.com/hahwul/hwaro-starter-blog")
       owner.should eq("hahwul")
@@ -239,6 +253,31 @@ describe Hwaro::Services::Scaffolds::Remote do
       err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
       err.exit_code.should eq(7)
       err.message.not_nil!.should contain("HTTP 500")
+    end
+
+    it "raises HwaroError(HWARO_E_NETWORK) when a 200 body is missing 'default_branch'" do
+      TestRemoteHelper.stub_response(200, %({"name":"repo"}))
+      helper = TestRemoteHelper.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        helper.do_fetch_default_branch("some-owner", "some-repo")
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+      err.exit_code.should eq(7)
+      err.message.not_nil!.should contain("missing 'default_branch'")
+    end
+
+    # A non-JSON 200 body crashes in JSON.parse BEFORE the `|| raise`, so it
+    # surfaces as a bare JSON::ParseException (not a classified HwaroError).
+    # This pins the current unguarded behavior.
+    it "raises JSON::ParseException on a non-JSON 200 body (unguarded)" do
+      TestRemoteHelper.stub_response(200, "<html>not json</html>")
+      helper = TestRemoteHelper.new
+
+      expect_raises(JSON::ParseException) do
+        helper.do_fetch_default_branch("some-owner", "some-repo")
+      end
     end
   end
 end

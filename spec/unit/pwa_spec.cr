@@ -226,6 +226,43 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    # A present-but-corrupt PNG (bad signature) must fall back to the filename
+    # heuristic rather than emitting a bogus size or raising.
+    it "falls back to the filename-derived size for a non-PNG file with the .png extension" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "icon-256.png"), "not a png at all")
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/icon-256.png"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("256x256")
+      end
+    end
+
+    # A truncated PNG (<24 bytes, even with a valid signature) is too short to
+    # hold an IHDR; the read<24 guard must trigger the filename fallback.
+    it "falls back to the filename-derived size for a truncated PNG (under 24 bytes)" do
+      Dir.mktmpdir do |dir|
+        # Valid 8-byte signature only — not enough bytes for the IHDR dims.
+        File.write(File.join(dir, "icon-256.png"), Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/icon-256.png"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("256x256")
+      end
+    end
+
     it "normalizes icon paths with and without static/ prefix" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)

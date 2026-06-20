@@ -85,6 +85,82 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    # A taxonomy with paginate_by set must split a term that exceeds the limit
+    # across /page/N/ directories. 5 pages with paginate_by=2 => ceil(5/2)=3
+    # pages: /tags/crystal/index.html (page 1) + page/2/ + page/3/, and NO
+    # page/4/. Exercises paginate_taxonomy + write_paginated_output + page_url.
+    it "splits a term across /page/N/ directories when paginate_by is set" do
+      config = Hwaro::Models::Config.new
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.paginate_by = 2
+      config.taxonomies = [tax]
+
+      site = Hwaro::Models::Site.new(config)
+
+      pages = (1..5).map do |i|
+        page = Hwaro::Models::Page.new("post#{i}.md")
+        page.title = "Post #{i}"
+        page.url = "/blog/post#{i}/"
+        page.tags = ["crystal"]
+        page.draft = false
+        page.generated = false
+        page
+      end
+      site.pages = pages
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        File.exists?(File.join(output_dir, "tags", "crystal", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "tags", "crystal", "page", "2", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "tags", "crystal", "page", "3", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "tags", "crystal", "page", "4", "index.html")).should be_false
+      end
+    end
+
+    # A term whose name slugifies to empty (all-symbol / emoji) must fall back to
+    # the safe_slugify "term-<hex>" token so it never produces a // path segment
+    # nor overwrites the /tags/ listing page itself.
+    it "uses the safe_slugify fallback for a term that slugifies to empty" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/blog/post/"
+      page.tags = ["🎉"]
+      page.draft = false
+      page.generated = false
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        # Exactly one term dir, named with the non-empty term-<hex> fallback.
+        term_dirs = Dir.children(File.join(output_dir, "tags")).reject { |c| c == "index.html" }
+        term_dirs.size.should eq(1)
+        slug = term_dirs.first
+        slug.starts_with?("term-").should be_true
+
+        # The term page exists at a non-empty path segment (no /tags//).
+        File.exists?(File.join(output_dir, "tags", slug, "index.html")).should be_true
+
+        # The listing page was not overwritten by the term page; it still lists
+        # the raw term.
+        index = File.read(File.join(output_dir, "tags", "index.html"))
+        index.should contain("🎉")
+      end
+    end
+
     it "disambiguates distinct terms that slugify identically (no silent overwrite)" do
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]

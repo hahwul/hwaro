@@ -49,6 +49,77 @@ describe Hwaro::Services::Importers::AstroImporter do
       end
     end
 
+    it "extracts src from a structured heroImage object" do
+      # Astro's official starter blog ships `heroImage: { src, alt }` (a YAML
+      # mapping), exercising the `when Hash` branch and the image["src"]?
+      # YAML::Any indexing. A regression mapping the wrong key would silently
+      # drop the cover image on every imported Astro post using that shape.
+      Dir.mktmpdir do |dir|
+        blog_dir = File.join(dir, "src", "content", "blog")
+        FileUtils.mkdir_p(blog_dir)
+
+        post_content = <<-ASTRO
+          ---
+          title: "Structured Hero"
+          heroImage:
+            src: /images/hero.jpg
+            alt: Hero
+          ---
+          Content.
+          ASTRO
+
+        File.write(File.join(blog_dir, "structured-hero.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "astro",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::AstroImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        content = File.read(File.join(output_dir, "blog", "structured-hero.md"))
+        content.should contain("image = \"/images/hero.jpg\"")
+      end
+    end
+
+    it "emits no image when a structured heroImage object lacks src" do
+      # Object with only `alt:` — no src to extract, so no image field and
+      # no crash on the YAML::Any indexing path.
+      Dir.mktmpdir do |dir|
+        blog_dir = File.join(dir, "src", "content", "blog")
+        FileUtils.mkdir_p(blog_dir)
+
+        post_content = <<-ASTRO
+          ---
+          title: "Alt Only Hero"
+          heroImage:
+            alt: Just alt text
+          ---
+          Content.
+          ASTRO
+
+        File.write(File.join(blog_dir, "alt-only-hero.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "astro",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::AstroImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        content = File.read(File.join(output_dir, "blog", "alt-only-hero.md"))
+        content.should_not contain("image =")
+      end
+    end
+
     it "maps pubDate to date" do
       Dir.mktmpdir do |dir|
         blog_dir = File.join(dir, "src", "content", "blog")

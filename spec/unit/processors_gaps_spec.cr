@@ -40,6 +40,22 @@ private class GapHigherProcessor < GapTestProcessor
   end
 end
 
+# Forces Markdown#process down its rescue branch by raising from the inherited
+# render. The override matches render's full signature so process's
+# render(content) call dispatches here.
+private class FailingMarkdown < Hwaro::Content::Processors::Markdown
+  def render(
+    content : String,
+    highlight : Bool = true,
+    safe : Bool = false,
+    lazy_loading : Bool = false,
+    emoji : Bool = false,
+    markdown_config : Hwaro::Models::MarkdownConfig? = nil,
+  ) : Tuple(String, Array(Hwaro::Models::TocHeader))
+    raise "boom"
+  end
+end
+
 # Capture and restore the registry around each test so we don't pollute other
 # specs that depend on the default-registered processors (markdown, html, ...).
 #
@@ -141,6 +157,18 @@ describe Hwaro::Content::Processors::Markdown do
       result.success.should be_true
       result.content.should contain("<ul")
       result.content.should contain("<strong>")
+    end
+
+    it "wraps a render failure into an error ProcessorResult (degrade, not crash)" do
+      md = FailingMarkdown.new
+      ctx = Hwaro::Content::Processors::ProcessorContext.new
+      result = md.process("# Hello\n\nWorld", ctx)
+
+      result.success.should be_false
+      result.content.should eq("")
+      result.error.should_not be_nil
+      result.error.not_nil!.starts_with?("Markdown processing failed:").should be_true
+      result.error.not_nil!.should contain("boom")
     end
   end
 

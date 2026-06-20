@@ -123,6 +123,24 @@ describe Hwaro::Models::ContentFilesConfig do
       config.publish?("file.tmp").should be_false
       config.publish?("file.jpg").should be_true
     end
+
+    it "skips a malformed disallow_paths glob instead of raising (BadPatternError swallow)" do
+      # "[bad" is an unterminated character set; File.match? raises
+      # File::BadPatternError. publish? must swallow it and treat the pattern
+      # as non-matching rather than crashing mid asset collection.
+      config = Hwaro::Models::ContentFilesConfig.new
+      config.allow_extensions = [".pdf"]
+      config.disallow_paths = ["[bad"]
+      config.publish?("a/b/secret.pdf").should be_true
+    end
+
+    it "still applies valid disallow patterns after skipping a malformed one" do
+      config = Hwaro::Models::ContentFilesConfig.new
+      config.allow_extensions = [".pdf"]
+      config.disallow_paths = ["[bad", "**/secret.*"]
+      config.publish?("a/b/secret.pdf").should be_false
+      config.publish?("a/b/keep.pdf").should be_true
+    end
   end
 
   describe ".normalize_extensions" do

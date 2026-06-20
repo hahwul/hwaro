@@ -553,6 +553,98 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
+    it "silently drops one of two source files that collide on the same slug" do
+      # Two distinct posts whose date-stripped slug is identical ("hello")
+      # both map to posts/hello.md. Under no-force, the first (sorted) input
+      # is imported and the second is skipped — silent data loss in a one-shot
+      # migration. This pins the current behavior and would catch a regression
+      # (or motivate a de-dup / slug-suffix fix).
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        File.write(File.join(posts_dir, "2024-01-01-hello.md"), <<-JEKYLL
+          ---
+          title: "First Hello"
+          ---
+          First post body.
+          JEKYLL
+        )
+        File.write(File.join(posts_dir, "2024-06-02-hello.md"), <<-JEKYLL
+          ---
+          title: "Second Hello"
+          ---
+          Second post body.
+          JEKYLL
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::JekyllImporter.new
+        result = importer.run(options)
+
+        # Exactly one survives; the other is silently dropped.
+        result.imported_count.should eq(1)
+        result.skipped_count.should eq(1)
+
+        # Dir.glob yields sorted paths, so the 2024-01-01 file wins.
+        output_file = File.join(output_dir, "posts", "hello.md")
+        File.exists?(output_file).should be_true
+        content = File.read(output_file)
+        content.should contain("First post body.")
+        content.should_not contain("Second post body.")
+      end
+    end
+
+    it "counts a malformed-YAML post as an error while still importing valid posts" do
+      # Jekyll's YAML.parse has no local rescue, so a malformed `---` block
+      # raises YAML::ParseException and the entire post (body included) is
+      # dropped via run's per-file rescue (error_count++). The valid post in
+      # the same run still imports. Unlike Hugo, the broken-YAML body is lost.
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        File.write(File.join(posts_dir, "2024-01-01-bad.md"), <<-JEKYLL
+          ---
+          title: "unterminated
+          ---
+          Bad post body.
+          JEKYLL
+        )
+        File.write(File.join(posts_dir, "2024-01-02-good.md"), <<-JEKYLL
+          ---
+          title: "Good Post"
+          ---
+          Good post body.
+          JEKYLL
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::JekyllImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        result.error_count.should eq(1)
+        # success = imported > 0 || errors == 0 -> true here.
+        result.success.should be_true
+
+        File.exists?(File.join(output_dir, "posts", "good.md")).should be_true
+        File.exists?(File.join(output_dir, "posts", "bad.md")).should be_false
+      end
+    end
+
     it "handles post without frontmatter" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")
