@@ -445,8 +445,9 @@ module Hwaro
         base_url : String,
         verbose : Bool = false,
       )
-        return if site.config.base_url.empty?
-
+        # No base_url guard: like the main and section feeds, taxonomy feeds
+        # emit with relative URLs when base_url is empty (the user opted in via
+        # `feed = true`) rather than being silently dropped.
         feed_output_dir = File.join(output_dir, base_url.lchop("/"))
         Hwaro::Utils::FileSafe.mkdir_p(feed_output_dir)
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"

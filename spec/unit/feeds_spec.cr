@@ -1364,8 +1364,44 @@ describe Hwaro::Content::Seo::Feeds do
       )
 
       rss.should contain("<title>My Blog</title>")
-      rss.should contain("<link>https://example.com</link>")
+      # Channel <link> ends with "/" to match the homepage canonical.
+      rss.should contain("<link>https://example.com/</link>")
       rss.should contain("<description>A developer blog</description>")
+    end
+
+    # Regression (#10/#11): with an empty base_url the channel <link> must not
+    # be an empty (invalid) element — it falls back to "/" (site root).
+    it "emits a non-empty channel link when base_url is empty" do
+      config = Hwaro::Models::Config.new
+      config.base_url = ""
+      config.title = "My Blog"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [] of Hwaro::Models::Page, config, "rss.xml", false, "My Blog", ""
+      )
+
+      rss.should contain("<link>/</link>")
+      rss.should_not contain("<link></link>")
+    end
+
+    # Regression (#6): full_content feed bodies must absolutize relative links
+    # so readers (which resolve content out of page context) don't break them.
+    it "absolutizes relative links in <content:encoded> against the page URL" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = true
+
+      page = Hwaro::Models::Page.new("guide/config.md")
+      page.title = "Config"
+      page.url = "/guide/config/"
+      page.content = %(<p><a href="../quick-start/">start</a> <img src="/img/a.png"/></p>)
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Blog", ""
+      )
+
+      rss.should contain("https://example.com/guide/quick-start/")
+      rss.should contain("https://example.com/img/a.png")
     end
 
     it "includes self-referencing atom:link" do
@@ -1798,8 +1834,9 @@ describe Hwaro::Content::Seo::Feeds do
       )
 
       atom.should contain("<title>My Feed</title>")
-      atom.should contain("<link href=\"https://example.com\"")
-      atom.should contain("<id>https://example.com</id>")
+      # Atom alternate <link>/<id> end with "/" to match the homepage canonical.
+      atom.should contain("<link href=\"https://example.com/\"")
+      atom.should contain("<id>https://example.com/</id>")
       atom.should contain("<subtitle>Feed description</subtitle>")
       atom.should contain("<updated>")
     end
