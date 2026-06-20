@@ -263,6 +263,39 @@ describe Hwaro::Utils::TextUtils do
       # so bare > in text gets consumed as a tag boundary
       Hwaro::Utils::TextUtils.strip_html("a > b").should eq("a b")
     end
+
+    # Raw-text elements: <style>/<script> bodies are code, not display text,
+    # and must be dropped along with their tags. Otherwise the CSS/JS source
+    # leaks into search indexes, feed summaries, and excerpts.
+    it "drops <style> element bodies, keeping surrounding text" do
+      input = "<style>.gallery { display: grid; gap: 10px; }</style><p>Real text</p>"
+      Hwaro::Utils::TextUtils.strip_html(input).should eq("Real text")
+    end
+
+    it "drops <script> element bodies, keeping surrounding text" do
+      input = "<p>Before</p><script>console.log(\"x\"); var y = 1;</script><p>After</p>"
+      Hwaro::Utils::TextUtils.strip_html(input).should eq("Before After")
+    end
+
+    it "drops multi-line and attributed <style>/<script> blocks" do
+      input = <<-HTML
+        <style type="text/css">
+          .a { color: red; }
+          .b { color: blue; }
+        </style>
+        <h1>Heading</h1>
+        <script src="x.js">
+          if (a < b) { doThing(); }
+        </script>
+        Tail
+        HTML
+      Hwaro::Utils::TextUtils.strip_html(input).should eq("Heading Tail")
+    end
+
+    it "is case-insensitive for raw-text element names" do
+      input = "<STYLE>.x{}</STYLE><p>Kept</p><SCRIPT>bad()</SCRIPT>"
+      Hwaro::Utils::TextUtils.strip_html(input).should eq("Kept")
+    end
   end
 
   describe ".cjk_char?" do

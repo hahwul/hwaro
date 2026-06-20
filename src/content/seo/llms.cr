@@ -1,5 +1,6 @@
 require "../../models/config"
 require "../../models/page"
+require "../../models/section"
 require "../../utils/logger"
 
 module Hwaro
@@ -57,23 +58,30 @@ module Hwaro
 
           eligible = pages.select { |p| p.render && !p.draft && p.in_search_index && !p.generated }
 
-          # Group by section, keyed by display heading. Section index
-          # pages double as the section's heading source — find the
-          # corresponding `_index.md` (`is_index && section.match`) and
-          # use its title; fall back to the section directory's basename.
+          # Group by section, keyed by display heading. A section's heading
+          # comes from its `_index.md`, which is the only page modeled as a
+          # `Models::Section`. Key off the *type*, NOT `is_index`: a
+          # page-bundle leaf (`foo/bar/index.md`) is also `is_index == true`,
+          # so testing `is_index` here let an arbitrary leaf's title clobber
+          # the section heading.
           headings = {} of String => String
           eligible.each do |p|
-            next unless p.is_index
+            next unless p.is_a?(Models::Section)
             next if p.section.empty?
             headings[p.section] = p.title unless p.title.empty? || p.title == "Untitled"
           end
 
-          # Section-level `_index.md` pages are folded into the section
-          # heading, so they don't need their own listing. Root-level
-          # `index.md` (the home page) has nowhere else to live, so it
-          # stays in the listing under "Pages".
+          # Fold section-level `_index.md` pages (a `Models::Section` with a
+          # non-empty section) into their heading, so they don't get their own
+          # listing. Everything else stays listed — in particular page-bundle
+          # leaves (`foo/index.md`), which are `Models::Page` with
+          # `is_index == true`: they are real content pages. Filtering on
+          # `is_index` here dropped every page-bundle leaf and left only the
+          # home page(s). The root `_index.md` (a `Models::Section` with an
+          # empty section) is the home page and has nowhere else to live, so
+          # the `!section.empty?` guard keeps it under "Pages".
           by_section = eligible
-            .reject { |p| p.is_index && !p.section.empty? }
+            .reject { |p| p.is_a?(Models::Section) && !p.section.empty? }
             .group_by(&.section)
 
           String.build do |str|

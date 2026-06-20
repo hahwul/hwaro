@@ -21,8 +21,14 @@ module Hwaro
           end
         end
 
-        # Filter out draft pages and pages with in_search_index = false
-        search_pages = pages.reject { |p| p.draft || !p.in_search_index }
+        # Filter out drafts, pages opted out of the index, and `render = false`
+        # pages. The `render` check keeps the search index in lockstep with the
+        # set of pages that actually emit HTML — the same guard sitemap.cr,
+        # feeds.cr, and llms.cr already apply. Without it, a section index with
+        # `render = false` (a common "navigation container, no landing page"
+        # pattern) is indexed even though no HTML is written for it, so the
+        # search hit 404s when clicked.
+        search_pages = pages.reject { |p| p.draft || !p.in_search_index || !p.render }
 
         # Deduplicate by URL (keep last occurrence, matching build behavior)
         seen_urls = Set(String).new
