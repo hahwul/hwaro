@@ -527,6 +527,48 @@ describe Hwaro::Models::Page do
         assets.should_not contain("blog/other.markdown")
       end
     end
+
+    # Regression: a root `_index.md` bundle scoops the whole content tree, so
+    # without honoring [content.files] it republished arbitrary non-md files
+    # (e.g. content/public/robots.txt -> public/public/robots.txt). When
+    # `allow_extensions` is set, bundle assets must obey the same allowlist.
+    it "honors [content.files] allow/disallow when content_files is enabled" do
+      Dir.mktmpdir do |dir|
+        page_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(page_dir)
+        File.write(File.join(dir, "_index.md"), "# Home")
+        File.write(File.join(page_dir, "robots.txt"), "User-agent: *")
+        File.write(File.join(dir, "photo.png"), "fake png")
+
+        page = Hwaro::Models::Page.new("_index.md")
+        page.is_index = true
+
+        content_files = Hwaro::Models::ContentFilesConfig.new
+        content_files.allow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["png"])
+
+        assets = page.collect_assets(dir, content_files)
+        assets.should contain("photo.png")
+        assets.should_not contain("public/robots.txt")
+      end
+    end
+
+    it "collects every non-md file when content_files is not configured" do
+      Dir.mktmpdir do |dir|
+        page_dir = File.join(dir, "bundle")
+        FileUtils.mkdir_p(page_dir)
+        File.write(File.join(page_dir, "index.md"), "# Test")
+        File.write(File.join(page_dir, "notes.txt"), "notes")
+        File.write(File.join(page_dir, "image.png"), "fake png")
+
+        page = Hwaro::Models::Page.new("bundle/index.md")
+        page.is_index = true
+
+        # Disabled config (no allow_extensions) must preserve legacy behavior.
+        assets = page.collect_assets(dir, Hwaro::Models::ContentFilesConfig.new)
+        assets.should contain("bundle/notes.txt")
+        assets.should contain("bundle/image.png")
+      end
+    end
   end
 end
 

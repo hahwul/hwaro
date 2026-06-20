@@ -18,9 +18,9 @@ require "../content/pagination/renderer"
 module Hwaro
   module Content
     class Taxonomies
-      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false)
+      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false) : Array(Models::Section)
         config = site.config
-        return if config.taxonomies.empty?
+        return [] of Models::Section if config.taxonomies.empty?
 
         build_taxonomy_index(site)
 
@@ -53,7 +53,15 @@ module Hwaro
         if root_language && (default_cfg = config.languages[root_language]?)
           root_taxonomies = config.taxonomies.select { |t| default_cfg.taxonomies.includes?(t.name) }
         end
-        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, global_vars, language: root_language, lang_prefix: "")
+
+        # Collect every generated taxonomy index/term page (each a
+        # Models::Section) so the caller can register them into the page set
+        # the SEO generators read. Without this, taxonomy pages are written to
+        # disk but never reach the sitemap/feeds/search/llms inputs, so
+        # `taxonomy.sitemap` / `taxonomy.feed` had no effect.
+        collected = [] of Models::Section
+
+        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, global_vars, collected, language: root_language, lang_prefix: "")
 
         # For multilingual sites, also generate language-prefixed taxonomy pages
         # (e.g. /en/tags/, /en/categories/) using only pages of that language.
@@ -72,10 +80,12 @@ module Hwaro
             next if lang_taxonomies.empty?
 
             lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
-            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars,
+            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars, collected,
               language: lang_code, lang_prefix: "/#{lang_code}", lang_taxonomies: lang_taxonomies)
           end
         end
+
+        collected
       end
 
       # Generate taxonomy index + terms for a (possibly language-scoped) set of taxonomies.
@@ -87,6 +97,7 @@ module Hwaro
         builder : Core::Build::Builder,
         verbose : Bool,
         global_vars : Hash(String, Crinja::Value),
+        collected : Array(Models::Section),
         language : String?,
         lang_prefix : String,
         lang_taxonomies : Hash(String, Hash(String, Array(Models::Page)))? = nil,
@@ -133,6 +144,7 @@ module Hwaro
                           terms_map.keys
                         end
           render_taxonomy_index(index_page, index_terms.sort!, templates, site, output_dir, builder, verbose, global_vars, slug_map)
+          collected << index_page
 
           terms_map.each do |term, pages|
             # Filter pages to the requested language when doing per-lang generation
@@ -143,7 +155,7 @@ module Hwaro
                              end
             next if filtered_pages.empty?
 
-            render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug_map[term], lang_prefix: lang_prefix, language: language)
+            collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug_map[term], lang_prefix: lang_prefix, language: language)
           end
         end
       end
@@ -260,7 +272,7 @@ module Hwaro
         slug : String,
         lang_prefix : String = "",
         language : String? = nil,
-      )
+      ) : Models::Section
         base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
 
         index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
@@ -300,9 +312,9 @@ module Hwaro
           end
         end
 
-        return unless taxonomy.feed
+        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url, verbose) if taxonomy.feed
 
-        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url, verbose)
+        index_page
       end
 
       private def self.paginate_taxonomy(
