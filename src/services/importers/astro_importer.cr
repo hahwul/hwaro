@@ -182,9 +182,18 @@ module Hwaro
               end
             end
 
-            # Author
+            # Author — Hwaro's parser only reads the plural `authors` array,
+            # so map Astro's singular `author` onto it (Astro templates
+            # occasionally use a list, so accept both shapes).
             if author = yaml["author"]?
-              fields["author"] = author.as_s? || author.raw.to_s
+              authors = [] of String
+              case author.raw
+              when Array
+                author.as_a.each { |a| authors << (a.as_s? || a.raw.to_s) }
+              else
+                authors << (author.as_s? || author.raw.to_s)
+              end
+              fields["authors"] = authors unless authors.empty?
             end
           end
 
