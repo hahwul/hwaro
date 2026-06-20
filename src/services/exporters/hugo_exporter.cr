@@ -102,21 +102,29 @@ module Hwaro
           lines = ["+++"]
 
           fields.each do |key, value|
+            k = toml_key(key)
             case value
             when Nil  then next
-            when Bool then lines << "#{key} = #{value}"
+            when Bool then lines << "#{k} = #{value}"
             when String
               next if value.empty?
-              lines << "#{key} = #{value.inspect}"
+              lines << "#{k} = #{value.inspect}"
             when Array(String)
               next if value.empty?
               formatted = value.map(&.inspect).join(", ")
-              lines << "#{key} = [#{formatted}]"
+              lines << "#{k} = [#{formatted}]"
             end
           end
 
           lines << "+++"
           lines.join("\n")
+        end
+
+        # Quote a front-matter key that isn't a bare TOML key. A key with a
+        # space, dot, or non-ASCII char (valid in YAML/JSON source) would emit
+        # unparseable TOML like `my key = "x"`; render it as `"my key" = "x"`.
+        private def toml_key(key : String) : String
+          key.matches?(/\A[A-Za-z0-9_-]+\z/) ? key : key.inspect
         end
       end
     end

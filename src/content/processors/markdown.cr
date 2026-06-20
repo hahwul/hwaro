@@ -873,7 +873,7 @@ module Hwaro
                   if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
                     begin
                       return Time.parse_rfc3339(str)
-                    rescue Time::Format::Error
+                    rescue Time::Format::Error | ArgumentError
                       "%Y-%m-%dT%H:%M:%S"
                     end
                   else
@@ -887,7 +887,12 @@ module Hwaro
 
           begin
             Time.parse(str, fmt, Time::Location.local)
-          rescue Time::Format::Error
+          rescue Time::Format::Error | ArgumentError
+            # Time::Format::Error  → string doesn't match the format at all.
+            # ArgumentError        → format matches but the value is out of
+            #   range (e.g. "2024-13-45", "2024-02-30"). Both mean "no usable
+            #   date" — return nil so the rest of the front matter survives
+            #   instead of letting the exception unwind the whole parse.
             nil
           end
         end

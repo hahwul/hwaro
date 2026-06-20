@@ -160,8 +160,12 @@ module Hwaro
       private def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
         loop do
           replaced = html.gsub(REGEX_PRESERVE_TOKEN) do
-            idx = $1.to_i
-            idx < preserves.size ? preserves[idx] : $0
+            # to_i? (not to_i) so a counterfeit token whose digits overflow
+            # Int32 (e.g. \x00HW_HTML_PB_99999999999999999999\x00 forged in
+            # author input) returns nil → emit $0 unchanged instead of raising
+            # ArgumentError and aborting minification of the whole page.
+            idx = $1.to_i?
+            idx && idx < preserves.size ? preserves[idx] : $0
           end
           break if replaced == html
           html = replaced

@@ -78,8 +78,10 @@ module Hwaro
 
         # ── Step 7: Restore preserved tokens (single-pass) ─────────────────
         result = result.gsub(/\x00PRESERVE_(\d+)\x00/) do
-          idx = $1.to_i
-          idx < preserves.size ? preserves[idx] : $0
+          # to_i? guards against a counterfeit token whose index overflows
+          # Int32 — return $0 unchanged rather than raising ArgumentError.
+          idx = $1.to_i?
+          idx && idx < preserves.size ? preserves[idx] : $0
         end
 
         result.strip

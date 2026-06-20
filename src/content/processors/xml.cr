@@ -44,6 +44,11 @@ module Hwaro
           xml
             .gsub(/>\s*\n\s*</, "><") # Remove whitespace-only text between tags (cross-line only)
             .gsub(/<[^>]+>/) do |tag|
+              # Never touch comments or CDATA sections: their bytes are
+              # significant character data (RSS <content:encoded>, embedded
+              # scripts, pre-formatted code), not attribute formatting, so
+              # collapsing internal whitespace would silently corrupt them.
+              next tag if tag.starts_with?("<!--") || tag.starts_with?("<![CDATA[")
               # Collapse whitespace runs only BETWEEN attributes; leave whitespace
               # inside quoted attribute values intact (e.g. `title="a    b"`),
               # otherwise the minifier silently corrupts attribute content.
