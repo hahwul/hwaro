@@ -162,6 +162,18 @@ describe "hwaro tool unused-assets" do
       status.success?.should be_true
     end
   end
+
+  it "deletes unused files under --delete --force --json" do
+    with_initialized_project do |project_dir|
+      orphan = File.join(project_dir, "static", "orphan.png")
+      File.write(orphan, "x")
+
+      status, _, _ = run_hwaro(["tool", "unused-assets", "--delete", "--force", "--json"], chdir: project_dir)
+
+      status.success?.should be_true
+      File.exists?(orphan).should be_false
+    end
+  end
 end
 
 describe "hwaro tool check-links" do

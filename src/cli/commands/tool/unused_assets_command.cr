@@ -25,6 +25,7 @@ module Hwaro
             CONTENT_DIR_FLAG,
             FlagInfo.new(short: "-s", long: "--static-dir", description: "Static files directory (default: static)", takes_value: true, value_hint: "DIR"),
             FlagInfo.new(short: nil, long: "--delete", description: "Delete unused files (with confirmation)"),
+            FlagInfo.new(short: "-f", long: "--force", description: "Skip confirmation prompt when deleting"),
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -43,6 +44,7 @@ module Hwaro
             content_dir = "content"
             static_dir = "static"
             delete_mode = false
+            force = false
             json_output = false
 
             OptionParser.parse(args) do |parser|
@@ -50,6 +52,7 @@ module Hwaro
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               parser.on("-s DIR", "--static-dir DIR", "Static files directory (default: static)") { |v| static_dir = v }
               parser.on("--delete", "Delete unused files (with confirmation)") { delete_mode = true }
+              parser.on("-f", "--force", "Skip confirmation prompt when deleting") { force = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
@@ -61,6 +64,13 @@ module Hwaro
             result = service.run
 
             if json_output
+              # Honour --delete in JSON mode too: previously the early return
+              # printed the report and skipped deletion entirely, so
+              # `--delete --json` was a silent no-op. Deletion in JSON mode
+              # requires --force, since there is no interactive prompt.
+              if delete_mode && force && !result.unused_files.empty?
+                service.delete_unused(result.unused_files)
+              end
               puts result.to_json
               return
             end
@@ -84,9 +94,13 @@ module Hwaro
             Logger.info ""
 
             if delete_mode
-              print "Delete #{result.unused_count} unused file(s)? [y/N] "
-              answer = gets
-              if answer && answer.strip.downcase == "y"
+              confirmed = force
+              unless confirmed
+                print "Delete #{result.unused_count} unused file(s)? [y/N] "
+                answer = gets
+                confirmed = !answer.nil? && answer.strip.downcase == "y"
+              end
+              if confirmed
                 service.delete_unused(result.unused_files)
                 Logger.success "Deleted #{result.unused_count} file(s)"
               else
