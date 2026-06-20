@@ -194,7 +194,16 @@ module Hwaro
       end
 
       # Collect assets from page directory
-      def collect_assets(content_dir : String) : Array(String)
+      #
+      # When `content_files` is configured (`[content.files]` with
+      # `allow_extensions`), co-located bundle assets are filtered through the
+      # SAME allow/disallow rules as standalone content files. Without this, a
+      # root `_index.md` turns the whole `content/` tree into one recursive
+      # bundle and republishes arbitrary non-markdown files (e.g.
+      # `content/public/robots.txt`) to the output regardless of
+      # `allow_extensions`. When `[content.files]` is not configured, every
+      # non-markdown file is collected (unchanged behavior).
+      def collect_assets(content_dir : String, content_files : ContentFilesConfig? = nil) : Array(String)
         # Assets are only collected for page bundles (directories)
         # This usually means the page is an index.md (either _index.md or index.md)
         return [] of String unless @is_index
@@ -204,12 +213,16 @@ module Hwaro
 
         return [] of String unless Dir.exists?(page_dir)
 
-        @assets = Dir.glob(File.join(page_dir, "**", "*")).select do |file|
-          File.file?(file) &&
-            !file.ends_with?(".md") &&
-            !file.ends_with?(".markdown")
-        end.map do |file|
-          Path[file].relative_to(content_dir).to_s
+        @assets = Dir.glob(File.join(page_dir, "**", "*")).compact_map do |file|
+          next unless File.file?(file)
+          next if file.ends_with?(".md") || file.ends_with?(".markdown")
+
+          relative = Path[file].relative_to(content_dir).to_s
+          # Honor [content.files] allow/disallow rules when configured so the
+          # bundle path can't bypass the user's publishing allowlist.
+          next if content_files && content_files.enabled? && !content_files.publish?(relative)
+
+          relative
         end
 
         @assets

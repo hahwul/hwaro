@@ -12,7 +12,12 @@ module Hwaro
         include Core::Lifecycle::Hookable
 
         def register_hooks(manager : Core::Lifecycle::Manager)
-          manager.on(Core::Lifecycle::HookPoint::BeforeGenerate, priority: 40, name: "taxonomy:generate") do |ctx|
+          # Priority 60 so this runs BEFORE seo:generate / pwa:generate (both
+          # priority 50). Hooks run highest-priority-first, so the taxonomy
+          # pages must be generated and registered here before the SEO
+          # generators read ctx.all_pages — otherwise the sitemap/feeds are
+          # written without them and taxonomy.sitemap/feed have no effect.
+          manager.on(Core::Lifecycle::HookPoint::BeforeGenerate, priority: 60, name: "taxonomy:generate") do |ctx|
             generate_taxonomies(ctx)
             Core::Lifecycle::HookResult::Continue
           end
@@ -22,7 +27,15 @@ module Hwaro
           site = ctx.site
           return unless site
 
-          Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose)
+          sections = Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose)
+          return if sections.empty?
+
+          # Register the generated taxonomy pages so the SEO generators include
+          # them. Reassign through the setter so the all_pages cache is
+          # invalidated. This intentionally augments ctx.sections only, leaving
+          # site.sections (and thus the PWA precache, which reads the Site)
+          # untouched.
+          ctx.sections = ctx.sections + sections
         end
       end
     end

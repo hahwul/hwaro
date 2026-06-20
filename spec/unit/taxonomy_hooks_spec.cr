@@ -17,7 +17,10 @@ describe Hwaro::Content::Hooks::TaxonomyHooks do
 
       taxonomy_hook = hooks.find { |h| h.name == "taxonomy:generate" }
       taxonomy_hook.should_not be_nil
-      taxonomy_hook.not_nil!.priority.should eq(40)
+      # Priority 60 so it runs before seo:generate / pwa:generate (priority 50)
+      # and the generated taxonomy pages are registered before the SEO
+      # generators read ctx.all_pages.
+      taxonomy_hook.not_nil!.priority.should eq(60)
     end
   end
 
@@ -57,6 +60,18 @@ describe Hwaro::Content::Hooks::TaxonomyHooks do
         # Verify output
         File.exists?(File.join(output_dir, "tags", "index.html")).should be_true
         File.exists?(File.join(output_dir, "tags", "crystal", "index.html")).should be_true
+
+        # Regression (#2): generated taxonomy pages must be registered into
+        # ctx.sections so the SEO generators (sitemap/feeds/search/llms) can
+        # see them. Without this, taxonomy.sitemap/feed had no effect.
+        tax_sections = ctx.sections.select(&.generated)
+        tax_urls = tax_sections.map(&.url)
+        tax_urls.should contain("/tags/")
+        tax_urls.should contain("/tags/crystal/")
+        # in_sitemap reflects taxonomy.sitemap (defaults to true), so these
+        # pages will be picked up by the sitemap generator.
+        ctx.sections.find! { |s| s.url == "/tags/" }.in_sitemap.should be_true
+        ctx.all_pages.map(&.url).should contain("/tags/crystal/")
       end
     end
 

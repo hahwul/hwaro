@@ -520,15 +520,20 @@ module Hwaro
           cache.save if options.cache
 
           # --- 5. Regenerate taxonomy index/term pages ---
-          Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          # Merge the generated taxonomy pages into the page set the SEO
+          # generators read so taxonomy.sitemap/feed take effect on incremental
+          # rebuilds too (mirrors the lifecycle taxonomy hook). `all_pages` is
+          # left intact for the rebuild summary below.
+          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
           seo_tasks = [
-            -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Sitemap.generate(seo_pages, site, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(seo_pages, site.config, output_dir, verbose); nil },
             -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil },
-            -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose); nil },
-            -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Llms.generate(site.config, seo_pages, output_dir, verbose); nil },
+            -> { Content::Search.generate(seo_pages, site.config, output_dir, verbose); nil },
           ] of Proc(Nil)
           ParallelHelper.execute(seo_tasks, options.parallel)
 
@@ -823,7 +828,12 @@ module Hwaro
           # only cover the priority subset. Per-taxonomy RSS feeds and tag
           # listing pages pull from `page.content` too, so they have to be
           # regenerated for the same reason — matches `run_rerender`.
-          all_pages = (site.pages + site.sections).as(Array(Models::Page))
+          # Regenerate taxonomy pages BEFORE the SEO surfaces and merge them
+          # into the page set. Previously taxonomy generation ran after the
+          # sitemap, so its pages never appeared in it (taxonomy.sitemap/feed
+          # had no effect on this deferred pass).
+          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          all_pages = (site.pages + site.sections + taxonomy_sections).as(Array(Models::Page))
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
@@ -831,7 +841,6 @@ module Hwaro
             -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
           ] of Proc(Nil)
           ParallelHelper.execute(seo_tasks, options.parallel)
-          Content::Taxonomies.generate(site, output_dir, templates, verbose)
 
           # Persist cache updates from the deferred pass. The initial build
           # already saved once; without this second save, killing the server
