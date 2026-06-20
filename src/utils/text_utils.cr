@@ -164,12 +164,26 @@ module Hwaro
         false
       end
 
+      # Raw-text HTML elements whose *content* is code, not display text.
+      # `<style>`/`<script>` bodies must be dropped along with their tags;
+      # otherwise the CSS/JS source survives tag-stripping and pollutes
+      # search indexes, feed summaries, and excerpts (a page with an inline
+      # `<style>` gallery block had its whole search entry replaced by CSS).
+      # `[\s\S]` matches across newlines (CSS/JS span multiple lines) without
+      # relying on a dotall flag; `\1` ties the close tag to the open tag.
+      # A self-closing or unterminated tag won't match and is left to the
+      # tag stripper below.
+      RAW_TEXT_ELEMENT = /<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
+
       # Strip HTML tags from text (single-pass)
       #
       # Example:
       #   strip_html("<p>Hello <b>World</b></p>")  # => "Hello World"
       #
       def strip_html(text : String) : String
+        # Remove raw-text element bodies (<style>/<script>) before stripping
+        # tags so their CSS/JS contents don't leak through as "text".
+        text = text.gsub(RAW_TEXT_ELEMENT, " ")
         String.build(text.bytesize) do |io|
           in_tag = false
           last_was_space = true # suppress leading space

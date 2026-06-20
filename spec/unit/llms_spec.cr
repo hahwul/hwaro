@@ -153,6 +153,55 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
+    # Regression: page-bundle leaves (`foo/bar/index.md`) are `Models::Page`
+    # with `is_index == true`, indistinguishable from a section `_index.md`
+    # by `is_index` alone. The listing filter keyed off `is_index`, so on a
+    # site built entirely from page bundles (the dominant Hugo/Zola layout)
+    # every content page was dropped and llms.txt listed only the home page.
+    # Distinguish by type (`Models::Section`) instead.
+    it "lists page-bundle leaves and folds only section indexes into headings" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "Bundles"
+      config.base_url = "https://example.com"
+
+      home = Hwaro::Models::Section.new("_index.md")
+      home.title = "Home"
+      home.url = "/"
+      home.section = ""
+      home.is_index = true
+
+      blog_idx = Hwaro::Models::Section.new("blog/_index.md")
+      blog_idx.title = "Blog"
+      blog_idx.url = "/blog/"
+      blog_idx.section = "blog"
+      blog_idx.is_index = true
+
+      # page-bundle leaf: a real content page, NOT a section
+      post = Hwaro::Models::Page.new("blog/hello-world/index.md")
+      post.title = "Hello World"
+      post.url = "/blog/hello-world/"
+      post.section = "blog"
+      post.is_index = true
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [home, blog_idx, post], output_dir)
+
+        content = File.read(File.join(output_dir, "llms.txt"))
+        # Section heading comes from the section's _index.md, not the leaf.
+        content.should contain("## Blog\n")
+        content.should_not contain("## Hello World")
+        # The page-bundle leaf is listed (this is the regression).
+        content.should contain("- [Hello World](https://example.com/blog/hello-world/)")
+        # The section index itself is folded into the heading, not listed.
+        content.should_not contain("- [Blog](https://example.com/blog/)")
+        # The root _index.md (a Section with empty section) stays as the home
+        # page under "Pages".
+        content.should contain("## Pages\n")
+        content.should contain("- [Home](https://example.com/)")
+      end
+    end
+
     it "skips drafts, hidden, and generated pages from the index" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true

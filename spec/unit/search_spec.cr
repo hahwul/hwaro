@@ -62,6 +62,37 @@ describe Hwaro::Content::Search do
       end
     end
 
+    # Regression: a section index with `render = false` emits no HTML, so a
+    # search hit pointing at its URL 404s. The search index must apply the
+    # same `render` filter that sitemap.cr / feeds.cr / llms.cr already do.
+    it "excludes render=false pages from search index" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      rendered = Hwaro::Models::Page.new("guide/intro.md")
+      rendered.title = "Intro"
+      rendered.url = "/guide/intro/"
+      rendered.draft = false
+      rendered.raw_content = "Content"
+
+      not_rendered = Hwaro::Models::Page.new("guide/_index.md")
+      not_rendered.title = "Guide"
+      not_rendered.url = "/guide/"
+      not_rendered.draft = false
+      not_rendered.render = false
+      not_rendered.raw_content = "Section container"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([rendered, not_rendered], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/guide/intro/")
+        content.should_not contain("\"/guide/\"")
+        content.should_not contain("Guide")
+      end
+    end
+
     it "excludes pages matching exclude patterns" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true
