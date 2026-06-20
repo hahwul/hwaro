@@ -51,6 +51,38 @@ module Hwaro
           "/usr/share/fonts/google-noto/NotoSans-Bold.ttf",
         ]
 
+        # CJK-capable system fonts. A title/description containing Hangul, kana,
+        # or Han ideographs renders as blank "tofu" boxes in the Latin-only
+        # fonts above; these cover CJK *and* Latin, so swapping the whole font
+        # to one of these renders mixed "Noir v1.0 — 한국어" lines correctly.
+        # Ordered by coverage breadth, then likelihood of being installed.
+        CJK_FONT_SEARCH_PATHS = [
+          # macOS
+          "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+          "/Library/Fonts/Arial Unicode.ttf",
+          "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+          "/System/Library/Fonts/PingFang.ttc",
+          "/System/Library/Fonts/Hiragino Sans GB.ttc",
+          # Linux (Noto CJK — common package layouts)
+          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+          "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+        ]
+
+        # First installed CJK-capable font, or nil if none is available.
+        def self.find_cjk_font : String?
+          CJK_FONT_SEARCH_PATHS.find { |path| File.exists?(path) }
+        end
+
+        # True if the font defines a glyph for `codepoint` (delegates to stb's
+        # glyph lookup). Used to verify CJK coverage.
+        def self.font_has_glyph?(info : LibStb::HwaroFontInfo, codepoint : Int32) : Bool
+          LibStb.hwaro_font_has_glyph(info, codepoint) != 0
+        end
+
         # Try to find a system font, returns file path or nil
         def self.find_system_font(bold : Bool = false) : String?
           paths = bold ? BOLD_FONT_SEARCH_PATHS : FONT_SEARCH_PATHS
@@ -173,8 +205,8 @@ module Hwaro
         # Priority: custom font_path > system fonts > bundled DejaVu Sans Bold.
         # Results are memoized so repeated calls (fast-start priority + deferred passes,
         # or watch rebuilds) do not re-scan the filesystem or re-parse TTF data.
-        def self.load_fonts(custom_font_path : String? = nil) : FontContext?
-          key = custom_font_path || "system"
+        def self.load_fonts(custom_font_path : String? = nil, prefer_cjk : Bool = false) : FontContext?
+          key = custom_font_path || (prefer_cjk ? "system-cjk" : "system")
 
           if @@cached_font_key == key && (cached = @@cached_font_ctx)
             return cached
@@ -193,7 +225,17 @@ module Hwaro
             end
           end
 
-          # 2) System fonts
+          # 2) CJK-capable system font, when the content needs it. A CJK font
+          #    covers Latin too, so the whole title renders (instead of "tofu"
+          #    boxes for the CJK characters). Skipped when a custom font is set.
+          if ctx.nil? && prefer_cjk && (cjk_path = find_cjk_font)
+            if result = load_font_file(cjk_path)
+              bold_info, bold_data = result
+              ctx = FontContext.new(bold_data, bold_info)
+            end
+          end
+
+          # 3) System fonts
           if ctx.nil?
             bold_path = find_system_font(bold: true)
             regular_path = find_system_font(bold: false)
@@ -216,7 +258,7 @@ module Hwaro
             end
           end
 
-          # 3) Bundled fallback (DejaVu Sans Bold)
+          # 4) Bundled fallback (DejaVu Sans Bold)
           if ctx.nil?
             if result = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
               bold_info, bold_data = result

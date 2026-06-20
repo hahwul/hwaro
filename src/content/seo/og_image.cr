@@ -239,20 +239,26 @@ module Hwaro
           cached_logo = nil
           cached_bg = nil
           if format == "png"
-            font_ctx = OgPngRenderer.load_fonts(ai.font_path)
+            # Does any page need CJK glyph coverage? If so, prefer a CJK-capable
+            # system font (which also covers Latin) so titles don't render as
+            # blank "tofu" boxes. A user-set font_path always takes precedence.
+            needs_cjk = ai.font_path.nil? &&
+                        pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+
+            font_ctx = OgPngRenderer.load_fonts(ai.font_path, prefer_cjk: needs_cjk)
             png_available = !font_ctx.nil?
             unless png_available
               Logger.warn "  PNG format requested but font initialization failed. Falling back to SVG."
             end
 
-            # The bundled/system fallback fonts cover only Latin scripts. Warn
-            # once if any page has CJK text but no CJK-capable font is set, since
-            # those titles would otherwise render as blank "tofu" boxes.
-            if png_available && !@@cjk_font_warning_shown && ai.font_path.nil? &&
-               pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+            # Warn only when CJK text is present but no CJK-capable font could be
+            # found on the system (and the user set no font_path) — i.e. when we
+            # genuinely can't avoid the blank "tofu" boxes.
+            if png_available && needs_cjk && !@@cjk_font_warning_shown &&
+               OgPngRenderer.find_cjk_font.nil?
               @@cjk_font_warning_shown = true
               Logger.warn "  OG images: page titles/descriptions contain CJK characters, " \
-                          "but the bundled font covers only Latin scripts — they will render " \
+                          "but no CJK-capable system font was found — they will render " \
                           "as blank boxes. Set [og.auto_image].font_path to a CJK-capable font " \
                           "(e.g. Noto Sans CJK)."
             end

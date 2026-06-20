@@ -59,6 +59,35 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts("/nonexistent/font.ttf")
       ctx.should_not be_nil
     end
+
+    it "returns a FontContext when prefer_cjk is set" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts(nil, prefer_cjk: true)
+      ctx.should_not be_nil
+    end
+
+    # Regression (#8): CJK titles rendered as blank "tofu" boxes because the
+    # font search list was Latin-only. When a CJK-capable system font exists,
+    # prefer_cjk must load it so Hangul/Han/kana glyphs are available.
+    it "loads a CJK-capable font that covers Hangul when one is installed" do
+      cjk_path = Hwaro::Content::Seo::OgPngRenderer.find_cjk_font
+      next if cjk_path.nil? # no CJK font on this machine (e.g. minimal CI) — skip
+
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts(nil, prefer_cjk: true)
+      ctx.should_not be_nil
+      # U+D55C '한' (Hangul) must resolve to a real glyph in the loaded font.
+      Hwaro::Content::Seo::OgPngRenderer.font_has_glyph?(ctx.not_nil!.bold_info, 0xD55C).should be_true
+    end
+  end
+
+  describe ".find_cjk_font" do
+    it "returns an existing font path or nil" do
+      result = Hwaro::Content::Seo::OgPngRenderer.find_cjk_font
+      if result
+        File.exists?(result).should be_true
+      else
+        result.should be_nil
+      end
+    end
   end
 
   describe ".render_png" do

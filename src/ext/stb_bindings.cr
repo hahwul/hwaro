@@ -35,6 +35,7 @@ lib LibStb
   fun hwaro_font_alloc : HwaroFontInfo
   fun hwaro_font_free(info : HwaroFontInfo)
   fun hwaro_font_init(info : HwaroFontInfo, data : UInt8*, offset : LibC::Int) : LibC::Int
+  fun hwaro_font_has_glyph(info : HwaroFontInfo, codepoint : LibC::Int) : LibC::Int
   fun hwaro_font_scale_for_pixel_height(info : HwaroFontInfo, pixels : LibC::Float) : LibC::Float
   fun hwaro_font_get_vmetrics(info : HwaroFontInfo, ascent : LibC::Int*, descent : LibC::Int*, line_gap : LibC::Int*)
   fun hwaro_font_get_codepoint_hmetrics(info : HwaroFontInfo, codepoint : LibC::Int, advance_width : LibC::Int*, left_side_bearing : LibC::Int*)
