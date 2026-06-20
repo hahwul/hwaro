@@ -169,4 +169,29 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       ).should eq %(<a href="/a/b/guide/intro/">Intro</a>)
     end
   end
+
+  describe ".absolutize_links" do
+    it "absolutizes document-relative and root-relative links against the page URL" do
+      html = %(<a href="../quick-start/">q</a> <img src="/img/a.png"/> <a href="./sub/">s</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(
+        html, "https://h.com/guide/config/"
+      )
+      result.should contain(%(href="https://h.com/guide/quick-start/"))
+      result.should contain(%(src="https://h.com/img/a.png"))
+      result.should contain(%(href="https://h.com/guide/config/sub/"))
+    end
+
+    it "leaves absolute, protocol-relative, scheme, and anchor links untouched" do
+      html = %(<a href="https://ext.com/x">e</a> <a href="//cdn.com/y">c</a> <a href="mailto:a@b.com">m</a> <a href="#sec">s</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(
+        html, "https://h.com/p/"
+      )
+      result.should eq(html)
+    end
+
+    it "is a no-op when the page URL has no host (empty base_url deploy)" do
+      html = %(<a href="../x/">x</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "/p/").should eq(html)
+    end
+  end
 end

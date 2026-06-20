@@ -15,6 +15,35 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    # Regression (#7): per-taxonomy feeds (feed = true) must still be emitted
+    # when base_url is empty — like the main/section feeds, which emit with
+    # relative URLs — instead of being silently dropped.
+    it "emits per-taxonomy feeds even when base_url is empty" do
+      config = Hwaro::Models::Config.new
+      config.base_url = ""
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+
+      site = Hwaro::Models::Site.new(config)
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/blog/post/"
+      page.tags = ["crystal"]
+      page.draft = false
+      page.generated = false
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        File.exists?(File.join(output_dir, "tags", "crystal", "rss.xml")).should be_true
+      end
+    end
+
     it "builds taxonomy index from pages" do
       config = Hwaro::Models::Config.new
       taxonomy_config = Hwaro::Models::TaxonomyConfig.new("tags")

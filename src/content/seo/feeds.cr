@@ -191,8 +191,25 @@ module Hwaro
         # points at the right page and carries a unique IRI (RFC 4287).
         private def self.feed_home_url(config : Models::Config, base_path : String) : String
           base_url = config.base_url.rstrip('/')
-          return base_url if base_path.empty?
+          # End with "/" so the channel <link> / Atom <id> match the homepage
+          # canonical (base_url + "/") and the per-language branch below. When
+          # base_url is empty this yields "/" rather than an empty (invalid)
+          # <link> element.
+          return "#{base_url}/" if base_path.empty?
           Utils::TextUtils.encode_url_path("#{base_url}/#{base_path.strip("/")}/")
+        end
+
+        # Absolutize feed-body links so RSS <content:encoded> / Atom <content>
+        # render correctly in readers (which consume the HTML out of the page's
+        # URL context). Falls back to the subpath-prefix pass when base_url is
+        # empty (no host to absolutize against).
+        private def self.absolutize_feed_html(html : String, page : Models::Page, config : Models::Config) : String
+          base_url = config.base_url.rstrip('/')
+          if base_url.empty?
+            Processors::InternalLinkResolver.prefix_root_relative_links(html, config.base_url)
+          else
+            Processors::InternalLinkResolver.absolutize_links(html, page_full_url(page, base_url))
+          end
         end
 
         # Build the full absolute URL for a page.
@@ -426,12 +443,12 @@ module Hwaro
         # (gh#526).
         private def self.full_content_for_feed(page : Models::Page, config : Models::Config) : String
           html = page.content.empty? ? Processor::Markdown.render_body_cached(page.raw_content) : page.content
-          # Defensive: on an incremental (--cache) build the render phase only
-          # rewrites base_path into page.content for pages it re-renders, so
-          # cached pages keep root-relative links. Re-apply here (idempotent —
-          # already-prefixed links are skipped) so the feed <content:encoded>
-          # stays subpath-correct regardless of cache state.
-          Processors::InternalLinkResolver.prefix_root_relative_links(html, config.base_url)
+          # Absolutize body links so <content:encoded> resolves out of page
+          # context (root-relative AND document-relative). On an incremental
+          # (--cache) build the render phase only rewrites links for pages it
+          # re-renders; doing it here keeps the feed correct regardless of
+          # cache state.
+          absolutize_feed_html(html, page, config)
         end
 
         # Collect taxonomy terms that should appear as `<category>`
@@ -497,11 +514,10 @@ module Hwaro
               text_content # Return plain text even if not truncated for consistency
             end
           else
-            # Full HTML (Atom <content type="html">). Apply the subpath prefix
-            # defensively (idempotent) so cached pages — whose page.content the
-            # render phase never rewrote — still emit subpath-correct links,
-            # matching full_content_for_feed on the RSS path.
-            Processors::InternalLinkResolver.prefix_root_relative_links(html_content, config.base_url)
+            # Full HTML (Atom <content type="html">). Absolutize body links so
+            # they resolve out of page context, matching full_content_for_feed
+            # on the RSS path.
+            absolutize_feed_html(html_content, page, config)
           end
         end
       end
