@@ -286,5 +286,32 @@ describe Hwaro::Services::Exporters::HugoExporter do
         result.skipped_count.should eq(1)
       end
     end
+
+    it "quotes a frontmatter key containing a space so the TOML stays parseable" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        # A space-containing key is valid in YAML but bare-invalid in TOML;
+        # it must be emitted as a quoted key, not `my key = "value"`.
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\n\"my key\": value\n---\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(
+          target_type: "hugo",
+          content_dir: content_dir,
+          output_dir: output_dir,
+        )
+        result = exporter.run(options)
+        result.success.should be_true
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        fm = content.split("+++")[1]
+        parsed = TOML.parse(fm)
+        parsed["my key"].as_s.should eq("value")
+        fm.should contain(%("my key" = "value"))
+      end
+    end
   end
 end

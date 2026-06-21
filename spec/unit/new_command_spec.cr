@@ -218,6 +218,40 @@ describe Hwaro::CLI::Commands::NewCommand do
       end
     end
 
+    it "rejects `..`-escaping --section with HWARO_E_USAGE" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
+          FileUtils.mkdir_p("content")
+          # Benign path arg isolates the --section guard (the section
+          # validate_and_normalize_path! block).
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["post.md", "--section", "../escape"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+
+          # `--section ..` must not write a file outside content/.
+          File.exists?(File.join(dir, "escape", "post.md")).should be_false
+          File.exists?("escape/post.md").should be_false
+        end
+      end
+    end
+
+    it "sanitizes a URL-unsafe --section to a safe on-disk directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
+          FileUtils.mkdir_p("content")
+          Hwaro::CLI::Commands::NewCommand.new.run(["post.md", "--section", "my section!"])
+
+          # The space/`!` are rewritten before the section becomes a directory,
+          # so the file lands under a sanitized dir, not a literal "my section!".
+          Dir.exists?("content/my section!").should be_false
+          File.exists?("content/my-section/post.md").should be_true
+        end
+      end
+    end
+
     it "normalizes double slashes in the input path" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

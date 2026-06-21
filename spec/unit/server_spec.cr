@@ -16,6 +16,10 @@ module Hwaro
         ready_signal_line(host, port)
       end
 
+      def test_ready_signal_json(host : String, port : Int32) : String
+        ready_signal_json(host, port)
+      end
+
       def test_run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
         run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
       end
@@ -55,6 +59,25 @@ class DummyHandler
 
   def call(context)
     @called = true
+  end
+end
+
+# Downstream handler that writes a fixed Content-Type so post-processing
+# handlers (CharsetHandler, CustomHeadersHandler) can be exercised against a
+# realistic response. When @content_type is nil it sets no Content-Type at all.
+class ContentTypeHandler
+  include HTTP::Handler
+
+  property called : Bool = false
+
+  def initialize(@content_type : String?)
+  end
+
+  def call(context)
+    @called = true
+    if ct = @content_type
+      context.response.headers["Content-Type"] = ct
+    end
   end
 end
 
@@ -100,6 +123,31 @@ describe Hwaro::Services::Server do
       server = Hwaro::Services::Server.new
       line = server.test_ready_signal_line("0.0.0.0", 8080)
       line.should contain("url=http://0.0.0.0:8080")
+    end
+  end
+
+  describe "#ready_signal_json" do
+    it "emits the documented {event,url,host,port,pid} schema" do
+      server = Hwaro::Services::Server.new
+      parsed = JSON.parse(server.test_ready_signal_json("127.0.0.1", 3000))
+      parsed["event"].as_s.should eq("ready")
+      parsed["url"].as_s.should eq("http://127.0.0.1:3000")
+      parsed["host"].as_s.should eq("127.0.0.1")
+      parsed["port"].as_i.should eq(3000)
+      parsed["pid"].as_i.should eq(Process.pid)
+    end
+
+    it "emits port as a JSON integer, not a string" do
+      server = Hwaro::Services::Server.new
+      parsed = JSON.parse(server.test_ready_signal_json("0.0.0.0", 8080))
+      parsed["port"].as_i?.should eq(8080)
+      parsed["port"].as_s?.should be_nil
+    end
+
+    it "is a single line with no embedded newline" do
+      server = Hwaro::Services::Server.new
+      json = server.test_ready_signal_json("localhost", 4567)
+      json.includes?('\n').should be_false
     end
   end
 end
@@ -340,6 +388,111 @@ describe Hwaro::Services::DevCorsHandler do
     response.headers["Access-Control-Allow-Origin"]?.should be_nil
     response.headers["Access-Control-Allow-Methods"]?.should be_nil
     dummy.called.should be_false
+  end
+
+  it "reflects a bracketed loopback IPv6 Origin (strips brackets before membership check)" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(cors_request("GET", "http://[::1]:3000"), response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Origin"].should eq("http://[::1]:3000")
+    response.headers["Vary"].should eq("Origin")
+    dummy.called.should be_true
+  end
+
+  it "does NOT grant CORS to a non-loopback bracketed IPv6 Origin" do
+    handler = Hwaro::Services::DevCorsHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(cors_request("GET", "http://[2001:db8::1]:3000"), response)
+
+    handler.call(context)
+
+    response.headers["Access-Control-Allow-Origin"]?.should be_nil
+    dummy.called.should be_true
+  end
+end
+
+private def run_charset(content_type : String?)
+  handler = Hwaro::Services::CharsetHandler.new
+  handler.next = ContentTypeHandler.new(content_type)
+
+  io = IO::Memory.new
+  response = HTTP::Server::Response.new(io)
+  context = HTTP::Server::Context.new(HTTP::Request.new("GET", "/"), response)
+
+  handler.call(context)
+  response
+end
+
+describe Hwaro::Services::CharsetHandler do
+  it "appends charset to application/json" do
+    run_charset("application/json").headers["Content-Type"].should eq("application/json; charset=utf-8")
+  end
+
+  it "appends charset to feed and SVG text-shaped types" do
+    run_charset("application/rss+xml").headers["Content-Type"].should eq("application/rss+xml; charset=utf-8")
+    run_charset("image/svg+xml").headers["Content-Type"].should eq("image/svg+xml; charset=utf-8")
+  end
+
+  it "leaves binary types untouched (no charset)" do
+    run_charset("image/png").headers["Content-Type"].should eq("image/png")
+    run_charset("font/woff2").headers["Content-Type"].should eq("font/woff2")
+  end
+
+  it "is idempotent when a charset already exists (no double-append)" do
+    run_charset("text/html; charset=iso-8859-1").headers["Content-Type"].should eq("text/html; charset=iso-8859-1")
+  end
+
+  it "is a no-op when downstream sets no Content-Type" do
+    response = run_charset(nil)
+    response.headers["Content-Type"]?.should be_nil
+  end
+end
+
+describe Hwaro::Services::CustomHeadersHandler do
+  it "applies user headers and overrides built-ins set downstream" do
+    handler = Hwaro::Services::CustomHeadersHandler.new({
+      "X-Frame-Options" => "DENY",
+      "Content-Type"    => "text/custom",
+    })
+    handler.next = ContentTypeHandler.new("text/html")
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(HTTP::Request.new("GET", "/"), response)
+
+    handler.call(context)
+
+    response.headers["X-Frame-Options"].should eq("DENY")
+    # User value wins over the Content-Type the downstream handler set.
+    response.headers["Content-Type"].should eq("text/custom")
+  end
+
+  it "drops a header whose value contains control characters (defense-in-depth)" do
+    handler = Hwaro::Services::CustomHeadersHandler.new({
+      "X-Frame-Options" => "DENY",
+      "X-Evil"          => "a\r\nInjected: 1",
+    })
+    handler.next = ContentTypeHandler.new("text/html")
+
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(HTTP::Request.new("GET", "/"), response)
+
+    handler.call(context)
+
+    response.headers["X-Frame-Options"].should eq("DENY")
+    response.headers["X-Evil"]?.should be_nil
   end
 end
 
@@ -993,6 +1146,19 @@ describe Hwaro::Services::ChangeSet do
         config_changed: true,
       )
       cs.description.should eq("1 content, 1 template, 1 added, config file(s)")
+    end
+
+    it "describes content-asset and removed buckets" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: ["content/old.md"],
+        config_changed: false,
+        modified_content_files: ["content/a/cover.jpg"],
+      )
+      cs.description.should eq("1 content-asset, 1 removed file(s)")
     end
   end
 

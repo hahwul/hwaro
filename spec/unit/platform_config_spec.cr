@@ -104,6 +104,48 @@ describe Hwaro::Services::PlatformConfig do
 
         result.should contain("name = \"my-cool-blog\"")
       end
+
+      # A symbol-only or empty title sanitizes to an empty string; without the
+      # fallback wrangler emits `name = ""` which Cloudflare rejects.
+      it "falls back to 'my-site' when the title sanitizes to empty" do
+        config = Hwaro::Models::Config.new
+        config.title = "!!!"
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("cloudflare")
+
+        result.should contain("name = \"my-site\"")
+        result.should_not contain("name = \"\"")
+      end
+
+      it "collapses symbol runs and strips leading/trailing dashes from the project name" do
+        config = Hwaro::Models::Config.new
+        config.title = "--Hi  There!!--"
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("cloudflare")
+
+        result.should contain("name = \"hi-there\"")
+      end
+
+      # _redirects is space-delimited; an alias with whitespace or a quote would
+      # split into the wrong number of fields and corrupt the file, so such
+      # entries are skipped while well-formed ones are kept.
+      it "skips redirect aliases containing whitespace or quotes" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - /old url/\n  - \"/qu\\\"ote/\"\n  - /clean/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("cloudflare")
+
+            # Clean alias is emitted as a `# from to 301` comment line.
+            result.should contain("# /clean/ /posts/p/ 301")
+            result.should_not contain("/old url/")
+            result.should_not contain("/qu\"ote/")
+          end
+        end
+      end
     end
 
     describe "aliases" do
@@ -232,6 +274,35 @@ describe Hwaro::Services::PlatformConfig do
             vercel["redirects"][0]["source"].as_s.should eq("/myrepo/old/")
             vercel["redirects"][0]["destination"].as_s.should eq("/myrepo/moved/")
             vercel["headers"][0]["source"].as_s.should eq("/myrepo/assets/(.*)")
+          end
+        end
+      end
+
+      # An alias is arbitrary user frontmatter; a quote or backslash must be
+      # TOML-escaped or the emitted netlify.toml is unparseable, breaking the
+      # user's deploy. Exercise both gsub branches (quote and backslash).
+      it "escapes TOML-special characters in netlify redirect from/to so the block stays parseable" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            # YAML double-quoted scalars inject a literal quote and backslash
+            # into the alias values.
+            File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - \"/we\\\"ird/\"\n  - \"/back\\\\slash/\"\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            # The quote is escaped as \" and the backslash as \\.
+            result.should contain("from = \"/we\\\"ird/\"")
+            result.should contain("from = \"/back\\\\slash/\"")
+
+            # The emitted netlify.toml must parse as valid TOML, and the
+            # escaped values must round-trip back to the original aliases.
+            parsed = TOML.parse(result)
+            froms = parsed["redirects"].as_a.map(&.["from"].as_s)
+            froms.should contain("/we\"ird/")
+            froms.should contain("/back\\slash/")
           end
         end
       end

@@ -104,6 +104,29 @@ describe Hwaro::CLI::Runner do
         Hwaro::CLI::Runner.json_mode = previous_json
       end
     end
+
+    # The JSON branch of emit_hwaro_error writes to the hardcoded STDOUT
+    # constant (not the io: parameter), so it cannot be captured via an
+    # IO::Memory sink in-process. Drive the built binary instead: an unknown
+    # command plus --json triggers the ARGV.includes?("--json") branch (no
+    # parser has run yet), so this also covers the ARGV-detection path.
+    it "emits the structured JSON payload to stdout under --json (ARGV detection)" do
+      bin = File.expand_path("../../bin/hwaro", __DIR__)
+      next unless File.exists?(bin) && File::Info.executable?(bin)
+
+      stdout_sink = IO::Memory.new
+      stderr_sink = IO::Memory.new
+      status = Process.run(bin, ["boguscmd", "--json"], output: stdout_sink, error: stderr_sink)
+
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      stdout = stdout_sink.to_s
+      # No human-form "Error [CODE]" line leaks to stdout under --json.
+      stdout.should_not contain("Error [")
+      parsed = JSON.parse(stdout)
+      parsed["status"].as_s.should eq("error")
+      parsed["error"]["code"].as_s.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      parsed["error"]["message"].as_s.should contain("unknown command")
+    end
   end
 
   describe ".print_help" do

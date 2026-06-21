@@ -396,6 +396,64 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    # A blank/slash-only path_prefix collapses amp_output_path onto the
+    # canonical path, which would overwrite every page with its AMP variant.
+    # The guard must skip generation, leaving canonical HTML untouched.
+    it "skips generation when path_prefix is slash-only to avoid clobbering canonical pages" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          path_prefix = "/"
+          TOML
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.url = "/posts/hello/"
+        page.section = "posts"
+        page.render = true
+
+        canonical_dir = File.join(dir, "posts", "hello")
+        FileUtils.mkdir_p(canonical_dir)
+        original = "<html><head></head><body><p>Hello World</p></body></html>"
+        canonical_path = File.join(canonical_dir, "index.html")
+        File.write(canonical_path, original)
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        # Canonical page is unchanged (not AMP-converted, not clobbered).
+        content = File.read(canonical_path)
+        content.should eq(original)
+        content.should_not contain("<html amp")
+      end
+    end
+
+    it "skips generation when path_prefix is empty to avoid clobbering canonical pages" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          path_prefix = ""
+          TOML
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.url = "/posts/hello/"
+        page.section = "posts"
+        page.render = true
+
+        canonical_dir = File.join(dir, "posts", "hello")
+        FileUtils.mkdir_p(canonical_dir)
+        original = "<html><head></head><body><p>Hello World</p></body></html>"
+        canonical_path = File.join(canonical_dir, "index.html")
+        File.write(canonical_path, original)
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        content = File.read(canonical_path)
+        content.should eq(original)
+        content.should_not contain("<html amp")
+      end
+    end
+
     it "skips draft pages" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)

@@ -434,3 +434,44 @@ describe "Edge Cases: Page with multiple aliases" do
     end
   end
 end
+
+# ---------------------------------------------------------------------------
+# 13. Duplicate output path / alias collision detection
+# ---------------------------------------------------------------------------
+describe "Edge Cases: Duplicate output path detection" do
+  it "warns when two pages resolve to the same URL (slug collision)" do
+    # Both pages live in the same directory and share slug 'dup', so both
+    # resolve to /posts/dup/ — one silently overwrites the other in render
+    # order. The render phase detects this and warns so users see the data loss.
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "posts/a.md" => "---\ntitle: A\nslug: dup\n---\nA",
+          "posts/b.md" => "---\ntitle: B\nslug: dup\n---\nB",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    log.should contain("Duplicate output path")
+  end
+
+  it "warns when an alias collides with an already-seen alias" do
+    # Two pages declare the same alias. The first page registers /shared/ as an
+    # alias; the second page's identical alias then collides with the
+    # already-seen alias path and is reported as 'Duplicate alias output path'.
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "one.md" => "---\ntitle: One\naliases:\n  - /shared/\n---\nOne",
+          "two.md" => "---\ntitle: Two\naliases:\n  - /shared/\n---\nTwo",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    log.should contain("Duplicate alias output path")
+  end
+end

@@ -110,6 +110,12 @@ describe "bugfix regressions" do
       Hwaro::Utils::TextUtils.escape_xml("a<b").should eq("a&lt;b") # slow path agrees
     end
 
+    it "drops a NUL while still escaping an ampersand on the same input" do
+      # NUL (0x00) is an XML-illegal C0 control: dropped on the slow path while
+      # the ampersand on the same string is still escaped.
+      Hwaro::Utils::TextUtils.escape_xml("a\u{0}&b").should eq("a&amp;b")
+    end
+
     it "still escapes the five XML special characters" do
       Hwaro::Utils::TextUtils.escape_xml("a & b < c > \"d\" 'e'").should eq("a &amp; b &lt; c &gt; &quot;d&quot; &apos;e&apos;")
     end

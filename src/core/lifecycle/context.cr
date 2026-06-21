@@ -125,11 +125,20 @@ module Hwaro
         end
 
         def get_bool(key : String, default : Bool = false) : Bool
-          @metadata[key]?.try(&.as?(Bool)) || default
+          # NOTE: `value || default` is wrong here — a legitimately stored
+          # `false` is falsy and would collapse to `default`, inverting the
+          # flag a previous hook set. Distinguish "absent / wrong type" (nil)
+          # from a stored `false`.
+          val = @metadata[key]?.try(&.as?(Bool))
+          val.nil? ? default : val
         end
 
         def get_int(key : String, default : Int32 = 0) : Int32
-          @metadata[key]?.try(&.as?(Int32)) || default
+          # Same nil-vs-stored-value distinction as get_bool. `0 || default`
+          # happens to work (0 is truthy in Crystal) but the explicit form
+          # keeps the two getters consistent and intent-revealing.
+          val = @metadata[key]?.try(&.as?(Int32))
+          val.nil? ? default : val
         end
       end
 

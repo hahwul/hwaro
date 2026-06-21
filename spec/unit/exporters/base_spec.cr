@@ -193,5 +193,26 @@ describe Hwaro::Services::Exporters::Base do
       )
       out.should eq("[a](/a) and [b](/b)")
     end
+
+    it "strips .md before an anchor fragment" do
+      out = TestExporter.new.test_rewrite_internal_links(
+        "see [x](@/guide/intro.md#setup) here"
+      )
+      out.should eq("see [x](/guide/intro#setup) here")
+    end
+
+    it "strips _index before an anchor fragment" do
+      out = TestExporter.new.test_rewrite_internal_links(
+        "[s](@/blog/_index.md#latest)"
+      )
+      out.should eq("[s](/blog/#latest)")
+    end
+
+    it "strips .md before a query string" do
+      out = TestExporter.new.test_rewrite_internal_links(
+        "[x](@/page.md?ref=home)"
+      )
+      out.should eq("[x](/page?ref=home)")
+    end
   end
 end

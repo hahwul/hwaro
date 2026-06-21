@@ -83,6 +83,72 @@ describe Hwaro::Content::I18n do
         translations.has_key?("ja").should be_false
       end
     end
+
+    # Resilience: a single syntactically broken i18n file must NOT abort the
+    # build. The rescue in load_translations logs a warning and continues with
+    # the remaining languages, so a typo in one translation file degrades
+    # gracefully (that language is skipped) instead of crashing the whole build.
+    it "skips a malformed TOML file with a warning and keeps valid languages" do
+      Dir.mktmpdir do |dir|
+        i18n_dir = File.join(dir, "i18n")
+        FileUtils.mkdir_p(i18n_dir)
+
+        File.write(File.join(i18n_dir, "en.toml"), <<-TOML)
+          greeting = "Hi"
+          TOML
+
+        File.write(File.join(i18n_dir, "ko.toml"), <<-TOML)
+          this = = broken
+          TOML
+
+        config = Hwaro::Models::Config.new
+        config.default_language = "en"
+        config.languages = {"ko" => Hwaro::Models::LanguageConfig.new("ko")}
+
+        translations = Hwaro::Content::I18n.load_translations(i18n_dir, config)
+
+        log = with_captured_log do
+          translations = Hwaro::Content::I18n.load_translations(i18n_dir, config)
+        end
+
+        log.should contain("Failed to parse i18n file")
+        translations.has_key?("en").should be_true
+        translations["en"]["greeting"].should eq("Hi")
+        translations.has_key?("ko").should be_false
+      end
+    end
+
+    # The Array branch of flatten_toml indexes list items as key.0, key.1, etc.
+    # List-valued i18n keys (e.g. nav menus) are a plausible multilingual
+    # pattern; a cast regression would silently drop them. Covers string items,
+    # the non-string scalar to_s fallback, and the recursive table-in-array case.
+    it "flattens TOML array values into indexed keys" do
+      Dir.mktmpdir do |dir|
+        i18n_dir = File.join(dir, "i18n")
+        FileUtils.mkdir_p(i18n_dir)
+
+        File.write(File.join(i18n_dir, "en.toml"), <<-TOML)
+          items = ["Home", "About"]
+          counts = [1, 2]
+          [[menu]]
+          label = "First"
+          [[menu]]
+          label = "Second"
+          TOML
+
+        config = Hwaro::Models::Config.new
+        config.default_language = "en"
+
+        translations = Hwaro::Content::I18n.load_translations(i18n_dir, config)
+
+        translations["en"]["items.0"].should eq("Home")
+        translations["en"]["items.1"].should eq("About")
+        translations["en"]["counts.0"].should eq("1")
+        translations["en"]["counts.1"].should eq("2")
+        translations["en"]["menu.0.label"].should eq("First")
+        translations["en"]["menu.1.label"].should eq("Second")
+      end
+    end
   end
 
   describe ".translate" do

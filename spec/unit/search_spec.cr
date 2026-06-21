@@ -157,6 +157,45 @@ describe Hwaro::Content::Search do
       end
     end
 
+    # Regression: the exclude match must respect the path-segment boundary. The
+    # `excluded + "/"` guard in search.cr means excluding "/blog" drops pages
+    # genuinely under /blog/ (and the exact "/blog") but must NOT strip a sibling
+    # like /blogroll/ that merely shares the prefix segment. Removing the
+    # trailing-slash boundary would silently drop legitimate pages.
+    it "does not exclude pages that merely share a prefix segment" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+      config.search.exclude = ["/blog"]
+
+      under = Hwaro::Models::Page.new("blog/post.md")
+      under.title = "Blog Post"
+      under.url = "/blog/post/"
+      under.draft = false
+      under.raw_content = "Content"
+
+      sibling = Hwaro::Models::Page.new("blogroll.md")
+      sibling.title = "Blogroll"
+      sibling.url = "/blogroll/"
+      sibling.draft = false
+      sibling.raw_content = "Content"
+
+      exact = Hwaro::Models::Page.new("blog.md")
+      exact.title = "Blog Index"
+      exact.url = "/blog"
+      exact.draft = false
+      exact.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([under, sibling, exact], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/blogroll/")
+        content.should_not contain("/blog/post/")
+        content.should_not contain("\"/blog\"")
+      end
+    end
+
     it "uses custom filename" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true

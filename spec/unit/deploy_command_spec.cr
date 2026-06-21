@@ -44,6 +44,18 @@ describe Hwaro::CLI::Commands::DeployCommand do
       options.max_deletes.should eq(-1)
     end
 
+    it "raises HwaroError(HWARO_E_USAGE) when --max-deletes is not an integer" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+
+      ["abc", "", "1.5", "10x"].each do |bad|
+        err = expect_raises(Hwaro::HwaroError) do
+          cmd.parse_options(["--max-deletes", bad])
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        err.message.to_s.should contain("Invalid --max-deletes")
+      end
+    end
+
     it "parses list targets" do
       cmd = Hwaro::CLI::Commands::DeployCommand.new
       _, list_targets, _ = cmd.parse_options(["--list-targets"])

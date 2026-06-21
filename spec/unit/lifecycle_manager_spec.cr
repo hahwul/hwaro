@@ -117,6 +117,21 @@ describe Hwaro::Core::Lifecycle::Manager do
       manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
       second_ran.should be_false
     end
+
+    it "re-raises a HwaroError unchanged instead of downgrading to Abort" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "classified-raiser") do |_|
+        raise Hwaro::HwaroError.new(Hwaro::Errors::HWARO_E_CONFIG, "bad config")
+      end
+
+      error = expect_raises(Hwaro::HwaroError) do
+        manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
+      end
+      error.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      error.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+    end
   end
 
   describe "#trigger" do
@@ -222,6 +237,25 @@ describe Hwaro::Core::Lifecycle::Manager do
       end
 
       result.should eq(Hwaro::Core::Lifecycle::HookResult::Abort)
+      after_ran.should be_false
+    end
+
+    it "re-raises a HwaroError from the action and does not run after hooks" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+      after_ran = false
+
+      manager.after(Hwaro::Core::Lifecycle::Phase::ParseContent, name: "after") do |_|
+        after_ran = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      error = expect_raises(Hwaro::HwaroError) do
+        manager.run_phase(Hwaro::Core::Lifecycle::Phase::ParseContent, ctx) do
+          raise Hwaro::HwaroError.new(Hwaro::Errors::HWARO_E_CONTENT, "boom")
+        end
+      end
+      error.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
       after_ran.should be_false
     end
 

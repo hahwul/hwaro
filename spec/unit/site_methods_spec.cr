@@ -230,6 +230,76 @@ describe Hwaro::Models::Site do
     end
   end
 
+  describe "#section_for" do
+    it "returns the language-specific section when present" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      site = Hwaro::Models::Site.new(config)
+
+      neutral = Hwaro::Models::Section.new("blog/_index.md")
+      neutral.section = "blog"
+      neutral.language = nil
+      neutral.title = "Neutral Blog"
+
+      ko = Hwaro::Models::Section.new("blog/_index.ko.md")
+      ko.section = "blog"
+      ko.language = "ko"
+      ko.title = "Korean Blog"
+
+      site.sections << neutral
+      site.sections << ko
+      site.build_lookup_index
+
+      site.section_for("blog", "ko").should eq(ko)
+    end
+
+    it "falls back to the language-neutral (nil) section for a missing language" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      site = Hwaro::Models::Site.new(config)
+
+      neutral = Hwaro::Models::Section.new("blog/_index.md")
+      neutral.section = "blog"
+      neutral.language = nil
+      neutral.title = "Neutral Blog"
+
+      site.sections << neutral
+      site.build_lookup_index
+
+      site.section_for("blog", "fr").should eq(neutral)
+    end
+
+    it "falls back to the default-language section when no neutral entry exists" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      site = Hwaro::Models::Site.new(config)
+
+      en = Hwaro::Models::Section.new("blog/_index.en.md")
+      en.section = "blog"
+      en.language = "en"
+      en.title = "English Blog"
+
+      site.sections << en
+      site.build_lookup_index
+
+      # No {blog, fr} and no {blog, nil}; must fall through to {blog, "en"}.
+      site.section_for("blog", "fr").should eq(en)
+    end
+
+    it "returns nil for an unknown section name" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      site = Hwaro::Models::Site.new(config)
+
+      blog = Hwaro::Models::Section.new("blog/_index.md")
+      blog.section = "blog"
+      site.sections << blog
+      site.build_lookup_index
+
+      site.section_for("missing", "en").should be_nil
+    end
+  end
+
   describe "#pages_for_section (with lookup index)" do
     it "returns direct pages for a section" do
       config = Hwaro::Models::Config.new
@@ -627,6 +697,25 @@ describe Hwaro::Models::Site do
       ko_pages.size.should eq(1)
       ko_pages.first.title.should eq("Korean Archived")
     end
+
+    it "terminates on a self-referencing transparent section (recursion guard)" do
+      config = Hwaro::Models::Config.new
+      site = Hwaro::Models::Site.new(config)
+
+      # The index parent comes from Path[s.section].parent ("blog"), but the
+      # recursion key at line 142 comes from Path[s.path].dirname ("blog").
+      # So pages_for_section("blog") recurses back into "blog", which the
+      # `seen` guard must short-circuit instead of looping forever.
+      loopy = Hwaro::Models::Section.new("blog/_index.md")
+      loopy.section = "blog/sub"
+      loopy.transparent = true
+
+      site.sections << loopy
+      site.build_lookup_index
+
+      result = site.pages_for_section("blog", nil)
+      result.should be_a(Array(Hwaro::Models::Page))
+    end
   end
 
   describe "#pages_for_section (without lookup index)" do
@@ -707,6 +796,34 @@ describe Hwaro::Models::Site do
 
       result1.size.should eq(result2.size)
       result1.map(&.title).sort!.should eq(result2.map(&.title).sort!)
+    end
+
+    it "terminates on a transparent subsection chain via the unindexed path" do
+      config = Hwaro::Models::Config.new
+      site = Hwaro::Models::Site.new(config)
+
+      blog = Hwaro::Models::Section.new("blog/_index.md")
+      blog.section = "blog"
+
+      # Transparent child of "blog" that bubbles up; the unindexed recursion at
+      # line 175 passes the same content_items + shared `seen` set, so the guard
+      # is responsible for termination. Assert a finite array, not contents.
+      sub = Hwaro::Models::Section.new("blog/sub/_index.md")
+      sub.section = "blog/sub"
+      sub.transparent = true
+
+      post = Hwaro::Models::Page.new("blog/sub/post.md")
+      post.section = "blog/sub"
+      post.title = "Sub Post"
+
+      site.sections << blog
+      site.sections << sub
+      site.pages << post
+
+      # Do NOT call build_lookup_index - exercises the unindexed recursion site.
+      result = site.pages_for_section("blog", nil)
+      result.should be_a(Array(Hwaro::Models::Page))
+      result.should contain(post)
     end
   end
 

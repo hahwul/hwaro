@@ -174,9 +174,13 @@ module Hwaro
             .gsub("&#8221;", "\"")
             .gsub("&#8230;", "...")
             .gsub(/&#(\d+);/) do
-              code = $1.to_i
+              # to_i? (not to_i): a numeric entity whose digits exceed Int32
+              # (e.g. &#99999999999999999999;) must be dropped, not crash the
+              # import. The range check below already rejects it, but to_i
+              # would raise before we ever get there.
+              code = $1.to_i?
               # Validate Unicode range (exclude surrogates 0xD800..0xDFFF)
-              if code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
+              if code && code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
                 code.chr.to_s
               else
                 ""

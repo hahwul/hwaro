@@ -80,13 +80,16 @@ module Hwaro
             yaml_lines << "published: false"
           end
 
-          if tags = fields["tags"]?.as?(Array(String))
+          # Accept both list (`tags: [a, b]`) and scalar (`tags: crystal`)
+          # shorthand — a scalar would otherwise fail the Array(String) cast
+          # and silently drop the post's taxonomy membership.
+          if tags = string_list_field(fields["tags"]?)
             yaml_lines << "tags:"
             tags.each { |t| yaml_lines << "  - #{t}" }
           end
 
           # categories from taxonomies if present
-          if cats = fields["categories"]?.as?(Array(String))
+          if cats = string_list_field(fields["categories"]?)
             yaml_lines << "categories:"
             cats.each { |c| yaml_lines << "  - #{c}" }
           end

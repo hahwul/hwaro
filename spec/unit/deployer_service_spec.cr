@@ -205,6 +205,38 @@ describe Hwaro::Services::Deployer do
         File.read(dest_file).should eq("Foo Content")
       end
     end
+
+    # When strip_index_html is on, `foo/index.html` strips to the file `foo`
+    # while `foo/bar/index.html` yields the path `foo/bar` — writing a file and
+    # a directory at the same `foo` corrupts the destination, so the validator
+    # must raise HWARO_E_CONFIG before any copy happens.
+    it "raises HwaroError(HWARO_E_CONFIG) when strip_index_html produces a file/dir collision" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(File.join(src_dir, "foo", "bar"))
+        File.write(File.join(src_dir, "foo", "index.html"), "Foo")
+        File.write(File.join(src_dir, "foo", "bar", "index.html"), "Bar")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        target.strip_index_html = true
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"]
+        )
+
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("stripIndexHTML cannot be used")
+      end
+    end
+
     it "auto-generates command for s3:// URL in dry_run" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")
@@ -457,6 +489,14 @@ describe "Deployer private helpers" do
       result.should eq("az storage blob sync --source {source} --container 'my-container'")
     end
 
+    it "returns nil for az:// URL with an empty container" do
+      deployer = Hwaro::Services::Deployer.new
+      # An az:// URL with no container must not emit a command targeting an
+      # empty container; it falls through to the unsupported-scheme path.
+      result = deployer.test_auto_command_for_url("az://", "/tmp")
+      result.should be_nil
+    end
+
     it "returns nil for unknown scheme" do
       deployer = Hwaro::Services::Deployer.new
       result = deployer.test_auto_command_for_url("https://example.com", "/tmp")
@@ -584,6 +624,21 @@ describe "Deployer private helpers" do
         config.deployment.targets << target
 
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["unknown"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unsupported deploy target URL scheme")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) for az:// with an empty container (no auto command)" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "az-empty"
+        target.url = "az://"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["az-empty"])
         err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
         err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
         (err.message || "").should contain("Unsupported deploy target URL scheme")

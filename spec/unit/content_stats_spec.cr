@@ -116,6 +116,24 @@ describe Hwaro::Services::ContentStats do
       end
     end
 
+    it "buckets monthly frequency from TOML native and string dates" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        # Unquoted TOML date parses to a native Time value (distinct branch
+        # from quoted/string dates).
+        File.write(File.join(content_dir, "native.md"), "+++\ntitle = \"X\"\ndate = 2024-03-15T10:00:00Z\ntags = [\"a\"]\n+++\n\nword word\n")
+        File.write(File.join(content_dir, "string.md"), "+++\ntitle = \"Y\"\ndate = \"2024-04-01\"\n+++\n\nword word\n")
+
+        stats = Hwaro::Services::ContentStats.new(content_dir)
+        result = stats.run
+
+        result.monthly["2024-03"].should eq(1)
+        result.monthly["2024-04"].should eq(1)
+      end
+    end
+
     it "works with TOML frontmatter" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

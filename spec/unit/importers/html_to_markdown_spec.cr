@@ -90,6 +90,20 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should eq("& < > \"")
     end
 
+    it "decodes an in-range numeric entity to its codepoint" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("a &#128512; b")
+      result.should eq("a 😀 b")
+    end
+
+    it "drops a numeric entity that overflows Int32 instead of crashing" do
+      # &#99999999999999999999; would raise ArgumentError on to_i; it must be
+      # dropped (out of Unicode range) while the surrounding text survives.
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>x &#99999999999999999999; y</p>")
+      result.should contain("x")
+      result.should contain("y")
+      result.should_not contain("9999")
+    end
+
     it "strips unknown tags" do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<div><span>text</span></div>")
       result.should eq("text")

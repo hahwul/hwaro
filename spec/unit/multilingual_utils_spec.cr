@@ -219,6 +219,22 @@ describe Hwaro::Content::Multilingual do
       key = Hwaro::Content::Multilingual.translation_key("blog\\post.ko.md", config)
       key.should eq("blog/post.md")
     end
+
+    # Regression: only the FIRST matching language suffix may be stripped. For a
+    # filename with two stacked codes ("post.en.ko.md") the loop (iterating
+    # languages in insertion order: ko first) strips ".ko.md" -> "post.en.md"
+    # and breaks. Stripping both would over-strip to "post.md" and mis-group two
+    # unrelated files as translations of each other (wrong switcher links).
+    it "strips only the first matching language suffix for stacked codes" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      config.languages["en"] = Hwaro::Models::LanguageConfig.new("en")
+
+      key = Hwaro::Content::Multilingual.translation_key("post.en.ko.md", config)
+      key.should eq("post.en.md")
+      key.should_not eq("post.md")
+    end
   end
 
   describe ".link_translations!" do

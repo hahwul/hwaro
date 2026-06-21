@@ -762,6 +762,33 @@ describe Hwaro::Content::Processors::Template do
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should eq("yes")
     end
+
+    it "returns false for matching test with an invalid regex (no raise)" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("u", "anything")
+
+      # Unbalanced bracket "[" is an invalid regex; the rescue ArgumentError
+      # branch must return false rather than letting the error abort the build.
+      template = "{% if u is matching(\"[\") %}HIT{% else %}MISS{% endif %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("MISS")
+    end
+
+    it "matches consistently across repeated renders with a valid regex (cached)" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("u", "photo.png")
+
+      template = "{% if u is matching(\"[.](jpg|png)$\") %}HIT{% else %}MISS{% endif %}"
+      Hwaro::Content::Processors::Template.process(template, context).should eq("HIT")
+      # Second render hits the cached compiled regex and must yield the same result.
+      Hwaro::Content::Processors::Template.process(template, context).should eq("HIT")
+    end
   end
 
   describe "Custom Functions" do
@@ -775,6 +802,19 @@ describe Hwaro::Content::Processors::Template do
       result = Hwaro::Content::Processors::Template.process(template, context)
       # Should contain a date-like string
       result.should match(/\d{4}-\d{2}-\d{2}/)
+    end
+
+    it "processes now function with explicit format argument" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      template = "{{ now(format=\"%Y\") }}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      # Explicit format branch should pass the format through to time.to_s
+      result.should match(/^\d{4}$/)
+      result.should eq(Time.local.year.to_s)
     end
 
     it "processes env function with set variable" do
@@ -835,6 +875,79 @@ describe Hwaro::Content::Processors::Template do
       template = "{{ url_for(path=\"/about/\") }}"
       result = Hwaro::Content::Processors::Template.process(template, context)
       result.should eq("https://example.com/about/")
+    end
+
+    it "load_data parses CSV cells (stripped) from a project-relative path" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          # Cells include surrounding whitespace to confirm .strip is applied.
+          File.write("data/menu.csv", "name , price\n Tea , 3 \n")
+
+          page = Hwaro::Models::Page.new("test.md")
+          config = Hwaro::Models::Config.new
+          context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+          template = "{% set d = load_data(path=\"data/menu.csv\") %}{{ d[1][0] }}|{{ d[1][1] }}"
+          result = Hwaro::Content::Processors::Template.process(template, context)
+          result.should eq("Tea|3")
+        end
+      end
+    end
+
+    it "load_data blocks path traversal outside the project root" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          page = Hwaro::Models::Page.new("test.md")
+          config = Hwaro::Models::Config.new
+          context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+          template = "[{{ load_data(path=\"../../../etc/passwd\") }}]"
+          result = Hwaro::Content::Processors::Template.process(template, context)
+          # Boundary check fails -> result stays Crinja nil. Crinja renders nil
+          # as the literal "none", so the traversal yields no file contents.
+          result.should eq("[none]")
+        end
+      end
+    end
+
+    it "load_data returns nil (empty render) for a malformed JSON data file" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/bad.json", "{ not valid json ")
+
+          page = Hwaro::Models::Page.new("test.md")
+          config = Hwaro::Models::Config.new
+          context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+          # The rescue at the parse site swallows the error into Crinja nil
+          # (no exception escapes the build); Crinja renders nil as "none".
+          template = "[{{ load_data(path=\"data/bad.json\") }}]"
+          result = Hwaro::Content::Processors::Template.process(template, context)
+          result.should eq("[none]")
+        end
+      end
+    end
+
+    it "load_data returns nil (empty render) for an unsupported extension" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          # File must exist inside project_root to reach the else (unsupported)
+          # branch; otherwise the boundary/exists check short-circuits.
+          File.write("data/notes.txt", "hello")
+
+          page = Hwaro::Models::Page.new("test.md")
+          config = Hwaro::Models::Config.new
+          context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+          template = "[{{ load_data(path=\"data/notes.txt\") }}]"
+          result = Hwaro::Content::Processors::Template.process(template, context)
+          # Unsupported extension -> result stays Crinja nil -> renders "none".
+          result.should eq("[none]")
+        end
+      end
     end
   end
 

@@ -157,6 +157,24 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         missing.parse_failed.should be_false
       end
     end
+
+    it "re-raises classified frontmatter errors (HWARO_E_CONTENT) to abort the build" do
+      # Unterminated TOML string between `+++` fences reliably raises from
+      # TOML.parse and is classified as HWARO_E_CONTENT (markdown.cr). Unlike a
+      # generic parse failure, this must propagate so CI/scripts see exit 5.
+      with_content_dir({
+        "bad.md" => "+++\ntitle = \"x\nbroken toml\n+++\nbody",
+      }) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(Hwaro::Models::Config.new)
+
+        bad = Hwaro::Models::Page.new("bad.md")
+        ex = expect_raises(Hwaro::HwaroError) do
+          builder.test_parse_content_sequential([bad])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      end
+    end
   end
 
   describe "#parse_content_parallel" do
@@ -173,6 +191,35 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         builder.test_parse_content_parallel(pages)
 
         pages.map(&.title).sort!.should eq(["A", "B", "C"])
+      end
+    end
+
+    it "re-raises a classified frontmatter error after draining all workers" do
+      # The parallel path records the first HWARO_E_CONTENT under a mutex, keeps
+      # draining the queue, and re-raises after every worker joins. A bad page
+      # mixed with good pages must still abort (not hang, not swallow) while the
+      # good pages are still parsed. Crystal's spec timeout guards against a hang.
+      with_content_dir({
+        "good1.md" => "---\ntitle: Good1\n---\nx",
+        "good2.md" => "---\ntitle: Good2\n---\nx",
+        "good3.md" => "---\ntitle: Good3\n---\nx",
+        "good4.md" => "---\ntitle: Good4\n---\nx",
+        "bad.md"   => "+++\ntitle = \"x\nbroken toml\n+++\nbody",
+      }) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(Hwaro::Models::Config.new)
+
+        good = ["good1.md", "good2.md", "good3.md", "good4.md"].map { |p| Hwaro::Models::Page.new(p) }
+        bad = Hwaro::Models::Page.new("bad.md")
+        pages = [good[0], good[1], bad, good[2], good[3]]
+
+        ex = expect_raises(Hwaro::HwaroError) do
+          builder.test_parse_content_parallel(pages)
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+
+        # Good pages were still parsed before the build aborted.
+        good.map(&.title).sort!.should eq(["Good1", "Good2", "Good3", "Good4"])
       end
     end
   end

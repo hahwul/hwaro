@@ -112,6 +112,34 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       )
       result.should eq %(<a href="/a/b/docs/">docs</a>)
     end
+
+    it "resolves a @/ link carrying a query string (ampersand escaped once)" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md?page=2&sort=asc">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
+      result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
+    end
+
+    it "resolves a @/ link carrying both a query string and an anchor (query before anchor)" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md?page=2&sort=asc#sec">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
+      result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc#sec">link</a>)
+    end
+
+    it "ignores a host-only base_url instead of prefixing it onto links" do
+      pages = {"a.md" => make_page("a.md", "/a/")}
+      html = %(<a href="@/a.md">x</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "src.md", "example.com")
+      result.should eq %(<a href="/a/">x</a>)
+    end
+
+    it "does not raise or embed a malformed base_url into resolved links" do
+      pages = {"a.md" => make_page("a.md", "/a/")}
+      html = %(<a href="@/a.md">x</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "src.md", "not a url")
+      result.should eq %(<a href="/a/">x</a>)
+    end
   end
 
   describe ".prefix_root_relative_links" do
@@ -192,6 +220,18 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
     it "is a no-op when the page URL has no host (empty base_url deploy)" do
       html = %(<a href="../x/">x</a>)
       Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "/p/").should eq(html)
+    end
+
+    it "leaves an empty href value untouched" do
+      html = %(<a href="">empty</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/").should eq(html)
+    end
+
+    it "resolves a relative link carrying an encoded entity without double-encoding it" do
+      html = %(<a href="sub/?a=1&amp;b=2">q</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
+      result.should contain(%(href="https://h.com/p/sub/?a=1&amp;b=2"))
+      result.should_not contain("&amp;amp;")
     end
   end
 end

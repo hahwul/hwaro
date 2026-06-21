@@ -83,6 +83,27 @@ describe "TemplateDeps graph" do
     deps.shortcodes_used_in("has {{ badge() }} inline").should eq(Set{"shortcodes/badge"})
     deps.shortcodes_used_in("no shortcode here").should be_empty
   end
+
+  it "terminates with a finite closure on a circular template reference" do
+    # A user can author a circular extends (a→b, b→a) by mistake. The
+    # closure DFS relies on `result.add?` to break the cycle; a regression
+    # to a plain `<<` would loop forever and hang the build. Pin termination
+    # and finiteness.
+    deps = Hwaro::Core::Build::TemplateDeps.new({
+      "a" => %({% extends "b.html" %}),
+      "b" => %({% extends "a.html" %}),
+    })
+
+    deps.closure("a").should eq(Set{"a", "b"})
+
+    hash = deps.closure_hash("a")
+    hash.should_not be_empty
+    hash.size.should eq(32)
+
+    affected = deps.dependents_closure(Set{"a"})
+    affected.should contain("a")
+    affected.should contain("b")
+  end
 end
 
 describe "Template deps: cached builds" do

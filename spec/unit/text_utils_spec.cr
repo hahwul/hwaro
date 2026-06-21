@@ -296,6 +296,19 @@ describe Hwaro::Utils::TextUtils do
       input = "<STYLE>.x{}</STYLE><p>Kept</p><SCRIPT>bad()</SCRIPT>"
       Hwaro::Utils::TextUtils.strip_html(input).should eq("Kept")
     end
+
+    # Pin the documented intentional fall-through (src/utils/text_utils.cr:174-175):
+    # RAW_TEXT_ELEMENT only matches a balanced <script>/<style>...</tag> pair, so an
+    # unterminated raw-text element does NOT match and its code body leaks through the
+    # tag stripper as text. These lock that behavior so a future regex edit can't
+    # silently widen the leak or regress the balanced case.
+    it "leaks the body of an unterminated <script> (documented fall-through)" do
+      Hwaro::Utils::TextUtils.strip_html("<p>a</p><script>var x = 1;").should eq("a var x = 1;")
+    end
+
+    it "leaks the body of an unterminated <style> at EOF (documented fall-through)" do
+      Hwaro::Utils::TextUtils.strip_html("<style>.x{color:red}").should eq(".x{color:red}")
+    end
   end
 
   describe ".cjk_char?" do

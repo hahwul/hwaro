@@ -48,7 +48,21 @@ module Hwaro
         ) : String
           return html unless html.includes?("@/")
 
-          base_path = base_url.empty? ? "" : URI.parse(base_url).path.rstrip("/")
+          # Only treat base_url as a subpath prefix when it is a real absolute
+          # URL (has a scheme). A host-only or malformed value like
+          # "example.com" parses with the whole string as `.path`, which would
+          # otherwise be prepended to every link ("example.com/a/"). Match the
+          # defensive URI::Error rescue used by the sibling absolutize methods.
+          base_path = if base_url.empty?
+                        ""
+                      else
+                        begin
+                          uri = URI.parse(base_url)
+                          uri.scheme ? uri.path.rstrip("/") : ""
+                        rescue URI::Error
+                          ""
+                        end
+                      end
 
           html.gsub(INTERNAL_LINK_REGEX) do |match|
             content_path = $1

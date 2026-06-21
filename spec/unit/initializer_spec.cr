@@ -334,6 +334,22 @@ describe Hwaro::Services::Initializer do
         end
       end
 
+      it "writes a parseable multilingual config.toml in default mode (real loader)" do
+        # build_balanced_default_config assembles the [languages] block via raw
+        # String concatenation (a prior duplicate-key TOML bug lived here). A
+        # substring check can't catch a missing newline / duplicate key, so load
+        # the generated file with the real config loader end-to-end.
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en", "ko"])
+
+          config = Hwaro::Models::Config.load(File.join(target, "config.toml"))
+          config.default_language.should eq("en")
+          config.languages.has_key?("en").should be_true
+          config.languages.has_key?("ko").should be_true
+        end
+      end
+
       it "enables languages in --full-config mode (regression: full config dropped multilingual)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")

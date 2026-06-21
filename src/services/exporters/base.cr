@@ -104,12 +104,32 @@ module Hwaro
           Logger.debug "Exported: #{path}" if verbose
         end
 
+        # Normalize a front-matter field that may be authored as either a list
+        # (`tags: [a, b]`) or a single scalar (`tags: crystal`) into an array,
+        # so the scalar shorthand isn't silently dropped on export. Returns nil
+        # when the value is absent or empty.
+        protected def string_list_field(value : (String | Bool | Array(String))?) : Array(String)?
+          case value
+          when Array(String) then value.empty? ? nil : value
+          when String        then value.empty? ? nil : [value]
+          end
+        end
+
         # Convert @/ internal links to relative paths
         protected def rewrite_internal_links(body : String) : String
           body.gsub(/\[([^\]]*)\]\(@\/([^\)]+)\)/) do |_, match|
             text = match[1]
-            path = match[2].sub(/\.md$/, "").sub(/_index$/, "")
-            "[#{text}](/#{path})"
+            target = match[2]
+            # Peel off any #anchor or ?query suffix *before* stripping the .md /
+            # _index, otherwise `.md$` no longer anchors and links like
+            # @/guide.md#sec or @/page.md?x=1 keep their .md and 404.
+            suffix = ""
+            if idx = target.index(/[#?]/)
+              suffix = target[idx..]
+              target = target[0...idx]
+            end
+            path = target.sub(/\.md$/, "").sub(/_index$/, "")
+            "[#{text}](/#{path}#{suffix})"
           end
         end
       end

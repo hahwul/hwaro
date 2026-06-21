@@ -126,6 +126,28 @@ describe Hwaro::Content::Processors::Json do
       result.error.should_not be_nil
     end
 
+    it "round-trips a max-Int64 integer losslessly" do
+      processor = Hwaro::Content::Processors::Json.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = %q({"n":9223372036854775807})
+      result = processor.process(input, context)
+      result.error.should be_nil
+      result.content.should eq(input)
+    end
+
+    it "reports an error for an integer larger than Int64 (pinned parser limit)" do
+      # Crystal's JSON parser cannot represent integers beyond Int64, so a
+      # valid-but-huge literal currently fails to minify rather than being
+      # preserved. Pin this so a future numeric-preserving fix is deliberate.
+      processor = Hwaro::Content::Processors::Json.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = %q({"n": 123456789012345678901234567890})
+      result = processor.process(input, context)
+      result.error.should_not be_nil
+    end
+
     it "handles JSON with special characters in strings" do
       processor = Hwaro::Content::Processors::Json.new
       context = Hwaro::Content::Processors::ProcessorContext.new
@@ -303,6 +325,26 @@ describe Hwaro::Content::Processors::Xml do
       input = "<root><item>value</item></root>"
       result = processor.process(input, context)
       result.content.should eq(input)
+    end
+
+    it "preserves whitespace and newlines inside a CDATA section" do
+      # CDATA is raw character data (RSS <content:encoded>, embedded scripts,
+      # pre-formatted code) — its internal whitespace must not be collapsed.
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<root>\n  <![CDATA[ keep   these    spaces\n  and newline ]]>\n</root>"
+      result = processor.process(input, context)
+      result.content.should contain("<![CDATA[ keep   these    spaces\n  and newline ]]>")
+    end
+
+    it "preserves whitespace and newlines inside an XML comment" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<root>\n  <!-- keep   these    spaces\n  and newline -->\n</root>"
+      result = processor.process(input, context)
+      result.content.should contain("<!-- keep   these    spaces\n  and newline -->")
     end
 
     it "minifies XML with attributes" do

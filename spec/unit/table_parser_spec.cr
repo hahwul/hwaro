@@ -217,6 +217,26 @@ describe Hwaro::Content::Processors::TableParser do
       result.scan(/<td/).size.should be >= 1
     end
 
+    it "keeps overflow cells when a row has more columns than headers" do
+      content = <<-MD
+        | A | B |
+        |---|---|
+        | 1 | 2 | 3 |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should contain("<table>")
+      # Only two headers are declared. /<th[ >]/ avoids matching the <thead>
+      # opening tag, so this counts real header cells (2).
+      result.scan(/<th[ >]/).size.should eq(2)
+      result.should contain("<th>A</th>")
+      result.should contain("<th>B</th>")
+      # The overflow third cell is KEPT (not dropped as GFM would), producing a
+      # ragged 3-<td> body row. This locks the current keep-overflow contract.
+      result.scan(/<td/).size.should eq(3)
+      result.should contain("<td>3</td>")
+    end
+
     it "handles escaped pipes within cells" do
       content = <<-MD
         | Command |

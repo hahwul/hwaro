@@ -79,6 +79,24 @@ describe Hwaro::Models::Page do
       page.calculate_word_count
       page.word_count.should eq(3)
     end
+
+    it "counts space-separated CJK runs as whitespace-delimited words (documented limitation)" do
+      # The single-pass scanner counts any run of non-delimiter chars as one
+      # word, so a space-separated CJK string counts space-runs as 3 words
+      # (a space-less CJK paragraph would collapse to 1). Pin the contract.
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "한국어 테스트 문서"
+      page.calculate_word_count.should eq(3)
+    end
+
+    it "does not raise on an opened-but-never-closed real tag (swallows the tail)" do
+      # `<a` flips into tag mode; with no closing '>' the rest of the document
+      # is swallowed. This pins graceful degradation (count of pre-tag words,
+      # no crash) on truncated/malformed HTML.
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "hello <a href=foo and more text"
+      page.calculate_word_count.should eq(1)
+    end
   end
 
   describe "#calculate_reading_time" do

@@ -243,6 +243,87 @@ describe Hwaro::Services::Importers::EleventyImporter do
       end
     end
 
+    it "round-trips nested .11tydata.json directory data through YAML dump/reparse" do
+      # Regression guard for json_any_to_yaml_any's recursive Array/Hash
+      # branches and the .11tydata.json precedence path: nested objects/arrays
+      # in dir-data must survive YAML.dump/reparse so the merged tags appear.
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        # .11tydata.json takes precedence over posts.json (untested before).
+        File.write(
+          File.join(posts_dir, "posts.11tydata.json"),
+          %({"tags": ["a", "b"], "meta": {"k": "v"}})
+        )
+
+        File.write(File.join(posts_dir, "nested-merge.md"), <<-ELEVENTY
+          ---
+          title: "Nested Merge"
+          ---
+          Content.
+          ELEVENTY
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::EleventyImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        content = File.read(File.join(output_dir, "posts", "nested-merge.md"))
+        content.should contain("title = \"Nested Merge\"")
+        # The nested array tags survive the dump/reparse round trip.
+        content.should contain("tags = [\"a\", \"b\"]")
+      end
+    end
+
+    it "lets file frontmatter win over directory data on a type conflict" do
+      # dir-data provides tags as an array, the file provides a scalar string.
+      # File overrides win; the merge must not error.
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        FileUtils.mkdir_p(posts_dir)
+
+        File.write(
+          File.join(posts_dir, "posts.json"),
+          %({"tags": ["a", "b"]})
+        )
+
+        File.write(File.join(posts_dir, "type-conflict.md"), <<-ELEVENTY
+          ---
+          title: "Type Conflict"
+          tags: solo
+          ---
+          Content.
+          ELEVENTY
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::EleventyImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(1)
+        result.error_count.should eq(0)
+        content = File.read(File.join(output_dir, "posts", "type-conflict.md"))
+        # File's scalar value wins over the dir-data array.
+        content.should contain("tags = [\"solo\"]")
+        content.should_not contain("\"a\"")
+        content.should_not contain("\"b\"")
+      end
+    end
+
     it "returns error result for non-existent directory" do
       options = Hwaro::Config::Options::ImportOptions.new(
         source_type: "eleventy",

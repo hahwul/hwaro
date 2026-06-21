@@ -192,6 +192,54 @@ describe Hwaro::Models::Config do
       config.base_url = "https://example.com/two"
       config.base_path.should eq("/two")
     end
+
+    it "returns an empty string when the URI parse path is just \"/\"" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/"
+      config.base_path.should eq("")
+    end
+
+    it "returns an empty string for a malformed base_url (URI::Error rescue)" do
+      config = Hwaro::Models::Config.new
+      # A bracketed host with no closing bracket is not a parseable URI; the
+      # rescue must swallow URI::Error and fall back to "".
+      config.base_url = "http://[::1"
+      config.base_path.should eq("")
+    end
+  end
+
+  describe "#with_base_path" do
+    it "prefixes a root-relative path under a subpath deployment" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://x.com/repo"
+      config.with_base_path("/posts/a/").should eq("/repo/posts/a/")
+    end
+
+    it "leaves protocol-relative URLs untouched" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://x.com/repo"
+      # Without the // guard this would become /repo//cdn.example.com/x.
+      config.with_base_path("//cdn.example.com/x").should eq("//cdn.example.com/x")
+    end
+
+    it "leaves absolute http(s) URLs untouched" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://x.com/repo"
+      config.with_base_path("http://y.com/z").should eq("http://y.com/z")
+      config.with_base_path("https://y.com/z").should eq("https://y.com/z")
+    end
+
+    it "leaves a non-leading-slash path unchanged" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://x.com/repo"
+      config.with_base_path("posts/a/").should eq("posts/a/")
+    end
+
+    it "is a no-op when base_path is empty (domain-root deploy)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://x.com"
+      config.with_base_path("/posts/").should eq("/posts/")
+    end
   end
 
   describe "#initialize" do
@@ -2336,6 +2384,20 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
 
     it "falls back to the default for a wrong-typed numeric value" do
       load_config("[pagination]\nper_page = \"twenty\"").pagination.per_page.should eq(10)
+    end
+
+    it "clamps an oversized integer [pagination] per_page to Int32::MAX (int_value)" do
+      # 9999999999 > Int32::MAX. int_value uses as_i64?+clamp so this yields a
+      # clamped Int32 instead of raising OverflowError out of as_i?/to_i.
+      load_config("[pagination]\nper_page = 9999999999").pagination.per_page.should eq(Int32::MAX)
+    end
+
+    it "clamps an oversized float [feeds] limit to Int32::MAX (int_value)" do
+      load_config("[feeds]\nlimit = 1e30").feeds.limit.should eq(Int32::MAX)
+    end
+
+    it "clamps an oversized integer [deployment] max_deletes to Int32::MAX (int_or_nil)" do
+      load_config("[deployment]\nmax_deletes = 99999999999").deployment.max_deletes.should eq(Int32::MAX)
     end
   end
 end

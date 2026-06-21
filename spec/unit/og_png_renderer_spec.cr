@@ -317,6 +317,160 @@ describe Hwaro::Content::Seo::OgPngRenderer do
         result.should be_true
       end
     end
+
+    # config.cr only rejects non-finite opacity; a finite but out-of-range
+    # value (e.g. 1.8 or -0.5) passes through from TOML. Every opacity branch
+    # relies on .clamp(0.0,1.0) before .to_u8 (the gradient branch even carries
+    # a comment that a missing clamp raises OverflowError). These render with
+    # out-of-range opacities to pin that no OverflowError aborts the build.
+    {1.8, -0.5}.each do |opacity|
+      it "renders dots style with out-of-range pattern_opacity #{opacity} without OverflowError" do
+        next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+        Dir.mktmpdir do |dir|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Dots Opacity"
+
+          config = Hwaro::Models::Config.new
+          config.og.auto_image.style = "dots"
+          config.og.auto_image.pattern_opacity = opacity
+
+          png_path = File.join(dir, "dots-opacity.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+          result.should be_true
+          data = File.open(png_path, "rb", &.getb_to_end)
+          data[0].should eq(0x89_u8) # PNG magic byte
+        end
+      end
+
+      it "renders gradient style with out-of-range pattern_opacity #{opacity} without OverflowError" do
+        next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+        Dir.mktmpdir do |dir|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Gradient Opacity"
+
+          config = Hwaro::Models::Config.new
+          config.og.auto_image.style = "gradient"
+          config.og.auto_image.pattern_opacity = opacity
+
+          png_path = File.join(dir, "gradient-opacity.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+          result.should be_true
+          data = File.open(png_path, "rb", &.getb_to_end)
+          data[0].should eq(0x89_u8) # PNG magic byte
+        end
+      end
+    end
+
+    it "renders a background overlay with out-of-range overlay_opacity without OverflowError" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      Dir.mktmpdir do |dir|
+        bg_path = File.join(dir, "bg.png")
+        pixel = Pointer(UInt8).malloc(4)
+        pixel[0] = 0_u8; pixel[1] = 0_u8; pixel[2] = 255_u8; pixel[3] = 255_u8
+        LibStb.stbi_write_png(bg_path, 1, 1, 4, pixel.as(Void*), 4)
+        GC.free(pixel.as(Void*))
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Overlay Opacity"
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.background_image = bg_path
+        config.og.auto_image.overlay_opacity = 2.0
+
+        png_path = File.join(dir, "overlay-opacity.png")
+        result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path, nil, bg_path)
+        result.should be_true
+        data = File.open(png_path, "rb", &.getb_to_end)
+        data[0].should eq(0x89_u8) # PNG magic byte
+      end
+    end
+
+    # render_png's only failure signal is the boolean return from
+    # stbi_write_png. Writing into a read-only directory makes the write fail;
+    # render_png must return false (not raise) and leave no file behind.
+    it "returns false without raising when the png cannot be written" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+      next if LibC.getuid == 0 # root bypasses chmod-based unwritability
+
+      Dir.mktmpdir do |dir|
+        ro_dir = File.join(dir, "readonly")
+        Dir.mkdir_p(ro_dir)
+        File.chmod(ro_dir, 0o500)
+        begin
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Write Failure"
+
+          config = Hwaro::Models::Config.new
+
+          png_path = File.join(ro_dir, "out.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+          result.should be_false
+          File.exists?(png_path).should be_false
+        ensure
+          File.chmod(ro_dir, 0o700) # restore so mktmpdir cleanup succeeds
+        end
+      end
+    end
+
+    # An empty / whitespace-only title yields title_lines == [] from
+    # word_wrap_measured. The terminal-cursor branch (!title_lines.empty?) and
+    # the hero ghost branch (page.title.split.first? / unless empty?) are
+    # load-bearing guards; render must no-op those branches without raising.
+    ["", "   "].each do |blank|
+      label = blank.empty? ? "empty" : "whitespace-only"
+
+      it "renders terminal style with an #{label} title without raising" do
+        next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+        Dir.mktmpdir do |dir|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = blank
+
+          config = Hwaro::Models::Config.new
+          config.og.auto_image.style = "terminal"
+
+          png_path = File.join(dir, "terminal-blank.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+          result.should be_true
+        end
+      end
+
+      it "renders hero style with an #{label} title without raising" do
+        next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+        Dir.mktmpdir do |dir|
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = blank
+
+          config = Hwaro::Models::Config.new
+          config.og.auto_image.style = "hero"
+
+          png_path = File.join(dir, "hero-blank.png")
+          result = Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path)
+          result.should be_true
+        end
+      end
+    end
+  end
+
+  describe ".load_image" do
+    # load_image decodes/resizes logo & bg images via stb. Its failure guards
+    # must each return nil cleanly (and free the source buffer) rather than
+    # raise or segfault on a user-supplied corrupt or missing image.
+    it "returns nil for a corrupt (non-image) file" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "corrupt.png")
+        File.write(path, "this is not an image")
+        Hwaro::Content::Seo::OgPngRenderer.load_image(path, 48, 48).should be_nil
+      end
+    end
+
+    it "returns nil for a nonexistent path" do
+      Hwaro::Content::Seo::OgPngRenderer.load_image("/nonexistent/logo.png", 48, 48).should be_nil
+    end
   end
 
   describe "integration with OgImage.generate" do

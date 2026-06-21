@@ -76,5 +76,88 @@ describe Hwaro::Content::Hooks::OgImageHooks do
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
       end
     end
+
+    # Guards that gate the expensive OgImage.generate call. A regression here
+    # would re-render every PNG on each keystroke rebuild during dev (the cost
+    # these guards avoid), or invert and ship pages with a missing og:image.
+    it "skips generation when options.skip_og_image is true (--skip-og-image)" do
+      Dir.mktmpdir do |output_dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+
+        site = Hwaro::Models::Site.new(config)
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: output_dir,
+          skip_og_image: true,
+        )
+
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options: options)
+        ctx.output_dir = output_dir
+        ctx.site = site
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        hooks = Hwaro::Content::Hooks::OgImageHooks.new
+        hooks.register_hooks(manager)
+
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        Dir.glob(File.join(output_dir, "**", "*.png")).should be_empty
+      end
+    end
+
+    it "skips generation in serve mode when lazy_generate is enabled" do
+      Dir.mktmpdir do |output_dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.lazy_generate = true
+
+        site = Hwaro::Models::Site.new(config)
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: output_dir,
+          serve_mode: true,
+        )
+
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options: options)
+        ctx.output_dir = output_dir
+        ctx.site = site
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        hooks = Hwaro::Content::Hooks::OgImageHooks.new
+        hooks.register_hooks(manager)
+
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        Dir.glob(File.join(output_dir, "**", "*.png")).should be_empty
+      end
+    end
+
+    it "does NOT skip generation when lazy_generate is enabled but not in serve mode" do
+      # Contrast: lazy_generate alone (without serve_mode) does not gate
+      # generation. With zero pages OgImage.generate is a cheap no-op, so the
+      # hook still returns Continue and writes nothing — confirming the guard
+      # requires BOTH lazy_generate AND serve_mode.
+      Dir.mktmpdir do |output_dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.lazy_generate = true
+
+        site = Hwaro::Models::Site.new(config)
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: output_dir,
+          serve_mode: false,
+        )
+
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options: options)
+        ctx.output_dir = output_dir
+        ctx.site = site
+
+        manager = Hwaro::Core::Lifecycle::Manager.new
+        hooks = Hwaro::Content::Hooks::OgImageHooks.new
+        hooks.register_hooks(manager)
+
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+      end
+    end
   end
 end

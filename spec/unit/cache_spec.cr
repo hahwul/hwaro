@@ -240,6 +240,72 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    it "returns false when cascade_hash and template_hash both match" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, "", cascade_hash: "c1", template_hash: "t1")
+        cache.changed?(test_file, "", cascade_hash: "c1", template_hash: "t1").should be_false
+      end
+    end
+
+    it "returns true when cascade_hash changes (parent _index cascade edit)" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, "", cascade_hash: "c1", template_hash: "t1")
+        cache.changed?(test_file, "", cascade_hash: "c2", template_hash: "t1").should be_true
+      end
+    end
+
+    it "returns true when template_hash changes (closure template edit)" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, "", cascade_hash: "c1", template_hash: "t1")
+        cache.changed?(test_file, "", cascade_hash: "c1", template_hash: "t2").should be_true
+      end
+    end
+
+    it "skips the template comparison when template_hash is nil" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        # Stored with a non-empty template_hash...
+        cache.update(test_file, "", template_hash: "t1")
+        # ...but a nil reader skips the template branch entirely, so the only
+        # remaining checks (mtime/content/output) match → not changed.
+        cache.changed?(test_file, "", template_hash: nil).should be_false
+        # Distinct from a mismatching non-nil hash, which does invalidate.
+        cache.changed?(test_file, "", template_hash: "t2").should be_true
+      end
+    end
+
+    it "returns true when stored cascade_hash defaults empty but a value is checked" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        # update with default cascade_hash ("")
+        cache.update(test_file)
+        cache.changed?(test_file, "", cascade_hash: "c1").should be_true
+      end
+    end
+
     it "handles large files" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
@@ -828,6 +894,69 @@ describe Hwaro::Core::Build::Cache do
         c3.stats[:total].should eq(2)
       end
     end
+
+    it "does not rewrite the cache file on a no-op second save" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file)
+        cache.save # first write, clears @dirty
+
+        first_bytes = File.read(cache_path)
+        first_mtime = File.info(cache_path).modification_time
+
+        sleep 10.milliseconds
+        cache.save # no mutation since last save → guard skips rewrite
+
+        # Bytes are unchanged and (since @dirty stayed false) the file was not
+        # touched at all, so mtime is identical too.
+        File.read(cache_path).should eq(first_bytes)
+        File.info(cache_path).modification_time.should eq(first_mtime)
+      end
+    end
+
+    it "rewrites the cache file when an entry is added after save" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        f1 = File.join(dir, "f1.md")
+        f2 = File.join(dir, "f2.md")
+        File.write(f1, "one")
+        File.write(f2, "two")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(f1)
+        cache.save
+        File.read(cache_path).includes?(f2).should be_false
+
+        cache.update(f2) # real mutation → marks dirty
+        cache.save
+        File.read(cache_path).includes?(f2).should be_true
+      end
+    end
+
+    it "upgrades a legacy-format cache file to the metadata format on next save" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+        mtime = File.info(test_file).modification_time.to_unix_ms
+
+        legacy_json = %([{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}])
+        File.write(cache_path, legacy_json)
+
+        # Legacy load marks @dirty=true so the first save upgrades the format
+        # even on an otherwise no-op build.
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.save
+
+        data = Hwaro::Core::Build::CacheData.from_json(File.read(cache_path))
+        data.entries.size.should eq(1)
+        data.metadata.should be_a(Hwaro::Core::Build::CacheMetadata)
+      end
+    end
   end
 
   # ===========================================================================
@@ -1222,6 +1351,113 @@ describe Hwaro::Core::Build::Cache, "global checksums" do
       cache3.changed?(test_file).should be_false
     end
   end
+
+  it "does not invalidate on template change when invalidate_on_template_change is false" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      test_file = File.join(dir, "test.md")
+      File.write(test_file, "content")
+
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.set_global_checksums("tmpl_v1", "cfg_v1")
+      cache.update(test_file)
+      cache.save
+
+      # Template-dependency-tracking mode: a template edit must NOT wipe the
+      # whole cache — per-page closure hashes decide invalidation instead.
+      cache2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache2.set_global_checksums("tmpl_v2", "cfg_v1", invalidate_on_template_change: false)
+
+      cache2.changed?(test_file).should be_false
+    end
+  end
+
+  it "still invalidates on config change even when invalidate_on_template_change is false" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      test_file = File.join(dir, "test.md")
+      File.write(test_file, "content")
+
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.set_global_checksums("tmpl_v1", "cfg_v1")
+      cache.update(test_file)
+      cache.save
+
+      # Config-change invalidation is ungated and fires regardless of the flag.
+      cache2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache2.set_global_checksums("tmpl_v1", "cfg_v2", invalidate_on_template_change: false)
+
+      cache2.changed?(test_file).should be_true
+    end
+  end
+end
+
+# ===========================================================================
+# page/section-set fingerprints (listing-page invalidation)
+# ===========================================================================
+describe Hwaro::Core::Build::Cache, "set fingerprints" do
+  it "reports a change against fresh (empty) fingerprints" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.page_set_changed?("fp1").should be_true
+      cache.section_set_changed?("sfp1").should be_true
+    end
+  end
+
+  it "records fingerprints and compares them on subsequent calls" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.record_set_fingerprints("fp1", "sfp1")
+
+      cache.page_set_changed?("fp1").should be_false
+      cache.page_set_changed?("fp2").should be_true
+      cache.section_set_changed?("sfp1").should be_false
+      cache.section_set_changed?("sfp2").should be_true
+    end
+  end
+
+  it "persists fingerprints across save/load" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.record_set_fingerprints("fp1", "sfp1")
+      cache.save
+
+      reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      reloaded.page_set_changed?("fp1").should be_false
+      reloaded.section_set_changed?("sfp1").should be_false
+      reloaded.page_set_changed?("fp2").should be_true
+    end
+  end
+
+  it "does not flip dirty (no rewrite) when recording identical fingerprints" do
+    Dir.mktmpdir do |dir|
+      cache_path = File.join(dir, ".hwaro_cache.json")
+      cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+      cache.record_set_fingerprints("fp1", "sfp1")
+      cache.save # clears @dirty
+
+      first_bytes = File.read(cache_path)
+      first_mtime = File.info(cache_path).modification_time
+
+      sleep 10.milliseconds
+      # Identical values → @dirty stays false → save is a no-op.
+      cache.record_set_fingerprints("fp1", "sfp1")
+      cache.save
+
+      File.read(cache_path).should eq(first_bytes)
+      File.info(cache_path).modification_time.should eq(first_mtime)
+    end
+  end
+
+  it "is a no-op when caching is disabled" do
+    cache = Hwaro::Core::Build::Cache.new(enabled: false)
+    cache.record_set_fingerprints("fp1", "sfp1")
+    # Early return on @enabled means the metadata never updates.
+    cache.page_set_changed?("fp1").should be_true
+  end
 end
 
 # ===========================================================================
@@ -1312,6 +1548,49 @@ describe Hwaro::Core::Build::Cache, "compute helpers" do
       h2 = Hwaro::Core::Build::Cache.compute_config_hash(config_path)
       h1.should eq(h2)
     end
+  end
+
+  # --- effective-config overload: compute_config_hash(config, env) ---------
+  it "folds the active env into the effective config hash" do
+    config = Hwaro::Models::Config.new
+    prod = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")
+    dev = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "dev")
+    prod.should_not eq(dev)
+  end
+
+  it "folds base_url into the effective config hash without touching raw" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://example.com"
+    before = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")
+
+    config.base_url = "https://other.example.com"
+    after = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")
+
+    before.should_not eq(after)
+  end
+
+  it "is stable across repeated calls with the same config" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://example.com"
+    config.raw = TOML.parse("title = \"site\"\ndescription = \"d\"")
+
+    h1 = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")
+    h2 = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")
+    h1.should eq(h2)
+  end
+
+  it "is independent of raw key insertion order" do
+    c1 = Hwaro::Models::Config.new
+    c1.base_url = "https://example.com"
+    c1.raw = TOML.parse("title = \"site\"\ndescription = \"d\"\nauthor = \"a\"")
+
+    c2 = Hwaro::Models::Config.new
+    c2.base_url = "https://example.com"
+    c2.raw = TOML.parse("author = \"a\"\ndescription = \"d\"\ntitle = \"site\"")
+
+    Hwaro::Core::Build::Cache.compute_config_hash(c1, env: "prod").should eq(
+      Hwaro::Core::Build::Cache.compute_config_hash(c2, env: "prod")
+    )
   end
 end
 

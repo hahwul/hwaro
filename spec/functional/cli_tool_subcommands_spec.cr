@@ -412,6 +412,29 @@ describe "hwaro tool convert" do
       err.should contain("unknown format")
     end
   end
+
+  it "exits 1 and emits a failing ConversionResult JSON for a missing content dir" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(
+        ["tool", "convert", "to-yaml", "-c", "does-not-exist", "--json"],
+        chdir: project_dir
+      )
+      status.exit_code.should eq(1)
+      parsed = JSON.parse(output.strip)
+      parsed["success"].as_bool.should be_false
+      parsed["message"].as_s.should contain("not found")
+    end
+  end
+
+  it "exits 1 for a missing content dir without --json" do
+    with_initialized_project do |project_dir|
+      status, _, _ = run_hwaro(
+        ["tool", "convert", "to-yaml", "-c", "does-not-exist"],
+        chdir: project_dir
+      )
+      status.exit_code.should eq(1)
+    end
+  end
 end
 
 describe "hwaro tool list" do

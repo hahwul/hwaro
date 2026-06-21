@@ -272,6 +272,29 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "preserves a scalar tags/categories shorthand as a single-item list" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        # `tags: crystal` (scalar, not a list) must not be silently dropped —
+        # that would lose the post's taxonomy membership in the migration.
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ntags: crystal\ncategories: news\n---\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+        result.success.should be_true
+
+        content = File.read(Dir.glob(File.join(output_dir, "_posts", "*.md")).first)
+        content.should contain("tags:")
+        content.should contain("- crystal")
+        content.should contain("categories:")
+        content.should contain("- news")
+      end
+    end
+
     it "includes authors in YAML frontmatter" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

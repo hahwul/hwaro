@@ -776,3 +776,81 @@ describe Hwaro::Services::Scaffolds::Registry do
     end
   end
 end
+
+# Helper to drive the protected prepend_translation_notice without a network
+# hop, mirroring the TestRemoteHelper wrapper pattern in remote_scaffold_spec.cr.
+class TestNoticeScaffold < Hwaro::Services::Scaffolds::Simple
+  def do_prepend(body : String, lang : String) : String
+    prepend_translation_notice(body, lang)
+  end
+end
+
+describe "minimal_config_content multilingual parseability" do
+  # minimal_config_content assembles the [languages] block via raw String
+  # concatenation; a missing newline / duplicate key / TOML-special char in a
+  # language_name would slip past substring checks but break the first
+  # `hwaro build`. Parse it with the real config loader to catch that.
+  it "produces parseable multilingual TOML with [languages.en]/[languages.ko] tables for every built-in scaffold" do
+    Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+      toml = scaffold.minimal_config_content(multilingual_languages: ["en", "ko"])
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, toml)
+        config = Hwaro::Models::Config.load(path)
+
+        config.default_language.should eq("en")
+        config.languages.has_key?("en").should be_true
+        config.languages.has_key?("ko").should be_true
+      end
+    end
+  end
+
+  it "produces parseable multilingual TOML with skip_taxonomies for every built-in scaffold" do
+    Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+      toml = scaffold.minimal_config_content(skip_taxonomies: true, multilingual_languages: ["en", "ko"])
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, toml)
+        config = Hwaro::Models::Config.load(path)
+
+        config.languages.has_key?("en").should be_true
+        config.languages.has_key?("ko").should be_true
+        # No global [[taxonomies]] block when skipped.
+        toml.should_not contain("[[taxonomies]]")
+      end
+    end
+  end
+end
+
+describe "prepend_translation_notice" do
+  # The built-in scaffolds all ship TOML (+++) front matter, so the YAML
+  # (---) branch and the unclosed-delimiter fallback are never exercised by
+  # built-in content. Drive them directly.
+  it "inserts the notice after a closing YAML (---) delimiter, before the body" do
+    body = "---\ntitle: X\n---\n\nbody"
+    result = TestNoticeScaffold.new.do_prepend(body, "ko")
+
+    notice_at = result.index!("<!-- TODO: Translate")
+    close_at = result.index!("---", 4) # closing delimiter, past the opening one
+    body_at = result.index!("body")
+
+    notice_at.should be > close_at
+    notice_at.should be < body_at
+    # The front-matter block at the top of the result still parses cleanly
+    # (the notice did not get injected between the delimiters).
+    lines = result.lines
+    second_delim = lines[1..].index!("---") + 1
+    inner = lines[1...second_delim].join("\n")
+    YAML.parse(inner)["title"].as_s.should eq("X")
+  end
+
+  it "prepends the notice at the top when the YAML delimiter is unclosed (fallback)" do
+    body = "---\ntitle: X"
+    result = TestNoticeScaffold.new.do_prepend(body, "ko")
+
+    result.index!("<!-- TODO: Translate").should eq(0)
+    result.should contain("---\ntitle: X")
+  end
+end

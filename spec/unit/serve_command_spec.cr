@@ -47,6 +47,27 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.port.should eq(8080)
     end
 
+    it "raises HwaroError(HWARO_E_USAGE) when --port is out of range or non-numeric" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+
+      ["0", "-1", "99999", "abc", ""].each do |bad|
+        err = expect_raises(Hwaro::HwaroError) do
+          cmd.test_parse_options(["--port", bad])
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
+    end
+
+    it "accepts the inclusive --port boundary values 1 and 65535" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+
+      _, options = cmd.test_parse_options(["--port", "1"])
+      options.port.should eq(1)
+
+      _, options = cmd.test_parse_options(["--port", "65535"])
+      options.port.should eq(65535)
+    end
+
     it "parses --bind flag" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options(["--bind", "127.0.0.1"])
@@ -216,6 +237,17 @@ describe Hwaro::CLI::Commands::ServeCommand do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options(["--header", "X-Foo = bar baz"])
       options.headers["X-Foo"].should eq("bar baz")
+    end
+
+    it "preserves a colon inside the --header value (split on first colon only)" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([
+        "--header", "Refresh: 5; url=https://example.com",
+        "--header", "CSP: default-src https://a.com",
+      ])
+      # Value is .strip-ped, but the colon(s) after the first are kept intact.
+      options.headers["Refresh"].should eq("5; url=https://example.com")
+      options.headers["CSP"].should eq("default-src https://a.com")
     end
 
     it "raises on invalid --header (empty key)" do

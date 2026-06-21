@@ -53,8 +53,11 @@ module Hwaro
 
             # Pluralize filter: {{ count | pluralize("item", "items") }}
             env.filters["pluralize"] = Crinja.filter({singular: "", plural: ""}) do
+              # Keep the count as a number (don't .to_i): truncating 1.9 → 1
+              # would wrongly pick the singular form. Grammatically only an
+              # exact count of 1 is singular.
               count = begin
-                target.as_number.to_i
+                target.as_number
               rescue Exception
                 0
               end
