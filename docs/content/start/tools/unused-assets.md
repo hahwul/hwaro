@@ -16,8 +16,14 @@ hwaro tool unused-assets -c posts -s assets
 # Delete unused files (with confirmation prompt)
 hwaro tool unused-assets --delete
 
+# Delete without the prompt (scripts/CI)
+hwaro tool unused-assets --delete --force
+
 # Output as JSON
 hwaro tool unused-assets --json
+
+# Delete in JSON mode (requires --force, since there is no prompt)
+hwaro tool unused-assets --delete --force --json
 ```
 
 ## Options
@@ -27,6 +33,7 @@ hwaro tool unused-assets --json
 | -c, --content DIR | Content directory (default: content) |
 | -s, --static-dir DIR | Static files directory (default: static) |
 | --delete | Delete unused files (prompts for confirmation) |
+| -f, --force | Skip the confirmation prompt when deleting (required for deletion under `--json`) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 

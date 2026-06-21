@@ -294,5 +294,24 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         content.should contain("- news")
       end
     end
+
+    it "includes authors in YAML frontmatter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\nauthors:\n  - Jane\n  - John\n---\n\nContent\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        files = Dir.glob(File.join(output_dir, "_posts", "*.md"))
+        content = File.read(files.first)
+        content.should contain("authors:")
+        content.should contain("- Jane")
+      end
+    end
   end
 end

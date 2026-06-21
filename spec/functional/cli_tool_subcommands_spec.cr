@@ -162,6 +162,38 @@ describe "hwaro tool unused-assets" do
       status.success?.should be_true
     end
   end
+
+  it "deletes unused files under --delete --force --json and keeps stdout valid JSON" do
+    with_initialized_project do |project_dir|
+      orphan = File.join(project_dir, "static", "orphan.png")
+      File.write(orphan, "x")
+
+      status, output, _ = run_hwaro(["tool", "unused-assets", "--delete", "--force", "--json"], chdir: project_dir)
+
+      status.success?.should be_true
+      File.exists?(orphan).should be_false
+      # stdout must remain a single parseable JSON document — the
+      # `Deleted: …` log lines must not leak onto stdout in JSON mode.
+      parsed = JSON.parse(output.strip)
+      parsed["unused_files"].as_a.map(&.as_s).should contain("static/orphan.png")
+    end
+  end
+
+  it "does not delete under --delete --json without --force, and warns on stderr" do
+    with_initialized_project do |project_dir|
+      orphan = File.join(project_dir, "static", "orphan.png")
+      File.write(orphan, "x")
+
+      status, output, error = run_hwaro(["tool", "unused-assets", "--delete", "--json"], chdir: project_dir)
+
+      status.success?.should be_true
+      # Destructive action is skipped without --force, but not silently:
+      # the file survives, stdout stays parseable, and stderr explains why.
+      File.exists?(orphan).should be_true
+      JSON.parse(output.strip)
+      error.should contain("--force")
+    end
+  end
 end
 
 describe "hwaro tool check-links" do

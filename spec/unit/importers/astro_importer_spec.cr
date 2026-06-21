@@ -299,5 +299,35 @@ describe Hwaro::Services::Importers::AstroImporter do
       result.success.should be_false
       result.message.should contain("not found")
     end
+
+    it "maps a singular author to the authors array" do
+      Dir.mktmpdir do |dir|
+        blog_dir = File.join(dir, "src", "content", "blog")
+        FileUtils.mkdir_p(blog_dir)
+
+        post_content = <<-ASTRO
+          ---
+          title: "Author Test"
+          author: "Jane"
+          ---
+          Content.
+          ASTRO
+
+        File.write(File.join(blog_dir, "author-test.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "astro",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::AstroImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "blog", "author-test.md"))
+        content.should contain("authors = [\"Jane\"]")
+      end
+    end
   end
 end
