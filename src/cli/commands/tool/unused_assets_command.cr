@@ -57,6 +57,14 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            # In JSON mode stdout must stay a single parseable document, so
+            # silence `Logger.info`/`.success` (the `delete_unused` "Deleted: …"
+            # lines included) the same way the sibling tool commands do.
+            # `Logger.warn`/`.error` still reach stderr, so the no-force notice
+            # below survives.
+            Logger.quiet = true if json_output
+            Runner.json_mode = true if json_output
+
             service = Services::UnusedAssets.new(
               content_dir: content_dir,
               static_dir: static_dir,
@@ -67,9 +75,15 @@ module Hwaro
               # Honour --delete in JSON mode too: previously the early return
               # printed the report and skipped deletion entirely, so
               # `--delete --json` was a silent no-op. Deletion in JSON mode
-              # requires --force, since there is no interactive prompt.
-              if delete_mode && force && !result.unused_files.empty?
-                service.delete_unused(result.unused_files)
+              # requires --force, since there is no interactive prompt — and
+              # rather than fail silently without it, warn on stderr so the
+              # skipped destructive action is visible without polluting stdout.
+              if delete_mode && !result.unused_files.empty?
+                if force
+                  service.delete_unused(result.unused_files)
+                else
+                  Logger.warn "Skipping deletion in JSON mode: pass --force to confirm."
+                end
               end
               puts result.to_json
               return
