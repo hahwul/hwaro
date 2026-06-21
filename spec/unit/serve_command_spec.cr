@@ -225,6 +225,35 @@ describe Hwaro::CLI::Commands::ServeCommand do
       build_options.fast_start_count.should eq(5)
     end
 
+    it "defaults workers to 0 (auto)" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([] of String)
+      options.workers.should eq(0)
+    end
+
+    it "parses --jobs into the worker count" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--jobs", "2"])
+      options.workers.should eq(2)
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when --jobs is not a positive integer" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+
+      ["0", "-1", "abc", ""].each do |bad|
+        err = expect_raises(Hwaro::HwaroError) do
+          cmd.test_parse_options(["--jobs", bad])
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
+    end
+
+    it "propagates workers to build options via to_build_options" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options(["--jobs", "3"])
+      options.to_build_options.workers.should eq(3)
+    end
+
     it "parses --header and stores in options.headers (CLI only at parse time)" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options(["--header", "X-Test: hello", "--header", "Cache-Control=no-store"])

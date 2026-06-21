@@ -12,6 +12,7 @@ describe Hwaro::Config::Options::BuildOptions do
       opts.include_future.should be_false
       opts.minify.should be_false
       opts.parallel.should be_true
+      opts.workers.should eq(0)
       opts.cache.should be_false
       opts.full.should be_false
       opts.highlight.should be_true
