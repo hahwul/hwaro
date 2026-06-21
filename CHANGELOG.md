@@ -1,15 +1,34 @@
 # Changelog
 
-## Unreleased
+## v0.16.0
 
 ### Added
-- Section `[cascade]` front matter: defaults inherited by descendant pages and sections (Hugo-style). Deeper cascades override shallower ones; a page's own front matter wins; `extra`/`taxonomies` merge per key. Cached builds invalidate descendants when a parent cascade changes; `hwaro serve` escalates to a full rebuild on cascade edits
-- `[highlight] mode = "server"`: build-time syntax highlighting via Tartrazine lexers (250+ languages, pure Crystal, no external libraries). Emits Highlight.js-compatible CSS classes so existing hljs themes keep working, and ships zero JavaScript — `highlight_js` becomes empty. Default remains `"client"`
-- Template dependency tracking: a static `extends`/`include`/`import`/shortcode graph means editing a template now only rebuilds the pages that render it — in `--cache` builds (per-page closure fingerprints) and `hwaro serve` (selective re-render instead of all pages). Dynamic references (`{% include some_var %}`) or `[build] template_deps = false` restore whole-site invalidation
+- Section `[cascade]` front matter: defaults inherited by descendant pages and sections (Hugo-style); nearer cascades and a page's own keys win, `extra`/`taxonomies` merge per key, and cached/serve builds invalidate affected descendants
+- `[highlight] mode = "server"`: build-time syntax highlighting via Tartrazine (250+ languages, pure Crystal). Emits Highlight.js-compatible classes (existing hljs themes keep working) and ships zero JavaScript; default stays `"client"`
+- Template dependency tracking: editing a template only rebuilds the pages that render it, in `--cache` builds and `hwaro serve`; opt out with `[build] template_deps = false`
+- `page.taxonomies` template variable and Zola-style `[taxonomies]` front-matter tables
+- OG styles `terminal`, `bauhaus`, `halftone`, plus upgraded `artistic`/`hero`/`surreal` renders
+- `hwaro build --jobs N`: cap parallel render concurrency (#655)
 
 ### Changed
-- Terminal output redesign ("ember" identity): `build`, `serve`, `init`, `new`, and `doctor` now share one warm visual language — a live status line animates the build through its phases (TTY only) then collapses into a calm, aligned receipt, ending on a single ember outcome line (`▴ built 42 pages …`). The help banner wordmark moves from off-brand cyan to the ember accent, and durations are humanized (`1.18s` / `842ms`). Machine output is unchanged: `--json` payloads, the `hwaro serve` ready line, `--quiet`, and the `NO_COLOR`/non-TTY plain path are byte-for-byte preserved (no escapes, no `\r`). `HWARO_THEME=light` tunes the accent for light terminals; `COLORTERM` enables the 24-bit tier. NOTE: scripts that grep the *human* stdout (e.g. `Build complete!`, `[Watch] Change detected`) should switch to `--json` — the wording changed, the machine contracts did not
-- Template errors now report `templates/<file>:line:col` with a caret-marked source excerpt instead of an anonymous `<string>` template — applies to syntax errors, runtime errors, and user shortcode templates
+- Terminal output redesign ("ember" identity): `build`/`serve`/`init`/`new`/`doctor` share one warm visual language — a live status line collapses into an aligned receipt ending on a single ember outcome line; humanized durations. Machine output (`--json`, the `serve` ready line, `--quiet`, `NO_COLOR`/non-TTY) is byte-for-byte unchanged; scripts grepping human stdout should switch to `--json` (#637)
+- `init`/`new` scaffolds unified under the ember identity (#624)
+- Template errors report `templates/<file>:line:col` with a caret-marked source excerpt instead of an anonymous `<string>` template
+- Docs redesign: collapsible sidebar, header search trigger, command-palette
+
+### Fixed
+- Security: hardened importers (path traversal, entity DoS), dev-server CORS, and redirect/report sinks (#643); closed symlink-exfil, WS-origin, and `rm_rf` gaps (#623)
+- Dogfood sweeps: 40+ correctness fixes across feeds, markdown, SEO, AMP, PWA, scaffolds, permalinks, and tooling (#640, #641); `--cache` listing-page staleness (#642)
+- Friends audit: llms/search/feed discovery surfaces, taxonomy SEO registration, feed absolutization, and CJK-capable OG fonts (#648, #650, #651, #652)
+- Markdown: fence tracking, pass ordering, code-span/table-cell corruption, math-span emphasis, unquoted YAML dates, and table code-span pipes (#638)
+- Taxonomies: `get_taxonomy` slugs match written pages for drafts and non-default-language terms; closed the authors-taxonomy gap
+- `slugify` lowercases uppercase Unicode letters (#639); OG cache invalidates when logo/background file contents change; `get_section().pages` honors the section's `sort_by`; `hwaro serve` removes orphaned output when a watched source is deleted
+- `tool export jekyll` preserves the `authors` field (#645); `tool unused-assets --delete` honored in JSON mode plus a new `--force` (#647); Astro singular `author` mapped to `authors` on import (#646)
+- Latent-bug and stability audits across subsystems: 10+ edge-case fixes (parse-time, falsy bools, minifier overflow, XML CDATA, etc.) (#620, #653)
+
+### Performance
+- Render: per-page template hash computed once, O(1) current-page exclusion in section lists, cache bookkeeping skipped when caching is off
+- Feeds/search: memoized fallback markdown renders shared between the two surfaces
 
 ## v0.15.3
 
