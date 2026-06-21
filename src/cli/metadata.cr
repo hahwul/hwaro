@@ -47,6 +47,7 @@ module Hwaro
     DEBUG_FLAG                 = FlagInfo.new(short: nil, long: "--debug", description: "Print debug information")
     ENV_FLAG                   = FlagInfo.new(short: "-e", long: "--env", description: "Environment name (loads config.<env>.toml override)", takes_value: true, value_hint: "ENV")
     PROFILE_FLAG               = FlagInfo.new(short: nil, long: "--profile", description: "Show build timing profile")
+    JOBS_FLAG                  = FlagInfo.new(short: nil, long: "--jobs", description: "Concurrent render workers (default: auto). Try 1-2 for template-heavy sites", takes_value: true, value_hint: "N")
     DRAFTS_FLAG                = FlagInfo.new(short: "-d", long: "--drafts", description: "Include draft content")
     INCLUDE_EXPIRED_FLAG       = FlagInfo.new(short: nil, long: "--include-expired", description: "Include expired content")
     INCLUDE_FUTURE_FLAG        = FlagInfo.new(short: nil, long: "--include-future", description: "Include future-dated content")

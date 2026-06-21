@@ -150,6 +150,10 @@ module Hwaro
         @crinja_cache_mutex : Mutex = Mutex.new(:reentrant)
         # Mutex to protect created_dirs set during parallel rendering
         @created_dirs_mutex : Mutex = Mutex.new
+        # Explicit render-worker count from `--jobs` (0 = auto/CPU-based).
+        # Set from BuildOptions at every build entry point and consumed by
+        # process_files_parallel's ParallelConfig. Does not affect output.
+        @render_workers : Int32 = 0
         # Unified cache manager for all cache layers
         @cache_manager : CacheManager = CacheManager.new
         # Pages stashed by `--fast-start` during the initial build so the
@@ -226,6 +230,7 @@ module Hwaro
         end
 
         def run(options : Config::Options::BuildOptions)
+          @render_workers = options.workers
           run(
             output_dir: options.output_dir,
             base_url: options.base_url,
@@ -263,6 +268,7 @@ module Hwaro
         # - Recomputes series/related posts only for affected pages
         # - Selectively invalidates Crinja caches
         def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+          @render_workers = options.workers
           config = @config
           site = @site
           templates = @templates
@@ -549,6 +555,7 @@ module Hwaro
         # Incremental parse of changed content + full re-render with reloaded templates.
         # Used when both content and templates changed simultaneously.
         def run_incremental_then_rerender(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+          @render_workers = options.workers
           config = @config
           site = @site
 
@@ -635,6 +642,7 @@ module Hwaro
         # membership may have changed too, so taxonomy pages regenerate
         # whenever force_pages are present.
         def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil)
+          @render_workers = options.workers
           config = @config
           site = @site
 
@@ -767,6 +775,7 @@ module Hwaro
         # page assets. Without this step those images never get produced
         # in a fast-start serve session until the user saves a file.
         def render_deferred(options : Config::Options::BuildOptions) : Int32
+          @render_workers = options.workers
           pages = @deferred_pages
           return 0 if pages.nil? || pages.empty?
 

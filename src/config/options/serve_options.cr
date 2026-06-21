@@ -9,6 +9,8 @@ module Hwaro
         property include_expired : Bool
         property include_future : Bool
         property minify : Bool
+        # Concurrent render workers (0 = auto). See BuildOptions#workers.
+        property workers : Int32
         property open_browser : Bool
         property verbose : Bool
         property debug : Bool
@@ -37,6 +39,7 @@ module Hwaro
           @include_expired : Bool = false,
           @include_future : Bool = false,
           @minify : Bool = false,
+          @workers : Int32 = 0,
           @open_browser : Bool = false,
           @verbose : Bool = false,
           @debug : Bool = false,
@@ -72,6 +75,7 @@ module Hwaro
             include_future: @include_future,
             minify: @minify,
             parallel: true,
+            workers: @workers,
             verbose: @verbose,
             profile: @profile,
             debug: @debug,

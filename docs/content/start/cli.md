@@ -198,6 +198,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | --include-future | Include future-dated content |
 | --minify | Minify output files (see below) |
 | --no-parallel | Disable parallel processing |
+| --jobs N | Concurrent render workers (default: auto). Try `1`-`2` for template-heavy sites (see below) |
 | --cache | Enable incremental build caching (see below) |
 | --full | Force a complete rebuild, clearing the cache |
 | --skip-highlighting | Disable syntax highlighting |
@@ -253,6 +254,18 @@ hwaro build --cache --full
 
 See [Incremental Build](/features/incremental-build/) for details.
 
+**About `--jobs` (render concurrency):**
+
+By default Hwaro renders pages with an automatic, CPU-based number of concurrent workers. `--jobs N` caps that number. It never changes the generated output — only how many pages render at once.
+
+Lowering it can make **template/Crinja-heavy** sites build faster: those pages allocate many small objects, and beyond ~2 workers the garbage collector's allocation lock contends more than the extra cores help. **Markdown-heavy** sites (large page bodies) keep scaling, so the default stays automatic.
+
+```bash
+hwaro build --jobs 2   # try this if your build is template/shortcode heavy
+```
+
+Leave it unset for the automatic default. `--jobs` has no effect together with `--no-parallel`.
+
 **About `-i, --input`:**
 
 When specified, Hwaro changes its working directory to the given path before building. This lets you build a site located in another directory without `cd`-ing into it first.
@@ -286,6 +299,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --base-url URL | Temporarily override `base_url` from `config.toml` |
 | -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
 | --minify | Serve minified output |
+| --jobs N | Concurrent render workers (default: auto). Try `1`-`2` for template-heavy sites |
 | --open | Open browser after starting |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |

@@ -15,6 +15,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
       options.drafts.should be_false
       options.minify.should be_false
       options.parallel.should be_true
+      options.workers.should eq(0)
       options.cache.should be_false
       options.highlight.should be_true
       options.verbose.should be_false
@@ -97,6 +98,24 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
       options.parallel.should be_false
       options.highlight.should be_false
+    end
+
+    it "parses --jobs into the worker count" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      result, _ = cmd.parse_options(["--jobs", "2"])
+      options, _ = result
+      options.workers.should eq(2)
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when --jobs is not a positive integer" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+
+      ["0", "-1", "abc", ""].each do |bad|
+        err = expect_raises(Hwaro::HwaroError) do
+          cmd.parse_options(["--jobs", bad])
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
     end
 
     it "defaults skip_og_image to false" do
