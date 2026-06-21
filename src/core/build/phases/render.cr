@@ -362,7 +362,11 @@ module Hwaro::Core::Build::Phases::Render
   ) : Int32
     return 0 if pages.empty?
 
-    config = ParallelConfig.new(enabled: true)
+    # @render_workers (from `--jobs`, 0 = auto) caps the concurrent render
+    # fibers. Fewer fibers means fewer of the runtime's worker threads render
+    # at once, which on allocation-heavy template sites reduces GC-allocator
+    # lock contention. Output is identical regardless of the count.
+    config = ParallelConfig.new(enabled: true, max_workers: @render_workers)
     worker_count = config.calculate_workers(pages.size)
     safe = site.config.markdown.safe
 

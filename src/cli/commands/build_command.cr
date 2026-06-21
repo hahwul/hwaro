@@ -33,6 +33,7 @@ module Hwaro
           # Build behavior
           MINIFY_FLAG,
           FlagInfo.new(short: nil, long: "--no-parallel", description: "Disable parallel file processing"),
+          JOBS_FLAG,
           FlagInfo.new(short: nil, long: "--cache", description: "Enable build caching (skip unchanged files)"),
           FlagInfo.new(short: nil, long: "--full", description: "Force a complete rebuild (ignore cache)"),
           FlagInfo.new(short: nil, long: "--stream", description: "Enable streaming build to reduce memory usage"),
@@ -165,6 +166,7 @@ module Hwaro
           # Build behavior
           minify = false
           parallel = true
+          workers = 0
           cache = false
           full = false
           stream = false
@@ -210,6 +212,17 @@ module Hwaro
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
+            CLI.register_flag(parser, JOBS_FLAG) do |v|
+              n = v.to_i?
+              if n.nil? || n < 1
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "Invalid --jobs value: #{v}",
+                  hint: "Pass a positive integer, e.g. --jobs 2. Omit it for automatic (CPU-based) parallelism.",
+                )
+              end
+              workers = n
+            end
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--full", "Force a complete rebuild (ignore cache)") { full = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
@@ -240,6 +253,7 @@ module Hwaro
             include_future: include_future,
             minify: minify,
             parallel: parallel,
+            workers: workers,
             cache: cache,
             full: full,
             highlight: highlight,

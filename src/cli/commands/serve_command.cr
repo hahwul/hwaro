@@ -30,6 +30,7 @@ module Hwaro
 
           # Build behavior
           MINIFY_FLAG,
+          JOBS_FLAG,
           FlagInfo.new(short: nil, long: "--cache", description: "Enable build caching (skip unchanged files)"),
           FlagInfo.new(short: nil, long: "--stream", description: "Enable streaming build to reduce memory usage"),
           FlagInfo.new(short: nil, long: "--memory-limit", description: "Memory limit for streaming build (e.g. 2G, 512M)", takes_value: true, value_hint: "SIZE"),
@@ -130,6 +131,7 @@ module Hwaro
 
           # Build behavior
           minify = false
+          workers = 0
           cache = false
           stream = false
           memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
@@ -185,6 +187,17 @@ module Hwaro
 
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
+            CLI.register_flag(parser, JOBS_FLAG) do |v|
+              n = v.to_i?
+              if n.nil? || n < 1
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "Invalid --jobs value: #{v}",
+                  hint: "Pass a positive integer, e.g. --jobs 2. Omit it for automatic (CPU-based) parallelism.",
+                )
+              end
+              workers = n
+            end
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
             parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }
@@ -252,6 +265,7 @@ module Hwaro
             include_expired: include_expired,
             include_future: include_future,
             minify: minify,
+            workers: workers,
             open_browser: open_browser,
             verbose: verbose,
             debug: debug,
