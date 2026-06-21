@@ -91,6 +91,13 @@ module Hwaro
             cats.each { |c| yaml_lines << "  - #{c}" }
           end
 
+          # Jekyll natively understands an `authors` front-matter list, so
+          # carry it across instead of dropping author attribution.
+          if authors = fields["authors"]?.as?(Array(String))
+            yaml_lines << "authors:"
+            authors.each { |a| yaml_lines << "  - #{a}" }
+          end
+
           if image = fields["image"]?.as?(String)
             yaml_lines << "image: #{image}"
           end
