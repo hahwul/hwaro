@@ -1090,10 +1090,13 @@ module Hwaro
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose); nil },
-            -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil },
-            -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil },
           ] of Proc(Nil)
+          # Robots slots in right after Feeds — its original position in the
+          # incremental path — so sequential (--no-parallel) output ordering is
+          # preserved, not just the generated files.
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
+          seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
+          seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
           ParallelHelper.execute(seo_tasks, parallel)
         end
 

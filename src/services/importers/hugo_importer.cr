@@ -174,11 +174,9 @@ module Hwaro
           has_shortcodes ? :imported_wrapped : :imported
         end
 
-        # Regex for TOML frontmatter: +++ on first line, +++ on its own line
+        # Regex for TOML frontmatter: +++ on first line, +++ on its own line.
+        # (YAML frontmatter reuses the inherited Base::YAML_FM_REGEX.)
         TOML_FM_REGEX = /\A\+\+\+[ \t]*\n(.*?\n?)^\+\+\+[ \t]*$\n?(.*)\z/m
-
-        # Regex for YAML frontmatter: --- on first line, --- on its own line
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
 
         private def extract_frontmatter(raw : String) : {Hash(String, TOML::Any)?, String} | {Hash(String, YAML::Any)?, String}
           if raw.starts_with?("+++")

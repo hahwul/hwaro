@@ -230,7 +230,6 @@ module Hwaro
           Filters::MiscFilters.register(@env)
         end
 
-        # Register custom tests
         # Shared body for the `empty`/`present` Crinja tests: a value is empty
         # when it's an empty string/array/hash or nil.
         private def value_empty?(value : Crinja::Raw) : Bool
@@ -248,6 +247,7 @@ module Hwaro
           end
         end
 
+        # Register custom tests
         private def register_custom_tests
           # Test if a string starts with a prefix
           # Usage: {% if page_url is startswith("/blog/") %}

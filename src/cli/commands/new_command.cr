@@ -62,10 +62,7 @@ module Hwaro
           # rendered as the structured payload on stdout instead of the
           # human "Error [CODE]: …" line on stderr. Also silence the
           # `Created new content: …` info line so stdout stays pure JSON.
-          if json_output
-            Runner.json_mode = true
-            Logger.quiet = true
-          end
+          Runner.enable_json_mode! if json_output
 
           # Refuse to run outside a Hwaro project. Previously `hwaro new` would
           # happily create `content/drafts/foo.md` in any directory, so a typo
