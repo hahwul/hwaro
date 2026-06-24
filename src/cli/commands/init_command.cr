@@ -155,15 +155,13 @@ module Hwaro
             parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
             parser.on("--full-config", "Generate full config.toml with all comments and optional sections (maximum discoverability)") { full_config = true }
             parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|
-              begin
-                agents_mode = Config::Options::AgentsMode.from_string(mode)
-              rescue ex : ArgumentError
-                Logger.error(ex.message || "Unknown error")
-                Logger.info "Available modes:"
-                Logger.info "  remote - Lightweight with links to online docs (default)"
-                Logger.info "  local  - Full embedded reference for offline use"
-                exit(1)
-              end
+              agents_mode = Config::Options::AgentsMode.from_string(mode)
+            rescue ex : ArgumentError
+              Logger.error(ex.message || "Unknown error")
+              Logger.info "Available modes:"
+              Logger.info "  remote - Lightweight with links to online docs (default)"
+              Logger.info "  local  - Full embedded reference for offline use"
+              exit(1)
             end
 
             # Skip options
