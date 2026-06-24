@@ -546,11 +546,9 @@ module Hwaro
         # responses sat indefinitely.
         listen_done = Channel(Nil).new
         spawn do
-          begin
-            server.listen
-          ensure
-            listen_done.close
-          end
+          server.listen
+        ensure
+          listen_done.close
         end
 
         if fast_start_pending

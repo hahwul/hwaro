@@ -24,16 +24,14 @@ module Hwaro
           errors = 0
 
           files.each do |file_path|
-            begin
-              result = export_file(file_path, content_dir, output_dir, include_drafts, verbose)
-              case result
-              when :exported then exported += 1
-              when :skipped  then skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error exporting #{file_path}: #{ex.message}"
+            result = export_file(file_path, content_dir, output_dir, include_drafts, verbose)
+            case result
+            when :exported then exported += 1
+            when :skipped  then skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error exporting #{file_path}: #{ex.message}"
           end
 
           ExportResult.new(

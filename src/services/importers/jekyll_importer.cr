@@ -36,21 +36,19 @@ module Hwaro
           end
 
           files.each do |file_info|
-            begin
-              result = import_file(file_info, output_dir, options.verbose, options.force)
-              case result
-              when :imported
-                imported += 1
-              when :imported_wrapped
-                imported += 1
-                wrapped += 1
-              when :skipped
-                skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error importing #{file_info[:path]}: #{ex.message}"
+            result = import_file(file_info, output_dir, options.verbose, options.force)
+            case result
+            when :imported
+              imported += 1
+            when :imported_wrapped
+              imported += 1
+              wrapped += 1
+            when :skipped
+              skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error importing #{file_info[:path]}: #{ex.message}"
           end
 
           if wrapped > 0

@@ -126,11 +126,9 @@ module Hwaro
         snapshot = @sockets_mutex.synchronize { @sockets.dup }
         dead = [] of HTTP::WebSocket
         snapshot.each do |socket|
-          begin
-            socket.send(message)
-          rescue IO::Error | Socket::Error
-            dead << socket
-          end
+          socket.send(message)
+        rescue IO::Error | Socket::Error
+          dead << socket
         end
         unless dead.empty?
           @sockets_mutex.synchronize { dead.each { |s| @sockets.delete(s) } }

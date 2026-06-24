@@ -425,19 +425,17 @@ module Hwaro
       def start : Nil
         @active = true
         spawn do
-          begin
-            until @stopped.get == 1
-              draw
-              sleep INTERVAL
-            end
-          ensure
-            # Always erase our line and signal `stop`, even if `draw` raised
-            # (e.g. the TTY went away mid-build). Without this, `stop`'s
-            # `@done.receive` — reached from the build's `ensure` — would
-            # deadlock the whole process.
-            erase
-            @done.send(nil)
+          until @stopped.get == 1
+            draw
+            sleep INTERVAL
           end
+        ensure
+          # Always erase our line and signal `stop`, even if `draw` raised
+          # (e.g. the TTY went away mid-build). Without this, `stop`'s
+          # `@done.receive` — reached from the build's `ensure` — would
+          # deadlock the whole process.
+          erase
+          @done.send(nil)
         end
       end
 

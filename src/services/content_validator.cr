@@ -223,13 +223,11 @@ module Hwaro
 
         parsed = false
         formats.each do |fmt|
-          begin
-            Time.parse(date_str, fmt, Time::Location::UTC)
-            parsed = true
-            break
-          rescue Time::Format::Error
-            next
-          end
+          Time.parse(date_str, fmt, Time::Location::UTC)
+          parsed = true
+          break
+        rescue Time::Format::Error
+          next
         end
 
         # Try RFC 3339 as last resort

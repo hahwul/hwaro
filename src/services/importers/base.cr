@@ -176,11 +176,9 @@ module Hwaro
           ]
 
           formats.each do |fmt|
-            begin
-              return Time.parse(date_str.strip, fmt, Time::Location::UTC)
-            rescue Time::Format::Error
-              next
-            end
+            return Time.parse(date_str.strip, fmt, Time::Location::UTC)
+          rescue Time::Format::Error
+            next
           end
 
           nil
