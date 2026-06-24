@@ -189,28 +189,26 @@ module Hwaro
           # Spawn worker fibers
           CONCURRENCY.times do
             spawn do
-              begin
-                while job = work_channel.receive?
-                  begin
-                    width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality)
-                    map_mutex.synchronize do
-                      new_map[job.original_url] = width_map unless width_map.empty?
-                      new_lqip_map[job.original_url] = lqip_data if lqip_data
-                    end
-                  rescue ex
-                    # resize_one does file I/O (cp, mkdir_p, image writes) that
-                    # can raise on permissions/disk-full/vanished files. A dead
-                    # worker would stall the bounded work_channel feeder below
-                    # and hang the build, so log and move to the next job.
-                    Logger.warn "  Image resize failed for #{job.source_path}: #{ex.message}"
+              while job = work_channel.receive?
+                begin
+                  width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality)
+                  map_mutex.synchronize do
+                    new_map[job.original_url] = width_map unless width_map.empty?
+                    new_lqip_map[job.original_url] = lqip_data if lqip_data
                   end
+                rescue ex
+                  # resize_one does file I/O (cp, mkdir_p, image writes) that
+                  # can raise on permissions/disk-full/vanished files. A dead
+                  # worker would stall the bounded work_channel feeder below
+                  # and hang the build, so log and move to the next job.
+                  Logger.warn "  Image resize failed for #{job.source_path}: #{ex.message}"
                 end
-              ensure
-                # Guarantee the done signal even if the loop dies some other
-                # way; the `CONCURRENCY.times { done_channel.receive }` wait
-                # below hangs otherwise.
-                done_channel.send(nil)
               end
+            ensure
+              # Guarantee the done signal even if the loop dies some other
+              # way; the `CONCURRENCY.times { done_channel.receive }` wait
+              # below hangs otherwise.
+              done_channel.send(nil)
             end
           end
 

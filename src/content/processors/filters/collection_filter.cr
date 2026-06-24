@@ -14,13 +14,11 @@ module Hwaro
                 val = arguments["value"]
 
                 filtered = arr.select do |item|
-                  begin
-                    item_hash = item.as_h
-                    item_val = item_hash[attr_key]?
-                    item_val == val
-                  rescue Exception
-                    false
-                  end
+                  item_hash = item.as_h
+                  item_val = item_hash[attr_key]?
+                  item_val == val
+                rescue Exception
+                  false
                 end
                 Crinja::Value.new(filtered)
               rescue Exception
@@ -41,18 +39,16 @@ module Hwaro
                 # lexicographically ("1","10","2"). Strings/dates fall back to
                 # string comparison; a missing attribute sorts as "".
                 sorted = arr.sort do |a, b|
-                  begin
-                    av = a.as_h[attr_key]? || Crinja::Value.new("")
-                    bv = b.as_h[attr_key]? || Crinja::Value.new("")
-                    cmp = if av.number? && bv.number?
-                            av.as_number <=> bv.as_number
-                          else
-                            av.to_s <=> bv.to_s
-                          end
-                    cmp || 0
-                  rescue Exception
-                    0
-                  end
+                  av = a.as_h[attr_key]? || Crinja::Value.new("")
+                  bv = b.as_h[attr_key]? || Crinja::Value.new("")
+                  cmp = if av.number? && bv.number?
+                          av.as_number <=> bv.as_number
+                        else
+                          av.to_s <=> bv.to_s
+                        end
+                  cmp || 0
+                rescue Exception
+                  0
                 end
 
                 sorted = sorted.reverse if reverse
@@ -71,14 +67,12 @@ module Hwaro
                 groups = {} of String => Array(Crinja::Value)
 
                 arr.each do |item|
-                  begin
-                    item_hash = item.as_h
-                    key = item_hash[attr_key]?.try(&.to_s) || ""
-                    groups[key] ||= [] of Crinja::Value
-                    groups[key] << item
-                  rescue Exception
-                    # Skip non-hash items
-                  end
+                  item_hash = item.as_h
+                  key = item_hash[attr_key]?.try(&.to_s) || ""
+                  groups[key] ||= [] of Crinja::Value
+                  groups[key] << item
+                rescue Exception
+                  # Skip non-hash items
                 end
 
                 group_result = groups.map do |key, items|
@@ -122,12 +116,10 @@ module Hwaro
                 arr = target.as_a
                 flattened = [] of Crinja::Value
                 arr.each do |item|
-                  begin
-                    sub = item.as_a
-                    sub.each { |v| flattened << v }
-                  rescue Exception
-                    flattened << item
-                  end
+                  sub = item.as_a
+                  sub.each { |v| flattened << v }
+                rescue Exception
+                  flattened << item
                 end
                 Crinja::Value.new(flattened)
               rescue Exception

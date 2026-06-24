@@ -50,12 +50,10 @@ describe Hwaro::Utils::FileSafe do
 
         worker_count.times do |i|
           spawn do
-            begin
-              Hwaro::Utils::FileSafe.mkdir_p(File.join(base, "page_#{i}"))
-              done.send(nil)
-            rescue ex
-              done.send(ex)
-            end
+            Hwaro::Utils::FileSafe.mkdir_p(File.join(base, "page_#{i}"))
+            done.send(nil)
+          rescue ex
+            done.send(ex)
           end
         end
 
