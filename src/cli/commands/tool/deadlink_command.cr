@@ -106,8 +106,7 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
-            Logger.quiet = true if json_output
-            Runner.json_mode = true if json_output
+            Runner.enable_json_mode! if json_output
 
             if external_only && internal_only
               Logger.warn "--external-only and --internal-only cancel each other out; checking all links"

@@ -72,9 +72,7 @@ module Hwaro
         end
 
         private def collect_markdown_files(path : String) : Array(String)
-          files = [] of String
-          scan_dir(path, files)
-          files
+          walk_files(path, skip_dir: ->(entry : String) { entry.starts_with?(".") })
         end
 
         # Build a name → URL map covering every note in the vault. Keys are
@@ -91,13 +89,11 @@ module Hwaro
           files.each do |file_path|
             raw = File.read(file_path)
             content_cache[file_path] = raw
-            fm_yaml, _ = parse_markdown_file(raw)
+            fm_yaml, _ = split_yaml_frontmatter(raw)
 
             # Section mirrors `import_file`'s computation so the URL we
             # emit lands at the same path the file will be written to.
-            relative = file_path.sub(base_path, "").lstrip('/')
-            parts = relative.split("/")
-            section = parts.size > 1 ? parts[0..-2].join("/") : "posts"
+            section, _ = section_from_path(file_path, base_path, "posts")
 
             basename = File.basename(file_path, File.extname(file_path))
             title = basename
@@ -158,18 +154,6 @@ module Hwaro
           anchor.empty? ? slug : "#{slug}##{slugify(anchor.lchop('#').lchop('^'))}"
         end
 
-        private def scan_dir(dir : String, files : Array(String))
-          Dir.each_child(dir) do |entry|
-            full_path = File.join(dir, entry)
-            # Skip hidden directories (like .obsidian, .trash)
-            if File.directory?(full_path)
-              scan_dir(full_path, files) unless entry.starts_with?(".")
-            elsif entry.ends_with?(".md") || entry.ends_with?(".markdown")
-              files << full_path
-            end
-          end
-        end
-
         private def import_file(
           file_path : String,
           base_path : String,
@@ -181,7 +165,7 @@ module Hwaro
           content_cache : Hash(String, String) = {} of String => String,
         ) : Symbol
           raw = content_cache[file_path]? || File.read(file_path)
-          frontmatter_yaml, body = parse_markdown_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
           fields = Hash(String, (String | Bool | Array(String))?).new
           tags = [] of String
@@ -274,13 +258,7 @@ module Hwaro
           body = convert_obsidian_syntax(body, link_map)
 
           # Determine section from vault folder structure
-          relative = file_path.sub(base_path, "").lstrip('/')
-          parts = relative.split("/")
-          if parts.size > 1
-            section = parts[0..-2].join("/")
-          else
-            section = "posts"
-          end
+          section, _ = section_from_path(file_path, base_path, "posts")
 
           slug = slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
 
@@ -288,17 +266,6 @@ module Hwaro
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
-        end
-
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_markdown_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-          {nil, content.strip}
         end
 
         # Recursively flatten a YAML array value into a flat list of strings.

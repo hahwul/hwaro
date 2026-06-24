@@ -88,16 +88,7 @@ module Hwaro
         end
 
         private def scan_markdown(dir : String) : Array(String)
-          files = [] of String
-          Dir.each_child(dir) do |entry|
-            full_path = File.join(dir, entry)
-            if File.directory?(full_path)
-              scan_markdown(full_path).each { |f| files << f }
-            elsif entry.ends_with?(".md") || entry.ends_with?(".markdown")
-              files << full_path
-            end
-          end
-          files
+          walk_files(dir)
         end
 
         private def import_file(
@@ -107,7 +98,7 @@ module Hwaro
           force : Bool,
         ) : Symbol
           raw = File.read(file_info[:path])
-          frontmatter_yaml, body = parse_hexo_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
           filename = File.basename(file_info[:path])
 
           fields = Hash(String, (String | Bool | Array(String))?).new
@@ -247,17 +238,6 @@ module Hwaro
           written = write_content_file(output_dir, "posts", slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_hexo_tags ? :imported_wrapped : :imported
-        end
-
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_hexo_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-          {nil, content.strip}
         end
 
         private def extract_slug(filename : String) : String

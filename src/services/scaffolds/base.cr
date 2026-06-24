@@ -785,6 +785,46 @@ module Hwaro
           ConfigSnippets.highlight
         end
 
+        # Dark-theme highlight block shared by the *_dark scaffolds (identical
+        # across blog/docs/book dark variants).
+        protected def highlight_dark_config : String
+          <<-TOML
+
+            # =============================================================================
+            # Syntax Highlighting
+            # =============================================================================
+            # Code blocks are highlighted in the browser by Highlight.js and themed by
+            # an inlined, ember-warm dark theme in css/style.css (so you recolor syntax
+            # by editing that CSS, not the `theme` below). `mode = "server"` can
+            # highlight at build time with no JS, but its Tartrazine backend isn't
+            # multi-thread-safe, so the scaffold default stays "client".
+
+            [highlight]
+            enabled = true
+            mode = "client"              # "client" = Highlight.js in the browser; "server" = build-time (no JS)
+            theme = "github-dark"        # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
+            use_cdn = true               # true loads Highlight.js from a CDN; false expects a self-hosted build
+
+            TOML
+        end
+
+        # Shared search overlay markup; only the input placeholder varies per
+        # scaffold (e.g. "Search posts...", "Search documentation...").
+        protected def search_overlay_html(placeholder : String) : String
+          <<-HTML
+            <div class="search-overlay" id="searchOverlay" onclick="if(event.target===this)closeSearch()">
+              <div class="search-modal">
+                <div class="search-input-wrap">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="search" id="searchInput" aria-label="Search" placeholder="#{placeholder}" autocomplete="off">
+                  <kbd onclick="closeSearch()">ESC</kbd>
+                </div>
+                <div class="search-results" id="searchResults"></div>
+              </div>
+            </div>
+            HTML
+        end
+
         protected def og_config : String
           ConfigSnippets.og
         end

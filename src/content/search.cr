@@ -27,7 +27,7 @@ module Hwaro
         # actually emit HTML; the `generated` check mirrors llms.cr so
         # navigational listing pages don't pollute search results. Both match
         # the guards sitemap.cr / feeds.cr / llms.cr already apply.
-        search_pages = pages.reject { |p| p.draft || !p.in_search_index || !p.render || p.generated }
+        search_pages = pages.reject { |p| !p.search_index_eligible? }
 
         # Deduplicate by URL (keep last occurrence, matching build behavior)
         seen_urls = Set(String).new

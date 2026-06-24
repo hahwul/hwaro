@@ -46,8 +46,7 @@ module Hwaro
 
           # Quiet logger so --json emits only the final JSON document. Human
           # --list-targets and --dry-run output is routed around Logger below.
-          Logger.quiet = true if json_output
-          Runner.json_mode = true if json_output
+          Runner.enable_json_mode! if json_output
 
           if list_targets
             print_targets(options.env, json: json_output)

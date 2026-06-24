@@ -54,20 +54,7 @@ module Hwaro
         end
 
         private def collect_markdown_files(path : String) : Array(String)
-          files = [] of String
-          scan_dir(path, files)
-          files
-        end
-
-        private def scan_dir(dir : String, files : Array(String))
-          Dir.each_child(dir) do |entry|
-            full_path = File.join(dir, entry)
-            if File.directory?(full_path)
-              scan_dir(full_path, files)
-            elsif entry.ends_with?(".md") || entry.ends_with?(".markdown")
-              files << full_path
-            end
-          end
+          walk_files(path)
         end
 
         private def import_file(
@@ -78,7 +65,7 @@ module Hwaro
           force : Bool,
         ) : Symbol
           raw = File.read(file_path)
-          frontmatter_yaml, body = parse_markdown_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
           fields = Hash(String, (String | Bool | Array(String))?).new
 
@@ -147,18 +134,6 @@ module Hwaro
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           written ? :imported : :skipped
-        end
-
-        # Regex to match YAML frontmatter
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_markdown_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-          {nil, content.strip}
         end
 
         private def extract_title_from_body(body : String) : String?

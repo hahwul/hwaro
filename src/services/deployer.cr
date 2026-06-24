@@ -73,20 +73,10 @@ module Hwaro
         config ||= Models::Config.load(env: options.env)
         deployment = config.deployment
 
-        source_dir = options.source_dir || deployment.source_dir
-        source_dir = File.expand_path(source_dir)
+        source_dir = resolve_source_dir(options, deployment)
         return ops unless Dir.exists?(source_dir)
 
-        target_names =
-          if options.targets.present?
-            options.targets
-          elsif default_target = deployment.target
-            [default_target]
-          elsif deployment.targets.size > 0
-            [deployment.targets.first.name]
-          else
-            [] of String
-          end
+        target_names = resolve_target_names(options, deployment)
         return ops if target_names.empty?
 
         targets = target_names.compact_map { |name| deployment.target_named(name) }
@@ -155,35 +145,11 @@ module Hwaro
         config ||= Models::Config.load(env: options.env)
         deployment = config.deployment
 
-        source_dir = options.source_dir || deployment.source_dir
-        source_dir = File.expand_path(source_dir)
+        source_dir = resolve_source_dir(options, deployment)
+        require_source_dir!(source_dir)
 
-        unless Dir.exists?(source_dir)
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Source directory not found: #{source_dir}",
-            hint: "Run 'hwaro build' first, or pass '--source DIR'.",
-          )
-        end
-
-        target_names =
-          if options.targets.present?
-            options.targets
-          elsif default_target = deployment.target
-            [default_target]
-          elsif deployment.targets.size > 0
-            [deployment.targets.first.name]
-          else
-            [] of String
-          end
-
-        if target_names.empty?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "No deployment targets configured.",
-            hint: "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>",
-          )
-        end
+        target_names = resolve_target_names(options, deployment)
+        require_target_names!(target_names)
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
@@ -346,35 +312,11 @@ module Hwaro
         config ||= Models::Config.load(env: options.env)
         deployment = config.deployment
 
-        source_dir = options.source_dir || deployment.source_dir
-        source_dir = File.expand_path(source_dir)
+        source_dir = resolve_source_dir(options, deployment)
+        require_source_dir!(source_dir)
 
-        unless Dir.exists?(source_dir)
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Source directory not found: #{source_dir}",
-            hint: "Run 'hwaro build' first, or pass '--source DIR'.",
-          )
-        end
-
-        target_names =
-          if options.targets.present?
-            options.targets
-          elsif default_target = deployment.target
-            [default_target]
-          elsif deployment.targets.size > 0
-            [deployment.targets.first.name]
-          else
-            [] of String
-          end
-
-        if target_names.empty?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "No deployment targets configured.",
-            hint: "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>",
-          )
-        end
+        target_names = resolve_target_names(options, deployment)
+        require_target_names!(target_names)
 
         targets = target_names.map do |name|
           target = deployment.target_named(name)
@@ -734,26 +676,55 @@ module Hwaro
         files
       end
 
+      # Resolve the deploy source directory from options/config (expanded).
+      private def resolve_source_dir(options, deployment) : String
+        File.expand_path(options.source_dir || deployment.source_dir)
+      end
+
+      # Resolve which deploy target names to act on: explicit CLI targets, then
+      # the configured default target, then the first configured target.
+      private def resolve_target_names(options, deployment) : Array(String)
+        if options.targets.present?
+          options.targets
+        elsif default_target = deployment.target
+          [default_target]
+        elsif deployment.targets.size > 0
+          [deployment.targets.first.name]
+        else
+          [] of String
+        end
+      end
+
+      # Raise HWARO_E_CONFIG when the deploy source directory doesn't exist.
+      private def require_source_dir!(source_dir : String)
+        return if Dir.exists?(source_dir)
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Source directory not found: #{source_dir}",
+          hint: "Run 'hwaro build' first, or pass '--source DIR'.",
+        )
+      end
+
+      # Raise HWARO_E_CONFIG when no deployment targets are configured.
+      private def require_target_names!(target_names : Array(String))
+        return unless target_names.empty?
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "No deployment targets configured.",
+          hint: "Add '[[deployment.targets]]' to config.toml, or pass target names: hwaro deploy <targets>",
+        )
+      end
+
       private def included_by_target?(rel : String, target : Models::DeploymentTarget) : Bool
         normalized = rel.gsub('\\', '/')
         # A malformed include/exclude glob raises File::BadPatternError. Treat a
         # bad `include` as not-matching (file excluded) and a bad `exclude` as
         # not-matching (file kept), so a config typo doesn't crash the deploy.
         if inc = target.include
-          matched = begin
-            File.match?(inc, normalized)
-          rescue File::BadPatternError
-            false
-          end
-          return false unless matched
+          return false unless Utils::PathUtils.glob_match?(inc, normalized)
         end
         if exc = target.exclude
-          excluded = begin
-            File.match?(exc, normalized)
-          rescue File::BadPatternError
-            false
-          end
-          return false if excluded
+          return false if Utils::PathUtils.glob_match?(exc, normalized)
         end
         true
       end

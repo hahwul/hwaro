@@ -194,20 +194,21 @@ module Hwaro
         Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
       end
 
-      private def create_scaffold_content(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)
-        content_files = scaffold.content_files(skip_taxonomies)
-
-        content_files.each do |relative_path, content|
-          full_path = File.join(target_path, "content", relative_path)
+      # Write each {relative_path => content} entry under base_dir, creating
+      # parent directories on demand. Hash iteration order is preserved, so the
+      # @created_count tally and Logger.action sequence are unchanged.
+      private def write_files(base_dir : String, files : Hash(String, String))
+        files.each do |relative_path, content|
+          full_path = File.join(base_dir, relative_path)
           dir_path = File.dirname(full_path)
-
-          # Create directory if it doesn't exist
-          unless Dir.exists?(dir_path)
-            create_directory(dir_path)
-          end
-
+          create_directory(dir_path) unless Dir.exists?(dir_path)
           create_file(full_path, content)
         end
+      end
+
+      private def create_scaffold_content(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)
+        content_files = scaffold.content_files(skip_taxonomies)
+        write_files(File.join(target_path, "content"), content_files)
       end
 
       private def create_scaffold_templates(target_path : String, scaffold : Scaffolds::Base, skip_taxonomies : Bool)
@@ -218,14 +219,7 @@ module Hwaro
         # (e.g. `partials/nav.html`) so the parent directory is
         # created on demand instead of relying on a flat layout.
         template_files = scaffold.template_files(skip_taxonomies)
-        template_files.each do |relative_path, content|
-          full_path = File.join(templates_dir, relative_path)
-          dir_path = File.dirname(full_path)
-          unless Dir.exists?(dir_path)
-            create_directory(dir_path)
-          end
-          create_file(full_path, content)
-        end
+        write_files(templates_dir, template_files)
 
         # Create shortcodes directory and files only if the scaffold ships any.
         # (Bare scaffold returns empty to stay truly minimal.)
@@ -254,31 +248,12 @@ module Hwaro
         archetypes_dir = File.join(target_path, "archetypes")
         create_directory(archetypes_dir)
 
-        archetype_files.each do |relative_path, content|
-          full_path = File.join(archetypes_dir, relative_path)
-          dir_path = File.dirname(full_path)
-
-          unless Dir.exists?(dir_path)
-            create_directory(dir_path)
-          end
-
-          create_file(full_path, content)
-        end
+        write_files(archetypes_dir, archetype_files)
       end
 
       private def create_scaffold_static_files(target_path : String, scaffold : Scaffolds::Base)
         static_dir = File.join(target_path, "static")
-
-        scaffold.static_files.each do |relative_path, content|
-          full_path = File.join(static_dir, relative_path)
-          dir_path = File.dirname(full_path)
-
-          unless Dir.exists?(dir_path)
-            create_directory(dir_path)
-          end
-
-          create_file(full_path, content)
-        end
+        write_files(static_dir, scaffold.static_files)
       end
 
       private def create_multilingual_content(
@@ -288,12 +263,7 @@ module Hwaro
         scaffold : Scaffolds::Base,
       )
         content_dir = File.join(target_path, "content")
-        scaffold.multilingual_content_files(languages, skip_taxonomies).each do |relative_path, content|
-          full_path = File.join(content_dir, relative_path)
-          dir_path = File.dirname(full_path)
-          create_directory(dir_path) unless Dir.exists?(dir_path)
-          create_file(full_path, content)
-        end
+        write_files(content_dir, scaffold.multilingual_content_files(languages, skip_taxonomies))
       end
 
       private def language_display_name(code : String) : String

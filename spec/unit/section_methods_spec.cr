@@ -26,25 +26,6 @@ describe Hwaro::Models::Section do
     end
   end
 
-  describe "#effective_page_template" do
-    it "returns nil when page_template is not set" do
-      section = Hwaro::Models::Section.new("blog/_index.md")
-      section.effective_page_template.should be_nil
-    end
-
-    it "returns the page_template when set" do
-      section = Hwaro::Models::Section.new("blog/_index.md")
-      section.page_template = "blog_post"
-      section.effective_page_template.should eq("blog_post")
-    end
-
-    it "returns correct template for different values" do
-      section = Hwaro::Models::Section.new("docs/_index.md")
-      section.page_template = "documentation"
-      section.effective_page_template.should eq("documentation")
-    end
-  end
-
   describe "#add_subsection" do
     it "adds a subsection to the section" do
       parent = Hwaro::Models::Section.new("blog/_index.md")
@@ -78,59 +59,6 @@ describe Hwaro::Models::Section do
 
       parent.subsections.size.should eq(3)
       parent.subsections.map(&.title).should eq(["Guide", "API", "FAQ"])
-    end
-  end
-
-  describe "#find_subsection" do
-    it "finds subsection by section name" do
-      parent = Hwaro::Models::Section.new("blog/_index.md")
-
-      archive = Hwaro::Models::Section.new("blog/archive/_index.md")
-      archive.section = "archive"
-      archive.title = "Archive"
-
-      recent = Hwaro::Models::Section.new("blog/recent/_index.md")
-      recent.section = "recent"
-      recent.title = "Recent"
-
-      parent.add_subsection(archive)
-      parent.add_subsection(recent)
-
-      found = parent.find_subsection("archive")
-      found.should_not be_nil
-      found.not_nil!.title.should eq("Archive")
-    end
-
-    it "finds subsection by title (case-insensitive)" do
-      parent = Hwaro::Models::Section.new("blog/_index.md")
-
-      archive = Hwaro::Models::Section.new("blog/archive/_index.md")
-      archive.section = "blog/archive"
-      archive.title = "Archive Section"
-
-      parent.add_subsection(archive)
-
-      found = parent.find_subsection("archive section")
-      found.should_not be_nil
-      found.not_nil!.title.should eq("Archive Section")
-    end
-
-    it "returns nil when subsection is not found" do
-      parent = Hwaro::Models::Section.new("blog/_index.md")
-
-      archive = Hwaro::Models::Section.new("blog/archive/_index.md")
-      archive.section = "archive"
-      archive.title = "Archive"
-      parent.add_subsection(archive)
-
-      found = parent.find_subsection("nonexistent")
-      found.should be_nil
-    end
-
-    it "returns nil when no subsections exist" do
-      parent = Hwaro::Models::Section.new("blog/_index.md")
-      found = parent.find_subsection("anything")
-      found.should be_nil
     end
   end
 

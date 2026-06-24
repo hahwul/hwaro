@@ -261,8 +261,7 @@ module Hwaro::Core::Build::Phases::Render
     section_set_changed = cache.section_set_changed?(section_set_fp)
     listing_memo = {} of String => Tuple(Bool, Bool)
     pages.select do |page|
-      source_path = File.join("content", page.path)
-      output_path = get_output_path(page, output_dir)
+      source_path, output_path = cache_paths_for(page, output_dir)
       next true if cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
@@ -347,6 +346,24 @@ module Hwaro::Core::Build::Phases::Render
     Utils::OutputGuard.safe_output_path(output_path, output_dir) || File.join(output_dir, "index.html")
   end
 
+  # Source + output path pair the cache keys a page by.
+  private def cache_paths_for(page : Models::Page, output_dir : String) : {String, String}
+    {File.join("content", page.path), get_output_path(page, output_dir)}
+  end
+
+  # Record this page's post-render cache entry. No-op when the cache is
+  # disabled (the default build).
+  #
+  # The `cache.enabled?` guard wraps ARGUMENT evaluation, not just the
+  # `cache.update` call: computing page_template_hash costs a shortcode-regex
+  # scan over the raw content plus an MD5 per page, so it must be skipped
+  # entirely when the cache is off.
+  private def record_page_cache_entry(page : Models::Page, cache : Cache, templates : Hash(String, String), site : Models::Site, output_dir : String)
+    return unless cache.enabled?
+    source_path, output_path = cache_paths_for(page, output_dir)
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+  end
+
   private def process_files_parallel(
     pages : Array(Models::Page),
     site : Models::Site,
@@ -423,15 +440,7 @@ module Hwaro::Core::Build::Phases::Render
               template_name = determine_template(page, templates, site)
               profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
             end
-            # Guard argument evaluation, not just the call: update is a no-op
-            # when the cache is disabled (the default build), but its
-            # arguments cost a template-hash computation — shortcode regex
-            # scans over the raw content plus an MD5 — per page.
-            if cache.enabled?
-              source_path = File.join("content", page.path)
-              output_path = get_output_path(page, output_dir)
-              cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
-            end
+            record_page_cache_entry(page, cache, templates, site, output_dir)
             ok = true
           rescue ex : Hwaro::HwaroError
             error_mutex.synchronize do
@@ -555,13 +564,7 @@ module Hwaro::Core::Build::Phases::Render
         template_name = determine_template(page, templates, site)
         profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
       end
-      # See the parallel worker: skip argument evaluation entirely when the
-      # cache is disabled — the template-hash computation is per-page work.
-      if cache.enabled?
-        source_path = File.join("content", page.path)
-        output_path = get_output_path(page, output_dir)
-        cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
-      end
+      record_page_cache_entry(page, cache, templates, site, output_dir)
       count += 1
     end
     count
@@ -681,10 +684,7 @@ module Hwaro::Core::Build::Phases::Render
                        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
                        prebuilt_vars: shortcode_context, template_name: template_name)
                    else
-                     msg = "No template found for #{page.path}. Using raw content."
-                     Logger.warn "#{msg}"
-                     page.build_warnings << msg unless page.build_warnings.includes?(msg)
-                     html_content
+                     no_template_fallback(page, html_content)
                    end
 
       if error_overlay && !page.build_warnings.empty?
@@ -766,10 +766,7 @@ module Hwaro::Core::Build::Phases::Render
                        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, pagination_seo_links: pagination_seo_links,
                        template_name: template_name)
                    else
-                     msg = "No template found for #{section.path}. Using raw content."
-                     Logger.warn "#{msg}"
-                     section.build_warnings << msg unless section.build_warnings.includes?(msg)
-                     html_content
+                     no_template_fallback(section, html_content)
                    end
 
       if error_overlay && !section.build_warnings.empty?
@@ -797,6 +794,16 @@ module Hwaro::Core::Build::Phases::Render
     Logger.action :create, output_path if verbose
   end
 
+  # Render-path fallback when a page/section has no template: warn, record a
+  # dedup'd build warning, and return the raw HTML unchanged. (determine_template
+  # has its own intentionally warn-once handling and is not routed through here.)
+  private def no_template_fallback(page : Models::Page, html_content : String) : String
+    msg = "No template found for #{page.path}. Using raw content."
+    Logger.warn msg
+    page.build_warnings << msg unless page.build_warnings.includes?(msg)
+    html_content
+  end
+
   private def determine_template(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String
     if custom = page.template
       return custom if templates.has_key?(custom)
@@ -822,7 +829,7 @@ module Hwaro::Core::Build::Phases::Render
     # their own "section" template (handled above), so they are excluded here.
     unless page.is_a?(Models::Section)
       if section = site.section_for(page.section, page.language)
-        if pt = section.effective_page_template
+        if pt = section.page_template
           return pt if templates.has_key?(pt)
         end
       end

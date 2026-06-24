@@ -143,6 +143,14 @@ module Hwaro
         @@json_mode = value
       end
 
+      # Enable JSON output mode: silence human log lines and flag json_mode so
+      # error/output payloads emit machine JSON. Call when a command parses
+      # `--json`.
+      def self.enable_json_mode!
+        Logger.quiet = true
+        @@json_mode = true
+      end
+
       # Emit a classified error in either the quiet/JSON machine shape or the
       # human-friendly `Error [CODE]: message` form. JSON mode is detected
       # from `Runner.json_mode?` (set by commands that saw `--json`) or from

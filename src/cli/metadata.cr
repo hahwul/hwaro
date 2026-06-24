@@ -79,5 +79,38 @@ module Hwaro
         end
       end
     end
+
+    # Register the shared --base-url flag, validating the value and raising a
+    # usage error on a malformed URL. Yields the validated value to `block`.
+    def self.register_base_url(parser : OptionParser, &block : String ->)
+      register_flag(parser, BASE_URL_FLAG) do |v|
+        begin
+          Models::Config.validate_base_url!(v)
+        rescue ex : ArgumentError
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: ex.message || "Invalid --base-url",
+            hint: "Examples: https://example.com, https://example.com/subpath, http://localhost:3000.",
+          )
+        end
+        block.call(v)
+      end
+    end
+
+    # Register the shared --jobs flag, parsing a positive worker count and
+    # raising a usage error otherwise. Yields the parsed Int32 to `block`.
+    def self.register_jobs(parser : OptionParser, &block : Int32 ->)
+      register_flag(parser, JOBS_FLAG) do |v|
+        n = v.to_i?
+        if n.nil? || n < 1
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Invalid --jobs value: #{v}",
+            hint: "Pass a positive integer, e.g. --jobs 2. Omit it for automatic (CPU-based) parallelism.",
+          )
+        end
+        block.call(n)
+      end
+    end
   end
 end

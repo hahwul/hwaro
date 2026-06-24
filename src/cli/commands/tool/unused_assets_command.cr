@@ -62,8 +62,7 @@ module Hwaro
             # lines included) the same way the sibling tool commands do.
             # `Logger.warn`/`.error` still reach stderr, so the no-force notice
             # below survives.
-            Logger.quiet = true if json_output
-            Runner.json_mode = true if json_output
+            Runner.enable_json_mode! if json_output
 
             service = Services::UnusedAssets.new(
               content_dir: content_dir,

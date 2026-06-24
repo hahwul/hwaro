@@ -4,9 +4,20 @@ require "./deployment"
 require "../utils/errors"
 require "../utils/text_utils"
 require "../utils/env_substitutor"
+require "../utils/path_utils"
 
 module Hwaro
   module Models
+    # Cache-busting query suffix shared by the asset/highlight tag emitters.
+    def self.cache_bust_suffix(value : String) : String
+      value.empty? ? "" : "?v=#{HTML.escape(value)}"
+    end
+
+    # Join non-empty tag fragments with newlines.
+    def self.join_tags(*parts : String) : String
+      parts.reject(&.empty?).join("\n")
+    end
+
     class SitemapConfig
       property enabled : Bool
       property filename : String
@@ -161,12 +172,9 @@ module Hwaro
         return false unless @allow_extensions.includes?(ext)
         return false if @disallow_extensions.includes?(ext)
         @disallow_paths.each do |pattern|
-          # A malformed glob raises File::BadPatternError; skip it rather than
-          # crashing the build, so other disallow patterns still apply.
-
-          return false if File.match?(pattern, normalized_path)
-        rescue File::BadPatternError
-          next
+          # A malformed glob is treated as non-matching by glob_match?, so a
+          # config typo can't crash the build; other patterns still apply.
+          return false if Utils::PathUtils.glob_match?(pattern, normalized_path)
         end
         true
       end
@@ -279,7 +287,7 @@ module Hwaro
         return "" unless @enabled
         return "" if @dirs.empty?
 
-        suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
+        suffix = Models.cache_bust_suffix(cache_bust)
         tags = [] of String
         @dirs.each do |dir|
           static_dir = File.join("static", dir)
@@ -297,7 +305,7 @@ module Hwaro
       def all_tags(base_url : String = "", cache_bust : String = "") : String
         css = css_tags(base_url, cache_bust)
         js = js_tags(base_url, cache_bust)
-        [css, js].reject(&.empty?).join("\n")
+        Models.join_tags(css, js)
       end
     end
 
@@ -401,6 +409,12 @@ module Hwaro
         @auto_image = AutoImageConfig.new
       end
 
+      # Append a single conditional `<meta>` line (leading newline + 2-space
+      # indent) for the OG/Twitter tag builders.
+      private def append_meta(str, attr : String, name : String, value : String)
+        str << %(\n  <meta #{attr}="#{name}" content="#{Utils::TextUtils.escape_xml(value)}">)
+      end
+
       # Generate OG meta tags.
       #
       # `og_type_override` lets the renderer force `og:type="website"` for
@@ -425,13 +439,13 @@ module Hwaro
           str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(og_type)}">\n  )
           str << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(url)}">)
           if desc = description
-            str << %(\n  <meta property="og:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
+            append_meta(str, "property", "og:description", desc)
           end
           if img_url = resolve_image_url(image, base_url)
-            str << %(\n  <meta property="og:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
+            append_meta(str, "property", "og:image", img_url)
           end
           if fb_id = @fb_app_id
-            str << %(\n  <meta property="fb:app_id" content="#{Utils::TextUtils.escape_xml(fb_id)}">)
+            append_meta(str, "property", "fb:app_id", fb_id)
           end
         end
       end
@@ -455,16 +469,16 @@ module Hwaro
           str << %(<meta name="twitter:card" content="#{Utils::TextUtils.escape_xml(card)}">\n  )
           str << %(<meta name="twitter:title" content="#{Utils::TextUtils.escape_xml(title)}">)
           if desc = description
-            str << %(\n  <meta name="twitter:description" content="#{Utils::TextUtils.escape_xml(desc)}">)
+            append_meta(str, "name", "twitter:description", desc)
           end
           if img_url
-            str << %(\n  <meta name="twitter:image" content="#{Utils::TextUtils.escape_xml(img_url)}">)
+            append_meta(str, "name", "twitter:image", img_url)
           end
           if site = @twitter_site
-            str << %(\n  <meta name="twitter:site" content="#{Utils::TextUtils.escape_xml(site)}">)
+            append_meta(str, "name", "twitter:site", site)
           end
           if creator = @twitter_creator
-            str << %(\n  <meta name="twitter:creator" content="#{Utils::TextUtils.escape_xml(creator)}">)
+            append_meta(str, "name", "twitter:creator", creator)
           end
         end
       end
@@ -487,7 +501,7 @@ module Hwaro
       ) : String
         og = og_tags(title, description, url, image, base_url, og_type_override)
         twitter = twitter_tags(title, description, image, base_url)
-        [og, twitter].reject(&.empty?).join("\n")
+        Models.join_tags(og, twitter)
       end
     end
 
@@ -520,7 +534,7 @@ module Hwaro
         if @use_cdn
           %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{safe_theme}.min.css">)
         else
-          suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
+          suffix = Models.cache_bust_suffix(cache_bust)
           %(<link rel="stylesheet" href="/assets/css/highlight/#{safe_theme}.min.css#{suffix}">)
         end
       end
@@ -533,7 +547,7 @@ module Hwaro
         if @use_cdn
           %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
         else
-          suffix = cache_bust.empty? ? "" : "?v=#{HTML.escape(cache_bust)}"
+          suffix = Models.cache_bust_suffix(cache_bust)
           %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
         end
       end
@@ -893,12 +907,8 @@ module Hwaro
           # an unclosed `[` class) makes File.match? raise File::BadPatternError;
           # treat it as non-matching rather than crashing the whole build on a
           # single config typo.
-          begin
-            File.match?(pattern, normalized) ||
-              (!pattern.includes?('/') && File.match?(pattern, basename))
-          rescue File::BadPatternError
-            false
-          end
+          Utils::PathUtils.glob_match?(pattern, normalized) ||
+            (!pattern.includes?('/') && Utils::PathUtils.glob_match?(pattern, basename))
         else
           # Literal: an exact file, or a directory subtree rooted at it.
           normalized == pattern || normalized.starts_with?("#{pattern}/")

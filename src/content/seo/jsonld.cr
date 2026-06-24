@@ -8,16 +8,26 @@ module Hwaro
       module JsonLd
         extend self
 
+        # Join `path` onto `base` as a root-relative absolute URL.
+        private def abs_path(base : String, path : String) : String
+          "#{base}#{path.starts_with?("/") ? path : "/#{path}"}"
+        end
+
+        # Like abs_path, but leaves an already-absolute http(s) URL untouched.
+        private def abs_or_external(base : String, value : String) : String
+          value.starts_with?("http") ? value : abs_path(base, value)
+        end
+
         # Generate Article JSON-LD for a page
         def article(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
           base = config.base_url_stripped
-          url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+          url = page.permalink || abs_path(base, page.url)
 
           date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           updated_str = page.updated.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           desc = page.description
           image_url = if image = page.image
-                        image.starts_with?("http") ? image : "#{base}#{image.starts_with?("/") ? image : "/#{image}"}"
+                        abs_or_external(base, image)
                       end
           # Prefer the resolved display name from site.authors (data/authors
           # enrichment) so the schema.org author matches the visible author name
@@ -73,9 +83,9 @@ module Hwaro
         def collection_page(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
           base = config.base_url_stripped
           url = if u = url_override
-                  "#{base}#{u.starts_with?("/") ? u : "/#{u}"}"
+                  abs_path(base, u)
                 else
-                  page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+                  page.permalink || abs_path(base, page.url)
                 end
 
           json = JSON.build do |j|
@@ -112,7 +122,7 @@ module Hwaro
 
           # Ancestors
           page.ancestors.each_with_index do |ancestor, idx|
-            ancestor_url = "#{base}#{ancestor.url.starts_with?("/") ? ancestor.url : "/#{ancestor.url}"}"
+            ancestor_url = abs_path(base, ancestor.url)
             items << {
               "@type"    => "ListItem",
               "position" => idx + 2,
@@ -196,7 +206,7 @@ module Hwaro
           return "" if steps.empty?
 
           base = config.base_url_stripped
-          url = "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+          url = abs_path(base, page.url)
 
           json = JSON.build do |j|
             j.object do
@@ -274,10 +284,10 @@ module Hwaro
               j.field "@type", "Person"
               j.field "name", name
               if u = url
-                j.field "url", u.starts_with?("http") ? u : "#{base}#{u.starts_with?("/") ? u : "/#{u}"}"
+                j.field "url", abs_or_external(base, u)
               end
               if img = image
-                j.field "image", img.starts_with?("http") ? img : "#{base}#{img.starts_with?("/") ? img : "/#{img}"}"
+                j.field "image", abs_or_external(base, img)
               end
             end
           end
@@ -300,7 +310,7 @@ module Hwaro
                 j.field "description", config.description
               end
               if logo_url = logo
-                j.field "logo", logo_url.starts_with?("http") ? logo_url : "#{base}#{logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"}"
+                j.field "logo", abs_or_external(base, logo_url)
               end
             end
           end

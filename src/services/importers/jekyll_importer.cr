@@ -93,7 +93,7 @@ module Hwaro
           force : Bool,
         ) : Symbol
           raw = File.read(file_info[:path])
-          frontmatter_yaml, body = parse_jekyll_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
           filename = File.basename(file_info[:path])
 
           # Extract slug and date from filename
@@ -236,20 +236,6 @@ module Hwaro
 
           return :skipped unless written
           has_liquid ? :imported_wrapped : :imported
-        end
-
-        # Regex to match YAML frontmatter: opening --- on first line,
-        # closing --- on its own line. Uses multiline mode so ^ matches line starts.
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_jekyll_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-
-          {nil, content.strip}
         end
 
         private def extract_slug(filename : String) : String

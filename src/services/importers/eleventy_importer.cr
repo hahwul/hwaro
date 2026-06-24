@@ -70,27 +70,10 @@ module Hwaro
         end
 
         private def collect_content_files(path : String) : Array(String)
-          files = [] of String
-          scan_dir(path, files)
-          files
-        end
-
-        private def scan_dir(dir : String, files : Array(String))
-          Dir.each_child(dir) do |entry|
-            full_path = File.join(dir, entry)
-            if File.directory?(full_path)
-              # Skip common non-content directories
-              next if entry.starts_with?(".")
-              next if entry == "node_modules"
-              next if entry == "_site"
-              next if entry == "_includes"
-              next if entry == "_layouts"
-              next if entry == "_data"
-              scan_dir(full_path, files)
-            elsif entry.ends_with?(".md") || entry.ends_with?(".markdown")
-              files << full_path
-            end
-          end
+          # Skip common non-content directories
+          walk_files(path, skip_dir: ->(entry : String) {
+            entry.starts_with?(".") || {"node_modules", "_site", "_includes", "_layouts", "_data"}.includes?(entry)
+          })
         end
 
         # Load 11ty directory data files (dirname.json or dirname.11tydata.json)
@@ -175,7 +158,7 @@ module Hwaro
           force : Bool,
         ) : Symbol
           raw = File.read(file_path)
-          frontmatter_yaml, body = parse_eleventy_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
           fields = Hash(String, (String | Bool | Array(String))?).new
 
@@ -282,13 +265,7 @@ module Hwaro
           end
 
           # Determine section
-          relative = file_path.sub(base_path, "").lstrip('/')
-          parts = relative.split("/")
-          section = if parts.size > 1
-                      parts[0]
-                    else
-                      "posts"
-                    end
+          section = top_section_from_path(file_path, base_path, "posts")
 
           slug = slugify(File.basename(file_path, File.extname(file_path)))
 
@@ -297,17 +274,6 @@ module Hwaro
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_template_tags ? :imported_wrapped : :imported
-        end
-
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_eleventy_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-          {nil, content.strip}
         end
 
         # Merge directory data with per-file frontmatter (file data takes precedence)
