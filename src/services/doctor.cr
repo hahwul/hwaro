@@ -806,31 +806,29 @@ module Hwaro
       # `config-dir-missing` (directory), both suppressible via
       # `[doctor] ignore = [...]`. See
       # https://github.com/hahwul/hwaro/issues/489.
+      # Emit a "<kind> not found" config warning for `value` unless it's blank
+      # or `resolver` reports it resolves. `id`/`kind` are passed independently
+      # so route checks can keep the "config-path-missing"/"file" pairing.
+      private def emit_missing(issues : Array(Issue), label : String, value : String, *, resolver : String -> Bool, id : String, kind : String)
+        stripped = strip_query_hash(value)
+        return if stripped.empty?
+        return if resolver.call(stripped)
+        issues << Issue.new(
+          id: id,
+          level: :warning,
+          category: "config",
+          file: @config_path,
+          message: "#{label}: #{value} — #{kind} not found",
+        )
+      end
+
       private def check_referenced_paths(issues : Array(Issue), config : Models::Config)
         emit_file = ->(label : String, value : String) do
-          stripped = strip_query_hash(value)
-          return if stripped.empty?
-          return if path_resolves?(stripped)
-          issues << Issue.new(
-            id: "config-path-missing",
-            level: :warning,
-            category: "config",
-            file: @config_path,
-            message: "#{label}: #{value} — file not found",
-          )
+          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) }, id: "config-path-missing", kind: "file")
         end
 
         emit_dir = ->(label : String, value : String) do
-          stripped = strip_query_hash(value)
-          return if stripped.empty?
-          return if dir_resolves?(stripped)
-          issues << Issue.new(
-            id: "config-dir-missing",
-            level: :warning,
-            category: "config",
-            file: @config_path,
-            message: "#{label}: #{value} — directory not found",
-          )
+          emit_missing(issues, label, value, resolver: ->(s : String) { dir_resolves?(s) }, id: "config-dir-missing", kind: "directory")
         end
 
         # PWA offline_page / precache_urls are routes, not just static files:
@@ -839,16 +837,7 @@ module Hwaro
         # found" warnings. Use a route-aware check that also accepts a matching
         # content source or a built output page.
         emit_route = ->(label : String, value : String) do
-          stripped = strip_query_hash(value)
-          return if stripped.empty?
-          return if path_resolves?(stripped) || route_resolves?(stripped)
-          issues << Issue.new(
-            id: "config-path-missing",
-            level: :warning,
-            category: "config",
-            file: @config_path,
-            message: "#{label}: #{value} — file not found",
-          )
+          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s) }, id: "config-path-missing", kind: "file")
         end
 
         config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }

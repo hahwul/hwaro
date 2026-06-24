@@ -29,6 +29,61 @@ module Hwaro
       abstract class Base
         abstract def run(options : Config::Options::ImportOptions) : ImportResult
 
+        # Regex matching YAML frontmatter: opening `---` on the first line and a
+        # closing `---` on its own line (multiline mode so ^ matches line starts).
+        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
+
+        # Split YAML frontmatter from a document body. Returns {frontmatter, body}
+        # with both stripped, or {nil, content.strip} when no frontmatter present.
+        protected def split_yaml_frontmatter(content : String) : {String?, String}
+          if match = YAML_FM_REGEX.match(content)
+            return {match[1].strip, match[2].strip}
+          end
+          {nil, content.strip}
+        end
+
+        # Recursively collect files under `dir` whose name ends with one of
+        # `extensions`. `skip_dir`, when given, receives each subdirectory's
+        # basename and skips recursion into it when it returns true.
+        protected def walk_files(dir : String, extensions : Array(String) = [".md", ".markdown"], skip_dir : Proc(String, Bool)? = nil) : Array(String)
+          files = [] of String
+          walk_files_into(dir, files, extensions, skip_dir)
+          files
+        end
+
+        private def walk_files_into(dir : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
+          Dir.each_child(dir) do |entry|
+            full_path = File.join(dir, entry)
+            if File.directory?(full_path)
+              next if skip_dir && skip_dir.call(entry)
+              walk_files_into(full_path, files, extensions, skip_dir)
+            elsif extensions.any? { |ext| entry.ends_with?(ext) }
+              files << full_path
+            end
+          end
+        end
+
+        # Split a file's path (relative to base_path) into {section, filename},
+        # where section is the parent-directory chain joined with "/" (or
+        # `default` for a top-level file) and filename is the last path segment.
+        protected def section_from_path(file_path : String, base_path : String, default : String) : {String, String}
+          relative = file_path.sub(base_path, "").lstrip('/')
+          parts = relative.split("/")
+          if parts.size > 1
+            {parts[0..-2].join("/"), parts.last}
+          else
+            {default, parts.first}
+          end
+        end
+
+        # The top-level section (first path segment) for a file relative to
+        # base_path, or `default` for a top-level file.
+        protected def top_section_from_path(file_path : String, base_path : String, default : String = "posts") : String
+          relative = file_path.sub(base_path, "").lstrip('/')
+          parts = relative.split("/")
+          parts.size > 1 ? parts[0] : default
+        end
+
         # Generate TOML frontmatter string from fields hash
         protected def generate_frontmatter(fields : Hash(String, (String | Bool | Array(String))?)) : String
           lines = [] of String

@@ -56,6 +56,15 @@ module Hwaro
         end
         real_path == real_root || real_path.starts_with?(real_root + File::SEPARATOR)
       end
+
+      # File.match? that treats a malformed glob as non-matching instead of
+      # raising File::BadPatternError, so a single config typo can't crash a
+      # build or deploy.
+      def glob_match?(pattern : String, path : String) : Bool
+        File.match?(pattern, path)
+      rescue File::BadPatternError
+        false
+      end
     end
   end
 end

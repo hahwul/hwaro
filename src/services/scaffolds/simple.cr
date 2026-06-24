@@ -76,7 +76,7 @@ module Hwaro
             str << sitemap_config
             str << robots_config
             str << llms_config
-            str << feeds_config
+            str << feeds_config(feed_sections)
 
             # Optional features (commented out by default)
             str << permalinks_config

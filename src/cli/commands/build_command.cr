@@ -69,8 +69,7 @@ module Hwaro
           options, output_dir_explicit = result
 
           # --json implies quiet so only the final JSON document reaches stdout.
-          Logger.quiet = true if json_output
-          Runner.json_mode = true if json_output
+          Runner.enable_json_mode! if json_output
 
           if dir = input_dir
             unless Dir.exists?(dir)
@@ -190,18 +189,7 @@ module Hwaro
             # Path & URL
             CLI.register_flag(parser, INPUT_DIR_FLAG) { |v| input_dir = v }
             parser.on("-o DIR", "--output DIR", "Output directory (default: public)") { |dir| output_dir = dir; output_dir_explicit = true }
-            CLI.register_flag(parser, BASE_URL_FLAG) do |v|
-              begin
-                Models::Config.validate_base_url!(v)
-              rescue ex : ArgumentError
-                raise Hwaro::HwaroError.new(
-                  code: Hwaro::Errors::HWARO_E_USAGE,
-                  message: ex.message || "Invalid --base-url",
-                  hint: "Examples: https://example.com, https://example.com/subpath, http://localhost:3000.",
-                )
-              end
-              base_url = v
-            end
+            CLI.register_base_url(parser) { |v| base_url = v }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
 
             # Content filtering
@@ -212,17 +200,7 @@ module Hwaro
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
             parser.on("--no-parallel", "Disable parallel file processing") { parallel = false }
-            CLI.register_flag(parser, JOBS_FLAG) do |v|
-              n = v.to_i?
-              if n.nil? || n < 1
-                raise Hwaro::HwaroError.new(
-                  code: Hwaro::Errors::HWARO_E_USAGE,
-                  message: "Invalid --jobs value: #{v}",
-                  hint: "Pass a positive integer, e.g. --jobs 2. Omit it for automatic (CPU-based) parallelism.",
-                )
-              end
-              workers = n
-            end
+            CLI.register_jobs(parser) { |n| workers = n }
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--full", "Force a complete rebuild (ignore cache)") { full = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }

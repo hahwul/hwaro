@@ -166,7 +166,7 @@ module Hwaro
         result = {} of String => Hash(String, Array(Models::Page))
 
         site.pages.each do |page|
-          next if page.draft || page.generated
+          next if page.excluded_from_listings?
 
           enabled_taxonomy_names.each do |tax_name|
             values = page.taxonomy_values(tax_name)
@@ -205,8 +205,7 @@ module Hwaro
         config = site.config
 
         site.pages.each do |page|
-          next if page.draft
-          next if page.generated
+          next if page.excluded_from_listings?
 
           config.taxonomies.each do |taxonomy|
             name = taxonomy.name
@@ -511,10 +510,9 @@ module Hwaro
         base.rstrip("/") + "/" + suffix.lstrip("/")
       end
 
-      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
-        url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
-        output_path = File.join(output_dir, url_path, "index.html")
-
+      # Guard against escaping the output dir, then mkdir + write + log a
+      # taxonomy output file. Shared by the single-page and paginated writers.
+      private def self.write_to(output_path : String, output_dir : String, content : String, verbose : Bool)
         unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
           Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
           return
@@ -525,18 +523,16 @@ module Hwaro
         Logger.action :create, output_path if verbose
       end
 
+      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
+        url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
+        output_path = File.join(output_dir, url_path, "index.html")
+        write_to(output_path, output_dir, content, verbose)
+      end
+
       private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page")
         url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
         output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
-
-        unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-          Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
-          return
-        end
-
-        Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
-        File.write(output_path, content)
-        Logger.action :create, output_path if verbose
+        write_to(output_path, output_dir, content, verbose)
       end
     end
   end

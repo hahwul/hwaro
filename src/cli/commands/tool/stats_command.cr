@@ -49,8 +49,7 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
-            Logger.quiet = true if json_output
-            Runner.json_mode = true if json_output
+            Runner.enable_json_mode! if json_output
 
             stats = Services::ContentStats.new(content_dir: content_dir)
             begin

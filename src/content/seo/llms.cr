@@ -56,7 +56,7 @@ module Hwaro
         private def self.build_index(config : Models::Config, pages : Array(Models::Page)) : String
           base_url = config.base_url.rstrip('/')
 
-          eligible = pages.select { |p| p.render && !p.draft && p.in_search_index && !p.generated }
+          eligible = pages.select(&.search_index_eligible?)
 
           # Group by section, keyed by display heading. A section's heading
           # comes from its `_index.md`, which is the only page modeled as a

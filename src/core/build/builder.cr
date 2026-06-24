@@ -307,11 +307,7 @@ module Hwaro
           cascade_map = @cascade_map || build_cascade_map(site.sections)
 
           changed_content_files.each do |file|
-            relative_path = begin
-              Path[file].relative_to("content").to_s
-            rescue ArgumentError
-              file.lchop("content/")
-            end
+            relative_path = path_relative_to(file, "content")
 
             page = pages_map[relative_path]?
             unless page
@@ -516,11 +512,7 @@ module Hwaro
           render_list.each do |page|
             next unless page.render
             render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
-            if cache.enabled?
-              source_path = File.join("content", page.path)
-              output_path = get_output_path(page, output_dir)
-              cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
-            end
+            record_page_cache_entry(page, cache, templates, site, output_dir)
           end
 
           cache.save if options.cache
@@ -534,22 +526,11 @@ module Hwaro
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
-          seo_tasks = [
-            -> { Content::Seo::Sitemap.generate(seo_pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(seo_pages, site.config, output_dir, verbose); nil },
-            -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil },
-            -> { Content::Seo::Llms.generate(site.config, seo_pages, output_dir, verbose); nil },
-            -> { Content::Search.generate(seo_pages, site.config, output_dir, verbose); nil },
-          ] of Proc(Nil)
-          ParallelHelper.execute(seo_tasks, options.parallel)
+          regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size} / #{all_pages.size} pages", :result, elapsed.total_milliseconds)
-          if options.verbose
-            @cache_manager.report_verbose
-          else
-            @cache_manager.report
-          end
+          report_cache_stats(options.verbose)
         end
 
         # Incremental parse of changed content + full re-render with reloaded templates.
@@ -576,11 +557,7 @@ module Hwaro
           cascade_map = @cascade_map || build_cascade_map(site.sections)
 
           changed_content_files.each do |file|
-            relative_path = begin
-              Path[file].relative_to("content").to_s
-            rescue ArgumentError
-              file.lchop("content/")
-            end
+            relative_path = path_relative_to(file, "content")
 
             page = pages_map[relative_path]?
             unless page
@@ -745,11 +722,7 @@ module Hwaro
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{count} pages · re-render", :result, elapsed.total_milliseconds)
-          if verbose
-            @cache_manager.report_verbose
-          else
-            @cache_manager.report
-          end
+          report_cache_stats(verbose)
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?
@@ -843,13 +816,7 @@ module Hwaro
           # had no effect on this deferred pass).
           taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose)
           all_pages = (site.pages + site.sections + taxonomy_sections).as(Array(Models::Page))
-          seo_tasks = [
-            -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose); nil },
-            -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose); nil },
-            -> { Content::Search.generate(all_pages, site.config, output_dir, verbose); nil },
-          ] of Proc(Nil)
-          ParallelHelper.execute(seo_tasks, options.parallel)
+          regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel)
 
           # Persist cache updates from the deferred pass. The initial build
           # already saved once; without this second save, killing the server
@@ -875,11 +842,7 @@ module Hwaro
             next unless File.exists?(src_path)
             next if File.directory?(src_path)
 
-            relative = begin
-              Path[src_path].relative_to("static").to_s
-            rescue ArgumentError
-              src_path.lchop("static/")
-            end
+            relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
             dest_path = File.join(output_dir, relative)
 
@@ -914,11 +877,7 @@ module Hwaro
             next unless File.exists?(src_path)
             next if File.directory?(src_path)
 
-            relative = begin
-              Path[src_path].relative_to("content").to_s
-            rescue ArgumentError
-              src_path.lchop("content/")
-            end
+            relative = path_relative_to(src_path, "content")
 
             next unless config.content_files.publish?(relative)
 
@@ -1099,11 +1058,7 @@ module Hwaro
           profiler.hook_report
 
           # Print cache stats
-          if options.verbose
-            @cache_manager.report_verbose
-          else
-            @cache_manager.report
-          end
+          report_cache_stats(options.verbose)
 
           # Run post-build hooks
           unless post_hooks.empty?
@@ -1117,6 +1072,37 @@ module Hwaro
               Utils::DebugPrinter.print(debug_site)
             end
           end
+        end
+
+        # Resolve `path` relative to `root`, falling back to a plain prefix
+        # strip when it can't be made relative (e.g. an absolute path).
+        private def path_relative_to(path : String, root : String) : String
+          Path[path].relative_to(root).to_s
+        rescue ArgumentError
+          path.lchop("#{root}/")
+        end
+
+        # Regenerate the lightweight SEO/search surfaces (sitemap, feeds, llms,
+        # search index, optionally robots) for the given page set. Each
+        # generator writes a distinct output file with no shared in-process
+        # state, so task order doesn't affect output.
+        private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
+          seo_tasks = [
+            -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose); nil },
+          ] of Proc(Nil)
+          # Robots slots in right after Feeds — its original position in the
+          # incremental path — so sequential (--no-parallel) output ordering is
+          # preserved, not just the generated files.
+          seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
+          seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
+          seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
+          ParallelHelper.execute(seo_tasks, parallel)
+        end
+
+        # Emit the end-of-build cache statistics at the requested verbosity.
+        private def report_cache_stats(verbose : Bool)
+          verbose ? @cache_manager.report_verbose : @cache_manager.report
         end
 
         # Selectively invalidate Crinja caches for changed pages and affected sections.

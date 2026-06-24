@@ -38,20 +38,9 @@ module Hwaro
         @cascade = {} of String => ExtraValue
       end
 
-      # Get effective page template (for pages in this section)
-      def effective_page_template : String?
-        @page_template
-      end
-
       # Add a subsection
       def add_subsection(section : Section)
         @subsections << section
-      end
-
-      # Find subsection by name (exact section match first, then case-insensitive title)
-      def find_subsection(name : String) : Section?
-        @subsections.find { |s| s.section == name } ||
-          @subsections.find { |s| s.title.downcase == name.downcase }
       end
 
       # Get all pages including from subsections (recursive)

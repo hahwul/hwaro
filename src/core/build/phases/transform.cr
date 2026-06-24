@@ -415,19 +415,7 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    groups.each do |_name, pages|
-      sorted = pages.sort_by do |p|
-        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
-      end
-
-      sorted.each_with_index do |page, idx|
-        page.series_index = idx + 1
-        # A single-post series has no prev/next, so leave series_pages empty
-        # to keep the template's `page.series_pages` guard from rendering an
-        # orphan series-nav box.
-        page.series_pages = sorted.size > 1 ? sorted : ([] of Models::Page)
-      end
-    end
+    assign_series_groups(groups)
 
     # Clear series data for pages whose series became empty
     affected_series.each do |series_name|
@@ -458,20 +446,7 @@ module Hwaro::Core::Build::Phases::Transform
     all_pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
-    inverted = {} of String => Hash(String, Array(String))
-    page_lookup = {} of String => Models::Page
-
-    all_pages.each do |page|
-      page_lookup[page.path] = page
-      taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name)
-        values.each do |term|
-          inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
-          arr = inv_tax[term]? || (inv_tax[term] = [] of String)
-          arr << page.path
-        end
-      end
-    end
+    inverted, page_lookup = build_related_index(all_pages, taxonomy_names)
 
     # Collect paths of pages that need related_posts recomputed:
     # 1. Changed pages themselves
@@ -639,6 +614,22 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Sort each series group by weight/date/title and assign series_index and
+  # series_pages. A single-post series gets empty series_pages so the
+  # template's `page.series_pages` guard skips the orphan series-nav box.
+  private def assign_series_groups(groups : Hash(String, Array(Models::Page)))
+    groups.each do |_name, pages|
+      sorted = pages.sort_by do |p|
+        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
+      end
+
+      sorted.each_with_index do |page, idx|
+        page.series_index = idx + 1
+        page.series_pages = sorted.size > 1 ? sorted : ([] of Models::Page)
+      end
+    end
+  end
+
   # Group pages by series name and assign series_index, series_pages.
   # Pages within a series are sorted by series_weight, then date, then title.
   private def compute_series(site : Models::Site)
@@ -651,32 +642,13 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    groups.each do |_name, pages|
-      sorted = pages.sort_by do |p|
-        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
-      end
-
-      sorted.each_with_index do |page, idx|
-        page.series_index = idx + 1
-        # A single-post series has no prev/next, so leave series_pages empty
-        # to keep the template's `page.series_pages` guard from rendering an
-        # orphan series-nav box.
-        page.series_pages = sorted.size > 1 ? sorted : ([] of Models::Page)
-      end
-    end
+    assign_series_groups(groups)
   end
 
-  # Compute related posts for each page based on shared taxonomy terms.
-  # Pages with more shared terms are ranked higher.
-  private def compute_related_posts(site : Models::Site)
-    config = site.config.related
-    taxonomy_names = config.taxonomies
-    limit = config.limit
-    return if limit <= 0
-    pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
-
-    # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
-    # This avoids the O(N²) pairwise comparison
+  # Build the taxonomy inverted index ({tax_name => {term => [page_path]}}) and a
+  # path->page lookup for the given candidate pages. Shared by the full and
+  # incremental related-posts computations.
+  private def build_related_index(pages : Array(Models::Page), taxonomy_names : Array(String)) : {Hash(String, Hash(String, Array(String))), Hash(String, Models::Page)}
     inverted = {} of String => Hash(String, Array(String))
     page_lookup = {} of String => Models::Page
 
@@ -691,6 +663,22 @@ module Hwaro::Core::Build::Phases::Transform
         end
       end
     end
+
+    {inverted, page_lookup}
+  end
+
+  # Compute related posts for each page based on shared taxonomy terms.
+  # Pages with more shared terms are ranked higher.
+  private def compute_related_posts(site : Models::Site)
+    config = site.config.related
+    taxonomy_names = config.taxonomies
+    limit = config.limit
+    return if limit <= 0
+    pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
+
+    # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
+    # This avoids the O(N²) pairwise comparison
+    inverted, page_lookup = build_related_index(pages, taxonomy_names)
 
     pages.each do |page|
       # Count co-occurrences via inverted index: O(terms * avg_pages_per_term).

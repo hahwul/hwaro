@@ -57,20 +57,7 @@ module Hwaro
         end
 
         private def scan_markdown_files(content_dir : String) : Array(String)
-          files = [] of String
-          scan_dir(content_dir, files)
-          files
-        end
-
-        private def scan_dir(dir : String, files : Array(String))
-          Dir.each_child(dir) do |entry|
-            path = File.join(dir, entry)
-            if File.directory?(path)
-              scan_dir(path, files)
-            elsif entry.ends_with?(".md") || entry.ends_with?(".markdown")
-              files << path
-            end
-          end
+          walk_files(content_dir)
         end
 
         private def process_file(
@@ -169,18 +156,8 @@ module Hwaro
 
           frontmatter = generate_frontmatter(fields)
 
-          # Determine relative path for output structure
-          relative_path = file_path.sub(content_dir, "").lstrip('/')
-
           # Determine section and filename
-          parts = relative_path.split("/")
-          if parts.size > 1
-            section = parts[0..-2].join("/")
-            filename = parts.last
-          else
-            section = ""
-            filename = parts.first
-          end
+          section, filename = section_from_path(file_path, content_dir, "")
 
           # Determine slug for the file
           if filename == "_index.md" || filename == "_index.markdown"
@@ -197,11 +174,9 @@ module Hwaro
           has_shortcodes ? :imported_wrapped : :imported
         end
 
-        # Regex for TOML frontmatter: +++ on first line, +++ on its own line
+        # Regex for TOML frontmatter: +++ on first line, +++ on its own line.
+        # (YAML frontmatter reuses the inherited Base::YAML_FM_REGEX.)
         TOML_FM_REGEX = /\A\+\+\+[ \t]*\n(.*?\n?)^\+\+\+[ \t]*$\n?(.*)\z/m
-
-        # Regex for YAML frontmatter: --- on first line, --- on its own line
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
 
         private def extract_frontmatter(raw : String) : {Hash(String, TOML::Any)?, String} | {Hash(String, YAML::Any)?, String}
           if raw.starts_with?("+++")

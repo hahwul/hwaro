@@ -100,7 +100,7 @@ module Hwaro
             "header.html"           => header_template,
             "footer.html"           => footer_template,
             "partials/nav.html"     => docs_nav_html,
-            "partials/search.html"  => search_overlay_html,
+            "partials/search.html"  => search_overlay_html("Search documentation..."),
             "partials/sidebar.html" => docs_sidebar_html,
             "page.html"             => docs_page_template,
             "section.html"          => docs_section_template,
@@ -136,7 +136,7 @@ module Hwaro
             str << sitemap_config
             str << robots_config
             str << llms_config
-            str << feeds_config
+            str << feeds_config(feed_sections)
 
             # Optional features (commented out by default)
             str << permalinks_config
@@ -1068,22 +1068,6 @@ module Hwaro
             {{ auto_includes_js }}
             </body>
             </html>
-            HTML
-        end
-
-        # Search overlay HTML shared by page and section templates
-        private def search_overlay_html : String
-          <<-HTML
-            <div class="search-overlay" id="searchOverlay" onclick="if(event.target===this)closeSearch()">
-              <div class="search-modal">
-                <div class="search-input-wrap">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <input type="search" id="searchInput" aria-label="Search" placeholder="Search documentation..." autocomplete="off">
-                  <kbd onclick="closeSearch()">ESC</kbd>
-                </div>
-                <div class="search-results" id="searchResults"></div>
-              </div>
-            </div>
             HTML
         end
 

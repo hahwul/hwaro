@@ -56,8 +56,7 @@ module Hwaro
               end
             end
 
-            Logger.quiet = true if json_output
-            Runner.json_mode = true if json_output
+            Runner.enable_json_mode! if json_output
 
             unless format
               raise Hwaro::HwaroError.new(

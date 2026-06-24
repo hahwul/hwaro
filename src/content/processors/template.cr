@@ -230,6 +230,23 @@ module Hwaro
           Filters::MiscFilters.register(@env)
         end
 
+        # Shared body for the `empty`/`present` Crinja tests: a value is empty
+        # when it's an empty string/array/hash or nil.
+        private def value_empty?(value : Crinja::Raw) : Bool
+          case value
+          when String
+            value.empty?
+          when Array
+            value.empty?
+          when Hash
+            value.empty?
+          when Nil
+            true
+          else
+            false
+          end
+        end
+
         # Register custom tests
         private def register_custom_tests
           # Test if a string starts with a prefix
@@ -255,36 +272,12 @@ module Hwaro
 
           # Test if value is empty (string, array, hash)
           @env.tests["empty"] = Crinja.test do
-            value = target.raw
-            case value
-            when String
-              value.empty?
-            when Array
-              value.empty?
-            when Hash
-              value.empty?
-            when Nil
-              true
-            else
-              false
-            end
+            value_empty?(target.raw)
           end
 
           # Test if value is present (not empty and not nil)
           @env.tests["present"] = Crinja.test do
-            value = target.raw
-            case value
-            when String
-              !value.empty?
-            when Array
-              !value.empty?
-            when Hash
-              !value.empty?
-            when Nil
-              false
-            else
-              true
-            end
+            !value_empty?(target.raw)
           end
 
           regex_cache = {} of String => Regex
@@ -312,6 +305,16 @@ module Hwaro
 
         # Register custom functions
         private def register_custom_functions
+          register_now_function
+          register_url_for_function
+          register_lookup_functions
+          register_image_function
+          register_data_function
+          register_asset_functions
+          register_env_function
+        end
+
+        private def register_now_function
           # now() function - returns current time
           @env.functions["now"] = Crinja.function({format: nil}) do
             format = arguments["format"]
@@ -323,7 +326,9 @@ module Hwaro
               Crinja::Value.new(time.to_s(format.to_s))
             end
           end
+        end
 
+        private def register_url_for_function
           # url_for() function - generate URL for a path
           @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
@@ -338,7 +343,9 @@ module Hwaro
 
           # get_url() function - alias for url_for to match
           @env.functions["get_url"] = @env.functions["url_for"]
+        end
 
+        private def register_lookup_functions
           # get_page() function - get page data by path
           # Usage: {% set about = get_page(path="about.md") %}
           #        {{ about.title }}
@@ -469,7 +476,9 @@ module Hwaro
             url = "/#{kind}/#{slug}/"
             Crinja::Value.new(base_url.rstrip("/") + url)
           end
+        end
 
+        private def register_image_function
           # resize_image() function - returns URL to a resized image variant
           # Usage: {{ resize_image(path="/images/photo.jpg", width=800).url }}
           # Returns object with:
@@ -514,7 +523,9 @@ module Hwaro
               "dominant_color" => Crinja::Value.new(dominant_color_value),
             })
           end
+        end
 
+        private def register_data_function
           # load_data() function - load data from JSON/TOML/YAML files
           # Usage: {% set data = load_data(path="data/menu.json") %}
           @env.functions["load_data"] = Crinja.function({path: ""}) do
@@ -569,7 +580,9 @@ module Hwaro
 
             result
           end
+        end
 
+        private def register_asset_functions
           # asset() function - resolve asset path from pipeline manifest
           # Usage: {{ asset(name="main.css") }}
           # Returns fingerprinted path if asset pipeline is enabled,
@@ -590,7 +603,9 @@ module Hwaro
 
           # asset_url is an alias for asset
           @env.functions["asset_url"] = @env.functions["asset"]
+        end
 
+        private def register_env_function
           # env() function - read environment variables in templates
           # Usage: {{ env("ANALYTICS_ID") }}
           #        {{ env("API_KEY", default="none") }}

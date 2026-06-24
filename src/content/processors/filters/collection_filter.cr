@@ -8,28 +8,24 @@ module Hwaro
           def self.register(env : Crinja)
             # Array where filter
             env.filters["where"] = Crinja.filter({attribute: nil, value: nil}) do
-              result = begin
+              safe_array do
                 arr = target.as_a
                 attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 val = arguments["value"]
 
-                filtered = arr.select do |item|
+                arr.select do |item|
                   item_hash = item.as_h
                   item_val = item_hash[attr_key]?
                   item_val == val
                 rescue Exception
                   false
                 end
-                Crinja::Value.new(filtered)
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
               end
-              result
             end
 
             # Array sort_by filter
             env.filters["sort_by"] = Crinja.filter({attribute: nil, reverse: false}) do
-              result = begin
+              safe_array do
                 arr = target.as_a
                 attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 reverse = arguments["reverse"].truthy?
@@ -52,16 +48,13 @@ module Hwaro
                 end
 
                 sorted = sorted.reverse if reverse
-                Crinja::Value.new(sorted)
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
+                sorted
               end
-              result
             end
 
             # Group by filter
             env.filters["group_by"] = Crinja.filter({attribute: nil}) do
-              result = begin
+              safe_array do
                 arr = target.as_a
                 attr_key = Crinja::Value.new(arguments["attribute"].to_s)
                 groups = {} of String => Array(Crinja::Value)
@@ -82,19 +75,16 @@ module Hwaro
                   }
                 end
 
-                Crinja::Value.new(group_result.map { |h| Crinja::Value.new(h) })
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
+                group_result.map { |h| Crinja::Value.new(h) }
               end
-              result
             end
 
             # Unique filter — removes duplicate values from an array
             env.filters["unique"] = Crinja.filter do
-              result = begin
+              safe_array do
                 arr = target.as_a
                 seen = Set(String).new
-                unique_items = arr.select do |item|
+                arr.select do |item|
                   key = item.to_s
                   if seen.includes?(key)
                     false
@@ -103,16 +93,12 @@ module Hwaro
                     true
                   end
                 end
-                Crinja::Value.new(unique_items)
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
               end
-              result
             end
 
             # Flatten filter — flattens nested arrays one level
             env.filters["flatten"] = Crinja.filter do
-              result = begin
+              safe_array do
                 arr = target.as_a
                 flattened = [] of Crinja::Value
                 arr.each do |item|
@@ -121,26 +107,27 @@ module Hwaro
                 rescue Exception
                   flattened << item
                 end
-                Crinja::Value.new(flattened)
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
+                flattened
               end
-              result
             end
 
             # Compact filter — removes nil/empty values from an array
             env.filters["compact"] = Crinja.filter do
-              result = begin
+              safe_array do
                 arr = target.as_a
-                compacted = arr.reject do |item|
+                arr.reject do |item|
                   item.raw.nil? || item.to_s.empty?
                 end
-                Crinja::Value.new(compacted)
-              rescue Exception
-                Crinja::Value.new([] of Crinja::Value)
               end
-              result
             end
+          end
+
+          # Wrap a filter body that builds an Array(Crinja::Value): return it as
+          # a Crinja::Value, falling back to an empty array on any error.
+          private def self.safe_array(& : -> Array(Crinja::Value)) : Crinja::Value
+            Crinja::Value.new(yield)
+          rescue Exception
+            Crinja::Value.new([] of Crinja::Value)
           end
         end
       end

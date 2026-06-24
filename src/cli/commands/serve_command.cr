@@ -78,8 +78,7 @@ module Hwaro
 
           # --json suppresses banners/action lines so the ready event is the
           # first line on stdout. Errors still go to stderr via Logger.error.
-          Logger.quiet = true if options.json
-          Runner.json_mode = true if options.json
+          Runner.enable_json_mode! if options.json
 
           if input_dir
             unless Dir.exists?(input_dir)
@@ -166,18 +165,7 @@ module Hwaro
 
             # Path & URL
             CLI.register_flag(parser, INPUT_DIR_FLAG) { |v| input_dir = v }
-            CLI.register_flag(parser, BASE_URL_FLAG) do |v|
-              begin
-                Models::Config.validate_base_url!(v)
-              rescue ex : ArgumentError
-                raise Hwaro::HwaroError.new(
-                  code: Hwaro::Errors::HWARO_E_USAGE,
-                  message: ex.message || "Invalid --base-url",
-                  hint: "Examples: https://example.com, https://example.com/subpath, http://localhost:3000.",
-                )
-              end
-              base_url = v
-            end
+            CLI.register_base_url(parser) { |v| base_url = v }
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
 
             # Content filtering
@@ -187,17 +175,7 @@ module Hwaro
 
             # Build behavior
             CLI.register_flag(parser, MINIFY_FLAG) { |_| minify = true }
-            CLI.register_flag(parser, JOBS_FLAG) do |v|
-              n = v.to_i?
-              if n.nil? || n < 1
-                raise Hwaro::HwaroError.new(
-                  code: Hwaro::Errors::HWARO_E_USAGE,
-                  message: "Invalid --jobs value: #{v}",
-                  hint: "Pass a positive integer, e.g. --jobs 2. Omit it for automatic (CPU-based) parallelism.",
-                )
-              end
-              workers = n
-            end
+            CLI.register_jobs(parser) { |n| workers = n }
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
             parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }

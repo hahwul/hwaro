@@ -61,7 +61,7 @@ module Hwaro
             str << plugins_config
             str << content_files_config
             str << sitemap_config
-            str << feeds_config
+            str << feeds_config(feed_sections)
           end
           config
         end

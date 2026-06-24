@@ -177,6 +177,19 @@ module Hwaro
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)
       end
 
+      # True when a page should be omitted from generated listings (taxonomy
+      # indexes, related posts, …): drafts and synthetic generated pages.
+      def excluded_from_listings? : Bool
+        draft || generated
+      end
+
+      # True when a page is eligible for the search index / llms.txt: it emits
+      # HTML, isn't a draft, opts into the search index, and isn't a synthetic
+      # generated listing page.
+      def search_index_eligible? : Bool
+        render && !draft && in_search_index && !generated
+      end
+
       # Resolve the term list for a configured taxonomy `name`. Most
       # taxonomies live in `@taxonomies`, but a few — `tags` and `authors`
       # — are stored on dedicated `Page` properties so other features

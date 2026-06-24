@@ -71,20 +71,7 @@ module Hwaro
         end
 
         private def collect_markdown_files(dir : String) : Array(String)
-          files = [] of String
-          scan_dir(dir, files)
-          files
-        end
-
-        private def scan_dir(dir : String, files : Array(String))
-          Dir.each_child(dir) do |entry|
-            full_path = File.join(dir, entry)
-            if File.directory?(full_path)
-              scan_dir(full_path, files)
-            elsif entry.ends_with?(".md") || entry.ends_with?(".mdx")
-              files << full_path
-            end
-          end
+          walk_files(dir, [".md", ".mdx"])
         end
 
         private def import_file(
@@ -96,7 +83,7 @@ module Hwaro
           force : Bool,
         ) : Symbol
           raw = File.read(file_path)
-          frontmatter_yaml, body = parse_astro_file(raw)
+          frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
           fields = Hash(String, (String | Bool | Array(String))?).new
 
@@ -213,14 +200,8 @@ module Hwaro
             end
           end
 
-          # Determine section from content collection name
-          relative = file_path.sub(content_dir, "").lstrip('/')
-          parts = relative.split("/")
-          section = if parts.size > 1
-                      parts[0] # Collection name (e.g., "blog", "posts")
-                    else
-                      "posts"
-                    end
+          # Determine section from content collection name (e.g. "blog", "posts")
+          section = top_section_from_path(file_path, content_dir, "posts")
 
           slug = slugify(File.basename(file_path, File.extname(file_path)))
 
@@ -229,17 +210,6 @@ module Hwaro
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_mdx_components ? :imported_wrapped : :imported
-        end
-
-        YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
-
-        private def parse_astro_file(content : String) : Tuple(String?, String)
-          if match = YAML_FM_REGEX.match(content)
-            yaml_str = match[1].strip
-            body = match[2].strip
-            return {yaml_str, body}
-          end
-          {nil, content.strip}
         end
       end
     end

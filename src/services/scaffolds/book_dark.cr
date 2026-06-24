@@ -36,7 +36,7 @@ module Hwaro
             str << sitemap_config
             str << robots_config
             str << llms_config
-            str << feeds_config
+            str << feeds_config(feed_sections)
             str << permalinks_config
             str << auto_includes_config
             str << assets_config
@@ -51,27 +51,6 @@ module Hwaro
             str << deployment_config
           end
           config
-        end
-
-        private def highlight_dark_config : String
-          <<-TOML
-
-            # =============================================================================
-            # Syntax Highlighting
-            # =============================================================================
-            # Code blocks are highlighted in the browser by Highlight.js and themed by
-            # an inlined, ember-warm dark theme in css/style.css (so you recolor syntax
-            # by editing that CSS, not the `theme` below). `mode = "server"` can
-            # highlight at build time with no JS, but its Tartrazine backend isn't
-            # multi-thread-safe, so the scaffold default stays "client".
-
-            [highlight]
-            enabled = true
-            mode = "client"              # "client" = Highlight.js in the browser; "server" = build-time (no JS)
-            theme = "github-dark"        # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
-            use_cdn = true               # true loads Highlight.js from a CDN; false expects a self-hosted build
-
-            TOML
         end
 
         private def css_content : String
