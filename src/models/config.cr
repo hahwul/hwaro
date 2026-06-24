@@ -163,11 +163,10 @@ module Hwaro
         @disallow_paths.each do |pattern|
           # A malformed glob raises File::BadPatternError; skip it rather than
           # crashing the build, so other disallow patterns still apply.
-          begin
-            return false if File.match?(pattern, normalized_path)
-          rescue File::BadPatternError
-            next
-          end
+
+          return false if File.match?(pattern, normalized_path)
+        rescue File::BadPatternError
+          next
         end
         true
       end

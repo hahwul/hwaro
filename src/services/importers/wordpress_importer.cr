@@ -46,18 +46,16 @@ module Hwaro
           items = find_items(doc)
 
           items.each do |item|
-            begin
-              result = process_item(item, output_dir, include_drafts, verbose, force)
-              case result
-              when :imported
-                imported += 1
-              when :skipped
-                skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error processing item: #{ex.message}"
+            result = process_item(item, output_dir, include_drafts, verbose, force)
+            case result
+            when :imported
+              imported += 1
+            when :skipped
+              skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error processing item: #{ex.message}"
           end
 
           ImportResult.new(

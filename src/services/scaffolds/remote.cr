@@ -185,13 +185,11 @@ module Hwaro
 
           targets.each do |target|
             spawn do
-              begin
-                body = fetch_file(owner, repo, default_branch, target[:full_path])
-                channel.send({category: target[:category], key: target[:key], display: target[:display], body: body})
-              rescue ex
-                Logger.warn "Failed to fetch #{target[:display]}: #{ex.message}"
-                channel.send({category: target[:category], key: target[:key], display: target[:display], body: ""})
-              end
+              body = fetch_file(owner, repo, default_branch, target[:full_path])
+              channel.send({category: target[:category], key: target[:key], display: target[:display], body: body})
+            rescue ex
+              Logger.warn "Failed to fetch #{target[:display]}: #{ex.message}"
+              channel.send({category: target[:category], key: target[:key], display: target[:display], body: ""})
             end
           end
 

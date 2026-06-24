@@ -91,12 +91,10 @@ module Hwaro
         private def process_sequential(items : Array(T), &block : T, Int32 -> R) : Array(WorkResult(R))
           results = [] of WorkResult(R)
           items.each_with_index do |item, idx|
-            begin
-              value = block.call(item, idx)
-              results << WorkResult(R).success(value, idx)
-            rescue ex
-              results << WorkResult(R).failure(ex.message || "Unknown error", idx)
-            end
+            value = block.call(item, idx)
+            results << WorkResult(R).success(value, idx)
+          rescue ex
+            results << WorkResult(R).failure(ex.message || "Unknown error", idx)
           end
           results
         end
@@ -163,13 +161,11 @@ module Hwaro
           done = Channel(Nil).new(tasks.size)
           tasks.each do |task|
             spawn do
-              begin
-                task.call
-              rescue ex
-                Logger.warn "ParallelHelper: task failed: #{ex.message}"
-              ensure
-                done.send(nil)
-              end
+              task.call
+            rescue ex
+              Logger.warn "ParallelHelper: task failed: #{ex.message}"
+            ensure
+              done.send(nil)
             end
           end
           tasks.size.times { done.receive }

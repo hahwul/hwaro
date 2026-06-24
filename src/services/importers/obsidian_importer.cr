@@ -50,18 +50,16 @@ module Hwaro
           link_map = build_link_map(files, path, content_cache)
 
           files.each do |file_path|
-            begin
-              result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
-              case result
-              when :imported
-                imported += 1
-              when :skipped
-                skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error importing #{file_path}: #{ex.message}"
+            result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
+            case result
+            when :imported
+              imported += 1
+            when :skipped
+              skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error importing #{file_path}: #{ex.message}"
           end
 
           ImportResult.new(
@@ -91,49 +89,47 @@ module Hwaro
         private def build_link_map(files : Array(String), base_path : String, content_cache : Hash(String, String) = {} of String => String) : Hash(String, String)
           map = Hash(String, String).new
           files.each do |file_path|
-            begin
-              raw = File.read(file_path)
-              content_cache[file_path] = raw
-              fm_yaml, _ = parse_markdown_file(raw)
+            raw = File.read(file_path)
+            content_cache[file_path] = raw
+            fm_yaml, _ = parse_markdown_file(raw)
 
-              # Section mirrors `import_file`'s computation so the URL we
-              # emit lands at the same path the file will be written to.
-              relative = file_path.sub(base_path, "").lstrip('/')
-              parts = relative.split("/")
-              section = parts.size > 1 ? parts[0..-2].join("/") : "posts"
+            # Section mirrors `import_file`'s computation so the URL we
+            # emit lands at the same path the file will be written to.
+            relative = file_path.sub(base_path, "").lstrip('/')
+            parts = relative.split("/")
+            section = parts.size > 1 ? parts[0..-2].join("/") : "posts"
 
-              basename = File.basename(file_path, File.extname(file_path))
-              title = basename
-              aliases = [] of String
+            basename = File.basename(file_path, File.extname(file_path))
+            title = basename
+            aliases = [] of String
 
-              if fm_yaml && (yaml = YAML.parse(fm_yaml))
-                if t = yaml["title"]?
-                  title = t.as_s? || t.raw.to_s
-                end
-                if a = yaml["aliases"]?
-                  case a.raw
-                  when Array
-                    flatten_yaml_strings(a).each { |s| aliases << s }
-                  when String
-                    aliases << a.as_s
-                  end
+            if fm_yaml && (yaml = YAML.parse(fm_yaml))
+              if t = yaml["title"]?
+                title = t.as_s? || t.raw.to_s
+              end
+              if a = yaml["aliases"]?
+                case a.raw
+                when Array
+                  flatten_yaml_strings(a).each { |s| aliases << s }
+                when String
+                  aliases << a.as_s
                 end
               end
-
-              slug = slugify(title)
-              url = "/#{section}/#{slug}/"
-
-              # Register every name a wiki-link could plausibly use.
-              [basename, "#{basename}.md", title, *aliases].each do |key|
-                next if key.empty?
-                map[key.downcase.strip] = url
-              end
-            rescue ex
-              # Don't fail the whole import if one note's YAML is malformed;
-              # we just won't be able to resolve links pointing at it. The
-              # per-file import below will surface the actual error.
-              Logger.debug "build_link_map: skipped #{file_path}: #{ex.message}"
             end
+
+            slug = slugify(title)
+            url = "/#{section}/#{slug}/"
+
+            # Register every name a wiki-link could plausibly use.
+            [basename, "#{basename}.md", title, *aliases].each do |key|
+              next if key.empty?
+              map[key.downcase.strip] = url
+            end
+          rescue ex
+            # Don't fail the whole import if one note's YAML is malformed;
+            # we just won't be able to resolve links pointing at it. The
+            # per-file import below will surface the actual error.
+            Logger.debug "build_link_map: skipped #{file_path}: #{ex.message}"
           end
           map
         end

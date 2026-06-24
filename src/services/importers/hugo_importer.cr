@@ -28,21 +28,19 @@ module Hwaro
           wrapped = 0
 
           scan_markdown_files(content_dir).each do |file_path|
-            begin
-              result = process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
-              case result
-              when :imported
-                imported += 1
-              when :imported_wrapped
-                imported += 1
-                wrapped += 1
-              when :skipped
-                skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error processing #{file_path}: #{ex.message}"
+            result = process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
+            case result
+            when :imported
+              imported += 1
+            when :imported_wrapped
+              imported += 1
+              wrapped += 1
+            when :skipped
+              skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error processing #{file_path}: #{ex.message}"
           end
 
           if wrapped > 0

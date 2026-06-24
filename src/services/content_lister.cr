@@ -274,11 +274,9 @@ module Hwaro
         ]
 
         formats.each do |fmt|
-          begin
-            return Time.parse(time_str, fmt, Time::Location::UTC)
-          rescue Time::Format::Error
-            next
-          end
+          return Time.parse(time_str, fmt, Time::Location::UTC)
+        rescue Time::Format::Error
+          next
         end
 
         # Try ISO 8601 parsing as last resort

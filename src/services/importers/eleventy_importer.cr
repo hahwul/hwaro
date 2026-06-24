@@ -41,21 +41,19 @@ module Hwaro
           dir_data = load_directory_data(path)
 
           files.each do |file_path|
-            begin
-              result = import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
-              case result
-              when :imported
-                imported += 1
-              when :imported_wrapped
-                imported += 1
-                wrapped += 1
-              when :skipped
-                skipped += 1
-              end
-            rescue ex
-              errors += 1
-              Logger.warn "Error importing #{file_path}: #{ex.message}"
+            result = import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
+            case result
+            when :imported
+              imported += 1
+            when :imported_wrapped
+              imported += 1
+              wrapped += 1
+            when :skipped
+              skipped += 1
             end
+          rescue ex
+            errors += 1
+            Logger.warn "Error importing #{file_path}: #{ex.message}"
           end
 
           if wrapped > 0

@@ -219,18 +219,16 @@ module Hwaro::Core::Build::Phases::Initialize
 
     worker_count.times do
       spawn do
-        begin
-          while pair = work_queue.receive?
-            src, dest = pair
-            begin
-              FileUtils.cp(src, dest)
-            rescue ex
-              Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
-            end
+        while pair = work_queue.receive?
+          src, dest = pair
+          begin
+            FileUtils.cp(src, dest)
+          rescue ex
+            Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
           end
-        ensure
-          done.send(nil)
         end
+      ensure
+        done.send(nil)
       end
     end
     worker_count.times { done.receive }

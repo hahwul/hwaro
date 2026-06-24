@@ -218,17 +218,15 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   private def parse_content_sequential(pages : Array(Models::Page))
     pages.each do |page|
-      begin
-        parse_single_page(page)
-      rescue ex : Hwaro::HwaroError
-        # Classified frontmatter errors (HWARO_E_CONTENT) must abort the
-        # build so scripts and CI see a stable exit code, rather than
-        # silently skipping the offending page.
-        raise ex
-      rescue ex
-        page.parse_failed = true
-        Logger.warn "Failed to parse #{page.path}: #{ex.message}"
-      end
+      parse_single_page(page)
+    rescue ex : Hwaro::HwaroError
+      # Classified frontmatter errors (HWARO_E_CONTENT) must abort the
+      # build so scripts and CI see a stable exit code, rather than
+      # silently skipping the offending page.
+      raise ex
+    rescue ex
+      page.parse_failed = true
+      Logger.warn "Failed to parse #{page.path}: #{ex.message}"
     end
   end
 
