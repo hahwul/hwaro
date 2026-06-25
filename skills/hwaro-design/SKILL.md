@@ -31,11 +31,17 @@ nobody asked for. Avoid it by gathering a *design brief* first.
 Ask focused questions and let the answers steer everything. Use the
 `AskUserQuestion` tool when it is available (offer 2–4 concrete options per
 question with short descriptions; people choose better than they free-associate),
-otherwise ask in prose. Prefer showing **examples and contrasts** over abstract
-adjectives — "Linear/Vercel-clean vs. editorial-magazine vs. warm-handcrafted"
-tells you more than "modern."
+otherwise ask in prose. Lean on its **option previews** — a token-value block or
+a small ASCII layout sketch per option makes the choice concrete; people pick a
+palette they can *see* far more decisively than an adjective. Prefer showing
+**examples and contrasts** over abstract adjectives — "Linear/Vercel-clean vs.
+editorial-magazine vs. warm-handcrafted" tells you more than "modern."
 
-Cover, roughly in this order — but stop asking once you have enough to commit:
+`AskUserQuestion` caps at **4 questions per round**, so lead with the
+highest-leverage dimensions (purpose, personality/aesthetic, light-vs-dark, type
+feel) and defer the rest — density, motion, constraints — to a quick second round
+only if they aren't already implied. Cover, roughly in this order — but stop
+asking once you have enough to commit:
 
 1. **Purpose & audience.** What is the site (blog, docs, portfolio, landing,
    shop)? Who reads it, on what devices? What should they feel / do?
@@ -182,6 +188,12 @@ your audience needs CJK):
 }
 ```
 
+> **Token *names* vary by scaffold — read the project's `:root` first.** The set
+> above is the `simple`/base vocabulary. The `blog` scaffold instead uses
+> `--bg-secondary` / `--bg-code` / `--text-secondary` / `--border-light` /
+> `--radius-sm` / `--content-max-w` / `--header-h`; `docs` and `book` differ
+> again. Recolor the names that are actually present — don't assume this list.
+
 **Extend it into a full system** — add the layers a considered design needs, then
 build every component against the tokens (never hardcode a raw value in a rule):
 
@@ -217,6 +229,15 @@ build every component against the tokens (never hardcode a raw value in a rule):
 /* Or make it user-toggleable with a `[data-theme="dark"]` block + a small JS toggle. */
 ```
 
+> **Reality check: a token override alone rarely gives you full dark mode.** Real
+> scaffold stylesheets hardcode colors *outside* `:root` that won't follow your
+> tokens — `grep` the sheet for `#` and `rgba(` before you start. In the `blog`
+> scaffold these include the sticky-header background, the `h1` accent-rule
+> gradient, the **entire `.hljs-*` syntax theme**, the image `outline` (a
+> near-black `rgba(0,0,0,.06)` that vanishes on dark), and the selection /
+> search-highlight tints. Convert each to a token (or fix it inline) — otherwise
+> your "dark" theme ships light patches.
+
 ### Imagery, fonts, and the small marks
 
 - **Responsive images:** `resize_image(path=…, width=…)` returns `.url`, plus
@@ -229,6 +250,12 @@ build every component against the tokens (never hardcode a raw value in a rule):
   Charis SIL so headings render the same off-Apple). Subset, `font-display: swap`,
   and limit families/weights — fonts are usually the biggest perf cost of a
   "designed" site.
+- **Code blocks are a design surface.** Scaffolds inline a `.hljs-*` highlight
+  theme (light by default) and Hwaro colors code **server-side** (Tartrazine) —
+  there's no client-side theme to swap, so recolor the `.hljs-*` rules directly
+  when you retheme, especially for dark (a light syntax theme on a dark well
+  reads as broken). Tie it to your palette — e.g. keywords in your accent color —
+  for cohesion.
 - **Signature detail:** give the design one small recurring mark (an accent rule,
   a marker bullet, a consistent hover) rather than decorating everything.
 
@@ -247,8 +274,12 @@ build every component against the tokens (never hardcode a raw value in a rule):
 3. **Implement, token-first.** Define/extend the `:root` token layer, *then*
    style components against the tokens, *then* assemble layouts in the
    templates. Keep markup semantic and accessible from the start.
-4. **Iterate live.** Run `hwaro serve` and refine with the browser open. Show
-   the user real results early and often; design is a conversation.
+4. **Iterate live — and actually look at it.** Run `hwaro serve` and refine with
+   the browser open. If you're an agent that can't see a browser, build and
+   **screenshot the page with a headless browser** (e.g. headless Chrome
+   `--screenshot`) and review the image — never judge a *visual* design from
+   HTML/CSS source alone. Either way hand the user the `hwaro serve` URL and show
+   real results early; design is a conversation.
 5. **Review & ship.** Walk the pre-ship checklist below, fix gaps, then present
    the result and explicitly invite feedback ("want it warmer / denser /
    quieter?"). Revise. Don't declare it done — let the user.
@@ -260,7 +291,11 @@ build every component against the tokens (never hardcode a raw value in a rule):
   light-only) gives you a complete, accessible,
   token-driven baseline. Often the highest-leverage move is just **rewriting the
   token block** and a few component rules to the user's brief — minutes to a
-  distinctly different site.
+  distinctly different site. For a *custom* dark (e.g. a warm dark, not the stock
+  `*-dark` palette), retheme the light scaffold's `:root` rather than starting
+  from `blog-dark` — you pick the exact hues instead of inheriting a fixed
+  cold-dark set (and remember the dark "reality check" above: also fix the
+  hardcoded header/gradient/syntax colors).
 - **Build bespoke.** When the brief needs a layout the scaffolds don't have,
   author templates from scratch (or start from `--scaffold bare`/`simple`) and
   bring your own token system. More work, full control.
