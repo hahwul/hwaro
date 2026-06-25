@@ -139,15 +139,16 @@ can do the work.
 
 ### CSS delivery — three options, pick deliberately
 
-1. **Inlined `<style>`** — the `simple` / `bare` scaffolds ship their CSS in a
-   `<style>` block inside `header.html`. Zero extra requests, great for small
-   sites; edit that block directly. (`blog` / `book` / `docs` instead ship an
-   external `static/css/style.css` — that's option 2.)
+1. **Inlined `<style>`** — the `simple` scaffold ships its CSS in a `<style>`
+   block inside `header.html`: zero extra requests, great for small sites; edit
+   that block directly. (`blog` / `book` / `docs` instead ship an external
+   `static/css/style.css` — option 2; `bare` ships *no* CSS at all, so you bring
+   your own.)
 2. **Static stylesheet + `[auto_includes]`** — drop files in `static/assets/css/`
-   (and `…/js`) and emit `{{ auto_includes_css | safe }}` /
-   `{{ auto_includes_js | safe }}` in your head/body. These variables (like
-   `og_all_tags` and `highlight_*`) output raw HTML, so they need `| safe` in
-   hand-authored templates. Good when CSS grows past "one block."
+   (and `…/js`) and emit `{{ auto_includes_css }}` / `{{ auto_includes_js }}` in
+   your head/body. (These output raw HTML; Hwaro disables template autoescape, so
+   the scaffolds write them without `| safe` — the docs add `| safe` as a
+   harmless, portable convention you can keep.) Good when CSS grows past "one block."
 3. **`[assets]` pipeline** — declare bundles in `config.toml`, reference with
    `{{ asset(name='main.css') }}`; you get concatenation, minification, and
    content-hash fingerprinting (cache busting) for free.

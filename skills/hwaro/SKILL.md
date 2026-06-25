@@ -159,7 +159,7 @@ Key points:
 ### E. Diagnose & validate
 
 ```bash
-hwaro doctor                 # config/template/structure issues; gate CI on exit code (0/3/4/5)
+hwaro doctor                 # config/template/structure issues; gate CI on exit code (0/3/4/5; 1 under --strict/--max-warnings)
 hwaro doctor --fix           # normalize config values (base_url trailing slash, sitemap priority…)
 hwaro doctor --approve       # add recommended config.toml sections (--full does both)
 hwaro tool validate --json   # content front matter + markup
@@ -216,9 +216,12 @@ Templates under `templates/` are Crinja (Jinja2-compatible). The essentials:
 
 - **Inheritance:** child templates `{% extends "base.html" %}` and fill
   `{% block content %}…{% endblock %}`. Partials via `{% include "partials/x.html" %}`.
-- **Render HTML, don't escape it:** rendered body and pre-built tag bundles need
-  `| safe` — e.g. `{{ content | safe }}`, `{{ og_all_tags | safe }}`,
-  `{{ toc | safe }}`. Forgetting `| safe` prints escaped markup.
+- **Rendered HTML emits raw:** Hwaro disables template autoescape, so
+  `{{ content }}`, `{{ og_all_tags }}`, and `{{ toc }}` output HTML directly —
+  the built-in scaffolds write them with no filter. The docs show `| safe`
+  (`{{ content | safe }}`) as a harmless, portable convention; keep it if you
+  see it, but its absence won't escape your markup. Use the `e` filter where you
+  *do* want escaping (e.g. an attribute value).
 - **Always guard nil:** `{% if page.image %}…{% endif %}`; use
   `{{ page.description | default(value=site.description) }}`.
 - **URLs:** build links with `{{ url_for(path='/about/') }}` /
