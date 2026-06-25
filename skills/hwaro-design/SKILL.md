@@ -38,10 +38,10 @@ palette they can *see* far more decisively than an adjective. Prefer showing
 editorial-magazine vs. warm-handcrafted" tells you more than "modern."
 
 `AskUserQuestion` caps at **4 questions per round**, so lead with the
-highest-leverage dimensions (purpose, personality/aesthetic, light-vs-dark, type
-feel) and defer the rest — density, motion, constraints — to a quick second round
-only if they aren't already implied. Cover, roughly in this order — but stop
-asking once you have enough to commit:
+highest-leverage dimensions (purpose, personality/aesthetic, color incl.
+light-vs-dark + mood, type feel) and defer the rest — density, motion,
+constraints — to a quick second round only if they aren't already implied.
+Cover, roughly in this order — but stop asking once you have enough to commit:
 
 1. **Purpose & audience.** What is the site (blog, docs, portfolio, landing,
    shop)? Who reads it, on what devices? What should they feel / do?
@@ -168,7 +168,7 @@ can do the work.
 
 Every Hwaro scaffold themes itself through **CSS custom properties** in `:root`.
 This is the right pattern: define the system once, theme by editing tokens, and
-get dark mode + restyles almost for free. The scaffolds' "Hwaro Ember" token
+get dark mode + restyles almost for free. The `simple`/base "Hwaro Ember" token
 vocabulary is (hex values exact; font stacks abbreviated — the real ones are
 longer and include CJK fallbacks like `"Noto Serif KR"`, so don't strip those if
 your audience needs CJK):
@@ -189,10 +189,12 @@ your audience needs CJK):
 ```
 
 > **Token *names* vary by scaffold — read the project's `:root` first.** The set
-> above is the `simple`/base vocabulary. The `blog` scaffold instead uses
+> above is what `simple` (and the base) use. The `blog` scaffold instead uses
 > `--bg-secondary` / `--bg-code` / `--text-secondary` / `--border-light` /
-> `--radius-sm` / `--content-max-w` / `--header-h`; `docs` and `book` differ
-> again. Recolor the names that are actually present — don't assume this list.
+> `--radius-sm` / `--content-max-w` / `--header-h`; `docs` and `book` keep
+> blog's names and add their own (`--bg-sidebar`, `--sidebar-w`, `--shadow`,
+> `--primary-subtle`). Recolor the names that are actually present — don't
+> assume this list.
 
 **Extend it into a full system** — add the layers a considered design needs, then
 build every component against the tokens (never hardcode a raw value in a rule):
@@ -218,7 +220,9 @@ build every component against the tokens (never hardcode a raw value in a rule):
   --measure: 68ch;            /* max reading width */
 }
 
-/* Dark mode by token override — components don't change, only the values do. */
+/* Dark mode by token override — values change, components mostly don't.
+   (But see the reality check below: scaffold CSS also hardcodes colors
+   outside :root that you must fix by hand.) */
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #ece6df; --text-muted: #a89c8e;
@@ -250,12 +254,11 @@ build every component against the tokens (never hardcode a raw value in a rule):
   Charis SIL so headings render the same off-Apple). Subset, `font-display: swap`,
   and limit families/weights — fonts are usually the biggest perf cost of a
   "designed" site.
-- **Code blocks are a design surface.** Scaffolds inline a `.hljs-*` highlight
-  theme (light by default) and Hwaro colors code **server-side** (Tartrazine) —
-  there's no client-side theme to swap, so recolor the `.hljs-*` rules directly
-  when you retheme, especially for dark (a light syntax theme on a dark well
-  reads as broken). Tie it to your palette — e.g. keywords in your accent color —
-  for cohesion.
+- **Code blocks are a design surface.** Scaffolds inline a `.hljs-*` theme and
+  Hwaro colors code **server-side** (Tartrazine) — there's no client-side theme
+  to swap, so recolor the `.hljs-*` rules directly when you retheme and tie them
+  to your palette (e.g. keywords in your accent color) for cohesion. (Dark mode
+  flags this theme as a must-recolor surface — see the reality check above.)
 - **Signature detail:** give the design one small recurring mark (an accent rule,
   a marker bullet, a consistent hover) rather than decorating everything.
 
