@@ -15,81 +15,12 @@
             rel="stylesheet"
         />
         {{ auto_includes_css }}
-
-        <style>
-            /* Shared SVG animation keyframes */
-            .fire-pulse {
-                transform-origin: center 144px;
-                animation: pulse 1.5s infinite alternate ease-in-out;
-            }
-            @keyframes pulse {
-                0% {
-                    transform: scaleY(1);
-                    opacity: 0.92;
-                }
-                100% {
-                    transform: scaleY(1.03);
-                    opacity: 1;
-                }
-            }
-            .spark {
-                animation-timing-function: ease-in;
-                animation-iteration-count: infinite;
-            }
-            .spark-1 {
-                animation-name: flyUp1;
-                animation-duration: 2s;
-            }
-            .spark-2 {
-                animation-name: flyUp2;
-                animation-duration: 2.5s;
-                animation-delay: 0.5s;
-            }
-            .spark-3 {
-                animation-name: flyUp3;
-                animation-duration: 1.8s;
-                animation-delay: 1.2s;
-            }
-            @keyframes flyUp1 {
-                0% {
-                    transform: translateY(0);
-                    opacity: 0;
-                }
-                50% {
-                    opacity: 0.8;
-                }
-                100% {
-                    transform: translateY(-40px);
-                    opacity: 0;
-                }
-            }
-            @keyframes flyUp2 {
-                0% {
-                    transform: translateY(0);
-                    opacity: 0;
-                }
-                50% {
-                    opacity: 1;
-                }
-                100% {
-                    transform: translateY(-50px);
-                    opacity: 0;
-                }
-            }
-            @keyframes flyUp3 {
-                0% {
-                    transform: translateY(0);
-                    opacity: 0;
-                }
-                50% {
-                    opacity: 0.9;
-                }
-                100% {
-                    transform: translateY(-45px);
-                    opacity: 0;
-                }
-            }
-        </style>
+        <!-- Progressive enhancement: only the JS-driven reveal/fill effects
+             below the fold start hidden, so a no-JS visitor still sees all
+             content (and the benchmark bars at full width). -->
+        <script>
+            document.documentElement.classList.add("js");
+        </script>
     </head>
     <body class="landing-body">
         <header class="landing-header">
@@ -161,7 +92,7 @@
             <!-- ============================================================
                  FEATURES
                  ============================================================ -->
-            <section class="features">
+            <section class="features reveal">
                 <div class="features-header">
                     <h2>Everything built in.</h2>
                     <p>No plugins needed. Enable in config.toml and go.</p>
@@ -217,46 +148,86 @@
             <!-- ============================================================
                  BENCHMARK
                  ============================================================ -->
-            <section class="benchmark">
+            <section class="benchmark reveal">
                 <div class="benchmark-header">
                     <h2>1,000 pages. Under 7 seconds.</h2>
                     <p>Benchmarked against popular static site generators.</p>
                 </div>
+
+                <!-- SVG gradient/sheen definitions shared by every bar. Kept
+                     out of .benchmark-bars so the row nth-child stagger is
+                     not thrown off by an extra child. -->
+                <svg
+                    class="bench-defs"
+                    width="0"
+                    height="0"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <defs>
+                        <linearGradient id="benchGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0" stop-color="#2f2f37" />
+                            <stop offset="1" stop-color="#51515d" />
+                        </linearGradient>
+                        <linearGradient id="benchGradHot" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0" stop-color="#e7a85f" />
+                            <stop offset="0.55" stop-color="#c46262" />
+                            <stop offset="1" stop-color="#974646" />
+                        </linearGradient>
+                        <linearGradient id="benchSheen" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0" stop-color="#fff" stop-opacity="0" />
+                            <stop offset="0.5" stop-color="#ffe9cc" stop-opacity="0.9" />
+                            <stop offset="1" stop-color="#fff" stop-opacity="0" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+
                 <div class="benchmark-bars">
-                    <div class="bench-row">
+                    <div class="bench-row" tabindex="0" aria-label="Zola: 5.2 seconds">
                         <span class="bench-name">Zola</span>
                         <div class="bench-track">
-                            <div class="bench-bar" style="width: 63%"></div>
+                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+                                <rect class="bench-fill" x="0" y="0" width="44.8" height="12" fill="url(#benchGrad)" />
+                            </svg>
                         </div>
-                        <span class="bench-time">5.2s</span>
+                        <span class="bench-time" data-time="5.2">5.2s</span>
                     </div>
-                    <div class="bench-row bench-highlight">
+                    <div class="bench-row bench-highlight" tabindex="0" aria-label="Hwaro: 6.2 seconds">
                         <span class="bench-name">Hwaro</span>
                         <div class="bench-track">
-                            <div class="bench-bar" style="width: 75%"></div>
+                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+                                <rect class="bench-fill" x="0" y="0" width="53.4" height="12" fill="url(#benchGradHot)" />
+                                <rect class="bench-sheen" x="0" y="0" width="15" height="12" fill="url(#benchSheen)" style="--travel: 38" />
+                            </svg>
                         </div>
-                        <span class="bench-time">6.2s</span>
+                        <span class="bench-time" data-time="6.2">6.2s</span>
                     </div>
-                    <div class="bench-row">
+                    <div class="bench-row" tabindex="0" aria-label="Hugo: 8.2 seconds">
                         <span class="bench-name">Hugo</span>
                         <div class="bench-track">
-                            <div class="bench-bar" style="width: 100%"></div>
+                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+                                <rect class="bench-fill" x="0" y="0" width="70.7" height="12" fill="url(#benchGrad)" />
+                            </svg>
                         </div>
-                        <span class="bench-time">8.2s</span>
+                        <span class="bench-time" data-time="8.2">8.2s</span>
                     </div>
-                    <div class="bench-row">
+                    <div class="bench-row" tabindex="0" aria-label="Eleventy: 9.0 seconds">
                         <span class="bench-name">Eleventy</span>
                         <div class="bench-track">
-                            <div class="bench-bar" style="width: 109%"></div>
+                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+                                <rect class="bench-fill" x="0" y="0" width="77.6" height="12" fill="url(#benchGrad)" />
+                            </svg>
                         </div>
-                        <span class="bench-time">9.0s</span>
+                        <span class="bench-time" data-time="9.0">9.0s</span>
                     </div>
-                    <div class="bench-row">
+                    <div class="bench-row" tabindex="0" aria-label="Jekyll: 11.6 seconds">
                         <span class="bench-name">Jekyll</span>
                         <div class="bench-track">
-                            <div class="bench-bar" style="width: 141%"></div>
+                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+                                <rect class="bench-fill" x="0" y="0" width="100" height="12" fill="url(#benchGrad)" />
+                            </svg>
                         </div>
-                        <span class="bench-time">11.6s</span>
+                        <span class="bench-time" data-time="11.6">11.6s</span>
                     </div>
                 </div>
                 <p class="benchmark-link">
@@ -272,7 +243,7 @@
             <!-- ============================================================
                  SHOWCASE
                  ============================================================ -->
-            <section class="showcase">
+            <section class="showcase reveal">
                 <div class="showcase-header">
                     <h2>Built with Hwaro</h2>
                     <p>
@@ -403,7 +374,7 @@
             <!-- ============================================================
                  CTA
                  ============================================================ -->
-            <section class="landing-cta">
+            <section class="landing-cta reveal">
                 <p class="cta-heading">Start building.</p>
                 <p class="cta-sub">
                     One command to install. Three lines to deploy.
@@ -721,6 +692,63 @@
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') close();
             });
+        })();
+        </script>
+        <script>
+        // Scroll-reveal for below-the-fold sections + the interactive
+        // benchmark chart (bars grow from zero, times count up) once each
+        // section scrolls into view. Honors prefers-reduced-motion.
+        (function() {
+            var reduce = window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function countUp(el, target) {
+                if (reduce) { el.textContent = target.toFixed(1) + 's'; return; }
+                var dur = 1100, t0 = null;
+                el.textContent = '0.0s';
+                function step(ts) {
+                    if (t0 === null) t0 = ts;
+                    var p = Math.min((ts - t0) / dur, 1);
+                    var eased = 1 - Math.pow(1 - p, 3);
+                    el.textContent = (target * eased).toFixed(1) + 's';
+                    if (p < 1) requestAnimationFrame(step);
+                }
+                requestAnimationFrame(step);
+            }
+
+            function runBench(section) {
+                var times = section.querySelectorAll('.bench-time');
+                for (var i = 0; i < times.length; i++) {
+                    (function(el, idx) {
+                        var target = parseFloat(el.getAttribute('data-time'));
+                        if (reduce) { countUp(el, target); return; }
+                        setTimeout(function() { countUp(el, target); },
+                            120 * idx + 120);
+                    })(times[i], i);
+                }
+            }
+
+            var reveals = document.querySelectorAll('.reveal');
+
+            function show(el) {
+                el.classList.add('is-visible');
+                if (el.classList.contains('benchmark')) runBench(el);
+            }
+
+            if (reduce || !('IntersectionObserver' in window)) {
+                for (var i = 0; i < reveals.length; i++) show(reveals[i]);
+                return;
+            }
+
+            var io = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (!e.isIntersecting) return;
+                    show(e.target);
+                    io.unobserve(e.target);
+                });
+            }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+
+            for (var j = 0; j < reveals.length; j++) io.observe(reveals[j]);
         })();
         </script>
     </body>

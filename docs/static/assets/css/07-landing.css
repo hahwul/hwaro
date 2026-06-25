@@ -110,38 +110,46 @@
 
 /* Toned-down fire cover as an immersive backdrop.
    Sits below the ember canvas (z-index 1) and hero content (z-index 2).
-   Centered and capped to the native width (1280px) so it never upscales and
-   stays crisp. A soft scrim keeps the centered title readable, and a radial
-   mask feathers every edge to transparent so the art dissolves into the
-   page's pure-black background instead of ending on a hard rectangle. */
+   The pseudo-element is sized to the image itself (capped at the native
+   1280px so it never upscales) and centred at 48%. Because the radial mask
+   is now measured against this image-sized box rather than the viewport, the
+   feather stays locked to the artwork's edges at every screen size: it is
+   fully transparent (88%) well before the image's rectangle (sides at 100%,
+   corners at 141%), so the art always dissolves smoothly into the page's
+   pure-black background with no visible border. A soft scrim keeps the
+   centred title readable. */
 .hero-bg::before {
     content: "";
     position: absolute;
-    inset: 0;
+    top: 48%;
+    left: 50%;
+    width: min(1240px, 94vw);
+    aspect-ratio: 16 / 9;
+    transform: translate(-50%, -50%);
     z-index: 0;
     background-image:
         radial-gradient(
-            ellipse 60% 50% at 50% 48%,
+            ellipse 68% 60% at 50% 50%,
             rgba(0, 0, 0, 0.5) 0%,
-            rgba(0, 0, 0, 0.18) 54%,
-            rgba(0, 0, 0, 0) 80%
+            rgba(0, 0, 0, 0.18) 55%,
+            rgba(0, 0, 0, 0) 82%
         ),
         url("/images/landing/cover.jpg");
     background-repeat: no-repeat;
-    background-position: center, center 48%;
-    background-size: auto, min(1240px, 94vw);
+    background-position: center;
+    background-size: cover;
     filter: saturate(0.58) brightness(0.88);
     -webkit-mask-image: radial-gradient(
-        ellipse 44% 42% at 50% 48%,
-        #000 30%,
-        rgba(0, 0, 0, 0.55) 64%,
-        transparent 100%
+        ellipse 50% 50% at 50% 50%,
+        #000 24%,
+        rgba(0, 0, 0, 0.5) 58%,
+        transparent 88%
     );
     mask-image: radial-gradient(
-        ellipse 44% 42% at 50% 48%,
-        #000 30%,
-        rgba(0, 0, 0, 0.55) 64%,
-        transparent 100%
+        ellipse 50% 50% at 50% 50%,
+        #000 24%,
+        rgba(0, 0, 0, 0.5) 58%,
+        transparent 88%
     );
 }
 
@@ -389,17 +397,136 @@
 }
 
 .bench-track {
-    height: 6px;
-    background: #111;
-    border-radius: 3px;
+    position: relative;
+    height: 12px;
+    background: #111418;
+    border-radius: 6px;
     overflow: hidden;
+    transition: box-shadow 0.25s ease;
 }
 
-.bench-bar {
+.bench-svg {
+    display: block;
+    width: 100%;
     height: 100%;
-    background: #333;
-    border-radius: 3px;
-    transition: width 0.6s ease;
+}
+
+/* Bars grow from zero when the benchmark scrolls into view. The stagger
+   delay (--d) is per row; filter has no delay so hover stays snappy. */
+.bench-fill {
+    transform-origin: left center;
+    transform-box: fill-box;
+    transition:
+        transform 1s var(--ease-out) var(--d, 0s),
+        filter 0.25s ease;
+}
+
+.js .bench-fill {
+    transform: scaleX(0);
+}
+
+.js .benchmark.is-visible .bench-fill {
+    transform: scaleX(1);
+}
+
+.benchmark-bars .bench-row:nth-child(1) {
+    --d: 0.05s;
+}
+.benchmark-bars .bench-row:nth-child(2) {
+    --d: 0.16s;
+}
+.benchmark-bars .bench-row:nth-child(3) {
+    --d: 0.27s;
+}
+.benchmark-bars .bench-row:nth-child(4) {
+    --d: 0.38s;
+}
+.benchmark-bars .bench-row:nth-child(5) {
+    --d: 0.49s;
+}
+
+/* Continuous ember sheen sweeping the Hwaro bar so it always reads as
+   "alive" against the static competitor bars. */
+.bench-sheen {
+    transform-box: fill-box;
+    opacity: 0;
+}
+
+.benchmark.is-visible .bench-sheen {
+    animation: benchSheen 3.6s ease-in-out 1.3s infinite;
+}
+
+@keyframes benchSheen {
+    0% {
+        transform: translateX(0);
+        opacity: 0;
+    }
+    8% {
+        opacity: 0.9;
+    }
+    34% {
+        opacity: 0.9;
+    }
+    42% {
+        transform: translateX(calc(var(--travel) * 1px));
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(calc(var(--travel) * 1px));
+        opacity: 0;
+    }
+}
+
+/* Hover / keyboard focus: spotlight one row, dim the rest. */
+.bench-row {
+    border-radius: 8px;
+    outline: none;
+    transition: opacity 0.25s ease;
+}
+
+.bench-name,
+.bench-time {
+    transition:
+        color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.bench-time {
+    display: inline-block;
+    transform-origin: left center;
+}
+
+.benchmark-bars:hover .bench-row:not(:hover),
+.benchmark-bars:focus-within .bench-row:not(:focus-within) {
+    opacity: 0.4;
+}
+
+.bench-row:hover .bench-fill,
+.bench-row:focus-within .bench-fill {
+    filter: brightness(1.3) saturate(1.15);
+}
+
+.bench-row:hover .bench-track,
+.bench-row:focus-within .bench-track {
+    box-shadow:
+        inset 0 0 0 1px var(--hair-strong),
+        0 6px 22px -8px var(--primary-glow);
+}
+
+.bench-row:hover .bench-name,
+.bench-row:focus-within .bench-name,
+.bench-row:hover .bench-time,
+.bench-row:focus-within .bench-time {
+    color: #fff;
+}
+
+.bench-row:hover .bench-time,
+.bench-row:focus-within .bench-time {
+    transform: scale(1.12);
+}
+
+.bench-row:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
 .bench-time {
@@ -412,10 +539,6 @@
 .bench-highlight .bench-name {
     color: #fff;
     font-weight: 600;
-}
-
-.bench-highlight .bench-bar {
-    background: var(--primary);
 }
 
 .bench-highlight .bench-time {
@@ -971,5 +1094,63 @@
         border-top: 1px solid #1a1a1e;
         border-radius: 0 0 8px 8px;
         padding: 0.6rem;
+    }
+}
+
+/* =============================================================================
+   Motion — hero entrance + scroll-reveal
+   ============================================================================= */
+
+/* Hero copy rises in on load. */
+.hero-content {
+    animation: heroRise 1s var(--ease-out) 0.15s both;
+}
+
+@keyframes heroRise {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Below-the-fold sections fade + rise as they enter the viewport.
+   Gated on .js so no-JS visitors still see every section. */
+.js .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+        opacity 0.7s var(--ease-out),
+        transform 0.7s var(--ease-out);
+}
+
+.js .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-content {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+
+    .js .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .js .bench-fill {
+        transform: scaleX(1);
+        transition: none;
+    }
+
+    .bench-sheen {
+        display: none;
     }
 }
