@@ -388,7 +388,9 @@ Diagnose config, template, and structure issues (top-level shortcut):
 
 ```bash
 hwaro doctor               # Diagnose config, template, and structure issues
-hwaro doctor --fix         # Add missing config sections to config.toml
+hwaro doctor --fix         # Normalize config values (base_url trailing slash, sitemap priority…)
+hwaro doctor --approve     # Add recommended config sections to config.toml
+hwaro doctor --full        # Both (equivalent to --fix --approve)
 ```
 
 **Exit codes.** `doctor` returns a classified exit code based on the most

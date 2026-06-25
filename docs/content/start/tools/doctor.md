@@ -14,11 +14,17 @@ hwaro doctor
 # Check only a specific content directory
 hwaro doctor -c posts
 
-# Auto-fix: add missing config sections
+# Normalize config values (base_url trailing slash, sitemap priority, …)
 hwaro doctor --fix
 
-# Auto-fix with minimal sections (skip pwa, amp, assets, etc.)
-hwaro doctor --fix --minimal
+# Add recommended config sections to config.toml
+hwaro doctor --approve
+
+# Do both (equivalent to --fix --approve)
+hwaro doctor --full
+
+# Preview changes without writing config.toml
+hwaro doctor --full --dry-run
 
 # Output result as JSON
 hwaro doctor --json
@@ -30,10 +36,15 @@ hwaro doctor --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Content directory to check |
-| --fix | Auto-fix issues (add missing config sections) |
-| --minimal | With `--fix`, skip advanced optional sections (pwa, amp, assets, deployment, image_processing, etc.) |
+| -c, --content-dir DIR | Content directory to check (default: content) |
+| --fix | Perform real fixes — normalize values (base_url trailing slash, sitemap priority, …) |
+| --approve | Approve and add recommended optional config sections |
+| --full | Both `--fix` and `--approve` |
+| --dry-run | Preview changes without writing `config.toml` |
+| --strict | Treat warnings as errors when computing the exit code |
+| --max-warnings N | Exit non-zero when warning count exceeds N |
 | -j, --json | Output result as JSON |
+| -q, --quiet | Suppress info output and banner |
 | -h, --help | Show help |
 
 ## What It Checks

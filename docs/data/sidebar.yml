@@ -125,3 +125,10 @@
       url: /deploy/codeberg-pages/
     - title: Docker
       url: /deploy/docker/
+- title: Integrations
+  section: integrations
+  items:
+    - title: Overview
+      url: /integrations/
+    - title: Agent Skills
+      url: /integrations/skills/

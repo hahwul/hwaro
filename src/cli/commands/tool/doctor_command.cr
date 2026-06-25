@@ -222,7 +222,7 @@ module Hwaro
             end
 
             unless config_missing.empty?
-              Logger.info "Missing Config Sections (run 'hwaro doctor --fix' to add):"
+              Logger.info "Missing Config Sections (run 'hwaro doctor --full' to add):"
               config_missing.each { |issue| print_issue(issue, plain) }
               Logger.info ""
             end
