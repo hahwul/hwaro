@@ -79,6 +79,9 @@ base_url = "https://example.com"
 hwaro new content/about.md
 ```
 
+> **Tip:** run `hwaro new` with no arguments to open an interactive wizard that
+> suggests a path and collects the title, description, tags, and more for you.
+
 Edit `content/about.md`:
 
 ```markdown

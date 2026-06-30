@@ -240,7 +240,9 @@ describe Hwaro::Services::Initializer do
           content = File.read(archetype_path)
           content.should contain("+++")
           content.should contain("title = \"{{ title }}\"")
-          content.should contain("description = \"\"")
+          # `hwaro new` substitutes {{ description }} (empty when none given,
+          # or the value collected by the interactive wizard).
+          content.should contain("description = \"{{ description }}\"")
           # Regression for gh#525: archetype must not inject `# {{ title }}`
           # because every scaffold's `page.html` already renders the title
           # as `<h1>` — duplicating it produced two H1s on every new post.

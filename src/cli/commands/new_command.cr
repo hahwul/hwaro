@@ -1,6 +1,8 @@
 require "option_parser"
 require "json"
 require "../metadata"
+require "../prompt"
+require "./new_wizard"
 require "../../config/options/new_options"
 require "../../models/config"
 require "../../services/creator"
@@ -77,18 +79,34 @@ module Hwaro
             )
           end
 
-          # `hwaro new` is flag-only: there is no interactive prompt, so a
-          # missing <path> always fails fast with a classified usage error.
-          # Keeping this a HwaroError lets both text and --json consumers see
-          # the same taxonomy (code/category/exit).
+          # When no <path> is given, an interactive human session (TTY + color,
+          # not --json / --quiet) gets a guided wizard that collects the title,
+          # description, recommended path, tags, date, draft, and archetype.
+          # Every non-interactive context — pipes, CI, agents, --json, --quiet —
+          # keeps the fast classified usage error so scripted callers see the
+          # same taxonomy (code/category/exit) as before and never block on a
+          # prompt that will not be answered.
           raw_path = options.path
           if raw_path.nil?
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_USAGE,
-              message: "missing <path> argument",
-              hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
-            )
+            interactive = !json_output && !Logger.quiet? && Prompt.interactive?
+            if interactive
+              unless NewWizard.new.run(options, discover_archetypes)
+                Logger.info "Cancelled."
+                return
+              end
+              raw_path = options.path
+            else
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <path> argument",
+                hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
+              )
+            end
           end
+
+          # The wizard always sets a path on success; this guard is defensive
+          # and also narrows `raw_path` to String for the pipeline below.
+          return if raw_path.nil?
 
           # Canonicalize early so the rest of the pipeline (and the
           # `Created new content: …` log line) works with a path that

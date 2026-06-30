@@ -169,7 +169,7 @@ module Hwaro
             title = "{{ title }}"
             date = "{{ date }}"
             draft = {{ draft }}
-            description = ""
+            description = "{{ description }}"
             +++
 
             MD

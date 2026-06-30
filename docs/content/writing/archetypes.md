@@ -37,6 +37,7 @@ An archetype is a Markdown file with front matter and optional content. Use plac
 | `{{ date }}` | Current local date as `YYYY-MM-DD`, or the `--date` value verbatim |
 | `{{ tags }}` | Tags from `--tags` as a TOML array (`[]` if none) |
 | `{{ draft }}` | `true` if `--draft` is passed, or the target path contains a `drafts` directory; `false` otherwise |
+| `{{ description }}` | Description collected by the interactive `hwaro new` wizard; empty string when none is given |
 
 ### Example Archetype
 
@@ -173,7 +174,7 @@ draft = false
 authors = []
 tags = []
 categories = []
-description = ""
+description = "{{ description }}"
 image = ""
 +++
 
@@ -208,19 +209,25 @@ Brief description of this documentation page.
 ```markdown
 +++
 title = "{{ title }}"
-date = {{ date }}
+date = "{{ date }}"
 draft = {{ draft }}
+description = "{{ description }}"
+tags = {{ tags }}
 +++
 
 # {{ title }}
 ```
+
+This mirrors the `archetypes/default.md` that `hwaro init` ships. The
+`{{ description }}` placeholder substitutes to an empty string for the flag
+form and to the value you type in the interactive `hwaro new` wizard.
 
 ## Tips
 
 - **Consistent metadata**: Define all commonly used front matter fields in archetypes
 - **Section-specific**: Create archetypes for each content section with relevant defaults
 - **Nested organization**: Use subdirectories in `archetypes/` to match your content structure
-- **Draft handling**: `{{ draft }}` is `true` when `--draft` is passed or the target path contains a `drafts` directory — including `hwaro new -t "Title"` without a path, which defaults to `content/drafts/`
+- **Draft handling**: `{{ draft }}` is `true` when `--draft` is passed, when you enable the draft toggle in the interactive wizard, or when the target path contains a `drafts/` segment
 
 ## See Also
 

@@ -280,8 +280,9 @@ module Hwaro
 
         # Built-in default archetype content (TOML front matter).
         # `Services::Creator` substitutes `{{ title }}`, `{{ date }}`,
-        # `{{ draft }}`, and `{{ tags }}`; other fields (description) ship
-        # with empty values for users to fill in.
+        # `{{ draft }}`, `{{ tags }}`, and `{{ description }}`. An unset
+        # description substitutes to "" — identical to the prior hardcoded
+        # empty value — while the interactive `hwaro new` wizard fills it in.
         #
         # The body is intentionally empty: every scaffold's `page.html` /
         # `post.html` already renders `<h1>{{ page.title | e }}</h1>`, so
@@ -293,7 +294,7 @@ module Hwaro
             title = "{{ title }}"
             date = "{{ date }}"
             draft = {{ draft }}
-            description = ""
+            description = "{{ description }}"
             tags = {{ tags }}
             +++
 

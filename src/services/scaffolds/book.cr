@@ -173,7 +173,7 @@ module Hwaro
             +++
             title = "{{ title }}"
             draft = {{ draft }}
-            description = ""
+            description = "{{ description }}"
             weight = 0
             toc = true
             +++

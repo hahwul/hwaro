@@ -111,6 +111,17 @@ module Hwaro
         sanitized_segments.join(PATH_SEP)
       end
 
+      # Derive a filename-safe slug from a free-text title: lowercase, then
+      # collapse every run of non-letter/non-digit Unicode characters to a
+      # single hyphen and trim hyphens off the ends. Returns "" when the title
+      # has no slug-able characters (the caller decides how to handle that).
+      # Single source of truth for the title→filename mapping, shared by the
+      # Creator's title-only fallback and the interactive `new` wizard's
+      # recommended-path suggestion.
+      def self.slugify(title : String) : String
+        title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
+      end
+
       private def self.sanitize_url_segment(segment : String) : String
         return segment if segment.empty?
         String.build(segment.bytesize) do |io|
@@ -266,7 +277,7 @@ module Hwaro
               hint: "Pass a non-empty --title.",
             )
           end
-          slug = title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
+          slug = Creator.slugify(title)
           if slug.empty?
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
@@ -295,6 +306,7 @@ module Hwaro
         # Full ISO with offset is still accepted if provided via --date.
         date = options.date || Time.local.to_s("%Y-%m-%d")
         tags = options.tags
+        description = options.description
 
         # Find archetype, extracting any hwaro directives (e.g. bundle=true)
         # before substitution so they don't end up in generated content.
@@ -360,9 +372,9 @@ module Hwaro
         end
 
         content = if archetype_content
-                    process_archetype(archetype_content, title, date, is_draft, tags)
+                    process_archetype(archetype_content, title, date, is_draft, tags, description)
                   else
-                    generate_default_content(title, date, is_draft, tags, content_new)
+                    generate_default_content(title, date, is_draft, tags, content_new, description)
                   end
 
         if File.exists?(full_path)
@@ -535,7 +547,7 @@ module Hwaro
         nil
       end
 
-      private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String)) : String
+      private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String), description : String? = nil) : String
         # Archetypes wrap these placeholders in quoted TOML fields
         # (`title = "{{ title }}"`), so the substituted values must be escaped
         # the same way `tags` already is — otherwise a title/date containing a
@@ -543,12 +555,17 @@ module Hwaro
         # generated file fails to build.
         safe_title = escape_string(title)
         safe_date = escape_string(date)
+        # An unset description substitutes to "" so an archetype that ships a
+        # `description = "{{ description }}"` line still produces valid output.
+        safe_description = escape_string(description || "")
         tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")}]"
         content = archetype_content
           .gsub("{{ title }}", safe_title)
           .gsub("{{title}}", safe_title)
           .gsub("{{ date }}", safe_date)
           .gsub("{{date}}", safe_date)
+          .gsub("{{ description }}", safe_description)
+          .gsub("{{description}}", safe_description)
           .gsub("{{ draft }}", is_draft.to_s)
           .gsub("{{draft}}", is_draft.to_s)
           .gsub("{{ tags }}", tags_str)
@@ -567,13 +584,26 @@ module Hwaro
         is_draft : Bool,
         tags : Array(String),
         content_new : Models::ContentNewConfig,
+        description : String? = nil,
       ) : String
+        # Map of extra-field name → value. Today only `description` carries a
+        # value (supplied by the interactive `new` wizard); every other extra
+        # field still scaffolds an empty placeholder. A provided description is
+        # force-included even when the project's `default_fields` omitted it, so
+        # the entered value is never silently dropped.
+        field_values = {} of String => String
+        extra_fields = content_new.extra_fields
+        if d = description
+          field_values["description"] = d
+          extra_fields = ["description"] + extra_fields unless extra_fields.includes?("description")
+        end
+
         if content_new.json?
-          build_json_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+          build_json_front_matter(title, date, is_draft, tags, extra_fields, field_values)
         elsif content_new.yaml?
-          build_yaml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+          build_yaml_front_matter(title, date, is_draft, tags, extra_fields, field_values)
         else
-          build_toml_front_matter(title, date, is_draft, tags, content_new.extra_fields)
+          build_toml_front_matter(title, date, is_draft, tags, extra_fields, field_values)
         end
       end
 
@@ -588,14 +618,14 @@ module Hwaro
       # `<h1>{{ page.title | e }}</h1>`, so injecting a markdown `# title`
       # here would produce two H1s on every page created via `hwaro new`
       # (gh#525).
-      private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+      private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
         safe_title = escape_string(title)
         date_literal = date.matches?(TOML_DATETIME_RE) ? date : "\"#{escape_string(date)}\""
         String.build do |str|
           str << "+++\n"
           str << "title = \"#{safe_title}\"\n"
           str << "date = #{date_literal}\n"
-          extra_fields.each { |f| str << "#{f} = \"\"\n" }
+          extra_fields.each { |f| str << "#{f} = \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft = true\n" if is_draft
           unless tags.empty?
             rendered = tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")
@@ -605,7 +635,7 @@ module Hwaro
         end
       end
 
-      private def build_yaml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+      private def build_yaml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
         safe_title = escape_string(title)
         String.build do |str|
           str << "---\n"
@@ -614,7 +644,7 @@ module Hwaro
           # valid YAML, and a normal date parses back as a String scalar (an
           # unquoted YYYY-MM-DD parses as a Time node and is silently dropped).
           str << "date: \"#{escape_string(date)}\"\n"
-          extra_fields.each { |f| str << "#{f}: \"\"\n" }
+          extra_fields.each { |f| str << "#{f}: \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"
@@ -624,11 +654,11 @@ module Hwaro
         end
       end
 
-      private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String)) : String
+      private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
         fields = {} of String => JSON::Any
         fields["title"] = JSON::Any.new(title)
         fields["date"] = JSON::Any.new(date)
-        extra_fields.each { |f| fields[f] = JSON::Any.new("") }
+        extra_fields.each { |f| fields[f] = JSON::Any.new(field_values[f]? || "") }
         fields["draft"] = JSON::Any.new(true) if is_draft
         unless tags.empty?
           fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
