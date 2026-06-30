@@ -207,7 +207,7 @@ module Hwaro
             title = "{{ title }}"
             date = "{{ date }}"
             draft = {{ draft }}
-            description = ""
+            description = "{{ description }}"
             authors = []
             categories = []
             tags = {{ tags }}

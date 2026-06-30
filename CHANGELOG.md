@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `hwaro new` with no `<path>` opens an interactive wizard in a terminal: it prompts for the title, description, a recommended path (derived from the title and section), tags, date, draft flag, and archetype, previews a summary, and confirms before writing. Flags already passed pre-fill their prompts. Non-interactive contexts (pipes, CI, `--json`, `--quiet`) keep the classified `HWARO_E_USAGE` error, so scripts and agents are unchanged
+- Archetypes support a `{{ description }}` placeholder, and a `description` collected by the wizard is written into the new file's front matter instead of an empty value (the flag form still scaffolds an empty `description`)
+
 ## v0.16.0
 
 ### Added

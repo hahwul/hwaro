@@ -474,6 +474,120 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # An explicit `description` (supplied by the interactive `hwaro new` wizard)
+    # must be written as the field's value instead of the empty placeholder the
+    # flag form leaves behind, across every front-matter format.
+    it "writes the supplied description value into TOML front matter" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello", description: "A short intro")
+          Hwaro::Services::Creator.new.run(options)
+
+          File.read("content/post.md").should contain(%(description = "A short intro"))
+        end
+      end
+    end
+
+    it "writes the supplied description value into YAML front matter" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "yaml"
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello", description: "A short intro")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          File.read("content/post.md").should contain(%(description: "A short intro"))
+        end
+      end
+    end
+
+    it "writes the supplied description value into JSON front matter" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = "json"
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello", description: "A short intro")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          content = File.read("content/post.md")
+          parsed = JSON.parse(content[0, content.index!("}\n") + 1])
+          parsed["description"].as_s.should eq("A short intro")
+        end
+      end
+    end
+
+    it "force-includes description even when default_fields omitted it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = [] of String
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello", description: "Forced in")
+          Hwaro::Services::Creator.new.run(options, config)
+
+          File.read("content/post.md").should contain(%(description = "Forced in"))
+        end
+      end
+    end
+
+    it "substitutes {{ description }} in an archetype, escaping the value" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/default.md", %(+++\ntitle = "{{ title }}"\ndescription = "{{ description }}"\n+++\n\n))
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello", description: %(My "Quoted" intro))
+          Hwaro::Services::Creator.new.run(options)
+
+          File.read("content/post.md").should contain(%(description = "My \\"Quoted\\" intro"))
+        end
+      end
+    end
+
+    it "leaves an archetype's {{ description }} empty when none is supplied" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/default.md", %(+++\ntitle = "{{ title }}"\ndescription = "{{ description }}"\n+++\n\n))
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "Hello")
+          Hwaro::Services::Creator.new.run(options)
+
+          File.read("content/post.md").should contain(%(description = ""))
+        end
+      end
+    end
+
+    describe ".slugify" do
+      it "lowercases and hyphenates a title" do
+        Hwaro::Services::Creator.slugify("My First Post!").should eq("my-first-post")
+      end
+
+      it "collapses punctuation runs and trims edge hyphens" do
+        Hwaro::Services::Creator.slugify("  Breaking News! (2024)  ").should eq("breaking-news-2024")
+      end
+
+      it "preserves CJK letters" do
+        Hwaro::Services::Creator.slugify("안녕 세계").should eq("안녕-세계")
+      end
+
+      it "returns an empty string when nothing is slug-able" do
+        Hwaro::Services::Creator.slugify("!!!").should eq("")
+      end
+    end
+
     # The default generators (no archetype) hand-roll escape_string for
     # backslash-before-quote ordering. An adversarial title (`C:\` style
     # backslash + embedded quote) must still produce front matter that

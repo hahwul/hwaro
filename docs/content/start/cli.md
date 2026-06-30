@@ -120,14 +120,27 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 Create a new content file:
 
 ```bash
+hwaro new                                     # interactive wizard (TTY): prompts for everything
 hwaro new content/about.md
 hwaro new content/blog/my-post.md
-hwaro new -t "My Post Title"
 hwaro new posts/my-post.md -a posts
 hwaro new my-post.md --section blog --draft --tags "go,web" --date 2026-03-22
 ```
 
 Creates a Markdown file with front matter template. Supports **archetypes** for customizable templates.
+
+**Interactive mode:**
+
+Running `hwaro new` without a `<path>` in an interactive terminal opens a guided wizard.
+It prompts for the title, description, a **recommended path** (derived from the title and
+section), tags, date, draft flag, and archetype, then shows a summary and asks to confirm
+before writing. Any flags you already passed pre-fill the matching prompt, so
+`hwaro new -t "My Post"` only asks for the rest. Press `Ctrl-D` or answer `n` at the final
+prompt to cancel without creating anything.
+
+The wizard never runs in non-interactive contexts — pipes, CI, agents, `--json`, or
+`--quiet` — which instead print the classified `HWARO_E_USAGE` error, so scripted callers
+stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 
 **Options:**
 
@@ -152,7 +165,7 @@ Archetypes are template files in `archetypes/` directory that define default fro
 - `archetypes/posts.md` - Used for `hwaro new posts/...`
 - `archetypes/tools/develop.md` - Used for `hwaro new tools/develop/...`
 
-Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`, `{{ tags }}`
+Archetype files support placeholders: `{{ title }}`, `{{ date }}`, `{{ draft }}`, `{{ tags }}`, `{{ description }}`
 
 Example archetype (`archetypes/posts.md`):
 ```

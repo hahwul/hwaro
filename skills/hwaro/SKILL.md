@@ -113,14 +113,19 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and the content
 ```bash
 hwaro new content/blog/my-post.md            # path-based
 hwaro new my-post.md -s blog --draft --tags "crystal,web" --date 2026-03-22
-hwaro new -t "My Post Title"                 # title only
+hwaro new posts/my-post.md -t "My Post Title"  # title sets front matter, not the path
 hwaro new posts/launch.md --bundle           # leaf bundle (posts/launch/index.md) for co-located assets
 hwaro new --list-archetypes --json
 ```
 
 Front matter comes from `archetypes/` (matched by `-a`, then by path, then
 `archetypes/default.md`, then a built-in). Use `--bundle` when a page owns
-images/assets; use `--no-bundle` to force a single file.
+images/assets; use `--no-bundle` to force a single file. The wizard fills the
+default archetype's `{{ description }}` placeholder; the flag form leaves it empty.
+
+Running `hwaro new` with no `<path>` opens an interactive wizard in a TTY — but
+that never triggers in agent/CI runs (no TTY), where it instead exits with
+`HWARO_E_USAGE`. **Always pass an explicit `content/<section>/<slug>.md` path.**
 
 ### C. Develop — `hwaro serve`
 
