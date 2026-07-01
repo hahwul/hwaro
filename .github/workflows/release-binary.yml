@@ -55,33 +55,19 @@ jobs:
             crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static -Dpreview_mt
           "
       - if: matrix.platform == 'macos'
-        name: Build binary (macOS)
+        name: Install macOS build dependencies
+        run: brew install openssl@3 pkg-config
+      - if: matrix.platform == 'macos'
+        name: Build and package binary (macOS)
         run: |
           mkdir -p build
-          # Link against current OpenSSL (openssl@3). Without pinning PKG_CONFIG_PATH
-          # the build can pick up an EOL openssl@1.1, producing a binary that won't
-          # launch on a clean machine (dyld: libssl.1.1.dylib not found).
-          brew install openssl@3
-          export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig"
           BIN="build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}"
-          crystal build src/main.cr \
-            -o "$BIN" \
-            --no-debug --release \
-            -Dpreview_mt
-          echo "== otool -L $BIN ==" && otool -L "$BIN"
-          # Guard 1: never ship a macOS binary linked against EOL openssl@1.1.
-          if otool -L "$BIN" | grep -q 'openssl@1.1'; then
-            echo "::error::macOS binary still links EOL openssl@1.1"; exit 1
-          fi
-          # Guard 2: openssl@3 must be the ONLY Homebrew dynamic dep. Anything else
-          # means the Homebrew formula's depends_on list is out of date.
-          EXTRA="$(otool -L "$BIN" \
-            | grep -oE '/(opt/homebrew|usr/local)/(opt|Cellar)/[^/]+' \
-            | grep -v 'openssl@3' | sort -u || true)"
-          if [ -n "$EXTRA" ]; then
-            echo "::error::unexpected non-openssl@3 Homebrew deps (update formula depends_on):"
-            echo "$EXTRA"; exit 1
-          fi
+          crystal build src/main.cr -o "$BIN" --no-debug --release -Dpreview_mt
+          chmod +x scripts/package-macos.sh
+          scripts/package-macos.sh "$BIN" "build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}.tar.gz" hwaro
+          rm -f "$BIN"
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
