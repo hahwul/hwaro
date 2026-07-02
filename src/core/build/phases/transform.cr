@@ -289,7 +289,7 @@ module Hwaro::Core::Build::Phases::Transform
       name = tax.name
       next if name.strip.empty?
       next if snapshot.has_key?(name)
-      values = page.taxonomy_values(name).reject { |t| t.strip.empty? }
+      values = page.taxonomy_values(name).reject(&.strip.empty?)
       snapshot[name] = values unless values.empty?
     end
     snapshot

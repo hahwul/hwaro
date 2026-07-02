@@ -333,26 +333,24 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       args["_1"].should eq("beta")
     end
 
-    # Characterization: a call that mixes a leading positional with a trailing
-    # named arg currently drops the positional. The named-arg branch fires once
-    # any `key=` is present, and the positional fallback is gated on
-    # `args.empty?`, so the quoted positional is never captured (no _0). This
-    # pins the present contract; if mixed args ever start preserving the
-    # positional, this assertion is the regression/intent guard that flips.
-    it "drops a leading positional once a named arg is present (current contract)" do
+    # A call that mixes a leading positional with a trailing named arg keeps
+    # BOTH. This used to drop the positional (the named-arg branch fired once
+    # any `key=` was present and the positional fallback was gated on
+    # `args.empty?`) — the old characterization spec pinned that as the
+    # "current contract" and anticipated exactly this flip.
+    it "keeps a leading positional when a named arg is also present" do
       builder = Hwaro::Core::Build::Builder.new
       args = builder.test_sc_parse_args(%("/img.jpg", caption="hi"))
       args["caption"].should eq("hi")
-      args.has_key?("_0").should be_false
+      args["_0"].should eq("/img.jpg")
     end
 
-    it "renders figure with an empty src for a mixed positional+named call (current contract)" do
+    it "renders figure with the positional src for a mixed positional+named call" do
       builder = Hwaro::Core::Build::Builder.new
-      # The positional "/img.jpg" is dropped, so the figure src never fills.
       result = builder.test_sc_process(
         %({{ figure("/img.jpg", caption="hi") }}),
       )
-      result.should contain(%(<img src="" ))
+      result.should contain(%(<img src="/img.jpg" ))
       result.should contain("<figcaption>hi</figcaption>")
     end
   end
