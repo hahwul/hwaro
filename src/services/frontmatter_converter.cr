@@ -106,12 +106,12 @@ module Hwaro
 
         # Skip if already in target format or unknown format
         if current_format == target_format
-          Logger.info "  Skipped (already #{target_format}): #{file_path}" if log_skipped
+          Logger.item("skipped (already #{target_format}): #{file_path}", glyph: :bullet) if log_skipped
           return ConversionStatus::Skipped
         end
 
         if current_format == FrontmatterFormat::Unknown
-          Logger.warn "  Skipped (no frontmatter): #{file_path}" if log_skipped
+          Logger.item("skipped (no frontmatter): #{file_path}", glyph: :warn) if log_skipped
           return ConversionStatus::Skipped
         end
 
@@ -119,7 +119,7 @@ module Hwaro
 
         if converted_content
           File.write(file_path, converted_content)
-          Logger.success "  Converted: #{file_path}"
+          Logger.item(file_path, glyph: :ok)
           ConversionStatus::Converted
         else
           Logger.error "  Failed to convert: #{file_path}"
@@ -143,8 +143,6 @@ module Hwaro
         errors = 0
 
         format_name = format_label(target_format)
-        Logger.info "Converting frontmatter to #{format_name} format..."
-        Logger.info ""
 
         find_content_files.each do |file_path|
           status = convert_file_with_status(file_path, target_format, log_skipped: false)
@@ -159,11 +157,9 @@ module Hwaro
           end
         end
 
-        Logger.info ""
-        Logger.info "Conversion complete:"
-        Logger.info "  Converted: #{converted}"
-        Logger.info "  Skipped: #{skipped}"
-        Logger.info "  Errors: #{errors}" if errors > 0
+        summary = "#{converted} files · #{skipped} skipped"
+        summary += " · #{errors} errors" if errors > 0
+        Logger.outcome("converted", summary, glyph: errors > 0 ? :err : :result)
 
         ConversionResult.new(
           success: errors == 0,

@@ -430,6 +430,42 @@ describe Hwaro::Services::ContentLister do
         lister.display(Hwaro::Services::ContentFilter::Published)
       end
     end
+
+    it "renders the ember heading, an aligned table, and a listed outcome" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Test Post\ndraft: false\ndate: 2024-01-15\n---\n\n# Content")
+        File.write(File.join(content_dir, "wip.md"), "---\ntitle: WIP\ndraft: true\ndate: 2024-02-01\n---\n\n# Draft")
+
+        output = with_captured_log do
+          Hwaro::Services::ContentLister.new(content_dir).display(Hwaro::Services::ContentFilter::All)
+        end
+
+        output.should contain("hwaro: list all")
+        output.should contain("Status")
+        output.should contain("[pub]")
+        output.should contain("[draft]")
+        output.should contain("Test Post")
+        output.should contain("2024-01-15")
+        output.should contain("listed: 2 files")
+        output.should_not contain("\e[")
+      end
+    end
+
+    it "reports an empty directory with an info outcome" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        output = with_captured_log do
+          Hwaro::Services::ContentLister.new(content_dir).display(Hwaro::Services::ContentFilter::Drafts)
+        end
+
+        output.should contain("hwaro: list drafts")
+        output.should contain("listed: no content found")
+      end
+    end
   end
 end
 

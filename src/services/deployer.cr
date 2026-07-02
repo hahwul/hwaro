@@ -4,6 +4,7 @@ require "json"
 require "set"
 require "uri"
 
+require "../cli/prompt"
 require "../models/config"
 require "../utils/command_runner"
 require "../utils/errors"
@@ -268,8 +269,6 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : {Bool, TargetCounts}
-        Logger.action(:Deploy, "Target: #{target.name}")
-
         if command = target.command
           ok = deploy_via_command(target, source_dir, command, effective)
           return {ok, TargetCounts.new}
@@ -370,8 +369,6 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : Bool
-        Logger.action(:Deploy, "Target: #{target.name}")
-
         if command = target.command
           return deploy_via_command(target, source_dir, command, effective)
         end
@@ -419,6 +416,7 @@ module Hwaro
         command : String,
         effective : EffectiveOptions,
       ) : Bool
+        Logger.heading("deploy", target.name)
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -465,7 +463,7 @@ module Hwaro
           )
         end
 
-        Logger.success "Deploy command completed."
+        Logger.outcome("deployed", target.name)
         true
       end
 
@@ -477,6 +475,7 @@ module Hwaro
         dest_dir : String,
         effective : EffectiveOptions,
       ) : {Bool, TargetCounts}
+        Logger.heading("deploy", target.name)
         counts = TargetCounts.new
         dest_dir_expanded = File.expand_path(dest_dir)
 
@@ -536,7 +535,7 @@ module Hwaro
         end
 
         remove_empty_directories(dest_dir_expanded)
-        Logger.success "Deployed to #{dest_dir_expanded} (created #{counts.created}, updated #{counts.updated}, deleted #{counts.deleted})"
+        Logger.outcome("deployed", "#{dest_dir_expanded} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
         {true, counts}
       end
 
@@ -575,7 +574,11 @@ module Hwaro
 
         to_copy, skipped = compute_copies(desired, dest_dir, effective.force)
 
-        Logger.info "Plan: copy #{to_copy.size}, delete #{to_delete.size}, skip #{skipped}"
+        Logger::Receipt.new("deploy", target.name)
+          .row("source", source_dir)
+          .row("dest", dest_dir)
+          .row("plan", "copy #{to_copy.size} · delete #{to_delete.size} · skip #{skipped}")
+          .emit
 
         if effective.dry_run
           log_plan(to_copy, to_delete)
@@ -604,7 +607,7 @@ module Hwaro
         end
 
         remove_empty_directories(dest_dir)
-        Logger.success "Deployed to #{dest_dir} (copied #{summary.copied}, deleted #{summary.deleted}, skipped #{summary.skipped})"
+        Logger.outcome("deployed", "#{dest_dir} · #{summary.copied} copied · #{summary.deleted} deleted · #{summary.skipped} skipped")
         true
       end
 
@@ -897,28 +900,26 @@ module Hwaro
 
       private def log_plan(to_copy : Array({String, String}), to_delete : Array(String))
         if to_copy.present?
-          Logger.info "Copy:"
-          to_copy.first(50).each { |(dest_rel, _)| Logger.info "  + #{dest_rel}" }
-          Logger.info "  ... (#{to_copy.size - 50} more)" if to_copy.size > 50
+          Logger.section("copy")
+          to_copy.first(50).each { |(dest_rel, _)| Logger.item("+ #{dest_rel}", glyph: :bullet) }
+          Logger.item("… and #{to_copy.size - 50} more", glyph: :bullet) if to_copy.size > 50
         end
         if to_delete.present?
-          Logger.info "Delete:"
-          to_delete.first(50).each { |rel| Logger.info "  - #{rel}" }
-          Logger.info "  ... (#{to_delete.size - 50} more)" if to_delete.size > 50
+          Logger.section("delete")
+          to_delete.first(50).each { |rel| Logger.item("- #{rel}", glyph: :bullet) }
+          Logger.item("… and #{to_delete.size - 50} more", glyph: :bullet) if to_delete.size > 50
         end
       end
 
       private def confirm?(prompt : String) : Bool
-        unless STDIN.tty?
+        unless CLI::Prompt.interactive?
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
             message: "Cannot prompt for confirmation: stdin is not a TTY.",
             hint: "Pass --force to skip confirmation prompts in non-interactive environments.",
           )
         end
-        Logger.warn "#{prompt} [y/N]"
-        input = STDIN.gets
-        (input.try(&.strip.downcase) == "y")
+        CLI::Prompt.confirm?(prompt, default: false) == true
       end
 
       # Supported placeholders in `command = "..."` templates. Listed

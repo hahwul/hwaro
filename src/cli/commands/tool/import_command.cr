@@ -98,8 +98,10 @@ module Hwaro
                          )
                        end
 
-            Logger.info "Importing from #{options.source_type}: #{options.path}"
-            Logger.info "Output directory: #{options.output_dir}"
+            Logger::Receipt.new(NAME, options.source_type)
+              .row("source", options.path)
+              .row("output", options.output_dir)
+              .emit
 
             result = importer.run(options)
 
@@ -120,7 +122,9 @@ module Hwaro
               )
             end
 
-            Logger.success "Import complete: #{result.imported_count} imported, #{result.skipped_count} skipped, #{result.error_count} errors"
+            summary = "#{result.imported_count} files · #{result.skipped_count} skipped"
+            summary += " · #{result.error_count} errors" if result.error_count > 0
+            Logger.outcome("imported", summary, glyph: result.error_count > 0 ? :err : :result)
 
             if result.skipped_count > 0 && !options.force
               Logger.warn "#{result.skipped_count} file(s) skipped because the destination already exists. Re-run with --force to overwrite."

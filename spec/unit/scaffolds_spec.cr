@@ -396,12 +396,18 @@ describe Hwaro::Services::Scaffolds::BlogDark do
       scaffold.static_files.has_key?("js/search.js").should be_true
     end
 
-    it "uses dark color variables" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      css = scaffold.static_files["css/style.css"]
+    it "forces the dark scheme over the shared light-dark tokens" do
+      dark = Hwaro::Services::Scaffolds::BlogDark.new
+      light = Hwaro::Services::Scaffolds::Blog.new
+      css = dark.static_files["css/style.css"]
       css.should contain("color-scheme: dark")
-      css.should contain("--bg: #0f0f0e")
-      css.should contain("--primary: #ec7a66")
+      css.should contain("light-dark(#b35454, #ec7a66)")
+      css.should contain("light-dark(#faf7f2, #0f0f0e)")
+      # Dedup lock: the dark sheet is the light sheet plus a small
+      # forced-dark suffix — never a second stylesheet to maintain.
+      light_css = light.static_files["css/style.css"]
+      css.starts_with?(light_css).should be_true
+      (css.bytesize - light_css.bytesize).should be < 400
     end
   end
 end
@@ -457,12 +463,18 @@ describe Hwaro::Services::Scaffolds::DocsDark do
       scaffold.static_files.has_key?("js/search.js").should be_true
     end
 
-    it "uses dark color variables" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      css = scaffold.static_files["css/style.css"]
+    it "forces the dark scheme over the shared light-dark tokens" do
+      dark = Hwaro::Services::Scaffolds::DocsDark.new
+      light = Hwaro::Services::Scaffolds::Docs.new
+      css = dark.static_files["css/style.css"]
       css.should contain("color-scheme: dark")
-      css.should contain("--bg: #0f0f0e")
-      css.should contain("--primary: #ec7a66")
+      css.should contain("light-dark(#b35454, #ec7a66)")
+      css.should contain("light-dark(#faf7f2, #0f0f0e)")
+      # Dedup lock: the dark sheet is the light sheet plus a small
+      # forced-dark suffix — never a second stylesheet to maintain.
+      light_css = light.static_files["css/style.css"]
+      css.starts_with?(light_css).should be_true
+      (css.bytesize - light_css.bytesize).should be < 400
     end
   end
 end

@@ -102,7 +102,7 @@ module Hwaro
       return if @@level > Level::Debug
       return if @@quiet
       clear_active_line
-      @@io.puts colorize("[DEBUG] #{message}", :light_gray)
+      @@io.puts paint("[DEBUG] #{message}", Role::Dim)
     end
 
     def self.info(message : String)
@@ -114,27 +114,31 @@ module Hwaro
 
     def self.error(message : String)
       clear_active_line
-      @@err_io.puts colorize(message, :red)
+      @@err_io.puts paint(message, Role::Error)
     end
 
     def self.warn(message : String)
       return if @@level > Level::Warn
       clear_active_line
-      @@err_io.puts colorize("[WARN] #{message}", :yellow)
+      @@err_io.puts paint("[WARN] #{message}", Role::Warn)
     end
 
     def self.success(message : String)
       return if @@quiet
       clear_active_line
-      @@io.puts colorize(message, :green)
+      @@io.puts paint(message, Role::Success)
     end
 
-    def self.action(label : String | Symbol, message : String, color : Symbol = :green)
+    # Cargo-style verbose action line: a 12-column right-justified label and
+    # a message. Callers name a semantic `Role` (never a raw color) so the
+    # label picks up the truecolor tier and theme awareness like everything
+    # else. The plain form (`"      create  path"`) is unchanged.
+    def self.action(label : String | Symbol, message : String, role : Role = Role::Success)
       return if @@quiet
       clear_active_line
       label_s = label.to_s.rjust(12)
       if color_enabled?
-        @@io.puts "#{label_s.colorize(color).bold}  #{message}"
+        @@io.puts "#{paint(label_s, role, bold: true)}  #{message}"
       else
         @@io.puts "#{label_s}  #{message}"
       end
@@ -243,6 +247,8 @@ module Hwaro
       :heading => {"●", "#", Role::Accent},
       :ready   => {"◇", ">", Role::Accent},
       :watch   => {"↻", "~", Role::Accent},
+      :bullet  => {"·", "-", Role::Dim},
+      :arrow   => {"→", "->", Role::Dim},
     }
 
     # Resolve a glyph by key: colorized unicode when color is on, else the
@@ -258,6 +264,46 @@ module Hwaro
     def self.dur(ms : Float64) : String
       return "#{"%.2f" % (ms / 1000.0)}s" if ms >= 1000.0
       "#{ms.round.to_i}ms"
+    end
+
+    # A single body line inside a command's report: a glyph and a message on
+    # the 4-space grid (6 spaces for continuation detail under an item). The
+    # glyph names the item's severity (`:ok`/`:warn`/`:err`/`:info`) or shape
+    # (`:bullet` for neutral lists, `:arrow` for from→to detail). This is the
+    # one way findings render, so doctor / validate / check-links agree.
+    def self.item(message : String, glyph glyph_key : Symbol = :bullet, indent : Int32 = 4) : Nil
+      return if @@quiet
+      clear_active_line
+      @@io.puts "#{" " * indent}#{glyph(glyph_key)} #{message}"
+    end
+
+    # A dim lowercase label that groups the items below it, with an optional
+    # ` · note` suffix (`tags · top 15`). Plain form is "label:" /
+    # "label: note" so piped output stays grep-friendly.
+    def self.section(label : String, note : String? = nil) : Nil
+      return if @@quiet
+      clear_active_line
+      if color_enabled?
+        line = "    #{paint(label, Role::Dim, bold: true)}"
+        line += "#{paint(" · ", Role::Dim)}#{paint(note, Role::Dim)}" if note
+        @@io.puts line
+      else
+        # Same flattening as Receipt/outcome: plain output carries no middots.
+        @@io.puts(note ? "#{label}: #{note.gsub(" · ", ", ")}" : "#{label}:")
+      end
+    end
+
+    # A static proportion bar for report bodies (stats charts). Accent fill on
+    # a dim track when color is on; a plain "#" run when color is off, keeping
+    # piped output free of multibyte glyphs. Distinct from `progress`, which
+    # is the animated \r bar for long-running operations and is frozen.
+    def self.bar(value : Number, max : Number, width : Int32 = 20) : String
+      filled = max > 0 ? (value.to_f / max.to_f * width).round.to_i.clamp(0, width) : 0
+      if color_enabled?
+        "#{paint("█" * filled, Role::Accent)}#{paint("░" * (width - filled), Role::Dim)}"
+      else
+        "#" * filled
+      end
     end
 
     # Total visible width of a receipt heading / divider rule.
@@ -278,14 +324,15 @@ module Hwaro
     end
 
     # Print a command heading. No-ops in quiet; degrades to "hwaro: kind title"
-    # when color is off (no glyph, no rule).
+    # when color is off (no glyph, no rule; middots flattened like the other
+    # plain forms).
     def self.heading(kind : String, title : String? = nil) : Nil
       return if @@quiet
       clear_active_line
       if color_enabled?
         @@io.puts heading_str(kind, title)
       else
-        @@io.puts(title ? "hwaro: #{kind} #{title}" : "hwaro: #{kind}")
+        @@io.puts(title ? "hwaro: #{kind} #{title.gsub(" · ", ", ")}" : "hwaro: #{kind}")
       end
     end
 
@@ -380,7 +427,7 @@ module Hwaro
       end
 
       def render_plain : String
-        lines = [@title ? "hwaro: #{@kind} #{@title}" : "hwaro: #{@kind}"]
+        lines = [(t = @title) ? "hwaro: #{@kind} #{t.gsub(" · ", ", ")}" : "hwaro: #{@kind}"]
         @rows.each do |r|
           val = r.value.gsub(" · ", ", ")
           val = "#{val}, #{r.emphasis}" if r.emphasis
@@ -390,6 +437,71 @@ module Hwaro
           lines << Logger.outcome_str(o[:verb], o[:value], o[:glyph], o[:ms], 0, true)
         end
         lines.join("\n")
+      end
+    end
+
+    # A small aligned table for list-style reports (`hwaro tool list`). Same
+    # builder shape as `Receipt`: pure data → string, testable without a live
+    # terminal. Columns are left-aligned to the widest cell (min: the header),
+    # separated by a two-space gutter, on the 2-space margin grid. The header
+    # is dim; per-cell roles let a column paint status words without callers
+    # touching raw colors. Plain form is the same geometry minus paint, so
+    # piped output columnizes identically.
+    class Table
+      def initialize(@headers : Array(String))
+        @rows = [] of Array(String)
+        @roles = [] of Array(Role)?
+      end
+
+      def row(cells : Array(String), roles : Array(Role)? = nil) : self
+        @rows << cells
+        @roles << roles
+        self
+      end
+
+      def empty? : Bool
+        @rows.empty?
+      end
+
+      def emit(io : IO = Logger.io) : Nil
+        return if Logger.quiet?
+        io.puts(Logger.color_enabled? ? render_tty : render_plain)
+      end
+
+      private def widths : Array(Int32)
+        @headers.map_with_index do |header, i|
+          cell_max = @rows.max_of? { |cells| (cells[i]? || "").size } || 0
+          {header.size, cell_max}.max
+        end
+      end
+
+      private def render(paint : Bool) : String
+        w = widths
+        last = @headers.size - 1
+        lines = [] of String
+        header = @headers.map_with_index { |h, i| i == last ? h : h.ljust(w[i]) }.join("  ")
+        lines << "  #{paint ? Logger.paint(header, Role::Dim) : header}"
+        @rows.each_with_index do |cells, ri|
+          roles = @roles[ri]
+          painted = cells.map_with_index do |cell, ci|
+            # The last column stays unpadded so lines carry no trailing blanks.
+            padded = ci == last ? cell : cell.ljust(w[ci])
+            next padded unless paint
+            role = roles.try(&.[ci]?) || Role::Plain
+            # Pad first, paint second: escapes would break ljust math.
+            role.plain? ? padded : Logger.paint(padded, role)
+          end
+          lines << "  #{painted.join("  ")}"
+        end
+        lines.join("\n")
+      end
+
+      def render_tty : String
+        render(paint: true)
+      end
+
+      def render_plain : String
+        render(paint: false)
       end
     end
 
@@ -528,14 +640,6 @@ module Hwaro
     # logging methods so the live region coexists with normal log lines.
     private def self.clear_active_line : Nil
       @@active_status.try(&.clear_line)
-    end
-
-    # Colorize helper that respects `color_enabled?`. Returns the raw string
-    # (no ANSI escapes) when color is disabled, so output stays clean for
-    # scripts, CI, and AI agents.
-    private def self.colorize(message : String, color : Symbol) : String
-      return message unless color_enabled?
-      message.colorize(color).to_s
     end
   end
 end

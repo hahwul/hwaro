@@ -8,6 +8,7 @@
 require "json"
 require "option_parser"
 require "../../metadata"
+require "../../prompt"
 require "../../../services/unused_assets"
 require "../../../utils/logger"
 
@@ -88,41 +89,39 @@ module Hwaro
               return
             end
 
-            Logger.info "Scanning for unused assets..."
-            Logger.info ""
-            Logger.info "  Total assets:      #{result.total_assets}"
-            Logger.info "  Referenced:         #{result.referenced_count}"
-            Logger.info "  Unused:             #{result.unused_count}"
-            Logger.info ""
+            receipt = Logger::Receipt.new(NAME, static_dir)
+              .row("total", result.total_assets.to_s)
+              .row("referenced", result.referenced_count.to_s)
+              .row("unused", result.unused_count.to_s)
 
             if result.unused_files.empty?
-              Logger.info "  No unused assets found."
+              receipt.outcome("found", "no unused assets")
+              receipt.emit
               return
             end
 
-            Logger.info "  Unused files:"
+            receipt.emit
+            Logger.section("unused files")
             result.unused_files.each do |file|
-              Logger.info "    #{file}"
+              Logger.item(file, glyph: :bullet)
             end
-            Logger.info ""
+            Logger.item("dynamic references (e.g. template variables) may cause false positives", glyph: :info)
 
-            if delete_mode
-              confirmed = force
-              unless confirmed
-                print "Delete #{result.unused_count} unused file(s)? [y/N] "
-                answer = gets
-                confirmed = !answer.nil? && answer.strip.downcase == "y"
-              end
-              if confirmed
-                service.delete_unused(result.unused_files)
-                Logger.success "Deleted #{result.unused_count} file(s)"
-              else
-                Logger.info "Cancelled."
-              end
+            unless delete_mode
+              Logger.outcome("found", "#{result.unused_count} unused assets", glyph: :warn)
+              return
             end
 
-            Logger.info ""
-            Logger.info "Note: Dynamic references (e.g., template variables) may cause false positives."
+            confirmed = force
+            unless confirmed
+              confirmed = Prompt.confirm?("Delete #{result.unused_count} unused file(s)?", default: false) == true
+            end
+            if confirmed
+              service.delete_unused(result.unused_files)
+              Logger.outcome("deleted", "#{result.unused_count} files")
+            else
+              Logger.outcome("cancelled", "no files deleted", glyph: :info)
+            end
           end
         end
       end

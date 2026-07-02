@@ -85,51 +85,56 @@ module Hwaro
               return
             end
 
-            Logger.info "Content statistics for '#{content_dir}':"
-            Logger.info ""
-
             if result.total == 0
-              Logger.info "  No content found."
+              Logger.heading("stats", content_dir)
+              Logger.outcome("counted", "no content found", :info)
               return
             end
 
-            # Overview
-            Logger.info "  Overview:"
-            Logger.info "    Total:     #{result.total}"
-            Logger.info "    Published: #{result.published}"
-            Logger.info "    Drafts:    #{result.drafts}"
-            Logger.info ""
+            # Context receipt: totals, word counts (published only — matches
+            # what `build` ships), then bar-chart sections and one outcome.
+            receipt = Logger::Receipt.new("stats", content_dir)
+            receipt.row("total", "#{result.total.format} files",
+              emphasis: result.drafts > 0 ? "#{result.drafts.format} drafts" : nil)
+            receipt.row("words", "#{result.words_total.format} total · #{result.words_avg.format} avg")
+            receipt.row("range", "#{result.words_min.format} min · #{result.words_max.format} max")
+            receipt.emit
 
-            # Word counts (published only — matches what `build` ships).
-            Logger.info "  Word Count (published only):"
-            Logger.info "    Total:   #{result.words_total}"
-            Logger.info "    Average: #{result.words_avg}"
-            Logger.info "    Min:     #{result.words_min}"
-            Logger.info "    Max:     #{result.words_max}"
-            Logger.info ""
-
-            # Top tags
+            # Top tags — bars scale against the most-used tag.
             unless result.tags.empty?
-              Logger.info "  Tags (top 15):"
-              result.tags.first(15).each do |tag, count|
-                bar = "█" * [count, 30].min
-                Logger.info "    #{tag.ljust(20)} #{count.to_s.rjust(3)} #{bar}"
+              Logger.info ""
+              Logger.section("tags", result.tags.size > 15 ? "top 15" : nil)
+              top_tags = result.tags.first(15)
+              max_count = top_tags.max_of { |_, count| count }
+              label_width = top_tags.max_of { |tag, _| tag.size }.clamp(0, 20)
+              top_tags.each do |tag, count|
+                Logger.info "      #{truncate_label(tag, label_width).ljust(label_width)}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
               end
               if result.tags.size > 15
-                Logger.info "    ... and #{result.tags.size - 15} more"
+                Logger.info "      … and #{result.tags.size - 15} more"
               end
-              Logger.info ""
             end
 
-            # Monthly frequency
+            # Monthly publishing frequency.
             unless result.monthly.empty?
-              Logger.info "  Monthly Publishing:"
-              result.monthly.each do |month, count|
-                bar = "█" * [count, 30].min
-                Logger.info "    #{month} #{count.to_s.rjust(3)} #{bar}"
-              end
               Logger.info ""
+              Logger.section("monthly")
+              max_count = result.monthly.max_of { |_, count| count }
+              result.monthly.each do |month, count|
+                Logger.info "      #{month}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+              end
             end
+
+            Logger.info ""
+            Logger.outcome("counted",
+              "#{result.total.format} files · #{result.published.format} published · #{result.drafts.format} drafts")
+          end
+
+          # Cap a bar-chart label to the column width, marking the cut with an
+          # ellipsis so rows stay aligned even for very long tag names.
+          private def truncate_label(label : String, width : Int32) : String
+            return label if label.size <= width
+            "#{label[0, width - 1]}…"
           end
         end
       end

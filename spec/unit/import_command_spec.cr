@@ -83,8 +83,8 @@ describe Hwaro::CLI::Commands::Tool::ImportCommand do
           cmd.run(["jekyll", dir, "-o", output_dir])
         end
 
-        output.should contain("Importing from jekyll")
-        output.should contain("Import complete")
+        output.should contain("hwaro: import jekyll")
+        output.should contain("imported:")
         File.exists?(File.join(output_dir, "posts", "hello-world.md")).should be_true
       end
     end

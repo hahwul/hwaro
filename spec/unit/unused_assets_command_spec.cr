@@ -41,8 +41,8 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
           cmd.run(["-c", content_dir, "-s", static_dir])
         end
 
-        output.should contain("Scanning for unused assets")
-        output.should contain("No unused assets found")
+        output.should contain("hwaro: unused-assets")
+        output.should contain("found: no unused assets")
       end
     end
 
@@ -65,9 +65,10 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
           cmd.run(["-c", content_dir, "-s", static_dir])
         end
 
-        output.should contain("Total assets:")
-        output.should contain("Unused files:")
+        output.should contain("total:")
+        output.should contain("unused files:")
         output.should contain("orphan.png")
+        output.should contain("found: 1 unused assets")
       end
     end
   end

@@ -93,7 +93,12 @@ Internal links using the `@/` prefix are automatically converted to absolute pat
 ## Example Output
 
 ```
-Exporting to hugo: export
-Content directory: content
-✔ Export complete: 38 exported, 4 skipped, 0 errors
+hwaro: export hugo
+source: content
+output: export
+exported: 38 files, 4 skipped
 ```
+
+An `errors` count is appended only when errors occurred. In a color terminal
+the same report renders as an `● export` heading with aligned rows and an
+`▴ exported` outcome line.

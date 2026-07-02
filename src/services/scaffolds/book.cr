@@ -181,34 +181,20 @@ module Hwaro
             MD
         end
 
+        # The stylesheet opens with the shared ember `:root` prelude (see
+        # DesignTokens): every color token carries both schemes, so this
+        # one sheet serves light and dark and BookDark only appends a
+        # forced `color-scheme: dark` rule. Book's geometry (header
+        # height, sidebar width, measure) and its tighter shape (--radius
+        # overrides) ride in through the layout hook — as does
+        # `--bg-sidebar`, the book family's one extra color pair, which is
+        # why the scheme-pair literal below is the only one outside
+        # design_tokens.cr. Component rules never hardcode a color.
         private def css_content : String
           <<-CSS
             #{font_face_css("../fonts")}
 
-            :root {
-              --primary: #b35454;
-              --primary-hover: #8f4040;
-              --primary-subtle: rgba(179, 84, 84, 0.06);
-              --text: #2a241f;
-              --text-secondary: #5c5248;
-              --text-muted: #8a7c6e;
-              --border: #e4dacd;
-              --border-light: #efe8dd;
-              --bg: #faf7f2;
-              --bg-secondary: #f1eae0;
-              --bg-sidebar: #f4eee5;
-              --bg-code: #f1eae0;
-              --header-h: 50px;
-              --sidebar-w: 280px;
-              --content-max-w: 780px;
-              --radius: 6px;
-              --radius-sm: 3px;
-              --shadow-sm: 0 1px 2px rgba(42, 36, 31, 0.05);
-              --shadow: 0 2px 8px rgba(42, 36, 31, 0.08);
-              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
-              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-            }
+            #{design_root("--header-h: 50px;\n--sidebar-w: 280px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4eee5, #151412);\n--radius: 6px;\n--radius-sm: 3px;")}
 
             *,
             *::before,
@@ -232,7 +218,7 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(179, 84, 84, 0.18); }
+            ::selection { background: var(--selection); }
 
             /* ── Header ── */
             .book-header {
@@ -241,12 +227,14 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: var(--bg);
+              background: var(--glass);
+              backdrop-filter: saturate(180%) blur(20px);
+              -webkit-backdrop-filter: saturate(180%) blur(20px);
               border-bottom: 1px solid var(--border);
               display: grid;
               grid-template-columns: 1fr auto 1fr;
               align-items: center;
-              padding: 0 0.75rem;
+              padding: 0 var(--space-3);
               z-index: 100;
               font-family: var(--font-sans);
             }
@@ -267,7 +255,7 @@ module Hwaro
               display: flex;
               align-items: center;
               justify-content: flex-end;
-              gap: 0.25rem;
+              gap: var(--space-1);
             }
 
             /* ── Icon Button (shared by toggle, search, fullscreen) ── */
@@ -282,13 +270,13 @@ module Hwaro
               background: none;
               color: var(--text-muted);
               cursor: pointer;
-              transition: color 0.15s, background 0.15s;
+              transition: color var(--transition), background var(--transition);
               padding: 0;
             }
 
             .icon-btn:hover {
               color: var(--text-secondary);
-              background: var(--primary-subtle);
+              background: var(--primary-tint);
             }
 
             .book-header .logo {
@@ -334,7 +322,7 @@ module Hwaro
               height: calc(100vh - var(--header-h));
               background: var(--bg-sidebar);
               border-right: 1px solid var(--border);
-              padding: 1rem 0;
+              padding: var(--space-4) 0;
               overflow-y: auto;
               scrollbar-width: thin;
               scrollbar-color: var(--border) transparent;
@@ -361,15 +349,16 @@ module Hwaro
               margin-bottom: 0.25rem;
             }
 
+            /* Part/chapter group titles read as quiet overlines. */
             .chapter-title {
               display: block;
               padding: 0.4rem 1.25rem;
-              font-size: 0.65rem;
-              font-weight: 700;
+              font-size: 0.72rem;
+              font-weight: 600;
               text-transform: uppercase;
-              letter-spacing: 0.06em;
+              letter-spacing: 0.08em;
               color: var(--text-muted);
-              margin-top: 0.75rem;
+              margin-top: var(--space-3);
             }
 
             .chapter-title:first-child {
@@ -406,12 +395,12 @@ module Hwaro
 
             .chapter-links a:hover {
               color: var(--text);
-              background: rgba(179, 84, 84, 0.05);
+              background: color-mix(in srgb, var(--primary) 5%, transparent);
             }
 
             .chapter-links a.active {
-              color: var(--primary-hover);
-              background: rgba(179, 84, 84, 0.09);
+              color: var(--primary-strong);
+              background: var(--primary-tint);
               border-left-color: var(--primary);
               font-weight: 600;
             }
@@ -435,24 +424,25 @@ module Hwaro
               flex: 1;
               max-width: var(--content-max-w);
               margin: 0 auto;
-              padding: 2.5rem 3rem;
+              padding: var(--space-6) 3rem;
               width: 100%;
             }
 
             .book-toc {
               margin: 1.5rem 0 2rem 0;
               padding: 1rem 1.25rem;
-              background: var(--bg-secondary);
-              border: 1px solid var(--border-light);
+              background: var(--bg-subtle);
+              border: 1px solid var(--border-subtle);
               border-radius: var(--radius);
             }
 
+            /* Same overline treatment as the sidebar chapter titles. */
             .book-toc-title {
               margin: 0 0 0.5rem 0;
-              font-size: 0.8rem;
+              font-size: 0.72rem;
               font-weight: 600;
               text-transform: uppercase;
-              letter-spacing: 0.04em;
+              letter-spacing: 0.08em;
               color: var(--text-muted);
             }
 
@@ -474,6 +464,7 @@ module Hwaro
             .book-toc a {
               color: var(--text-secondary);
               text-decoration: none;
+              font-size: var(--step--1);
             }
 
             .book-toc a:hover {
@@ -487,16 +478,16 @@ module Hwaro
             .book-content h3,
             .book-content h4 {
               font-family: var(--font-serif);
+              color: var(--heading);
               text-wrap: balance;
             }
 
             .book-content h1 {
-              font-size: 2.1rem;
+              font-size: var(--step-3);
               font-weight: 700;
               margin: 0 0 1rem 0;
               letter-spacing: -0.018em;
               line-height: 1.3;
-              color: var(--text);
             }
 
             /* Page title gets a short ember rule — the one mark every
@@ -514,7 +505,7 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #c46262, #8f4040);
+              background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
             .book-content h2 {
@@ -523,7 +514,7 @@ module Hwaro
               margin: 2.5rem 0 0.75rem 0;
               letter-spacing: -0.015em;
               padding-bottom: 0.5rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .book-content h3 {
@@ -567,9 +558,9 @@ module Hwaro
             a {
               color: var(--text);
               text-decoration: underline;
-              text-decoration-color: rgba(179, 84, 84, 0.35);
+              text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
               text-underline-offset: 3px;
-              transition: color 0.15s ease, text-decoration-color 0.15s ease;
+              transition: color var(--transition), text-decoration-color var(--transition);
             }
 
             a:hover {
@@ -583,7 +574,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border-radius: var(--radius-sm);
               font-size: 0.85em;
-              font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+              font-family: var(--font-mono);
             }
 
             pre {
@@ -604,7 +595,7 @@ module Hwaro
               padding: 0;
               font-size: 0.84rem;
             }
-            #{highlight_theme_css(false)}
+            #{highlight_theme_css}
 
             /* Tables */
             table {
@@ -626,7 +617,7 @@ module Hwaro
 
             td {
               padding: 0.55rem 0.75rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
               vertical-align: top;
             }
 
@@ -655,18 +646,18 @@ module Hwaro
             }
 
             .info-box.note {
-              background: rgba(179, 84, 84, 0.06);
-              border-color: rgba(179, 84, 84, 0.3);
+              background: color-mix(in srgb, var(--primary) 8%, transparent);
+              border-color: color-mix(in srgb, var(--primary) 30%, transparent);
             }
 
             .info-box.warning {
-              background: rgba(176, 125, 46, 0.08);
-              border-color: rgba(176, 125, 46, 0.35);
+              background: color-mix(in srgb, var(--warn) 8%, transparent);
+              border-color: color-mix(in srgb, var(--warn) 35%, transparent);
             }
 
             .info-box.tip {
-              background: rgba(94, 140, 97, 0.08);
-              border-color: rgba(94, 140, 97, 0.35);
+              background: color-mix(in srgb, var(--ok) 8%, transparent);
+              border-color: color-mix(in srgb, var(--ok) 35%, transparent);
             }
 
             /* Horizontal rule */
@@ -686,10 +677,10 @@ module Hwaro
             ul.section-list li {
               margin-bottom: 0.35rem;
               padding: 0.6rem 0.9rem;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               border-radius: var(--radius);
-              border: 1px solid var(--border-light);
-              transition: border-color 0.15s;
+              border: 1px solid var(--border-subtle);
+              transition: border-color var(--transition);
             }
 
             ul.section-list li:hover {
@@ -704,14 +695,14 @@ module Hwaro
 
             /* Pagination */
             nav.pagination {
-              margin: 1.5rem 0;
+              margin: var(--space-5) 0;
               font-family: var(--font-sans);
             }
 
             nav.pagination .pagination-list {
               list-style: none;
               display: flex;
-              gap: 0.5rem;
+              gap: var(--space-2);
               flex-wrap: wrap;
               align-items: center;
             }
@@ -735,7 +726,7 @@ module Hwaro
               padding: 0.25rem 0.55rem;
               border-radius: var(--radius);
               border: 1px solid var(--text-muted);
-              background: var(--primary-subtle);
+              background: var(--primary-tint);
               color: var(--text);
             }
 
@@ -806,7 +797,7 @@ module Hwaro
               border-radius: var(--radius-sm);
               pointer-events: none;
               opacity: 0;
-              transition: opacity 0.15s;
+              transition: opacity var(--transition);
               max-width: 200px;
               overflow: hidden;
               text-overflow: ellipsis;
@@ -834,7 +825,7 @@ module Hwaro
               margin: 0 auto;
               padding: 1.25rem 3rem 2rem;
               width: 100%;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
               font-size: 0.75rem;
               font-family: var(--font-sans);
@@ -845,7 +836,7 @@ module Hwaro
               display: none;
               position: fixed;
               inset: 0;
-              background: rgba(0, 0, 0, 0.3);
+              background: var(--scrim);
               backdrop-filter: blur(4px);
               -webkit-backdrop-filter: blur(4px);
               z-index: 200;
@@ -863,7 +854,7 @@ module Hwaro
               max-height: 70vh;
               background: var(--bg);
               border-radius: var(--radius);
-              box-shadow: 0 16px 70px rgba(0, 0, 0, 0.15);
+              box-shadow: var(--shadow-lg);
               display: flex;
               flex-direction: column;
               overflow: hidden;
@@ -875,8 +866,8 @@ module Hwaro
               display: flex;
               align-items: center;
               gap: 0.6rem;
-              padding: 0.75rem 1rem;
-              border-bottom: 1px solid var(--border-light);
+              padding: var(--space-3) var(--space-4);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .search-input-wrap svg {
@@ -906,8 +897,8 @@ module Hwaro
               font-size: 0.6rem;
               padding: 0.1rem 0.35rem;
               border: 1px solid var(--border);
-              border-radius: 3px;
-              background: var(--bg-secondary);
+              border-radius: var(--radius-sm);
+              background: var(--bg-subtle);
               color: var(--text-muted);
               font-family: inherit;
               cursor: pointer;
@@ -916,12 +907,12 @@ module Hwaro
 
             .search-results {
               overflow-y: auto;
-              padding: 0.5rem;
+              padding: var(--space-2);
             }
 
             .search-result-item {
               display: block;
-              padding: 0.5rem 0.75rem;
+              padding: var(--space-2) var(--space-3);
               border-radius: var(--radius-sm);
               text-decoration: none;
               color: var(--text);
@@ -931,7 +922,7 @@ module Hwaro
 
             .search-result-item:hover,
             .search-result-item.active {
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               text-decoration: none;
             }
 
@@ -952,8 +943,8 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(179, 84, 84, 0.15);
-              color: var(--primary-hover);
+              background: color-mix(in srgb, var(--primary) 15%, transparent);
+              color: var(--primary-strong);
               border-radius: 2px;
               padding: 0 1px;
             }
@@ -966,11 +957,11 @@ module Hwaro
             }
 
             .search-hint {
-              padding: 0.5rem 0.75rem;
+              padding: var(--space-2) var(--space-3);
               display: flex;
               gap: 1rem;
               justify-content: center;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
               font-size: 0.65rem;
             }
@@ -979,8 +970,8 @@ module Hwaro
               font-size: 0.6rem;
               padding: 0 0.25rem;
               border: 1px solid var(--border);
-              border-radius: 3px;
-              background: var(--bg-secondary);
+              border-radius: var(--radius-sm);
+              background: var(--bg-subtle);
               font-family: inherit;
               line-height: 1.4;
             }
@@ -995,7 +986,7 @@ module Hwaro
               .book-sidebar.open {
                 transform: translateX(0);
                 visibility: visible;
-                box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
+                box-shadow: var(--shadow);
               }
 
               .book-main {

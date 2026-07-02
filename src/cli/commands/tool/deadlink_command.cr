@@ -127,7 +127,7 @@ module Hwaro
               exit(err.exit_code)
             end
 
-            Logger.info "Starting dead link check in '#{target_dir}'..." unless json_output
+            Logger.heading("check-links", target_dir) unless json_output
 
             external_links = internal_only ? [] of Link : find_external_links(target_dir)
             internal_links = external_only ? [] of Link : find_internal_links(target_dir)
@@ -139,7 +139,7 @@ module Hwaro
                   "dead_external" => [] of Result,
                 }.to_json)
               else
-                Logger.info "✔ No links found."
+                Logger.outcome("checked", "no links found", :info)
               end
               return
             end
@@ -169,23 +169,28 @@ module Hwaro
               return
             end
 
-            Logger.info "----------------------------------------"
+            Logger.section("scan", "#{external_links.size} external · #{internal_links.size} internal")
+            links_noun = total == 1 ? "link" : "links"
+
             if dead_total == 0
-              Logger.info "✔ All #{total} links are healthy (#{external_links.size} external, #{internal_links.size} internal)."
+              Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
             else
-              Logger.warn "✘ Found #{dead_total} dead links (out of #{total} total):"
+              Logger.info ""
+              # One ✗ item per dead link, with the URL and reason as an →
+              # detail line. Every content-derived string passes through
+              # `sanitize_for_terminal` so a crafted URL can't inject ANSI.
               dead_external.each do |result|
-                Logger.error "[DEAD] #{sanitize_for_terminal(result.link.file)}"
-                Logger.error "  └─ URL: #{sanitize_for_terminal(result.link.url)}"
-                Logger.error "  └─ Status: #{result.status}#{result.error ? " (Error: #{sanitize_for_terminal(result.error.to_s)})" : ""}"
+                Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
+                detail = "#{sanitize_for_terminal(result.link.url)}  #{result.status}"
+                detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
+                Logger.item(detail, glyph: :arrow, indent: 6)
               end
               dead_internal.each do |result|
-                Logger.error "[DEAD] #{sanitize_for_terminal(result.link.file)}"
-                Logger.error "  └─ URL: #{sanitize_for_terminal(result.link.url)} (internal)"
-                Logger.error "  └─ #{sanitize_for_terminal(result.error.to_s)}"
+                Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
+                Logger.item("#{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}", glyph: :arrow, indent: 6)
               end
+              Logger.outcome("checked", "#{total} #{links_noun} · #{dead_total} dead", :err)
             end
-            Logger.info "----------------------------------------"
 
             # A dead-links result must fail the process so `check-links` is
             # usable as a CI gate; previously it always exited 0 regardless of

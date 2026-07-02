@@ -220,31 +220,13 @@ module Hwaro
           <<-CSS
             #{font_face_css("../fonts")}
 
-            :root {
-              --primary: #b35454;
-              --primary-hover: #8f4040;
-              --text: #2a241f;
-              --text-secondary: #5c5248;
-              --text-muted: #8a7c6e;
-              --border: #e4dacd;
-              --border-light: #efe8dd;
-              --bg: #faf7f2;
-              --bg-secondary: #f1eae0;
-              --bg-code: #f1eae0;
-              --header-h: 52px;
-              --content-max-w: 860px;
-              --radius: 10px;
-              --radius-sm: 6px;
-              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
-              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-            }
+            #{design_root("--header-h: 52px;\n--content-max-w: 860px;")}
 
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
             body {
               font-family: var(--font-sans);
-              font-size: 16px;
+              font-size: var(--step-0);
               line-height: 1.7;
               color: var(--text);
               background: var(--bg);
@@ -252,19 +234,19 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(179, 84, 84, 0.18); }
+            ::selection { background: var(--selection); }
 
-            /* Header */
+            /* Header — fixed glass bar over the page. */
             .blog-header {
               position: fixed;
               top: 0;
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(250, 247, 242, 0.85);
+              background: var(--glass);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
               display: flex;
               align-items: center;
               justify-content: center;
@@ -283,7 +265,7 @@ module Hwaro
               font-family: var(--font-serif);
               font-weight: 700;
               font-size: 1.15rem;
-              color: var(--text);
+              color: var(--heading);
               text-decoration: none;
               letter-spacing: -0.01em;
               margin-right: 2.5rem;
@@ -299,10 +281,10 @@ module Hwaro
             .blog-header nav a {
               color: var(--text-secondary);
               text-decoration: none;
-              font-size: 0.85rem;
+              font-size: var(--step--1);
               font-weight: 400;
               padding: 0.25rem 0;
-              transition: color 0.15s;
+              transition: color var(--transition);
             }
 
             .blog-header nav a:hover { color: var(--text); }
@@ -316,9 +298,9 @@ module Hwaro
             }
 
             /* Language switcher (only rendered for multilingual sites). */
-            .lang-switcher { display: flex; gap: 0.5rem; font-size: 0.85rem; }
+            .lang-switcher { display: flex; gap: 0.5rem; font-size: var(--step--1); }
             .lang-switcher a { color: var(--text-muted); text-decoration: none; padding: 0.15rem 0.4rem; border-radius: 4px; }
-            .lang-switcher a:hover { color: var(--text); background: var(--bg-secondary); }
+            .lang-switcher a:hover { color: var(--text); background: var(--bg-subtle); }
             .lang-switcher a[aria-current="true"] { color: var(--text); font-weight: 600; }
 
             /* Layout */
@@ -330,16 +312,17 @@ module Hwaro
             .blog-main {
               max-width: var(--content-max-w);
               margin: 0 auto;
-              padding: 2.5rem 1.5rem;
+              padding: var(--space-6) var(--space-5);
             }
 
             .blog-main h1 {
               font-family: var(--font-serif);
-              font-size: 2.1rem;
+              font-size: var(--step-3);
               font-weight: 700;
               margin: 0 0 0.5rem 0;
               letter-spacing: -0.018em;
               line-height: 1.2;
+              color: var(--heading);
               text-wrap: balance;
             }
 
@@ -360,29 +343,32 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #c46262, #8f4040);
+              background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
             .blog-main h2 {
               font-family: var(--font-serif);
-              font-size: 1.45rem;
+              font-size: var(--step-2);
               font-weight: 700;
               margin: 2.5rem 0 0.75rem 0;
               letter-spacing: -0.008em;
+              color: var(--heading);
               text-wrap: balance;
             }
 
             .blog-main h3 {
               font-family: var(--font-serif);
-              font-size: 1.15rem;
+              font-size: var(--step-1);
               font-weight: 700;
               margin: 2rem 0 0.5rem 0;
+              color: var(--heading);
             }
 
             .blog-main h4 {
               font-size: 0.95rem;
               font-weight: 600;
               margin: 1.5rem 0 0.5rem 0;
+              color: var(--heading);
             }
 
             .blog-main p {
@@ -406,9 +392,9 @@ module Hwaro
               text-decoration: underline;
               text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
               text-underline-offset: 3px;
-              transition: color 0.15s ease, text-decoration-color 0.15s ease;
+              transition: color var(--transition), text-decoration-color var(--transition);
             }
-            a:hover { color: var(--primary-hover); text-decoration-color: currentColor; }
+            a:hover { color: var(--primary-strong); text-decoration-color: currentColor; }
             .blog-header a, .skip-link, .post-title a, .tag,
             ul.section-list a, nav.pagination a, .search-result-item { text-decoration: none; }
 
@@ -436,12 +422,12 @@ module Hwaro
                sit on the warm code well instead of a white box. `pre code.hljs`
                (0,1,2) outranks the theme's `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; }
-            #{highlight_theme_css(false)}
+            #{highlight_theme_css}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }
             th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-secondary); }
-            td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+            td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
 
             /* Blockquote */
             blockquote {
@@ -456,24 +442,25 @@ module Hwaro
             blockquote p { margin-bottom: 0; }
 
             /* Images */
-            img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
+            img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid var(--edge); outline-offset: -1px; }
 
             /* Home */
             .home-hero {
-              padding-bottom: 1.75rem;
-              margin-bottom: 2.25rem;
-              border-bottom: 1px solid var(--border-light);
+              padding: var(--space-7) 0 var(--space-6);
+              margin-bottom: var(--space-6);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .home-title {
               position: relative;
               font-family: var(--font-serif);
-              font-size: 2.6rem;
+              font-size: var(--step-4);
               font-weight: 700;
               line-height: 1.1;
               letter-spacing: -0.02em;
               margin: 0 0 1rem 0;
               padding-bottom: 0.9rem;
+              color: var(--heading);
               text-wrap: balance;
             }
 
@@ -487,12 +474,12 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #c46262, #8f4040);
+              background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
             .home-tagline {
               font-family: var(--font-serif);
-              font-size: 1.2rem;
+              font-size: var(--step-1);
               line-height: 1.5;
               color: var(--text-secondary);
               margin: 0;
@@ -527,14 +514,14 @@ module Hwaro
               font-weight: 500;
               text-decoration: none;
             }
-            .home-more a:hover { color: var(--primary-hover); text-decoration: underline; }
+            .home-more a:hover { color: var(--primary-strong); text-decoration: underline; }
 
             /* Post list */
             .post-list { list-style: none; padding: 0; }
 
             .post-item {
-              padding: 1.25rem 0;
-              border-bottom: 1px solid var(--border-light);
+              padding: var(--space-5) 0;
+              border-bottom: 1px solid var(--border-subtle);
               transition: background 0.1s;
             }
 
@@ -543,22 +530,26 @@ module Hwaro
             .post-title {
               font-family: var(--font-serif);
               margin: 0 0 0.3rem 0;
-              font-size: 1.25rem;
+              font-size: var(--step-1);
               font-weight: 700;
               line-height: 1.3;
             }
 
+            /* List titles read as ink; hover warms the color only — no
+               underline soup in the feed. */
             .post-title a {
-              color: var(--text);
+              color: var(--heading);
               text-decoration: none;
-              transition: color 0.15s;
+              transition: color var(--transition);
             }
 
             .post-title a:hover { color: var(--primary); text-decoration: none; }
 
             .post-meta {
               color: var(--text-muted);
-              font-size: 0.8rem;
+              font-size: var(--step--1);
+              font-variant-numeric: tabular-nums;
+              letter-spacing: 0.02em;
               margin-bottom: 0.5rem;
               display: flex;
               align-items: center;
@@ -576,11 +567,15 @@ module Hwaro
             .post-header {
               margin-bottom: 2rem;
               padding-bottom: 1.5rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .post-header h1 { margin-bottom: 0.75rem; }
             .post-content { line-height: 1.8; }
+
+            /* Prose holds the measure; the 860px container stays for code,
+               tables, and images (wide code, narrow prose). */
+            .post-content p, .post-content li { max-width: var(--measure); }
 
             .series-nav {
               margin-top: 2rem;
@@ -621,20 +616,20 @@ module Hwaro
             .post-content h2 {
               margin-top: 2.5rem;
               padding-bottom: 0.4rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             /* Tags */
             .tag {
               display: inline-block;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               padding: 0.2rem 0.6rem;
               border-radius: 20px;
               font-size: 0.75rem;
               color: var(--text-secondary);
               text-decoration: none;
               border: 1px solid var(--border);
-              transition: all 0.15s;
+              transition: all var(--transition);
             }
 
             .tag:hover {
@@ -652,10 +647,10 @@ module Hwaro
             ul.section-list li {
               margin-bottom: 0.5rem;
               padding: 0.75rem 1rem;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               border-radius: var(--radius-sm);
-              border: 1px solid var(--border-light);
-              transition: border-color 0.15s;
+              border: 1px solid var(--border-subtle);
+              transition: border-color var(--transition);
             }
 
             ul.section-list li:hover { border-color: var(--border); }
@@ -666,18 +661,18 @@ module Hwaro
             /* Pagination */
             nav.pagination { margin: 1.5rem 0; }
             nav.pagination .pagination-list { list-style: none; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-            nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); color: var(--text-secondary); text-decoration: none; }
+            nav.pagination a { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); color: var(--text-secondary); text-decoration: none; }
             nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
-            .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); color: var(--primary); }
-            .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); color: var(--text-muted); opacity: 0.5; }
+            .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: var(--primary-tint); color: var(--primary); }
+            .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); color: var(--text-muted); opacity: 0.5; }
 
             /* Footer */
             .blog-footer {
               margin-top: 3rem;
               padding-top: 1.5rem;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
-              font-size: 0.8rem;
+              font-size: var(--step--1);
             }
 
             /* Search trigger */
@@ -692,7 +687,7 @@ module Hwaro
               color: var(--text-secondary);
               font-size: 0.8rem;
               cursor: pointer;
-              transition: all 0.15s;
+              transition: all var(--transition);
               font-family: inherit;
             }
 
@@ -703,7 +698,7 @@ module Hwaro
               padding: 0.1rem 0.35rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               color: var(--text-muted);
               font-family: inherit;
               line-height: 1.4;
@@ -714,7 +709,7 @@ module Hwaro
               display: none;
               position: fixed;
               inset: 0;
-              background: rgba(0, 0, 0, 0.4);
+              background: var(--scrim);
               backdrop-filter: blur(4px);
               -webkit-backdrop-filter: blur(4px);
               z-index: 200;
@@ -730,7 +725,7 @@ module Hwaro
               max-height: 70vh;
               background: var(--bg);
               border-radius: var(--radius);
-              box-shadow: 0 16px 70px rgba(0, 0, 0, 0.2);
+              box-shadow: var(--shadow-lg);
               display: flex;
               flex-direction: column;
               overflow: hidden;
@@ -742,7 +737,7 @@ module Hwaro
               align-items: center;
               gap: 0.6rem;
               padding: 0.75rem 1rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .search-input-wrap svg { flex-shrink: 0; color: var(--text-muted); }
@@ -768,7 +763,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               color: var(--text-muted);
               font-family: inherit;
               cursor: pointer;
@@ -787,10 +782,10 @@ module Hwaro
               transition: background 0.1s;
             }
 
-            .search-result-item:hover, .search-result-item.active { background: var(--bg-secondary); text-decoration: none; }
+            .search-result-item:hover, .search-result-item.active { background: var(--bg-subtle); text-decoration: none; }
             .search-result-item .search-result-title { font-weight: 500; font-size: 0.9rem; margin-bottom: 0.15rem; }
             .search-result-item .search-result-snippet { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-            .search-result-item .search-result-snippet mark { background: rgba(179, 84, 84, 0.15); color: var(--primary-hover); border-radius: 2px; padding: 0 1px; }
+            .search-result-item .search-result-snippet mark { background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary-strong); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
             .search-hint {
@@ -798,7 +793,7 @@ module Hwaro
               display: flex;
               gap: 1rem;
               justify-content: center;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
               font-size: 0.7rem;
             }
@@ -808,20 +803,21 @@ module Hwaro
               padding: 0 0.3rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               font-family: inherit;
               line-height: 1.4;
             }
 
             /* Search trigger press feedback */
-            .search-trigger { transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+            .search-trigger { transition: border-color var(--transition), color var(--transition), transform 0.1s ease; }
             .search-trigger:active { transform: scale(0.96); }
 
-            /* Responsive */
+            /* Responsive — the type scale is fluid, so only the frame
+               needs to adapt. */
             @media (max-width: 640px) {
               .blog-header nav { display: none; }
-              .blog-main { padding: 1.5rem 1rem; }
-              .blog-main h1 { font-size: 1.6rem; }
+              .blog-main { padding: var(--space-5) var(--space-4); }
+              .home-hero { padding-top: var(--space-6); }
             }
 
             @media (prefers-reduced-motion: reduce) {

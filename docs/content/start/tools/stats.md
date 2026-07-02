@@ -28,42 +28,41 @@ hwaro tool stats --json
 ## Example Output
 
 ```
-Content statistics for 'content':
+hwaro: stats content
+total: 42 files, 4 drafts
+words: 28,500 total, 678 avg
+range: 120 min, 3,200 max
 
-  Overview:
-    Total:     42
-    Published: 38
-    Drafts:    4
+tags:
+      crystal     12  ####################
+      web          8  #############
+      tutorial     5  ########
 
-  Word Count:
-    Total:   28500
-    Average: 678
-    Min:     120
-    Max:     3200
+monthly:
+      2024-01      3  ############
+      2024-02      5  ####################
+      2024-03      2  ########
 
-  Tags (top 15):
-    crystal              12 ████████████
-    web                   8 ████████
-    tutorial              5 █████
-    ... and 7 more
-
-  Monthly Publishing:
-    2024-01   3 ███
-    2024-02   5 █████
-    2024-03   2 ██
+counted: 42 files, 38 published, 4 drafts
 ```
+
+In a color terminal the same report renders as an `● stats` heading, aligned
+receipt rows, proportional bar charts, and a `▴ counted` outcome line. When
+there are more than 15 tags, only the top 15 are charted (`tags: top 15`).
 
 ## JSON Output
 
 ```json
 {
   "total": 42,
-  "drafts": 4,
   "published": 38,
-  "words_total": 28500,
-  "words_avg": 678,
-  "words_min": 120,
-  "words_max": 3200,
+  "drafts": 4,
+  "word_count": {
+    "total": 28500,
+    "average": 678,
+    "min": 120,
+    "max": 3200
+  },
   "tags": {
     "crystal": 12,
     "web": 8,

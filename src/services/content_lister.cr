@@ -125,56 +125,43 @@ module Hwaro
         contents = list_content(filter)
 
         filter_name = case filter
-                      when ContentFilter::All       then "All"
-                      when ContentFilter::Drafts    then "Drafts"
-                      when ContentFilter::Published then "Published"
-                      else                               "Unknown"
+                      when ContentFilter::Drafts    then "drafts"
+                      when ContentFilter::Published then "published"
+                      else                               "all"
                       end
 
-        Logger.info "Listing #{filter_name.downcase} content in '#{@content_dir}'..."
-        Logger.info ""
+        Logger.heading("list", "#{filter_name} · #{@content_dir}")
 
         if contents.empty?
-          Logger.info "  No content found."
+          Logger.outcome("listed", "no content found", :info)
           return
         end
 
-        # Calculate column widths.
-        # Cap to a max, but keep at least the header label width so columns separate cleanly
-        # even when all values are shorter than the label (e.g. one short-titled draft).
-        max_path_width = [[contents.max_of(&.path.size), 40].min, HEADER_PATH.size].max
+        Logger.info ""
+
+        # Cap long cells so the table stays scannable; the header labels are
+        # the minimum column widths (Logger::Table aligns to the widest cell).
         max_title_width = [[contents.max_of(&.title.size), 30].min, HEADER_TITLE.size].max
+        max_path_width = [[contents.max_of(&.path.size), 40].min, HEADER_PATH.size].max
 
-        # Print header
-        header = String.build do |str|
-          str << "  "
-          str << HEADER_STATUS.ljust(10)
-          str << HEADER_DATE.ljust(12)
-          str << HEADER_TITLE.ljust(max_title_width + 2)
-          str << HEADER_PATH
-        end
-        Logger.info header
-        Logger.info "  " + "-" * (10 + 12 + max_title_width + 2 + max_path_width)
-
-        # Print each content item
+        table = Logger::Table.new([HEADER_STATUS, HEADER_DATE, HEADER_TITLE, HEADER_PATH])
         contents.each do |info|
-          status_display = info.draft ? "[draft]" : "[pub]"
-          date_display = info.date.try(&.to_s("%Y-%m-%d")) || "-"
-          title_display = truncate(info.title, max_title_width)
-          path_display = truncate(info.path, max_path_width)
-
-          line = String.build do |str|
-            str << "  "
-            str << status_display.ljust(10)
-            str << date_display.ljust(12)
-            str << title_display.ljust(max_title_width + 2)
-            str << path_display
-          end
-          Logger.info line
+          status = info.draft ? "[draft]" : "[pub]"
+          status_role = info.draft ? Logger::Role::Warn : Logger::Role::Dim
+          table.row(
+            [
+              status,
+              info.date.try(&.to_s("%Y-%m-%d")) || "-",
+              truncate(info.title, max_title_width),
+              truncate(info.path, max_path_width),
+            ],
+            [status_role, Logger::Role::Dim, Logger::Role::Plain, Logger::Role::Dim]
+          )
         end
+        table.emit
 
         Logger.info ""
-        Logger.info "Total: #{contents.size} file(s)"
+        Logger.outcome("listed", "#{contents.size} files")
       end
 
       private def find_content_files : Array(String)

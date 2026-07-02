@@ -6,7 +6,6 @@
 #   hwaro tool validate [options]
 
 require "json"
-require "colorize"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_validator"
@@ -85,43 +84,48 @@ module Hwaro
               exit(errors > 0 ? Hwaro::Errors::EXIT_CONTENT : Hwaro::Errors::EXIT_SUCCESS)
             end
 
-            Logger.info "Validating content in '#{content_dir}'..."
-            Logger.info ""
+            Logger.heading("validate", content_dir)
 
             if issues.empty?
-              Logger.info "#{"✔".colorize(:green)} No issues found. Content looks great!"
+              Logger.outcome("checked", "no issues found — content looks great")
               return
             end
 
-            # Group by file
+            Logger.info ""
+
+            # Group by file: a dim file label, then one glyph item per issue.
+            # Same severity glyphs as `tool doctor` so findings read the same
+            # everywhere.
             by_file = issues.group_by(&.file)
 
             by_file.each do |file, file_issues|
-              Logger.info "  #{file || "(unknown)"}:"
+              Logger.section(file || "(unknown)")
               file_issues.each { |issue| print_issue(issue) }
               Logger.info ""
             end
 
-            # Summary
+            # Summary — one severity-aware outcome line (mirrors `tool doctor`).
             errors = issues.count { |i| i.level == :error }
             warnings = issues.count { |i| i.level == :warning }
             infos = issues.count { |i| i.level == :info }
 
-            Logger.info "Found #{errors} error(s), #{warnings} warning(s), #{infos} info(s)"
+            worst = errors > 0 ? :err : (warnings > 0 ? :warn : :result)
+            summary = "#{errors} #{errors == 1 ? "error" : "errors"} · " \
+                      "#{warnings} #{warnings == 1 ? "warning" : "warnings"} · " \
+                      "#{infos} info"
+            Logger.outcome("checked", summary, worst)
 
             # Gate CI on hard errors (matches `tool doctor`).
             exit(Hwaro::Errors::EXIT_CONTENT) if errors > 0
           end
 
           private def print_issue(issue : Services::Issue)
-            icon = case issue.level
-                   when :error   then "✘".colorize(:red)
-                   when :warning then "⚠".colorize(:yellow)
-                   when :info    then "ℹ".colorize(:cyan)
-                   else               "?"
-                   end
-
-            Logger.info "    #{icon} #{issue.message}"
+            glyph = case issue.level
+                    when :error   then :err
+                    when :warning then :warn
+                    else               :info
+                    end
+            Logger.item(issue.message, glyph: glyph, indent: 6)
           end
         end
       end

@@ -102,6 +102,13 @@ module Hwaro
         property agents_mode : AgentsMode
         property minimal_config : Bool
         property full_config : Bool
+        # Site title collected by the interactive init wizard; substituted into
+        # the generated config.toml's `title = "…"` line (built-in scaffolds
+        # only — remote scaffold configs are used verbatim).
+        property site_title : String?
+        # Set by the init wizard so the Initializer skips its own heading and
+        # scaffold line — the wizard already rendered them as a receipt.
+        property from_wizard : Bool
 
         def initialize(
           @path : String = ".",
@@ -116,6 +123,8 @@ module Hwaro
           @agents_mode : AgentsMode = AgentsMode::Remote,
           @minimal_config : Bool = false,
           @full_config : Bool = false,
+          @site_title : String? = nil,
+          @from_wizard : Bool = false,
         )
         end
 

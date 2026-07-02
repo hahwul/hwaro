@@ -1,5 +1,6 @@
 require "option_parser"
 require "../../metadata"
+require "../../prompt"
 require "../../../utils/logger"
 require "../../../services/defaults/agents_md"
 
@@ -74,9 +75,9 @@ module Hwaro
             if write
               filename = "AGENTS.md"
               if File.exists?(filename) && !force
-                print "AGENTS.md already exists. Overwrite? [y/N] "
-                answer = gets
-                unless answer && answer.strip.downcase == "y"
+                # `confirm?` returns nil on EOF (piped/non-interactive stdin) —
+                # treat that the same as "no" and abort without writing.
+                unless Prompt.confirm?("AGENTS.md already exists. Overwrite?", default: false) == true
                   Logger.info "Aborted."
                   exit
                 end
@@ -84,7 +85,7 @@ module Hwaro
 
               File.write(filename, content)
               mode_name = remote ? "remote" : "local"
-              Logger.success "Generated AGENTS.md (#{mode_name} mode)"
+              Logger.outcome("created", "AGENTS.md · #{mode_name} mode")
             else
               puts content
             end

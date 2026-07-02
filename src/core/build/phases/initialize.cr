@@ -144,7 +144,7 @@ module Hwaro::Core::Build::Phases::Initialize
     copy_static_pairs(files_to_copy)
 
     label = incremental ? "static files (#{files_to_copy.size} updated)" : "static files"
-    Logger.action :copy, label, :blue if verbose
+    Logger.action :copy, label, Logger::Role::Dim if verbose
   end
 
   # The effective `[static]` publishing config, falling back to defaults (which

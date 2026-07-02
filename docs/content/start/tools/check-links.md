@@ -51,35 +51,28 @@ hwaro tool check-links --internal-only
 ## Example Output
 
 ```
-Starting dead link check in 'content'...
-----------------------------------------
-✘ Found 3 dead links (out of 50 total):
-[DEAD] content/blog/post.md
-  └─ URL: https://old-site.com/page
-  └─ Status: 404
-[DEAD] content/blog/post.md
-  └─ URL: ../missing-page (internal)
-  └─ Internal link target not found
-[DEAD] content/about.md
-  └─ URL: /images/photo.png (internal)
-  └─ Image not found
-----------------------------------------
+hwaro: check-links content
+scan: 30 external, 20 internal
+
+    [err] content/blog/post.md
+      -> https://old-site.com/page  404
+    [err] content/blog/post.md
+      -> ../missing-page  Internal link target not found
+    [err] content/about.md
+      -> /images/photo.png  Image not found
+checked: 50 links, 3 dead
 ```
+
+In a color terminal each dead link renders as a `✗ file` item with a `→ url
+status` detail line under an `● check-links` heading, closed by a `▴ checked`
+outcome (`checked: 50 links · all healthy` when everything resolves). The
+command exits non-zero when dead links are found, so it can gate CI.
 
 ## JSON Output
 
 ```json
 {
-  "dead_links": [
-    {
-      "link": {
-        "file": "content/blog/post.md",
-        "url": "https://old-site.com/page",
-        "kind": "external"
-      },
-      "status": 404,
-      "error": null
-    },
+  "dead_internal": [
     {
       "link": {
         "file": "content/about.md",
@@ -90,9 +83,16 @@ Starting dead link check in 'content'...
       "error": "Image not found"
     }
   ],
-  "total_links": 50,
-  "external_links": 30,
-  "internal_links": 20,
-  "dead_link_count": 2
+  "dead_external": [
+    {
+      "link": {
+        "file": "content/blog/post.md",
+        "url": "https://old-site.com/page",
+        "kind": "external"
+      },
+      "status": 404,
+      "error": null
+    }
+  ]
 }
 ```

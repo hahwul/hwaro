@@ -191,6 +191,23 @@ og-samples:
     @[ -f bin/hwaro ] || just build
     ./scripts/generate_og_samples.sh
 
+# Regenerate the scaffold preview screenshots for the docs.
+#
+# Builds each built-in scaffold into a temp dir and captures a 1280x800
+# headless-Chrome screenshot of its homepage.
+#
+#     just scaffold-previews
+#
+# The generated images will be placed in:
+#     docs/static/images/scaffolds/scaffold-*.png
+#
+# Pass DARK=1 to also capture forced-dark self-review shots of the light
+# scaffolds into /tmp/hwaro-scaffold-previews-dark (not committed).
+[group('documents')]
+scaffold-previews:
+    @[ -f bin/hwaro ] || just build
+    ./scripts/generate_scaffold_previews.sh {{ if env("DARK", "") == "1" { "--dark" } else { "" } }}
+
 # Regenerate the `background_image` preview samples for the docs.
 #
 # These demonstrate how `overlay_opacity` dims a real background photo,

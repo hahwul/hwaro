@@ -63,7 +63,7 @@ module Hwaro
           # Signal json mode to the Runner so any HwaroError we raise is
           # rendered as the structured payload on stdout instead of the
           # human "Error [CODE]: …" line on stderr. Also silence the
-          # `Created new content: …` info line so stdout stays pure JSON.
+          # `created: …` outcome line so stdout stays pure JSON.
           Runner.enable_json_mode! if json_output
 
           # Refuse to run outside a Hwaro project. Previously `hwaro new` would

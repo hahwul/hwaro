@@ -75,18 +75,40 @@ hwaro doctor --json
 ## Example Output
 
 ```
-Running diagnostics...
+hwaro: doctor
+
+  config.toml
+    [ok]   file present & parseable
+    [warn] base_url, title
+    [ok]   sitemap (changefreq, priority)
+    [ok]   taxonomies (duplicates)
+    [ok]   search (format)
+    [ok]   languages (default_language resolves)
+    [ok]   markdown / pwa (valid enums)
+    [ok]   deployment / related (refs resolve)
+    [ok]   referenced files & dirs
+
+  templates/
+    [ok]   required files (page.html, section.html)
+    [ok]   template syntax
+
+  content/
+    [ok]   front matter (TOML/YAML parse)
 
 Config:
-  ⚠ config.toml: base_url is not set
+  [warn] config.toml: base_url is not set
 
 Structure:
-  ℹ content/docs: Section directory missing _index.md: docs/
+  [info] content/docs: Section directory missing _index.md: docs/
 
-Found 0 error(s), 1 warning(s), 1 info(s)
+checked: 0 errors, 1 warning, 1 info
 
 Tip: Use 'hwaro tool validate' for content checks
 ```
+
+In a color terminal the check lines use `✓`/`⚠`/`✗`/`ℹ` glyphs under an
+`● doctor` heading, and the summary is a severity-colored `▴ checked` outcome
+line. A clean run ends with `checked: no issues found — your site looks great`.
 
 ## Ignoring Known Issues
 
@@ -129,6 +151,7 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
 
 ```json
 {
+  "schema_version": 1,
   "issues": [
     {
       "id": "base-url-missing",

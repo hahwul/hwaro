@@ -205,27 +205,7 @@ module Hwaro
           <<-CSS
             #{font_face_css("../fonts")}
 
-            :root {
-              --primary: #b35454;
-              --primary-hover: #8f4040;
-              --text: #2a241f;
-              --text-secondary: #5c5248;
-              --text-muted: #8a7c6e;
-              --border: #e0d6c8;
-              --border-light: #ece4d8;
-              --bg: #fcfaf6;
-              --bg-sidebar: #f4eee5;
-              --bg-secondary: #f1eae0;
-              --bg-code: #f1eae0;
-              --header-h: 52px;
-              --sidebar-w: 260px;
-              --content-max-w: 780px;
-              --radius: 10px;
-              --radius-sm: 6px;
-              --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
-              --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-            }
+            #{design_root("--header-h: 52px;\n--sidebar-w: 260px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4eee5, #151412);")}
 
             *,
             *::before,
@@ -245,7 +225,7 @@ module Hwaro
               -moz-osx-font-smoothing: grayscale;
             }
 
-            ::selection { background: rgba(179, 84, 84, 0.18); }
+            ::selection { background: var(--selection); }
 
             /* Header */
             .docs-header {
@@ -254,10 +234,10 @@ module Hwaro
               left: 0;
               right: 0;
               height: var(--header-h);
-              background: rgba(252, 250, 246, 0.85);
+              background: var(--glass);
               backdrop-filter: saturate(180%) blur(20px);
               -webkit-backdrop-filter: saturate(180%) blur(20px);
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
               display: flex;
               align-items: center;
               padding: 0 1.5rem;
@@ -292,7 +272,7 @@ module Hwaro
               font-size: 0.85rem;
               font-weight: 400;
               padding: 0.25rem 0;
-              transition: color 0.15s;
+              transition: color var(--transition);
             }
 
             .docs-header nav a:hover {
@@ -310,7 +290,7 @@ module Hwaro
               color: var(--text-secondary);
               text-decoration: none;
               font-size: 0.85rem;
-              transition: color 0.15s;
+              transition: color var(--transition);
             }
 
             .header-right a:hover {
@@ -333,7 +313,7 @@ module Hwaro
               width: var(--sidebar-w);
               height: calc(100vh - var(--header-h));
               background: var(--bg-sidebar);
-              border-right: 1px solid var(--border-light);
+              border-right: 1px solid var(--border-subtle);
               padding: 1.25rem 0.75rem;
               overflow-y: auto;
               scrollbar-width: thin;
@@ -352,13 +332,15 @@ module Hwaro
               margin-bottom: 1.5rem;
             }
 
+            /* Section titles wear the overline treatment: small caps-feel
+               tracking that reads as structure, not content. */
             .sidebar-title {
               font-size: 0.7rem;
               font-weight: 600;
               text-transform: uppercase;
               color: var(--text-muted);
               margin-bottom: 0.4rem;
-              letter-spacing: 0.04em;
+              letter-spacing: 0.08em;
               padding-left: 0.75rem;
             }
 
@@ -370,25 +352,29 @@ module Hwaro
               margin-bottom: 1px;
             }
 
+            /* A 2px rail carries the active state; hover stays neutral so
+               the ember accent means "you are here", nothing else. */
             .sidebar-links a {
               display: block;
               padding: 0.3rem 0.75rem;
               color: var(--text-secondary);
               text-decoration: none;
-              border-radius: var(--radius-sm);
+              border-left: 2px solid transparent;
+              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
               font-size: 0.85rem;
-              transition: all 0.15s;
+              transition: all var(--transition);
               line-height: 1.4;
             }
 
             .sidebar-links a:hover {
-              background: rgba(179, 84, 84, 0.07);
+              background: var(--bg-subtle);
               color: var(--text);
             }
 
             .sidebar-links a.active {
-              background: rgba(179, 84, 84, 0.12);
-              color: var(--primary-hover);
+              background: var(--primary-tint);
+              border-left-color: var(--primary);
+              color: var(--primary);
               font-weight: 600;
             }
 
@@ -402,11 +388,12 @@ module Hwaro
 
             .docs-main h1 {
               font-family: var(--font-serif);
-              font-size: 2.1rem;
+              font-size: var(--step-3);
               font-weight: 700;
               margin: 0 0 0.5rem 0;
               letter-spacing: -0.018em;
               line-height: 1.2;
+              color: var(--heading);
               text-wrap: balance;
             }
 
@@ -425,23 +412,23 @@ module Hwaro
               width: 2.75rem;
               height: 3px;
               border-radius: 999px;
-              background: linear-gradient(90deg, #c46262, #8f4040);
+              background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
+            /* TOC: a hairline rail instead of a boxed grey card — quieter,
+               and it mirrors the sidebar's active-rail language. */
             .docs-toc {
               margin: 1.5rem 0 2rem 0;
-              padding: 1rem 1.25rem;
-              background: var(--bg-secondary);
-              border: 1px solid var(--border-light);
-              border-radius: var(--radius);
+              padding: 0.25rem 0 0.25rem 1.1rem;
+              border-left: 2px solid var(--border-subtle);
             }
 
             .docs-toc-title {
               margin: 0 0 0.5rem 0;
-              font-size: 0.8rem;
+              font-size: 0.7rem;
               font-weight: 600;
               text-transform: uppercase;
-              letter-spacing: 0.04em;
+              letter-spacing: 0.08em;
               color: var(--text-muted);
             }
 
@@ -463,6 +450,7 @@ module Hwaro
             .docs-toc a {
               color: var(--text-secondary);
               text-decoration: none;
+              font-size: var(--step--1);
             }
 
             .docs-toc a:hover {
@@ -470,28 +458,41 @@ module Hwaro
               text-decoration: underline;
             }
 
+            /* h2 marks a section break: generous air above and a hairline
+               rule — the classic docs rhythm. */
             .docs-main h2 {
               font-family: var(--font-serif);
-              font-size: 1.45rem;
+              font-size: var(--step-2);
               font-weight: 700;
-              margin: 2.5rem 0 0.75rem 0;
+              margin: var(--space-7) 0 0.75rem 0;
+              padding-top: var(--space-5);
+              border-top: 1px solid var(--border-subtle);
               letter-spacing: -0.008em;
-              color: var(--text);
+              color: var(--heading);
               text-wrap: balance;
             }
 
+            /* The first h2 after the title/TOC doesn't need the divider. */
+            .docs-main > h1:first-child + h2,
+            .docs-toc + h2 {
+              margin-top: var(--space-6);
+              padding-top: 0;
+              border-top: none;
+            }
+
             .docs-main h3 {
-              font-size: 1.1rem;
-              font-weight: 600;
+              font-size: var(--step-1);
+              font-family: var(--font-serif);
+              font-weight: 700;
               margin: 2rem 0 0.5rem 0;
-              color: var(--text);
+              color: var(--heading);
             }
 
             .docs-main h4 {
               font-size: 0.95rem;
               font-weight: 600;
               margin: 1.5rem 0 0.5rem 0;
-              color: var(--text);
+              color: var(--heading);
             }
 
             .docs-main p {
@@ -517,11 +518,11 @@ module Hwaro
               text-decoration: underline;
               text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
               text-underline-offset: 3px;
-              transition: color 0.15s ease, text-decoration-color 0.15s ease;
+              transition: color var(--transition), text-decoration-color var(--transition);
             }
 
             a:hover {
-              color: var(--primary-hover);
+              color: var(--primary-strong);
               text-decoration-color: currentColor;
             }
 
@@ -541,10 +542,10 @@ module Hwaro
             }
 
             pre {
-              padding: 1rem 1.25rem;
-              border-radius: var(--radius);
+              padding: var(--space-4) var(--space-5);
+              border-radius: var(--radius-sm);
               overflow-x: auto;
-              border: 1px solid var(--border);
+              border: 1px solid var(--border-subtle);
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
               background: var(--bg-code);
@@ -558,7 +559,7 @@ module Hwaro
               padding: 0;
               font-size: 0.82rem;
             }
-            #{highlight_theme_css(false)}
+            #{highlight_theme_css}
 
             /* Tables */
             table {
@@ -581,7 +582,7 @@ module Hwaro
 
             td {
               padding: 0.5rem 0.75rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
               vertical-align: top;
             }
 
@@ -610,19 +611,24 @@ module Hwaro
             }
 
             .info-box.note {
-              background: rgba(179, 84, 84, 0.06);
-              border-color: rgba(179, 84, 84, 0.3);
+              background: color-mix(in srgb, var(--primary) 6%, transparent);
+              border-color: color-mix(in srgb, var(--primary) 30%, transparent);
             }
 
             .info-box.warning {
-              background: rgba(176, 125, 46, 0.08);
-              border-color: rgba(176, 125, 46, 0.35);
+              background: color-mix(in srgb, var(--warn) 8%, transparent);
+              border-color: color-mix(in srgb, var(--warn) 35%, transparent);
             }
 
             .info-box.tip {
-              background: rgba(94, 140, 97, 0.08);
-              border-color: rgba(94, 140, 97, 0.35);
+              background: color-mix(in srgb, var(--ok) 8%, transparent);
+              border-color: color-mix(in srgb, var(--ok) 35%, transparent);
             }
+
+            /* The box's lead-in label carries its hue. */
+            .info-box.note > strong:first-child { color: var(--primary); }
+            .info-box.warning > strong:first-child { color: var(--warn); }
+            .info-box.tip > strong:first-child { color: var(--ok); }
 
             /* Section list */
             ul.section-list {
@@ -633,10 +639,10 @@ module Hwaro
             ul.section-list li {
               margin-bottom: 0.5rem;
               padding: 0.75rem 1rem;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               border-radius: var(--radius-sm);
-              border: 1px solid var(--border-light);
-              transition: border-color 0.15s;
+              border: 1px solid var(--border-subtle);
+              transition: border-color var(--transition);
             }
 
             ul.section-list li:hover {
@@ -665,7 +671,7 @@ module Hwaro
               display: inline-block;
               padding: 0.25rem 0.55rem;
               border-radius: var(--radius-sm);
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border-subtle);
               color: var(--text-secondary);
               text-decoration: none;
             }
@@ -688,7 +694,7 @@ module Hwaro
               display: inline-block;
               padding: 0.25rem 0.55rem;
               border-radius: var(--radius-sm);
-              border: 1px solid var(--border-light);
+              border: 1px solid var(--border-subtle);
               color: var(--text-muted);
               opacity: 0.5;
             }
@@ -697,7 +703,7 @@ module Hwaro
             .docs-footer {
               margin-top: 3rem;
               padding-top: 1.5rem;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
               font-size: 0.8rem;
             }
@@ -714,7 +720,7 @@ module Hwaro
               color: var(--text-secondary);
               font-size: 0.8rem;
               cursor: pointer;
-              transition: all 0.15s;
+              transition: all var(--transition);
               font-family: inherit;
             }
 
@@ -728,7 +734,7 @@ module Hwaro
               padding: 0.1rem 0.35rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               color: var(--text-muted);
               font-family: inherit;
               line-height: 1.4;
@@ -739,7 +745,7 @@ module Hwaro
               display: none;
               position: fixed;
               inset: 0;
-              background: rgba(0, 0, 0, 0.4);
+              background: var(--scrim);
               backdrop-filter: blur(4px);
               -webkit-backdrop-filter: blur(4px);
               z-index: 200;
@@ -757,7 +763,7 @@ module Hwaro
               max-height: 70vh;
               background: var(--bg);
               border-radius: var(--radius);
-              box-shadow: 0 16px 70px rgba(0, 0, 0, 0.2);
+              box-shadow: var(--shadow-lg);
               display: flex;
               flex-direction: column;
               overflow: hidden;
@@ -769,7 +775,7 @@ module Hwaro
               align-items: center;
               gap: 0.6rem;
               padding: 0.75rem 1rem;
-              border-bottom: 1px solid var(--border-light);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .search-input-wrap svg {
@@ -800,7 +806,7 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               color: var(--text-muted);
               font-family: inherit;
               cursor: pointer;
@@ -824,7 +830,7 @@ module Hwaro
 
             .search-result-item:hover,
             .search-result-item.active {
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               text-decoration: none;
             }
 
@@ -845,8 +851,8 @@ module Hwaro
             }
 
             .search-result-item .search-result-snippet mark {
-              background: rgba(179, 84, 84, 0.15);
-              color: var(--primary-hover);
+              background: color-mix(in srgb, var(--primary) 15%, transparent);
+              color: var(--primary-strong);
               border-radius: 2px;
               padding: 0 1px;
             }
@@ -863,7 +869,7 @@ module Hwaro
               display: flex;
               gap: 1rem;
               justify-content: center;
-              border-top: 1px solid var(--border-light);
+              border-top: 1px solid var(--border-subtle);
               color: var(--text-muted);
               font-size: 0.7rem;
             }
@@ -873,7 +879,7 @@ module Hwaro
               padding: 0 0.3rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-secondary);
+              background: var(--bg-subtle);
               font-family: inherit;
               line-height: 1.4;
             }

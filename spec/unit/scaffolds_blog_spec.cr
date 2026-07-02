@@ -126,4 +126,16 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl.should contain("class=\"related-posts\"")
     end
   end
+
+  describe "css" do
+    # The blog stylesheet is built on the shared ember token system:
+    # every color is a light-dark() pair resolved by color-scheme, and
+    # the fixed header paints with the --glass token instead of a
+    # hardcoded rgba() surface.
+    it "uses the shared design tokens (adaptive scheme + glass header)" do
+      css = Hwaro::Services::Scaffolds::Blog.new.static_files["css/style.css"]
+      css.should contain("color-scheme: light dark")
+      css.should contain("var(--glass)")
+    end
+  end
 end

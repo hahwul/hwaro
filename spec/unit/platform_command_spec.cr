@@ -43,7 +43,7 @@ describe Hwaro::CLI::Commands::Tool::PlatformCommand do
             cmd.run(["netlify", "-o", out_path])
           end
 
-          output.should contain("Generated")
+          output.should contain("created:")
           File.exists?(out_path).should be_true
           File.read(out_path).should_not be_empty
         end

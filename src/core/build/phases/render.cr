@@ -891,7 +891,7 @@ module Hwaro::Core::Build::Phases::Render
       target = page.url.starts_with?('/') ? page.url : "/#{page.url}"
       redirect_url = site.config.with_base_path(target)
       File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
-      Logger.action :create, dest_path, :yellow if verbose
+      Logger.action :create, dest_path, Logger::Role::Warn if verbose
     end
   end
 
