@@ -558,7 +558,8 @@ module Hwaro
               if resolved &&
                  (resolved == project_root || resolved.starts_with?(project_root + "/")) &&
                  (info = File.info?(resolved)) && info.file?
-                mtime = info.modification_time.to_unix_ns
+                # to_unix_ms (Int64) like the build cache — to_unix_ns is Int128
+                mtime = info.modification_time.to_unix_ms
 
                 cached = @@load_data_mutex.synchronize { @@load_data_cache[resolved]? }
                 if cached && cached[0] == mtime
