@@ -115,8 +115,12 @@ module Hwaro
           result = result.gsub(/\s+style=["'][^"']*["']/i, "")
           result = result.gsub(/\s+on\w+=["'][^"']*["']/i, "")
 
-          # Convert <img> to <amp-img>
-          result = result.gsub(/<img([^>]*)\/?>/mi) do
+          # Convert <img> to <amp-img>. Quote-aware attribute scan (same
+          # pattern as IMG_LAZY_REGEX in markdown.cr): a `>` inside a quoted
+          # attribute value (legal HTML5, e.g. alt="Home > Docs") must not be
+          # treated as the tag end, or the conversion emits a broken
+          # `<amp-img … alt="Home ></amp-img> Docs" />`.
+          result = result.gsub(/<img((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/mi) do
             # `[^>]*` greedily swallows the self-closing slash from `<img … />`,
             # which would otherwise be appended mid-tag as
             # `<amp-img … / layout="…">` — invalid AMP. Strip a trailing slash.

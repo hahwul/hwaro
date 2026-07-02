@@ -423,12 +423,20 @@ module Hwaro
           digest.final.hexstring
         end
 
-        # Compute a combined checksum for a set of template files
+        # Compute a combined checksum for a set of template files.
+        # Fields are length-prefixed so adjacent name/content pairs can't
+        # produce the same byte stream across boundaries (the "a"+"bc" vs
+        # "ab"+"c" ambiguity), which would have failed to invalidate.
         def self.compute_templates_hash(templates : Hash(String, String)) : String
           digest = Digest::MD5.new
           templates.keys.sort!.each do |name|
+            source = templates[name]
+            digest.update(name.bytesize.to_s)
+            digest.update(":")
             digest.update(name)
-            digest.update(templates[name])
+            digest.update(source.bytesize.to_s)
+            digest.update(":")
+            digest.update(source)
           end
           digest.final.hexstring
         end
@@ -451,11 +459,21 @@ module Hwaro
         # formatting-only edit to config.toml no longer forces a full rebuild.
         def self.compute_config_hash(config : Models::Config, env : String? = nil) : String
           digest = Digest::MD5.new
-          digest.update(env || "")
-          digest.update(config.base_url)
+          # Length-prefixed for the same boundary-ambiguity reason as
+          # compute_templates_hash.
+          [env || "", config.base_url].each do |field|
+            digest.update(field.bytesize.to_s)
+            digest.update(":")
+            digest.update(field)
+          end
           config.raw.keys.sort!.each do |key|
+            value = config.raw[key].to_s
+            digest.update(key.bytesize.to_s)
+            digest.update(":")
             digest.update(key)
-            digest.update(config.raw[key].to_s)
+            digest.update(value.bytesize.to_s)
+            digest.update(":")
+            digest.update(value)
           end
           digest.final.hexstring
         end
