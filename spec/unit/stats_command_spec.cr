@@ -27,7 +27,7 @@ describe Hwaro::CLI::Commands::Tool::StatsCommand do
           cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
           cmd.run(["-c", dir])
         end
-        output.should contain("No content found")
+        output.should contain("counted: no content found")
       end
     end
 
@@ -47,13 +47,14 @@ describe Hwaro::CLI::Commands::Tool::StatsCommand do
           cmd.run(["-c", dir])
         end
 
-        output.should contain("Content statistics")
-        output.should contain("Overview:")
-        output.should contain("Total:")
-        output.should contain("Word Count")
-        output.should contain("Tags")
+        # Plain (non-TTY) forms: receipt heading + rows, sections, outcome.
+        output.should contain("hwaro: stats")
+        output.should contain("total: 2 files")
+        output.should contain("words:")
+        output.should contain("tags:")
         output.should contain("crystal")
-        output.should contain("Monthly Publishing")
+        output.should contain("monthly:")
+        output.should contain("counted: 2 files, 2 published, 0 drafts")
       end
     end
   end

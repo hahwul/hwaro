@@ -33,8 +33,8 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
           cmd.run(["-c", dir])
         end
 
-        output.should contain("Validating content")
-        output.should contain("No issues found")
+        output.should contain("hwaro: validate")
+        output.should contain("no issues found")
       end
     end
 
@@ -55,7 +55,7 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
         # on the summary line shape rather than a specific severity so the test
         # does not break if the validator reclassifies this issue.
         output.should contain("bad.md")
-        output.should match(/Found \d+ error\(s\), \d+ warning\(s\), \d+ info\(s\)/)
+        output.should match(/checked: \d+ errors?, \d+ warnings?, \d+ info/)
       end
     end
   end

@@ -511,3 +511,35 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     sanitize_for_terminal(s)
   end
 end
+
+describe "check-links ember output" do
+  it "renders heading, scan context, and a healthy outcome for resolving internal links" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "target.md"), "---\ntitle: T\n---\nBody")
+      File.write(File.join(dir, "index.md"), "---\ntitle: I\n---\n[t](/target)")
+
+      output = with_captured_log do
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.run(["-c", dir, "--internal-only"])
+      end
+
+      output.should contain("hwaro: check-links")
+      output.should contain("scan: 0 external, 1 internal")
+      output.should contain("checked: 1 link, all healthy")
+      output.should_not contain("\e[")
+    end
+  end
+
+  it "reports an info outcome when no links exist" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "index.md"), "---\ntitle: I\n---\nNo links here")
+
+      output = with_captured_log do
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.run(["-c", dir, "--internal-only"])
+      end
+
+      output.should contain("checked: no links found")
+    end
+  end
+end

@@ -288,7 +288,8 @@ module Hwaro
         line += "#{paint(" · ", Role::Dim)}#{paint(note, Role::Dim)}" if note
         @@io.puts line
       else
-        @@io.puts(note ? "#{label}: #{note}" : "#{label}:")
+        # Same flattening as Receipt/outcome: plain output carries no middots.
+        @@io.puts(note ? "#{label}: #{note.gsub(" · ", ", ")}" : "#{label}:")
       end
     end
 

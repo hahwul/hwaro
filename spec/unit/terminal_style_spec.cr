@@ -27,12 +27,8 @@ end
 
 describe "terminal style lint" do
   it "routes every color through Logger (no raw .colorize outside logger.cr)" do
-    pending_migration = [
-      "src/cli/commands/tool/validate_command.cr",
-    ]
     offenders = Dir.glob("src/**/*.cr").select do |path|
       next false if path == "src/utils/logger.cr"
-      next false if pending_migration.includes?(path)
       File.read(path).includes?(".colorize(")
     end
     offenders.should be_empty
@@ -40,12 +36,7 @@ describe "terminal style lint" do
 
   it "uses only GLYPHS-registry status glyphs in terminal output" do
     banned = ["✔", "✘", "[DEAD]", "└─"]
-    pending_migration = [
-      "src/cli/commands/tool/validate_command.cr",
-      "src/cli/commands/tool/deadlink_command.cr",
-    ]
     offenders = output_surface_files.select do |path|
-      next false if pending_migration.includes?(path)
       content = File.read(path)
       banned.any? { |glyph| content.includes?(glyph) }
     end
@@ -53,16 +44,12 @@ describe "terminal style lint" do
   end
 
   it "does not hand-roll ASCII dash dividers" do
-    pending_migration = [
-      "src/cli/commands/tool/deadlink_command.cr",
-      "src/services/content_lister.cr",
-    ]
     allowed = [
       # Profiler table borders are part of its spec-pinned layout.
       "src/utils/profiler.cr",
     ]
     offenders = output_surface_files.select do |path|
-      next false if pending_migration.includes?(path) || allowed.includes?(path)
+      next false if allowed.includes?(path)
       File.read(path).includes?(%("-" *))
     end
     offenders.should be_empty
