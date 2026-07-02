@@ -283,10 +283,10 @@ module Hwaro
           "",
           "",
           "",
-          "  #{brand} v#{Hwaro::VERSION}",
+          "  #{brand} #{Logger.paint("v#{Hwaro::VERSION}", Logger::Role::Dim)}",
           "",
-          "  A fast and lightweight static site",
-          "  generator written in Crystal.",
+          "  #{Logger.paint("A fast and lightweight static site", Logger::Role::Dim)}",
+          "  #{Logger.paint("generator written in Crystal.", Logger::Role::Dim)}",
           "",
           "  Usage: hwaro <command> [options]",
           "",
@@ -305,15 +305,17 @@ module Hwaro
         # Define display order
         priority = ["init", "build", "serve", "new", "deploy", "doctor", "tool", "completion", "version", "help"]
 
-        # Print registered commands in priority order
+        # Print registered commands in priority order: bold names, dim
+        # descriptions (pad before paint so escapes never skew the column).
         CommandRegistry.all.sort_by { |cmd|
           priority.index(cmd[:name]) || priority.size
         }.each do |cmd|
-          Logger.info "  #{cmd[:name].ljust(12)} #{cmd[:description]}"
+          name = Logger.paint(cmd[:name].ljust(12), Logger::Role::Plain, bold: true)
+          Logger.info "  #{name} #{Logger.paint(cmd[:description], Logger::Role::Dim)}"
         end
 
         Logger.info ""
-        Logger.info "Run 'hwaro <command> --help' for more information on a command."
+        Logger.info Logger.paint("Run 'hwaro <command> --help' for more information on a command.", Logger::Role::Dim)
       end
     end
   end

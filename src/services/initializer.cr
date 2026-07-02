@@ -39,7 +39,9 @@ module Hwaro
           options.agents_mode,
           options.minimal_config,
           options.full_config,
-          options.clean
+          options.clean,
+          options.site_title,
+          options.from_wizard
         )
       end
 
@@ -72,6 +74,8 @@ module Hwaro
         minimal_config : Bool = false,
         full_config : Bool = false,
         clean : Bool = false,
+        site_title : String? = nil,
+        from_wizard : Bool = false,
       )
         if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
           clean_target(target_path)
@@ -90,8 +94,12 @@ module Hwaro
           exit(1)
         end
 
-        Logger.heading("init", target_path == "." ? nil : target_path)
-        Logger.info "  #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
+        # The wizard already rendered the heading and a scaffold/title receipt;
+        # printing them again here would double the header beat.
+        unless from_wizard
+          Logger.heading("init", target_path == "." ? nil : target_path)
+          Logger.info "  #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
+        end
 
         is_multilingual = multilingual_languages.size > 1
 
@@ -157,6 +165,14 @@ module Hwaro
           config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
         else
           config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+        end
+
+        # Wizard-collected site title: substitute the first `title = "…"` line
+        # of the generated config. Built-in scaffolds only — a remote
+        # scaffold's config is used verbatim.
+        if (title = site_title) && !title.empty? && !scaffold.is_a?(Scaffolds::Remote)
+          escaped = title.gsub("\\", "\\\\").gsub("\"", "\\\"")
+          config_content = config_content.sub(/^title\s*=\s*"[^"\n]*"/m, "title = \"#{escaped}\"")
         end
 
         create_file(File.join(target_path, "config.toml"), config_content)

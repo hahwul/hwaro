@@ -153,13 +153,20 @@ module Hwaro
           Logger.info ""
           Logger.info "Available subcommands:"
 
+          # Bold subcommand names, dim descriptions, dim-bold category labels
+          # (pad before paint so escapes never skew the column).
+          render_sub = ->(sub : CommandInfo) do
+            usage = Logger.paint(name_with_args.call(sub).ljust(max_len + 2), Logger::Role::Plain, bold: true)
+            Logger.info "    #{usage} #{Logger.paint(sub.description, Logger::Role::Dim)}"
+          end
+
           categorized = Set(String).new
           CATEGORIES.each do |category, names|
             Logger.info ""
-            Logger.info "  #{category}:"
+            Logger.info "  #{Logger.paint("#{category}:", Logger::Role::Dim, bold: true)}"
             names.each do |name|
               if sub = sub_by_name[name]?
-                Logger.info "    #{name_with_args.call(sub).ljust(max_len + 2)} #{sub.description}"
+                render_sub.call(sub)
                 categorized << name
               end
             end
@@ -169,14 +176,12 @@ module Hwaro
           uncategorized = visible.reject { |s| categorized.includes?(s.name) }
           unless uncategorized.empty?
             Logger.info ""
-            Logger.info "  Other:"
-            uncategorized.each do |sub|
-              Logger.info "    #{name_with_args.call(sub).ljust(max_len + 2)} #{sub.description}"
-            end
+            Logger.info "  #{Logger.paint("Other:", Logger::Role::Dim, bold: true)}"
+            uncategorized.each { |sub| render_sub.call(sub) }
           end
 
           Logger.info ""
-          Logger.info "Run 'hwaro tool <subcommand> --help' for more information on a subcommand."
+          Logger.info Logger.paint("Run 'hwaro tool <subcommand> --help' for more information on a subcommand.", Logger::Role::Dim)
         end
 
         # Render a subcommand's usage signature for the help summary:

@@ -1,6 +1,8 @@
 require "option_parser"
 require "json"
 require "../metadata"
+require "../prompt"
+require "./init_wizard"
 require "../../config/options/init_options"
 require "../../services/initializer"
 require "../../services/scaffolds/registry"
@@ -38,6 +40,9 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--list-scaffolds", description: "List available built-in scaffolds and exit"),
           FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
 
+          # Wizard control
+          FlagInfo.new(short: "-y", long: "--yes", description: "Skip the interactive wizard and initialize with defaults"),
+
           # Debug & output
           QUIET_FLAG,
           HELP_FLAG,
@@ -62,8 +67,28 @@ module Hwaro
             return
           end
 
+          # A bare interactive invocation (`hwaro init` / `hwaro init path`
+          # with no option flags on a real terminal) gets the guided wizard.
+          # Any flag — including --yes — plus non-TTY and quiet sessions keep
+          # the flag path byte-identical for scripts and CI.
+          if wizard_eligible?(args)
+            options = InitWizard.new.run(args.first?)
+            if options.nil?
+              Logger.info "Cancelled."
+              return
+            end
+            Services::Initializer.new.run(options)
+            return
+          end
+
           options = parse_options(args)
           Services::Initializer.new.run(options)
+        end
+
+        private def wizard_eligible?(args : Array(String)) : Bool
+          return false unless Prompt.interactive?
+          return false if Logger.quiet?
+          args.none?(&.starts_with?("-"))
         end
 
         # Print the list of built-in scaffolds.
@@ -173,6 +198,10 @@ module Hwaro
             # they appear in --help output).
             parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { }
             parser.on("--json", "Emit machine-readable JSON output (with --list-scaffolds)") { }
+
+            # Wizard control (its mere presence in args disables the wizard in
+            # #run; registered so OptionParser accepts it and --help shows it).
+            parser.on("-y", "--yes", "Skip the interactive wizard and initialize with defaults") { }
 
             # Debug & output
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }

@@ -539,6 +539,35 @@ describe Hwaro::Services::Initializer do
           agents_content.should contain "## Templates"
         end
       end
+
+      it "substitutes a wizard-collected site_title into config.toml" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          options = Hwaro::Config::Options::InitOptions.new(
+            path: target,
+            site_title: %(My "Quoted" Site),
+          )
+
+          Hwaro::Services::Initializer.new.run(options)
+
+          config = File.read(File.join(target, "config.toml"))
+          config.should contain(%(title = "My \\"Quoted\\" Site"))
+          # Only the title line changes; the description default survives.
+          config.should contain("description =")
+        end
+      end
+
+      it "leaves config.toml untouched when site_title is nil" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          options = Hwaro::Config::Options::InitOptions.new(path: target)
+
+          Hwaro::Services::Initializer.new.run(options)
+
+          config = File.read(File.join(target, "config.toml"))
+          config.should contain(%(title = "My Hwaro Site"))
+        end
+      end
     end
   end
 end
