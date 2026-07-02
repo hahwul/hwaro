@@ -285,7 +285,6 @@ module Hwaro
           minify = options.minify
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
-          safe = site.config.markdown.safe
           include_drafts = options.drafts
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
@@ -508,11 +507,17 @@ module Hwaro
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
+          # Render in parallel like run_rerender/the cold build — a section
+          # `_index` edit re-renders its whole subtree, and doing that one
+          # page at a time made large-section edits the slowest watch path.
+          # process_files_sequential mirrors the old per-page loop exactly
+          # (render_page + record_page_cache_entry).
           error_overlay = options.error_overlay
-          render_list.each do |page|
-            next unless page.render
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
-            record_page_cache_entry(page, cache, templates, site, output_dir)
+          renderable_list = render_list.select(&.render)
+          if options.parallel && renderable_list.size > 1
+            process_files_parallel(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
+          else
+            process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
 
           cache.save if options.cache

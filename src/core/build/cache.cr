@@ -224,7 +224,29 @@ module Hwaro
               # mtime changed — verify with content hash to catch false positives
               # (e.g. file touched but content identical)
               current_hash = compute_file_hash(file_path)
-              return current_hash != entry.hash
+              return true if current_hash != entry.hash
+              # Content identical, only the mtime moved (touch, git checkout).
+              # Refresh the stored mtime so the NEXT build takes the mtime fast
+              # path — otherwise every subsequent warm build re-hashes the file
+              # (unchanged entries skip #update, so nothing else repairs it).
+              @mutex.synchronize do
+                if current = @entries[file_path]?
+                  # Only touch entries nobody else replaced since our read.
+                  if current.mtime == entry.mtime
+                    @entries[file_path] = CacheEntry.new(
+                      path: current.path,
+                      mtime: current_mtime,
+                      hash: current.hash,
+                      output_path: current.output_path,
+                      template_hash: current.template_hash,
+                      config_hash: current.config_hash,
+                      cascade_hash: current.cascade_hash,
+                    )
+                    @dirty = true
+                  end
+                end
+              end
+              return false
             end
           rescue ex
             Logger.debug "Cache: failed to read mtime for #{file_path}: #{ex.message}"

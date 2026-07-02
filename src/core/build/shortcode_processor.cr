@@ -76,14 +76,12 @@ module Hwaro
 
           in_fence = false
           fence_marker = ""
-          fence_close_regex : Regex? = nil
 
           content.each_line(chomp: false) do |line|
             if in_fence
-              if fence_close_regex.try(&.match(line))
+              if fence_close_line?(line, fence_marker)
                 in_fence = false
                 fence_marker = ""
-                fence_close_regex = nil
               end
               next
             end
@@ -91,7 +89,6 @@ module Hwaro
             if match = line.match(/^\s*(`{3,}|~{3,})/)
               in_fence = true
               fence_marker = match[1]
-              fence_close_regex = Regex.new("^\\s*#{Regex.escape(fence_marker)}\\s*$")
               next
             end
 
@@ -104,6 +101,16 @@ module Hwaro
           end
 
           false
+        end
+
+        # A fence-closing line is the opening marker alone, surrounded only by
+        # whitespace — equivalent to the previous per-fence compiled regex
+        # `^\s*MARKER\s*$` (Crystal regexes run with UCP, so `\s` and
+        # `String#strip` agree on Unicode whitespace). A longer run (e.g.
+        # ```` closing ```) does not match, same as before. The comparison
+        # replaces a PCRE2 compile per fenced block per page render.
+        private def fence_close_line?(line : String, fence_marker : String) : Bool
+          line.strip == fence_marker
         end
 
         private def has_shortcode_token_outside_inline_code?(line : String) : Bool
@@ -129,7 +136,6 @@ module Hwaro
           String.build do |io|
             in_fence = false
             fence_marker = ""
-            fence_close_regex : Regex? = nil
             buffer = String::Builder.new
             # Nesting depth of open block shortcodes. While > 0 we must NOT treat
             # a fence line as a buffer boundary, otherwise a block shortcode whose
@@ -140,10 +146,9 @@ module Hwaro
             content.each_line(chomp: false) do |line|
               if in_fence
                 io << line
-                if fence_close_regex.try(&.match(line))
+                if fence_close_line?(line, fence_marker)
                   in_fence = false
                   fence_marker = ""
-                  fence_close_regex = nil
                 end
                 next
               end
@@ -168,8 +173,6 @@ module Hwaro
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
-                # Compile the close-fence regex once per fenced block
-                fence_close_regex = Regex.new("^\\s*#{Regex.escape(fence_marker)}\\s*$")
                 io << line
               else
                 buffer << line
