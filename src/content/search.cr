@@ -117,11 +117,15 @@ module Hwaro
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               # Convert markdown to plain text
-              # Optimization: Reuse rendered content if available
+              # Optimization: Reuse rendered content if available. The
+              # fallback passes the site's markdown options so cache-hit
+              # pages index the same text a rendered page produces
+              # (safe-mode HTML stripping, emoji, extensions).
               if !page.content.empty?
                 html_content = page.content
               else
-                html_content = Processor::Markdown.render_body_cached(page.raw_content)
+                md = config.markdown
+                html_content = Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, markdown_config: md)
               end
 
               # Strip HTML tags AND decode entities so the index stores

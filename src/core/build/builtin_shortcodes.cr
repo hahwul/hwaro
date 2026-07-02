@@ -8,7 +8,12 @@ module Hwaro
   module Core
     module Build
       module BuiltinShortcodes
-        @@templates : Hash(String, String)? = nil
+        # Direct initializer (not `||=` memoization): Crystal wraps class-var
+        # initializers in a thread-safe once guard, so the first touch can't
+        # race under -Dpreview_mt no matter which fiber gets there first.
+        # The old lazy `@@templates ||= build_templates` was an unsynchronized
+        # check-then-write that render.cr had to pre-warm defensively.
+        @@templates : Hash(String, String) = build_templates
 
         # Per-shortcode positional argument names — `_N` maps to `POSITIONAL_PARAMS[N]`
         # at dispatch time so the documented `{{ youtube("ID") }}` form (and the
@@ -31,7 +36,7 @@ module Hwaro
         # Returns the full set of built-in shortcode templates keyed by
         # their template path (e.g. "shortcodes/youtube").
         def self.templates : Hash(String, String)
-          @@templates ||= build_templates
+          @@templates
         end
 
         # Returns the positional parameter list for a built-in shortcode,

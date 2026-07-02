@@ -248,19 +248,35 @@ module Hwaro
           end
         end
 
+        # Next BLOCK_OPEN_RE match at or after `from` that is a real
+        # shortcode opener, skipping Crinja/Jinja control tags. Bare keyword
+        # tags (`{% endif %}`, `{% else %}`, `{% raw %}`) and assignment tags
+        # (`{% set x = 1 %}`) match BLOCK_OPEN_RE too; counting them as block
+        # openers desynced the nesting scan — a block shortcode whose body
+        # contained `{% if %}…{% endif %}` never found its `{% end %}` and
+        # leaked its opening tag as literal text. Mirrors the filtering the
+        # outer fence loop already applies (see process_shortcodes_jinja).
+        private def next_block_open(content : String, from : Int32) : Regex::MatchData?
+          pos = from
+          while m = BLOCK_OPEN_RE.match(content, pos)
+            return m unless CRINJA_CONTROL_TAG_RE.matches?(m[0])
+            pos = m.begin + m[0].size
+          end
+          nil
+        end
+
         # Stack-based block shortcode parser that correctly handles nested
         # block shortcodes of the same type. Scans for opening tags {% name(...) %}
         # and closing tags {% end %}, tracking nesting depth to pair them correctly.
         private def process_block_shortcodes(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32, spans : Array(String) = [] of String) : String
-          open_re = BLOCK_OPEN_RE
           close_re = BLOCK_CLOSE_RE
 
           result = String::Builder.new
           pos = 0
 
           while pos < content.size
-            # Find next opening tag
-            open_match = open_re.match(content, pos)
+            # Find next opening tag (control tags skipped)
+            open_match = next_block_open(content, pos)
             # Find next closing tag (to handle stray {% end %} gracefully)
             close_match = close_re.match(content, pos)
 
@@ -305,7 +321,7 @@ module Hwaro
             body_end = nil
 
             while nesting > 0 && scan_pos < content.size
-              next_open = open_re.match(content, scan_pos)
+              next_open = next_block_open(content, scan_pos)
               next_close = close_re.match(content, scan_pos)
 
               break unless next_close

@@ -966,13 +966,17 @@ module Hwaro
         @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config)
       end
 
-      # Memoized default-options body render for the Generate-phase
-      # fallbacks: on warm --cache builds (and in streaming mode) feeds and
-      # search hit pages whose `page.content` is empty because the Render
-      # phase skipped them, and the same page can be re-rendered up to four
-      # times in one build (feed summary + full body + section feed +
-      # search index). Output is a pure function of the raw content for the
-      # default arguments, so it is shared by content digest.
+      # Memoized body render for the Generate-phase fallbacks: on warm
+      # --cache builds (and in streaming mode) feeds and search hit pages
+      # whose `page.content` is empty because the Render phase skipped
+      # them, and the same page can be re-rendered up to four times in one
+      # build (feed summary + full body + section feed + search index).
+      # Output is a pure function of the raw content and the passed
+      # options, so it is shared by content digest + options fingerprint.
+      #
+      # Callers should pass the site's markdown options so fallback bodies
+      # match what the render phase produces (safe-mode HTML stripping,
+      # emoji, extensions) instead of a default-options approximation.
       #
       # Mutex-guarded — feeds and search run as parallel fibers. The byte
       # cap keeps streaming mode's memory bound: once full, renders still
@@ -982,15 +986,19 @@ module Hwaro
       @@body_cache_mutex = Mutex.new
       BODY_CACHE_MAX_BYTES = 32_i64 * 1024 * 1024
 
-      def render_body_cached(content : String) : String
-        key = Digest::MD5.hexdigest(content)
+      def render_body_cached(content : String, safe : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : String
+        key = String.build do |io|
+          io << (safe ? '1' : '0') << (emoji ? '1' : '0') << ':'
+          io << (markdown_config.try(&.cache_fingerprint) || "-") << ':'
+          io << Digest::MD5.hexdigest(content)
+        end
         @@body_cache_mutex.synchronize do
           if cached = @@body_cache[key]?
             return cached
           end
         end
 
-        html, _ = render(content)
+        html, _ = render(content, safe: safe, emoji: emoji, markdown_config: markdown_config)
 
         @@body_cache_mutex.synchronize do
           unless @@body_cache.has_key?(key) || @@body_cache_bytes + html.bytesize > BODY_CACHE_MAX_BYTES

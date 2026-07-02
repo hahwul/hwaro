@@ -14,10 +14,20 @@ require "./hooks/image_hooks"
 module Hwaro
   module Content
     module Hooks
-      # Factory method to get all default hooks
+      # Factory method to get all default hooks.
+      #
+      # MarkdownHooks is intentionally NOT registered: the builder's
+      # ParseContent phase default only steps aside for a BeforeParseContent
+      # hook (parse_content.cr), and MarkdownHooks registered at
+      # AfterReadContent/BeforeRender — so every one of its file reads,
+      # front-matter parses, summary renders, and sequential whole-site
+      # markdown renders was immediately redone (in parallel, with cascades
+      # and template-name normalization) by the ParseContent/Render phases.
+      # Removing it halves the markdown work per build; the only output it
+      # contributed — `page.content` for cache-hit pages that Generate's
+      # feeds/search read — is covered by their render_body_cached fallback.
       def self.all : Array(Core::Lifecycle::Hookable)
         [
-          MarkdownHooks.new,
           SeoHooks.new,
           TaxonomyHooks.new,
           AssetHooks.new,

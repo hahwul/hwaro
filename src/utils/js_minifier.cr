@@ -23,11 +23,16 @@ module Hwaro
         # whitespace inside a `...` literal). Restored verbatim at the end.
         # (Plain "" / '' strings and /regex/ literals can't contain raw newlines,
         # so the line pass never touches them.)
+        # Materialize the chars once: the scanner below indexes by char
+        # position, and `String#[](Int32)` is O(position) on any non-ASCII
+        # string — a single CJK character or emoji in a JS bundle turned this
+        # loop O(n²) (measured: 0.2ms ASCII vs 3+ seconds with CJK comments
+        # on an ~80KB input). Array(Char) access is O(1) either way.
         protected_spans = [] of String
         result = String.build do |io|
           i = 0
-          len = js.size
-          chars = js
+          chars = js.chars
+          len = chars.size
 
           while i < len
             c = chars[i]
@@ -155,7 +160,7 @@ module Hwaro
       # a regex literal (e.g. `return /foo/`, `typeof /re/`, `void /re/`,
       # `case /re/`, `throw /re/`) are misclassified as division because
       # full keyword-aware tokenization is not performed.
-      private def regex_context?(chars : String, pos : Int32) : Bool
+      private def regex_context?(chars : Array(Char), pos : Int32) : Bool
         j = pos - 1
         while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')
           j -= 1
@@ -176,7 +181,7 @@ module Hwaro
       # strings, balanced braces, and nested template literals inside an
       # interpolation, so a `}`/backtick that belongs to the interpolation can
       # never be mistaken for the outer literal's terminator.
-      private def scan_template_literal(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_template_literal(chars : Array(Char), i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening backtick
         i += 1
         while i < len
@@ -206,7 +211,7 @@ module Hwaro
       # or quote inside them is content, not structure — interpreting it (e.g.
       # treating a comment's backtick as a nested template) misaligns the scan
       # and corrupts the literal's boundary.
-      private def scan_interpolation(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_interpolation(chars : Array(Char), i : Int32, len : Int32, lb : String::Builder) : Int32
         depth = 1
         while i < len
           c = chars[i]
@@ -259,7 +264,7 @@ module Hwaro
       # Scan a quoted string beginning at chars[i] (a `"` or `'`). Appends it
       # verbatim (honoring backslash escapes) and returns the index just past
       # the closing quote.
-      private def scan_quoted(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_quoted(chars : Array(Char), i : Int32, len : Int32, lb : String::Builder) : Int32
         quote = chars[i]
         lb << quote
         i += 1
@@ -282,7 +287,7 @@ module Hwaro
       # main loop's regex handling, including its limitation of not modelling
       # `[...]` character classes (an unescaped `/` inside a class still ends the
       # literal) — kept identical so behaviour matches the top-level scanner.
-      private def scan_regex(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_regex(chars : Array(Char), i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening /
         i += 1
         while i < len

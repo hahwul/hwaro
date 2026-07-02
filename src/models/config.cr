@@ -649,6 +649,19 @@ module Hwaro
         @heading_ids = true
       end
 
+      # Compact fingerprint of every field that changes rendered body HTML.
+      # Keys Processor::Markdown.render_body_cached's memo so entries from a
+      # previous config (e.g. after a config reload in `serve`) can't be
+      # served for a build running with different markdown options.
+      def cache_fingerprint : String
+        String.build(12 + @math_engine.bytesize) do |io|
+          io << (@safe ? '1' : '0') << (@lazy_loading ? '1' : '0') << (@emoji ? '1' : '0')
+          io << (@footnotes ? '1' : '0') << (@task_lists ? '1' : '0') << (@definition_lists ? '1' : '0')
+          io << (@mermaid ? '1' : '0') << (@math ? '1' : '0') << (@admonitions ? '1' : '0')
+          io << (@heading_ids ? '1' : '0') << @math_engine
+        end
+      end
+
       # Generate CDN script tags for the math engine. The markdown processor
       # emits `\(…\)`/`\[…\]` wrappers with `class="math math-{inline,display}"`
       # but doesn't load the renderer — without these tags the math reaches

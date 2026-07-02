@@ -156,6 +156,12 @@ module Hwaro
         @render_workers : Int32 = 0
         # Unified cache manager for all cache layers
         @cache_manager : CacheManager = CacheManager.new
+        # The render phase's site-wide template vars, stashed so the Write
+        # phase's 404 page can reuse them. Rebuilding them there re-converted
+        # every page/section/taxonomy term to Crinja values and re-hashed
+        # every auto-include asset — O(site) work for one page — and silently
+        # used cache_busting defaults instead of the build's options.
+        @render_global_vars : Hash(String, Crinja::Value)? = nil
         # Pages stashed by `--fast-start` during the initial build so the
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
@@ -710,7 +716,7 @@ module Hwaro
 
           # Re-generate 404 page with new template
           if affected_templates.nil? || affected_templates.includes?("404")
-            generate_404_page(site, templates, output_dir, minify, verbose)
+            generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
           end
 
           # Re-generate taxonomy pages with new templates. Their template

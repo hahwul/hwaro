@@ -159,16 +159,28 @@ module Hwaro
           return tasks.each(&.call) unless parallel
 
           done = Channel(Nil).new(tasks.size)
+          first_error : Exception? = nil
+          error_mutex = Mutex.new
           tasks.each do |task|
             spawn do
               task.call
             rescue ex
+              error_mutex.synchronize { first_error ||= ex }
               Logger.warn "ParallelHelper: task failed: #{ex.message}"
             ensure
               done.send(nil)
             end
           end
           tasks.size.times { done.receive }
+
+          # Sequential mode lets a task exception abort the build; parallel
+          # mode used to swallow it behind the warn above, so e.g. a failed
+          # sitemap/feed generator still exited 0 and CI shipped a site
+          # missing those files. Surface the first failure once every task
+          # has drained, mirroring process_files_parallel.
+          if err = first_error
+            raise err
+          end
         end
       end
     end

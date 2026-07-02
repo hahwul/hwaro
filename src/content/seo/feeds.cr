@@ -427,9 +427,19 @@ module Hwaro
           # Fall back to a stripped + truncated body. Prefer the
           # already-rendered HTML; degrade to the raw markdown only if
           # render hasn't run.
-          html = page.content.empty? ? Processor::Markdown.render_body_cached(page.raw_content) : page.content
+          html = page.content.empty? ? rendered_body_fallback(page, config) : page.content
           text = HTML.unescape(Utils::TextUtils.strip_html(html)).strip
           truncate_for_feed(text, limit)
+        end
+
+        # Markdown-render a page body for feed use when the Render phase
+        # didn't populate `page.content` (cache-hit pages on warm --cache
+        # builds, streaming mode). Passes the site's markdown options so
+        # the fallback matches rendered-page fidelity — notably safe-mode
+        # HTML stripping and emoji.
+        private def self.rendered_body_fallback(page : Models::Page, config : Models::Config) : String
+          md = config.markdown
+          Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, markdown_config: md)
         end
 
         # Hard-truncate plain text to `limit` characters with an ellipsis.
@@ -442,7 +452,7 @@ module Hwaro
         # available so we don't pay for a second markdown pass per page
         # (gh#526).
         private def self.full_content_for_feed(page : Models::Page, config : Models::Config) : String
-          html = page.content.empty? ? Processor::Markdown.render_body_cached(page.raw_content) : page.content
+          html = page.content.empty? ? rendered_body_fallback(page, config) : page.content
           # Absolutize body links so <content:encoded> resolves out of page
           # context (root-relative AND document-relative). On an incremental
           # (--cache) build the render phase only rewrites links for pages it
@@ -497,7 +507,7 @@ module Hwaro
           html_content = if !page.content.empty?
                            page.content
                          else
-                           Processor::Markdown.render_body_cached(page.raw_content)
+                           rendered_body_fallback(page, config)
                          end
 
           # Truncate if needed

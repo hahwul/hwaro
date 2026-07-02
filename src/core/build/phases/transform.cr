@@ -67,10 +67,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Find top-level sections (no parent) and sort by weight (path tiebreaker
     # so equal weights keep a stable, deterministic reading order).
     top_sections = ctx.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort! do |a, b|
-      cmp = a.weight <=> b.weight
-      cmp.zero? ? (a.path <=> b.path) : cmp
-    end
+    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page
@@ -88,6 +85,16 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Weight-then-path ordering shared by the cold build's navigation link and
+  # the incremental relink. Both MUST use the same comparator: the relink
+  # previously sorted by weight alone, so equal-weight sections could come out
+  # in a different order than the full build produced, flipping prev/next
+  # links across whole section blocks on serve-mode incremental rebuilds.
+  private def compare_sections_by_weight(a : Models::Section, b : Models::Section) : Int32
+    cmp = a.weight <=> b.weight
+    cmp.zero? ? (a.path <=> b.path) : cmp
+  end
+
   # Append pages that belong to no rendered section to the reading-order list.
   #
   # The site root index (`content/index.md`, whose `section` is "") is the
@@ -101,9 +108,13 @@ module Hwaro::Core::Build::Phases::Transform
     section_names : Set(String),
     flat_list : Array(Models::Page),
   )
+    # Membership via a path set — `flat_list.includes?(page)` was a linear
+    # scan per page, O(n²) on sites with no `_index.md` sections at all
+    # (every page an orphan), and this runs again on every incremental relink.
+    seen_paths = flat_list.each_with_object(Set(String).new) { |p, set| set << p.path }
     pages.each do |page|
       next if section_names.includes?(page.section)
-      next if flat_list.includes?(page)
+      next if seen_paths.includes?(page.path)
       if page.is_index && page.section.empty?
         flat_list.unshift(page)
       else
@@ -353,7 +364,7 @@ module Hwaro::Core::Build::Phases::Transform
     end
 
     top_sections = site.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort_by!(&.weight)
+    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     flat_list = [] of Models::Page
     flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)

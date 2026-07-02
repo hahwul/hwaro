@@ -2,6 +2,12 @@
 #
 # Integrates the Markdown processor with the lifecycle system.
 # Handles parsing front matter and transforming Markdown to HTML.
+#
+# NOT part of Content::Hooks.all (see hooks.cr): the builder's own
+# ParseContent and Render phases perform this work in parallel with
+# cascade support, so registering this hookable duplicates every parse
+# and markdown render sequentially. Kept for API compatibility and for
+# builds that run without the builder's default phases.
 
 require "../../core/lifecycle"
 require "../processors/markdown"

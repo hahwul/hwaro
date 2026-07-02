@@ -27,6 +27,13 @@ module Hwaro
       property pages_for_section_cache : Hash(Tuple(String, String?), Array(Page))
       @lookup_index_built : Bool = false
       @all_content_cache : Array(Page)?
+      # Guards the lazy memo Hashes above: pages_for_section runs inside
+      # parallel render fibers (render_section_with_pagination), and an
+      # unsynchronized Hash insert there is undefined behavior under
+      # -Dpreview_mt. Held only around cache reads/writes — not the compute —
+      # so the transparent-section recursion can't self-deadlock; a racy
+      # duplicate compute is harmless (both fibers store the same result).
+      @memo_mutex : Mutex = Mutex.new
 
       def initialize(@config : Config)
         @pages = [] of Page
@@ -62,7 +69,9 @@ module Hwaro
       end
 
       def all_content : Array(Page)
-        @all_content_cache ||= (pages + sections.map { |s| s.as(Page) }).sort_by!(&.path)
+        @memo_mutex.synchronize do
+          @all_content_cache ||= (pages + sections.map { |s| s.as(Page) }).sort_by!(&.path)
+        end
       end
 
       def build_lookup_index
@@ -115,7 +124,7 @@ module Hwaro
 
         if @lookup_index_built && items.nil?
           cache_key = {normalized_name, language}
-          if cached = @pages_for_section_cache[cache_key]?
+          if cached = @memo_mutex.synchronize { @pages_for_section_cache[cache_key]? }
             return cached
           end
 
@@ -147,7 +156,7 @@ module Hwaro
             end
           end
 
-          @pages_for_section_cache[cache_key] = result
+          @memo_mutex.synchronize { @pages_for_section_cache[cache_key] = result }
           return result
         end
 

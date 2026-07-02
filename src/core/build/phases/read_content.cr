@@ -38,7 +38,11 @@ module Hwaro::Core::Build::Phases::ReadContent
         language = extract_language_from_filename(basename, config)
 
         clean_basename = if language
-                           basename.sub(/\.#{language}\.md$/, ".md")
+                           # basename is guaranteed to end with ".<language>.md"
+                           # (extract_language_from_filename just matched it), so
+                           # plain string surgery replaces what was a per-file
+                           # interpolated Regex compile.
+                           "#{basename.rchop(".#{language}.md")}.md"
                          else
                            basename
                          end
