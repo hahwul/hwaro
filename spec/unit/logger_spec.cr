@@ -571,4 +571,150 @@ describe Hwaro::Logger do
       Hwaro::Logger.quiet = false
     end
   end
+
+  describe ".item" do
+    it "prints an indented ascii-glyph line when color is off" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.item("posts/a.md is fine", glyph: :ok) }
+      out.should eq("    [ok] posts/a.md is fine\n")
+      out.should_not contain("\e[")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "defaults to the neutral bullet and honors indent" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.item("detail", indent: 6) }
+      out.should eq("      - detail\n")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "uses the unicode glyph when color is on" do
+      Hwaro::Logger.color_enabled = true
+      out = capture_logger_output { Hwaro::Logger.item("bad link", glyph: :err) }
+      out.should contain("✗")
+      out.should contain("bad link")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "is suppressed in quiet mode" do
+      Hwaro::Logger.quiet = true
+      out = capture_logger_output { Hwaro::Logger.item("x") }
+      out.should eq("")
+    ensure
+      Hwaro::Logger.quiet = false
+    end
+  end
+
+  describe ".section" do
+    it "prints `label: annotation` when color is off" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.section("tags", "top 15") }
+      out.should eq("tags: top 15\n")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "prints `label:` without an annotation when color is off" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.section("unused files") }
+      out.should eq("unused files:\n")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "joins label and annotation with a middot on the 4-space grid in tty mode" do
+      Hwaro::Logger.color_enabled = true
+      out = capture_logger_output { Hwaro::Logger.section("tags", "top 15") }
+      out.should start_with("    ")
+      out.should contain("·")
+      out.should contain("top 15")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
+
+  describe ".bar" do
+    it "renders a plain # run when color is off" do
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.bar(5, 10, width: 20).should eq("#" * 10)
+      Hwaro::Logger.bar(10, 10, width: 20).should eq("#" * 20)
+      Hwaro::Logger.bar(0, 10, width: 20).should eq("")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "renders an accent fill on a dim track when color is on" do
+      Hwaro::Logger.color_enabled = true
+      bar = Hwaro::Logger.bar(5, 10, width: 20)
+      bar.should contain("█")
+      bar.should contain("░")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "renders an empty bar when max is zero" do
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.bar(3, 0).should eq("")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
+
+  describe Hwaro::Logger::Table do
+    it "columnizes rows against the widest cell with a two-space gutter" do
+      t = Hwaro::Logger::Table.new(["Status", "Title", "Path"])
+      t.row(["[pub]", "Hello World", "content/posts/hello.md"])
+      t.row(["[draft]", "WIP", "content/wip.md"])
+
+      out = t.render_plain
+      lines = out.split("\n")
+      lines[0].should eq("  Status   Title        Path")
+      lines[1].should eq("  [pub]    Hello World  content/posts/hello.md")
+      lines[2].should eq("  [draft]  WIP          content/wip.md")
+      out.should_not contain("\e[")
+    end
+
+    it "keeps geometry identical in tty mode and paints roles" do
+      original_colorize = Colorize.enabled?
+      Colorize.enabled = true
+      Hwaro::Logger.color_enabled = true
+      t = Hwaro::Logger::Table.new(["Status", "Path"])
+      t.row(["[draft]", "a.md"], [Hwaro::Logger::Role::Warn, Hwaro::Logger::Role::Dim])
+      tty = t.render_tty
+      tty.should contain("\e[")
+      # Stripping escapes must yield the plain geometry.
+      stripped = tty.gsub(/\e\[[0-9;]*m/, "")
+      stripped.should eq(t.render_plain)
+    ensure
+      Hwaro::Logger.color_enabled = nil
+      Colorize.enabled = original_colorize.nil? ? true : original_colorize
+    end
+
+    it "does not emit anything in quiet mode" do
+      Hwaro::Logger.quiet = true
+      io = IO::Memory.new
+      t = Hwaro::Logger::Table.new(["A"])
+      t.row(["1"])
+      t.emit(io)
+      io.to_s.should eq("")
+    ensure
+      Hwaro::Logger.quiet = false
+    end
+  end
+
+  describe "glyph registry additions" do
+    it "provides bullet and arrow with ascii fallbacks" do
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.glyph(:bullet).should eq("-")
+      Hwaro::Logger.glyph(:arrow).should eq("->")
+      Hwaro::Logger.color_enabled = true
+      Hwaro::Logger.glyph(:bullet).should contain("·")
+      Hwaro::Logger.glyph(:arrow).should contain("→")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
 end

@@ -3,7 +3,7 @@
 # Provides detailed timing information for each build phase
 # when the --profile flag is enabled.
 
-require "colorize"
+require "./logger"
 
 module Hwaro
   class Profiler
@@ -136,8 +136,8 @@ module Hwaro
       return if @phases.empty?
 
       io.puts ""
-      io.puts "Build Profile".colorize(:cyan).bold
-      io.puts "─" * 50
+      io.puts Logger.paint("Build Profile", Logger::Role::Heading, bold: true)
+      io.puts Logger.paint("─" * 50, Logger::Role::Dim)
 
       total = @phases.sum(&.duration_ms)
       max_name_len = @phases.max_of?(&.phase.size) || 0
@@ -158,7 +158,7 @@ module Hwaro
         io.puts "  #{name} #{time_str} #{percent_str} #{bar}"
       end
 
-      io.puts "─" * 50
+      io.puts Logger.paint("─" * 50, Logger::Role::Dim)
       io.puts "  #{"Total".ljust(max_name_len + 2)} #{format_time(total).rjust(10)}"
       io.puts ""
     end
@@ -228,7 +228,7 @@ module Hwaro
       header_width = max_name_len
 
       io.puts ""
-      io.puts "Template Profile".colorize(:cyan).bold
+      io.puts Logger.paint("Template Profile", Logger::Role::Heading, bold: true)
 
       # Header
       io.puts "#{"Template".ljust(header_width)} | Count | #{" Bytes".rjust(10)} | #{"Time".rjust(10)}"
@@ -262,7 +262,7 @@ module Hwaro
       header_width = max_name_len
 
       io.puts ""
-      io.puts "Markdown Render Profile (top consumers)".colorize(:cyan).bold
+      io.puts Logger.paint("Markdown Render Profile (top consumers)", Logger::Role::Heading, bold: true)
 
       io.puts "#{"Page".ljust(header_width)} | Count | #{" Bytes".rjust(10)} | #{"Time".rjust(10)}"
       io.puts "#{"-" * header_width}-+-------+#{"-" * 12}+#{"-" * 11}"
@@ -294,8 +294,8 @@ module Hwaro
       return if @asset_stats.empty?
 
       io.puts ""
-      io.puts "Asset Generation (OG + Image Hooks)".colorize(:cyan).bold
-      io.puts "─" * 60
+      io.puts Logger.paint("Asset Generation (OG + Image Hooks)", Logger::Role::Heading, bold: true)
+      io.puts Logger.paint("─" * 60, Logger::Role::Dim)
 
       total_time = 0.0
       @asset_stats.each do |s|
@@ -307,7 +307,7 @@ module Hwaro
         io.puts "  #{label} #{gen}#{skp}  #{t}"
       end
 
-      io.puts "─" * 60
+      io.puts Logger.paint("─" * 60, Logger::Role::Dim)
       io.puts "  Total asset generation time: #{format_time(total_time).rjust(10)}"
       io.puts ""
     end
@@ -321,8 +321,8 @@ module Hwaro
       sorted = @hook_profiles.values.sort_by! { |h| -h.total_time_ms }
 
       io.puts ""
-      io.puts "Hook Profile".colorize(:cyan).bold
-      io.puts "─" * 60
+      io.puts Logger.paint("Hook Profile", Logger::Role::Heading, bold: true)
+      io.puts Logger.paint("─" * 60, Logger::Role::Dim)
 
       max_name_len = sorted.max_of(&.name.size)
 
@@ -334,7 +334,7 @@ module Hwaro
       end
 
       total_time = sorted.sum(&.total_time_ms)
-      io.puts "─" * 60
+      io.puts Logger.paint("─" * 60, Logger::Role::Dim)
       io.puts "  Total hook execution time: #{format_time(total_time).rjust(10)}"
       io.puts ""
     end
@@ -361,12 +361,14 @@ module Hwaro
       end
     end
 
-    # Render a simple bar chart
+    # Render a simple bar chart. Keeps the █/░ glyphs in every mode (the
+    # profile layout is spec-pinned); only the paint follows the ember roles.
     private def render_bar(percent : Float64, width : Int32) : String
       filled = (percent / 100.0 * width).to_i
       filled = [filled, width].min
-      bar = "█" * filled + "░" * (width - filled)
-      bar.colorize(:blue).to_s
+      fill = Logger.paint("█" * filled, Logger::Role::Accent)
+      track = Logger.paint("░" * (width - filled), Logger::Role::Dim)
+      "#{fill}#{track}"
     end
   end
 end

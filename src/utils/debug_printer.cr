@@ -1,7 +1,7 @@
 require "../models/site"
 require "../models/page"
 require "../models/section"
-require "colorize"
+require "./logger"
 
 module Hwaro
   module Utils
@@ -51,7 +51,7 @@ module Hwaro
           current.section = section
         end
 
-        io.puts "\nSite Structure (Debug):".colorize(:cyan).mode(:bold)
+        io.puts "\n#{Logger.paint("Site Structure (Debug):", Logger::Role::Heading, bold: true)}"
         print_node(root, "", true, io)
         io.puts ""
       end
@@ -62,10 +62,10 @@ module Hwaro
           label = node.name
           if section = node.section
             label += " (Section: #{section.title})"
-            io.puts "#{prefix}#{label}".colorize(:blue).mode(:bold)
+            io.puts Logger.paint("#{prefix}#{label}", Logger::Role::Dim, bold: true)
           else
             label += " (Dir)"
-            io.puts "#{prefix}#{label}".colorize(:blue)
+            io.puts Logger.paint("#{prefix}#{label}", Logger::Role::Dim)
           end
         end
 
@@ -73,7 +73,7 @@ module Hwaro
 
         # Print pages
         node.pages.sort_by!(&.title).each do |page|
-          io.puts "#{indent}- #{page.title} (#{page.path})".colorize(:green)
+          io.puts "#{indent}- #{page.title} (#{page.path})"
         end
 
         # Print children

@@ -163,7 +163,7 @@ module Hwaro::Core::Build::Phases::Write
             # build recopies this asset.
           end
         end
-        Logger.action :copy, dest_path, :blue if verbose
+        Logger.action :copy, dest_path, Logger::Role::Dim if verbose
       end
     end
   end

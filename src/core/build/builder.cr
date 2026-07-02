@@ -903,7 +903,7 @@ module Hwaro
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             FileUtils.cp(src_path, dest_path)
-            Logger.action :copy, dest_path, :blue if verbose
+            Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied += 1
           end
           Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0

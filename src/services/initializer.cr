@@ -308,13 +308,13 @@ module Hwaro
         entries.each do |entry|
           full = File.join(target_path, entry)
           FileUtils.rm_rf(full)
-          Logger.action :remove, full, :yellow
+          Logger.action :remove, full, Logger::Role::Warn
         end
       end
 
       private def create_directory(path : String)
         if Dir.exists?(path)
-          Logger.action :exist, path, :light_gray
+          Logger.action :exist, path, Logger::Role::Dim
         else
           Hwaro::Utils::FileSafe.mkdir_p(path)
           @created_count += 1
@@ -324,7 +324,7 @@ module Hwaro
 
       private def create_file(path : String, content : String)
         if File.exists?(path)
-          Logger.action :exist, path, :light_gray
+          Logger.action :exist, path, Logger::Role::Dim
         else
           File.write(path, content)
           @created_count += 1
