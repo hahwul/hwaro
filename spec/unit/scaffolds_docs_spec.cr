@@ -3,6 +3,15 @@ require "../../src/services/scaffolds/docs"
 
 describe Hwaro::Services::Scaffolds::Docs do
   describe "#static_files" do
+    it "consumes the shared token system (auto light+dark)" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      css = scaffold.static_files["css/style.css"]
+      css.should contain("color-scheme: light dark")
+      css.should contain("var(--glass)")
+      css.should contain("var(--primary-tint)")
+      css.should contain("--bg-sidebar: light-dark(")
+    end
+
     it "includes css/style.css" do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       files = scaffold.static_files

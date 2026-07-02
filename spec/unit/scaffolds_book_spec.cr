@@ -181,6 +181,18 @@ describe Hwaro::Services::Scaffolds::Book do
       files["css/style.css"].should contain(":root")
       files["js/book.js"].should contain("function")
     end
+
+    # The sheet is token-driven: the shared ember :root prelude (both
+    # schemes) plus book's own layout tokens injected through the layout
+    # hook — including --bg-sidebar, the family's one scheme-pair outside
+    # design_tokens.cr — and the shared ember rule mark.
+    it "builds the CSS from the shared design tokens plus book layout tokens" do
+      css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
+      css.should contain("color-scheme: light dark;")
+      css.should contain("--sidebar-w: 280px;")
+      css.should contain("--bg-sidebar: light-dark(#f4eee5, #151412);")
+      css.should contain("linear-gradient(90deg, var(--rule-from), var(--rule-to))")
+    end
   end
 
   describe "#config_content" do
@@ -250,6 +262,22 @@ describe Hwaro::Services::Scaffolds::BookDark do
       files = Hwaro::Services::Scaffolds::BookDark.new.static_files
       files.has_key?("css/style.css").should be_true
       files.has_key?("js/book.js").should be_true
+    end
+
+    # The dark preset is not a second stylesheet: Book's sheet is built
+    # from scheme-paired design tokens, and BookDark appends only the
+    # forced `color-scheme: dark` rule that flips every token to its dark
+    # side.
+    it "reuses Book's token sheet and only appends the forced-dark rule" do
+      light_css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
+      dark_css = Hwaro::Services::Scaffolds::BookDark.new.static_files["css/style.css"]
+      dark_css.should contain("color-scheme: dark")
+      dark_css.should contain("light-dark(#b35454, #ec7a66)")
+      # Dedup lock: the dark sheet is byte-for-byte the light sheet plus a
+      # small forced-dark tail (~300 bytes of comment + one :root rule). A
+      # reintroduced hand-maintained dark stylesheet would blow past this.
+      dark_css.starts_with?(light_css).should be_true
+      (dark_css.bytesize - light_css.bytesize).should be < 400
     end
   end
 

@@ -48,7 +48,7 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       root_part.should contain("--header-h: 52px;")
       root_part.should contain("--content-max-w: 860px;")
       # The injection lands before :root closes.
-      root_part.index("--header-h").not_nil!.should be < root_part.index("}").not_nil!
+      root_part.index!("--header-h").should be < root_part.index!("}")
     end
 
     it "is deterministic" do
