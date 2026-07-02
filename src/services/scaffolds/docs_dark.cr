@@ -383,7 +383,7 @@ module Hwaro
               font-size: 0.82rem;
               color: var(--text);
             }
-            #{highlight_theme_css(true)}
+            #{highlight_theme_css}
 
             /* Tables */
             table {

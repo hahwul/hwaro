@@ -436,7 +436,7 @@ module Hwaro
                sit on the warm code well instead of a white box. `pre code.hljs`
                (0,1,2) outranks the theme's `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; }
-            #{highlight_theme_css(false)}
+            #{highlight_theme_css}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }

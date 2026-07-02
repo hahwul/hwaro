@@ -73,12 +73,4 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       Hwaro::Services::Scaffolds::DesignTokens.forced_dark_css.should contain(":root { color-scheme: dark; }")
     end
   end
-
-  describe ".theme_color_meta" do
-    it "emits a scheme-paired theme-color meta" do
-      html = Hwaro::Services::Scaffolds::DesignTokens.theme_color_meta
-      html.should contain(%(media="(prefers-color-scheme: light)" content="#faf7f2"))
-      html.should contain(%(media="(prefers-color-scheme: dark)" content="#0f0f0e"))
-    end
-  end
 end

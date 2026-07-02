@@ -284,7 +284,7 @@ module Hwaro
             /* Force the highlight theme's own (cold navy github-dark) background off so syntax
                tokens sit on the warm card. `pre code.hljs` (0,1,2) outranks `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.84rem; color: var(--text); }
-            #{highlight_theme_css(true)}
+            #{highlight_theme_css}
 
             table { width: 100%; border-collapse: collapse; margin: 1.25rem 0 1.5rem 0; font-size: 0.9rem; font-family: var(--font-sans); }
             th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); }

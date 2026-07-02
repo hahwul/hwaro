@@ -194,15 +194,6 @@ module Hwaro
             :root { color-scheme: dark; }
             CSS
         end
-
-        # The pair of `theme-color` metas that keep the browser chrome in
-        # step with the resolved scheme on mobile.
-        def self.theme_color_meta : String
-          <<-HTML
-            <meta name="theme-color" media="(prefers-color-scheme: light)" content="#{BG_LIGHT}">
-            <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#{BG_DARK}">
-            HTML
-        end
       end
     end
   end

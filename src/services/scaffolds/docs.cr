@@ -558,7 +558,7 @@ module Hwaro
               padding: 0;
               font-size: 0.82rem;
             }
-            #{highlight_theme_css(false)}
+            #{highlight_theme_css}
 
             /* Tables */
             table {

@@ -13,6 +13,7 @@
 
 require "../../config/options/init_options"
 require "../config_snippets"
+require "./design_tokens"
 require "./embedded_fonts"
 
 module Hwaro
@@ -216,45 +217,22 @@ module Hwaro
             SVG
         end
 
-        # An ember-warm syntax-highlight theme, inlined into each scaffold's
-        # stylesheet. Highlight.js (loaded from a CDN, `mode = "client"`)
-        # tags code with hljs-compatible classes in the browser; this theme
-        # colors them, so we ship no separate highlight theme stylesheet —
-        # the scaffold recolors syntax by editing its own CSS. Because the
-        # rules live in the scaffold stylesheet (loaded via
-        # `{{ base_url }}/css/style.css`) they stay correct under sub-path
-        # deploys, unlike a root-absolute `/assets/...` theme link. The theme
-        # also covers `mode = "server"` output, which uses the same classes.
-        #
-        # The earthy palette (gruvbox-adjacent, retuned to the warm surfaces)
-        # keeps the syntax colors inside the ember world instead of the cold
-        # github default. `.hljs` itself stays transparent so the code sits on
-        # the warm `--bg-code` card set by `pre`.
-        protected def highlight_theme_css(dark : Bool = false) : String
-          comment = dark ? "#8a8073" : "#a1907c"
-          keyword = dark ? "#f0846f" : "#b03a2e"
-          string = dark ? "#b7c06a" : "#5f7032"
-          number = dark ? "#e8a83f" : "#9a6a14"
-          func = dark ? "#8ec5a3" : "#2f6a5a"
-          type = dark ? "#e6914f" : "#b0641c"
-          variable = dark ? "#e8b0a0" : "#8a4a3a"
-          attr = dark ? "#93b5c8" : "#45617a"
-          symbol = dark ? "#d79bb8" : "#8a4368"
-          <<-CSS
-            /* Syntax highlighting — ember-warm, inlined (recolor here, not via a theme link). */
-            .hljs-comment, .hljs-quote { color: #{comment}; font-style: italic; }
-            .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag { color: #{keyword}; }
-            .hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: #{string}; }
-            .hljs-number, .hljs-built_in, .hljs-builtin-name, .hljs-bullet { color: #{number}; }
-            .hljs-title, .hljs-title.function_, .hljs-section .hljs-title { color: #{func}; }
-            .hljs-type, .hljs-class .hljs-title, .hljs-title.class_, .hljs-tag { color: #{type}; }
-            .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-name { color: #{variable}; }
-            .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #{attr}; }
-            .hljs-symbol, .hljs-link, .hljs-meta, .hljs-params { color: #{symbol}; }
-            .hljs-deletion { color: #{keyword}; }
-            .hljs-emphasis { font-style: italic; }
-            .hljs-strong { font-weight: 700; }
-            CSS
+        # The shared `:root` token prelude (see DesignTokens). `layout` lines
+        # add per-scaffold geometry tokens inside the same block.
+        protected def design_root(layout : String = "") : String
+          DesignTokens.root_block(layout)
+        end
+
+        # The ember-warm syntax-highlight theme, inlined into each scaffold's
+        # stylesheet and colored entirely through the `--code-*` tokens (see
+        # DesignTokens.highlight_css). Because the rules live in the scaffold
+        # stylesheet (loaded via `{{ base_url }}/css/style.css`) they stay
+        # correct under sub-path deploys, unlike a root-absolute `/assets/...`
+        # theme link, and they cover both `mode = "client"` and
+        # `mode = "server"` output (same hljs classes). The colors resolve
+        # per the page's color-scheme — no dark variant needed.
+        protected def highlight_theme_css : String
+          DesignTokens.highlight_css
         end
 
         # Returns shortcode files as a hash of path => content
@@ -425,13 +403,14 @@ module Hwaro
         # of appearing as literal markup. (Crinja autoescaping is off here, the
         # same way `{{ content }}` emits rendered HTML.)
         protected def alert_shortcode : String
-          # A translucent ember tint (not a hardcoded light grey) so the alert
-          # stays readable on both light and dark scaffolds — the inherited text
-          # colour was previously near-invisible on the dark themes' light
-          # `#f9f9f9` background. `color: inherit` keeps it on the theme palette.
+          # A translucent ember tint driven by the shared --primary token so
+          # the alert follows the resolved scheme (and any user retheme).
+          # The `#b35454` var() fallbacks keep the shortcode rendering
+          # identically on `bare`, which ships no stylesheet and therefore
+          # no tokens. `color: inherit` keeps the body on the theme palette.
           <<-HTML
-            <div class="alert" style="padding: 0.875rem 1.125rem; border: 1px solid rgba(179, 84, 84, 0.3); background-color: rgba(179, 84, 84, 0.07); border-radius: 6px; margin: 1rem 0; color: inherit;">
-              <strong style="color: #b35454;">{{ type | upper }}:</strong> {{ body | markdownify }}
+            <div class="alert" style="padding: 0.875rem 1.125rem; border: 1px solid color-mix(in srgb, var(--primary, #b35454) 30%, transparent); background-color: color-mix(in srgb, var(--primary, #b35454) 7%, transparent); border-radius: 6px; margin: 1rem 0; color: inherit;">
+              <strong style="color: var(--primary, #b35454);">{{ type | upper }}:</strong> {{ body | markdownify }}
             </div>
             HTML
         end
@@ -575,89 +554,81 @@ module Hwaro
           <<-CSS
             <style>
               #{font_face_css("{{ base_url }}/fonts")}
-              :root {
-                --primary: #b35454;
-                --primary-strong: #8f4040;
-                --text: #2a241f;
-                --text-muted: #6f6358;
-                --border: #e4dacd;
-                --bg: #faf7f2;
-                --bg-subtle: #f1eae0;
-                --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
-                --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-              }
+              #{design_root("--content-max-w: 720px;")}
               *, *::before, *::after { box-sizing: border-box; }
-              body { font-family: var(--font-sans); font-size: 16px; line-height: 1.7; margin: 0; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-              ::selection { background: rgba(179, 84, 84, 0.18); }
+              body { font-family: var(--font-sans); font-size: var(--step-0); line-height: 1.7; margin: 0; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+              ::selection { background: var(--selection); }
 
               /* Layout */
-              .site-wrapper { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
-              .site-header { display: flex; align-items: baseline; justify-content: space-between; padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); margin-bottom: 2.5rem; }
-              .site-logo { font-family: var(--font-serif); font-weight: 700; font-size: 1.25rem; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+              .site-wrapper { max-width: var(--content-max-w); margin: 0 auto; padding: 0 var(--space-5); }
+              .site-header { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-5) 0 var(--space-4); border-bottom: 1px solid var(--border); margin-bottom: var(--space-6); }
+              .site-logo { font-family: var(--font-serif); font-weight: 700; font-size: var(--step-1); color: var(--heading); text-decoration: none; letter-spacing: -0.01em; }
               .site-logo:hover { color: var(--primary); }
               .site-header nav { display: flex; gap: 1.4rem; }
-              .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: color 0.15s ease; }
+              .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); transition: color var(--transition); }
               .site-header nav a:hover { color: var(--primary); }
               .site-main { min-height: calc(100vh - 220px); }
-              .site-footer { margin-top: 4rem; padding: 1.5rem 0 2rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; text-align: center; }
+              .site-footer { margin-top: var(--space-7); padding: var(--space-5) 0 var(--space-6); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--step--1); text-align: center; }
 
-              /* Typography */
-              h1, h2, h3 { font-family: var(--font-serif); line-height: 1.25; margin-top: 1.6em; margin-bottom: 0.5em; font-weight: 700; text-wrap: balance; }
-              h1 { font-size: 2.1rem; margin-top: 0; letter-spacing: -0.018em; }
-              h2 { font-size: 1.45rem; letter-spacing: -0.008em; }
-              h3 { font-size: 1.15rem; }
+              /* Typography — the fluid minor-third scale. */
+              h1, h2, h3 { font-family: var(--font-serif); line-height: 1.25; margin-top: 1.6em; margin-bottom: 0.5em; font-weight: 700; color: var(--heading); text-wrap: balance; }
+              h1 { font-size: var(--step-3); margin-top: 0; letter-spacing: -0.018em; }
+              h2 { font-size: var(--step-2); letter-spacing: -0.008em; }
+              h3 { font-size: var(--step-1); }
               p { margin: 1em 0; text-wrap: pretty; }
+              .site-main p, .site-main li { max-width: var(--measure); }
 
               /* Page title gets a short ember rule — the one mark every
-                 hwaro scaffold shares. */
+                 hwaro scaffold shares — and its first paragraph reads as a
+                 lede, giving the page a real focal point. */
               .site-main > h1:first-child { position: relative; padding-bottom: 0.9rem; margin-bottom: 1.1rem; }
-              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 2.75rem; height: 3px; border-radius: 999px; background: linear-gradient(90deg, #c46262, #8f4040); }
+              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 2.75rem; height: 3px; border-radius: 999px; background: linear-gradient(90deg, var(--rule-from), var(--rule-to)); }
+              .site-main > h1:first-child + p { font-size: var(--step-1); line-height: 1.55; color: var(--text-secondary); }
 
               /* Links: ember, with an underline that warms up on hover. */
-              a { color: var(--primary); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent); text-underline-offset: 3px; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
+              a { color: var(--primary); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent); text-underline-offset: 3px; transition: color var(--transition), text-decoration-color var(--transition); }
               a:hover { color: var(--primary-strong); text-decoration-color: currentColor; }
               .site-header a, .skip-link, ul.section-list a, nav.pagination a { text-decoration: none; }
 
-              code { background: var(--bg-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); }
-              pre { background: var(--bg-subtle); padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); line-height: 1.55; }
+              code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); }
+              pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius-sm); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; }
               /* Keep `.hljs` transparent so code sits on the warm well; if a
                  user switches to a CDN theme it won't repaint a clashing box.
                  `pre code.hljs` (0,1,2) outranks a theme's `.hljs` (0,1,0). */
               pre code, pre code.hljs { background: transparent; padding: 0; }
-              #{highlight_theme_css(false)}
-              img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid rgba(0, 0, 0, 0.06); outline-offset: -1px; }
-              blockquote { font-family: var(--font-serif); font-style: italic; margin: 1.4em 0; padding: 0.1rem 0 0.1rem 1.25rem; color: var(--text-muted); border-left: 1px solid var(--primary); }
+              #{highlight_theme_css}
+              img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--edge); outline-offset: -1px; }
+              blockquote { font-family: var(--font-serif); font-style: italic; margin: 1.4em 0; padding: 0.1rem 0 0.1rem var(--space-5); color: var(--text-muted); border-left: 1px solid var(--primary); }
               table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
               th, td { border-bottom: 1px solid var(--border); padding: 0.55rem 0.75rem; text-align: left; }
               th { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 2px solid var(--border); }
-              hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+              hr { border: none; border-top: 1px solid var(--border); margin: var(--space-6) 0; }
 
               /* Components */
-              ul.section-list { list-style: none; padding: 0; margin: 1.5rem 0; }
+              ul.section-list { list-style: none; padding: 0; margin: var(--space-5) 0; }
               ul.section-list li { padding: 0.85rem 0.1rem; border-bottom: 1px solid var(--bg-subtle); }
               ul.section-list li:first-child { border-top: 1px solid var(--bg-subtle); }
-              ul.section-list li a { font-family: var(--font-serif); font-weight: 500; font-size: 1.05rem; color: var(--text); transition: color 0.15s ease; }
+              ul.section-list li a { font-family: var(--font-serif); font-weight: 500; font-size: var(--step-1); color: var(--text); transition: color var(--transition); }
               ul.section-list li a:hover { color: var(--primary); }
-              .taxonomy-desc { color: var(--text-muted); margin-bottom: 1.5rem; }
-              nav.pagination { margin: 2rem 0; }
-              nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
-              nav.pagination a { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+              .taxonomy-desc { color: var(--text-muted); margin-bottom: var(--space-5); }
+              nav.pagination { margin: var(--space-6) 0; }
+              nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
+              nav.pagination a { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); transition: color var(--transition), border-color var(--transition), transform 0.1s ease; }
               nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
               nav.pagination a:active { transform: scale(0.96); }
-              .pagination-current span { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary-strong); }
-              .pagination-disabled span { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
+              .pagination-current span { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: var(--primary-tint); color: var(--primary-strong); }
+              .pagination-disabled span { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); opacity: 0.6; }
 
-              /* Responsive */
+              /* Responsive — the type scale is fluid, so only the frame
+                 needs to adapt. */
               @media (max-width: 600px) {
                 .site-header { flex-direction: column; gap: 0.6rem; align-items: flex-start; }
-                .site-wrapper { padding: 0 1rem; }
-                h1 { font-size: 1.7rem; }
+                .site-wrapper { padding: 0 var(--space-4); }
               }
 
               /* Accessibility */
               :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-              .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: 0.5rem 1rem; z-index: 1000; border-radius: 0 0 6px 0; }
+              .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: var(--space-2) var(--space-4); z-index: 1000; border-radius: 0 0 var(--radius-sm) 0; }
               .skip-link:focus { top: 0; }
               @media (prefers-reduced-motion: reduce) {
                 *, *::before, *::after { transition-duration: 0.01ms !important; }
