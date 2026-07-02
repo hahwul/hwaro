@@ -154,11 +154,43 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.minimal_config.should be_true
     end
 
+    it "accepts --wizard flag as a no-op for parse_options" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      options = cmd.parse_options(["my-site", "--wizard"])
+      options.path.should eq("my-site")
+    end
+
+    it "rejects removed -y/--yes flags" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      expect_raises(OptionParser::InvalidOption) do
+        cmd.parse_options(["-y"])
+      end
+      expect_raises(OptionParser::InvalidOption) do
+        cmd.parse_options(["--yes"])
+      end
+    end
+
     it "raises on unknown flags" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
       expect_raises(OptionParser::InvalidOption) do
         cmd.parse_options(["--unknown-flag"])
       end
+    end
+  end
+
+  describe "wizard eligibility" do
+    it "does not run the wizard without --wizard" do
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+      # Non-interactive specs fall through to parse_options; a bare invocation
+      # must not require wizard-only flags.
+      options = cmd.parse_options([] of String)
+      options.path.should eq(".")
+    end
+
+    it "registers --wizard in metadata" do
+      flag_names = Hwaro::CLI::Commands::InitCommand.metadata.flags.map(&.long)
+      flag_names.should contain("--wizard")
+      flag_names.should_not contain("--yes")
     end
   end
 

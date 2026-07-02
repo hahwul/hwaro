@@ -41,7 +41,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
 
           # Wizard control
-          FlagInfo.new(short: "-y", long: "--yes", description: "Skip the interactive wizard and initialize with defaults"),
+          FlagInfo.new(short: nil, long: "--wizard", description: "Run the interactive wizard (TTY only)"),
 
           # Debug & output
           QUIET_FLAG,
@@ -67,13 +67,12 @@ module Hwaro
             return
           end
 
-          # A bare interactive invocation (`hwaro init` or `hwaro init <path>`
-          # with no option flags on a real terminal) gets the guided wizard.
-          # A supplied path skips the directory prompt inside the wizard.
-          # Any flag — including --yes — plus non-TTY and quiet sessions keep
-          # the flag path byte-identical for scripts and CI.
+          # The guided wizard runs only when `--wizard` is passed explicitly in
+          # an interactive session. Every other invocation — bare `hwaro init`,
+          # flags, pipes/CI, and `--quiet` — initializes immediately with
+          # defaults (the former `-y`/`--yes` path).
           if wizard_eligible?(args)
-            options = InitWizard.new.run(args.first?)
+            options = InitWizard.new.run(wizard_seed_path(args))
             if options.nil?
               Logger.info "Cancelled."
               return
@@ -87,9 +86,21 @@ module Hwaro
         end
 
         private def wizard_eligible?(args : Array(String)) : Bool
+          return false unless args.any?(&.==("--wizard"))
           return false unless Prompt.interactive?
           return false if Logger.quiet?
-          args.none?(&.starts_with?("-"))
+          true
+        end
+
+        # First positional argument, ignoring flags — mirrors #parse_options'
+        # unknown_args handling so `hwaro init my-site --wizard` and
+        # `hwaro init --wizard my-site` both seed the directory prompt skip.
+        private def wizard_seed_path(args : Array(String)) : String?
+          args.each do |arg|
+            next if arg.starts_with?("-")
+            return arg
+          end
+          nil
         end
 
         # Print the list of built-in scaffolds.
@@ -200,9 +211,9 @@ module Hwaro
             parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { }
             parser.on("--json", "Emit machine-readable JSON output (with --list-scaffolds)") { }
 
-            # Wizard control (its mere presence in args disables the wizard in
-            # #run; registered so OptionParser accepts it and --help shows it).
-            parser.on("-y", "--yes", "Skip the interactive wizard and initialize with defaults") { }
+            # Wizard control (handled in #run before full init; registered here
+            # so OptionParser accepts it and --help shows it).
+            parser.on("--wizard", "Run the interactive wizard (TTY only)") { }
 
             # Debug & output
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }

@@ -6,8 +6,8 @@ require "../../utils/logger"
 module Hwaro
   module CLI
     module Commands
-      # Guided, line-based wizard for `hwaro init` when invoked bare (no
-      # option flags) in an interactive session. Mirrors `NewWizard`: it asks
+      # Guided, line-based wizard for `hwaro init --wizard` in an interactive
+      # session. Mirrors `NewWizard`: it asks
       # one styled question at a time, shows a `Receipt` summary, and confirms
       # before anything touches the filesystem. It only *collects* input — the
       # resulting `InitOptions` flows through the exact same
