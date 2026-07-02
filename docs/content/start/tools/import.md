@@ -61,10 +61,16 @@ hwaro tool import hugo path/to/site --verbose
 ## Example Output
 
 ```
-Importing from jekyll: ./old-blog
-Output directory: content
-✔ Import complete: 42 imported, 3 skipped, 0 errors
+hwaro: import jekyll
+source: ./old-blog
+output: content
+imported: 42 files, 3 skipped
 ```
+
+An `errors` count is appended only when errors occurred, and a warning reminds
+you about `--force` when files were skipped. In a color terminal the same
+report renders as an `● import` heading with aligned rows and an `▴ imported`
+outcome line.
 
 ## See Also
 

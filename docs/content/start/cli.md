@@ -80,11 +80,30 @@ exit code `1`, so this is a strictly additive contract.
 Create a new site:
 
 ```bash
-hwaro init my-site
+hwaro init                    # interactive wizard (TTY): scaffold, title, dark toggle
+hwaro init my-site            # wizard with the directory pre-filled
+hwaro init my-site -y         # skip the wizard, use defaults
 hwaro init my-site --scaffold blog
 hwaro init my-site --scaffold docs
 hwaro init my-site --scaffold book
 ```
+
+**Interactive mode:**
+
+Running `hwaro init` with no option flags in an interactive terminal opens a
+guided wizard: it asks for the directory, a scaffold (picked from the base
+scaffolds, with a "Dark theme?" toggle for the ones that have a dark preset),
+and the site title, then shows a summary and asks to confirm before writing
+anything. A bare path argument (`hwaro init my-site`) still opens the wizard
+with the directory pre-filled.
+
+Pass `-y`/`--yes` to skip the wizard and initialize with defaults. Any other
+flag also skips it, as do non-interactive contexts (pipes, CI, `--quiet`), so
+existing scripts behave exactly as before.
+
+Every scaffold follows the reader's OS color scheme automatically (the shared
+token system uses CSS `light-dark()` pairs); the `*-dark` scaffolds are presets
+of the same design that force the dark scheme permanently.
 
 You can also use a remote scaffold from a GitHub repository:
 
@@ -104,7 +123,8 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 
 | Flag | Description |
 |------|-------------|
-| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `blog-dark`, `docs`, `docs-dark`, `book`, `book-dark`) or remote source (`github:user/repo[/path]`, URL) |
+| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `docs`, `book`, plus `blog-dark`/`docs-dark`/`book-dark` presets that force the dark scheme) or remote source (`github:user/repo[/path]`, URL) |
+| -y, --yes | Skip the interactive wizard and initialize with defaults |
 | --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
 | -f, --force | Force creation even if directory is not empty |
 | --skip-agents-md | Skip creating AGENTS.md file |

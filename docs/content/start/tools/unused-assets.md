@@ -53,20 +53,23 @@ Images (png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff), stylesheets (css)
 ## Example Output
 
 ```
-Scanning for unused assets...
-
-  Total assets:      24
-  Referenced:         20
-  Unused:             4
-
-  Unused files:
-    static/old-logo.png
-    static/unused-banner.jpg
-    content/blog/my-post/draft-image.png
-    static/deprecated.css
-
-Note: Dynamic references (e.g., template variables) may cause false positives.
+hwaro: unused-assets static
+total: 24
+referenced: 20
+unused: 4
+unused files:
+    - static/old-logo.png
+    - static/unused-banner.jpg
+    - content/blog/my-post/draft-image.png
+    - static/deprecated.css
+    [info] dynamic references (e.g. template variables) may cause false positives
+found: 4 unused assets
 ```
+
+In a color terminal this renders as an `● unused-assets` receipt with aligned
+rows and a `▴ found` outcome line (`found: no unused assets` when everything is
+referenced). With `--delete` the outcome becomes `deleted: N files` after
+confirmation, or `cancelled: no files deleted`.
 
 ## JSON Output
 

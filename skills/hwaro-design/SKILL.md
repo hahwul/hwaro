@@ -168,79 +168,135 @@ can do the work.
 
 Every Hwaro scaffold themes itself through **CSS custom properties** in `:root`.
 This is the right pattern: define the system once, theme by editing tokens, and
-get dark mode + restyles almost for free. The `simple`/base "Hwaro Ember" token
-vocabulary is (hex values exact; font stacks abbreviated — the real ones are
-longer and include CJK fallbacks like `"Noto Serif KR"`, so don't strip those if
-your audience needs CJK):
+get dark mode + restyles almost for free. All eight scaffolds share **one**
+"Hwaro Ember" vocabulary: every color token is a `light-dark(light, dark)` pair
+resolved by `color-scheme`, so every scaffold (including `simple`) follows the
+reader's OS scheme automatically. The vocabulary is (values exact; font stacks
+abbreviated — the real ones are longer and include CJK fallbacks like
+`"Noto Serif KR"`, so don't strip those if your audience needs CJK):
 
 ```css
 :root {
-  --primary: #b35454;          /* the single accent */
-  --primary-strong: #8f4040;   /* hover/active accent */
-  --text: #2a241f;             /* body text (not pure black) */
-  --text-muted: #6f6358;       /* secondary text */
-  --border: #e4dacd;           /* hairlines */
-  --bg: #faf7f2;               /* page canvas (not pure white) */
-  --bg-subtle: #f1eae0;        /* code/wells/cards */
-  --font-serif: "Charter", Georgia, "Noto Serif KR", serif;   /* headings (+CJK) */
-  --font-sans:  -apple-system, "Segoe UI", Roboto, sans-serif;  /* body */
-  --font-mono:  ui-monospace, "SF Mono", Menlo, monospace;      /* code */
-}
-```
+  color-scheme: light dark;
 
-> **Token *names* vary by scaffold — read the project's `:root` first.** The set
-> above is what `simple` (and the base) use. The `blog` scaffold instead uses
-> `--bg-secondary` / `--bg-code` / `--text-secondary` / `--border-light` /
-> `--radius-sm` / `--content-max-w` / `--header-h`; `docs` and `book` keep
-> blog's names and add their own (`--bg-sidebar`, `--sidebar-w`, `--shadow`,
-> `--primary-subtle`). Recolor the names that are actually present — don't
-> assume this list.
+  /* Accent — the single ember. */
+  --primary:        light-dark(#b35454, #ec7a66);
+  --primary-strong: light-dark(#8f4040, #f39683);  /* hover/active accent */
+  --primary-tint:   color-mix(in srgb, var(--primary) 8%, transparent);
+  --selection:      color-mix(in srgb, var(--primary) 22%, transparent);
 
-**Extend it into a full system** — add the layers a considered design needs, then
-build every component against the tokens (never hardcode a raw value in a rule):
+  /* Ember rule — the one mark every scaffold shares. */
+  --rule-from: light-dark(#c46262, #f39683);
+  --rule-to:   light-dark(#8f4040, #cc5d4b);
 
-```css
-:root {
-  /* …colors & fonts as above… */
+  /* Ink — a three-step ramp (not pure black/white). */
+  --heading:        light-dark(#241f1a, #f5f2ed);
+  --text:           light-dark(#2a241f, #dedad3);
+  --text-secondary: light-dark(#5c5248, #a7a199);
+  --text-muted:     light-dark(#6f6358, #7d776e);
 
-  /* Type scale (1.25 ratio, fluid) */
-  --step-0: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  --step-1: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
-  --step-2: clamp(1.6rem, 1.3rem + 1.2vw, 2.25rem);
-  --step-3: clamp(2.1rem, 1.6rem + 2vw, 3.25rem);
+  /* Surfaces & edges. */
+  --bg:            light-dark(#faf7f2, #0f0f0e);
+  --bg-subtle:     light-dark(#f1eae0, #1a1917);
+  --bg-code:       light-dark(#f1eae0, #1e1c19);
+  --border:        light-dark(#e4dacd, #2b2926);
+  --border-subtle: light-dark(#efe8dd, #201e1c);
+  --edge:  color-mix(in srgb, var(--text) 8%, transparent);
+  --glass: color-mix(in srgb, var(--bg) 85%, transparent);
+  --scrim: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
 
-  /* Spacing scale (8px base) */
-  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 1rem;
-  --space-4: 1.5rem;  --space-5: 2.5rem; --space-6: 4rem;
+  /* Support hues (info boxes only — the accent stays singular). */
+  --warn: light-dark(#b07d2e, #d9a45a);
+  --ok:   light-dark(#5e8c61, #8fb491);
 
-  /* Shape, depth, motion, measure */
-  --radius: 8px;
-  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  /* Syntax — nine slots the .hljs-* theme reads from. */
+  --code-comment:  light-dark(#a1907c, #8a8073);
+  --code-keyword:  light-dark(#b03a2e, #f0846f);
+  --code-string:   light-dark(#5f7032, #b7c06a);
+  --code-number:   light-dark(#9a6a14, #e8a83f);
+  --code-func:     light-dark(#2f6a5a, #8ec5a3);
+  --code-type:     light-dark(#b0641c, #e6914f);
+  --code-variable: light-dark(#8a4a3a, #e8b0a0);
+  --code-attr:     light-dark(#45617a, #93b5c8);
+  --code-symbol:   light-dark(#8a4368, #d79bb8);
+
+  /* Type scale — minor third (1.2), fluid via clamp(). */
+  --step--1: clamp(0.83rem, 0.81rem + 0.11vw, 0.89rem);
+  --step-0:  clamp(1rem, 0.96rem + 0.22vw, 1.125rem);
+  --step-1:  clamp(1.2rem, 1.13rem + 0.35vw, 1.4rem);
+  --step-2:  clamp(1.44rem, 1.32rem + 0.61vw, 1.78rem);
+  --step-3:  clamp(1.73rem, 1.53rem + 0.98vw, 2.28rem);
+  --step-4:  clamp(2.07rem, 1.77rem + 1.52vw, 2.92rem);
+
+  /* Space — 8px rhythm. */
+  --space-1: 0.25rem; --space-2: 0.5rem;  --space-3: 0.75rem; --space-4: 1rem;
+  --space-5: 1.5rem;  --space-6: 2.5rem;  --space-7: 4rem;    --space-8: 6rem;
+
+  /* Shape, depth, motion, measure. */
+  --measure: 68ch;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
+  --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
+  --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
   --transition: 0.15s ease;
-  --measure: 68ch;            /* max reading width */
-}
 
-/* Dark mode by token override — values change, components mostly don't.
-   (But see the reality check below: scaffold CSS also hardcodes colors
-   outside :root that you must fix by hand.) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #ece6df; --text-muted: #a89c8e;
-    --bg: #14110e; --bg-subtle: #1f1a16; --border: #342d27;
-    --primary: #d98a7a; --primary-strong: #e6a293;
-  }
+  /* Faces. */
+  --font-serif: "Charter", Georgia, "Noto Serif KR", serif;    /* headings (+CJK) */
+  --font-sans:  -apple-system, "Segoe UI", Roboto, sans-serif; /* body */
+  --font-mono:  ui-monospace, "SF Mono", Menlo, monospace;     /* code */
 }
-/* Or make it user-toggleable with a `[data-theme="dark"]` block + a small JS toggle. */
 ```
 
-> **Reality check: a token override alone rarely gives you full dark mode.** Real
-> scaffold stylesheets hardcode colors *outside* `:root` that won't follow your
-> tokens — `grep` the sheet for `#` and `rgba(` before you start. In the `blog`
-> scaffold these include the sticky-header background, the `h1` accent-rule
-> gradient, the **entire `.hljs-*` syntax theme**, the image `outline` (a
-> near-black `rgba(0,0,0,.06)` that vanishes on dark), and the selection /
-> search-highlight tints. Convert each to a token (or fix it inline) — otherwise
-> your "dark" theme ships light patches.
+> **Every scaffold shares this exact vocabulary.** It is emitted from one place —
+> `DesignTokens.root_block` in `src/services/scaffolds/design_tokens.cr` in the
+> Hwaro repo — so the old per-scaffold name drift is gone (`--primary-hover`,
+> `--bg-secondary`, and `--border-light` were renamed to `--primary-strong`,
+> `--bg-subtle`, and `--border-subtle`). The only per-scaffold additions are
+> layout tokens (`--header-h`, `--sidebar-w`, `--content-max-w`, `--bg-sidebar`,
+> radius overrides) injected into the same `:root`. A
+> `@supports not (color: light-dark(#000, #fff))` block pins the static light
+> palette for pre-2024 browsers, so a `*-dark` site renders light there —
+> readable and on-brand rather than broken.
+
+**Retheme by rewriting token values, not by adding parallel systems.** The type
+scale (`--step--1`…`--step-4`), spacing rhythm (`--space-1`…`--space-8`),
+`--measure`, radii, shadows, and `--transition` already exist — don't re-create
+them under new names; override their values (a different ratio, a denser rhythm)
+and build every component against them. Never hardcode a raw color in a rule:
+reach for the existing pair, or `color-mix()` off one.
+
+```css
+/* A custom retheme = override the light-dark() pairs in :root.
+   Always set BOTH sides — a light-only override ships a broken dark scheme. */
+:root {
+  --primary:        light-dark(#3a6ea5, #7fb2e5);
+  --primary-strong: light-dark(#2c567f, #a3c9ee);
+  --bg:             light-dark(#f7f9fb, #101418);
+  /* …continue through the ink ramp, surfaces, and --code-* slots… */
+}
+
+/* Manual user toggle (scaffolds do NOT ship one): flip color-scheme via a
+   data attribute + a small JS toggle that sets it. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+```
+
+> **Reality check: dark mode is automatic now — don't re-plumb it.**
+> - Every scaffold is light **and** dark out of the box: all color tokens are
+>   `light-dark()` pairs under `color-scheme: light dark`, so the site follows
+>   the OS scheme with zero extra CSS.
+> - **Forcing dark permanently** = append `:root { color-scheme: dark; }` as the
+>   last rule of the sheet — that is literally all the `*-dark` scaffolds do.
+>   (Delete that rule to restore automatic switching.)
+> - **A custom retheme** = override the `light-dark()` pairs in `:root` — always
+>   supply **both** sides of each pair, or one scheme ships broken.
+> - **A user-facing toggle** = the `[data-theme]` pattern above plus a small JS
+>   toggle; you write the toggle, the tokens do the rest.
+> - A hygiene spec (`spec/unit/scaffold_token_hygiene_spec.cr`) enforces that
+>   scaffold CSS has **no hardcoded colors outside the token definitions** —
+>   when you edit scaffold source CSS, keep it green by routing every color
+>   through a token.
 
 ### Imagery, fonts, and the small marks
 
@@ -254,11 +310,12 @@ build every component against the tokens (never hardcode a raw value in a rule):
   Charis SIL so headings render the same off-Apple). Subset, `font-display: swap`,
   and limit families/weights — fonts are usually the biggest perf cost of a
   "designed" site.
-- **Code blocks are a design surface.** Scaffolds inline a `.hljs-*` theme and
-  Hwaro colors code **server-side** (Tartrazine) — there's no client-side theme
-  to swap, so recolor the `.hljs-*` rules directly when you retheme and tie them
-  to your palette (e.g. keywords in your accent color) for cohesion. (Dark mode
-  flags this theme as a must-recolor surface — see the reality check above.)
+- **Code blocks are a design surface.** Hwaro colors code **server-side**
+  (Tartrazine), and the scaffolds' `.hljs-*` rules read entirely from the nine
+  `--code-*` tokens — so recoloring syntax means editing those `light-dark()`
+  pairs in `:root`, not touching the `.hljs-*` rules themselves. Tie them to
+  your palette (e.g. keywords near your accent) for cohesion; both schemes come
+  along automatically.
 - **Signature detail:** give the design one small recurring mark (an accent rule,
   a marker bullet, a consistent hover) rather than decorating everything.
 
@@ -290,15 +347,15 @@ build every component against the tokens (never hardcode a raw value in a rule):
 ### Two paths
 
 - **Retheme a scaffold (fast path).** `hwaro init my-site --scaffold blog`
-  (also `docs` / `book`, each with a `-dark` variant; `simple` / `bare` are
-  light-only) gives you a complete, accessible,
-  token-driven baseline. Often the highest-leverage move is just **rewriting the
-  token block** and a few component rules to the user's brief — minutes to a
-  distinctly different site. For a *custom* dark (e.g. a warm dark, not the stock
-  `*-dark` palette), retheme the light scaffold's `:root` rather than starting
-  from `blog-dark` — you pick the exact hues instead of inheriting a fixed
-  cold-dark set (and remember the dark "reality check" above: also fix the
-  hardcoded header/gradient/syntax colors).
+  (also `simple` / `docs` / `book`; `bare` ships no CSS at all) gives you a
+  complete, accessible, token-driven baseline that already adapts to light *and*
+  dark. The `*-dark` variants are the same sheet with `color-scheme: dark`
+  pinned — presets, not separate designs. Often the highest-leverage move is
+  just **rewriting the token pairs** and a few component rules to the user's
+  brief — minutes to a distinctly different site. For a *custom* dark (e.g. a
+  warm dark, not the stock ember-dark), override the dark side of the
+  `light-dark()` pairs in `:root` — you pick the exact hues, and the syntax
+  theme follows via `--code-*`.
 - **Build bespoke.** When the brief needs a layout the scaffolds don't have,
   author templates from scratch (or start from `--scaffold bare`/`simple`) and
   bring your own token system. More work, full control.
@@ -323,7 +380,9 @@ back and confirmed ✔
 - [ ] Motion eased and purposeful; `prefers-reduced-motion` respected.
 - [ ] Images responsive (`resize_image` + `srcset`, lazy, LQIP); fonts subset with `font-display: swap`.
 - [ ] No generic-AI tells (centered-everything, default-font, purple gradient, identical emoji cards, leftover lorem).
-- [ ] Everything reads from tokens; no orphan hardcoded values.
+- [ ] Everything reads from tokens; no orphan hardcoded values; every custom
+      color pair defines **both** `light-dark()` sides (the scaffold hygiene
+      spec enforces this for scaffold CSS — keep it green).
 - [ ] Matches the confirmed brief — or the deviation was discussed.
 
 ---

@@ -39,18 +39,22 @@ hwaro tool validate --json
 ## Example Output
 
 ```
-Validating content in 'content'...
+hwaro: validate content
 
-  content/blog/draft.md:
-    ⚠ Missing description in frontmatter
-    ℹ File is marked as draft
+content/blog/draft.md:
+      [warn] Missing description in frontmatter
+      [info] File is marked as draft
 
-  content/about.md:
-    ⚠ Image missing alt text: ![](photo.jpg)
-    ℹ Tag has mixed case: "Crystal" (consider lowercase)
+content/about.md:
+      [warn] Image missing alt text: ![](photo.jpg)
+      [info] Tag has mixed case: "Crystal" (consider lowercase)
 
-Found 0 error(s), 2 warning(s), 2 info(s)
+checked: 0 errors, 2 warnings, 2 info
 ```
+
+In a color terminal the findings use `⚠`/`✗`/`ℹ` glyphs under an `● validate`
+heading, and the closing line is a severity-colored `▴ checked` outcome. The
+command exits non-zero when error-level issues are found, so it can gate CI.
 
 ## Rule IDs
 
@@ -72,20 +76,14 @@ Found 0 error(s), 2 warning(s), 2 info(s)
 
 ```json
 {
-  "issues": [
+  "findings": [
     {
-      "id": "content-description-missing",
-      "level": "warning",
-      "category": "content",
       "file": "content/blog/draft.md",
+      "line": null,
+      "rule": "content-description-missing",
+      "severity": "warning",
       "message": "Missing description in frontmatter"
     }
-  ],
-  "summary": {
-    "errors": 0,
-    "warnings": 1,
-    "infos": 0,
-    "total": 1
-  }
+  ]
 }
 ```

@@ -89,8 +89,9 @@ correct location.
   responsiveness, and accessibility — with an explicit list of generic-AI tells
   to avoid.
 - **Hwaro mechanics:** Crinja template structure, the three CSS-delivery options
-  (inline, `[auto_includes]`, the `[assets]` pipeline), the `:root` design-token
-  vocabulary used by the built-in scaffolds, dark-mode via token overrides, and
+  (inline, `[auto_includes]`, the `[assets]` pipeline), the shared `light-dark()`
+  design-token vocabulary all built-in scaffolds theme through (light and dark
+  come automatically; retheme by overriding the token pairs), and
   responsive images via `resize_image`.
 
 ## Prerequisite
