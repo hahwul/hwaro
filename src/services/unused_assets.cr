@@ -88,7 +88,7 @@ module Hwaro
         files.each do |file|
           if File.exists?(file)
             File.delete(file)
-            Logger.info "  Deleted: #{file}"
+            Logger.action(:remove, file, Logger::Role::Warn)
           end
         end
       end

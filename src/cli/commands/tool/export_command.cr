@@ -67,13 +67,17 @@ module Hwaro
                          )
                        end
 
-            Logger.info "Exporting to #{options.target_type}: #{options.output_dir}"
-            Logger.info "Content directory: #{options.content_dir}"
+            Logger::Receipt.new(NAME, options.target_type)
+              .row("source", options.content_dir)
+              .row("output", options.output_dir)
+              .emit
 
             result = exporter.run(options)
 
             if result.success
-              Logger.success "Export complete: #{result.exported_count} exported, #{result.skipped_count} skipped, #{result.error_count} errors"
+              summary = "#{result.exported_count} files · #{result.skipped_count} skipped"
+              summary += " · #{result.error_count} errors" if result.error_count > 0
+              Logger.outcome("exported", summary, glyph: result.error_count > 0 ? :err : :result)
             else
               Logger.error "Export failed: #{result.message}"
               exit(1)

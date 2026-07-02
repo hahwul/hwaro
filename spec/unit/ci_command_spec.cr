@@ -34,7 +34,7 @@ describe Hwaro::CLI::Commands::Tool::CICommand do
         end
 
         output.should contain("DEPRECATED")
-        output.should contain("Generated")
+        output.should contain("created:")
         File.exists?(out_path).should be_true
         File.read(out_path).should_not be_empty
       end

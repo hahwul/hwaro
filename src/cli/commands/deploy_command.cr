@@ -220,9 +220,9 @@ module Hwaro
             return
           end
 
-          Logger.info "Deployment targets:"
+          Logger.section("targets")
           deployment.targets.each do |t|
-            Logger.info "  #{t.name.ljust(16)} #{format_target_destination(t)}"
+            Logger.item("#{t.name.ljust(16)} #{format_target_destination(t)}")
           end
         end
 

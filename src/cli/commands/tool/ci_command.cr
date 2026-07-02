@@ -103,7 +103,7 @@ module Hwaro
               dir = File.dirname(filename)
               Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
               File.write(filename, content)
-              Logger.success "Generated #{filename}"
+              Logger.outcome("created", filename)
             end
           end
         end

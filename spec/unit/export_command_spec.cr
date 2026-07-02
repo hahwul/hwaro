@@ -61,8 +61,8 @@ describe Hwaro::CLI::Commands::Tool::ExportCommand do
           cmd.run(["hugo", "-c", content_dir, "-o", output_dir])
         end
 
-        output.should contain("Exporting to hugo")
-        output.should contain("Export complete")
+        output.should contain("hwaro: export hugo")
+        output.should contain("exported:")
         File.exists?(File.join(output_dir, "content", "post.md")).should be_true
       end
     end
