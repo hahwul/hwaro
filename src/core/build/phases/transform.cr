@@ -67,10 +67,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Find top-level sections (no parent) and sort by weight (path tiebreaker
     # so equal weights keep a stable, deterministic reading order).
     top_sections = ctx.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort! do |a, b|
-      cmp = a.weight <=> b.weight
-      cmp.zero? ? (a.path <=> b.path) : cmp
-    end
+    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page
@@ -88,6 +85,16 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Weight-then-path ordering shared by the cold build's navigation link and
+  # the incremental relink. Both MUST use the same comparator: the relink
+  # previously sorted by weight alone, so equal-weight sections could come out
+  # in a different order than the full build produced, flipping prev/next
+  # links across whole section blocks on serve-mode incremental rebuilds.
+  private def compare_sections_by_weight(a : Models::Section, b : Models::Section) : Int32
+    cmp = a.weight <=> b.weight
+    cmp.zero? ? (a.path <=> b.path) : cmp
+  end
+
   # Append pages that belong to no rendered section to the reading-order list.
   #
   # The site root index (`content/index.md`, whose `section` is "") is the
@@ -101,9 +108,13 @@ module Hwaro::Core::Build::Phases::Transform
     section_names : Set(String),
     flat_list : Array(Models::Page),
   )
+    # Membership via a path set — `flat_list.includes?(page)` was a linear
+    # scan per page, O(n²) on sites with no `_index.md` sections at all
+    # (every page an orphan), and this runs again on every incremental relink.
+    seen_paths = flat_list.each_with_object(Set(String).new) { |p, set| set << p.path }
     pages.each do |page|
       next if section_names.includes?(page.section)
-      next if flat_list.includes?(page)
+      next if seen_paths.includes?(page.path)
       if page.is_index && page.section.empty?
         flat_list.unshift(page)
       else
@@ -246,16 +257,10 @@ module Hwaro::Core::Build::Phases::Transform
       # the render-phase site.taxonomies matches what the generator writes —
       # otherwise get_taxonomy("authors") is empty at render and get_taxonomy_url
       # falls back to undisambiguated slugs that miss colliding author pages.
-      site.config.taxonomies.each do |tax|
-        name = tax.name
-        next if name.strip.empty?
-        next if page.taxonomies.has_key?(name) # already merged in the loop above
-        page.taxonomy_values(name).each do |term|
-          next if term.strip.empty?
-          site.taxonomies[name] ||= {} of String => Array(Models::Page)
-          site.taxonomies[name][term] ||= [] of Models::Page
-          site.taxonomies[name][term] << page
-        end
+      each_property_backed_taxonomy_term(page, site) do |name, term|
+        site.taxonomies[name] ||= {} of String => Array(Models::Page)
+        site.taxonomies[name][term] ||= [] of Models::Page
+        site.taxonomies[name][term] << page
       end
     end
 
@@ -265,6 +270,38 @@ module Hwaro::Core::Build::Phases::Transform
         terms[term] = Utils::SortUtils.sort_pages(terms[term], "date", false)
       end
     end
+  end
+
+  # Yield each {name, term} a page carries via a taxonomy whose terms live on
+  # a dedicated Page property (authors — see Page#taxonomy_values) rather
+  # than in page.taxonomies. ONE implementation drives rebuild_taxonomies,
+  # update_taxonomies_incremental, and snapshot_page_taxonomies — an
+  # asymmetry between those three is exactly how serve-mode taxonomy
+  # staleness arises (a term the snapshot missed is never removed, a term
+  # the add-side missed never appears).
+  private def each_property_backed_taxonomy_term(page : Models::Page, site : Models::Site, & : String, String ->)
+    site.config.taxonomies.each do |tax|
+      name = tax.name
+      next if name.strip.empty?
+      next if page.taxonomies.has_key?(name) # already carried by page.taxonomies
+      page.taxonomy_values(name).each do |term|
+        next if term.strip.empty?
+        yield name, term
+      end
+    end
+  end
+
+  # Snapshot a page's taxonomy assignments BEFORE re-parsing, including
+  # taxonomies whose terms live on dedicated Page properties (authors) that
+  # page.taxonomies doesn't carry. update_taxonomies_incremental's removal
+  # step reads this snapshot — without the property-backed terms, a page
+  # whose `authors` changed kept its old author-term membership forever.
+  protected def snapshot_page_taxonomies(page : Models::Page, site : Models::Site) : Hash(String, Array(String))
+    snapshot = page.taxonomies.transform_values(&.dup)
+    each_property_backed_taxonomy_term(page, site) do |name, term|
+      (snapshot[name] ||= [] of String) << term
+    end
+    snapshot
   end
 
   # Incremental taxonomy update: only remove/add entries for changed pages.
@@ -308,6 +345,17 @@ module Hwaro::Core::Build::Phases::Transform
           site.taxonomies[name][term] << page
           affected_tax_keys << {name, term}
         end
+      end
+
+      # Property-backed taxonomies ("authors" — see rebuild_taxonomies) don't
+      # live in page.taxonomies, so the loop above misses them and a serve-mode
+      # edit to `authors` frontmatter never reached site.taxonomies until the
+      # next full build.
+      each_property_backed_taxonomy_term(page, site) do |name, term|
+        site.taxonomies[name] ||= {} of String => Array(Models::Page)
+        site.taxonomies[name][term] ||= [] of Models::Page
+        site.taxonomies[name][term] << page
+        affected_tax_keys << {name, term}
       end
     end
 
@@ -353,7 +401,7 @@ module Hwaro::Core::Build::Phases::Transform
     end
 
     top_sections = site.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort_by!(&.weight)
+    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     flat_list = [] of Models::Page
     flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)

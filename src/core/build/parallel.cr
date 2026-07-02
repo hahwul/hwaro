@@ -3,6 +3,7 @@
 # Uses Crystal Fibers and Channels for efficient parallel processing.
 # Supports batch processing and worker pool patterns.
 
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -153,22 +154,62 @@ module Hwaro
           processor.map(items, &block)
         end
 
-        # Execute multiple independent tasks in parallel
-        def execute(tasks : Array(Proc(Nil)), parallel : Bool = true)
+        # Execute multiple independent tasks in parallel.
+        #
+        # `raise_on_error: true` (default) surfaces the first task failure
+        # once every task has drained — sequential mode lets a task exception
+        # abort the build, and parallel mode used to swallow it behind a
+        # warning, so e.g. a failed sitemap/feed generator still exited 0 and
+        # CI shipped a site missing those files. Generic exceptions are
+        # promoted to a classified HwaroError (mirroring #490 in
+        # process_files_parallel): the lifecycle turns unclassified phase
+        # exceptions into a silent HookResult::Abort where `--json` still
+        # reports status "ok".
+        #
+        # Serve-time callers that must stay resilient across a transient
+        # generator failure (the watch/fast-start passes, where a raise
+        # would skip cache persistence and the live-reload signal) pass
+        # `raise_on_error: false` to keep the warn-and-continue behavior.
+        def execute(tasks : Array(Proc(Nil)), parallel : Bool = true, raise_on_error : Bool = true)
           return if tasks.empty?
-          return tasks.each(&.call) unless parallel
+          if !parallel
+            # Sequential keeps its historical semantics: exceptions propagate
+            # unless the caller opted into warn-and-continue.
+            if raise_on_error
+              return tasks.each(&.call)
+            end
+            tasks.each do |task|
+              task.call
+            rescue ex
+              Logger.warn "ParallelHelper: task failed: #{ex.message}"
+            end
+            return
+          end
 
           done = Channel(Nil).new(tasks.size)
+          first_error : Exception? = nil
+          error_mutex = Mutex.new
           tasks.each do |task|
             spawn do
               task.call
             rescue ex
+              error_mutex.synchronize { first_error ||= ex }
               Logger.warn "ParallelHelper: task failed: #{ex.message}"
             ensure
               done.send(nil)
             end
           end
           tasks.size.times { done.receive }
+
+          return unless raise_on_error
+          if err = first_error
+            raise err if err.is_a?(Hwaro::HwaroError)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_INTERNAL,
+              message: "Parallel task failed: #{err.message}",
+              cause: err,
+            )
+          end
         end
       end
     end

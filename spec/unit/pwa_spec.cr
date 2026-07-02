@@ -496,8 +496,10 @@ describe Hwaro::Content::Seo::Pwa do
           content.should contain(%("/myrepo/"))
           content.should contain(%("/myrepo/css/main.css"))
           content.should contain(%("/myrepo/offline.html"))
-          # The hardcoded root fallback must follow the subpath too.
-          content.should contain(%(caches.match("/myrepo/offline.html") || caches.match("/myrepo/")))
+          # The hardcoded root fallback must follow the subpath too. The
+          # fallback chains via .then — `match(a) || match(b)` compares
+          # Promises (always truthy), which made the root fallback dead code.
+          content.should contain(%(caches.match("/myrepo/offline.html").then(offline => offline || caches.match("/myrepo/"))))
           # No bare-root key should leak through.
           content.should_not contain(%(caches.match("/")))
         end

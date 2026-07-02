@@ -8,9 +8,9 @@ describe Hwaro::Content::Hooks do
       hooks.should be_a(Array(Hwaro::Core::Lifecycle::Hookable))
     end
 
-    it "returns exactly 8 hooks" do
+    it "returns exactly 7 hooks" do
       hooks = Hwaro::Content::Hooks.all
-      hooks.size.should eq(8)
+      hooks.size.should eq(7)
     end
 
     it "includes ImageHooks" do
@@ -31,11 +31,6 @@ describe Hwaro::Content::Hooks do
     it "includes PwaHooks" do
       hooks = Hwaro::Content::Hooks.all
       hooks.any?(Hwaro::Content::Hooks::PwaHooks).should be_true
-    end
-
-    it "includes MarkdownHooks" do
-      hooks = Hwaro::Content::Hooks.all
-      hooks.any?(Hwaro::Content::Hooks::MarkdownHooks).should be_true
     end
 
     it "includes SeoHooks" do

@@ -496,9 +496,7 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Length-prefix strings so values containing the structural delimiters
   # (`=`, `;`, `,`) can't make two different cascades digest identically.
   private def fingerprint_string(digest : Digest::MD5, value : String)
-    digest.update(value.bytesize.to_s)
-    digest.update(":")
-    digest.update(value)
+    Utils::DigestUtils.update_length_prefixed(digest, value)
   end
 
   private def calculate_page_url(page : Models::Page)

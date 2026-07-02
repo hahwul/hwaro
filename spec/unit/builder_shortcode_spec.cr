@@ -88,6 +88,50 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("**bold**")
     end
 
+    it "expands a block shortcode named after a Jinja keyword when it uses call syntax" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/include" => "<div class=\"inc\">{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      # `{% include(...) %}` is unambiguous shortcode-call syntax — Jinja's
+      # own include form (`{% include "x.html" %}`) never matches the block
+      # opener regex, so a user shortcode named `include` must keep working.
+      content = "{% include(name=\"promo\") %}text{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div class=\"inc\">text</div>")
+      result.should_not contain("{% include")
+    end
+
+    it "expands a block shortcode whose hyphenated name starts with a Jinja keyword" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/include-code" => "<pre>{{ body }}</pre>"}
+      context = {} of String => Crinja::Value
+
+      content = "{% include-code(file=\"x\") %}code{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<pre>code</pre>")
+      result.should_not contain("{% include-code")
+    end
+
+    it "pairs a block shortcode whose body contains Jinja control tags" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      # {% if %}/{% endif %} inside the body must not count toward block
+      # nesting — previously {% endif %} matched as an opener, the {% end %}
+      # was never paired, and the whole shortcode leaked as literal text.
+      content = "{% note(type=\"info\") %}before {% if title %}x{% endif %} after{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div class=\"note\">")
+      result.should contain("before")
+      result.should contain("after")
+      result.should_not contain("{% note")
+    end
+
     it "accepts named closers like {% endnote %}" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
@@ -387,6 +431,26 @@ describe Hwaro::Core::Build::Builder do
       args.has_key?("_0").should be_false
     end
 
+    it "keeps positional args when mixed with named args" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("dQw4w9WgXcQ", width="560"))
+      args["_0"].should eq("dQw4w9WgXcQ")
+      args["width"].should eq("560")
+    end
+
+    it "keeps a comma inside a quoted positional value" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("warning", "Be careful, really!"))
+      args["_0"].should eq("warning")
+      args["_1"].should eq("Be careful, really!")
+    end
+
+    it "does not misparse a URL query = inside a positional value as a named arg" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("https://example.com/watch?v=abc&t=10"))
+      args["_0"].should eq("https://example.com/watch?v=abc&t=10")
+    end
+
     it "renders shortcode with positional args" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
@@ -396,6 +460,20 @@ describe Hwaro::Core::Build::Builder do
 
       result = builder.test_render_shortcode_jinja(template, args, context, crinja_env_override: env)
       result.should eq("alert: message")
+    end
+
+    it "fills positional slots in order, skipping slots already provided by name" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      context = {} of String => Crinja::Value
+
+      # gist's positional params are [user, id, file]; `user` is named, so
+      # the lone positional must land in `id` — indexing purely by
+      # positional order aliased it back onto the occupied user slot and
+      # silently dropped it.
+      content = %({{ gist(user="octocat", "abc123") }})
+      result = builder.test_process_shortcodes_jinja(content, {} of String => String, context, crinja_env_override: env)
+      result.should contain("gist.github.com/octocat/abc123.js")
     end
 
     # Regression for https://github.com/hahwul/hwaro/issues/479

@@ -88,20 +88,22 @@ module Hwaro
         end
 
         # Record a cache hit for the named layer.
+        #
+        # Deliberately lock-free: the counters are Atomics precisely so hot
+        # render paths don't serialize on @mutex (record_hit/record_miss run
+        # several times per page from parallel fibers). The bare @layers read
+        # is safe because layers are registered once during Builder
+        # construction, before any parallel phase mutates or reads stats.
         def record_hit(name : String)
-          @mutex.synchronize do
-            if layer = @layers[name]?
-              layer.stats.increment_hit
-            end
+          if layer = @layers[name]?
+            layer.stats.increment_hit
           end
         end
 
-        # Record a cache miss for the named layer.
+        # Record a cache miss for the named layer. Lock-free — see record_hit.
         def record_miss(name : String)
-          @mutex.synchronize do
-            if layer = @layers[name]?
-              layer.stats.increment_miss
-            end
+          if layer = @layers[name]?
+            layer.stats.increment_miss
           end
         end
 

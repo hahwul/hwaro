@@ -6,6 +6,7 @@
 
 require "digest/md5"
 require "json"
+require "../../utils/digest_utils"
 require "../../utils/logger"
 require "../../models/config"
 
@@ -224,7 +225,21 @@ module Hwaro
               # mtime changed — verify with content hash to catch false positives
               # (e.g. file touched but content identical)
               current_hash = compute_file_hash(file_path)
-              return current_hash != entry.hash
+              return true if current_hash != entry.hash
+              # Content identical, only the mtime moved (touch, git checkout).
+              # Refresh the stored mtime so the NEXT build takes the mtime fast
+              # path — otherwise every subsequent warm build re-hashes the file
+              # (unchanged entries skip #update, so nothing else repairs it).
+              # `entry` is a struct copy, so mutating the local and storing it
+              # back keeps every other field intact without a hand-maintained
+              # field-by-field reconstruction.
+              refreshed = entry
+              refreshed.mtime = current_mtime
+              @mutex.synchronize do
+                @entries[file_path] = refreshed
+                @dirty = true
+              end
+              return false
             end
           rescue ex
             Logger.debug "Cache: failed to read mtime for #{file_path}: #{ex.message}"
@@ -401,12 +416,15 @@ module Hwaro
           digest.final.hexstring
         end
 
-        # Compute a combined checksum for a set of template files
+        # Compute a combined checksum for a set of template files.
+        # Fields are length-prefixed (see DigestUtils) so adjacent
+        # name/content pairs can't produce the same byte stream across
+        # boundaries, which would have failed to invalidate.
         def self.compute_templates_hash(templates : Hash(String, String)) : String
           digest = Digest::MD5.new
           templates.keys.sort!.each do |name|
-            digest.update(name)
-            digest.update(templates[name])
+            Utils::DigestUtils.update_length_prefixed(digest, name)
+            Utils::DigestUtils.update_length_prefixed(digest, templates[name])
           end
           digest.final.hexstring
         end
@@ -429,11 +447,13 @@ module Hwaro
         # formatting-only edit to config.toml no longer forces a full rebuild.
         def self.compute_config_hash(config : Models::Config, env : String? = nil) : String
           digest = Digest::MD5.new
-          digest.update(env || "")
-          digest.update(config.base_url)
+          # Length-prefixed for the same boundary-ambiguity reason as
+          # compute_templates_hash.
+          Utils::DigestUtils.update_length_prefixed(digest, env || "")
+          Utils::DigestUtils.update_length_prefixed(digest, config.base_url)
           config.raw.keys.sort!.each do |key|
-            digest.update(key)
-            digest.update(config.raw[key].to_s)
+            Utils::DigestUtils.update_length_prefixed(digest, key)
+            Utils::DigestUtils.update_length_prefixed(digest, config.raw[key].to_s)
           end
           digest.final.hexstring
         end

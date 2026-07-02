@@ -15,7 +15,7 @@ module Hwaro::Core::Build::Phases::Write
       minify = ctx.options.minify
       verbose = ctx.options.verbose
 
-      generate_404_page(site, templates, output_dir, minify, verbose)
+      generate_404_page(site, templates, output_dir, minify, verbose, @render_global_vars)
 
       # Process raw files (JSON, XML)
       raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose)
@@ -28,7 +28,11 @@ module Hwaro::Core::Build::Phases::Write
     result
   end
 
-  private def generate_404_page(site : Models::Site, templates : Hash(String, String), output_dir : String, minify : Bool, verbose : Bool)
+  # `global_vars` is the render phase's site-wide template vars (or the
+  # caller's freshly built set). Passing it avoids an O(site) rebuild of
+  # every page/section Crinja value just for this one page; nil falls back
+  # to building them (standalone callers).
+  private def generate_404_page(site : Models::Site, templates : Hash(String, String), output_dir : String, minify : Bool, verbose : Bool, global_vars : Hash(String, Crinja::Value)? = nil)
     return unless templates.has_key?("404")
 
     template = templates["404"]
@@ -44,7 +48,7 @@ module Hwaro::Core::Build::Phases::Write
     section_list = ""
     toc = ""
 
-    final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404")
+    final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404", global_vars: global_vars)
 
     final_html = minify_html(final_html) if minify
 
@@ -134,8 +138,31 @@ module Hwaro::Core::Build::Phases::Write
         # an asset's relative path somehow climbs out of the bundle.
         next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
 
+        # Skip unchanged assets. The Write phase runs on every build with a
+        # surviving output dir (serve rebuilds, --preserve-output), so
+        # image-heavy page bundles otherwise pay full copy I/O each time.
+        # The copy below stamps the destination with the SOURCE mtime, so
+        # size + exact mtime equality identifies "this exact source version
+        # was already copied". A `src <= dest` ordering check instead would
+        # skip forever when an asset is replaced by a same-size file with an
+        # older preserved mtime (rsync -a / tar -x restoring a revision).
+        src_info = File.info?(source_path)
+        if src_info && (dest_info = File.info?(dest_path))
+          if src_info.size == dest_info.size && src_info.modification_time == dest_info.modification_time
+            next
+          end
+        end
+
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
         FileUtils.cp(source_path, dest_path)
+        if src_info
+          begin
+            File.utime(Time.utc, src_info.modification_time, dest_path)
+          rescue File::Error
+            # Stamping is an optimization; a failure just means the next
+            # build recopies this asset.
+          end
+        end
         Logger.action :copy, dest_path, :blue if verbose
       end
     end

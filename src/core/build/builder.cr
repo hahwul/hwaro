@@ -42,6 +42,7 @@ require "../../content/seo/jsonld"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
+require "../../utils/digest_utils"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/logger"
@@ -156,6 +157,12 @@ module Hwaro
         @render_workers : Int32 = 0
         # Unified cache manager for all cache layers
         @cache_manager : CacheManager = CacheManager.new
+        # The render phase's site-wide template vars, stashed so the Write
+        # phase's 404 page can reuse them. Rebuilding them there re-converted
+        # every page/section/taxonomy term to Crinja values and re-hashed
+        # every auto-include asset — O(site) work for one page — and silently
+        # used cache_busting defaults instead of the build's options.
+        @render_global_vars : Hash(String, Crinja::Value)? = nil
         # Pages stashed by `--fast-start` during the initial build so the
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
@@ -285,7 +292,6 @@ module Hwaro
           minify = options.minify
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
-          safe = site.config.markdown.safe
           include_drafts = options.drafts
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
@@ -321,8 +327,9 @@ module Hwaro
               next
             end
 
-            # Snapshot before re-parse
-            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            # Snapshot before re-parse (includes property-backed taxonomies
+            # like authors — see snapshot_page_taxonomies)
+            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
             old_series_names[page.path] = page.series
             old_neighbors[page.path] = {page.lower, page.higher}
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
@@ -508,11 +515,17 @@ module Hwaro
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
+          # Render in parallel like run_rerender/the cold build — a section
+          # `_index` edit re-renders its whole subtree, and doing that one
+          # page at a time made large-section edits the slowest watch path.
+          # process_files_sequential mirrors the old per-page loop exactly
+          # (render_page + record_page_cache_entry).
           error_overlay = options.error_overlay
-          render_list.each do |page|
-            next unless page.render
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
-            record_page_cache_entry(page, cache, templates, site, output_dir)
+          renderable_list = render_list.select(&.render)
+          if options.parallel && renderable_list.size > 1
+            process_files_parallel(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
+          else
+            process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
 
           cache.save if options.cache
@@ -570,8 +583,9 @@ module Hwaro
               next
             end
 
-            # Snapshot before re-parse
-            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            # Snapshot before re-parse (includes property-backed taxonomies
+            # like authors — see snapshot_page_taxonomies)
+            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
             old_series_names[page.path] = page.series
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
 
@@ -705,7 +719,7 @@ module Hwaro
 
           # Re-generate 404 page with new template
           if affected_templates.nil? || affected_templates.includes?("404")
-            generate_404_page(site, templates, output_dir, minify, verbose)
+            generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
           end
 
           # Re-generate taxonomy pages with new templates. Their template
@@ -1086,6 +1100,13 @@ module Hwaro
         # search index, optionally robots) for the given page set. Each
         # generator writes a distinct output file with no shared in-process
         # state, so task order doesn't affect output.
+        #
+        # `raise_on_error: false`: these are the serve-time passes (watch
+        # incremental, fast-start deferred). A transient generator failure
+        # must warn-and-continue here — raising would skip cache.save, the
+        # deferred-pages cleanup, and the live-reload signal even though
+        # every page rendered fine. The cold-build Generate phase keeps the
+        # fail-loud default via its own ParallelHelper.execute call.
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
@@ -1097,7 +1118,7 @@ module Hwaro
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
           seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
           seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
-          ParallelHelper.execute(seo_tasks, parallel)
+          ParallelHelper.execute(seo_tasks, parallel, raise_on_error: false)
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

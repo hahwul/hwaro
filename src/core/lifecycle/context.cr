@@ -38,10 +38,12 @@ module Hwaro
         # Raw files (JSON, XML, etc.)
         property raw_files : Array(RawFile)
 
-        # Sections removed by early draft/expired/future filtering (e.g. the
-        # MarkdownHooks AfterReadContent filter) whose [cascade] must still
-        # reach their descendants. apply_cascades merges these with the
-        # surviving sections when building the cascade map.
+        # Sections removed by an early (pre-ParseContent) draft/expired/future
+        # filter — e.g. a custom AfterReadContent hook — whose [cascade] must
+        # still reach their descendants. apply_cascades merges these with the
+        # surviving sections when building the cascade map. The default build
+        # filters inside the ParseContent phase (after cascades apply), so
+        # this stays empty there.
         property excluded_cascade_sections : Array(Models::Section)
 
         # Templates
@@ -79,6 +81,14 @@ module Hwaro
         # own timing so the true cost distribution inside the Render phase
         # becomes visible.
         property profiler : Hwaro::Profiler?
+
+        # True when the global page/section set changed since the previous
+        # cached build (page added/removed, listing metadata moved). Set by
+        # the Render phase BEFORE it records the new fingerprints — Generate
+        # can't re-check the cache itself at that point — so the SEO/search
+        # `skip_if_unchanged` fast path doesn't keep a deleted page in the
+        # sitemap/search index when no surviving page happened to re-render.
+        property page_or_section_set_changed : Bool = false
 
         @all_pages_cache : Array(Models::Page)?
 

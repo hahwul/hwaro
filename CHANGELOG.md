@@ -4,6 +4,23 @@
 
 ### Fixed
 - macOS release binaries are now shipped as portable `.tar.gz` archives with bundled OpenSSL libraries, instead of a bare executable that required Homebrew `openssl@3` at a hardcoded path and failed on machines without it.
+- Block shortcodes whose body contains Jinja control tags (`{% if %}…{% endif %}`, `{% set %}`) no longer desync the nesting scan and leak the opening tag as literal text
+- Mixed positional + named shortcode arguments (`{{ youtube("ID", width="560") }}`) no longer drop the positional value, and a quoted positional value can contain commas
+- PWA service worker: the offline→root navigation fallback was dead code in all three cache strategies (Promise truthiness); offline navigation now falls back to the cached root correctly
+- `llms-full.txt` honors `in_search_index = false` instead of dumping an opted-out page's full markdown
+- Internal `@/` links carrying a query string or anchor no longer double-escape `&` into `&amp;amp;`
+- `hwaro serve`: editing `authors` front matter now updates the authors taxonomy incrementally; equal-weight sections keep the same prev/next reading order as a full build
+- `--cache`: deleting a page regenerates the sitemap/feeds/search index even when no surviving page re-rendered (the removed URL used to linger)
+- Parallel builds surface sitemap/feed/search generator failures instead of exiting 0 with missing output files; closed fiber-safety gaps in the section-list memo and built-in shortcode template init under `-Dpreview_mt`
+- AMP: `<img>` tags carrying `>` inside a quoted attribute value (e.g. `alt="Home > Docs"`) convert to `<amp-img>` without corrupting the markup
+
+### Performance
+- Builds no longer run the whole markdown pipeline twice: the legacy hook pre-pass (sequential, its output overwritten by the parallel ParseContent/Render phases) is no longer registered — every content file was read/parsed twice and every page's markdown rendered twice per build; `--fast-start` no longer pre-renders the entire site either. Feed/search fallbacks for cache-hit pages now honor the site's markdown options
+- JS minification is no longer O(n²) on files containing any non-ASCII character (measured: a 128KB bundle with CJK comments went from 59.5s to 9.6ms); block-shortcode scanning uses byte-offset matching so shortcode-heavy CJK pages stop paying O(document) per tag
+- HTML minification compiles its protected-tag patterns once at startup instead of eight regexes per page; fenced-code detection no longer compiles a regex per fence
+- `--cache`: touched-but-identical files are re-hashed once instead of on every subsequent warm build; unchanged page-bundle assets are no longer recopied every build; cache hit/miss counters are lock-free again (they serialized parallel render fibers on a global mutex)
+- `hwaro serve`: incremental rebuilds render the affected page set in parallel (a section `_index` edit re-renders its subtree concurrently); static-file scanning issues up to 3× fewer stat syscalls
+- The 404 page reuses the render phase's site-wide template variables instead of rebuilding every page/section value (and now honors the build's cache-busting option); `--stream` creates per-worker template engines once per run instead of per batch; `load_data()` results are memoized per file mtime instead of re-read and re-parsed on every call
 
 ### Added
 - `hwaro new` with no `<path>` opens an interactive wizard in a terminal: it prompts for the title, description, a recommended path (derived from the title and section), tags, date, draft flag, and archetype, previews a summary, and confirms before writing. Flags already passed pre-fill their prompts. Non-interactive contexts (pipes, CI, `--json`, `--quiet`) keep the classified `HWARO_E_USAGE` error, so scripts and agents are unchanged

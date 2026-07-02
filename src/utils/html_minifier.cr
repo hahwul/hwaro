@@ -78,6 +78,18 @@ module Hwaro
       # they were their original tag.
       PROTECTED_INLINE = Set{"code", "svg", "math", "textarea"}
 
+      # Per-tag extraction patterns, compiled once at load time. minify()
+      # runs once per rendered page, so building these eight Regex objects
+      # inside protect_sensitive_blocks paid a PCRE2 compile per tag per
+      # page. Array (not Hash) to preserve PROTECTED_TAGS order — `style`
+      # must be extracted before `script` (see comment above).
+      private PROTECTED_PATTERNS = PROTECTED_TAGS.map do |tag|
+        {tag, Regex.new(
+          "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
+          Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
+        )}
+      end
+
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
       # so the placeholder cannot collide with author content. The
       # `B`/`I` suffix lets the whitespace collapser look up the
@@ -136,12 +148,8 @@ module Hwaro
       # mixed both. One pass per tag avoids that whole class of bug.
       private def protect_sensitive_blocks(html : String, preserves : Array(String)) : String
         result = html
-        PROTECTED_TAGS.each do |tag|
+        PROTECTED_PATTERNS.each do |(tag, pattern)|
           prefix = PROTECTED_INLINE.includes?(tag) ? PRESERVE_PREFIX_INLINE : PRESERVE_PREFIX_BLOCK
-          pattern = Regex.new(
-            "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
-            Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
-          )
           result = result.gsub(pattern) do |match|
             idx = preserves.size
             preserves << match

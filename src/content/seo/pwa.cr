@@ -178,7 +178,7 @@ module Hwaro
               if (event.request.mode === 'navigate') {
                 event.respondWith(
                   fetch(event.request).catch(() =>
-                    caches.match(#{offline_url}) || caches.match(#{root_url})
+                    caches.match(#{offline_url}).then(cached => cached || caches.match(#{root_url}))
                   )
                 );
                 return;
@@ -211,7 +211,7 @@ module Hwaro
                 }).catch(() =>
                   caches.match(event.request).then(cached =>
                     cached || (event.request.mode === 'navigate'
-                      ? caches.match(#{offline_url}) || caches.match(#{root_url})
+                      ? caches.match(#{offline_url}).then(offline => offline || caches.match(#{root_url}))
                       : undefined)
                   )
                 )
@@ -233,7 +233,7 @@ module Hwaro
                     return response;
                   }).catch(() => {
                     if (event.request.mode === 'navigate') {
-                      return caches.match(#{offline_url}) || caches.match(#{root_url});
+                      return caches.match(#{offline_url}).then(cached => cached || caches.match(#{root_url}));
                     }
                     return undefined;
                   });

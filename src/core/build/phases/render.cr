@@ -33,6 +33,10 @@ module Hwaro::Core::Build::Phases::Render
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
+                       # Publish the set-change signal for the Generate phase
+                       # BEFORE recording overwrites the stored fingerprints.
+                       ctx.page_or_section_set_changed =
+                         build_cache.page_set_changed?(page_set_fp) || build_cache.section_set_changed?(section_set_fp)
                        # Don't record under fast-start: deferred listing pages
                        # render in a later pass, so persisting the new fingerprint
                        # now would let the next build skip them while stale.
@@ -117,6 +121,8 @@ module Hwaro::Core::Build::Phases::Render
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
       Logger.status_phase(pages_to_build.size > 0 ? "render #{pages_to_build.size} pages" : "render")
       global_vars = build_global_vars(site, ctx.options.cache_busting)
+      # Stash for the Write phase's 404 page (see @render_global_vars).
+      @render_global_vars = global_vars
       @pages_by_path = build_pages_by_path(site)
       count = if ctx.options.streaming?
                 render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size)
@@ -214,12 +220,25 @@ module Hwaro::Core::Build::Phases::Render
     total_count = 0
     batch_num = 0
 
+    # Create the per-worker Crinja envs and compiled-template caches ONCE
+    # for the whole streaming render — every batch used to rebuild
+    # worker_count envs and re-parse the shared template ASTs from empty
+    # caches (worker_count × batch_count setup cost). Sized for the first
+    # batch, which each_slice guarantees is the largest.
+    env_pool : Array(Crinja)? = nil
+    template_cache_pool : Array(Hash(UInt64, Crinja::Template))? = nil
+    if parallel && pages.size > 1
+      pool_size = ParallelConfig.new(enabled: true, max_workers: @render_workers).calculate_workers(Math.min(batch_size, pages.size))
+      env_pool = Array.new(pool_size) { create_fresh_crinja_env }
+      template_cache_pool = Array.new(pool_size) { {} of UInt64 => Crinja::Template }
+    end
+
     pages.each_slice(batch_size) do |batch|
       batch_num += 1
       Logger.debug "  Streaming batch #{batch_num} (#{batch.size} pages)"
 
       count = if parallel && batch.size > 1
-                process_files_parallel(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
+                process_files_parallel(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler, env_pool: env_pool, template_cache_pool: template_cache_pool)
               else
                 process_files_sequential(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
               end
@@ -243,6 +262,14 @@ module Hwaro::Core::Build::Phases::Render
           "related_posts_crinja",
           reset_stats: false,
         )
+        # Also drop the per-worker compiled-template caches: a layout whose
+        # shortcodes expand per page compiles a distinct AST per page, and a
+        # pool shared across ALL batches would grow O(total pages) — exactly
+        # the unbounded footprint streaming exists to avoid. Clearing every
+        # Nth batch keeps cross-batch reuse for the common shared templates
+        # while re-bounding growth (base templates recompile once per
+        # interval per worker — negligible).
+        template_cache_pool.try(&.each(&.clear))
         GC.collect
       end
     end
@@ -376,6 +403,8 @@ module Hwaro::Core::Build::Phases::Render
     global_vars : Hash(String, Crinja::Value),
     error_overlay : Bool = false,
     profiler : Profiler? = nil,
+    env_pool : Array(Crinja)? = nil,
+    template_cache_pool : Array(Hash(UInt64, Crinja::Template))? = nil,
   ) : Int32
     return 0 if pages.empty?
 
@@ -387,17 +416,16 @@ module Hwaro::Core::Build::Phases::Render
     worker_count = config.calculate_workers(pages.size)
     safe = site.config.markdown.safe
 
-    # Pre-create per-worker Crinja environments and template caches
-    # to avoid shared mutable state between concurrent fibers.
-    worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
-    worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
-
-    # Warm the built-in shortcode template memo on THIS fiber before any worker
-    # spawns. BuiltinShortcodes.templates is `@@templates ||= build_templates`,
-    # an unsynchronized check-then-build; first-touched concurrently by two
-    # workers under -Dpreview_mt it races. Building it once here makes it
-    # read-only for the workers (identical content, negligible cost).
-    BuiltinShortcodes.templates
+    # Per-worker Crinja environments and template caches avoid shared mutable
+    # state between concurrent fibers. Streaming mode calls this once per
+    # batch and passes pools created up front — rebuilding the envs (full
+    # filter/function registration) and re-parsing the shared template ASTs
+    # from empty caches every batch multiplied that setup cost by the batch
+    # count. Never index past a caller-provided pool.
+    worker_count = Math.min(worker_count, env_pool.size) if env_pool
+    worker_count = Math.min(worker_count, template_cache_pool.size) if template_cache_pool
+    worker_envs = env_pool || Array.new(worker_count) { create_fresh_crinja_env }
+    worker_caches = template_cache_pool || Array.new(worker_count) { {} of UInt64 => Crinja::Template }
 
     results = Channel(Bool).new(pages.size)
     work_queue = Channel({Models::Page, Int32}).new(pages.size)

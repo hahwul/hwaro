@@ -23,11 +23,48 @@ module Hwaro
         # whitespace inside a `...` literal). Restored verbatim at the end.
         # (Plain "" / '' strings and /regex/ literals can't contain raw newlines,
         # so the line pass never touches them.)
+        #
+        # The scanner indexes by char position. `String#[](Int32)` is O(1)
+        # only on ascii-only strings — on any non-ASCII string it is
+        # O(position), which made this loop O(n²) (measured: 0.2ms ASCII vs
+        # 3+ seconds with CJK comments on an ~80KB input). Scan the String
+        # directly for the common all-ASCII bundle (no copy), and materialize
+        # an Array(Char) for O(1) access otherwise. `scan_source` is generic
+        # over both, so neither path pays a union dispatch.
         protected_spans = [] of String
-        result = String.build do |io|
+        result = if js.ascii_only?
+                   scan_source(js, protected_spans)
+                 else
+                   scan_source(js.chars, protected_spans)
+                 end
+
+        # Collapse multiple blank lines (placeholders survive: they contain no
+        # trailing whitespace and are never empty).
+        lines = result.lines.map(&.rstrip)
+        lines.reject!(&.empty?)
+        cleaned = lines.join("\n").strip
+
+        # Restore protected template literals verbatim. Bounds-guard the index
+        # so an adversarial literal `\x00JSPLn\x00` sequence in the source (NUL
+        # is not valid JS) can't raise IndexError — emit it unchanged instead.
+        return cleaned if protected_spans.empty?
+        cleaned.gsub(/\x00JSPL(\d+)\x00/) do
+          # to_i? guards against a counterfeit token whose index overflows
+          # Int32 — return $0 unchanged rather than raising ArgumentError.
+          idx = $1.to_i?
+          idx && idx < protected_spans.size ? protected_spans[idx] : $0
+        end
+      end
+
+      # Single scanning pass over `chars` — a String when the input is
+      # ascii-only, an Array(Char) otherwise. Untyped parameter so each
+      # concrete type gets its own instantiation (no union dispatch in the
+      # hot loop). Emits minified source; template literals are stashed
+      # verbatim into `protected_spans` behind NUL placeholders.
+      private def scan_source(chars, protected_spans : Array(String)) : String
+        String.build do |io|
           i = 0
-          len = js.size
-          chars = js
+          len = chars.size
 
           while i < len
             c = chars[i]
@@ -126,23 +163,6 @@ module Hwaro
             i += 1
           end
         end
-
-        # Collapse multiple blank lines (placeholders survive: they contain no
-        # trailing whitespace and are never empty).
-        lines = result.lines.map(&.rstrip)
-        lines.reject!(&.empty?)
-        cleaned = lines.join("\n").strip
-
-        # Restore protected template literals verbatim. Bounds-guard the index
-        # so an adversarial literal `\x00JSPLn\x00` sequence in the source (NUL
-        # is not valid JS) can't raise IndexError — emit it unchanged instead.
-        return cleaned if protected_spans.empty?
-        cleaned.gsub(/\x00JSPL(\d+)\x00/) do
-          # to_i? guards against a counterfeit token whose index overflows
-          # Int32 — return $0 unchanged rather than raising ArgumentError.
-          idx = $1.to_i?
-          idx && idx < protected_spans.size ? protected_spans[idx] : $0
-        end
       end
 
       # Determine whether a `/` at position `pos` in `chars` is likely a regex
@@ -155,7 +175,7 @@ module Hwaro
       # a regex literal (e.g. `return /foo/`, `typeof /re/`, `void /re/`,
       # `case /re/`, `throw /re/`) are misclassified as division because
       # full keyword-aware tokenization is not performed.
-      private def regex_context?(chars : String, pos : Int32) : Bool
+      private def regex_context?(chars, pos : Int32) : Bool
         j = pos - 1
         while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')
           j -= 1
@@ -176,7 +196,7 @@ module Hwaro
       # strings, balanced braces, and nested template literals inside an
       # interpolation, so a `}`/backtick that belongs to the interpolation can
       # never be mistaken for the outer literal's terminator.
-      private def scan_template_literal(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_template_literal(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening backtick
         i += 1
         while i < len
@@ -206,7 +226,7 @@ module Hwaro
       # or quote inside them is content, not structure — interpreting it (e.g.
       # treating a comment's backtick as a nested template) misaligns the scan
       # and corrupts the literal's boundary.
-      private def scan_interpolation(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_interpolation(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         depth = 1
         while i < len
           c = chars[i]
@@ -259,7 +279,7 @@ module Hwaro
       # Scan a quoted string beginning at chars[i] (a `"` or `'`). Appends it
       # verbatim (honoring backslash escapes) and returns the index just past
       # the closing quote.
-      private def scan_quoted(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_quoted(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         quote = chars[i]
         lb << quote
         i += 1
@@ -282,7 +302,7 @@ module Hwaro
       # main loop's regex handling, including its limitation of not modelling
       # `[...]` character classes (an unescaped `/` inside a class still ends the
       # literal) — kept identical so behaviour matches the top-level scanner.
-      private def scan_regex(chars : String, i : Int32, len : Int32, lb : String::Builder) : Int32
+      private def scan_regex(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening /
         i += 1
         while i < len

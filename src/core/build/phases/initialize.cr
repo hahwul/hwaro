@@ -172,27 +172,40 @@ module Hwaro::Core::Build::Phases::Initialize
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
 
     Dir.glob(File.join(src_dir, "**", "*"), match: glob_match) do |src_path|
-      # One stat for both checks: skip directories, and skip dangling symlinks
-      # (`info?` is nil when the target is missing) so the copy worker doesn't
-      # log a spurious failure.
-      info = File.info?(src_path, follow_symlinks: true)
-      next if info.nil? || info.directory?
+      # lstat first: for the common regular-file case one syscall covers
+      # the directory check AND proves it isn't a symlink (previously every
+      # file paid a stat plus an lstat). Only actual symlinks pay the
+      # follow-up target stat and realpath cost.
+      lstat = File.info?(src_path, follow_symlinks: false)
+      next if lstat.nil?
 
-      # A symlinked file whose target escapes the project would publish
-      # content from outside the site (e.g. `static/leak -> ~/.ssh/id_rsa`).
-      # Skip those; in-repo symlinks resolve back within the project root
-      # and are still copied. Only symlinks pay the realpath cost.
-      if File.symlink?(src_path) && !Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
-        Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
-        next
+      if lstat.symlink?
+        # Skip dangling symlinks (`info?` nil when the target is missing) so
+        # the copy worker doesn't log a spurious failure, and directories.
+        info = File.info?(src_path, follow_symlinks: true)
+        next if info.nil? || info.directory?
+
+        # A symlinked file whose target escapes the project would publish
+        # content from outside the site (e.g. `static/leak -> ~/.ssh/id_rsa`).
+        # Skip those; in-repo symlinks resolve back within the project root
+        # and are still copied.
+        unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
+          Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+          next
+        end
+      else
+        next if lstat.directory?
+        info = lstat
       end
 
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)
 
       dest_path = File.join(output_dir, relative)
-      if incremental && File.exists?(dest_path) &&
-         File.info(src_path).modification_time <= File.info(dest_path).modification_time
+      # `info` from above already carries the source mtime — re-statting
+      # src_path here tripled the stat count over static/ on watch rebuilds.
+      if incremental && (dest_info = File.info?(dest_path)) &&
+         info.modification_time <= dest_info.modification_time
         next
       end
 
@@ -246,8 +259,11 @@ module Hwaro::Core::Build::Phases::Initialize
       # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
       extension_priority = {"html" => 0, "j2" => 1, "jinja2" => 2, "jinja" => 3, "ecr" => 4}
       all_template_files = Dir.glob("templates/**/*.{html,j2,jinja2,jinja,ecr}")
-      # Sort by extension priority so higher-priority extensions are loaded first
-      all_template_files.sort_by! { |path| extension_priority[Path[path].extension.lchop('.')] || 99 }
+      # Sort by extension priority so higher-priority extensions are loaded
+      # first. `[]?` matters: `Hash#[]` raises on a miss, so the intended
+      # `|| 99` fallback was unreachable if the glob ever admits a new
+      # extension not present in the priority map.
+      all_template_files.sort_by! { |path| extension_priority[Path[path].extension.lchop('.')]? || 99 }
       all_template_files.each do |path|
         relative = Path[path].relative_to("templates")
         name = relative.to_s.gsub(Builder::TEMPLATE_EXTENSION_REGEX, "")
@@ -336,8 +352,10 @@ module Hwaro::Core::Build::Phases::Initialize
 
     digest = Digest::MD5.new
     paths.sort!.each do |path|
-      digest.update(path)
-      digest.update(File.read(path))
+      # Length-prefixed (see DigestUtils) so adjacent path/content pairs
+      # can't collide across boundaries.
+      Utils::DigestUtils.update_length_prefixed(digest, path)
+      Utils::DigestUtils.update_length_prefixed(digest, File.read(path))
     end
     digest.final.hexstring
   end

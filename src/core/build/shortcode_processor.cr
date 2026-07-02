@@ -18,14 +18,7 @@ module Hwaro
   module Core
     module Build
       module ShortcodeProcessor
-        SHORTCODE_ARGS_REGEX = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
-        # Detects a named argument (`key=`) at an argument boundary (string start
-        # or just after a comma). Used instead of a bare `includes?("=")` so an
-        # `=` inside a positional value (e.g. a query-string URL `?t=10`) doesn't
-        # get misparsed as named args. See issue: youtube()/figure() with URLs.
-        NAMED_ARG_RE = /(?:\A|,)\s*[A-Za-z_]\w*\s*=/
-        # NOTE: POSITIONAL_ARG_REGEX is reserved for future use
-        # POSITIONAL_ARG_REGEX  = /(?:^|,)\s*(?:"([^"]*)"|'([^']*)'|([^,\s=]+))/
+        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
         MAX_SHORTCODE_NESTING = 5
         BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
@@ -76,14 +69,12 @@ module Hwaro
 
           in_fence = false
           fence_marker = ""
-          fence_close_regex : Regex? = nil
 
           content.each_line(chomp: false) do |line|
             if in_fence
-              if fence_close_regex.try(&.match(line))
+              if fence_close_line?(line, fence_marker)
                 in_fence = false
                 fence_marker = ""
-                fence_close_regex = nil
               end
               next
             end
@@ -91,7 +82,6 @@ module Hwaro
             if match = line.match(/^\s*(`{3,}|~{3,})/)
               in_fence = true
               fence_marker = match[1]
-              fence_close_regex = Regex.new("^\\s*#{Regex.escape(fence_marker)}\\s*$")
               next
             end
 
@@ -104,6 +94,16 @@ module Hwaro
           end
 
           false
+        end
+
+        # A fence-closing line is the opening marker alone, surrounded only by
+        # whitespace — equivalent to the previous per-fence compiled regex
+        # `^\s*MARKER\s*$` (Crystal regexes run with UCP, so `\s` and
+        # `String#strip` agree on Unicode whitespace). A longer run (e.g.
+        # ```` closing ```) does not match, same as before. The comparison
+        # replaces a PCRE2 compile per fenced block per page render.
+        private def fence_close_line?(line : String, fence_marker : String) : Bool
+          line.strip == fence_marker
         end
 
         private def has_shortcode_token_outside_inline_code?(line : String) : Bool
@@ -129,7 +129,6 @@ module Hwaro
           String.build do |io|
             in_fence = false
             fence_marker = ""
-            fence_close_regex : Regex? = nil
             buffer = String::Builder.new
             # Nesting depth of open block shortcodes. While > 0 we must NOT treat
             # a fence line as a buffer boundary, otherwise a block shortcode whose
@@ -140,10 +139,9 @@ module Hwaro
             content.each_line(chomp: false) do |line|
               if in_fence
                 io << line
-                if fence_close_regex.try(&.match(line))
+                if fence_close_line?(line, fence_marker)
                   in_fence = false
                   fence_marker = ""
-                  fence_close_regex = nil
                 end
                 next
               end
@@ -168,8 +166,6 @@ module Hwaro
                 buffer = String::Builder.new
                 in_fence = true
                 fence_marker = match[1]
-                # Compile the close-fence regex once per fenced block
-                fence_close_regex = Regex.new("^\\s*#{Regex.escape(fence_marker)}\\s*$")
                 io << line
               else
                 buffer << line
@@ -245,46 +241,110 @@ module Hwaro
           end
         end
 
+        # Jinja/Crinja control keywords, for exact-name matching in the block
+        # parser. Deliberately NOT the prefix-based CRINJA_CONTROL_TAG_RE: its
+        # `\b` treats a hyphen as a boundary, so a user shortcode named
+        # `include-code` (or `if-banner`, `do-not-translate`, …) would be
+        # misclassified as a control tag and silently stop expanding.
+        CRINJA_CONTROL_KEYWORDS = Set{
+          "if", "elif", "else", "endif", "for", "endfor", "set", "endset",
+          "with", "endwith", "raw", "endraw", "filter", "endfilter",
+          "block", "endblock", "macro", "endmacro", "call", "endcall",
+          "autoescape", "endautoescape", "trans", "endtrans", "pluralize",
+          "comment", "endcomment", "include", "import", "from", "extends", "do",
+        }
+
+        # True when a BLOCK_OPEN_RE match is really a Jinja control tag, not a
+        # shortcode opener. Parenthesized args are decisive: no Jinja control
+        # form matching BLOCK_OPEN_RE carries `name(...)` (Jinja's own
+        # `{% include "x.html" %}` / `{% call(u) m(l) %}` don't match the
+        # regex at all), so `{% include(name="promo") %}` is a user shortcode
+        # named `include` and must keep expanding.
+        private def control_tag_open?(m : Regex::MatchData) : Bool
+          return false if m[2]? # `name(...)` form — unambiguously a shortcode call
+          CRINJA_CONTROL_KEYWORDS.includes?(m[1].downcase)
+        end
+
+        # Next BLOCK_OPEN_RE match at or after byte offset `from` that is a
+        # real shortcode opener, skipping Crinja/Jinja control tags. Bare
+        # keyword tags (`{% endif %}`, `{% else %}`, `{% raw %}`) and
+        # assignment tags (`{% set x = 1 %}`) match BLOCK_OPEN_RE too;
+        # counting them as block openers desynced the nesting scan — a block
+        # shortcode whose body contained `{% if %}…{% endif %}` never found
+        # its `{% end %}` and leaked its opening tag as literal text.
+        private def next_block_open(content : String, from : Int32) : Regex::MatchData?
+          pos = from
+          while m = BLOCK_OPEN_RE.match_at_byte_index(content, pos)
+            return m unless control_tag_open?(m)
+            pos = m.byte_begin + m[0].bytesize
+          end
+          nil
+        end
+
         # Stack-based block shortcode parser that correctly handles nested
         # block shortcodes of the same type. Scans for opening tags {% name(...) %}
         # and closing tags {% end %}, tracking nesting depth to pair them correctly.
+        #
+        # The scan works in BYTE offsets (match_at_byte_index / byte_begin /
+        # byte_slice): char-position `Regex#match(str, pos)` converts the char
+        # index to a byte index — O(pos) on non-ASCII strings — and
+        # `MatchData#begin` converts back, so every tag scanned on a CJK page
+        # cost O(document). All offsets come from regex matches, so slices
+        # always land on character boundaries.
         private def process_block_shortcodes(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32, spans : Array(String) = [] of String) : String
-          open_re = BLOCK_OPEN_RE
           close_re = BLOCK_CLOSE_RE
 
           result = String::Builder.new
           pos = 0
+          content_bytesize = content.bytesize
 
-          while pos < content.size
-            # Find next opening tag
-            open_match = open_re.match(content, pos)
+          # Memoized scans: a match found ahead of the cursor stays the next
+          # match until the cursor passes it, so re-running the regex from
+          # every new position is pure waste — consuming each stray
+          # `{% end %}` used to rescan every control tag ahead of it,
+          # quadratic on keyword-dense pages (Jinja documentation).
+          cached_open : Regex::MatchData? = nil
+          cached_close : Regex::MatchData? = nil
+
+          while pos < content_bytesize
+            # Find next opening tag (control tags skipped)
+            open_match = if (c = cached_open) && c.byte_begin >= pos
+                           c
+                         else
+                           cached_open = next_block_open(content, pos)
+                         end
             # Find next closing tag (to handle stray {% end %} gracefully)
-            close_match = close_re.match(content, pos)
+            close_match = if (c = cached_close) && c.byte_begin >= pos
+                            c
+                          else
+                            cached_close = close_re.match_at_byte_index(content, pos)
+                          end
 
             # No more opening tags — append rest and done
             unless open_match
-              result << content[pos..]
+              result << content.byte_slice(pos)
               break
             end
 
-            open_start = open_match.begin
+            open_start = open_match.byte_begin
 
             # If a close tag appears before the next open tag, it's unmatched — emit as-is
             if close_match
-              close_start = close_match.begin
+              close_start = close_match.byte_begin
               if close_start < open_start
-                result << content[pos..close_start + close_match[0].size - 1]
-                pos = close_start + close_match[0].size
+                close_end = close_start + close_match[0].bytesize
+                result << content.byte_slice(pos, close_end - pos)
+                pos = close_end
                 next
               end
             end
 
             # Emit text before the opening tag
-            result << content[pos...open_start]
+            result << content.byte_slice(pos, open_start - pos)
 
             name = open_match[1]
             args_str = open_match[2]? || open_match[3]?
-            body_start = open_start + open_match[0].size
+            body_start = open_start + open_match[0].bytesize
 
             # `{% end %}` is the closing-tag literal; BLOCK_OPEN_RE happens to
             # match it too (since `end` is a valid identifier), but treating
@@ -296,23 +356,35 @@ module Hwaro
               next
             end
 
-            # Find the matching {% end %} by tracking nesting depth
+            # Find the matching {% end %} by tracking nesting depth. Same
+            # memoization as the outer loop: matches ahead of scan_pos stay
+            # valid until the scan passes them.
             nesting = 1
             scan_pos = body_start
             body_end = nil
+            nest_open : Regex::MatchData? = nil
+            nest_close : Regex::MatchData? = nil
 
-            while nesting > 0 && scan_pos < content.size
-              next_open = open_re.match(content, scan_pos)
-              next_close = close_re.match(content, scan_pos)
+            while nesting > 0 && scan_pos < content_bytesize
+              next_open = if (c = nest_open) && c.byte_begin >= scan_pos
+                            c
+                          else
+                            nest_open = next_block_open(content, scan_pos)
+                          end
+              next_close = if (c = nest_close) && c.byte_begin >= scan_pos
+                             c
+                           else
+                             nest_close = close_re.match_at_byte_index(content, scan_pos)
+                           end
 
               break unless next_close
-              next_close_start = next_close.begin
+              next_close_start = next_close.byte_begin
 
               if next_open
-                next_open_start = next_open.begin
+                next_open_start = next_open.byte_begin
                 if next_open_start < next_close_start
                   nesting += 1
-                  scan_pos = next_open_start + next_open[0].size
+                  scan_pos = next_open_start + next_open[0].bytesize
                   next
                 end
               end
@@ -320,9 +392,9 @@ module Hwaro
               nesting -= 1
               if nesting == 0
                 body_end = next_close_start
-                pos = next_close_start + next_close[0].size
+                pos = next_close_start + next_close[0].bytesize
               else
-                scan_pos = next_close_start + next_close[0].size
+                scan_pos = next_close_start + next_close[0].bytesize
               end
             end
 
@@ -333,7 +405,7 @@ module Hwaro
               next
             end
 
-            body = content[body_start...body_end].strip
+            body = content.byte_slice(body_start, body_end - body_start).strip
 
             # Recursively process nested shortcodes in body (with depth limit).
             # The body is already masked by the caller, so recurse through the
@@ -351,7 +423,7 @@ module Hwaro
             unmasked_args = args_str.try { |a| unmask_inline_code(a, spans) }
 
             extra_args = {"body" => body}
-            original_text = content[open_start...pos]
+            original_text = content.byte_slice(open_start, pos - open_start)
             result << render_shortcode_result(name, unmasked_args, templates, context, shortcode_results, original_text, warn_missing: true, extra_args: extra_args, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
           end
 
@@ -403,16 +475,19 @@ module Hwaro
 
           # Built-in shortcodes read named slots (`{{ id }}`, `{{ src }}`, ...),
           # so the documented positional form (`{{ youtube("ID") }}`) only
-          # reaches them after we alias each `_N` to the corresponding named
-          # parameter declared in `BuiltinShortcodes::POSITIONAL_PARAMS`.
-          # Named arguments always win — we only fill slots the caller did
-          # not already provide.
+          # reaches them after we alias each `_N` to a named parameter from
+          # `BuiltinShortcodes::POSITIONAL_PARAMS`. Positional values fill the
+          # declared slots IN ORDER, skipping slots the caller already
+          # provided by name — `{{ gist(user="u", "abc") }}` maps "abc" to
+          # `id`, not to the named-consumed `user` slot (indexing purely by
+          # positional order silently dropped such values).
           if positional = BuiltinShortcodes.positional_params(template_key)
-            positional.each_with_index do |param_name, idx|
+            pos_idx = 0
+            positional.each do |param_name|
               next if args.has_key?(param_name)
-              if value = args["_#{idx}"]?
-                args[param_name] = value
-              end
+              break unless value = args["_#{pos_idx}"]?
+              args[param_name] = value
+              pos_idx += 1
             end
           end
 
@@ -427,36 +502,44 @@ module Hwaro
           end
         end
 
-        # Parse shortcode arguments — supports both named and positional
+        # A token that starts as `identifier =` is a named argument; anything
+        # else (quoted strings, bare values, URLs whose query carries `=`) is
+        # positional.
+        NAMED_TOKEN_RE = /\A[A-Za-z_]\w*\s*=/
+
+        # Parse shortcode arguments — supports named, positional, and MIXED
         # Named:      key="value", key='value', key=value
-        # Positional:  "value", 'value', value (assigned as _0, _1, ...)
+        # Positional: "value", 'value', value (assigned as _0, _1, ...)
+        # Mixed:      "value", key="v"  — positional slots fill in order
+        #
+        # Single pass: tokenize once on top-level commas (quote-aware, so
+        # `figure("/i.png", "a, b")` keeps the comma inside the caption),
+        # then classify each token. Named tokens are scanned with
+        # SHORTCODE_ARGS_REGEX so space-separated pairs in one token
+        # (`key1="a" key2="b"`) keep working; everything else is positional.
+        # Scanning per-token (not whole-string) also stops the named-arg
+        # regex from extracting phantom keys out of a quoted positional
+        # (`{{ youtube("…?v=abc", width="560") }}` used to yield v="abc").
+        # Previously positionals were parsed only when NO named arg was
+        # present, so the documented mixed form silently dropped them.
         private def parse_shortcode_args_jinja(args_str : String?) : Hash(String, String)
           args = {} of String => String
           return args unless args_str
           return args if args_str.strip.empty?
 
-          # First try named arguments. Require an identifier-equals at an arg
-          # boundary so an `=` embedded in a positional/quoted value (a URL
-          # query string like `?v=2`) doesn't trip the named-arg branch.
-          has_named = args_str.matches?(NAMED_ARG_RE)
-          if has_named
-            args_str.scan(SHORTCODE_ARGS_REGEX) do |match|
-              key = match[1]
-              value = match[2]? || match[3]? || match[4]? || ""
-              args[key] = value
-            end
-          end
+          idx = 0
+          split_shortcode_args(args_str).each do |part|
+            token = part.strip
+            next if token.empty?
 
-          # If no named args found, try positional
-          if args.empty?
-            idx = 0
-            args_str.split(",").each do |part|
-              value = part.strip
-              # Strip surrounding quotes
-              if (value.starts_with?('"') && value.ends_with?('"')) ||
-                 (value.starts_with?('\'') && value.ends_with?('\''))
-                value = value[1..-2]
+            if token.matches?(NAMED_TOKEN_RE)
+              token.scan(SHORTCODE_ARGS_REGEX) do |match|
+                key = match[1]
+                value = match[2]? || match[3]? || match[4]? || ""
+                args[key] = value
               end
+            else
+              value = unquote_shortcode_arg(token)
               next if value.empty?
               args["_#{idx}"] = value
               idx += 1
@@ -464,6 +547,40 @@ module Hwaro
           end
 
           args
+        end
+
+        # Split an argument string on top-level commas; commas inside single-
+        # or double-quoted values belong to the value.
+        private def split_shortcode_args(args_str : String) : Array(String)
+          parts = [] of String
+          current = String::Builder.new
+          quote : Char? = nil
+          args_str.each_char do |ch|
+            if q = quote
+              current << ch
+              quote = nil if ch == q
+            elsif ch == '"' || ch == '\''
+              quote = ch
+              current << ch
+            elsif ch == ','
+              parts << current.to_s
+              current = String::Builder.new
+            else
+              current << ch
+            end
+          end
+          parts << current.to_s
+          parts
+        end
+
+        # Strip one layer of surrounding quotes from an argument value.
+        private def unquote_shortcode_arg(value : String) : String
+          if value.size >= 2 && ((value.starts_with?('"') && value.ends_with?('"')) ||
+             (value.starts_with?('\'') && value.ends_with?('\'')))
+            value[1..-2]
+          else
+            value
+          end
         end
 
         # Render a shortcode template with Crinja

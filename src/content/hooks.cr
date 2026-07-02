@@ -2,7 +2,6 @@
 #
 # Exports all content-related lifecycle hooks.
 
-require "./hooks/markdown_hooks"
 require "./hooks/seo_hooks"
 require "./hooks/taxonomy_hooks"
 require "./hooks/asset_hooks"
@@ -14,10 +13,16 @@ require "./hooks/image_hooks"
 module Hwaro
   module Content
     module Hooks
-      # Factory method to get all default hooks
+      # Factory method to get all default hooks.
+      #
+      # Markdown parsing/rendering is NOT hook-based: the builder's
+      # ParseContent and Render phases own it. A historical MarkdownHooks
+      # hookable duplicated that entire pipeline sequentially (its output
+      # was overwritten by the phases) and was removed — front-matter
+      # parsing, draft filtering, URL calculation, summary rendering, and
+      # markdown transforms all live in the phase implementations now.
       def self.all : Array(Core::Lifecycle::Hookable)
         [
-          MarkdownHooks.new,
           SeoHooks.new,
           TaxonomyHooks.new,
           AssetHooks.new,
