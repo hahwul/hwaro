@@ -2,7 +2,6 @@
 #
 # Exports all content-related lifecycle hooks.
 
-require "./hooks/markdown_hooks"
 require "./hooks/seo_hooks"
 require "./hooks/taxonomy_hooks"
 require "./hooks/asset_hooks"
@@ -16,16 +15,12 @@ module Hwaro
     module Hooks
       # Factory method to get all default hooks.
       #
-      # MarkdownHooks is intentionally NOT registered: the builder's
-      # ParseContent phase default only steps aside for a BeforeParseContent
-      # hook (parse_content.cr), and MarkdownHooks registered at
-      # AfterReadContent/BeforeRender — so every one of its file reads,
-      # front-matter parses, summary renders, and sequential whole-site
-      # markdown renders was immediately redone (in parallel, with cascades
-      # and template-name normalization) by the ParseContent/Render phases.
-      # Removing it halves the markdown work per build; the only output it
-      # contributed — `page.content` for cache-hit pages that Generate's
-      # feeds/search read — is covered by their render_body_cached fallback.
+      # Markdown parsing/rendering is NOT hook-based: the builder's
+      # ParseContent and Render phases own it. A historical MarkdownHooks
+      # hookable duplicated that entire pipeline sequentially (its output
+      # was overwritten by the phases) and was removed — front-matter
+      # parsing, draft filtering, URL calculation, summary rendering, and
+      # markdown transforms all live in the phase implementations now.
       def self.all : Array(Core::Lifecycle::Hookable)
         [
           SeoHooks.new,

@@ -83,14 +83,15 @@ module Hwaro
               page_url = page.url.starts_with?("/") ? page.url : "/#{page.url}"
               url = HTML.escape("#{base_path}#{page_url}")
               # `query`/`anchor` are usually captured out of already-rendered
-              # HTML, where Markd has escaped entities (`&` is already
-              # `&amp;`) — blindly re-escaping produced `&amp;amp;`, a literal
-              # `&amp;` in the link target. Unescape-then-escape yields
-              # exactly one level of escaping for both rendered input and
-              # raw `&` input (e.g. TableParser cells).
-              url += "?#{HTML.escape(HTML.unescape(query))}" unless query.empty?
+              # HTML, where Markd has escaped `&` to `&amp;` — blindly
+              # re-escaping produced `&amp;amp;`, a literal `&amp;` in the
+              # link target. Collapse ONLY `&amp;` before escaping (not a full
+              # HTML.unescape: that decodes semicolon-less legacy entities, so
+              # a raw query like `?a=1&copy=2` would corrupt to `©=2`). One
+              # escaping level results for both rendered and raw `&` input.
+              url += "?#{HTML.escape(query.gsub("&amp;", "&"))}" unless query.empty?
               if anchor && !anchor.empty?
-                "href=\"#{url}##{HTML.escape(HTML.unescape(anchor))}\""
+                "href=\"#{url}##{HTML.escape(anchor.gsub("&amp;", "&"))}\""
               else
                 "href=\"#{url}\""
               end

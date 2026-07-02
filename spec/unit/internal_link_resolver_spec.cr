@@ -127,6 +127,22 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc#sec">link</a>)
     end
 
+    it "does not double-escape an already-rendered &amp; in a query string" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md?page=2&amp;sort=asc">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
+      result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
+    end
+
+    it "does not decode semicolon-less legacy entities in query params" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      # `&copy` is a legacy no-semicolon entity — a full HTML.unescape would
+      # turn `?a=1&copy=2` into `?a=1©=2`, destroying the parameter.
+      html = %(<a href="@/blog/post.md?a=1&copy=2">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
+      result.should eq %(<a href="/blog/post/?a=1&amp;copy=2">link</a>)
+    end
+
     it "ignores a host-only base_url instead of prefixing it onto links" do
       pages = {"a.md" => make_page("a.md", "/a/")}
       html = %(<a href="@/a.md">x</a>)

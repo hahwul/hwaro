@@ -257,16 +257,10 @@ module Hwaro::Core::Build::Phases::Transform
       # the render-phase site.taxonomies matches what the generator writes —
       # otherwise get_taxonomy("authors") is empty at render and get_taxonomy_url
       # falls back to undisambiguated slugs that miss colliding author pages.
-      site.config.taxonomies.each do |tax|
-        name = tax.name
-        next if name.strip.empty?
-        next if page.taxonomies.has_key?(name) # already merged in the loop above
-        page.taxonomy_values(name).each do |term|
-          next if term.strip.empty?
-          site.taxonomies[name] ||= {} of String => Array(Models::Page)
-          site.taxonomies[name][term] ||= [] of Models::Page
-          site.taxonomies[name][term] << page
-        end
+      each_property_backed_taxonomy_term(page, site) do |name, term|
+        site.taxonomies[name] ||= {} of String => Array(Models::Page)
+        site.taxonomies[name][term] ||= [] of Models::Page
+        site.taxonomies[name][term] << page
       end
     end
 
@@ -278,6 +272,25 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Yield each {name, term} a page carries via a taxonomy whose terms live on
+  # a dedicated Page property (authors — see Page#taxonomy_values) rather
+  # than in page.taxonomies. ONE implementation drives rebuild_taxonomies,
+  # update_taxonomies_incremental, and snapshot_page_taxonomies — an
+  # asymmetry between those three is exactly how serve-mode taxonomy
+  # staleness arises (a term the snapshot missed is never removed, a term
+  # the add-side missed never appears).
+  private def each_property_backed_taxonomy_term(page : Models::Page, site : Models::Site, & : String, String ->)
+    site.config.taxonomies.each do |tax|
+      name = tax.name
+      next if name.strip.empty?
+      next if page.taxonomies.has_key?(name) # already carried by page.taxonomies
+      page.taxonomy_values(name).each do |term|
+        next if term.strip.empty?
+        yield name, term
+      end
+    end
+  end
+
   # Snapshot a page's taxonomy assignments BEFORE re-parsing, including
   # taxonomies whose terms live on dedicated Page properties (authors) that
   # page.taxonomies doesn't carry. update_taxonomies_incremental's removal
@@ -285,12 +298,8 @@ module Hwaro::Core::Build::Phases::Transform
   # whose `authors` changed kept its old author-term membership forever.
   protected def snapshot_page_taxonomies(page : Models::Page, site : Models::Site) : Hash(String, Array(String))
     snapshot = page.taxonomies.transform_values(&.dup)
-    site.config.taxonomies.each do |tax|
-      name = tax.name
-      next if name.strip.empty?
-      next if snapshot.has_key?(name)
-      values = page.taxonomy_values(name).reject(&.strip.empty?)
-      snapshot[name] = values unless values.empty?
+    each_property_backed_taxonomy_term(page, site) do |name, term|
+      (snapshot[name] ||= [] of String) << term
     end
     snapshot
   end
@@ -341,18 +350,12 @@ module Hwaro::Core::Build::Phases::Transform
       # Property-backed taxonomies ("authors" — see rebuild_taxonomies) don't
       # live in page.taxonomies, so the loop above misses them and a serve-mode
       # edit to `authors` frontmatter never reached site.taxonomies until the
-      # next full build. Mirror rebuild_taxonomies' taxonomy_values patching.
-      site.config.taxonomies.each do |tax|
-        name = tax.name
-        next if name.strip.empty?
-        next if page.taxonomies.has_key?(name) # already merged above
-        page.taxonomy_values(name).each do |term|
-          next if term.strip.empty?
-          site.taxonomies[name] ||= {} of String => Array(Models::Page)
-          site.taxonomies[name][term] ||= [] of Models::Page
-          site.taxonomies[name][term] << page
-          affected_tax_keys << {name, term}
-        end
+      # next full build.
+      each_property_backed_taxonomy_term(page, site) do |name, term|
+        site.taxonomies[name] ||= {} of String => Array(Models::Page)
+        site.taxonomies[name][term] ||= [] of Models::Page
+        site.taxonomies[name][term] << page
+        affected_tax_keys << {name, term}
       end
     end
 

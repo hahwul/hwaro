@@ -352,16 +352,10 @@ module Hwaro::Core::Build::Phases::Initialize
 
     digest = Digest::MD5.new
     paths.sort!.each do |path|
-      content = File.read(path)
-      # Length-prefix both fields so adjacent path/content pairs can't
-      # collide across boundaries (the "a"+"bc" vs "ab"+"c" ambiguity) —
-      # same reason fingerprint_string in parse_content.cr length-prefixes.
-      digest.update(path.bytesize.to_s)
-      digest.update(":")
-      digest.update(path)
-      digest.update(content.bytesize.to_s)
-      digest.update(":")
-      digest.update(content)
+      # Length-prefixed (see DigestUtils) so adjacent path/content pairs
+      # can't collide across boundaries.
+      Utils::DigestUtils.update_length_prefixed(digest, path)
+      Utils::DigestUtils.update_length_prefixed(digest, File.read(path))
     end
     digest.final.hexstring
   end

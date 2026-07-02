@@ -439,7 +439,7 @@ module Hwaro
         # HTML stripping and emoji.
         private def self.rendered_body_fallback(page : Models::Page, config : Models::Config) : String
           md = config.markdown
-          Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, markdown_config: md)
+          Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, lazy_loading: md.lazy_loading, markdown_config: md)
         end
 
         # Hard-truncate plain text to `limit` characters with an ellipsis.

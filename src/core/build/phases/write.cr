@@ -138,18 +138,31 @@ module Hwaro::Core::Build::Phases::Write
         # an asset's relative path somehow climbs out of the bundle.
         next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
 
-        # Skip unchanged assets. The Write phase runs on every build — even
-        # fully-cached ones — so image-heavy page bundles otherwise pay full
-        # copy I/O each time. Same size + destination at least as new as the
-        # source means the copy is already current.
-        if (src_info = File.info?(source_path)) && (dest_info = File.info?(dest_path))
-          if src_info.size == dest_info.size && src_info.modification_time <= dest_info.modification_time
+        # Skip unchanged assets. The Write phase runs on every build with a
+        # surviving output dir (serve rebuilds, --preserve-output), so
+        # image-heavy page bundles otherwise pay full copy I/O each time.
+        # The copy below stamps the destination with the SOURCE mtime, so
+        # size + exact mtime equality identifies "this exact source version
+        # was already copied". A `src <= dest` ordering check instead would
+        # skip forever when an asset is replaced by a same-size file with an
+        # older preserved mtime (rsync -a / tar -x restoring a revision).
+        src_info = File.info?(source_path)
+        if src_info && (dest_info = File.info?(dest_path))
+          if src_info.size == dest_info.size && src_info.modification_time == dest_info.modification_time
             next
           end
         end
 
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
         FileUtils.cp(source_path, dest_path)
+        if src_info
+          begin
+            File.utime(Time.utc, src_info.modification_time, dest_path)
+          rescue File::Error
+            # Stamping is an optimization; a failure just means the next
+            # build recopies this asset.
+          end
+        end
         Logger.action :copy, dest_path, :blue if verbose
       end
     end

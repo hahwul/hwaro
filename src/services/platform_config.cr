@@ -310,7 +310,8 @@ module Hwaro
         end
       end
 
-      # Calculate the URL for a page, mirroring the logic in MarkdownHooks#calculate_page_url.
+      # Calculate the URL for a page, mirroring the ParseContent phase's
+      # calculate_page_url (src/core/build/phases/parse_content.cr).
       # Handles slug overrides, custom_path, permalinks, and index pages.
       private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?) : String
         directory_path = Path[relative_path].dirname.to_s

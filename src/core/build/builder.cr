@@ -42,6 +42,7 @@ require "../../content/seo/jsonld"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
+require "../../utils/digest_utils"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/logger"
@@ -1099,6 +1100,13 @@ module Hwaro
         # search index, optionally robots) for the given page set. Each
         # generator writes a distinct output file with no shared in-process
         # state, so task order doesn't affect output.
+        #
+        # `raise_on_error: false`: these are the serve-time passes (watch
+        # incremental, fast-start deferred). A transient generator failure
+        # must warn-and-continue here — raising would skip cache.save, the
+        # deferred-pages cleanup, and the live-reload signal even though
+        # every page rendered fine. The cold-build Generate phase keeps the
+        # fail-loud default via its own ParallelHelper.execute call.
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
@@ -1110,7 +1118,7 @@ module Hwaro
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
           seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
           seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
-          ParallelHelper.execute(seo_tasks, parallel)
+          ParallelHelper.execute(seo_tasks, parallel, raise_on_error: false)
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

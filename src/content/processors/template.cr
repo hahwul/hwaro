@@ -561,39 +561,18 @@ module Hwaro
                 # to_unix_ms (Int64) like the build cache — to_unix_ns is Int128
                 mtime = info.modification_time.to_unix_ms
 
-                cached = @@load_data_mutex.synchronize { @@load_data_cache[resolved]? }
-                if cached && cached[0] == mtime
-                  result = cached[1]
-                else
-                  content = File.read(resolved)
-
-                  parsed : Crinja::Value? = nil
-                  if path.ends_with?(".json")
-                    # Parse JSON
-                    json_data = JSON.parse(content)
-                    parsed = json_to_crinja(json_data)
-                  elsif path.ends_with?(".toml")
-                    # Parse TOML
-                    toml_data = TOML.parse(content)
-                    parsed = toml_to_crinja(toml_data)
-                  elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
-                    # Parse YAML
-                    yaml_data = YAML.parse(content)
-                    parsed = yaml_to_crinja(yaml_data)
-                  elsif path.ends_with?(".csv")
-                    # Parse CSV using stdlib parser (handles quoted fields correctly)
-                    csv_data = CSV.parse(content).map do |row|
-                      Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
-                    end
-                    parsed = Crinja::Value.new(csv_data)
+                # One lock across lookup + parse: data files are tiny, and it
+                # also means N parallel workers cold-starting on the same
+                # file parse it once instead of racing to parse in duplicate.
+                result = @@load_data_mutex.synchronize do
+                  cached = @@load_data_cache[resolved]?
+                  if cached && cached[0] == mtime
+                    cached[1]
+                  elsif parsed = parse_data_content(path, File.read(resolved))
+                    @@load_data_cache[resolved] = {mtime, parsed}
+                    parsed
                   else
-                    ext = File.extname(path)
-                    Logger.debug "load_data('#{path}'): unsupported file type '#{ext}' (supported: .json, .toml, .yaml, .yml, .csv)"
-                  end
-
-                  if parsed
-                    @@load_data_mutex.synchronize { @@load_data_cache[resolved] = {mtime, parsed} }
-                    result = parsed
+                    Crinja::Value.new(nil)
                   end
                 end
               end
@@ -603,6 +582,27 @@ module Hwaro
             end
 
             result
+          end
+        end
+
+        # Parse a data file's content by the extension carried on `path` (the
+        # template-facing argument). Returns nil for unsupported types.
+        private def parse_data_content(path : String, content : String) : Crinja::Value?
+          if path.ends_with?(".json")
+            json_to_crinja(JSON.parse(content))
+          elsif path.ends_with?(".toml")
+            toml_to_crinja(TOML.parse(content))
+          elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
+            yaml_to_crinja(YAML.parse(content))
+          elsif path.ends_with?(".csv")
+            # Parse CSV using stdlib parser (handles quoted fields correctly)
+            csv_data = CSV.parse(content).map do |row|
+              Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
+            end
+            Crinja::Value.new(csv_data)
+          else
+            Logger.debug "load_data('#{path}'): unsupported file type '#{File.extname(path)}' (supported: .json, .toml, .yaml, .yml, .csv)"
+            nil
           end
         end
 

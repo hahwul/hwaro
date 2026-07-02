@@ -221,24 +221,23 @@ module Hwaro::Core::Build::Phases::Render
     batch_num = 0
 
     # Create the per-worker Crinja envs and compiled-template caches ONCE
-    # for the whole streaming render. Each batch's worker count can never
-    # exceed the first (largest) batch's, so a pool sized lazily on the
-    # first parallel batch covers the rest. Without this, every batch
-    # rebuilt worker_count envs and re-parsed the shared template ASTs
-    # from empty caches — worker_count × batch_count setup cost.
+    # for the whole streaming render — every batch used to rebuild
+    # worker_count envs and re-parse the shared template ASTs from empty
+    # caches (worker_count × batch_count setup cost). Sized for the first
+    # batch, which each_slice guarantees is the largest.
     env_pool : Array(Crinja)? = nil
     template_cache_pool : Array(Hash(UInt64, Crinja::Template))? = nil
+    if parallel && pages.size > 1
+      pool_size = ParallelConfig.new(enabled: true, max_workers: @render_workers).calculate_workers(Math.min(batch_size, pages.size))
+      env_pool = Array.new(pool_size) { create_fresh_crinja_env }
+      template_cache_pool = Array.new(pool_size) { {} of UInt64 => Crinja::Template }
+    end
 
     pages.each_slice(batch_size) do |batch|
       batch_num += 1
       Logger.debug "  Streaming batch #{batch_num} (#{batch.size} pages)"
 
       count = if parallel && batch.size > 1
-                if env_pool.nil?
-                  pool_size = ParallelConfig.new(enabled: true, max_workers: @render_workers).calculate_workers(batch.size)
-                  env_pool = Array.new(pool_size) { create_fresh_crinja_env }
-                  template_cache_pool = Array.new(pool_size) { {} of UInt64 => Crinja::Template }
-                end
                 process_files_parallel(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler, env_pool: env_pool, template_cache_pool: template_cache_pool)
               else
                 process_files_sequential(batch, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
@@ -263,6 +262,14 @@ module Hwaro::Core::Build::Phases::Render
           "related_posts_crinja",
           reset_stats: false,
         )
+        # Also drop the per-worker compiled-template caches: a layout whose
+        # shortcodes expand per page compiles a distinct AST per page, and a
+        # pool shared across ALL batches would grow O(total pages) — exactly
+        # the unbounded footprint streaming exists to avoid. Clearing every
+        # Nth batch keeps cross-batch reuse for the common shared templates
+        # while re-bounding growth (base templates recompile once per
+        # interval per worker — negligible).
+        template_cache_pool.try(&.each(&.clear))
         GC.collect
       end
     end

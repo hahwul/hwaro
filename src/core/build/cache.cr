@@ -6,6 +6,7 @@
 
 require "digest/md5"
 require "json"
+require "../../utils/digest_utils"
 require "../../utils/logger"
 require "../../models/config"
 
@@ -229,22 +230,14 @@ module Hwaro
               # Refresh the stored mtime so the NEXT build takes the mtime fast
               # path — otherwise every subsequent warm build re-hashes the file
               # (unchanged entries skip #update, so nothing else repairs it).
+              # `entry` is a struct copy, so mutating the local and storing it
+              # back keeps every other field intact without a hand-maintained
+              # field-by-field reconstruction.
+              refreshed = entry
+              refreshed.mtime = current_mtime
               @mutex.synchronize do
-                if current = @entries[file_path]?
-                  # Only touch entries nobody else replaced since our read.
-                  if current.mtime == entry.mtime
-                    @entries[file_path] = CacheEntry.new(
-                      path: current.path,
-                      mtime: current_mtime,
-                      hash: current.hash,
-                      output_path: current.output_path,
-                      template_hash: current.template_hash,
-                      config_hash: current.config_hash,
-                      cascade_hash: current.cascade_hash,
-                    )
-                    @dirty = true
-                  end
-                end
+                @entries[file_path] = refreshed
+                @dirty = true
               end
               return false
             end
@@ -424,19 +417,14 @@ module Hwaro
         end
 
         # Compute a combined checksum for a set of template files.
-        # Fields are length-prefixed so adjacent name/content pairs can't
-        # produce the same byte stream across boundaries (the "a"+"bc" vs
-        # "ab"+"c" ambiguity), which would have failed to invalidate.
+        # Fields are length-prefixed (see DigestUtils) so adjacent
+        # name/content pairs can't produce the same byte stream across
+        # boundaries, which would have failed to invalidate.
         def self.compute_templates_hash(templates : Hash(String, String)) : String
           digest = Digest::MD5.new
           templates.keys.sort!.each do |name|
-            source = templates[name]
-            digest.update(name.bytesize.to_s)
-            digest.update(":")
-            digest.update(name)
-            digest.update(source.bytesize.to_s)
-            digest.update(":")
-            digest.update(source)
+            Utils::DigestUtils.update_length_prefixed(digest, name)
+            Utils::DigestUtils.update_length_prefixed(digest, templates[name])
           end
           digest.final.hexstring
         end
@@ -461,19 +449,11 @@ module Hwaro
           digest = Digest::MD5.new
           # Length-prefixed for the same boundary-ambiguity reason as
           # compute_templates_hash.
-          [env || "", config.base_url].each do |field|
-            digest.update(field.bytesize.to_s)
-            digest.update(":")
-            digest.update(field)
-          end
+          Utils::DigestUtils.update_length_prefixed(digest, env || "")
+          Utils::DigestUtils.update_length_prefixed(digest, config.base_url)
           config.raw.keys.sort!.each do |key|
-            value = config.raw[key].to_s
-            digest.update(key.bytesize.to_s)
-            digest.update(":")
-            digest.update(key)
-            digest.update(value.bytesize.to_s)
-            digest.update(":")
-            digest.update(value)
+            Utils::DigestUtils.update_length_prefixed(digest, key)
+            Utils::DigestUtils.update_length_prefixed(digest, config.raw[key].to_s)
           end
           digest.final.hexstring
         end

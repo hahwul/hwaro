@@ -33,11 +33,6 @@ describe Hwaro::Content::Hooks do
       hooks.any?(Hwaro::Content::Hooks::PwaHooks).should be_true
     end
 
-    it "does not include MarkdownHooks (its work is done by the ParseContent/Render phases)" do
-      hooks = Hwaro::Content::Hooks.all
-      hooks.any?(Hwaro::Content::Hooks::MarkdownHooks).should be_false
-    end
-
     it "includes SeoHooks" do
       hooks = Hwaro::Content::Hooks.all
       hooks.any?(Hwaro::Content::Hooks::SeoHooks).should be_true
