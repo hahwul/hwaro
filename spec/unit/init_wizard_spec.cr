@@ -61,8 +61,17 @@ describe Hwaro::CLI::Commands::InitWizard do
     options.not_nil!.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
   end
 
-  it "seeds the directory prompt from a bare path positional" do
-    options = run_init_wizard("\n\n\n\n", seed_path: "seeded-site")
+  it "skips the directory prompt when a path positional is given" do
+    log = with_captured_log do
+      with_wizard_input("\n\n\n") do
+        Hwaro::CLI::Commands::InitWizard.new.run("seeded-site")
+      end
+    end
+
+    log.should_not contain "Directory"
+    log.should contain "seeded-site"
+
+    options = run_init_wizard("\n\n\n", seed_path: "seeded-site")
     options.should_not be_nil
     options.not_nil!.path.should eq("seeded-site")
   end

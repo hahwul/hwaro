@@ -81,7 +81,7 @@ Create a new site:
 
 ```bash
 hwaro init                    # interactive wizard (TTY): scaffold, title, dark toggle
-hwaro init my-site            # wizard with the directory pre-filled
+hwaro init my-site            # wizard; directory prompt skipped (path taken from arg)
 hwaro init my-site -y         # skip the wizard, use defaults
 hwaro init my-site --scaffold blog
 hwaro init my-site --scaffold docs
@@ -94,8 +94,8 @@ Running `hwaro init` with no option flags in an interactive terminal opens a
 guided wizard: it asks for the directory, a scaffold (picked from the base
 scaffolds, with a "Dark theme?" toggle for the ones that have a dark preset),
 and the site title, then shows a summary and asks to confirm before writing
-anything. A bare path argument (`hwaro init my-site`) still opens the wizard
-with the directory pre-filled.
+anything. When a path argument is given (`hwaro init my-site`), the wizard
+still runs but skips the directory prompt and uses that path directly.
 
 Pass `-y`/`--yes` to skip the wizard and initialize with defaults. Any other
 flag also skips it, as do non-interactive contexts (pipes, CI, `--quiet`), so

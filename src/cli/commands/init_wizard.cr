@@ -33,13 +33,19 @@ module Hwaro
 
         # Returns the collected `InitOptions`, or `nil` on cancellation — a
         # declined confirmation or an EOF (Ctrl-D) on any prompt — so the
-        # caller can bail out without creating anything. A bare `path`
-        # positional (e.g. `hwaro init my-site`) seeds the directory default.
+        # caller can bail out without creating anything. A `path` positional
+        # (e.g. `hwaro init my-site`) skips the directory prompt and uses that
+        # path directly; a bare `hwaro init` still asks.
         def run(seed_path : String? = nil) : Config::Options::InitOptions?
-          Logger.heading("init")
-
-          path = Prompt.ask("Directory", default: seed_path || ".")
-          return if path.nil?
+          path = if seed = seed_path
+                   Logger.heading("init", seed == "." ? nil : seed)
+                   seed
+                 else
+                   Logger.heading("init")
+                   asked = Prompt.ask("Directory", default: ".")
+                   return if asked.nil?
+                   asked
+                 end
 
           labels = BASE_ORDER.map do |type|
             "#{type} — #{Services::Scaffolds::Registry.get(type).description}"

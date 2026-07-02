@@ -67,8 +67,9 @@ module Hwaro
             return
           end
 
-          # A bare interactive invocation (`hwaro init` / `hwaro init path`
+          # A bare interactive invocation (`hwaro init` or `hwaro init <path>`
           # with no option flags on a real terminal) gets the guided wizard.
+          # A supplied path skips the directory prompt inside the wizard.
           # Any flag — including --yes — plus non-TTY and quiet sessions keep
           # the flag path byte-identical for scripts and CI.
           if wizard_eligible?(args)
