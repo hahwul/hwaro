@@ -326,8 +326,9 @@ module Hwaro
               next
             end
 
-            # Snapshot before re-parse
-            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            # Snapshot before re-parse (includes property-backed taxonomies
+            # like authors — see snapshot_page_taxonomies)
+            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
             old_series_names[page.path] = page.series
             old_neighbors[page.path] = {page.lower, page.higher}
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
@@ -581,8 +582,9 @@ module Hwaro
               next
             end
 
-            # Snapshot before re-parse
-            old_taxonomies_snapshot[page.path] = page.taxonomies.transform_values(&.dup)
+            # Snapshot before re-parse (includes property-backed taxonomies
+            # like authors — see snapshot_page_taxonomies)
+            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
             old_series_names[page.path] = page.series
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
 

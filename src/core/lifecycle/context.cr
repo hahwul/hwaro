@@ -80,6 +80,14 @@ module Hwaro
         # becomes visible.
         property profiler : Hwaro::Profiler?
 
+        # True when the global page/section set changed since the previous
+        # cached build (page added/removed, listing metadata moved). Set by
+        # the Render phase BEFORE it records the new fingerprints — Generate
+        # can't re-check the cache itself at that point — so the SEO/search
+        # `skip_if_unchanged` fast path doesn't keep a deleted page in the
+        # sitemap/search index when no surviving page happened to re-render.
+        property page_or_section_set_changed : Bool = false
+
         @all_pages_cache : Array(Models::Page)?
 
         def initialize(@options : Config::Options::BuildOptions)

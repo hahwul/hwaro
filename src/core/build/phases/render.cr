@@ -33,6 +33,10 @@ module Hwaro::Core::Build::Phases::Render
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
+                       # Publish the set-change signal for the Generate phase
+                       # BEFORE recording overwrites the stored fingerprints.
+                       ctx.page_or_section_set_changed =
+                         build_cache.page_set_changed?(page_set_fp) || build_cache.section_set_changed?(section_set_fp)
                        # Don't record under fast-start: deferred listing pages
                        # render in a later pass, so persisting the new fingerprint
                        # now would let the next build skip them while stale.

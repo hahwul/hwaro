@@ -525,6 +525,16 @@ module Hwaro
           end
         end
 
+        # Memoized load_data results, shared across engine instances (each
+        # parallel render worker gets its own env, so an instance cache would
+        # miss on every worker). Keyed by resolved path; the stored mtime
+        # invalidates naturally when the data file changes, so `serve`
+        # sessions pick up edits. Mutex-guarded — workers call load_data
+        # concurrently under -Dpreview_mt. Without this, a load_data() call
+        # in a base layout re-read and re-parsed the file once per page.
+        @@load_data_cache = {} of String => {Int64, Crinja::Value}
+        @@load_data_mutex = Mutex.new
+
         private def register_data_function
           # load_data() function - load data from JSON/TOML/YAML files
           # Usage: {% set data = load_data(path="data/menu.json") %}
@@ -547,30 +557,43 @@ module Hwaro
 
               if resolved &&
                  (resolved == project_root || resolved.starts_with?(project_root + "/")) &&
-                 File.exists?(resolved) && File.file?(resolved)
-                content = File.read(resolved)
+                 (info = File.info?(resolved)) && info.file?
+                mtime = info.modification_time.to_unix_ns
 
-                if path.ends_with?(".json")
-                  # Parse JSON
-                  json_data = JSON.parse(content)
-                  result = json_to_crinja(json_data)
-                elsif path.ends_with?(".toml")
-                  # Parse TOML
-                  toml_data = TOML.parse(content)
-                  result = toml_to_crinja(toml_data)
-                elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
-                  # Parse YAML
-                  yaml_data = YAML.parse(content)
-                  result = yaml_to_crinja(yaml_data)
-                elsif path.ends_with?(".csv")
-                  # Parse CSV using stdlib parser (handles quoted fields correctly)
-                  csv_data = CSV.parse(content).map do |row|
-                    Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
-                  end
-                  result = Crinja::Value.new(csv_data)
+                cached = @@load_data_mutex.synchronize { @@load_data_cache[resolved]? }
+                if cached && cached[0] == mtime
+                  result = cached[1]
                 else
-                  ext = File.extname(path)
-                  Logger.debug "load_data('#{path}'): unsupported file type '#{ext}' (supported: .json, .toml, .yaml, .yml, .csv)"
+                  content = File.read(resolved)
+
+                  parsed : Crinja::Value? = nil
+                  if path.ends_with?(".json")
+                    # Parse JSON
+                    json_data = JSON.parse(content)
+                    parsed = json_to_crinja(json_data)
+                  elsif path.ends_with?(".toml")
+                    # Parse TOML
+                    toml_data = TOML.parse(content)
+                    parsed = toml_to_crinja(toml_data)
+                  elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
+                    # Parse YAML
+                    yaml_data = YAML.parse(content)
+                    parsed = yaml_to_crinja(yaml_data)
+                  elsif path.ends_with?(".csv")
+                    # Parse CSV using stdlib parser (handles quoted fields correctly)
+                    csv_data = CSV.parse(content).map do |row|
+                      Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
+                    end
+                    parsed = Crinja::Value.new(csv_data)
+                  else
+                    ext = File.extname(path)
+                    Logger.debug "load_data('#{path}'): unsupported file type '#{ext}' (supported: .json, .toml, .yaml, .yml, .csv)"
+                  end
+
+                  if parsed
+                    @@load_data_mutex.synchronize { @@load_data_cache[resolved] = {mtime, parsed} }
+                    result = parsed
+                  end
                 end
               end
             rescue ex

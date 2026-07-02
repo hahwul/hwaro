@@ -278,6 +278,23 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # Snapshot a page's taxonomy assignments BEFORE re-parsing, including
+  # taxonomies whose terms live on dedicated Page properties (authors) that
+  # page.taxonomies doesn't carry. update_taxonomies_incremental's removal
+  # step reads this snapshot — without the property-backed terms, a page
+  # whose `authors` changed kept its old author-term membership forever.
+  protected def snapshot_page_taxonomies(page : Models::Page, site : Models::Site) : Hash(String, Array(String))
+    snapshot = page.taxonomies.transform_values(&.dup)
+    site.config.taxonomies.each do |tax|
+      name = tax.name
+      next if name.strip.empty?
+      next if snapshot.has_key?(name)
+      values = page.taxonomy_values(name).reject { |t| t.strip.empty? }
+      snapshot[name] = values unless values.empty?
+    end
+    snapshot
+  end
+
   # Incremental taxonomy update: only remove/add entries for changed pages.
   # Returns the set of affected {taxonomy_name, term} pairs. Tuples rather
   # than "name:term" strings: a taxonomy name containing ":" would make the
@@ -315,6 +332,23 @@ module Hwaro::Core::Build::Phases::Transform
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
         terms.each do |term|
+          site.taxonomies[name][term] ||= [] of Models::Page
+          site.taxonomies[name][term] << page
+          affected_tax_keys << {name, term}
+        end
+      end
+
+      # Property-backed taxonomies ("authors" — see rebuild_taxonomies) don't
+      # live in page.taxonomies, so the loop above misses them and a serve-mode
+      # edit to `authors` frontmatter never reached site.taxonomies until the
+      # next full build. Mirror rebuild_taxonomies' taxonomy_values patching.
+      site.config.taxonomies.each do |tax|
+        name = tax.name
+        next if name.strip.empty?
+        next if page.taxonomies.has_key?(name) # already merged above
+        page.taxonomy_values(name).each do |term|
+          next if term.strip.empty?
+          site.taxonomies[name] ||= {} of String => Array(Models::Page)
           site.taxonomies[name][term] ||= [] of Models::Page
           site.taxonomies[name][term] << page
           affected_tax_keys << {name, term}

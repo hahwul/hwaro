@@ -88,6 +88,23 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("**bold**")
     end
 
+    it "pairs a block shortcode whose body contains Jinja control tags" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      # {% if %}/{% endif %} inside the body must not count toward block
+      # nesting — previously {% endif %} matched as an opener, the {% end %}
+      # was never paired, and the whole shortcode leaked as literal text.
+      content = "{% note(type=\"info\") %}before {% if title %}x{% endif %} after{% end %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<div class=\"note\">")
+      result.should contain("before")
+      result.should contain("after")
+      result.should_not contain("{% note")
+    end
+
     it "accepts named closers like {% endnote %}" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
@@ -385,6 +402,26 @@ describe Hwaro::Core::Build::Builder do
       args = builder.test_parse_shortcode_args_jinja(%(type="warning"))
       args["type"].should eq("warning")
       args.has_key?("_0").should be_false
+    end
+
+    it "keeps positional args when mixed with named args" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("dQw4w9WgXcQ", width="560"))
+      args["_0"].should eq("dQw4w9WgXcQ")
+      args["width"].should eq("560")
+    end
+
+    it "keeps a comma inside a quoted positional value" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("warning", "Be careful, really!"))
+      args["_0"].should eq("warning")
+      args["_1"].should eq("Be careful, really!")
+    end
+
+    it "does not misparse a URL query = inside a positional value as a named arg" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%("https://example.com/watch?v=abc&t=10"))
+      args["_0"].should eq("https://example.com/watch?v=abc&t=10")
     end
 
     it "renders shortcode with positional args" do
