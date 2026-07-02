@@ -324,14 +324,15 @@ module Hwaro
     end
 
     # Print a command heading. No-ops in quiet; degrades to "hwaro: kind title"
-    # when color is off (no glyph, no rule).
+    # when color is off (no glyph, no rule; middots flattened like the other
+    # plain forms).
     def self.heading(kind : String, title : String? = nil) : Nil
       return if @@quiet
       clear_active_line
       if color_enabled?
         @@io.puts heading_str(kind, title)
       else
-        @@io.puts(title ? "hwaro: #{kind} #{title}" : "hwaro: #{kind}")
+        @@io.puts(title ? "hwaro: #{kind} #{title.gsub(" · ", ", ")}" : "hwaro: #{kind}")
       end
     end
 
@@ -426,7 +427,7 @@ module Hwaro
       end
 
       def render_plain : String
-        lines = [@title ? "hwaro: #{@kind} #{@title}" : "hwaro: #{@kind}"]
+        lines = [(t = @title) ? "hwaro: #{@kind} #{t.gsub(" · ", ", ")}" : "hwaro: #{@kind}"]
         @rows.each do |r|
           val = r.value.gsub(" · ", ", ")
           val = "#{val}, #{r.emphasis}" if r.emphasis

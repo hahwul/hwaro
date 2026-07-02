@@ -10,11 +10,11 @@
 #                                                      # (not committed — design self-review)
 #
 # Output:
-#   docs/static/images/scaffolds/scaffold-<name>.png          (1280x800)
+#   docs/static/images/scaffolds/scaffold-<name>.png            (1280x800)
 #   /tmp/hwaro-scaffold-previews-dark/scaffold-<name>-dark.png  (--dark only)
 #
-# Requires headless Chrome/Chromium on PATH (google-chrome, chromium, or
-# the macOS Google Chrome app bundle).
+# Sites are served (not opened via file://) because asset URLs are absolute
+# against base_url. Requires headless Chrome/Chromium.
 set -euo pipefail
 
 if [ ! -f "bin/hwaro" ]; then
@@ -26,6 +26,7 @@ HWARO_BIN="$(pwd)/bin/hwaro"
 PROJECT_ROOT="$(pwd)"
 OUT_DIR="$PROJECT_ROOT/docs/static/images/scaffolds"
 DARK_OUT_DIR="/tmp/hwaro-scaffold-previews-dark"
+PORT="${HWARO_PREVIEW_PORT:-3799}"
 CAPTURE_DARK=false
 [ "${1:-}" = "--dark" ] && CAPTURE_DARK=true
 
@@ -57,12 +58,42 @@ LIGHT_SCAFFOLDS=(simple blog docs book)
 mkdir -p "$OUT_DIR"
 $CAPTURE_DARK && mkdir -p "$DARK_OUT_DIR"
 
-shoot() {
-    # shoot <built-site-dir> <output-png>
+SERVER_PID=""
+stop_server() {
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" >/dev/null 2>&1 || true
+        wait "$SERVER_PID" 2>/dev/null || true
+        SERVER_PID=""
+    fi
+}
+trap stop_server EXIT
+
+# serve_and_shoot <site-dir> <output-png>
+serve_and_shoot() {
+    "$HWARO_BIN" serve -p "$PORT" --base-url "http://127.0.0.1:$PORT" -q >/dev/null 2>&1 &
+    SERVER_PID=$!
+    for _ in $(seq 1 100); do
+        curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1 && break
+        sleep 0.1
+    done
     "$CHROME" --headless --disable-gpu --hide-scrollbars \
         --window-size=1280,800 \
         --screenshot="$2" \
-        "file://$1/index.html" >/dev/null 2>&1
+        "http://127.0.0.1:$PORT/" >/dev/null 2>&1
+    stop_server
+}
+
+# Pin the resolved scheme. The scaffolds are auto light+dark
+# (color-scheme: light dark), so an unpinned capture would follow the
+# machine's OS scheme; the committed previews must be deterministic.
+# Appending `dark` is byte-identical to what the *-dark presets ship.
+force_scheme() {
+    if [ -f "static/css/style.css" ]; then
+        printf '\n:root { color-scheme: %s; }\n' "$1" >>static/css/style.css
+    elif [ -f "templates/header.html" ]; then
+        # simple inlines its CSS — inject the override into the shared head.
+        SCHEME="$1" perl -0pi -e 's#</head>#<style>:root { color-scheme: $ENV{SCHEME}; }</style>\n</head>#' templates/header.html
+    fi
 }
 
 echo ""
@@ -76,22 +107,18 @@ for scaffold in "${SCAFFOLDS[@]}"; do
     pushd "$TMP" >/dev/null
 
     "$HWARO_BIN" init . --scaffold "$scaffold" --skip-agents-md -q
-    "$HWARO_BIN" build -q
 
-    shoot "$TMP/public" "$OUT_DIR/scaffold-${scaffold}.png"
+    # Light scaffolds are pinned light for the committed shot (a *-dark
+    # sheet already ends in a forced-dark rule, so it needs no pin).
+    if [[ " ${LIGHT_SCAFFOLDS[*]} " == *" ${scaffold} "* ]]; then
+        force_scheme light
+    fi
+    serve_and_shoot "$TMP" "$OUT_DIR/scaffold-${scaffold}.png"
 
-    # Forced-dark self-review shot: appending the same rule the *-dark
-    # presets ship flips every light-dark() token, byte-identical to the
-    # preset mechanism.
     if $CAPTURE_DARK && [[ " ${LIGHT_SCAFFOLDS[*]} " == *" ${scaffold} "* ]]; then
-        if [ -f "$TMP/public/css/style.css" ]; then
-            printf '\n:root { color-scheme: dark; }\n' >>"$TMP/public/css/style.css"
-        else
-            # simple inlines its CSS — inject the override into the page head.
-            find "$TMP/public" -name "*.html" -exec \
-                perl -0pi -e 's#</head>#<style>:root { color-scheme: dark; }</style></head>#' {} +
-        fi
-        shoot "$TMP/public" "$DARK_OUT_DIR/scaffold-${scaffold}-dark.png"
+        # Appended after the light pin — the later rule wins.
+        force_scheme dark
+        serve_and_shoot "$TMP" "$DARK_OUT_DIR/scaffold-${scaffold}-dark.png"
     fi
 
     popd >/dev/null
@@ -102,3 +129,4 @@ done
 echo "──────────────────────────────────────────────"
 echo "Previews written to $OUT_DIR"
 $CAPTURE_DARK && echo "Dark self-review shots in $DARK_OUT_DIR"
+exit 0
