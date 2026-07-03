@@ -1133,7 +1133,7 @@ describe Hwaro::Services::ChangeSet do
         removed_files: [] of String,
         config_changed: false,
       )
-      cs.description.should eq("2 content file(s)")
+      cs.description.should eq("2 content files")
     end
 
     it "describes mixed changes" do
@@ -1145,7 +1145,7 @@ describe Hwaro::Services::ChangeSet do
         removed_files: [] of String,
         config_changed: true,
       )
-      cs.description.should eq("1 content, 1 template, 1 added, config file(s)")
+      cs.description.should eq("1 content, 1 template, 1 added files, config")
     end
 
     it "describes content-asset and removed buckets" do
@@ -1158,7 +1158,7 @@ describe Hwaro::Services::ChangeSet do
         config_changed: false,
         modified_content_files: ["content/a/cover.jpg"],
       )
-      cs.description.should eq("1 content-asset, 1 removed file(s)")
+      cs.description.should eq("1 content-asset, 1 removed files")
     end
   end
 

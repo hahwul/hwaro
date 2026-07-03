@@ -35,10 +35,15 @@ describe "terminal style lint" do
   end
 
   it "uses only GLYPHS-registry status glyphs in terminal output" do
-    banned = ["✔", "✘", "[DEAD]", "└─"]
+    banned = ["✔", "✘", "[DEAD]"]
+    # Tree connectors are registry glyphs (:tree_mid / :tree_last); a literal
+    # anywhere but the registry itself bypasses the ASCII fallback and the
+    # Dim paint, so it stays banned outside logger.cr.
+    connectors = ["├─", "└─"]
     offenders = output_surface_files.select do |path|
       content = File.read(path)
-      banned.any? { |glyph| content.includes?(glyph) }
+      next true if banned.any? { |glyph| content.includes?(glyph) }
+      path != "src/utils/logger.cr" && connectors.any? { |glyph| content.includes?(glyph) }
     end
     offenders.should be_empty
   end

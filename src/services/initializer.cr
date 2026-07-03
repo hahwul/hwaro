@@ -17,9 +17,18 @@ require "./config_snippets"
 module Hwaro
   module Services
     class Initializer
+      # One scaffold write, remembered instead of streamed: TTY output renders
+      # the collected entries as a grouped tree at the end (24 near-identical
+      # "create" lines collapse into one line per top-level entry), while
+      # plain/piped output replays them as the historical per-file
+      # "      create  path" lines, byte-for-byte.
+      private record ScaffoldEntry, action : Symbol, path : String, dir : Bool
+
       # Counts files/directories actually created so the closing receipt can
       # report "N files" (existing entries left in place are not counted).
       @created_count = 0
+
+      @entries = [] of ScaffoldEntry
 
       def run(options : Config::Options::InitOptions)
         scaffold = if remote = options.scaffold_remote
@@ -95,10 +104,16 @@ module Hwaro
         end
 
         # The wizard already rendered the heading and a scaffold/title receipt;
-        # printing them again here would double the header beat.
+        # printing them again here would double the header beat. The TTY form
+        # sits on the 4-space grid with the tree below it; the plain form
+        # keeps its historical 2-space indent.
         unless from_wizard
           Logger.heading("init", target_path == "." ? nil : target_path)
-          Logger.info "  #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
+          if Logger.color_enabled?
+            Logger.info "    #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
+          else
+            Logger.info "  scaffold  #{scaffold.description}"
+          end
         end
 
         is_multilingual = multilingual_languages.size > 1
@@ -205,14 +220,91 @@ module Hwaro
         end
 
         display_target = target_path == "." ? "." : "#{target_path}/"
-        Logger.outcome("created", "#{@created_count} files · #{display_target}")
-        Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
-        Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
+        emit_scaffold_log(target_path)
+        if Logger.color_enabled?
+          # Close the frame like a Receipt: dim rule, ember outcome, then
+          # hint rows whose labels align under the outcome verb.
+          Logger.info "  #{Logger.paint("─" * (Logger::RECEIPT_WIDTH - 2), Logger::Role::Dim)}"
+          Logger.outcome("created", "#{@created_count} files · #{display_target}")
+          hint_col = "created".size
+          Logger.info "    #{Logger.paint("next".ljust(hint_col), Logger::Role::Dim)}  hwaro build · hwaro serve to preview"
+          Logger.info "    #{Logger.paint("deploy".ljust(hint_col), Logger::Role::Dim)}  set base_url in config.toml first (defaults to http://localhost:3000)"
+        else
+          Logger.outcome("created", "#{@created_count} files · #{display_target}")
+          Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
+          Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
+        end
+      end
+
+      # Emit the collected scaffold writes. Plain output replays the exact
+      # per-file action lines the CLI has always printed (scripts and specs
+      # match on them); a colored TTY gets the grouped tree instead.
+      private def emit_scaffold_log(target_path : String)
+        return if Logger.quiet?
+        if Logger.color_enabled?
+          emit_scaffold_tree(target_path)
+        else
+          @entries.each do |entry|
+            role = entry.action == :exist ? Logger::Role::Dim : Logger::Role::Success
+            Logger.action entry.action, entry.path, role
+          end
+        end
+      end
+
+      # Grouped tree summary of the scaffold: one row per top-level entry in
+      # creation order, with a dim per-group note (file count, notable
+      # subdirectories, kept-existing count). Dirs get a trailing slash.
+      private def emit_scaffold_tree(target_path : String)
+        group_order = [] of String
+        group_dir = {} of String => Bool
+        created = Hash(String, Int32).new(0)
+        kept = Hash(String, Int32).new(0)
+        subdirs = {} of String => Array(String)
+
+        @entries.each do |entry|
+          rel = Path[entry.path].relative_to(target_path).to_s
+          next if rel == "." || rel.empty?
+          parts = rel.split('/')
+          top = parts.first
+          unless group_dir.has_key?(top)
+            group_order << top
+            group_dir[top] = entry.dir || parts.size > 1
+          end
+          if parts.size == 1
+            kept[top] += 1 if entry.action == :exist && !entry.dir
+          elsif entry.dir
+            (subdirs[top] ||= [] of String) << parts[1] if parts.size == 2
+          else
+            entry.action == :exist ? (kept[top] += 1) : (created[top] += 1)
+          end
+        end
+        return if group_order.empty?
+
+        width = group_order.max_of { |name| name.size + (group_dir[name] ? 1 : 0) }
+        group_order.each_with_index do |name, i|
+          connector = Logger.glyph(i == group_order.size - 1 ? :tree_last : :tree_mid)
+          display = group_dir[name] ? "#{name}/" : name
+          notes = [] of String
+          if group_dir[name]
+            n = created[name]
+            notes << "#{n} #{n == 1 ? "file" : "files"}" if n > 0
+            subdirs[name]?.try(&.uniq.each { |d| notes << "#{d}/" })
+          end
+          notes << "#{kept[name]} kept" if kept[name] > 0
+          # Pad only when a note follows, so bare rows carry no trailing blanks.
+          line = "    #{connector} "
+          if notes.empty?
+            line += display
+          else
+            line += "#{display.ljust(width)}  #{Logger.paint(notes.join(" · "), Logger::Role::Dim)}"
+          end
+          Logger.info line
+        end
       end
 
       # Write each {relative_path => content} entry under base_dir, creating
       # parent directories on demand. Hash iteration order is preserved, so the
-      # @created_count tally and Logger.action sequence are unchanged.
+      # @created_count tally and the recorded entry sequence are unchanged.
       private def write_files(base_dir : String, files : Hash(String, String))
         files.each do |relative_path, content|
           full_path = File.join(base_dir, relative_path)
@@ -330,21 +422,21 @@ module Hwaro
 
       private def create_directory(path : String)
         if Dir.exists?(path)
-          Logger.action :exist, path, Logger::Role::Dim
+          @entries << ScaffoldEntry.new(:exist, path, dir: true)
         else
           Hwaro::Utils::FileSafe.mkdir_p(path)
           @created_count += 1
-          Logger.action :create, path
+          @entries << ScaffoldEntry.new(:create, path, dir: true)
         end
       end
 
       private def create_file(path : String, content : String)
         if File.exists?(path)
-          Logger.action :exist, path, Logger::Role::Dim
+          @entries << ScaffoldEntry.new(:exist, path, dir: false)
         else
           File.write(path, content)
           @created_count += 1
-          Logger.action :create, path
+          @entries << ScaffoldEntry.new(:create, path, dir: false)
         end
       end
 

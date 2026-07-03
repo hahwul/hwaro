@@ -100,17 +100,17 @@ module Hwaro
       @total_start = Time.instant
     end
 
-    # Start timing a phase
+    # Start timing a phase. Phase-level timing is collected even when full
+    # profiling is disabled — it costs two clock reads per phase and feeds
+    # the per-row timings in the build receipt. The detailed per-template /
+    # per-page collectors and all reports stay gated on `--profile`.
     def start_phase(phase : String)
-      return unless @enabled
       @current_phase = phase
       @phase_start = Time.instant
     end
 
     # End timing for the current phase
     def end_phase
-      return unless @enabled
-
       phase_start = @phase_start
       current_phase = @current_phase
       return unless phase_start && current_phase
@@ -119,6 +119,19 @@ module Hwaro
       @phases << PhaseTime.new(current_phase, duration)
       @current_phase = nil
       @phase_start = nil
+    end
+
+    # Total recorded time for a named phase (summed across repeats), or `nil`
+    # when the phase never ran. Lets the build receipt show per-row timings.
+    def phase_ms(phase : String) : Float64?
+      total = 0.0
+      found = false
+      @phases.each do |entry|
+        next unless entry.phase == phase
+        total += entry.duration_ms
+        found = true
+      end
+      found ? total : nil
     end
 
     # Get total elapsed time
