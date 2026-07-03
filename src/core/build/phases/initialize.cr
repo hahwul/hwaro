@@ -287,10 +287,53 @@ module Hwaro::Core::Build::Phases::Initialize
     # (Re)build the template dependency graph for selective invalidation
     @template_deps = TemplateDeps.new(templates)
 
+    # Precompute, per template source, whether the shortcode processor could
+    # rewrite it — apply_template consults this to skip its per-page scan.
+    # Rebuilt together with the templates hash so serve-mode template edits
+    # can't read a stale decision.
+    @template_shortcode_scan.clear
+    templates.each_value do |source|
+      @template_shortcode_scan[source.hash] = shortcode_scan_needed?(source)
+    end
+
+    compute_template_var_features(templates)
+
     # Initialize Crinja environment with file system loader
     @crinja_env = setup_crinja_env
 
     @templates = templates
+  end
+
+  # Decide, per entry template, which expensive per-page variables its static
+  # closure can reach (see Builder::TemplateVarFeatures). A template is gated
+  # only when every closure member resolves to a loaded source (an unknown
+  # include leaves the closure incomplete) and no member can carry shortcodes.
+  private def compute_template_var_features(templates : Hash(String, String))
+    @template_var_features.clear
+    deps = @template_deps
+    return unless deps
+    # A dynamic include (`{% include var %}`) makes every closure incomplete.
+    return if deps.dynamic?
+
+    templates.each_key do |name|
+      closure = deps.closure(name)
+      sources = closure.compact_map { |dep| templates[dep]? }
+      next unless sources.size == closure.size
+      next unless sources.all? { |src| @template_shortcode_scan[src.hash]? == false }
+
+      union = sources.join('\n')
+      # NOTE: "og_all_tags" is NOT a substring of "og_tags" (or vice versa) —
+      # both must be listed, or a template using only {{ og_all_tags }}
+      # would lose its OG block.
+      @template_var_features[name] = Builder::TemplateVarFeatures.new(
+        needs_seo: union.includes?("og_tags") || union.includes?("og_all_tags") ||
+                   union.includes?("twitter_tags") ||
+                   union.includes?("canonical_tag") || union.includes?("hreflang_tags") ||
+                   union.includes?("seo"),
+        needs_jsonld: union.includes?("jsonld"),
+        needs_section_pages: union.includes?("section"),
+      )
+    end
   end
 
   # Setup Crinja environment with custom filters, tests, and functions

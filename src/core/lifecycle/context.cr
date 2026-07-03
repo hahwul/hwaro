@@ -82,6 +82,12 @@ module Hwaro
         # becomes visible.
         property profiler : Hwaro::Profiler?
 
+        # The Builder driving this run. Hooks that render through a Builder
+        # (taxonomy generation) reuse it — its Crinja value caches are warm
+        # with every page already converted — instead of constructing a fresh
+        # Builder that re-converts the whole site a second time.
+        property builder : Build::Builder?
+
         # True when the global page/section set changed since the previous
         # cached build (page added/removed, listing metadata moved). Set by
         # the Render phase BEFORE it records the new fingerprints — Generate
