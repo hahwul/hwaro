@@ -137,6 +137,12 @@ module Hwaro
         # `math: true` keeps `$…$` spans in <dt>/<dd> bodies untransformed
         # for the later math pass (see InlineMarkdown.render).
         def preprocess_definition_lists(content : String, *, math : Bool = false) : String
+          # Whole-content marker pre-check (memchr-fast): every definition line
+          # must lstrip-start with ": " (see the loop conditions below), so a
+          # content without ": " anywhere cannot contain a definition list and
+          # the walk is the identity transform — skip it.
+          return content unless content.includes?(": ")
+
           lines = content.split("\n")
 
           tracker = FenceTracker.new
@@ -221,6 +227,17 @@ module Hwaro
         end
 
         def preprocess_footnotes(content : String) : String
+          # Whole-content marker pre-check (memchr-fast): without `[^` there is
+          # no footnote definition or reference to process, and without the
+          # HWARO comment markers the neutralization gsubs below are identity —
+          # skipping keeps both the output AND the in-band-injection defense
+          # exactly as before. Any page passing this check transforms as today.
+          unless content.includes?("[^") ||
+                 content.includes?("<!--HWARO-FN") ||
+                 content.includes?("<!--HWARO-FOOTNOTES-")
+            return content
+          end
+
           # Neutralize any author-typed HWARO FOOTNOTE markers up front so page
           # content that literally contains the engine's internal comment markers
           # (e.g. docs about hwaro, or a malicious multi-author contributor) can't

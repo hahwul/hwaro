@@ -253,12 +253,13 @@ module Hwaro
         # @param content - markdown content to render
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
-        def render(content : String, highlight : Bool = true, safe : Bool = false) : String
+        def render(content : String, highlight : Bool = true, safe : Bool = false, *, tables_preprocessed : Bool = false) : String
           # Pre-process tables before passing to markd (markd doesn't support
           # GFM tables). Markdown#render already converts tables before the
-          # extension passes, making this a cheap no-op there — it stays for
-          # direct callers of SyntaxHighlighter.render.
-          processed_content = TableParser.process(content)
+          # extension passes and passes `tables_preprocessed: true` to skip the
+          # redundant per-page scan — the default stays for direct callers of
+          # SyntaxHighlighter.render.
+          processed_content = tables_preprocessed ? content : TableParser.process(content)
 
           options = Markd::Options.new(safe: safe)
           document = Markd::Parser.parse(processed_content, options)
