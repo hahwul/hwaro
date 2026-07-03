@@ -112,6 +112,30 @@ module Hwaro
         @profiler : Profiler?
         @crinja_env : Crinja?
         @compiled_templates_cache : Hash(UInt64, Crinja::Template) = {} of UInt64 => Crinja::Template
+        # Per-template "can the shortcode processor rewrite this?" decision,
+        # keyed by template-source hash. Populated once in load_templates
+        # (single-threaded Initialize phase), read-only during render — lets
+        # apply_template skip the per-page shortcode scan over template
+        # strings that contain no shortcode tokens. A missing key means
+        # "unknown": process as before.
+        @template_shortcode_scan : Hash(UInt64, Bool) = {} of UInt64 => Bool
+        # Which expensive per-page template variables a template's static
+        # closure can actually reach. build_template_variables skips building
+        # the ones it provably can't (SEO/OG strings, JSON-LD strings, the
+        # per-page section-pages array copy — O(section size) per page).
+        # Detection is substring-based over the closure's source union, so it
+        # only ever over-approximates: any occurrence of the identifier keeps
+        # the variable. A template is only gated when its whole closure is
+        # statically resolvable AND it cannot contain shortcodes (template
+        # shortcodes render with the same vars hash and could read anything).
+        record TemplateVarFeatures,
+          needs_seo : Bool,
+          needs_jsonld : Bool,
+          needs_section_pages : Bool
+        # Keyed by entry template NAME (closure semantics are per-name).
+        # Populated once in load_templates, read-only during render. Missing
+        # key means "unknown": build everything, exactly as before.
+        @template_var_features : Hash(String, TemplateVarFeatures) = {} of String => TemplateVarFeatures
         # Tracks shortcode template keys we've already warned about, so a
         # single typo used across many pages emits just one warning line.
         @shortcode_warnings_seen : Set(String)? = nil
@@ -149,6 +173,17 @@ module Hwaro
         # Crystal fibers are single-threaded by default, but this guards against
         # future multi-threaded mode (-Dpreview_mt) and ensures correctness.
         @crinja_cache_mutex : Mutex = Mutex.new(:reentrant)
+        # True only while the default (non-streaming) Render phase fan-out runs:
+        # prewarm_crinja_caches has filled every Crinja value cache the workers
+        # can read, no cache is written until the flag drops, and readers
+        # therefore skip @crinja_cache_mutex entirely (concurrent reads of a
+        # non-mutated Hash are safe). A frozen-path miss computes its value
+        # WITHOUT caching — prewarming makes that a rare one-off, so this can't
+        # reintroduce the per-page re-conversion regression that removing the
+        # mutex outright caused. Serve/incremental rebuilds, streaming mode
+        # (which clears caches mid-run), fast-start deferred renders, and
+        # rerenders all run with the flag false, i.e. the locked path.
+        @crinja_caches_frozen : Bool = false
         # Mutex to protect created_dirs set during parallel rendering
         @created_dirs_mutex : Mutex = Mutex.new
         # Explicit render-worker count from `--jobs` (0 = auto/CPU-based).
@@ -535,7 +570,7 @@ module Hwaro
           # generators read so taxonomy.sitemap/feed take effect on incremental
           # rebuilds too (mirrors the lifecycle taxonomy hook). `all_pages` is
           # left intact for the rebuild summary below.
-          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
@@ -729,7 +764,7 @@ module Hwaro
           if affected_templates.nil? ||
              (force_pages && !force_pages.empty?) ||
              ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
-            Content::Taxonomies.generate(site, output_dir, templates, verbose)
+            Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
           end
 
           cache.save if options.cache
@@ -828,7 +863,7 @@ module Hwaro
           # into the page set. Previously taxonomy generation ran after the
           # sitemap, so its pages never appeared in it (taxonomy.sitemap/feed
           # had no effect on this deferred pass).
-          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose)
+          taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
           all_pages = (site.pages + site.sections + taxonomy_sections).as(Array(Models::Page))
           regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel)
 
@@ -1023,6 +1058,7 @@ module Hwaro
           ctx = Lifecycle::BuildContext.new(options)
           ctx.stats.start_time = Time.instant
           ctx.profiler = profiler if profiler.enabled?
+          ctx.builder = self
           @context = ctx
 
           # Reset internal caches (preserve @config loaded above)

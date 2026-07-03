@@ -27,7 +27,7 @@ module Hwaro
           site = ctx.site
           return unless site
 
-          sections = Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose)
+          sections = Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose, builder: ctx.builder)
           return if sections.empty?
 
           # Register the generated taxonomy pages so the SEO generators include

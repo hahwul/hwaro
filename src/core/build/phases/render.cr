@@ -124,14 +124,26 @@ module Hwaro::Core::Build::Phases::Render
       # Stash for the Write phase's 404 page (see @render_global_vars).
       @render_global_vars = global_vars
       @pages_by_path = build_pages_by_path(site)
-      count = if ctx.options.streaming?
-                render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size)
-              elsif parallel && pages_to_build.size > 1
-                process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
-              else
-                process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
-              end
-      ctx.stats.pages_rendered = count
+      # Freeze the Crinja value caches for the fan-out so workers read them
+      # lock-free (see @crinja_caches_frozen). Streaming mode is excluded:
+      # it clears these caches every Nth batch and relies on lazy refill,
+      # which needs the locked read-write path.
+      unless ctx.options.streaming?
+        prewarm_crinja_caches(site, pages_to_build)
+        @crinja_caches_frozen = true
+      end
+      begin
+        count = if ctx.options.streaming?
+                  render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size)
+                elsif parallel && pages_to_build.size > 1
+                  process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
+                else
+                  process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
+                end
+        ctx.stats.pages_rendered = count
+      ensure
+        @crinja_caches_frozen = false
+      end
     end
     profiler.end_phase
     result
@@ -1044,14 +1056,21 @@ module Hwaro::Core::Build::Phases::Render
              update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links)
              pv
            else
-             build_template_variables(page, site, content, section_list, toc, toc_headers, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links)
+             build_template_variables(page, site, content, section_list, toc, toc_headers, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links,
+               features: template_name.try { |tn| @template_var_features[tn]? })
            end
 
     begin
       # Process shortcodes in template directly (skip per-line fence detection
-      # since templates don't contain markdown fenced code blocks)
-      processed_template = process_shortcodes_in_text(template, templates, vars,
-        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+      # since templates don't contain markdown fenced code blocks). Templates
+      # known to contain no shortcode tokens (precomputed in load_templates)
+      # skip the scan entirely; unknown sources are processed as before.
+      processed_template = if @template_shortcode_scan[template.hash]? == false
+                             template
+                           else
+                             process_shortcodes_in_text(template, templates, vars,
+                               crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                           end
 
       # Cache compiled Crinja templates by content hash.
       # Most pages share the same base template string, so this avoids
@@ -1133,63 +1152,135 @@ module Hwaro::Core::Build::Phases::Render
   # section page lists, and paginator rendering.  The cached value contains
   # a superset of fields needed by all consumers.
   private def cached_page_crinja_value(p : Models::Page, default_language : String) : Crinja::Value
+    if @crinja_caches_frozen
+      if cached = @page_crinja_value_cache[p.path]?
+        @cache_manager.record_hit("page_crinja_value")
+        return cached
+      end
+      # Rare by construction (prewarm covers every page the fan-out reads):
+      # compute without caching — writing here would race other readers.
+      @cache_manager.record_miss("page_crinja_value")
+      return build_page_crinja_value(p, default_language)
+    end
+
     @crinja_cache_mutex.synchronize do
       if cached = @page_crinja_value_cache[p.path]?
         @cache_manager.record_hit("page_crinja_value")
         next cached.as(Crinja::Value)
       end
       @cache_manager.record_miss("page_crinja_value")
-      begin
-        translations = p.translations.map do |t|
-          Crinja::Value.new({
-            "code"       => Crinja::Value.new(t.code),
-            "url"        => Crinja::Value.new(t.url),
-            "title"      => Crinja::Value.new(t.title),
-            "is_current" => Crinja::Value.new(t.is_current),
-            "is_default" => Crinja::Value.new(t.is_default),
+      val = build_page_crinja_value(p, default_language)
+      @page_crinja_value_cache[p.path] = val
+      val
+    end
+  end
+
+  private def build_page_crinja_value(p : Models::Page, default_language : String) : Crinja::Value
+    translations = p.translations.map do |t|
+      Crinja::Value.new({
+        "code"       => Crinja::Value.new(t.code),
+        "url"        => Crinja::Value.new(t.url),
+        "title"      => Crinja::Value.new(t.title),
+        "is_current" => Crinja::Value.new(t.is_current),
+        "is_default" => Crinja::Value.new(t.is_default),
+      })
+    end
+    Crinja::Value.new({
+      "path"         => Crinja::Value.new(p.path),
+      "title"        => Crinja::Value.new(p.title),
+      "description"  => Crinja::Value.new(p.description || ""),
+      "url"          => Crinja::Value.new(p.url),
+      "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+      "image"        => Crinja::Value.new(p.image || ""),
+      "section"      => Crinja::Value.new(p.section),
+      "draft"        => Crinja::Value.new(p.draft),
+      "toc"          => Crinja::Value.new(p.toc),
+      "render"       => Crinja::Value.new(p.render),
+      "is_index"     => Crinja::Value.new(p.is_index),
+      "generated"    => Crinja::Value.new(p.generated),
+      "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
+      "language"     => Crinja::Value.new(p.language || default_language),
+      "translations" => Crinja::Value.new(translations),
+      "weight"       => Crinja::Value.new(p.weight),
+      "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+      "word_count"   => Crinja::Value.new(p.word_count),
+      "reading_time" => Crinja::Value.new(p.reading_time),
+      # Leaf fields a full page_obj also exposes, so iterated lists
+      # (section.pages / site.pages / term.pages) match the documented Page
+      # shape. Only PAGE-LOCAL fields are cached here. `permalink` is omitted
+      # (computed lazily per-page during render), and `series_index` is
+      # omitted because it is recomputed from OTHER pages in the series — a
+      # cross-page value @page_crinja_value_cache cannot keep fresh on the
+      # incremental `serve` path, where only the changed page is invalidated.
+      "updated"         => Crinja::Value.new(p.updated.try(&.to_s("%Y-%m-%d")) || ""),
+      "in_search_index" => Crinja::Value.new(p.in_search_index),
+      "series"          => Crinja::Value.new(p.series || ""),
+      "tags"            => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
+      "authors"         => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
+      "taxonomies"      => taxonomies_crinja_for(p),
+      "assets"          => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
+      "extra"           => Crinja::Value.new(
+        p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
+          h[k] = Utils::CrinjaUtils.from_extra(v)
+        }),
+    })
+  end
+
+  private def build_ancestors_crinja(page : Models::Page) : Array(Crinja::Value)
+    page.ancestors.map do |ancestor|
+      Crinja::Value.new({
+        "title" => Crinja::Value.new(ancestor.title),
+        "url"   => Crinja::Value.new(ancestor.url),
+      })
+    end
+  end
+
+  # Fill every Crinja value cache the render fan-out can read, so the frozen
+  # (mutex-free) fast paths never miss on a default build. build_global_vars
+  # already converted every site page, taxonomy term page, and per-section
+  # page list; this covers the remainder: the rendered pages themselves
+  # (section objects are pages_to_build entries but not site.pages entries),
+  # per-section ancestors and assets, series lists, and related posts.
+  #
+  # Runs single-threaded before the workers spawn, so it writes the caches
+  # directly. Iterating pages in render order reproduces the sequential
+  # first-writer-wins winner for the shared per-section keys — under MT the
+  # old lazy fill was render-order racy; this makes it deterministic and
+  # equal to the single-threaded result.
+  private def prewarm_crinja_caches(site : Models::Site, pages : Array(Models::Page))
+    default_lang = site.config.default_language
+
+    pages.each do |page|
+      cached_page_crinja_value(page, default_lang)
+
+      ancestors_key = "#{page.section}:#{page.language}"
+      unless @ancestors_crinja_cache.has_key?(ancestors_key)
+        @ancestors_crinja_cache[ancestors_key] = build_ancestors_crinja(page)
+      end
+
+      unless page.section.empty?
+        # The shared per-section list + url index read by non-paginated pages.
+        cached_section_pages_with_index(page.section, page.language, site)
+
+        if !page.is_a?(Models::Section) && !@section_assets_crinja_cache.has_key?(page.section)
+          if section_page = site.section_for(page.section, page.language)
+            @section_assets_crinja_cache[page.section] = section_page.assets.map { |a| Crinja::Value.new(a) }
+          end
+        end
+      end
+
+      if series_name = page.series
+        unless @series_crinja_cache.has_key?(series_name)
+          @series_crinja_cache[series_name] = Crinja::Value.new(page.series_pages.map { |sp|
+            cached_page_crinja_value(sp, default_lang)
           })
         end
-        val = Crinja::Value.new({
-          "path"         => Crinja::Value.new(p.path),
-          "title"        => Crinja::Value.new(p.title),
-          "description"  => Crinja::Value.new(p.description || ""),
-          "url"          => Crinja::Value.new(p.url),
-          "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-          "image"        => Crinja::Value.new(p.image || ""),
-          "section"      => Crinja::Value.new(p.section),
-          "draft"        => Crinja::Value.new(p.draft),
-          "toc"          => Crinja::Value.new(p.toc),
-          "render"       => Crinja::Value.new(p.render),
-          "is_index"     => Crinja::Value.new(p.is_index),
-          "generated"    => Crinja::Value.new(p.generated),
-          "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
-          "language"     => Crinja::Value.new(p.language || default_language),
-          "translations" => Crinja::Value.new(translations),
-          "weight"       => Crinja::Value.new(p.weight),
-          "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
-          "word_count"   => Crinja::Value.new(p.word_count),
-          "reading_time" => Crinja::Value.new(p.reading_time),
-          # Leaf fields a full page_obj also exposes, so iterated lists
-          # (section.pages / site.pages / term.pages) match the documented Page
-          # shape. Only PAGE-LOCAL fields are cached here. `permalink` is omitted
-          # (computed lazily per-page during render), and `series_index` is
-          # omitted because it is recomputed from OTHER pages in the series — a
-          # cross-page value @page_crinja_value_cache cannot keep fresh on the
-          # incremental `serve` path, where only the changed page is invalidated.
-          "updated"         => Crinja::Value.new(p.updated.try(&.to_s("%Y-%m-%d")) || ""),
-          "in_search_index" => Crinja::Value.new(p.in_search_index),
-          "series"          => Crinja::Value.new(p.series || ""),
-          "tags"            => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
-          "authors"         => Crinja::Value.new(p.authors.map { |a| Crinja::Value.new(a) }),
-          "taxonomies"      => taxonomies_crinja_for(p),
-          "assets"          => Crinja::Value.new(p.assets.map { |a| Crinja::Value.new(a) }),
-          "extra"           => Crinja::Value.new(
-            p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
-              h[k] = Utils::CrinjaUtils.from_extra(v)
-            }),
+      end
+
+      unless page.related_posts.empty? || @related_posts_crinja_cache.has_key?(page.path)
+        @related_posts_crinja_cache[page.path] = Crinja::Value.new(page.related_posts.map { |rp|
+          cached_page_crinja_value(rp, default_lang)
         })
-        @page_crinja_value_cache[p.path] = val
-        val
       end
     end
   end
@@ -1222,28 +1313,43 @@ module Hwaro::Core::Build::Phases::Render
     site : Models::Site,
   ) : Array(Crinja::Value)
     cache_key = "#{section_name}:#{language}"
+    if @crinja_caches_frozen
+      if cached = @section_pages_crinja_cache[cache_key]?
+        @cache_manager.record_hit("section_pages_crinja")
+        return cached
+      end
+      @cache_manager.record_miss("section_pages_crinja")
+      return build_section_pages_crinja(section_name, language, site)
+    end
+
     @crinja_cache_mutex.synchronize do
       if cached = @section_pages_crinja_cache[cache_key]?
         @cache_manager.record_hit("section_pages_crinja")
         next cached.as(Array(Crinja::Value))
       end
       @cache_manager.record_miss("section_pages_crinja")
-      begin
-        pages = site.pages_for_section(section_name, language)
-
-        # Use section's sort_by setting if available, otherwise sort by title
-        section = site.section_for(section_name, language)
-        sort_by = section.try(&.sort_by) || "title"
-        reverse = section.try(&.reverse) || false
-        pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
-
-        default_lang = site.config.default_language
-        arr = pages.map { |p| page_to_crinja_list_value(p, default_lang) }
-        @section_pages_crinja_cache[cache_key] = arr
-        @section_pages_url_index_cache[cache_key] = build_section_pages_url_index(arr)
-        arr
-      end
+      arr = build_section_pages_crinja(section_name, language, site)
+      @section_pages_crinja_cache[cache_key] = arr
+      @section_pages_url_index_cache[cache_key] = build_section_pages_url_index(arr)
+      arr
     end
+  end
+
+  private def build_section_pages_crinja(
+    section_name : String,
+    language : String?,
+    site : Models::Site,
+  ) : Array(Crinja::Value)
+    pages = site.pages_for_section(section_name, language)
+
+    # Use section's sort_by setting if available, otherwise sort by title
+    section = site.section_for(section_name, language)
+    sort_by = section.try(&.sort_by) || "title"
+    reverse = section.try(&.reverse) || false
+    pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+
+    default_lang = site.config.default_language
+    pages.map { |p| page_to_crinja_list_value(p, default_lang) }
   end
 
   # The cached section list plus its url→index map, for O(1) current-page
@@ -1256,6 +1362,14 @@ module Hwaro::Core::Build::Phases::Render
     site : Models::Site,
   ) : {Array(Crinja::Value), Hash(String, Int32)}
     cache_key = "#{section_name}:#{language}"
+    if @crinja_caches_frozen
+      arr = cached_section_pages_crinja(section_name, language, site)
+      if index = @section_pages_url_index_cache[cache_key]?
+        return {arr, index}
+      end
+      return {arr, build_section_pages_url_index(arr)}
+    end
+
     @crinja_cache_mutex.synchronize do
       arr = cached_section_pages_crinja(section_name, language, site)
       index = @section_pages_url_index_cache[cache_key]?
@@ -1293,6 +1407,15 @@ module Hwaro::Core::Build::Phases::Render
   # (e.g. taxonomy generation) can compute the shared, site-wide template vars
   # ONCE and thread them into apply_template, instead of rebuilding the whole
   # set — iterating every page/section and re-hashing static assets — per page.
+  # The Render phase's global template vars when this builder already computed
+  # them (also reused by the Write phase's 404 page), otherwise built fresh.
+  # NOTE: the render-phase vars honor the run's cache_busting option, which
+  # the old fresh-Builder taxonomy path silently ignored (always true) —
+  # taxonomy pages now match the rest of the build under --no-cache-busting.
+  def render_global_vars_or_build(site : Models::Site) : Hash(String, Crinja::Value)
+    @render_global_vars || global_template_vars(site)
+  end
+
   def global_template_vars(site : Models::Site, cache_busting : Bool = true) : Hash(String, Crinja::Value)
     build_global_vars(site, cache_busting)
   end
@@ -1606,6 +1729,7 @@ module Hwaro::Core::Build::Phases::Render
     paginator : Content::Pagination::PaginatedPage? = nil,
     global_vars : Hash(String, Crinja::Value)? = nil,
     pagination_seo_links : String = "",
+    features : Builder::TemplateVarFeatures? = nil,
   ) : Hash(String, Crinja::Value)
     config = site.config
 
@@ -1667,21 +1791,26 @@ module Hwaro::Core::Build::Phases::Render
     # served whichever language rendered first to every language (mirrors the
     # section_pages cache key).
     ancestors_cache_key = "#{page.section}:#{page.language}"
-    ancestors_array = @crinja_cache_mutex.synchronize do
-      if cached = @ancestors_crinja_cache[ancestors_cache_key]?
-        @cache_manager.record_hit("ancestors_crinja")
-        next cached.as(Array(Crinja::Value))
-      end
-      @cache_manager.record_miss("ancestors_crinja")
-      arr = page.ancestors.map do |ancestor|
-        Crinja::Value.new({
-          "title" => Crinja::Value.new(ancestor.title),
-          "url"   => Crinja::Value.new(ancestor.url),
-        })
-      end
-      @ancestors_crinja_cache[ancestors_cache_key] = arr
-      arr
-    end
+    ancestors_array = if @crinja_caches_frozen
+                        if cached = @ancestors_crinja_cache[ancestors_cache_key]?
+                          @cache_manager.record_hit("ancestors_crinja")
+                          cached
+                        else
+                          @cache_manager.record_miss("ancestors_crinja")
+                          build_ancestors_crinja(page)
+                        end
+                      else
+                        @crinja_cache_mutex.synchronize do
+                          if cached = @ancestors_crinja_cache[ancestors_cache_key]?
+                            @cache_manager.record_hit("ancestors_crinja")
+                            next cached.as(Array(Crinja::Value))
+                          end
+                          @cache_manager.record_miss("ancestors_crinja")
+                          arr = build_ancestors_crinja(page)
+                          @ancestors_crinja_cache[ancestors_cache_key] = arr
+                          arr
+                        end
+                      end
 
     # Page object with all properties
     page_obj = {
@@ -1717,23 +1846,35 @@ module Hwaro::Core::Build::Phases::Render
       "ancestors"       => Crinja::Value.new(ancestors_array),
       "series"          => Crinja::Value.new(page.series || ""),
       "series_index"    => Crinja::Value.new(page.series_index),
-      "series_pages"    => @crinja_cache_mutex.synchronize {
-        # Skip tracking for pages without series to avoid inflating miss counts
-        unless page.series
-          next Crinja::Value.new([] of Crinja::Value)
-        end
-        cached_series = page.series.try { |s| @series_crinja_cache[s]? }
-        if cached_series
+      "series_pages"    => if page.series.nil?
+        # Mirror related_posts below: series-less pages (the default) must not
+        # acquire the cache mutex just to hand back the same empty array.
+        Crinja::Value.new([] of Crinja::Value)
+      elsif @crinja_caches_frozen
+        if cached_series = page.series.try { |s| @series_crinja_cache[s]? }
           @cache_manager.record_hit("series_crinja")
-          next cached_series
+          cached_series
+        else
+          @cache_manager.record_miss("series_crinja")
+          Crinja::Value.new(page.series_pages.map { |sp|
+            cached_page_crinja_value(sp, default_lang)
+          })
         end
-        @cache_manager.record_miss("series_crinja")
-        val = Crinja::Value.new(page.series_pages.map { |sp|
-          cached_page_crinja_value(sp, default_lang)
-        })
-        page.series.try { |s| @series_crinja_cache[s] = val }
-        val
-      },
+      else
+        @crinja_cache_mutex.synchronize do
+          cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+          if cached_series
+            @cache_manager.record_hit("series_crinja")
+            next cached_series
+          end
+          @cache_manager.record_miss("series_crinja")
+          val = Crinja::Value.new(page.series_pages.map { |sp|
+            cached_page_crinja_value(sp, default_lang)
+          })
+          page.series.try { |s| @series_crinja_cache[s] = val }
+          val
+        end
+      end,
       "related_posts" => if page.related_posts.empty?
         # Mirror the early-return that `series_pages` does for series-less
         # pages. Sites without `[related]` enabled (the default) get an
@@ -1741,6 +1882,16 @@ module Hwaro::Core::Build::Phases::Render
         # times to hand back the same empty array measurably hurts on big
         # builds.
         Crinja::Value.new([] of Crinja::Value)
+      elsif @crinja_caches_frozen
+        if cached = @related_posts_crinja_cache[page.path]?
+          @cache_manager.record_hit("related_posts_crinja")
+          cached
+        else
+          @cache_manager.record_miss("related_posts_crinja")
+          Crinja::Value.new(page.related_posts.map { |rp|
+            cached_page_crinja_value(rp, default_lang)
+          })
+        end
       else
         @crinja_cache_mutex.synchronize do
           if cached = @related_posts_crinja_cache[page.path]?
@@ -1816,16 +1967,26 @@ module Hwaro::Core::Build::Phases::Render
         section_description = section_page.description || ""
         current_section = page.section
         # Use cached section assets to avoid re-allocating per page
-        section_assets_val = @crinja_cache_mutex.synchronize do
-          if cached_arr = @section_assets_crinja_cache[page.section]?
-            @cache_manager.record_hit("section_assets_crinja")
-            next Crinja::Value.new(cached_arr).as(Crinja::Value)
-          end
-          @cache_manager.record_miss("section_assets_crinja")
-          arr = section_page.assets.map { |a| Crinja::Value.new(a) }
-          @section_assets_crinja_cache[page.section] = arr
-          Crinja::Value.new(arr)
-        end
+        section_assets_val = if @crinja_caches_frozen
+                               if cached_arr = @section_assets_crinja_cache[page.section]?
+                                 @cache_manager.record_hit("section_assets_crinja")
+                                 Crinja::Value.new(cached_arr)
+                               else
+                                 @cache_manager.record_miss("section_assets_crinja")
+                                 Crinja::Value.new(section_page.assets.map { |a| Crinja::Value.new(a) })
+                               end
+                             else
+                               @crinja_cache_mutex.synchronize do
+                                 if cached_arr = @section_assets_crinja_cache[page.section]?
+                                   @cache_manager.record_hit("section_assets_crinja")
+                                   next Crinja::Value.new(cached_arr).as(Crinja::Value)
+                                 end
+                                 @cache_manager.record_miss("section_assets_crinja")
+                                 arr = section_page.assets.map { |a| Crinja::Value.new(a) }
+                                 @section_assets_crinja_cache[page.section] = arr
+                                 Crinja::Value.new(arr)
+                               end
+                             end
       end
     end
 
@@ -1834,6 +1995,11 @@ module Hwaro::Core::Build::Phases::Render
         # Paginated: convert paginator's page subset
         default_lang = config.default_language
         section_pages_array = paginator.pages.map { |p| page_to_crinja_list_value(p, default_lang) }
+      elsif features && !features.needs_section_pages
+        # The template's closure never mentions `section`, so the O(section
+        # size) minus-current copy below can never be observed — on a flat
+        # N-page site it was the only super-linear per-page cost (N-1
+        # element copies for every page). section_pages_array stays empty.
       else
         # Non-paginated: use per-section cache, then exclude current page.
         # O(1) lookup via the cached url→index map, then build result
@@ -1928,61 +2094,64 @@ module Hwaro::Core::Build::Phases::Render
     # NOTE: highlight_css/js/tags and auto_includes_css/js are now in
     # global_vars (computed once in build_global_vars).
 
-    # OG/Twitter tags (page-specific — depend on page title/description/url/image)
+    # OG/Twitter tags (page-specific — depend on page title/description/url/image).
+    # og_type_override stays unconditional: the JSON-LD block below reads it.
     og_type_override = og_type_for(page, effective_url)
-    # Fall back to the site title when the page itself has no title — most
-    # often the homepage, where authors deliberately leave `title = ""` so
-    # the section/page heading doesn't duplicate the site name. Without
-    # this fallback, og:title and twitter:title render as `content=""`,
-    # which breaks link previews (gh issue list, fix #1).
-    effective_og_title = page.title.empty? ? config.title : page.title
+    if features.nil? || features.needs_seo
+      # Fall back to the site title when the page itself has no title — most
+      # often the homepage, where authors deliberately leave `title = ""` so
+      # the section/page heading doesn't duplicate the site name. Without
+      # this fallback, og:title and twitter:title render as `content=""`,
+      # which breaks link previews (gh issue list, fix #1).
+      effective_og_title = page.title.empty? ? config.title : page.title
 
-    # Use page.description if present, otherwise a plain-text rendering of
-    # the `<!-- more -->` summary, finally fall back to site description.
-    # `plain_summary` strips markup so raw markdown (headings, code fences,
-    # literal newlines) never breaks the single-line meta attribute — using
-    # `page.summary` directly here dumped the raw chunk into og/twitter
-    # tags (gh#491). This gives social cards good per-post text without
-    # requiring every author to write a description in frontmatter.
-    effective_og_desc = page.description.presence || page.plain_summary || config.description
+      # Use page.description if present, otherwise a plain-text rendering of
+      # the `<!-- more -->` summary, finally fall back to site description.
+      # `plain_summary` strips markup so raw markdown (headings, code fences,
+      # literal newlines) never breaks the single-line meta attribute — using
+      # `page.summary` directly here dumped the raw chunk into og/twitter
+      # tags (gh#491). This gives social cards good per-post text without
+      # requiring every author to write a description in frontmatter.
+      effective_og_desc = page.description.presence || page.plain_summary || config.description
 
-    og_tags = config.og.og_tags(effective_og_title, effective_og_desc, effective_url, page.image, config.base_url, og_type_override)
-    twitter_tags = config.og.twitter_tags(effective_og_title, effective_og_desc, page.image, config.base_url)
-    # Mirror the 2-space indent used inside og_tags/twitter_tags so the
-    # joined block stays vertically aligned in the rendered HTML.
-    og_all_tags = if og_tags.empty?
-                    twitter_tags
-                  elsif twitter_tags.empty?
-                    og_tags
-                  else
-                    "#{og_tags}\n  #{twitter_tags}"
-                  end
-    vars["og_tags"] = Crinja::Value.new(og_tags)
-    vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
-    vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
+      og_tags = config.og.og_tags(effective_og_title, effective_og_desc, effective_url, page.image, config.base_url, og_type_override)
+      twitter_tags = config.og.twitter_tags(effective_og_title, effective_og_desc, page.image, config.base_url)
+      # Mirror the 2-space indent used inside og_tags/twitter_tags so the
+      # joined block stays vertically aligned in the rendered HTML.
+      og_all_tags = if og_tags.empty?
+                      twitter_tags
+                    elsif twitter_tags.empty?
+                      og_tags
+                    else
+                      "#{og_tags}\n  #{twitter_tags}"
+                    end
+      vars["og_tags"] = Crinja::Value.new(og_tags)
+      vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
+      vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
 
-    # Canonical and Hreflang tags. Pass page_url_override so paginated pages
-    # (page/2/ …) self-canonicalize instead of all pointing at page 1, keeping
-    # canonical consistent with og:url and rel=prev/next.
-    canonical_tag = Content::Seo::Tags.canonical_tag(page, config, page_url_override)
-    hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
-    vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
-    vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
+      # Canonical and Hreflang tags. Pass page_url_override so paginated pages
+      # (page/2/ …) self-canonicalize instead of all pointing at page 1, keeping
+      # canonical consistent with og:url and rel=prev/next.
+      canonical_tag = Content::Seo::Tags.canonical_tag(page, config, page_url_override)
+      hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
+      vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
+      vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
-    # Structured SEO object for custom meta tag markup
-    canonical_url = Content::Seo::Tags.canonical_url(page, config, page_url_override)
-    seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
-    seo_obj = {
-      "canonical_url"   => Crinja::Value.new(canonical_url),
-      "og_type"         => Crinja::Value.new(og_type_override || config.og.og_type),
-      "og_image"        => Crinja::Value.new(seo_image),
-      "twitter_card"    => Crinja::Value.new(config.og.twitter_card),
-      "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),
-      "twitter_creator" => Crinja::Value.new(config.og.twitter_creator || ""),
-      "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),
-      "hreflang"        => translations_crinja,
-    }
-    vars["seo"] = Crinja::Value.new(seo_obj)
+      # Structured SEO object for custom meta tag markup
+      canonical_url = Content::Seo::Tags.canonical_url(page, config, page_url_override)
+      seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
+      seo_obj = {
+        "canonical_url"   => Crinja::Value.new(canonical_url),
+        "og_type"         => Crinja::Value.new(og_type_override || config.og.og_type),
+        "og_image"        => Crinja::Value.new(seo_image),
+        "twitter_card"    => Crinja::Value.new(config.og.twitter_card),
+        "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),
+        "twitter_creator" => Crinja::Value.new(config.og.twitter_creator || ""),
+        "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),
+        "hreflang"        => translations_crinja,
+      }
+      vars["seo"] = Crinja::Value.new(seo_obj)
+    end
 
     # JSON-LD structured data.
     #
@@ -1991,6 +2160,27 @@ module Hwaro::Core::Build::Phases::Render
     # invalid empty `headline`. Use the WebSite schema for the homepage, and
     # for any other untitled page skip the Article entirely rather than emit
     # one with an empty headline.
+    if features.nil? || features.needs_jsonld
+      build_jsonld_vars(vars, page, site, config, page_url_override, og_type_override)
+    end
+
+    # Merge global vars at the end.  Page-specific keys (written above)
+    # take precedence because they were set first; merge! only adds keys
+    # that don't already exist when we reverse the direction below.
+    gv = global_vars || build_global_vars(site)
+    gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
+
+    vars
+  end
+
+  private def build_jsonld_vars(
+    vars : Hash(String, Crinja::Value),
+    page : Models::Page,
+    site : Models::Site,
+    config : Models::Config,
+    page_url_override : String?,
+    og_type_override : String?,
+  )
     is_homepage = home?(page)
     jsonld_article = if is_homepage || page.title.empty? || page.path == "404.html"
                        # The synthesized 404 page is neither an Article nor a
@@ -2035,14 +2225,6 @@ module Hwaro::Core::Build::Phases::Render
       schema_lower == "howto" || schema_lower == "how-to" ? Content::Seo::JsonLd.how_to(page, config) : ""
     )
     vars["jsonld"] = Crinja::Value.new(jsonld_all)
-
-    # Merge global vars at the end.  Page-specific keys (written above)
-    # take precedence because they were set first; merge! only adds keys
-    # that don't already exist when we reverse the direction below.
-    gv = global_vars || build_global_vars(site)
-    gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
-
-    vars
   end
 
   private def minify_html(html : String) : String

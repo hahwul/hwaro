@@ -151,8 +151,9 @@ module Hwaro
             processed = MarkdownExtensions.preprocess(processed, md_cfg)
           end
 
-          # Use SyntaxHighlighter for rendering with highlighting support
-          html = SyntaxHighlighter.render(processed, highlight, safe)
+          # Use SyntaxHighlighter for rendering with highlighting support.
+          # Tables were already converted above — skip the redundant re-scan.
+          html = SyntaxHighlighter.render(processed, highlight, safe, tables_preprocessed: true)
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config

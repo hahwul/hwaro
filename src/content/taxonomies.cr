@@ -18,20 +18,27 @@ require "../content/pagination/renderer"
 module Hwaro
   module Content
     class Taxonomies
-      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false) : Array(Models::Section)
+      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false, builder : Core::Build::Builder? = nil) : Array(Models::Section)
         config = site.config
         return [] of Models::Section if config.taxonomies.empty?
 
         build_taxonomy_index(site)
 
-        # Reuse a single Builder instance across all taxonomy renders
-        builder = Core::Build::Builder.new
+        # Reuse the running build's Builder when provided: its Crinja value
+        # caches are warm (every page already converted by the Render phase)
+        # and its stashed render-phase global vars can be reused outright.
+        # The previous always-fresh Builder re-converted the entire site to
+        # Crinja values a SECOND time — a duplicate O(N) pass on every
+        # taxonomy-enabled build. The fresh-Builder fallback remains for
+        # direct callers outside a build run.
+        builder ||= Core::Build::Builder.new
 
-        # Compute the site-wide template vars ONCE. apply_template otherwise
-        # falls back to build_global_vars(site) on every taxonomy term/page,
-        # re-iterating all pages/sections (and re-hashing assets) per page —
-        # O(terms × site_size) of redundant work on a site with many terms.
-        global_vars = builder.global_template_vars(site)
+        # Compute (or reuse) the site-wide template vars ONCE. apply_template
+        # otherwise falls back to build_global_vars(site) on every taxonomy
+        # term/page, re-iterating all pages/sections (and re-hashing assets)
+        # per page — O(terms × site_size) of redundant work on a site with
+        # many terms.
+        global_vars = builder.render_global_vars_or_build(site)
 
         # Generate root taxonomies. On a multilingual site the root is the
         # default language's space (its content pages live at the root), so

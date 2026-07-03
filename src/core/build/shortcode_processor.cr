@@ -216,10 +216,41 @@ module Hwaro
           text.gsub(INLINE_CODE_MASK_RE) { |tok| spans[$1.to_i]? || tok }
         end
 
+        # Named-closer tags (`{% endcustom %}`) that process_shortcodes_in_chunk
+        # rewrites to `{% end %}`. Shared with `shortcode_scan_needed?` so the
+        # skip decision and the rewrite can never drift apart.
+        NAMED_CLOSER_RE = /\{\%\s*end\s*(?!if|for|macro|block|call|set|with|autoescape|raw|filter|trans|pluralize|comment)[a-zA-Z_][\w\-]*\s*\%\}/i
+
+        # Matches both shortcode invocation forms handled by
+        # process_shortcodes_in_chunk: `{{ shortcode("name", …) }}` and the
+        # direct `{{ name(…) }}` call (`shortcode` is itself a name followed
+        # by `(`). Used only for the conservative skip pre-check below.
+        SHORTCODE_CALL_SCAN_RE = /\{\{\s*[a-zA-Z_][\w\-]*\s*\(/
+
+        # True when `process_shortcodes_in_text(text)` could be anything other
+        # than the identity transform. Over-approximates on purpose: a false
+        # positive only costs the normal (current) processing pass, while a
+        # false negative would skip a real rewrite — so every rewrite the
+        # processor can perform must be covered by one of these checks:
+        # named-closer normalization, an explicit/direct `{{ name(...) }}`
+        # call, or a non-control `{% name %}` block opener.
+        def shortcode_scan_needed?(text : String) : Bool
+          return false unless text.includes?("{{") || text.includes?("{%")
+          return true if NAMED_CLOSER_RE.matches?(text)
+          return true if SHORTCODE_CALL_SCAN_RE.matches?(text)
+
+          pos = 0
+          while m = BLOCK_OPEN_RE.match_at_byte_index(text, pos)
+            return true unless control_tag_open?(m)
+            pos = m.byte_begin + m[0].bytesize
+          end
+          false
+        end
+
         private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32, spans : Array(String) = [] of String) : String
           # Localized normalization for named closers (only affects shortcode block content).
           # Avoid touching real Jinja/Crinja control tags (endif, endfor, etc.).
-          normalized = content.gsub(/\{\%\s*end\s*(?!if|for|macro|block|call|set|with|autoescape|raw|filter|trans|pluralize|comment)[a-zA-Z_][\w\-]*\s*\%\}/i, "{% end %}")
+          normalized = content.gsub(NAMED_CLOSER_RE, "{% end %}")
 
           # 1. Block shortcodes
           processed = process_block_shortcodes(normalized, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth, spans)

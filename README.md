@@ -103,7 +103,9 @@ cd hwaro
 shards install
 
 # Build
-shards build --release --no-debug --production
+# -Dpreview_mt enables the multi-threaded runtime (how official binaries
+# ship) — without it, builds render on a single thread.
+shards build --release --no-debug --production -Dpreview_mt
 ```
 
 > For more installation options including Docker and pre-built binaries, see the [Installation Guide](https://hwaro.hahwul.com/start/installation/).
