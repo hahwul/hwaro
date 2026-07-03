@@ -375,17 +375,43 @@ module Hwaro
         end
       end
 
-      # Human-readable description of the change for logging.
+      # Human-readable description of the change for logging. The trailing
+      # noun is pluralized by the total file count; a config change is named
+      # separately since it is one specific file, not a category count.
       def description : String
         parts = [] of String
-        parts << "#{@modified_content.size} content" unless @modified_content.empty?
-        parts << "#{@modified_content_files.size} content-asset" unless @modified_content_files.empty?
-        parts << "#{@modified_templates.size} template" unless @modified_templates.empty?
-        parts << "#{@modified_static.size} static" unless @modified_static.empty?
-        parts << "#{@added_files.size} added" unless @added_files.empty?
-        parts << "#{@removed_files.size} removed" unless @removed_files.empty?
-        parts << "config" if @config_changed
-        parts.join(", ") + " file(s)"
+        total = 0
+        {
+          "content"       => @modified_content,
+          "content-asset" => @modified_content_files,
+          "template"      => @modified_templates,
+          "static"        => @modified_static,
+          "added"         => @added_files,
+          "removed"       => @removed_files,
+        }.each do |label, list|
+          next if list.empty?
+          parts << "#{list.size} #{label}"
+          total += list.size
+        end
+        desc = parts.empty? ? "" : "#{parts.join(", ")} #{total == 1 ? "file" : "files"}"
+        if @config_changed
+          desc = desc.empty? ? "config" : "#{desc}, config"
+        end
+        desc
+      end
+
+      # What the watch timeline prints: the path itself when exactly one file
+      # changed (the common save-one-file loop), the category summary above
+      # otherwise.
+      def display : String
+        return "config.toml" if @config_changed && all_changed_files.empty?
+        files = all_changed_files
+        files.size == 1 && !@config_changed ? files.first : description
+      end
+
+      private def all_changed_files : Array(String)
+        @modified_content + @modified_content_files + @modified_templates +
+          @modified_static + @added_files + @removed_files
       end
     end
 
@@ -603,9 +629,9 @@ module Hwaro
       #
       # Emitted AFTER `bind_tcp` succeeds (so the OS-level listening socket
       # already accepts connections) and BEFORE `listen` starts the blocking
-      # accept loop. Written directly to STDOUT (no color, no log prefix) and
-      # flushed immediately so subprocess consumers see it without buffering
-      # delay.
+      # accept loop. Written directly to STDOUT (no log prefix; dimmed on an
+      # interactive TTY, raw bytes everywhere else) and flushed immediately so
+      # subprocess consumers see it without buffering delay.
       #
       # Coexists with the pretty "Serving site at …" banner logged earlier —
       # this is an additional single line, not a replacement.
@@ -616,7 +642,13 @@ module Hwaro
       # Otherwise the human-readable `hwaro serve: ready url=... pid=...`
       # line from issue #360 is emitted.
       private def emit_ready_signal(host : String, port : Int32, json : Bool = false)
-        STDOUT.puts(json ? ready_signal_json(host, port) : ready_signal_line(host, port))
+        line = json ? ready_signal_json(host, port) : ready_signal_line(host, port)
+        # On an interactive colored TTY the machine line is dimmed so it reads
+        # as a footnote under the serve receipt; the bytes inside the escapes
+        # are unchanged. Pipes and CI (non-TTY) get the raw line exactly as
+        # documented — that is where machine consumers live.
+        line = Logger.paint(line, Logger::Role::Dim) if !json && Logger.color_enabled?
+        STDOUT.puts(line)
         STDOUT.flush
       end
 
@@ -797,11 +829,17 @@ module Hwaro
       # Choose the cheapest rebuild strategy for a given ChangeSet and execute it.
       private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         strategy = changeset.rebuild_strategy
-        # Calm watch timeline: one ember "↻ time  changed  <what>" event, then
-        # the rebuild's own "▴ rebuilt …" outcome line below it. The strategy is
+        # Calm watch timeline: one "↻ changed <what> · time" event, then the
+        # rebuild's own "▴ rebuilt …" outcome line below it, both on the same
+        # 2-space grid so the verbs and values column-align. The strategy is
         # implied by that outcome (incremental N/M, re-render, full).
         timestamp = Time.local.to_s("%H:%M:%S")
-        Logger.info "\n#{Logger.glyph(:watch)} #{Logger.paint(timestamp, Logger::Role::Dim)}  changed  #{Logger.paint(changeset.description, Logger::Role::Dim)}"
+        if Logger.color_enabled?
+          Logger.info "\n  #{Logger.glyph(:watch)} #{Logger.paint("changed", Logger::Role::Dim, bold: true)}  " \
+                      "#{changeset.display}#{Logger.paint("  ·  ", Logger::Role::Dim)}#{Logger.paint(timestamp, Logger::Role::Dim)}"
+        else
+          Logger.info "\n~ #{timestamp}  changed  #{changeset.display}"
+        end
 
         # Resolve removed sources to their output files BEFORE the rebuild
         # swaps in a site that no longer knows the deleted page's URL.

@@ -29,15 +29,22 @@ module Hwaro
 
     # Semantic color roles for the unified "ember" terminal identity.
     # Each role resolves to a truecolor RGB (when COLORTERM advertises it),
-    # a 16-color named fallback, or raw text when color is disabled. This is
-    # the single source of truth for brand color — callers name a role, never
-    # a raw colorize symbol, so the palette stays consistent across commands.
+    # a 256-color approximation (when TERM advertises 256 colors), a 16-color
+    # named fallback, or raw text when color is disabled. This is the single
+    # source of truth for brand color — callers name a role, never a raw
+    # colorize symbol, so the palette stays consistent across commands.
+    #
+    # The palette is the "hearth" set: one warm ember accent plus status
+    # colors picked to sit apart from it on the hue wheel — jade for success
+    # (never olive, which reads muddy), amber for warnings, a cold crimson
+    # for errors (so errors never blur into the ember accent), and a neutral
+    # ash gray for recessive text.
     enum Role : UInt8
       Accent  # warm ember (#ec7a66 dark / #b35454 light) — headings, outcomes, URLs
-      Success # green — a check passed
-      Warn    # yellow
-      Error   # red
-      Dim     # recessive gray — labels, timings, paths, rules
+      Success # jade green — a check passed
+      Warn    # amber
+      Error   # crimson (colder than the ember accent, never confusable)
+      Dim     # recessive ash gray — labels, timings, paths, rules
       Heading # ember (alias of Accent, kept distinct for intent)
       Plain   # no color (default foreground)
     end
@@ -112,15 +119,28 @@ module Hwaro
       @@io.puts message
     end
 
+    # TTY form leads with the crimson ✗ glyph so errors scan apart from the
+    # message body; plain form stays the bare message (no escapes, no glyph)
+    # for pipes / CI.
     def self.error(message : String)
       clear_active_line
-      @@err_io.puts paint(message, Role::Error)
+      if color_enabled?
+        @@err_io.puts "#{glyph(:err)} #{paint(message, Role::Error)}"
+      else
+        @@err_io.puts message
+      end
     end
 
+    # TTY form leads with the amber ⚠ glyph; plain form keeps the historical
+    # "[WARN] " prefix so scripts that grep for it keep working.
     def self.warn(message : String)
       return if @@level > Level::Warn
       clear_active_line
-      @@err_io.puts paint("[WARN] #{message}", Role::Warn)
+      if color_enabled?
+        @@err_io.puts "#{glyph(:warn)} #{paint(message, Role::Warn)}"
+      else
+        @@err_io.puts "[WARN] #{message}"
+      end
     end
 
     def self.success(message : String)
@@ -194,15 +214,37 @@ module Hwaro
       ENV["HWARO_THEME"]? != "light"
     end
 
+    # True when the terminal advertises at least 256 colors (and color is
+    # otherwise enabled) but not truecolor — the common case for macOS
+    # Terminal.app, which never sets COLORTERM. Without this tier those
+    # terminals would fall all the way down to the raw 16-color ANSI names,
+    # which is where the palette used to look dated.
+    def self.color256? : Bool
+      return false unless color_enabled?
+      ENV["TERM"]?.try(&.includes?("256color")) || false
+    end
+
     # Truecolor RGB for a role, honoring `dark?`. `nil` for Plain.
     private def self.role_rgb(role : Role) : Tuple(UInt8, UInt8, UInt8)?
       dark = dark?
       case role
       when .accent?, .heading? then dark ? {236_u8, 122_u8, 102_u8} : {179_u8, 84_u8, 84_u8}
-      when .success?           then dark ? {184_u8, 187_u8, 38_u8} : {90_u8, 130_u8, 80_u8}
-      when .warn?              then dark ? {250_u8, 189_u8, 47_u8} : {181_u8, 118_u8, 58_u8}
-      when .error?             then dark ? {251_u8, 73_u8, 52_u8} : {192_u8, 57_u8, 43_u8}
-      when .dim?               then dark ? {146_u8, 131_u8, 116_u8} : {138_u8, 128_u8, 118_u8}
+      when .success?           then dark ? {104_u8, 201_u8, 138_u8} : {23_u8, 128_u8, 74_u8}
+      when .warn?              then dark ? {245_u8, 184_u8, 74_u8} : {161_u8, 106_u8, 8_u8}
+      when .error?             then dark ? {240_u8, 72_u8, 94_u8} : {201_u8, 42_u8, 58_u8}
+      when .dim?               then dark ? {150_u8, 141_u8, 132_u8} : {130_u8, 124_u8, 118_u8}
+      end
+    end
+
+    # Nearest xterm-256 index for a role, honoring `dark?`. `nil` for Plain.
+    private def self.role_256(role : Role) : UInt8?
+      dark = dark?
+      case role
+      when .accent?, .heading? then dark ? 209_u8 : 131_u8
+      when .success?           then dark ? 78_u8 : 29_u8
+      when .warn?              then dark ? 214_u8 : 136_u8
+      when .error?             then dark ? 203_u8 : 160_u8
+      when .dim?               then dark ? 245_u8 : 243_u8
       end
     end
 
@@ -219,7 +261,7 @@ module Hwaro
 
     # Paint `text` in a semantic role. Returns raw text (no escapes) when
     # color is disabled, so scripts / CI / pipes stay clean. Prefers truecolor,
-    # falls back to the 16-color name, then to plain.
+    # then the 256-color approximation, then the 16-color name, then plain.
     def self.paint(text : String, role : Role, bold : Bool = false) : String
       unless color_enabled?
         return text
@@ -227,6 +269,8 @@ module Hwaro
       colored =
         if (rgb = role_rgb(role)) && truecolor?
           text.colorize(Colorize::ColorRGB.new(rgb[0], rgb[1], rgb[2]))
+        elsif (idx = role_256(role)) && color256?
+          text.colorize(Colorize::Color256.new(idx))
         elsif named = role_named(role)
           text.colorize(named)
         else
@@ -239,16 +283,18 @@ module Hwaro
     # used whenever color/unicode is disabled — the same gate the rest of the
     # CLI uses — so plain output never emits a stray multibyte glyph.
     GLYPHS = {
-      :ok      => {"✓", "[ok]", Role::Success},
-      :warn    => {"⚠", "[warn]", Role::Warn},
-      :err     => {"✗", "[err]", Role::Error},
-      :info    => {"ℹ", "[info]", Role::Dim},
-      :result  => {"▴", "*", Role::Accent},
-      :heading => {"●", "#", Role::Accent},
-      :ready   => {"◇", ">", Role::Accent},
-      :watch   => {"↻", "~", Role::Accent},
-      :bullet  => {"·", "-", Role::Dim},
-      :arrow   => {"→", "->", Role::Dim},
+      :ok        => {"✓", "[ok]", Role::Success},
+      :warn      => {"⚠", "[warn]", Role::Warn},
+      :err       => {"✗", "[err]", Role::Error},
+      :info      => {"ℹ", "[info]", Role::Dim},
+      :result    => {"▴", "*", Role::Accent},
+      :heading   => {"●", "#", Role::Accent},
+      :ready     => {"◇", ">", Role::Accent},
+      :watch     => {"↻", "~", Role::Accent},
+      :bullet    => {"·", "-", Role::Dim},
+      :arrow     => {"→", "->", Role::Dim},
+      :tree_mid  => {"├─", "|-", Role::Dim},
+      :tree_last => {"└─", "`-", Role::Dim},
     }
 
     # Resolve a glyph by key: colorized unicode when color is on, else the
@@ -370,7 +416,8 @@ module Hwaro
         value : String,
         role : Role,
         emphasis : String?,
-        emphasis_role : Role
+        emphasis_role : Role,
+        detail : String?
 
       @rows : Array(Row)
       @outcome : NamedTuple(verb: String, value: String, glyph: Symbol, ms: Float64?)?
@@ -382,9 +429,11 @@ module Hwaro
 
       # Append a key/value row. Skipped when empty so the summary never prints
       # noise like "0 drafts". `emphasis` is an optional differently-colored
-      # suffix (e.g. a yellow "2 drafts skipped").
-      def row(label : String, value : String, role : Role = Role::Plain, emphasis : String? = nil, emphasis_role : Role = Role::Warn) : self
-        @rows << Row.new(label, value, role, emphasis, emphasis_role) unless value.empty? && emphasis.nil?
+      # suffix (e.g. a yellow "2 drafts skipped"). `detail` is an optional dim
+      # trailing note (e.g. a phase timing) rendered on the TTY only — plain
+      # output stays byte-identical for scripts that parse it.
+      def row(label : String, value : String, role : Role = Role::Plain, emphasis : String? = nil, emphasis_role : Role = Role::Warn, detail : String? = nil) : self
+        @rows << Row.new(label, value, role, emphasis, emphasis_role, detail) unless value.empty? && emphasis.nil?
         self
       end
 
@@ -416,6 +465,9 @@ module Hwaro
           cell = Logger.paint(r.value, r.role)
           if e = r.emphasis
             cell = "#{cell}#{Logger.paint(" · ", Role::Dim)}#{Logger.paint(e, r.emphasis_role)}"
+          end
+          if d = r.detail
+            cell = "#{cell}#{Logger.paint(" · ", Role::Dim)}#{Logger.paint(d, Role::Dim)}"
           end
           lines << "    #{Logger.paint(r.label.ljust(width), Role::Dim)}  #{cell}"
         end
@@ -517,8 +569,8 @@ module Hwaro
     # escapes). Animation is driven by a timer fiber, decoupled from the build's
     # (possibly parallel) work so motion stays smooth regardless of phase.
     class Status
-      SPINNER  = %w[◐ ◓ ◑ ◒]
-      INTERVAL = 90.milliseconds
+      SPINNER  = %w[⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏]
+      INTERVAL = 80.milliseconds
 
       def initialize(@io : IO)
         @label = ""

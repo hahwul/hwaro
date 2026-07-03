@@ -1054,7 +1054,7 @@ module Hwaro
           # "content pages" rather than just "pages" — taxonomy/archive/section
           # index files are also written to disk, so a bare "N pages" count
           # misleads users who diff this number against `find public -name '*.html'`.
-          emit_build_receipt(ctx, raw_msg, elapsed.total_milliseconds)
+          emit_build_receipt(ctx, raw_msg, elapsed.total_milliseconds, profiler)
           # Only warn about an empty site when nothing was built at all. Under
           # `--cache`, unchanged pages are skipped (counted as `cache_hits`)
           # rather than re-rendered, so `pages_rendered` is 0 on a no-op rebuild
@@ -1160,24 +1160,36 @@ module Hwaro
         # Emit the calm closing receipt: an aligned per-phase summary plus the
         # one ember "built" outcome line. Rows are skipped when their value is
         # empty, so cached/no-op rebuilds stay terse. Falls back to plain
-        # "label: value" lines (no color, no rule) when color is off.
-        private def emit_build_receipt(ctx : Lifecycle::BuildContext, raw_msg : String, elapsed_ms : Float64)
+        # "label: value" lines (no color, no rule) when color is off. Each row
+        # carries its phase timing as a TTY-only dim detail so slow phases are
+        # visible at a glance without `--profile`.
+        private def emit_build_receipt(ctx : Lifecycle::BuildContext, raw_msg : String, elapsed_ms : Float64, profiler : Profiler)
           stats = ctx.stats
           receipt = Logger::Receipt.new("build")
-          receipt.row("read", stats.pages_read > 0 ? "#{stats.pages_read} content files" : "")
+          receipt.row("read", stats.pages_read > 0 ? "#{stats.pages_read} content files" : "",
+            detail: phase_detail(profiler, "ReadContent"))
           parsed = stats.pages_read - stats.pages_skipped
           receipt.row("parse", parsed > 0 ? "#{parsed} pages" : "",
-            emphasis: stats.pages_skipped > 0 ? "#{stats.pages_skipped} skipped" : nil)
+            emphasis: stats.pages_skipped > 0 ? "#{stats.pages_skipped} skipped" : nil,
+            detail: phase_detail(profiler, "ParseContent"))
           render_val =
             if stats.cache_hits > 0
               "#{stats.pages_rendered} pages · #{stats.cache_hits} cached"
             else
               "#{stats.pages_rendered} pages"
             end
-          receipt.row("render", render_val)
-          receipt.row("write", stats.raw_files_processed > 0 ? "#{stats.raw_files_processed} raw files" : "")
+          receipt.row("render", render_val, detail: phase_detail(profiler, "Render"))
+          receipt.row("write", stats.raw_files_processed > 0 ? "#{stats.raw_files_processed} raw files" : "",
+            detail: phase_detail(profiler, "Write"))
           receipt.outcome("built", "#{stats.pages_rendered} content pages#{raw_msg}", :result, elapsed_ms)
           receipt.emit
+        end
+
+        # A receipt row's dim timing note. Sub-millisecond phases return `nil`
+        # so trivial builds don't sprout four "0ms" notes.
+        private def phase_detail(profiler : Profiler, phase : String) : String?
+          ms = profiler.phase_ms(phase)
+          ms && ms >= 1.0 ? Logger.dur(ms) : nil
         end
 
         # Execute all build phases with lifecycle hooks
