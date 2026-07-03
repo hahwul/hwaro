@@ -169,6 +169,7 @@ module Hwaro
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
+              #{theme_head_script}
               {{ og_all_tags }}
               {{ canonical_tag }}
               {{ jsonld }}
@@ -590,6 +591,8 @@ module Hwaro
               font-size: 0.82rem;
             }
             #{highlight_theme_css}
+
+            #{theme_toggle_css}
 
             /* Tables */
             table {
@@ -1136,6 +1139,7 @@ module Hwaro
             </div>
             {{ highlight_js }}
             <script src="{{ base_url }}/js/search.js"></script>
+            #{theme_toggle_script}
             {{ auto_includes_js }}
             </body>
             </html>
@@ -1170,6 +1174,7 @@ module Hwaro
                   <span>Search</span>
                   <kbd>&#8984;K</kbd>
                 </button>
+                #{theme_toggle_html}
               </div>
             </header>
             HTML
@@ -1721,7 +1726,7 @@ module Hwaro
 
             | Option | Description |
             |--------|-------------|
-            | `--scaffold TYPE` | Scaffold type: simple, blog, blog-dark, docs, docs-dark, book, book-dark (default: simple) |
+            | `--scaffold TYPE` | Scaffold type: simple, bare, blog, docs, book (default: simple) |
             | `--force` | Overwrite existing files |
             | `--skip-sample-content` | Don't create sample content |
 
@@ -1730,11 +1735,8 @@ module Hwaro
             ```bash
             hwaro init my-site
             hwaro init my-blog --scaffold blog
-            hwaro init my-blog --scaffold blog-dark
             hwaro init my-docs --scaffold docs --force
-            hwaro init my-docs --scaffold docs-dark
             hwaro init my-book --scaffold book
-            hwaro init my-book --scaffold book-dark
             ```
 
             ## hwaro build

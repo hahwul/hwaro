@@ -345,140 +345,6 @@ describe Hwaro::Services::Scaffolds::Docs do
   end
 end
 
-describe Hwaro::Services::Scaffolds::BlogDark do
-  describe "#type" do
-    it "returns BlogDark scaffold type" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      scaffold.type.should eq(Hwaro::Config::Options::ScaffoldType::BlogDark)
-    end
-  end
-
-  describe "#description" do
-    it "returns a non-empty description" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      scaffold.description.should_not be_empty
-    end
-
-    it "mentions dark theme" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      scaffold.description.downcase.should contain("dark")
-    end
-  end
-
-  describe "#content_files" do
-    it "has the same content files as Blog" do
-      dark = Hwaro::Services::Scaffolds::BlogDark.new
-      light = Hwaro::Services::Scaffolds::Blog.new
-      dark.content_files.keys.sort!.should eq(light.content_files.keys.sort!)
-    end
-  end
-
-  describe "#template_files" do
-    it "has the same template files as Blog" do
-      dark = Hwaro::Services::Scaffolds::BlogDark.new
-      light = Hwaro::Services::Scaffolds::Blog.new
-      dark.template_files.keys.sort!.should eq(light.template_files.keys.sort!)
-    end
-  end
-
-  describe "#config_content" do
-    it "uses github-dark highlight theme" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      config = scaffold.config_content
-      config.should contain("github-dark")
-    end
-  end
-
-  describe "#static_files" do
-    it "includes css/style.css and js/search.js" do
-      scaffold = Hwaro::Services::Scaffolds::BlogDark.new
-      scaffold.static_files.has_key?("css/style.css").should be_true
-      scaffold.static_files.has_key?("js/search.js").should be_true
-    end
-
-    it "forces the dark scheme over the shared light-dark tokens" do
-      dark = Hwaro::Services::Scaffolds::BlogDark.new
-      light = Hwaro::Services::Scaffolds::Blog.new
-      css = dark.static_files["css/style.css"]
-      css.should contain("color-scheme: dark")
-      css.should contain("light-dark(#b35454, #ec7a66)")
-      css.should contain("light-dark(#faf7f2, #0f0f0e)")
-      # Dedup lock: the dark sheet is the light sheet plus a small
-      # forced-dark suffix — never a second stylesheet to maintain.
-      light_css = light.static_files["css/style.css"]
-      css.starts_with?(light_css).should be_true
-      (css.bytesize - light_css.bytesize).should be < 400
-    end
-  end
-end
-
-describe Hwaro::Services::Scaffolds::DocsDark do
-  describe "#type" do
-    it "returns DocsDark scaffold type" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      scaffold.type.should eq(Hwaro::Config::Options::ScaffoldType::DocsDark)
-    end
-  end
-
-  describe "#description" do
-    it "returns a non-empty description" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      scaffold.description.should_not be_empty
-    end
-
-    it "mentions dark theme" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      scaffold.description.downcase.should contain("dark")
-    end
-  end
-
-  describe "#content_files" do
-    it "has the same content files as Docs" do
-      dark = Hwaro::Services::Scaffolds::DocsDark.new
-      light = Hwaro::Services::Scaffolds::Docs.new
-      dark.content_files.keys.sort!.should eq(light.content_files.keys.sort!)
-    end
-  end
-
-  describe "#template_files" do
-    it "has the same template files as Docs" do
-      dark = Hwaro::Services::Scaffolds::DocsDark.new
-      light = Hwaro::Services::Scaffolds::Docs.new
-      dark.template_files.keys.sort!.should eq(light.template_files.keys.sort!)
-    end
-  end
-
-  describe "#config_content" do
-    it "uses github-dark highlight theme" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      config = scaffold.config_content
-      config.should contain("github-dark")
-    end
-  end
-
-  describe "#static_files" do
-    it "includes css/style.css and js/search.js" do
-      scaffold = Hwaro::Services::Scaffolds::DocsDark.new
-      scaffold.static_files.has_key?("css/style.css").should be_true
-      scaffold.static_files.has_key?("js/search.js").should be_true
-    end
-
-    it "forces the dark scheme over the shared light-dark tokens" do
-      dark = Hwaro::Services::Scaffolds::DocsDark.new
-      light = Hwaro::Services::Scaffolds::Docs.new
-      css = dark.static_files["css/style.css"]
-      css.should contain("color-scheme: dark")
-      css.should contain("light-dark(#b35454, #ec7a66)")
-      css.should contain("light-dark(#faf7f2, #0f0f0e)")
-      # Dedup lock: the dark sheet is the light sheet plus a small
-      # forced-dark suffix — never a second stylesheet to maintain.
-      light_css = light.static_files["css/style.css"]
-      css.starts_with?(light_css).should be_true
-      (css.bytesize - light_css.bytesize).should be < 400
-    end
-  end
-end
-
 describe Hwaro::Services::Scaffolds::Registry do
   describe ".get" do
     it "returns Simple scaffold" do
@@ -494,16 +360,6 @@ describe Hwaro::Services::Scaffolds::Registry do
     it "returns Docs scaffold" do
       scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Docs)
       scaffold.should be_a(Hwaro::Services::Scaffolds::Docs)
-    end
-
-    it "returns BlogDark scaffold" do
-      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::BlogDark)
-      scaffold.should be_a(Hwaro::Services::Scaffolds::BlogDark)
-    end
-
-    it "returns DocsDark scaffold" do
-      scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::DocsDark)
-      scaffold.should be_a(Hwaro::Services::Scaffolds::DocsDark)
     end
 
     it "raises for unknown scaffold type" do
@@ -525,12 +381,8 @@ describe Hwaro::Services::Scaffolds::Registry do
       Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Docs).should be_true
     end
 
-    it "returns true for BlogDark" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::BlogDark).should be_true
-    end
-
-    it "returns true for DocsDark" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::DocsDark).should be_true
+    it "returns true for Book" do
+      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Book).should be_true
     end
   end
 
@@ -545,9 +397,8 @@ describe Hwaro::Services::Scaffolds::Registry do
       types = all.map(&.type)
       types.should contain(Hwaro::Config::Options::ScaffoldType::Simple)
       types.should contain(Hwaro::Config::Options::ScaffoldType::Blog)
-      types.should contain(Hwaro::Config::Options::ScaffoldType::BlogDark)
       types.should contain(Hwaro::Config::Options::ScaffoldType::Docs)
-      types.should contain(Hwaro::Config::Options::ScaffoldType::DocsDark)
+      types.should contain(Hwaro::Config::Options::ScaffoldType::Book)
     end
   end
 

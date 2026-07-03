@@ -3,14 +3,11 @@ module Hwaro
     module Options
       # Available scaffold types for project initialization
       enum ScaffoldType
-        Simple   # Basic pages (current default)
-        Bare     # Minimal structure with semantic HTML only
-        Blog     # Blog-focused with posts, archives, tags
-        Docs     # Documentation-focused with sidebar, TOC
-        BlogDark # Blog-focused with dark theme
-        DocsDark # Documentation-focused with dark theme
-        Book     # Book-focused with chapters, like mdBook
-        BookDark # Book-focused with dark theme
+        Simple # Basic pages (current default)
+        Bare   # Minimal structure with semantic HTML only
+        Blog   # Blog-focused with posts, archives, tags
+        Docs   # Documentation-focused with sidebar, TOC
+        Book   # Book-focused with chapters, like mdBook
 
         def self.from_string(value : String) : ScaffoldType
           case value.downcase
@@ -22,30 +19,21 @@ module Hwaro
             Blog
           when "docs"
             Docs
-          when "blog-dark"
-            BlogDark
-          when "docs-dark"
-            DocsDark
           when "book"
             Book
-          when "book-dark"
-            BookDark
           else
-            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, bare, blog, blog-dark, docs, docs-dark, book, book-dark")
+            raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, bare, blog, docs, book")
           end
         end
 
         def to_s : String
           case self
-          when Simple   then "simple"
-          when Bare     then "bare"
-          when Blog     then "blog"
-          when Docs     then "docs"
-          when BlogDark then "blog-dark"
-          when DocsDark then "docs-dark"
-          when Book     then "book"
-          when BookDark then "book-dark"
-          else               "simple"
+          when Simple then "simple"
+          when Bare   then "bare"
+          when Blog   then "blog"
+          when Docs   then "docs"
+          when Book   then "book"
+          else             "simple"
           end
         end
       end

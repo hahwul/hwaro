@@ -3,14 +3,18 @@
 ## Unreleased
 
 ### Added
-- `hwaro init --wizard` opens an interactive wizard in a terminal: directory, a scaffold picker with one-line descriptions, site title (written into the generated `config.toml`), a dark-theme toggle for families that ship a dark preset, and a confirm receipt
+- `hwaro init --wizard` opens an interactive wizard in a terminal: directory, a scaffold picker with one-line descriptions, site title (written into the generated `config.toml`), and a confirm receipt
 - Scaffold design tokens: all init scaffolds share one "Hwaro Ember" `:root` vocabulary (`src/services/scaffolds/design_tokens.cr`) — every color is a `light-dark()` pair, plus fluid `--step-*` type scale, `--space-*` rhythm, `--measure`, radii, shadows, and motion tokens. Every scaffold (including `simple`) now adapts to the OS color scheme automatically; a `@supports` fallback pins the light palette on pre-2024 browsers
+- Scaffold theme switcher: every styled scaffold (`simple`, `blog`, `docs`, `book`) ships a header toggle that cycles auto → light → dark, persists the choice in `localStorage` (`hwaro-theme`), and applies it inline in `<head>` before first paint so a stored choice never flashes the OS scheme
 - `just scaffold-previews`: regenerate the docs' scaffold screenshots headlessly (`DARK=1` adds forced-dark self-review shots)
 
 ### Changed
 - `hwaro init` now initializes immediately with defaults; pass `--wizard` to open the interactive flow. Removed `-y`/`--yes` (no longer needed)
 - Terminal output: every command now speaks the ember language. `list`/`stats`/`validate`/`check-links`/`deploy`/`export`/`import`/`unused-assets`/`convert`/`platform`/`agents-md` moved from ad-hoc `info` lines onto the shared heading → context → body → outcome arc, with one glyph set (`✓ ⚠ ✗ ℹ · →`), one bar renderer, and lowercase-verb outcomes (`exported: 38 files, 4 skipped`). Raw `.colorize`, off-registry glyphs (`✔✘`, `[DEAD]`), and hand-rolled dividers are gone and lint-blocked by spec. Frozen machine surfaces — `--json` payloads, the `serve` ready line, `--version`, `Error [CODE]` shapes, plain receipt forms, exit codes — are byte-for-byte unchanged; human-readable stdout is not a stable API (use `--json`)
-- The `*-dark` scaffolds are now thin presets: the same stylesheet as their light family plus one `:root { color-scheme: dark; }` rule (~1,600 lines of duplicated dark CSS deleted). Scaffold design pass across the families: docs gains sidebar rail/overline hierarchy, hairline TOC, and real h2 section breaks; blog's hero/meta move onto the fluid scale with measure-capped prose; book keeps its serif reading character with tokenized surfaces; interactive prompts, help screens, and `--profile`/`--debug` output join the ember palette
+- Scaffold design pass across the families: docs gains sidebar rail/overline hierarchy, hairline TOC, and real h2 section breaks; blog's hero/meta move onto the fluid scale with measure-capped prose; book keeps its serif reading character with tokenized surfaces; interactive prompts, help screens, and `--profile`/`--debug` output join the ember palette (~1,600 lines of duplicated dark CSS deleted along the way)
+
+### Removed
+- The `blog-dark`, `docs-dark`, and `book-dark` scaffolds. Every scaffold already follows the OS color scheme automatically and now ships a manual theme switcher, so the forced-dark presets were redundant as separate init targets. To pin an existing or new site to one scheme permanently, append `:root { color-scheme: dark; }` (or `light`) to the generated `css/style.css` — byte-identical to what the presets shipped
 
 ### Fixed
 - macOS release binaries are now shipped as portable `.tar.gz` archives with bundled OpenSSL libraries, instead of a bare executable that required Homebrew `openssl@3` at a hardcoded path and failed on machines without it.

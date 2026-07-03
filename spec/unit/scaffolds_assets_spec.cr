@@ -14,7 +14,6 @@ describe "Scaffold embedded assets" do
         Hwaro::Services::Scaffolds::Blog.new,
         Hwaro::Services::Scaffolds::Docs.new,
         Hwaro::Services::Scaffolds::Book.new,
-        Hwaro::Services::Scaffolds::BlogDark.new,
       }.each do |scaffold|
         files = scaffold.static_files
         files.has_key?("fonts/charis-sil-400.woff2").should be_true
@@ -70,9 +69,6 @@ describe "Scaffold embedded assets" do
         Hwaro::Services::Scaffolds::Blog.new,
         Hwaro::Services::Scaffolds::Docs.new,
         Hwaro::Services::Scaffolds::Book.new,
-        Hwaro::Services::Scaffolds::BlogDark.new,
-        Hwaro::Services::Scaffolds::DocsDark.new,
-        Hwaro::Services::Scaffolds::BookDark.new,
       }.each do |scaffold|
         # The active setting (the explanatory comment may still mention "server").
         scaffold.config_content.should contain(%(mode = "client"))

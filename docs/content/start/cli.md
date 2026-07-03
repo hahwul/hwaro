@@ -82,7 +82,7 @@ Create a new site:
 ```bash
 hwaro init                    # initialize immediately with defaults
 hwaro init my-site            # initialize in my-site/
-hwaro init --wizard           # interactive wizard (TTY): scaffold, title, dark toggle
+hwaro init --wizard           # interactive wizard (TTY): scaffold, title
 hwaro init my-site --wizard   # wizard; directory prompt skipped (path taken from arg)
 hwaro init my-site --scaffold blog
 hwaro init my-site --scaffold docs
@@ -92,8 +92,7 @@ hwaro init my-site --scaffold book
 **Interactive mode:**
 
 Pass `--wizard` in an interactive terminal to open a guided flow: it asks for
-the directory, a scaffold (picked from the base scaffolds, with a "Dark theme?"
-toggle for the ones that have a dark preset), and the site title, then shows a
+the directory, a scaffold, and the site title, then shows a
 summary and asks to confirm before writing anything. When a path argument is
 given (`hwaro init my-site --wizard`), the wizard skips the directory prompt
 and uses that path directly.
@@ -102,8 +101,10 @@ Without `--wizard`, `hwaro init` initializes immediately with defaults — the
 same behaviour scripts and CI already relied on.
 
 Every scaffold follows the reader's OS color scheme automatically (the shared
-token system uses CSS `light-dark()` pairs); the `*-dark` scaffolds are presets
-of the same design that force the dark scheme permanently.
+token system uses CSS `light-dark()` pairs), and the styled scaffolds ship a
+header theme switcher that cycles auto → light → dark and remembers the choice
+in `localStorage`. To force one scheme permanently instead, add
+`:root { color-scheme: dark; }` (or `light`) at the end of `css/style.css`.
 
 You can also use a remote scaffold from a GitHub repository:
 
@@ -123,7 +124,7 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 
 | Flag | Description |
 |------|-------------|
-| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `docs`, `book`, plus `blog-dark`/`docs-dark`/`book-dark` presets that force the dark scheme) or remote source (`github:user/repo[/path]`, URL) |
+| --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `docs`, `book`) or remote source (`github:user/repo[/path]`, URL) |
 | --wizard | Run the interactive wizard (TTY only) |
 | --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
 | -f, --force | Force creation even if directory is not empty |

@@ -33,6 +33,12 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       css.should contain("light-dark(#faf7f2, #0f0f0e)")
     end
 
+    it "ships the [data-theme] pin rules the theme switcher drives" do
+      css = Hwaro::Services::Scaffolds::DesignTokens.root_block
+      css.should contain(%(:root[data-theme="light"] { color-scheme: light; }))
+      css.should contain(%(:root[data-theme="dark"] { color-scheme: dark; }))
+    end
+
     it "ships the static-light @supports fallback for pre-light-dark() browsers" do
       css = Hwaro::Services::Scaffolds::DesignTokens.root_block
       css.should contain("@supports not (color: light-dark(#000, #fff))")
@@ -68,9 +74,14 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
     end
   end
 
-  describe ".forced_dark_css" do
-    it "pins the dark scheme" do
-      Hwaro::Services::Scaffolds::DesignTokens.forced_dark_css.should contain(":root { color-scheme: dark; }")
+  describe ".theme_toggle_css" do
+    it "styles the switcher exclusively through tokens and shows one icon per mode" do
+      css = Hwaro::Services::Scaffolds::DesignTokens.theme_toggle_css
+      css.should contain(".theme-toggle")
+      css.should contain(%(.theme-toggle[data-mode="auto"] .tt-auto))
+      css.should contain(%(.theme-toggle[data-mode="light"] .tt-light))
+      css.should contain(%(.theme-toggle[data-mode="dark"] .tt-dark))
+      css.should_not match(/#[0-9a-f]{3,8}/i)
     end
   end
 end

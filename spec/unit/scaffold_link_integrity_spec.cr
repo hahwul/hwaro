@@ -1,11 +1,8 @@
 require "../spec_helper"
 require "../../src/models/config"
 require "../../src/services/scaffolds/blog"
-require "../../src/services/scaffolds/blog_dark"
 require "../../src/services/scaffolds/docs"
-require "../../src/services/scaffolds/docs_dark"
 require "../../src/services/scaffolds/book"
-require "../../src/services/scaffolds/book_dark"
 require "../../src/services/scaffolds/simple"
 require "../../src/services/scaffolds/bare"
 
@@ -39,14 +36,11 @@ end
 
 private def scaffold_fixtures
   {
-    "blog"      => Hwaro::Services::Scaffolds::Blog.new,
-    "blog_dark" => Hwaro::Services::Scaffolds::BlogDark.new,
-    "docs"      => Hwaro::Services::Scaffolds::Docs.new,
-    "docs_dark" => Hwaro::Services::Scaffolds::DocsDark.new,
-    "book"      => Hwaro::Services::Scaffolds::Book.new,
-    "book_dark" => Hwaro::Services::Scaffolds::BookDark.new,
-    "simple"    => Hwaro::Services::Scaffolds::Simple.new,
-    "bare"      => Hwaro::Services::Scaffolds::Bare.new,
+    "blog"   => Hwaro::Services::Scaffolds::Blog.new,
+    "docs"   => Hwaro::Services::Scaffolds::Docs.new,
+    "book"   => Hwaro::Services::Scaffolds::Book.new,
+    "simple" => Hwaro::Services::Scaffolds::Simple.new,
+    "bare"   => Hwaro::Services::Scaffolds::Bare.new,
   }
 end
 

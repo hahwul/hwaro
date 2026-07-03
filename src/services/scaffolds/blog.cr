@@ -146,6 +146,7 @@ module Hwaro
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
+              #{theme_head_script}
               {{ og_all_tags }}
               {{ canonical_tag }}
               {{ jsonld }}
@@ -174,6 +175,7 @@ module Hwaro
             </div>
             {{ highlight_js }}
             <script src="{{ base_url }}/js/search.js"></script>
+            #{theme_toggle_script}
             {{ auto_includes_js }}
             </body>
             </html>
@@ -453,6 +455,8 @@ module Hwaro
                (0,1,2) outranks the theme's `.hljs` (0,1,0). */
             pre code, pre code.hljs { background: transparent; padding: 0; font-size: 0.82rem; }
             #{highlight_theme_css}
+
+            #{theme_toggle_css}
 
             /* Tables */
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }
@@ -1075,6 +1079,7 @@ module Hwaro
                     <span>Search</span>
                     <kbd>&#8984;K</kbd>
                   </button>
+                  #{theme_toggle_html}
                 </div>
               </div>
             </header>
