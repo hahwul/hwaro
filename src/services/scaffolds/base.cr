@@ -559,57 +559,86 @@ module Hwaro
               body { font-family: var(--font-sans); font-size: var(--step-0); line-height: 1.7; margin: 0; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
               ::selection { background: var(--selection); }
 
-              /* Layout */
+              /* Layout. The masthead carries a small ember spark — the same
+                 diamond the favicon, dividers, and colophon share. */
               .site-wrapper { max-width: var(--content-max-w); margin: 0 auto; padding: 0 var(--space-5); }
-              .site-header { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-5) 0 var(--space-4); border-bottom: 1px solid var(--border); margin-bottom: var(--space-6); }
-              .site-logo { font-family: var(--font-serif); font-weight: 700; font-size: var(--step-1); color: var(--heading); text-decoration: none; letter-spacing: -0.01em; }
+              .site-header { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-6) 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); margin-bottom: var(--space-7); }
+              .site-logo { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-serif); font-weight: 700; font-size: var(--step-1); color: var(--heading); text-decoration: none; letter-spacing: -0.01em; }
+              .site-logo::before { content: ""; width: 9px; height: 9px; flex: none; border-radius: 2px; transform: rotate(45deg); background: var(--spark); }
               .site-logo:hover { color: var(--primary); }
               .site-header nav { display: flex; gap: 1.4rem; }
               .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); transition: color var(--transition); }
               .site-header nav a:hover { color: var(--primary); }
-              .site-main { min-height: calc(100vh - 220px); }
-              .site-footer { margin-top: var(--space-7); padding: var(--space-5) 0 var(--space-6); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--step--1); text-align: center; }
+              .site-main { min-height: calc(100vh - 260px); }
 
-              /* Typography — the fluid minor-third scale. */
-              h1, h2, h3 { font-family: var(--font-serif); line-height: 1.25; margin-top: 1.6em; margin-bottom: 0.5em; font-weight: 700; color: var(--heading); text-wrap: balance; }
-              h1 { font-size: var(--step-3); margin-top: 0; letter-spacing: -0.018em; }
-              h2 { font-size: var(--step-2); letter-spacing: -0.008em; }
+              /* Footer as colophon: a centered spark over a serif italic
+                 imprint line, like the last page of a well-set book. */
+              .site-footer { margin-top: var(--space-8); padding: 0 0 var(--space-6); text-align: center; color: var(--text-muted); font-size: var(--step--1); }
+              .site-footer::before { content: ""; display: block; width: 7px; height: 7px; margin: 0 auto var(--space-4); border-radius: 1px; transform: rotate(45deg); background: var(--spark); }
+              .site-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
+
+              /* Typography — the fluid minor-third scale, with a display-size
+                 page title. Tracking tightens as size grows so the serif
+                 reads engineered, not stretched. */
+              h1, h2, h3 { font-family: var(--font-serif); line-height: 1.2; margin-top: 1.7em; margin-bottom: 0.5em; font-weight: 700; color: var(--heading); text-wrap: balance; }
+              h1 { font-size: var(--step-4); margin-top: 0; letter-spacing: -0.022em; }
+              h2 { font-size: var(--step-2); letter-spacing: -0.012em; }
               h3 { font-size: var(--step-1); }
               p { margin: 1em 0; text-wrap: pretty; }
               .site-main p, .site-main li { max-width: var(--measure); }
 
               /* Page title gets a short ember rule — the one mark every
                  hwaro scaffold shares — and its first paragraph reads as a
-                 lede, giving the page a real focal point. */
-              .site-main > h1:first-child { position: relative; padding-bottom: 0.9rem; margin-bottom: 1.1rem; }
-              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 2.75rem; height: 3px; border-radius: 999px; background: linear-gradient(90deg, var(--rule-from), var(--rule-to)); }
-              .site-main > h1:first-child + p { font-size: var(--step-1); line-height: 1.55; color: var(--text-secondary); }
+                 serif lede, giving the page a real focal point. */
+              .site-main > h1:first-child { position: relative; padding-bottom: 1rem; margin-bottom: 1.1rem; }
+              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 3.25rem; height: 3px; border-radius: 999px; background: linear-gradient(90deg, var(--rule-from), var(--rule-to)); }
+              .site-main > h1:first-child + p { font-family: var(--font-serif); font-size: var(--step-1); line-height: 1.55; color: var(--text-secondary); }
 
               /* Links: ember, with an underline that warms up on hover. */
               a { color: var(--primary); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent); text-underline-offset: 3px; transition: color var(--transition), text-decoration-color var(--transition); }
               a:hover { color: var(--primary-strong); text-decoration-color: currentColor; }
               .site-header a, .skip-link, ul.section-list a, nav.pagination a { text-decoration: none; }
 
-              code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); }
-              pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius-sm); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; }
+              /* Lists carry the ember in their punctuation: serif numerals
+                 on ordered lists, warmed discs on unordered ones. */
+              .site-main ol > li::marker { font-family: var(--font-serif); font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+              .site-main ul > li::marker { color: var(--primary); }
+              .site-main li { margin-bottom: 0.35em; }
+
+              code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); overflow-wrap: break-word; }
+              pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius-sm); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
               /* Keep `.hljs` transparent so code sits on the warm well; if a
                  user switches to a CDN theme it won't repaint a clashing box.
                  `pre code.hljs` (0,1,2) outranks a theme's `.hljs` (0,1,0). */
               pre code, pre code.hljs { background: transparent; padding: 0; }
               #{highlight_theme_css}
               img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--edge); outline-offset: -1px; }
-              blockquote { font-family: var(--font-serif); font-style: italic; margin: 1.4em 0; padding: 0.1rem 0 0.1rem var(--space-5); color: var(--text-muted); border-left: 1px solid var(--primary); }
+
+              /* Blockquote as pulled voice: a hanging ember quote instead of
+                 a fence, set a touch larger in the serif italic. */
+              blockquote { font-family: var(--font-serif); font-style: italic; font-size: 1.06em; margin: var(--space-5) 0; padding: 0 0 0 var(--space-6); position: relative; color: var(--text-secondary); }
+              blockquote::before { content: "\\201C"; position: absolute; left: 0; top: -0.08em; font-size: 2.6em; line-height: 1; font-style: normal; color: var(--primary); opacity: 0.45; }
+              blockquote p { margin: 0.35em 0; }
+
               table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
               th, td { border-bottom: 1px solid var(--border); padding: 0.55rem 0.75rem; text-align: left; }
               th { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 2px solid var(--border); }
-              hr { border: none; border-top: 1px solid var(--border); margin: var(--space-6) 0; }
+              tbody tr { transition: background var(--transition); }
+              @media (hover: hover) { tbody tr:hover { background: var(--primary-tint); } }
+
+              /* Thematic break as an ember spark on a fading hairline — the
+                 scaffold's asterism. */
+              hr { border: none; height: 1px; margin: var(--space-7) 0; position: relative; overflow: visible; background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent); }
+              hr::after { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; border-radius: 1px; transform: translate(-50%, -50%) rotate(45deg); background: var(--spark); box-shadow: 0 0 0 7px var(--bg); }
 
               /* Components */
               ul.section-list { list-style: none; padding: 0; margin: var(--space-5) 0; }
               ul.section-list li { padding: 0.85rem 0.1rem; border-bottom: 1px solid var(--bg-subtle); }
               ul.section-list li:first-child { border-top: 1px solid var(--bg-subtle); }
               ul.section-list li a { font-family: var(--font-serif); font-weight: 500; font-size: var(--step-1); color: var(--text); transition: color var(--transition); }
+              ul.section-list li a::after { content: "\\2192"; display: inline-block; margin-left: 0.45rem; color: var(--primary); opacity: 0; transform: translateX(-4px); transition: opacity var(--transition), transform var(--transition); }
               ul.section-list li a:hover { color: var(--primary); }
+              @media (hover: hover) { ul.section-list li a:hover::after { opacity: 1; transform: translateX(0); } }
               .taxonomy-desc { color: var(--text-muted); margin-bottom: var(--space-5); }
               nav.pagination { margin: var(--space-6) 0; }
               nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }

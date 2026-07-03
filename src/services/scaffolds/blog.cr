@@ -262,6 +262,9 @@ module Hwaro
             }
 
             .blog-header .logo {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.55rem;
               font-family: var(--font-serif);
               font-weight: 700;
               font-size: 1.15rem;
@@ -269,6 +272,18 @@ module Hwaro
               text-decoration: none;
               letter-spacing: -0.01em;
               margin-right: 2.5rem;
+            }
+
+            /* The ember spark — the same diamond the favicon, dividers, and
+               footer colophon share. */
+            .blog-header .logo::before {
+              content: "";
+              width: 8px;
+              height: 8px;
+              flex: none;
+              border-radius: 2px;
+              transform: rotate(45deg);
+              background: var(--spark);
             }
 
             .blog-header .logo:hover { color: var(--primary); }
@@ -317,11 +332,11 @@ module Hwaro
 
             .blog-main h1 {
               font-family: var(--font-serif);
-              font-size: var(--step-3);
+              font-size: var(--step-4);
               font-weight: 700;
               margin: 0 0 0.5rem 0;
-              letter-spacing: -0.018em;
-              line-height: 1.2;
+              letter-spacing: -0.022em;
+              line-height: 1.15;
               color: var(--heading);
               text-wrap: balance;
             }
@@ -351,7 +366,7 @@ module Hwaro
               font-size: var(--step-2);
               font-weight: 700;
               margin: 2.5rem 0 0.75rem 0;
-              letter-spacing: -0.008em;
+              letter-spacing: -0.012em;
               color: var(--heading);
               text-wrap: balance;
             }
@@ -386,6 +401,18 @@ module Hwaro
               line-height: 1.6;
             }
 
+            /* Lists carry the ember in their punctuation: serif numerals on
+               ordered lists, warmed discs on unordered ones. (Chrome-less
+               lists — post feed, pagination, search — set list-style: none,
+               so no marker is painted there.) */
+            .blog-main ol > li::marker { font-family: var(--font-serif); font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+            .blog-main ul > li::marker { color: var(--primary); }
+
+            /* Thematic break as an ember spark on a fading hairline — the
+               scaffold's asterism. */
+            hr { border: none; height: 1px; margin: var(--space-7) 0; position: relative; overflow: visible; background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent); }
+            hr::after { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; border-radius: 1px; transform: translate(-50%, -50%) rotate(45deg); background: var(--spark); box-shadow: 0 0 0 7px var(--bg); }
+
             /* Links: ember, with an underline that warms up on hover. */
             a {
               color: var(--primary);
@@ -406,6 +433,7 @@ module Hwaro
               font-size: 0.85em;
               font-family: var(--font-mono);
               color: var(--text);
+              overflow-wrap: break-word;
             }
 
             pre {
@@ -416,6 +444,8 @@ module Hwaro
               margin: 1rem 0 1.5rem 0;
               line-height: 1.5;
               background: var(--bg-code);
+              scrollbar-width: thin;
+              scrollbar-color: var(--border) transparent;
             }
 
             /* Drop the highlight theme's own white background so syntax tokens
@@ -428,18 +458,35 @@ module Hwaro
             table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem 0; font-size: 0.9rem; }
             th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-secondary); }
             td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+            tbody tr { transition: background var(--transition); }
+            @media (hover: hover) { tbody tr:hover { background: var(--primary-tint); } }
 
-            /* Blockquote */
+            /* Blockquote as pulled voice: a hanging ember quote instead of
+               a fence, set a touch larger in the serif italic. */
             blockquote {
               font-family: var(--font-serif);
               font-style: italic;
-              border-left: 1px solid var(--primary);
-              padding: 0.1rem 0 0.1rem 1.25rem;
-              margin: 1.4rem 0;
+              font-size: 1.06em;
+              margin: var(--space-5) 0;
+              padding: 0 0 0 var(--space-6);
+              position: relative;
               color: var(--text-secondary);
             }
 
-            blockquote p { margin-bottom: 0; }
+            blockquote::before {
+              content: "\\201C";
+              position: absolute;
+              left: 0;
+              top: -0.08em;
+              font-size: 2.6em;
+              line-height: 1;
+              font-style: normal;
+              color: var(--primary);
+              opacity: 0.45;
+            }
+
+            blockquote p { margin-bottom: 0.35rem; }
+            blockquote p:last-child { margin-bottom: 0; }
 
             /* Images */
             img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid var(--edge); outline-offset: -1px; }
@@ -613,11 +660,9 @@ module Hwaro
             .related-posts a { color: var(--primary); text-decoration: none; }
             .related-posts a:hover { text-decoration: underline; }
 
-            .post-content h2 {
-              margin-top: 2.5rem;
-              padding-bottom: 0.4rem;
-              border-bottom: 1px solid var(--border-subtle);
-            }
+            /* Section headings rely on scale and space, not fences — the
+               ember punctuation (rule, sparks, markers) carries structure. */
+            .post-content h2 { margin-top: 3rem; }
 
             /* Tags */
             .tag {
@@ -666,14 +711,26 @@ module Hwaro
             .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: var(--primary-tint); color: var(--primary); }
             .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); color: var(--text-muted); opacity: 0.5; }
 
-            /* Footer */
+            /* Footer as colophon: a centered spark over a serif italic
+               imprint line, like the last page of a well-set book. */
             .blog-footer {
-              margin-top: 3rem;
-              padding-top: 1.5rem;
-              border-top: 1px solid var(--border-subtle);
+              margin-top: var(--space-8);
+              padding-bottom: var(--space-5);
+              text-align: center;
               color: var(--text-muted);
               font-size: var(--step--1);
             }
+            .blog-footer::before {
+              content: "";
+              display: block;
+              width: 7px;
+              height: 7px;
+              margin: 0 auto var(--space-4);
+              border-radius: 1px;
+              transform: rotate(45deg);
+              background: var(--spark);
+            }
+            .blog-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
 
             /* Search trigger */
             .search-trigger {

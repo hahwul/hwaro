@@ -280,12 +280,27 @@ module Hwaro
             }
 
             .book-header .logo {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.5rem;
               font-family: var(--font-serif);
               font-weight: 700;
               font-size: 0.95rem;
               color: var(--text-secondary);
               text-decoration: none;
               letter-spacing: 0.01em;
+            }
+
+            /* The ember spark — the same diamond the favicon, dividers, and
+               footer colophon share. */
+            .book-header .logo::before {
+              content: "";
+              width: 7px;
+              height: 7px;
+              flex: none;
+              border-radius: 1px;
+              transform: rotate(45deg);
+              background: var(--spark);
             }
 
             .book-header .logo:hover {
@@ -483,11 +498,11 @@ module Hwaro
             }
 
             .book-content h1 {
-              font-size: var(--step-3);
+              font-size: var(--step-4);
               font-weight: 700;
               margin: 0 0 1rem 0;
-              letter-spacing: -0.018em;
-              line-height: 1.3;
+              letter-spacing: -0.022em;
+              line-height: 1.15;
             }
 
             /* Page title gets a short ember rule — the one mark every
@@ -508,13 +523,13 @@ module Hwaro
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
+            /* Section headings rely on scale and space, not fences — the
+               ember punctuation (rule, sparks, markers) carries structure. */
             .book-content h2 {
               font-size: 1.5rem;
               font-weight: 600;
-              margin: 2.5rem 0 0.75rem 0;
-              letter-spacing: -0.015em;
-              padding-bottom: 0.5rem;
-              border-bottom: 1px solid var(--border-subtle);
+              margin: 3rem 0 0.75rem 0;
+              letter-spacing: -0.012em;
             }
 
             .book-content h3 {
@@ -549,6 +564,13 @@ module Hwaro
               margin-top: 0.2rem;
             }
 
+            /* Lists carry the ember in their punctuation: serif numerals on
+               ordered lists, warmed discs on unordered ones. (Sidebar, TOC,
+               and section lists set list-style: none, so no marker paints
+               there.) */
+            .book-content ol > li::marker { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+            .book-content ul > li::marker { color: var(--primary); }
+
             .book-content strong {
               font-weight: 700;
               color: var(--text);
@@ -575,6 +597,7 @@ module Hwaro
               border-radius: var(--radius-sm);
               font-size: 0.85em;
               font-family: var(--font-mono);
+              overflow-wrap: break-word;
             }
 
             pre {
@@ -585,6 +608,8 @@ module Hwaro
               border: 1px solid var(--border);
               margin: 1.25rem 0 1.5rem 0;
               line-height: 1.6;
+              scrollbar-width: thin;
+              scrollbar-color: var(--border) transparent;
             }
 
             /* Drop the highlight theme's own white background so syntax tokens
@@ -621,16 +646,37 @@ module Hwaro
               vertical-align: top;
             }
 
-            /* Blockquote */
+            tbody tr { transition: background var(--transition); }
+            @media (hover: hover) { tbody tr:hover { background: var(--primary-tint); } }
+
+            /* Blockquote as pulled voice: a hanging ember quote instead of
+               a fence, set a touch larger in the serif italic. */
             blockquote {
-              border-left: 1px solid var(--primary);
-              padding: 0.5rem 1.25rem;
-              margin: 1.25rem 0;
-              color: var(--text-secondary);
               font-style: italic;
+              font-size: 1.04em;
+              margin: var(--space-5) 0;
+              padding: 0 0 0 var(--space-6);
+              position: relative;
+              color: var(--text-secondary);
+            }
+
+            blockquote::before {
+              content: "\\201C";
+              position: absolute;
+              left: 0;
+              top: -0.08em;
+              font-size: 2.6em;
+              line-height: 1;
+              font-style: normal;
+              color: var(--primary);
+              opacity: 0.45;
             }
 
             blockquote p {
+              margin-bottom: 0.35rem;
+            }
+
+            blockquote p:last-child {
               margin-bottom: 0;
             }
 
@@ -660,11 +706,28 @@ module Hwaro
               border-color: color-mix(in srgb, var(--ok) 35%, transparent);
             }
 
-            /* Horizontal rule */
+            /* Thematic break as an ember spark on a fading hairline — the
+               scene-break asterism a reader layout was made for. */
             hr {
               border: none;
-              border-top: 1px solid var(--border);
-              margin: 2rem 0;
+              height: 1px;
+              margin: var(--space-7) 0;
+              position: relative;
+              overflow: visible;
+              background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent);
+            }
+
+            hr::after {
+              content: "";
+              position: absolute;
+              left: 50%;
+              top: 50%;
+              width: 7px;
+              height: 7px;
+              border-radius: 1px;
+              transform: translate(-50%, -50%) rotate(45deg);
+              background: var(--spark);
+              box-shadow: 0 0 0 7px var(--bg);
             }
 
             /* Section list */
@@ -819,17 +882,30 @@ module Hwaro
               opacity: 1;
             }
 
-            /* ── Footer ── */
+            /* ── Footer as colophon: a centered spark over a serif italic
+               imprint line, like the last page of a well-set book. ── */
             .book-footer {
               max-width: var(--content-max-w);
-              margin: 0 auto;
-              padding: 1.25rem 3rem 2rem;
+              margin: var(--space-6) auto 0;
+              padding: 0 3rem var(--space-5);
               width: 100%;
-              border-top: 1px solid var(--border-subtle);
+              text-align: center;
               color: var(--text-muted);
               font-size: 0.75rem;
-              font-family: var(--font-sans);
             }
+
+            .book-footer::before {
+              content: "";
+              display: block;
+              width: 7px;
+              height: 7px;
+              margin: 0 auto var(--space-4);
+              border-radius: 1px;
+              transform: rotate(45deg);
+              background: var(--spark);
+            }
+
+            .book-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
 
             /* ── Search Overlay ── */
             .search-overlay {

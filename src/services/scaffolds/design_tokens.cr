@@ -51,6 +51,11 @@ module Hwaro
               /* Ember rule — the one mark every scaffold shares. */
               --rule-from: light-dark(#c46262, #f39683);
               --rule-to:   light-dark(#8f4040, #cc5d4b);
+              /* The spark: the same ember as a 135° fill, used by the
+                 diamond marks (logo, dividers, footer colophon). Resolves
+                 through --rule-from/--rule-to, so the pre-light-dark()
+                 fallback below needs no gradient copy. */
+              --spark: linear-gradient(135deg, var(--rule-from), var(--rule-to));
 
               /* Ink — a three-step ramp. */
               --heading:        light-dark(#241f1a, #f5f2ed);

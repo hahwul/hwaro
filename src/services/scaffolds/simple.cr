@@ -115,6 +115,8 @@ module Hwaro
             3. Run `hwaro build` to regenerate the site.
             4. Run `hwaro serve` to preview changes locally.
 
+            ---
+
             ## Taxonomies
 
             Hwaro supports taxonomies like tags and categories. Check out:
