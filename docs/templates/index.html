@@ -146,96 +146,65 @@
             </section>
 
             <!-- ============================================================
-                 BENCHMARK
+                 SPEED — the measured build, replayed in real time
                  ============================================================ -->
-            <section class="benchmark reveal">
-                <div class="benchmark-header">
-                    <h2>1,000 pages. Under 7 seconds.</h2>
-                    <p>Benchmarked against popular static site generators.</p>
+            <section class="speed reveal">
+                <div class="speed-header">
+                    <h2>1,000 pages. Half a second.</h2>
+                    <p>
+                        Median cold build on the open
+                        <a
+                            href="https://hahwul.github.io/ssg-benchmark/"
+                            target="_blank"
+                            rel="noopener"
+                            >SSG benchmark</a
+                        >
+                        — a full blog workload: tag pages, pagination, feeds.
+                    </p>
                 </div>
 
-                <!-- SVG gradient/sheen definitions shared by every bar. Kept
-                     out of .benchmark-bars so the row nth-child stagger is
-                     not thrown off by an extra child. -->
-                <svg
-                    class="bench-defs"
-                    width="0"
-                    height="0"
-                    aria-hidden="true"
-                    focusable="false"
-                >
-                    <defs>
-                        <linearGradient id="benchGrad" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0" stop-color="#2f2f37" />
-                            <stop offset="1" stop-color="#51515d" />
-                        </linearGradient>
-                        <linearGradient id="benchGradHot" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0" stop-color="#e7a85f" />
-                            <stop offset="0.55" stop-color="#c46262" />
-                            <stop offset="1" stop-color="#974646" />
-                        </linearGradient>
-                        <linearGradient id="benchSheen" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0" stop-color="#fff" stop-opacity="0" />
-                            <stop offset="0.5" stop-color="#ffe9cc" stop-opacity="0.9" />
-                            <stop offset="1" stop-color="#fff" stop-opacity="0" />
-                        </linearGradient>
-                    </defs>
-                </svg>
-
-                <div class="benchmark-bars">
-                    <div class="bench-row" tabindex="0" aria-label="Zola: 5.2 seconds">
-                        <span class="bench-name">Zola</span>
-                        <div class="bench-track">
-                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-                                <rect class="bench-fill" x="0" y="0" width="44.8" height="12" fill="url(#benchGrad)" />
-                            </svg>
-                        </div>
-                        <span class="bench-time" data-time="5.2">5.2s</span>
+                <div class="speed-stage">
+                    <p class="speed-figure" aria-hidden="true">
+                        <span class="speed-number">0.00</span><span class="speed-unit">s</span>
+                    </p>
+                    <p class="speed-rate">&asymp; 2,000 pages per second</p>
+                    <div
+                        class="speed-track"
+                        role="img"
+                        aria-label="A full 1,000-page build finishes in 0.48 seconds"
+                    >
+                        <span class="speed-fill"></span>
                     </div>
-                    <div class="bench-row bench-highlight" tabindex="0" aria-label="Hwaro: 6.2 seconds">
-                        <span class="bench-name">Hwaro</span>
-                        <div class="bench-track">
-                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-                                <rect class="bench-fill" x="0" y="0" width="53.4" height="12" fill="url(#benchGradHot)" />
-                                <rect class="bench-sheen" x="0" y="0" width="15" height="12" fill="url(#benchSheen)" style="--travel: 38" />
-                            </svg>
-                        </div>
-                        <span class="bench-time" data-time="6.2">6.2s</span>
-                    </div>
-                    <div class="bench-row" tabindex="0" aria-label="Hugo: 8.2 seconds">
-                        <span class="bench-name">Hugo</span>
-                        <div class="bench-track">
-                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-                                <rect class="bench-fill" x="0" y="0" width="70.7" height="12" fill="url(#benchGrad)" />
-                            </svg>
-                        </div>
-                        <span class="bench-time" data-time="8.2">8.2s</span>
-                    </div>
-                    <div class="bench-row" tabindex="0" aria-label="Eleventy: 9.0 seconds">
-                        <span class="bench-name">Eleventy</span>
-                        <div class="bench-track">
-                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-                                <rect class="bench-fill" x="0" y="0" width="77.6" height="12" fill="url(#benchGrad)" />
-                            </svg>
-                        </div>
-                        <span class="bench-time" data-time="9.0">9.0s</span>
-                    </div>
-                    <div class="bench-row" tabindex="0" aria-label="Jekyll: 11.6 seconds">
-                        <span class="bench-name">Jekyll</span>
-                        <div class="bench-track">
-                            <svg class="bench-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-                                <rect class="bench-fill" x="0" y="0" width="100" height="12" fill="url(#benchGrad)" />
-                            </svg>
-                        </div>
-                        <span class="bench-time" data-time="11.6">11.6s</span>
-                    </div>
+                    <p class="speed-caption">
+                        <span>This bar fills in real time — 482&nbsp;ms, one full rebuild.</span>
+                        <button type="button" class="speed-replay">&#8635; replay</button>
+                    </p>
                 </div>
+
+                <ul class="speed-modes">
+                    <li>
+                        <span class="mode-name">minimal</span>
+                        <span class="mode-desc">markdown &rarr; HTML</span>
+                        <span class="mode-time">0.57s</span>
+                    </li>
+                    <li>
+                        <span class="mode-name">blog</span>
+                        <span class="mode-desc">tags &middot; pagination &middot; feeds</span>
+                        <span class="mode-time">0.48s</span>
+                    </li>
+                    <li>
+                        <span class="mode-name">heavy</span>
+                        <span class="mode-desc">+ syntax highlighting</span>
+                        <span class="mode-time">0.57s</span>
+                    </li>
+                </ul>
+
                 <p class="benchmark-link">
                     <a
                         href="https://hahwul.github.io/ssg-benchmark/"
                         target="_blank"
                         rel="noopener"
-                        >Full benchmark results →</a
+                        >Full results &amp; methodology &rarr;</a
                     >
                 </p>
             </section>
@@ -702,37 +671,57 @@
             var reduce = window.matchMedia &&
                 window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-            function countUp(el, target) {
-                if (reduce) { el.textContent = target.toFixed(1) + 's'; return; }
-                var dur = 1100, t0 = null;
-                el.textContent = '0.0s';
-                function step(ts) {
-                    if (t0 === null) t0 = ts;
-                    var p = Math.min((ts - t0) / dur, 1);
-                    var eased = 1 - Math.pow(1 - p, 3);
-                    el.textContent = (target * eased).toFixed(1) + 's';
-                    if (p < 1) requestAnimationFrame(step);
-                }
-                requestAnimationFrame(step);
-            }
+            // The speed stage replays the actual measured build: the bar
+            // fills in exactly MS milliseconds (the median 1,000-page blog
+            // build) while the counter tracks real elapsed time.
+            function runSpeed(section) {
+                var MS = 482;
+                var fill = section.querySelector('.speed-fill');
+                var num = section.querySelector('.speed-number');
+                var stage = section.querySelector('.speed-stage');
+                if (!fill || !num || !stage) return;
+                var running = false;
 
-            function runBench(section) {
-                var times = section.querySelectorAll('.bench-time');
-                for (var i = 0; i < times.length; i++) {
-                    (function(el, idx) {
-                        var target = parseFloat(el.getAttribute('data-time'));
-                        if (reduce) { countUp(el, target); return; }
-                        setTimeout(function() { countUp(el, target); },
-                            120 * idx + 120);
-                    })(times[i], i);
+                function play() {
+                    if (running) return;
+                    if (reduce) {
+                        num.textContent = (MS / 1000).toFixed(2);
+                        fill.style.transform = 'scaleX(1)';
+                        stage.classList.add('is-done');
+                        return;
+                    }
+                    running = true;
+                    stage.classList.remove('is-done');
+                    fill.style.transition = 'none';
+                    fill.style.transform = 'scaleX(0)';
+                    void fill.offsetWidth; /* flush the reset */
+                    fill.style.transition = 'transform ' + MS + 'ms linear';
+                    fill.style.transform = 'scaleX(1)';
+                    var t0 = null;
+                    function step(ts) {
+                        if (t0 === null) t0 = ts;
+                        var p = Math.min((ts - t0) / MS, 1);
+                        num.textContent = ((MS * p) / 1000).toFixed(2);
+                        if (p < 1) {
+                            requestAnimationFrame(step);
+                        } else {
+                            stage.classList.add('is-done');
+                            running = false;
+                        }
+                    }
+                    requestAnimationFrame(step);
                 }
+
+                var replay = section.querySelector('.speed-replay');
+                if (replay) replay.addEventListener('click', play);
+                play();
             }
 
             var reveals = document.querySelectorAll('.reveal');
 
             function show(el) {
                 el.classList.add('is-visible');
-                if (el.classList.contains('benchmark')) runBench(el);
+                if (el.classList.contains('speed')) runSpeed(el);
             }
 
             if (reduce || !('IntersectionObserver' in window)) {
