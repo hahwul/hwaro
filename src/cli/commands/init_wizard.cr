@@ -14,9 +14,9 @@ module Hwaro
       # `Services::Initializer` pipeline the flag form uses, so there is one
       # creation path, not two.
       class InitWizard
-        # Base (light) scaffolds in presentation order. Dark variants are
-        # reached through the "Dark theme?" toggle instead of tripling the
-        # picker list.
+        # Scaffolds in presentation order. Every scaffold follows the OS
+        # color scheme automatically and ships a manual theme switcher, so
+        # there is no separate dark-variant picker step.
         BASE_ORDER = [
           Config::Options::ScaffoldType::Simple,
           Config::Options::ScaffoldType::Blog,
@@ -24,12 +24,6 @@ module Hwaro
           Config::Options::ScaffoldType::Book,
           Config::Options::ScaffoldType::Bare,
         ]
-
-        DARK_VARIANTS = {
-          Config::Options::ScaffoldType::Blog => Config::Options::ScaffoldType::BlogDark,
-          Config::Options::ScaffoldType::Docs => Config::Options::ScaffoldType::DocsDark,
-          Config::Options::ScaffoldType::Book => Config::Options::ScaffoldType::BookDark,
-        }
 
         # Returns the collected `InitOptions`, or `nil` on cancellation — a
         # declined confirmation or an EOF (Ctrl-D) on any prompt — so the
@@ -59,12 +53,6 @@ module Hwaro
 
           title = Prompt.ask("Site title", default: "My Hwaro Site")
           return if title.nil?
-
-          if dark_variant = DARK_VARIANTS[scaffold]?
-            dark = Prompt.confirm?("Dark theme?", default: false)
-            return if dark.nil?
-            scaffold = dark_variant if dark
-          end
 
           Logger::Receipt.new("init")
             .row("path", path == "." ? "current directory" : path)

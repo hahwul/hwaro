@@ -4,7 +4,7 @@
 # (docs/content/start/first-site.md embeds them).
 #
 # Usage:
-#   ./scripts/generate_scaffold_previews.sh            # regenerate the 8 committed previews
+#   ./scripts/generate_scaffold_previews.sh            # regenerate the 5 committed previews
 #   ./scripts/generate_scaffold_previews.sh --dark     # ALSO capture forced-dark shots of the
 #                                                      # light scaffolds into a review dir
 #                                                      # (not committed — design self-review)
@@ -52,7 +52,7 @@ if [ -z "$CHROME" ]; then
     exit 1
 fi
 
-SCAFFOLDS=(simple bare blog blog-dark docs docs-dark book book-dark)
+SCAFFOLDS=(simple bare blog docs book)
 LIGHT_SCAFFOLDS=(simple blog docs book)
 
 mkdir -p "$OUT_DIR"
@@ -86,7 +86,6 @@ serve_and_shoot() {
 # Pin the resolved scheme. The scaffolds are auto light+dark
 # (color-scheme: light dark), so an unpinned capture would follow the
 # machine's OS scheme; the committed previews must be deterministic.
-# Appending `dark` is byte-identical to what the *-dark presets ship.
 force_scheme() {
     if [ -f "static/css/style.css" ]; then
         printf '\n:root { color-scheme: %s; }\n' "$1" >>static/css/style.css
@@ -108,8 +107,7 @@ for scaffold in "${SCAFFOLDS[@]}"; do
 
     "$HWARO_BIN" init . --scaffold "$scaffold" --skip-agents-md -q
 
-    # Light scaffolds are pinned light for the committed shot (a *-dark
-    # sheet already ends in a forced-dark rule, so it needs no pin).
+    # Styled scaffolds are pinned light for the committed shot.
     if [[ " ${LIGHT_SCAFFOLDS[*]} " == *" ${scaffold} "* ]]; then
         force_scheme light
     fi

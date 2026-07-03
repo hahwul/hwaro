@@ -21,28 +21,23 @@ Built-in scaffolds:
 | `simple` | Landing pages, small sites (default) |
 | `bare` | Minimal structure with semantic HTML only |
 | `blog` | Posts with tags and categories |
-| `blog-dark` | Blog preset that forces the dark scheme |
 | `docs` | Documentation with sidebar |
-| `docs-dark` | Documentation preset that forces the dark scheme |
 | `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
-| `book-dark` | Book preset that forces the dark scheme |
 
 Every scaffold shares one design-token system built on CSS `light-dark()` pairs,
 so each site automatically follows the reader's OS color scheme — light for
-light, dark for dark, with no extra setup. The `*-dark` variants are not
-separate designs: they are the same scaffold with the dark scheme forced
-permanently (a single `:root { color-scheme: dark; }` rule you can delete to
-restore automatic switching).
+light, dark for dark, with no extra setup. The styled scaffolds also ship a
+theme switcher in the header: it cycles auto → light → dark, persists the
+choice in `localStorage`, and applies it before first paint so there is no
+flash. To force one scheme permanently (a dark-only site), add
+`:root { color-scheme: dark; }` at the end of the generated `css/style.css`.
 
 {% preview_gallery() %}
 <a class="preview-item" href="/images/scaffolds/scaffold-simple.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-simple.png" alt="simple scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>simple</code> — Landing pages, small sites</div></a>
 <a class="preview-item" href="/images/scaffolds/scaffold-bare.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-bare.png" alt="bare scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>bare</code> — Minimal structure, semantic HTML only</div></a>
 <a class="preview-item" href="/images/scaffolds/scaffold-blog.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-blog.png" alt="blog scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>blog</code> — Posts with tags and categories</div></a>
-<a class="preview-item" href="/images/scaffolds/scaffold-blog-dark.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-blog-dark.png" alt="blog-dark scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>blog-dark</code> — Blog, forced dark scheme</div></a>
 <a class="preview-item" href="/images/scaffolds/scaffold-docs.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-docs.png" alt="docs scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>docs</code> — Documentation with sidebar</div></a>
-<a class="preview-item" href="/images/scaffolds/scaffold-docs-dark.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-docs-dark.png" alt="docs-dark scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>docs-dark</code> — Documentation, forced dark scheme</div></a>
 <a class="preview-item" href="/images/scaffolds/scaffold-book.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-book.png" alt="book scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>book</code> — Book with chapters</div></a>
-<a class="preview-item" href="/images/scaffolds/scaffold-book-dark.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-book-dark.png" alt="book-dark scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>book-dark</code> — Book, forced dark scheme</div></a>
 {% end %}
 
 > **Tip:** Looking for a more complete starting point? Check out the [Hwaro Examples](https://examples.hwaro.hahwul.com/) for ready-made boilerplates you can use right away.

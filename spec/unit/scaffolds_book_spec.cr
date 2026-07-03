@@ -2,13 +2,11 @@ require "../spec_helper"
 require "../../src/services/scaffolds/registry"
 
 # =============================================================================
-# Unit specs for the Book / BookDark scaffolds and the abstract Base class.
+# Unit specs for the Book scaffold and the abstract Base class.
 #
-# Existing scaffolds_spec.cr (600 lines) covers Simple, Docs, BlogDark,
-# DocsDark, and Registry. scaffolds_blog_spec.cr / scaffolds_bare_spec.cr
-# / scaffolds_docs_spec.cr cover the remaining named scaffolds. Book and
-# BookDark were referenced only in scaffold_registry_spec.cr (lookup) and
-# had no functional coverage; Base (abstract class) likewise had no spec.
+# Existing scaffolds_spec.cr covers Simple, Docs, and Registry.
+# scaffolds_blog_spec.cr / scaffolds_bare_spec.cr / scaffolds_docs_spec.cr
+# cover the remaining named scaffolds.
 # =============================================================================
 
 describe Hwaro::Services::Scaffolds::Book do
@@ -207,13 +205,9 @@ describe Hwaro::Services::Scaffolds::Book do
       config.should contain("A book powered by Hwaro.")
     end
 
-    it "uses the light highlight.js theme by default" do
+    it "uses the github highlight.js theme" do
       config = Hwaro::Services::Scaffolds::Book.new.config_content
-      # `theme = "github"` is a prefix of `theme = "github-dark"`, so a
-      # negative-lookahead regex disambiguates the two values. (The line
-      # has a trailing comment, so a simple newline guard would miss.)
-      config.should match(/theme = "github"(?!-)/)
-      config.should_not contain(%(theme = "github-dark"))
+      config.should contain(%(theme = "github"))
     end
 
     # Book intentionally drops `[[taxonomies]]` from the default
@@ -221,81 +215,6 @@ describe Hwaro::Services::Scaffolds::Book do
     # them can copy from the simple/blog scaffolds.
     it "omits taxonomies block by default" do
       config = Hwaro::Services::Scaffolds::Book.new.config_content
-      config.should_not contain("[[taxonomies]]")
-    end
-  end
-end
-
-describe Hwaro::Services::Scaffolds::BookDark do
-  describe "#type" do
-    it "returns BookDark scaffold type" do
-      Hwaro::Services::Scaffolds::BookDark.new.type
-        .should eq(Hwaro::Config::Options::ScaffoldType::BookDark)
-    end
-  end
-
-  describe "#description" do
-    it "mentions both Book-style and dark theme" do
-      desc = Hwaro::Services::Scaffolds::BookDark.new.description
-      desc.should contain("Book-style")
-      desc.should contain("dark")
-    end
-  end
-
-  describe "inheritance from Book" do
-    it "reuses Book's content_files (chapter structure)" do
-      light = Hwaro::Services::Scaffolds::Book.new.content_files
-      dark = Hwaro::Services::Scaffolds::BookDark.new.content_files
-      # Guard against the both-empty trivial case before comparing key sets.
-      dark.size.should be > 0
-      dark.keys.sort!.should eq(light.keys.sort!)
-    end
-
-    it "reuses Book's template files structure" do
-      light = Hwaro::Services::Scaffolds::Book.new.template_files
-      dark = Hwaro::Services::Scaffolds::BookDark.new.template_files
-      dark.size.should be > 0
-      dark.keys.sort!.should eq(light.keys.sort!)
-    end
-
-    it "ships its own static assets via the inherited static_files" do
-      files = Hwaro::Services::Scaffolds::BookDark.new.static_files
-      files.has_key?("css/style.css").should be_true
-      files.has_key?("js/book.js").should be_true
-    end
-
-    # The dark preset is not a second stylesheet: Book's sheet is built
-    # from scheme-paired design tokens, and BookDark appends only the
-    # forced `color-scheme: dark` rule that flips every token to its dark
-    # side.
-    it "reuses Book's token sheet and only appends the forced-dark rule" do
-      light_css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
-      dark_css = Hwaro::Services::Scaffolds::BookDark.new.static_files["css/style.css"]
-      dark_css.should contain("color-scheme: dark")
-      dark_css.should contain("light-dark(#b35454, #ec7a66)")
-      # Dedup lock: the dark sheet is byte-for-byte the light sheet plus a
-      # small forced-dark tail (~300 bytes of comment + one :root rule). A
-      # reintroduced hand-maintained dark stylesheet would blow past this.
-      dark_css.starts_with?(light_css).should be_true
-      (dark_css.bytesize - light_css.bytesize).should be < 400
-    end
-  end
-
-  describe "#config_content" do
-    it "uses the github-dark highlight theme" do
-      config = Hwaro::Services::Scaffolds::BookDark.new.config_content
-      config.should contain(%(theme = "github-dark"))
-      # Negative lookahead — see the matching Book test for rationale.
-      config.should_not match(/theme = "github"(?!-)/)
-    end
-
-    it "still names the scaffold 'My Book'" do
-      config = Hwaro::Services::Scaffolds::BookDark.new.config_content
-      config.should contain(%(title = "My Book"))
-    end
-
-    it "omits taxonomies block when skip_taxonomies is true" do
-      config = Hwaro::Services::Scaffolds::BookDark.new.config_content(skip_taxonomies: true)
       config.should_not contain("[[taxonomies]]")
     end
   end
@@ -372,11 +291,9 @@ describe Hwaro::Services::Scaffolds::Base do
       out.should_not contain("[[taxonomies]]")
     end
 
-    it "uses the light highlight theme via the default config_highlight_theme" do
+    it "uses the github highlight theme" do
       out = TestBaseScaffold.new.config_content
-      # Negative lookahead disambiguates "github" from "github-dark".
-      out.should match(/theme = "github"(?!-)/)
-      out.should_not contain(%(theme = "github-dark"))
+      out.should contain(%(theme = "github"))
     end
   end
 end

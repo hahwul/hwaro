@@ -15,20 +15,12 @@ describe Hwaro::Config::Options::ScaffoldType do
       Hwaro::Config::Options::ScaffoldType.from_string("docs").should eq(Hwaro::Config::Options::ScaffoldType::Docs)
     end
 
-    it "parses 'blog-dark'" do
-      Hwaro::Config::Options::ScaffoldType.from_string("blog-dark").should eq(Hwaro::Config::Options::ScaffoldType::BlogDark)
-    end
-
-    it "parses 'docs-dark'" do
-      Hwaro::Config::Options::ScaffoldType.from_string("docs-dark").should eq(Hwaro::Config::Options::ScaffoldType::DocsDark)
+    it "parses 'bare'" do
+      Hwaro::Config::Options::ScaffoldType.from_string("bare").should eq(Hwaro::Config::Options::ScaffoldType::Bare)
     end
 
     it "parses 'book'" do
       Hwaro::Config::Options::ScaffoldType.from_string("book").should eq(Hwaro::Config::Options::ScaffoldType::Book)
-    end
-
-    it "parses 'book-dark'" do
-      Hwaro::Config::Options::ScaffoldType.from_string("book-dark").should eq(Hwaro::Config::Options::ScaffoldType::BookDark)
     end
 
     it "is case insensitive" do
@@ -56,24 +48,16 @@ describe Hwaro::Config::Options::ScaffoldType do
       Hwaro::Config::Options::ScaffoldType::Docs.to_s.should eq("docs")
     end
 
-    it "converts BlogDark to 'blog-dark'" do
-      Hwaro::Config::Options::ScaffoldType::BlogDark.to_s.should eq("blog-dark")
-    end
-
-    it "converts DocsDark to 'docs-dark'" do
-      Hwaro::Config::Options::ScaffoldType::DocsDark.to_s.should eq("docs-dark")
+    it "converts Bare to 'bare'" do
+      Hwaro::Config::Options::ScaffoldType::Bare.to_s.should eq("bare")
     end
 
     it "converts Book to 'book'" do
       Hwaro::Config::Options::ScaffoldType::Book.to_s.should eq("book")
     end
 
-    it "converts BookDark to 'book-dark'" do
-      Hwaro::Config::Options::ScaffoldType::BookDark.to_s.should eq("book-dark")
-    end
-
     it "round-trips through from_string and to_s" do
-      ["simple", "blog", "docs", "blog-dark", "docs-dark", "book", "book-dark"].each do |name|
+      ["simple", "bare", "blog", "docs", "book"].each do |name|
         Hwaro::Config::Options::ScaffoldType.from_string(name).to_s.should eq(name)
       end
     end

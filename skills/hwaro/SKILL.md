@@ -98,7 +98,7 @@ Use the exit code to decide what to fix (e.g. `3` → look at `config.toml`,
 
 ```bash
 hwaro init my-site                       # default scaffold
-hwaro init my-site --scaffold blog       # simple | bare | blog | blog-dark | docs | docs-dark | book | book-dark
+hwaro init my-site --scaffold blog       # simple | bare | blog | docs | book
 hwaro init my-site --scaffold github:user/repo        # remote scaffold (GitHub shorthand or full URL)
 hwaro init --list-scaffolds --json       # discover built-ins programmatically
 ```

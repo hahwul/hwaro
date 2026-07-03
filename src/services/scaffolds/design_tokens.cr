@@ -3,9 +3,10 @@
 #
 # One warm identity, both schemes: every color token is a `light-dark()` pair
 # resolved by the page's `color-scheme`, so all scaffolds (including the
-# default `simple`) adapt to the OS scheme automatically. The `*-dark`
-# scaffolds are presets that force `color-scheme: dark` via `forced_dark_css`
-# instead of shipping a second stylesheet.
+# default `simple`) adapt to the OS scheme automatically. A visitor can pin
+# one side via the theme switcher: it sets `data-theme` on `<html>` and the
+# `:root[data-theme=…]` rules below re-resolve every token — no second
+# stylesheet, no dark scaffold variants.
 #
 # Rules of the system:
 #   * Scaffold component CSS never hardcodes a color — everything goes
@@ -36,8 +37,8 @@ module Hwaro
             :root {
               /* ── Hwaro Ember tokens ─────────────────────────────────────
                  One warm identity, both schemes. Colors are light-dark()
-                 pairs resolved by color-scheme; *-dark scaffolds force
-                 `color-scheme: dark` at the end of the sheet. Browsers
+                 pairs resolved by color-scheme; the theme switcher pins
+                 one side via [data-theme] at the end of the sheet. Browsers
                  without light-dark() (pre-2024) get the static light
                  palette from the fallback block below. */
               color-scheme: light dark;
@@ -162,6 +163,12 @@ module Hwaro
                 --shadow-lg: 0 16px 70px rgba(42, 36, 31, 0.18);
               }
             }
+
+            /* Manual scheme override — the theme switcher sets `data-theme`
+               on <html> to pin one side of every light-dark() token above;
+               no attribute (auto) follows the OS scheme. */
+            :root[data-theme="light"] { color-scheme: light; }
+            :root[data-theme="dark"] { color-scheme: dark; }
             CSS
         end
 
@@ -188,15 +195,19 @@ module Hwaro
             CSS
         end
 
-        # Appended as the last rule of a `*-dark` scaffold's sheet: a
-        # later-in-sheet, same-specificity `color-scheme` declaration wins,
-        # flipping every light-dark() token above to its dark side.
-        def self.forced_dark_css : String
+        # The theme-switcher button, colored entirely through tokens so it
+        # follows the resolved scheme like everything else. The three icons
+        # live in the markup (see `Base#theme_toggle_html`); `data-mode`
+        # picks the visible one.
+        def self.theme_toggle_css : String
           <<-CSS
-            /* ── Forced dark preset ──────────────────────────────────────
-               This scaffold pins the dark side of every light-dark() token.
-               Delete this rule to restore automatic OS-scheme switching. */
-            :root { color-scheme: dark; }
+            /* Theme switcher — cycles auto → light → dark (script inlined in footer). */
+            .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--transition), border-color var(--transition); }
+            .theme-toggle:hover { color: var(--primary); border-color: var(--primary); }
+            .theme-toggle svg { display: none; }
+            .theme-toggle[data-mode="auto"] .tt-auto,
+            .theme-toggle[data-mode="light"] .tt-light,
+            .theme-toggle[data-mode="dark"] .tt-dark { display: block; }
             CSS
         end
       end

@@ -133,6 +133,7 @@ module Hwaro
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
+              #{theme_head_script}
               {{ og_all_tags }}
               {{ canonical_tag }}
               {{ jsonld }}
@@ -183,8 +184,8 @@ module Hwaro
 
         # The stylesheet opens with the shared ember `:root` prelude (see
         # DesignTokens): every color token carries both schemes, so this
-        # one sheet serves light and dark and BookDark only appends a
-        # forced `color-scheme: dark` rule. Book's geometry (header
+        # one sheet serves light and dark — the theme switcher pins one
+        # side via `data-theme`. Book's geometry (header
         # height, sidebar width, measure) and its tighter shape (--radius
         # overrides) ride in through the layout hook — as does
         # `--bg-sidebar`, the book family's one extra color pair, which is
@@ -621,6 +622,12 @@ module Hwaro
               font-size: 0.84rem;
             }
             #{highlight_theme_css}
+
+            #{theme_toggle_css}
+
+            /* Match the header's borderless icon buttons. */
+            .book-header .theme-toggle { width: 34px; height: 34px; border: none; }
+            .book-header .theme-toggle:hover { color: var(--text-secondary); background: var(--primary-tint); }
 
             /* Tables */
             table {
@@ -1377,6 +1384,7 @@ module Hwaro
             </div>
             {{ highlight_js }}
             <script src="{{ base_url }}/js/book.js"></script>
+            #{theme_toggle_script}
             {{ auto_includes_js }}
             </body>
             </html>
@@ -1403,6 +1411,7 @@ module Hwaro
                   <svg class="fs-enter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                   <svg class="fs-exit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                 </button>
+                #{theme_toggle_html}
               </div>
             </header>
             HTML

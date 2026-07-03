@@ -235,6 +235,69 @@ module Hwaro
           DesignTokens.highlight_css
         end
 
+        # Shared switcher styling (token-driven — see DesignTokens).
+        protected def theme_toggle_css : String
+          DesignTokens.theme_toggle_css
+        end
+
+        # Applied before first paint so a visitor's stored theme choice
+        # doesn't flash the OS scheme first (`theme_toggle_script` is the
+        # writer side). Inlined in every scaffold's <head>.
+        protected def theme_head_script : String
+          <<-HTML
+            <script>(function(){try{var t=localStorage.getItem("hwaro-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})()</script>
+            HTML
+        end
+
+        # The theme-switcher button: three inline icons (auto half-disc, sun,
+        # moon); `data-mode` picks the visible one via
+        # `DesignTokens.theme_toggle_css`.
+        protected def theme_toggle_html : String
+          <<-HTML
+            <button class="theme-toggle" type="button" data-mode="auto" aria-label="Theme: auto" title="Theme: auto — click to switch">
+              <svg class="tt-auto" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg>
+              <svg class="tt-light" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 .9v2M8 13.1v2M.9 8h2M13.1 8h2M2.98 2.98l1.42 1.42M11.6 11.6l1.42 1.42M13.02 2.98L11.6 4.4M4.4 11.6l-1.42 1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg class="tt-dark" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 9.9A5.8 5.8 0 0 1 6.1 2.6a5.8 5.8 0 1 0 7.3 7.3z" fill="currentColor"/></svg>
+            </button>
+            HTML
+        end
+
+        # Cycle logic for the switcher: auto → light → dark → auto, persisted
+        # in localStorage ("auto" clears the key so the site follows the OS
+        # scheme again). Inlined before </body> so the button exists when it
+        # runs.
+        protected def theme_toggle_script : String
+          <<-HTML
+            <script>
+            (function () {
+              var KEY = "hwaro-theme";
+              var MODES = ["auto", "light", "dark"];
+              var root = document.documentElement;
+              var btn = document.querySelector(".theme-toggle");
+              if (!btn) return;
+              function apply(mode) {
+                if (mode === "auto") {
+                  root.removeAttribute("data-theme");
+                  try { localStorage.removeItem(KEY); } catch (e) {}
+                } else {
+                  root.setAttribute("data-theme", mode);
+                  try { localStorage.setItem(KEY, mode); } catch (e) {}
+                }
+                btn.setAttribute("data-mode", mode);
+                btn.setAttribute("aria-label", "Theme: " + mode);
+                btn.title = "Theme: " + mode + " — click to switch";
+              }
+              var stored = "auto";
+              try { var t = localStorage.getItem(KEY); if (t === "light" || t === "dark") stored = t; } catch (e) {}
+              btn.addEventListener("click", function () {
+                apply(MODES[(MODES.indexOf(btn.getAttribute("data-mode")) + 1) % MODES.length]);
+              });
+              apply(stored);
+            })();
+            </script>
+            HTML
+        end
+
         # Returns shortcode files as a hash of path => content
         def shortcode_files : Hash(String, String)
           {
@@ -293,11 +356,6 @@ module Hwaro
         # Returns the site description used in config (overridable per scaffold)
         protected def config_description : String
           "Welcome to my new Hwaro site."
-        end
-
-        # Returns the highlight.js theme name (overridable for dark scaffolds)
-        protected def config_highlight_theme : String
-          "github"
         end
 
         # Display name for language codes (used in minimal + balanced config for --include-multilingual).
@@ -364,7 +422,7 @@ module Hwaro
             str << "\n[highlight]\n"
             str << "enabled = true\n"
             str << "mode = \"client\"\n"
-            str << "theme = \"#{config_highlight_theme}\"\n"
+            str << "theme = \"github\"\n"
             str << "use_cdn = true\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"
@@ -432,6 +490,7 @@ module Hwaro
               <meta name="description" content="{{ page.description | default(site.description, true) | e }}">
               <title>{% if page.title is present %}{{ page.title | e }} - {% endif %}{{ site.title | e }}</title>
               <link rel="icon" type="image/svg+xml" href="{{ base_url }}/favicon.svg">
+              #{theme_head_script}
               {{ og_all_tags }}
               {{ canonical_tag }}
               {{ jsonld }}
@@ -450,7 +509,10 @@ module Hwaro
               <div class="site-wrapper">
                 <header class="site-header">
                   <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title | e }}</a>
-                  #{navigation}
+                  <div class="site-header-right">
+                    #{navigation}
+                    #{theme_toggle_html}
+                  </div>
                 </header>
 
             HTML
@@ -464,6 +526,7 @@ module Hwaro
                 </footer>
               </div>
               {{ highlight_js }}
+              #{theme_toggle_script}
               {{ auto_includes_js }}
             </body>
             </html>
@@ -566,9 +629,11 @@ module Hwaro
               .site-logo { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-serif); font-weight: 700; font-size: var(--step-1); color: var(--heading); text-decoration: none; letter-spacing: -0.01em; }
               .site-logo::before { content: ""; width: 9px; height: 9px; flex: none; border-radius: 2px; transform: rotate(45deg); background: var(--spark); }
               .site-logo:hover { color: var(--primary); }
+              .site-header-right { display: flex; align-items: center; gap: 1.4rem; }
               .site-header nav { display: flex; gap: 1.4rem; }
               .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); transition: color var(--transition); }
               .site-header nav a:hover { color: var(--primary); }
+              #{theme_toggle_css}
               .site-main { min-height: calc(100vh - 260px); }
 
               /* Footer as colophon: a centered spark over a serif italic
@@ -784,29 +849,6 @@ module Hwaro
 
         protected def highlight_config : String
           ConfigSnippets.highlight
-        end
-
-        # Dark-theme highlight block shared by the *_dark scaffolds (identical
-        # across blog/docs/book dark variants).
-        protected def highlight_dark_config : String
-          <<-TOML
-
-            # =============================================================================
-            # Syntax Highlighting
-            # =============================================================================
-            # Code blocks are highlighted in the browser by Highlight.js and themed by
-            # an inlined, ember-warm dark theme in css/style.css (so you recolor syntax
-            # by editing that CSS, not the `theme` below). `mode = "server"` can
-            # highlight at build time with no JS, but its Tartrazine backend isn't
-            # multi-thread-safe, so the scaffold default stays "client".
-
-            [highlight]
-            enabled = true
-            mode = "client"              # "client" = Highlight.js in the browser; "server" = build-time (no JS)
-            theme = "github-dark"        # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
-            use_cdn = true               # true loads Highlight.js from a CDN; false expects a self-hosted build
-
-            TOML
         end
 
         # Shared search overlay markup; only the input placeholder varies per

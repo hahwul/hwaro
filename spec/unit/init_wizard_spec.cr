@@ -25,8 +25,8 @@ end
 
 describe Hwaro::CLI::Commands::InitWizard do
   it "collects directory, scaffold, and title, and confirms" do
-    # directory, scaffold(2 = blog), title, dark(n), confirm(accept default y)
-    options = run_init_wizard("my-site\n2\nMy Blog\nn\n\n")
+    # directory, scaffold(2 = blog), title, confirm(accept default y)
+    options = run_init_wizard("my-site\n2\nMy Blog\n\n")
     options.should_not be_nil
     options = options.not_nil!
 
@@ -47,18 +47,11 @@ describe Hwaro::CLI::Commands::InitWizard do
     options.site_title.should eq("My Hwaro Site")
   end
 
-  it "maps the dark toggle onto the matching *-dark scaffold" do
-    # directory, scaffold(3 = docs), title(accept), dark(y), confirm
-    options = run_init_wizard("site\n3\n\ny\n\n")
+  it "selects the docs scaffold without a dark-variant step" do
+    # directory, scaffold(3 = docs), title(accept), confirm
+    options = run_init_wizard("site\n3\n\n\n")
     options.should_not be_nil
-    options.not_nil!.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::DocsDark)
-  end
-
-  it "does not ask about dark for scaffolds without a dark variant" do
-    # directory, scaffold(1 = simple), title, confirm — no dark answer needed
-    options = run_init_wizard("site\n1\nTitle\n\n")
-    options.should_not be_nil
-    options.not_nil!.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
+    options.not_nil!.scaffold.should eq(Hwaro::Config::Options::ScaffoldType::Docs)
   end
 
   it "skips the directory prompt when a path positional is given" do

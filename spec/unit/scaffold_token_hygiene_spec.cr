@@ -43,11 +43,4 @@ describe "scaffold token hygiene" do
       color_violations(css).should be_empty
     end
   {% end %}
-
-  {% for pair in [{"blog-dark", "BlogDark"}, {"docs-dark", "DocsDark"}, {"book-dark", "BookDark"}] %}
-    it "{{ pair[0].id }}'s forced-dark sheet stays clean too" do
-      css = external_sheet(Hwaro::Services::Scaffolds::{{ pair[1].id }}.new)
-      color_violations(css).should be_empty
-    end
-  {% end %}
 end

@@ -75,7 +75,7 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 
 ### Development & Deployment
 - Dev server with live reload and error overlay
-- Scaffolding with built-in themes (`blog`, `docs`, `blog-dark`, `docs-dark`)
+- Scaffolding with built-in themes (`simple`, `bare`, `blog`, `docs`, `book`) — auto light/dark with a built-in theme switcher
 - Deploy to multiple targets with dry-run support
 - Platform config generation (Netlify, Vercel, Cloudflare Pages, GitHub Pages, GitLab CI)
 - Import from WordPress, Jekyll, Hugo
