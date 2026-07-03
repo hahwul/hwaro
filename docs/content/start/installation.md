@@ -96,10 +96,15 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 git clone https://github.com/hahwul/hwaro
 cd hwaro
 shards install
-shards build --release
+shards build --release --no-debug -Dpreview_mt
 ```
 
 The binary is created at `./bin/hwaro`.
+
+> `-Dpreview_mt` enables Crystal's multi-threaded runtime — it is how the
+> official binaries and Docker image are built, and `hwaro build` renders
+> pages in parallel only with it. Packagers should always pass this flag;
+> without it, builds run on a single thread.
 
 ### Add to PATH (Optional)
 
