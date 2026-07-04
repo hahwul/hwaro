@@ -36,3 +36,10 @@ Lint/NotNil:
 Lint/SpecFilename:
   Excluded:
     - spec/functional/support/**/*.cr
+
+# `OutputsConfig#any?` (page/section formats configured) is a custom Bool
+# method, not `Enumerable#any?` — this rule matches any arg-less/no-block
+# `.any?` call by name alone and can't tell the two apart.
+Performance/AnyInsteadOfPresent:
+  Excluded:
+    - spec/unit/outputs_config_spec.cr

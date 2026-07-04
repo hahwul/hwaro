@@ -929,6 +929,35 @@ module Hwaro
       end
     end
 
+    # `[outputs]` — declares extra per-page/per-section output formats
+    # beyond HTML (sibling `index.<fmt>` files rendered from a user-supplied
+    # `templates/<name>.<fmt>.jinja` template). See
+    # docs/content/features/output-formats.md for the full selection chain
+    # and front matter override (`page.extra["outputs"]`).
+    class OutputsConfig
+      VALID_FORMATS = %w[json txt xml csv]
+
+      # Formats every regular page emits (unless overridden by front matter).
+      property page : Array(String)
+      # Formats every section index emits (unless overridden by front matter).
+      property section : Array(String)
+      # Optional allowlist of section names formats apply to; empty = all
+      # sections. Matches a section name or any of its descendants, mirroring
+      # `FeedConfig#sections`.
+      property sections : Array(String)
+
+      def initialize
+        @page = [] of String
+        @section = [] of String
+        @sections = [] of String
+      end
+
+      # Whether any format is configured at all (page or section).
+      def any? : Bool
+        @page.present? || @section.present?
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -960,6 +989,7 @@ module Hwaro
       property image_processing : ImageProcessingConfig
       property doctor : DoctorConfig
       property static : StaticConfig
+      property outputs : OutputsConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -996,6 +1026,7 @@ module Hwaro
         @image_processing = ImageProcessingConfig.new
         @doctor = DoctorConfig.new
         @static = StaticConfig.new
+        @outputs = OutputsConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1205,6 +1236,7 @@ module Hwaro
         load_doctor(config)
         load_static(config)
         load_deployment(config)
+        load_outputs(config)
 
         config
       end
@@ -1858,6 +1890,37 @@ module Hwaro
           end
           matcher
         end
+      end
+
+      private def self.load_outputs(config : Config)
+        return unless s = config.raw["outputs"]?.try(&.as_h?)
+
+        if page_any = s["page"]?
+          config.outputs.page = validate_output_formats(string_or_array(page_any))
+        end
+        if section_any = s["section"]?
+          config.outputs.section = validate_output_formats(string_or_array(section_any))
+        end
+        if sections = s["sections"]?.try(&.as_a?)
+          config.outputs.sections = sections.compact_map(&.as_s?)
+        end
+      end
+
+      # Validate `[outputs]` format names against `OutputsConfig::VALID_FORMATS`.
+      # Raises a classified `HWARO_E_CONFIG` error (rather than warning and
+      # falling back) because an unknown format silently produces no output —
+      # a user who typos "jso" for "json" deserves a build failure, not a
+      # quietly-missing file.
+      private def self.validate_output_formats(formats : Array(String)) : Array(String)
+        formats.each do |fmt|
+          next if OutputsConfig::VALID_FORMATS.includes?(fmt)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Unknown output format '#{fmt}' in [outputs]. Valid formats: #{OutputsConfig::VALID_FORMATS.join(", ")}.",
+            hint: "Use one of: #{OutputsConfig::VALID_FORMATS.join(", ")}.",
+          )
+        end
+        formats
       end
     end
   end
