@@ -4,7 +4,7 @@
 
 ### Added
 - `[outputs]` config: extra per-page/section output formats (`json`, `txt`, `xml`, `csv`) from user `templates/page.<fmt>.jinja` / `section.<fmt>.jinja`, overridable per page via a front-matter `outputs` key (cascades), exposed as `{{ alternate_output_tags }}`, cache-aware under `--cache`
-- Markdown render hooks: `templates/hooks/render-{link,image,heading,codeblock}.html` override element rendering (Hugo/Zola-style), no-op when absent; existing `@/`/shortcode/`srcset`/anchor resolvers still run. See [Render Hooks](/templates/render-hooks/)
+- Markdown render hooks: `templates/hooks/render-{link,image,heading,codeblock}.html` override element rendering (Hugo/Zola-style), no-op when absent; existing `@/`/shortcode/`srcset`/anchor resolvers still run. See [Render Hooks](https://hwaro.hahwul.com/templates/render-hooks/)
 - Fenced code block options after the language (`{linenos=true, hl_lines="2-4 7", linenostart=5}`) plus `[highlight] line_numbers`; `mode = "server"` bakes the result at build time, `mode = "client"` emits `data-*` attributes
 - Opt-in inline markup behind `[markdown]` flags (off by default): `ins` (`++`), `mark` (`==`), `sub` (`~`), `sup` (`^`)
 - Generalized `{#id .class key=val}` attribute blocks on headings and inline images (`[markdown] attributes`)
