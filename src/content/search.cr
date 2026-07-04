@@ -125,7 +125,9 @@ module Hwaro
                 html_content = page.content
               else
                 md = config.markdown
-                html_content = Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, lazy_loading: md.lazy_loading, markdown_config: md)
+                hooks = Content::Processors::RenderHooks.fallback_context(page, config)
+                html_content = Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, lazy_loading: md.lazy_loading, markdown_config: md,
+                  hooks: hooks, hooks_key: "#{page.url}:#{page.language}")
               end
 
               # Strip HTML tags AND decode entities so the index stores
