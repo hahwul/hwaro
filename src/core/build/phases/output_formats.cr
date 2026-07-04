@@ -134,4 +134,22 @@ module Hwaro::Core::Build::Phases::OutputFormats
       Utils::OutputGuard.safe_output_path(candidate, output_dir)
     end
   end
+
+  # `<link rel="alternate" type="MIME" href="ABS">` tags for every enabled
+  # format on `page`, one per line — empty string when no formats apply.
+  # `ABS` matches the same `base_url_stripped + page.url` pattern used by
+  # `canonical_tag`/`hreflang_tags` so subpath deployments resolve correctly.
+  def alternate_output_tags(page : Models::Page, config : Models::Config) : String
+    formats = effective_output_formats(page, config)
+    return "" if formats.empty?
+
+    base = config.base_url_stripped
+    url_path = page.url.starts_with?("/") ? page.url : "/#{page.url}"
+
+    formats.map do |fmt|
+      mime = FORMAT_MIME[fmt]? || "application/octet-stream"
+      href = "#{base}#{url_path}index.#{fmt}"
+      %(<link rel="alternate" type="#{mime}" href="#{HTML.escape(href)}">)
+    end.join("\n  ")
+  end
 end

@@ -2156,6 +2156,10 @@ module Hwaro::Core::Build::Phases::Render
       vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
       vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 
+      # Sibling output-format alternate links (rel=alternate) — one per
+      # enabled format (see `[outputs]`), empty when this page has none.
+      vars["alternate_output_tags"] = Crinja::Value.new(alternate_output_tags(page, config))
+
       # Structured SEO object for custom meta tag markup
       canonical_url = Content::Seo::Tags.canonical_url(page, config, page_url_override)
       seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""

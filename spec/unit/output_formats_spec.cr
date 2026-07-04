@@ -20,6 +20,10 @@ module Hwaro::Core::Build
     def test_write_format_output(page : Models::Page, output_dir : String, fmt : String, content : String, verbose : Bool = false)
       write_format_output(page, output_dir, fmt, content, verbose)
     end
+
+    def test_alternate_output_tags(page : Models::Page, config : Models::Config)
+      alternate_output_tags(page, config)
+    end
   end
 end
 
@@ -216,6 +220,53 @@ describe Hwaro::Core::Build::Phases::OutputFormats do
           File.read("public/blog/post/index.json").should eq(%({"a":1}))
         end
       end
+    end
+  end
+
+  describe "#alternate_output_tags" do
+    it "returns an empty string when the page has no formats" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      page = Hwaro::Models::Page.new("about.md")
+      page.url = "/about/"
+      builder.test_alternate_output_tags(page, config).should eq("")
+    end
+
+    it "emits a rel=alternate link per enabled format" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.outputs.page = ["json"]
+      page = Hwaro::Models::Page.new("about.md")
+      page.url = "/about/"
+      tags = builder.test_alternate_output_tags(page, config)
+      tags.should contain(%(rel="alternate"))
+      tags.should contain(%(type="application/json"))
+      tags.should contain(%(href="https://example.com/about/index.json"))
+    end
+
+    it "emits one line per format, joined with a newline" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.outputs.page = ["json", "xml"]
+      page = Hwaro::Models::Page.new("about.md")
+      page.url = "/about/"
+      tags = builder.test_alternate_output_tags(page, config)
+      tags.split("\n").size.should eq(2)
+      tags.should contain(%(href="https://example.com/about/index.json"))
+      tags.should contain(%(href="https://example.com/about/index.xml"))
+    end
+
+    it "resolves under a subpath base_url" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/blog"
+      config.outputs.page = ["json"]
+      page = Hwaro::Models::Page.new("about.md")
+      page.url = "/about/"
+      tags = builder.test_alternate_output_tags(page, config)
+      tags.should contain(%(href="https://example.com/blog/about/index.json"))
     end
   end
 end

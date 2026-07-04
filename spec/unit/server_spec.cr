@@ -39,13 +39,26 @@ module Hwaro
   end
 end
 
-# Reopen Builder to test private inject_error_overlay method
+# Reopen Builder to test private inject_error_overlay method, and to seed
+# @site/@config/@cache for stale_outputs_for_removed's [outputs] fallbacks.
 module Hwaro
   module Core
     module Build
       class Builder
         def test_inject_error_overlay(html : String, warnings : Array(String)) : String
           inject_error_overlay(html, warnings)
+        end
+
+        def test_set_site(site : Models::Site)
+          @site = site
+        end
+
+        def test_set_config(config : Models::Config)
+          @config = config
+        end
+
+        def test_set_cache(cache : Cache)
+          @cache = cache
         end
       end
     end
@@ -506,6 +519,74 @@ describe "stale output cleanup on file removal" do
   it "ignores removed markdown files when no site has been built yet" do
     builder = Hwaro::Core::Build::Builder.new
     builder.stale_outputs_for_removed(["content/posts/gone.md"], "public").should be_empty
+  end
+
+  it "includes cache-recorded sibling output-format files for a removed page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/gone.md", "content")
+
+        config = Hwaro::Models::Config.new
+        site = Hwaro::Models::Site.new(config)
+        page = Hwaro::Models::Page.new("posts/gone.md")
+        page.url = "/posts/gone/"
+        site.pages << page
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update("content/posts/gone.md", output_paths: [File.join("public", "posts/gone/index.json")])
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_site(site)
+        builder.test_set_config(config)
+        builder.test_set_cache(cache)
+
+        outputs = builder.stale_outputs_for_removed(["content/posts/gone.md"], "public")
+        outputs.any?(&.ends_with?("public/posts/gone/index.html")).should be_true
+        outputs.should contain(File.join("public", "posts/gone/index.json"))
+      end
+    end
+  end
+
+  it "falls back to recomputing effective formats when the cache has no record" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        config = Hwaro::Models::Config.new
+        config.outputs.page = ["json"]
+        site = Hwaro::Models::Site.new(config)
+        page = Hwaro::Models::Page.new("posts/gone.md")
+        page.url = "/posts/gone/"
+        site.pages << page
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_site(site)
+        builder.test_set_config(config)
+
+        outputs = builder.stale_outputs_for_removed(["content/posts/gone.md"], "public")
+        outputs.any?(&.ends_with?("public/posts/gone/index.html")).should be_true
+        outputs.any?(&.ends_with?("public/posts/gone/index.json")).should be_true
+      end
+    end
+  end
+
+  it "adds no format paths for a removed page with no effective formats" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        config = Hwaro::Models::Config.new
+        site = Hwaro::Models::Site.new(config)
+        page = Hwaro::Models::Page.new("posts/gone.md")
+        page.url = "/posts/gone/"
+        site.pages << page
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_site(site)
+        builder.test_set_config(config)
+
+        outputs = builder.stale_outputs_for_removed(["content/posts/gone.md"], "public")
+        outputs.size.should eq(1)
+        outputs[0].ends_with?("public/posts/gone/index.html").should be_true
+      end
+    end
   end
 
   it "deletes stale outputs and prunes empty parent directories" do
