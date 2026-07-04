@@ -17,6 +17,7 @@ require "./base"
 require "./table_parser"
 require "./syntax_highlighter"
 require "./markdown_extensions"
+require "./heading_ids"
 require "./render_hooks"
 require "../../models/toc"
 require "../../utils/errors"
@@ -136,7 +137,10 @@ module Hwaro
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
         # @param lazy_loading - if true, adds loading="lazy" to img tags
         # @param emoji - if true, converts emoji shortcodes to emoji characters
-        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
+        # @param hooks - render-hook context; nil (the default) renders exactly
+        #   as before this parameter existed.
+        def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
+                   hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
           # Tables are converted FIRST: cell bodies render through
           # InlineMarkdown, which HTML-escapes — so the HTML-injecting
           # extension passes (strikethrough/footnote refs/math) must not have
@@ -158,7 +162,7 @@ module Hwaro
 
           # Use SyntaxHighlighter for rendering with highlighting support.
           # Tables were already converted above — skip the redundant re-scan.
-          html = SyntaxHighlighter.render(processed, highlight, safe, tables_preprocessed: true)
+          html = SyntaxHighlighter.render(processed, highlight, safe, tables_preprocessed: true, hooks: hooks)
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config
@@ -639,8 +643,9 @@ module Hwaro
         end
 
         # Render with anchor links inserted into headings
-        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
-          html, toc = render(content, highlight, safe, lazy_loading, emoji, markdown_config)
+        def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
+                                hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
+          html, toc = render(content, highlight, safe, lazy_loading, emoji, markdown_config, hooks: hooks)
           html_with_anchors = insert_anchor_links_to_html(html, anchor_style)
           {html_with_anchors, toc}
         end
@@ -724,26 +729,11 @@ module Hwaro
                               id_match[1]
                             end
 
-              # The heading text reaches us entity-escaped (`&` → `&amp;` by
-              # Markd); unescape before slugifying so "Tom & Jerry" gets the
-              # id "tom-jerry", not "tom-amp-jerry". The TOC title keeps the
-              # escaped form — both consumers (generate_toc_html and Crinja
-              # with autoescape off) interpolate it into HTML verbatim.
-              slug = Utils::TextUtils.slugify(HTML.unescape(title))
-              id = existing_id || (slug.empty? ? "heading" : slug)
-
-              # Ensure uniqueness using counter map for O(1) suffix lookup
-              if used_ids.includes?(id)
-                base_id = id
-                id_counters[base_id] += 1
-                id = "#{base_id}-#{id_counters[base_id]}"
-                # Handle the rare case where the suffixed id also exists
-                while used_ids.includes?(id)
-                  id_counters[base_id] += 1
-                  id = "#{base_id}-#{id_counters[base_id]}"
-                end
-              end
-              used_ids << id
+              # The TOC title keeps the escaped form — both consumers
+              # (generate_toc_html and Crinja with autoescape off)
+              # interpolate it into HTML verbatim; slugify/unescape happen
+              # inside HeadingIds.assign.
+              id = HeadingIds.assign(title, existing_id, used_ids, id_counters)
 
               permalink = "##{id}"
 
@@ -968,8 +958,11 @@ module Hwaro
       # @param safe - if true, raw HTML will not be passed through (replaced by comments)
       # @param lazy_loading - if true, adds loading="lazy" to img tags
       # @param emoji - if true, converts emoji shortcodes to emoji characters
-      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config)
+      # @param hooks - render-hook context; nil (the default) renders exactly
+      #   as before this parameter existed.
+      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
+                 hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config, hooks: hooks)
       end
 
       # Memoized body render for the Generate-phase fallbacks: on warm
@@ -1022,8 +1015,9 @@ module Hwaro
       end
 
       # Renders with anchor links injected into headings (delegates to shared instance)
-      def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render_with_anchors(content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config)
+      def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
+                              hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
+        @@instance.render_with_anchors(content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config, hooks: hooks)
       end
     end
   end
