@@ -288,6 +288,11 @@ module Hwaro::Core::Build::Phases::Initialize
     # (Re)build the template dependency graph for selective invalidation
     @template_deps = TemplateDeps.new(templates)
 
+    # (Re)build the render-hook registry — nil when no templates/hooks/render-*
+    # template exists, which is the zero-cost gate the render path checks
+    # before doing any hook-related work.
+    Content::Processors::RenderHooks.configure(templates, @template_paths)
+
     # Precompute, per template source, whether the shortcode processor could
     # rewrite it — apply_template consults this to skip its per-page scan.
     # Rebuilt together with the templates hash so serve-mode template edits
