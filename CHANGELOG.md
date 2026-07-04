@@ -1,55 +1,44 @@
 # Changelog
 
-## Unreleased
+## v0.17.0
 
 ### Added
-- `[outputs]` config: render extra per-page/per-section output formats (`json`, `txt`, `xml`, `csv`) alongside HTML from user-supplied `templates/page.<fmt>.jinja` / `templates/section.<fmt>.jinja` templates. Configurable via `[outputs].page`/`.section`/`.sections`, overridable per page via a front matter `outputs` key (cascades through `[cascade.extra]`), limited to pagination page 1, exposed to templates as `{{ alternate_output_tags }}`, and cache-aware under `--cache` (a deleted format file or an edited format template correctly triggers a rebuild). A missing template for an enabled format fails the build with every template name tried
-- Hugo/Zola-style Markdown render hooks: `templates/hooks/render-{link,image,heading,codeblock}.html` override how those Markdown elements render, with no effect at all when none of those templates exist. Hooks receive pre-escaped context (destination/title/alt/text/level/id/lang/options/code/highlighted), see `@/` destinations and shortcode placeholders unresolved (existing resolvers still run afterward), and interact with the existing pipeline as expected — `{#custom-id}` headings, TOC/anchor links, responsive-image `srcset`, `loading="lazy"`, and the Mermaid config bypass all keep working. Not yet applied inside table cells, footnotes, definition lists, or summaries. See [Render Hooks](/templates/render-hooks/)
-- Fenced code blocks accept Zola/Pandoc-style options after the language — `` ```python {linenos=true, hl_lines="2-4 7", linenostart=5} `` — for line numbers and highlighted lines, plus a new `[highlight] line_numbers` config default. `mode = "server"` renders the wrapped result at build time with no JS; `mode = "client"` (default) exposes the same options as `data-linenos`/`data-linenostart`/`data-hl-lines` attributes on `<pre>` instead
-- Opt-in inline markup behind four new `[markdown]` flags, all off by default: `ins` (`++text++` → `<ins>`), `mark` (`==text==` → `<mark>`), `sub` (`~text~` → `<sub>`), and `sup` (`^text^` → `<sup>`) — apply consistently in body text, table cells, definition lists, and footnote bodies
-- Generalized `{#id .class key=val}` attribute blocks on headings and inline images behind `[markdown] attributes` — a superset of the existing `{#custom-id}` heading shorthand that also sets classes and arbitrary HTML attributes
-- First-class menu system (Hugo-style): `[[menus.<name>]]` in `config.toml`, per-language overrides/inheritance (`[[languages.<code>.menus.<name>]]`), and front-matter registration (`menus = ["main"]` or table form with name/weight/parent/identifier overrides). Exposed to templates via `site.menus` (default language) and `get_menu(name="main")` (resolves against the current page's language), with an `active_path` filter for nav active-state styling. `hwaro doctor` validates undefined menu parents and undeclared front-matter menu names. The `blog` and `simple` scaffolds' nav is now driven by the menu system instead of hardcoded links
-- `hwaro init --wizard` opens an interactive wizard in a terminal: directory, a scaffold picker with one-line descriptions, site title (written into the generated `config.toml`), and a confirm receipt
-- Scaffold design tokens: all init scaffolds share one "Hwaro Ember" `:root` vocabulary (`src/services/scaffolds/design_tokens.cr`) — every color is a `light-dark()` pair, plus fluid `--step-*` type scale, `--space-*` rhythm, `--measure`, radii, shadows, and motion tokens. Every scaffold (including `simple`) now adapts to the OS color scheme automatically; a `@supports` fallback pins the light palette on pre-2024 browsers
-- Scaffold theme switcher: every styled scaffold (`simple`, `blog`, `docs`, `book`) ships a header toggle that cycles auto → light → dark, persists the choice in `localStorage` (`hwaro-theme`), and applies it inline in `<head>` before first paint so a stored choice never flashes the OS scheme
-- `just scaffold-previews`: regenerate the docs' scaffold screenshots headlessly (`DARK=1` adds forced-dark self-review shots)
+- `[outputs]` config: extra per-page/section output formats (`json`, `txt`, `xml`, `csv`) from user `templates/page.<fmt>.jinja` / `section.<fmt>.jinja`, overridable per page via a front-matter `outputs` key (cascades), exposed as `{{ alternate_output_tags }}`, cache-aware under `--cache`
+- Markdown render hooks: `templates/hooks/render-{link,image,heading,codeblock}.html` override element rendering (Hugo/Zola-style), no-op when absent; existing `@/`/shortcode/`srcset`/anchor resolvers still run. See [Render Hooks](/templates/render-hooks/)
+- Fenced code block options after the language (`{linenos=true, hl_lines="2-4 7", linenostart=5}`) plus `[highlight] line_numbers`; `mode = "server"` bakes the result at build time, `mode = "client"` emits `data-*` attributes
+- Opt-in inline markup behind `[markdown]` flags (off by default): `ins` (`++`), `mark` (`==`), `sub` (`~`), `sup` (`^`)
+- Generalized `{#id .class key=val}` attribute blocks on headings and inline images (`[markdown] attributes`)
+- First-class menu system (Hugo-style): `[[menus.<name>]]`, per-language overrides, front-matter registration; exposed via `site.menus`/`get_menu()` with an `active_path` filter; `doctor` validates undefined parents and menu names
+- `hwaro init --wizard` and `hwaro new` (no `<path>`) open interactive terminal wizards; archetypes gain a `{{ description }}` placeholder
+- Scaffold design tokens ("Hwaro Ember" `:root` with `light-dark()` pairs, fluid type/space scales) and a header theme switcher (auto → light → dark, persisted, flash-free) across every styled scaffold
+- `just scaffold-previews`: regenerate docs scaffold screenshots headlessly
 
 ### Changed
-- `hwaro init` now initializes immediately with defaults; pass `--wizard` to open the interactive flow. Removed `-y`/`--yes` (no longer needed)
-- Terminal output: every command now speaks the ember language. `list`/`stats`/`validate`/`check-links`/`deploy`/`export`/`import`/`unused-assets`/`convert`/`platform`/`agents-md` moved from ad-hoc `info` lines onto the shared heading → context → body → outcome arc, with one glyph set (`✓ ⚠ ✗ ℹ · →`), one bar renderer, and lowercase-verb outcomes (`exported: 38 files, 4 skipped`). Raw `.colorize`, off-registry glyphs (`✔✘`, `[DEAD]`), and hand-rolled dividers are gone and lint-blocked by spec. Frozen machine surfaces — `--json` payloads, the `serve` ready line, `--version`, `Error [CODE]` shapes, plain receipt forms, exit codes — are byte-for-byte unchanged; human-readable stdout is not a stable API (use `--json`)
-- Scaffold design pass across the families: docs gains sidebar rail/overline hierarchy, hairline TOC, and real h2 section breaks; blog's hero/meta move onto the fluid scale with measure-capped prose; book keeps its serif reading character with tokenized surfaces; interactive prompts, help screens, and `--profile`/`--debug` output join the ember palette (~1,600 lines of duplicated dark CSS deleted along the way)
+- `hwaro init` initializes immediately with defaults; `--wizard` opens the interactive flow (removed `-y`/`--yes`)
+- Terminal output: the remaining commands (`list`/`stats`/`validate`/`check-links`/`deploy`/`export`/`import`/`unused-assets`/`convert`/`platform`/`agents-md`) adopt the ember language and shared glyph set; machine surfaces (`--json`, `serve` ready line, `--version`, exit codes) are byte-for-byte unchanged
+- Scaffold design pass across docs/blog/book (~1,600 lines of duplicated dark CSS deleted)
 
 ### Removed
-- The `blog-dark`, `docs-dark`, and `book-dark` scaffolds. Every scaffold already follows the OS color scheme automatically and now ships a manual theme switcher, so the forced-dark presets were redundant as separate init targets. To pin an existing or new site to one scheme permanently, append `:root { color-scheme: dark; }` (or `light`) to the generated `css/style.css` — byte-identical to what the presets shipped
+- The `blog-dark`, `docs-dark`, and `book-dark` scaffolds — scaffolds follow the OS scheme and ship a manual switcher; pin one permanently with `:root { color-scheme: dark; }` in `css/style.css`
 
 ### Fixed
-- macOS release binaries are now shipped as portable `.tar.gz` archives with bundled OpenSSL libraries, instead of a bare executable that required Homebrew `openssl@3` at a hardcoded path and failed on machines without it.
-- Block shortcodes whose body contains Jinja control tags (`{% if %}…{% endif %}`, `{% set %}`) no longer desync the nesting scan and leak the opening tag as literal text
-- Mixed positional + named shortcode arguments (`{{ youtube("ID", width="560") }}`) no longer drop the positional value, and a quoted positional value can contain commas
-- PWA service worker: the offline→root navigation fallback was dead code in all three cache strategies (Promise truthiness); offline navigation now falls back to the cached root correctly
-- `llms-full.txt` honors `in_search_index = false` instead of dumping an opted-out page's full markdown
-- Internal `@/` links carrying a query string or anchor no longer double-escape `&` into `&amp;amp;`
-- `hwaro serve`: editing `authors` front matter now updates the authors taxonomy incrementally; equal-weight sections keep the same prev/next reading order as a full build
-- `--cache`: deleting a page regenerates the sitemap/feeds/search index even when no surviving page re-rendered (the removed URL used to linger)
-- Parallel builds surface sitemap/feed/search generator failures instead of exiting 0 with missing output files; closed fiber-safety gaps in the section-list memo and built-in shortcode template init under `-Dpreview_mt`
-- AMP: `<img>` tags carrying `>` inside a quoted attribute value (e.g. `alt="Home > Docs"`) convert to `<amp-img>` without corrupting the markup
+- macOS release binaries shipped as portable `.tar.gz` archives with bundled OpenSSL, dropping the hardcoded Homebrew `openssl@3` dependency
+- Shortcodes: Jinja control tags (`{% if %}`, `{% set %}`) in block bodies no longer desync the nesting scan; mixed positional + named args no longer drop the positional value
+- PWA service worker: offline→root navigation fallback restored across all three cache strategies
+- `llms-full.txt` honors `in_search_index = false`
+- Internal `@/` links with a query string or anchor no longer double-escape `&`
+- `hwaro serve`: `authors` front-matter edits update the taxonomy incrementally; equal-weight sections keep a stable prev/next order
+- `--cache`: deleting a page regenerates the sitemap/feeds/search index even when no surviving page re-rendered
+- Parallel builds surface sitemap/feed/search failures instead of exiting 0; closed section-list and shortcode-init fiber-safety gaps under `-Dpreview_mt`
+- AMP: `<img>` with `>` inside a quoted attribute value converts without corrupting the markup
 
 ### Performance
-- Flat N-page sites no longer pay an O(N²) render cost when the page template doesn't reference `section`: the per-page "section pages minus current" array copy (N-1 Crinja refs per page), SEO/OG/canonical/hreflang strings, and JSON-LD strings are each built only when the template's static closure can actually reach them. Templates that reference them — or whose closure has a dynamic include or shortcode — keep the exact previous behavior
-- Parallel render workers read the shared Crinja value caches lock-free: the caches are fully prewarmed before the fan-out and frozen for its duration, removing ~5 global-mutex acquisitions per page (`-Dpreview_mt`). Serve/incremental/streaming paths keep the locked read-write path; the prewarm also makes the per-section first-writer-wins cache entries deterministic instead of render-order dependent
-- Taxonomy generation reuses the running build's Builder and its stashed render-phase global vars instead of constructing a fresh Builder that re-converted every page to Crinja values a second time (a duplicate O(N) pass on every taxonomy-enabled build). Taxonomy pages now also honor `--no-cache-busting` like the rest of the build
-- Markdown pages without footnotes/definition-list markers skip those passes entirely (previously: two full-content gsubs + a per-line regex walk for footnotes, and a full line walk for definition lists, on every page — both default-on); the duplicate per-page table scan in the highlight pipeline is gone; templates that can't contain shortcodes skip the per-page template shortcode scan (3 regex passes over the template string per page); series-less pages no longer take the cache mutex for `series_pages`
-- `scripts/benchmark_run.cr` gained `--shape=public`, generating the exact corpus/templates/config the public ssg-benchmark measures, so both corpus shapes can be tracked separately
-- Builds no longer run the whole markdown pipeline twice: the legacy hook pre-pass (sequential, its output overwritten by the parallel ParseContent/Render phases) is no longer registered — every content file was read/parsed twice and every page's markdown rendered twice per build; `--fast-start` no longer pre-renders the entire site either. Feed/search fallbacks for cache-hit pages now honor the site's markdown options
-- JS minification is no longer O(n²) on files containing any non-ASCII character (measured: a 128KB bundle with CJK comments went from 59.5s to 9.6ms); block-shortcode scanning uses byte-offset matching so shortcode-heavy CJK pages stop paying O(document) per tag
-- HTML minification compiles its protected-tag patterns once at startup instead of eight regexes per page; fenced-code detection no longer compiles a regex per fence
-- `--cache`: touched-but-identical files are re-hashed once instead of on every subsequent warm build; unchanged page-bundle assets are no longer recopied every build; cache hit/miss counters are lock-free again (they serialized parallel render fibers on a global mutex)
-- `hwaro serve`: incremental rebuilds render the affected page set in parallel (a section `_index` edit re-renders its subtree concurrently); static-file scanning issues up to 3× fewer stat syscalls
-- The 404 page reuses the render phase's site-wide template variables instead of rebuilding every page/section value (and now honors the build's cache-busting option); `--stream` creates per-worker template engines once per run instead of per batch; `load_data()` results are memoized per file mtime instead of re-read and re-parsed on every call
-
-### Added
-- `hwaro new` with no `<path>` opens an interactive wizard in a terminal: it prompts for the title, description, a recommended path (derived from the title and section), tags, date, draft flag, and archetype, previews a summary, and confirms before writing. Flags already passed pre-fill their prompts. Non-interactive contexts (pipes, CI, `--json`, `--quiet`) keep the classified `HWARO_E_USAGE` error, so scripts and agents are unchanged
-- Archetypes support a `{{ description }}` placeholder, and a `description` collected by the wizard is written into the new file's front matter instead of an empty value (the flag form still scaffolds an empty `description`)
+- Flat N-page sites avoid an O(N²) render cost — section-page arrays and SEO/OG/canonical/JSON-LD strings are built only when the template's static closure can reach them
+- Parallel render workers read prewarmed Crinja caches lock-free (`-Dpreview_mt`); taxonomy generation reuses the running Builder instead of a second O(N) Crinja pass
+- Markdown skips footnote/definition-list passes when the markers are absent; builds no longer run the markdown pipeline twice (dropped the legacy hook pre-pass)
+- JS minification is no longer O(n²) on non-ASCII files (128KB CJK bundle: 59.5s → 9.6ms); HTML minifier compiles protected-tag patterns once at startup
+- `--cache`: touched-but-identical files re-hashed once, page-bundle assets no longer recopied, lock-free hit/miss counters; `serve` incremental rebuilds render the affected set in parallel
+- 404 page reuses render-phase template vars; `--stream` builds per-worker engines once per run; `load_data()` memoized per file mtime
 
 ## v0.16.0
 
