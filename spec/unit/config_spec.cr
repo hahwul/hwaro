@@ -1498,6 +1498,75 @@ describe Hwaro::Models::Config do
     end
   end
 
+  describe "markdown configuration — F10/F9 inline markup flags" do
+    it "defaults ins/mark/sub/sup/attributes to false" do
+      config = Hwaro::Models::Config.new
+      config.markdown.ins.should be_false
+      config.markdown.mark.should be_false
+      config.markdown.sub.should be_false
+      config.markdown.sup.should be_false
+      config.markdown.attributes.should be_false
+    end
+
+    it "loads ins/mark/sub/sup/attributes from TOML" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [markdown]
+        ins = true
+        mark = true
+        sub = true
+        sup = true
+        attributes = true
+        TOML
+
+      config.markdown.ins.should be_true
+      config.markdown.mark.should be_true
+      config.markdown.sub.should be_true
+      config.markdown.sup.should be_true
+      config.markdown.attributes.should be_true
+    end
+
+    it "keeps ins/mark/sub/sup/attributes false when the [markdown] table omits them" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [markdown]
+        safe = true
+        TOML
+
+      config.markdown.ins.should be_false
+      config.markdown.mark.should be_false
+      config.markdown.sub.should be_false
+      config.markdown.sup.should be_false
+      config.markdown.attributes.should be_false
+    end
+
+    it "changes cache_fingerprint when any one of the five new flags flips" do
+      base_fp = Hwaro::Models::MarkdownConfig.new.cache_fingerprint
+
+      ins_only = Hwaro::Models::MarkdownConfig.new
+      ins_only.ins = true
+      ins_only.cache_fingerprint.should_not eq(base_fp)
+
+      mark_only = Hwaro::Models::MarkdownConfig.new
+      mark_only.mark = true
+      mark_only.cache_fingerprint.should_not eq(base_fp)
+
+      sub_only = Hwaro::Models::MarkdownConfig.new
+      sub_only.sub = true
+      sub_only.cache_fingerprint.should_not eq(base_fp)
+
+      sup_only = Hwaro::Models::MarkdownConfig.new
+      sup_only.sup = true
+      sup_only.cache_fingerprint.should_not eq(base_fp)
+
+      attributes_only = Hwaro::Models::MarkdownConfig.new
+      attributes_only.attributes = true
+      attributes_only.cache_fingerprint.should_not eq(base_fp)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Multilingual / Languages
   # ---------------------------------------------------------------------------

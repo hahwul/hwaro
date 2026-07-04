@@ -42,6 +42,35 @@ module Hwaro
         INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![a-zA-Z0-9_])/
         INLINE_STRIKETHROUGH_RE     = /~~(?=\S)(.+?)(?<=\S)~~/
 
+        # Opt-in inline markup (F10) — all gated behind their own
+        # `[markdown]` flags (see `Flags`), so with every flag off these
+        # patterns are never even consulted.
+        #
+        # `++ins++`: same flanking-guard shape as strikethrough. A lone
+        # `++` (as in `C++`) never gets a second delimiter to pair with, so
+        # it's left alone without any special-casing.
+        INLINE_INS_RE = /\+\+(?=\S)(.+?)(?<=\S)\+\+/
+        # `==mark==`: the `(?<!=)`/`(?!=)` outer guards and the
+        # `[^\s=]` inner guards keep a run of `=` (a setext heading
+        # underline, a `====` divider) from ever matching — there's no
+        # non-`=` character for the inner lookaround to anchor on.
+        INLINE_MARK_RE = /(?<!=)==(?=[^\s=])(.+?)(?<=[^\s=])==(?!=)/
+        # `~sub~`: single tilde, deliberately disjoint from the double-tilde
+        # strikethrough delimiter (which always runs first and consumes any
+        # `~~...~~` pair before this pattern gets a chance to see it).
+        INLINE_SUB_RE = /(?<!~)~([^~\s]+)~(?!~)/
+        # `^sup^`: the `(?<![\^\[])` guard specifically excludes a `^` that
+        # immediately follows `[` — i.e. a footnote reference's `[^key]` —
+        # so `sup` and `footnotes` can both be enabled without sup mangling
+        # a footnote marker before the footnotes pass gets to it.
+        INLINE_SUP_RE = /(?<![\^\[])\^([^\^\s]+)\^(?!\^)/
+
+        # Per-call feature flags for `render`. `math` already existed as a
+        # positional keyword arg; F10 adds four more opt-in transforms that
+        # default OFF, so every existing call site (`Flags.new` == all
+        # false except math defaults false too) renders identically.
+        record Flags, math : Bool = false, ins : Bool = false, mark : Bool = false, sub : Bool = false, sup : Bool = false
+
         # Math span patterns — canonical home for the whole pipeline
         # (MarkdownExtensions aliases these, mirroring INLINE_STRIKETHROUGH_RE).
         DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
@@ -55,7 +84,11 @@ module Hwaro
         # UNtransformed: emphasis/strikethrough/link passes must not rewrite
         # formula internals (`$~~x~~$`, `$f([x])(y)$`), and the math
         # preprocess wraps the still-raw span afterwards.
-        def render(text : String, *, math : Bool = false) : String
+        #
+        # `flags` controls the F10 opt-in inline markup (ins/mark/sub/sup)
+        # in addition to math — see `render(text, *, math:)` below, which is
+        # the pre-F10 signature every existing caller/spec still uses.
+        def render(text : String, *, flags : Flags) : String
           result = HTML.escape(text)
 
           code_spans = [] of String
@@ -65,7 +98,7 @@ module Hwaro
           end
 
           math_spans = [] of String
-          if math && result.includes?('$')
+          if flags.math && result.includes?('$')
             result = result.gsub(DISPLAY_MATH_RE) do |match|
               math_spans << match
               "\x00MATHSPAN#{math_spans.size - 1}\x00"
@@ -106,6 +139,11 @@ module Hwaro
           result = result.gsub(INLINE_ITALIC_UNDERSCORE_RE) { "<em>#{$1}</em>" }
           result = result.gsub(INLINE_STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
 
+          result = result.gsub(INLINE_INS_RE) { "<ins>#{$1}</ins>" } if flags.ins
+          result = result.gsub(INLINE_MARK_RE) { "<mark>#{$1}</mark>" } if flags.mark
+          result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
+          result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
+
           math_spans.each_with_index do |span, idx|
             result = result.sub("\x00MATHSPAN#{idx}\x00", span)
           end
@@ -115,6 +153,13 @@ module Hwaro
           end
 
           result
+        end
+
+        # Pre-F10 signature — delegates to the `Flags` overload with every
+        # new transform off, so every existing caller/spec keeps compiling
+        # and rendering exactly as before.
+        def render(text : String, *, math : Bool = false) : String
+          render(text, flags: Flags.new(math: math))
         end
 
         # Returns true for URLs we're willing to emit in a generated `href`/`src`.

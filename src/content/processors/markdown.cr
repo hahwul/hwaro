@@ -144,7 +144,11 @@ module Hwaro
           # generated <td> text afterwards, so refs and `$…$` inside cells
           # keep working. The math flag keeps `$~~x~~$` formula internals in
           # cells out of InlineMarkdown's strikethrough/emphasis passes.
-          processed = TableParser.process(content, math: !!markdown_config.try(&.math))
+          # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
+          # sup) into cell rendering, alongside the existing math flag.
+          processed = TableParser.process(
+            content,
+            flags: markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new)
 
           # Pre-process markdown extensions (task lists, footnotes, etc.)
           if md_cfg = markdown_config

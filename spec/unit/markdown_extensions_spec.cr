@@ -10,6 +10,11 @@ private def make_config(**opts) : Hwaro::Models::MarkdownConfig
   config.math = opts[:math]? || false
   config.admonitions = opts[:admonitions]? || false
   config.heading_ids = opts[:heading_ids]? || false
+  config.ins = opts[:ins]? || false
+  config.mark = opts[:mark]? || false
+  config.sub = opts[:sub]? || false
+  config.sup = opts[:sup]? || false
+  config.attributes = opts[:attributes]? || false
   config
 end
 
@@ -979,6 +984,187 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html, _ = Hwaro::Processor::Markdown.render("Author <code>$x$</code> in paragraph.", markdown_config: make_config(math: true))
       html.should contain("<code>$x$</code>")
       html.should_not contain("math-inline")
+    end
+  end
+
+  describe "F10 inline markup — ins" do
+    it "converts ++text++ to <ins>" do
+      html, _ = Hwaro::Processor::Markdown.render("++inserted++ text", markdown_config: make_config(ins: true))
+      html.should contain("<ins>inserted</ins>")
+    end
+
+    it "leaves ++text++ literal when the flag is off" do
+      html, _ = Hwaro::Processor::Markdown.render("++inserted++ text", markdown_config: make_config)
+      html.should contain("++inserted++")
+      html.should_not contain("<ins>")
+    end
+
+    it "leaves ++text++ untouched inside a backtick code span" do
+      html, _ = Hwaro::Processor::Markdown.render("`++inserted++`", markdown_config: make_config(ins: true))
+      html.should contain("<code>++inserted++</code>")
+      html.should_not contain("<ins>")
+    end
+
+    it "leaves ++text++ untouched inside a fenced code block" do
+      content = "```\n++inserted++\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: make_config(ins: true))
+      html.should contain("++inserted++")
+      html.should_not contain("<ins>")
+    end
+
+    it "leaves ++text++ untouched inside an author-written <code> HTML span" do
+      html, _ = Hwaro::Processor::Markdown.render("Author <code>++x++</code> text.", markdown_config: make_config(ins: true))
+      html.should contain("<code>++x++</code>")
+      html.should_not contain("<ins>")
+    end
+
+    it "does not touch a lone C++ (no closing delimiter)" do
+      html, _ = Hwaro::Processor::Markdown.render("C++ is nice", markdown_config: make_config(ins: true))
+      html.should contain("C++ is nice")
+      html.should_not contain("<ins>")
+    end
+  end
+
+  describe "F10 inline markup — mark" do
+    it "converts ==text== to <mark>" do
+      html, _ = Hwaro::Processor::Markdown.render("==highlighted== text", markdown_config: make_config(mark: true))
+      html.should contain("<mark>highlighted</mark>")
+    end
+
+    it "leaves ==text== literal when the flag is off" do
+      html, _ = Hwaro::Processor::Markdown.render("==highlighted==", markdown_config: make_config)
+      html.should contain("==highlighted==")
+      html.should_not contain("<mark>")
+    end
+
+    it "leaves ==text== untouched inside a backtick code span" do
+      html, _ = Hwaro::Processor::Markdown.render("`==x==`", markdown_config: make_config(mark: true))
+      html.should contain("<code>==x==</code>")
+      html.should_not contain("<mark>")
+    end
+
+    it "leaves ==text== untouched inside a fenced code block" do
+      content = "```\n==x==\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: make_config(mark: true))
+      html.should contain("==x==")
+      html.should_not contain("<mark>")
+    end
+
+    it "leaves ==text== untouched inside an author-written <code> HTML span" do
+      html, _ = Hwaro::Processor::Markdown.render("Author <code>==x==</code> text.", markdown_config: make_config(mark: true))
+      html.should contain("<code>==x==</code>")
+      html.should_not contain("<mark>")
+    end
+
+    it "does not touch a setext heading underline (Title\\n=====)" do
+      html, _ = Hwaro::Processor::Markdown.render("Title\n=====", markdown_config: make_config(mark: true))
+      html.should contain(">Title</h1>")
+      html.should_not contain("<mark>")
+    end
+
+    it "does not touch spaced == (a == b)" do
+      html, _ = Hwaro::Processor::Markdown.render("a == b", markdown_config: make_config(mark: true))
+      html.should contain("a == b")
+      html.should_not contain("<mark>")
+    end
+
+    it "keeps == verbatim inside math even when mark is enabled" do
+      html, _ = Hwaro::Processor::Markdown.render("$a == b$", markdown_config: make_config(math: true, mark: true))
+      html.should contain("a == b")
+      html.should_not contain("<mark>")
+    end
+  end
+
+  describe "F10 inline markup — sub" do
+    it "converts ~text~ to <sub>" do
+      html, _ = Hwaro::Processor::Markdown.render("H~2~O", markdown_config: make_config(sub: true))
+      html.should contain("H<sub>2</sub>O")
+    end
+
+    it "leaves ~text~ literal when the flag is off" do
+      html, _ = Hwaro::Processor::Markdown.render("H~2~O", markdown_config: make_config)
+      html.should contain("H~2~O")
+      html.should_not contain("<sub>")
+    end
+
+    it "leaves ~text~ untouched inside a backtick code span" do
+      html, _ = Hwaro::Processor::Markdown.render("`~x~`", markdown_config: make_config(sub: true))
+      html.should contain("<code>~x~</code>")
+      html.should_not contain("<sub>")
+    end
+
+    it "leaves ~text~ untouched inside a fenced code block" do
+      content = "```\n~x~\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: make_config(sub: true))
+      html.should contain("~x~")
+      html.should_not contain("<sub>")
+    end
+
+    it "leaves ~text~ untouched inside an author-written <code> HTML span" do
+      html, _ = Hwaro::Processor::Markdown.render("Author <code>~x~</code> text.", markdown_config: make_config(sub: true))
+      html.should contain("<code>~x~</code>")
+      html.should_not contain("<sub>")
+    end
+
+    it "converts strikethrough and sub together on the same line (~~x~~ and ~y~)" do
+      html, _ = Hwaro::Processor::Markdown.render("~~x~~ and ~y~", markdown_config: make_config(sub: true))
+      html.should contain("<del>x</del>")
+      html.should contain("<sub>y</sub>")
+    end
+  end
+
+  describe "F10 inline markup — sup" do
+    it "converts ^text^ to <sup>" do
+      html, _ = Hwaro::Processor::Markdown.render("x^2^ formula", markdown_config: make_config(sup: true))
+      html.should contain("x<sup>2</sup> formula")
+    end
+
+    it "leaves ^text^ literal when the flag is off" do
+      html, _ = Hwaro::Processor::Markdown.render("x^2^", markdown_config: make_config)
+      html.should contain("x^2^")
+      html.should_not contain("<sup>")
+    end
+
+    it "leaves ^text^ untouched inside a backtick code span" do
+      html, _ = Hwaro::Processor::Markdown.render("`x^2^`", markdown_config: make_config(sup: true))
+      html.should contain("<code>x^2^</code>")
+      html.should_not contain("<sup>")
+    end
+
+    it "leaves ^text^ untouched inside a fenced code block" do
+      content = "```\nx^2^\n```"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: make_config(sup: true))
+      html.should contain("x^2^")
+      html.should_not contain("<sup>")
+    end
+
+    it "leaves ^text^ untouched inside an author-written <code> HTML span" do
+      html, _ = Hwaro::Processor::Markdown.render("Author <code>x^2^</code> text.", markdown_config: make_config(sup: true))
+      html.should contain("<code>x^2^</code>")
+      html.should_not contain("<sup>")
+    end
+
+    it "does not mangle a footnote reference marker ([^1]) when sup is also enabled" do
+      html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: text", markdown_config: make_config(footnotes: true, sup: true))
+      html.should contain(%(<sup class="footnote-ref">))
+      html.should_not contain(%(<sup>1]</sup>))
+    end
+  end
+
+  describe "F10 inline markup inside table cells, definitions, and footnotes" do
+    it "renders mark inside a table cell" do
+      html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| ==x== |", markdown_config: make_config(mark: true))
+      html.should contain("<td><mark>x</mark></td>")
+    end
+
+    it "renders sub inside a definition body" do
+      html, _ = Hwaro::Processor::Markdown.render("Term\n: H~2~O", markdown_config: make_config(definition_lists: true, sub: true))
+      html.should contain("<dd>H<sub>2</sub>O</dd>")
+    end
+
+    it "renders sup inside a footnote body" do
+      html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: x^2^ formula", markdown_config: make_config(footnotes: true, sup: true))
+      html.should contain("x<sup>2</sup> formula")
     end
   end
 end
