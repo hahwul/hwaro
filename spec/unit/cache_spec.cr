@@ -293,6 +293,37 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    it "returns true when a recorded secondary output format file is missing" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        output_file = File.join(dir, "output.html")
+        fmt_file = File.join(dir, "output.json")
+        File.write(test_file, "content")
+        File.write(output_file, "<p>content</p>")
+        File.write(fmt_file, "{}")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, output_file, output_paths: [fmt_file])
+        cache.changed?(test_file, output_file, extra_outputs: [fmt_file]).should be_false
+
+        File.delete(fmt_file)
+        cache.changed?(test_file, output_file, extra_outputs: [fmt_file]).should be_true
+      end
+    end
+
+    it "ignores extra_outputs that were not recorded (default empty)" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file)
+        cache.changed?(test_file).should be_false
+      end
+    end
+
     it "returns true when stored cascade_hash defaults empty but a value is checked" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
@@ -493,6 +524,33 @@ describe Hwaro::Core::Build::Cache do
         # Same source, different output path
         cache.update(test_file, out2)
         cache.changed?(test_file, out2).should be_false
+      end
+    end
+
+    it "stores output_paths with the entry and returns them via output_paths_for" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+
+        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+      end
+    end
+
+    it "re-updates when only output_paths changes" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, output_paths: ["out.json"])
+        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+
+        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
       end
     end
 
@@ -841,6 +899,37 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    it "round-trips output_paths through save/load" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache1 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache1.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache1.save
+
+        cache2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache2.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+      end
+    end
+
+    it "loads legacy cache JSON without an output_paths key as an empty array" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+        mtime = File.info(test_file).modification_time.to_unix_ms
+
+        legacy_json = %([{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}])
+        File.write(cache_path, legacy_json)
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.output_paths_for(test_file).should eq([] of String)
+        cache.changed?(test_file).should be_false
+      end
+    end
+
     it "multiple save/load cycles preserve correct state" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
@@ -1048,6 +1137,36 @@ describe Hwaro::Core::Build::Cache do
   end
 
   # ===========================================================================
+  # output_paths_for
+  # ===========================================================================
+  describe "#output_paths_for" do
+    it "returns an empty array for a file not in cache" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.output_paths_for("ghost.md").should eq([] of String)
+      end
+    end
+
+    it "returns an empty array for an entry recorded without output_paths" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file)
+        cache.output_paths_for(test_file).should eq([] of String)
+      end
+    end
+
+    it "returns an empty array when the cache is disabled" do
+      cache = Hwaro::Core::Build::Cache.new(enabled: false)
+      cache.output_paths_for("any.md").should eq([] of String)
+    end
+  end
+
+  # ===========================================================================
   # stats
   # ===========================================================================
   describe "#stats" do
@@ -1195,6 +1314,25 @@ describe Hwaro::Core::Build::CacheEntry do
     entry = Hwaro::Core::Build::CacheEntry.from_json(json)
     entry.path.should eq("test.md")
     entry.hash.should eq("abc")
+  end
+
+  it "round-trips output_paths through to_json/from_json" do
+    entry = Hwaro::Core::Build::CacheEntry.new(
+      path: "test.md",
+      mtime: 100_i64,
+      hash: "abc",
+      output_path: "out.html",
+      output_paths: ["out.json", "out.xml"],
+    )
+    json = entry.to_json
+    restored = Hwaro::Core::Build::CacheEntry.from_json(json)
+    restored.output_paths.should eq(["out.json", "out.xml"])
+  end
+
+  it "defaults output_paths to an empty array when legacy JSON omits the key" do
+    json = %({"path":"test.md","mtime":100,"hash":"abc","output_path":"out.html"})
+    entry = Hwaro::Core::Build::CacheEntry.from_json(json)
+    entry.output_paths.should eq([] of String)
   end
 end
 

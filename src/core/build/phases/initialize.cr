@@ -329,6 +329,7 @@ module Hwaro::Core::Build::Phases::Initialize
         needs_seo: union.includes?("og_tags") || union.includes?("og_all_tags") ||
                    union.includes?("twitter_tags") ||
                    union.includes?("canonical_tag") || union.includes?("hreflang_tags") ||
+                   union.includes?("alternate_output_tags") ||
                    union.includes?("seo"),
         needs_jsonld: union.includes?("jsonld"),
         needs_section_pages: union.includes?("section"),

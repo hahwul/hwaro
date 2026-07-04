@@ -30,6 +30,7 @@ require "./phases/read_content"
 require "./phases/parse_content"
 require "./phases/transform"
 require "./phases/render"
+require "./phases/output_formats"
 require "./phases/generate"
 require "./phases/write"
 require "./phases/finalize"
@@ -79,6 +80,7 @@ module Hwaro
         include Phases::ParseContent
         include Phases::Transform
         include Phases::Render
+        include Phases::OutputFormats
         include Phases::Generate
         include Phases::Write
         include Phases::Finalize
@@ -963,6 +965,18 @@ module Hwaro
                 rel = path.lchop("content/")
                 if page = site.pages.find { |p| p.path == rel }
                   outputs << get_output_path(page, output_dir)
+
+                  # Sibling output-format files (see `[outputs]`): prefer what
+                  # the cache actually recorded for this source (the ground
+                  # truth of what was last written); fall back to recomputing
+                  # from the page's effective formats when the cache has
+                  # nothing (cache disabled, or never built with caching on).
+                  cached_fmt_paths = @cache.try(&.output_paths_for(path)) || [] of String
+                  if !cached_fmt_paths.empty?
+                    outputs.concat(cached_fmt_paths)
+                  elsif cfg = @config
+                    outputs.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
+                  end
                 end
               else
                 dest = File.join(output_dir, path.lchop("content/"))

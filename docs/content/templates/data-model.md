@@ -449,6 +449,11 @@ pros = ["Fast", "Reliable"]
 </ul>
 ```
 
+A top-level `outputs = ["json"]` in front matter is likewise an ordinary
+unknown key that lands in `page.extra.outputs` — it overrides the
+`[outputs]` config default for that one page/section. See
+[Output Formats](/features/output-formats/).
+
 ---
 
 ### Time Variables
