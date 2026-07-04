@@ -150,7 +150,7 @@
                  ============================================================ -->
             <section class="speed reveal">
                 <div class="speed-header">
-                    <h2>1,000 pages. Half a second.</h2>
+                    <h2>1,000 pages. Under a second.</h2>
                     <p>
                         Median cold build on the open
                         <a
@@ -159,7 +159,7 @@
                             rel="noopener"
                             >SSG benchmark</a
                         >
-                        — a full blog workload: tag pages, pagination, feeds.
+                        — minimal workload: pure markdown &rarr; HTML.
                     </p>
                 </div>
 
@@ -167,16 +167,16 @@
                     <p class="speed-figure" aria-hidden="true">
                         <span class="speed-number">0.00</span><span class="speed-unit">s</span>
                     </p>
-                    <p class="speed-rate">&asymp; 2,000 pages per second</p>
+                    <p class="speed-rate">&asymp; 2,300 pages per second</p>
                     <div
                         class="speed-track"
                         role="img"
-                        aria-label="A full 1,000-page build finishes in 0.48 seconds"
+                        aria-label="A full 1,000-page build finishes in 0.44 seconds"
                     >
                         <span class="speed-fill"></span>
                     </div>
                     <p class="speed-caption">
-                        <span>This bar fills in real time — 482&nbsp;ms, one full rebuild.</span>
+                        <span>This bar fills in real time — 443&nbsp;ms, one full rebuild.</span>
                         <button type="button" class="speed-replay">&#8635; replay</button>
                     </p>
                 </div>
@@ -185,17 +185,17 @@
                     <li>
                         <span class="mode-name">minimal</span>
                         <span class="mode-desc">markdown &rarr; HTML</span>
-                        <span class="mode-time">0.57s</span>
+                        <span class="mode-time">0.44s</span>
                     </li>
                     <li>
                         <span class="mode-name">blog</span>
                         <span class="mode-desc">tags &middot; pagination &middot; feeds</span>
-                        <span class="mode-time">0.48s</span>
+                        <span class="mode-time">0.59s</span>
                     </li>
                     <li>
                         <span class="mode-name">heavy</span>
                         <span class="mode-desc">+ syntax highlighting</span>
-                        <span class="mode-time">0.57s</span>
+                        <span class="mode-time">1.50s</span>
                     </li>
                 </ul>
 
@@ -672,10 +672,10 @@
                 window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
             // The speed stage replays the actual measured build: the bar
-            // fills in exactly MS milliseconds (the median 1,000-page blog
+            // fills in exactly MS milliseconds (the median 1,000-page minimal
             // build) while the counter tracks real elapsed time.
             function runSpeed(section) {
-                var MS = 482;
+                var MS = 443;
                 var fill = section.querySelector('.speed-fill');
                 var num = section.querySelector('.speed-number');
                 var stage = section.querySelector('.speed-stage');
