@@ -258,6 +258,40 @@ describe "Render hooks: generalized {#id .class} attribute blocks" do
       html.should_not contain("HATTR")
     end
   end
+
+  # A plain (marker-less) image must NOT reach forward across a block boundary
+  # and absorb a *later* element's attribute marker. This can happen when a
+  # non-conformant render-heading hook emits non-`<hN>` markup, leaving the
+  # heading's HATTR marker unconsumed by the heading pass — the image's gap
+  # must stop at the closing `</p>` rather than swallow the whole heading.
+  it "does not let a plain image absorb a following heading's attribute block" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      ![plain image](a.png)
+
+      ## Heading Title {#hid .cls}
+      MD
+
+    build_site(
+      ATTR_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html" => "<body>{{ content }}</body>",
+        # Deliberately non-conformant: emits a <div>, not an <hN>, so the
+        # heading pass can't consume the marker.
+        "hooks/render-heading.html" => %(<div class="h{{ level }}">{{ text }}</div>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      # The image stays clean — the heading's id/class did not leak onto it.
+      html.should contain(%(<img src="a.png" alt="plain image" />))
+      html.should_not contain(%(id="hid"))
+      html.should_not contain(%(class="cls"))
+      html.should_not contain("HATTR")
+    end
+  end
 end
 
 MERMAID_CONTENT = <<-MD

@@ -459,6 +459,23 @@ describe "MiscFilters" do
       result.should contain("\n")
       JSON.parse(result).as_a.map(&.as_i).should eq([1, 2])
     end
+
+    # A negative indent would make `String#*` raise ArgumentError (aborting the
+    # whole build); a huge one would overflow/allocate a giant string. Both are
+    # clamped to a sane range instead of crashing.
+    it "clamps a negative indent to compact output instead of crashing" do
+      vars = {"text" => Crinja::Value.new("hi")}
+      result = render_filter("{{ text | tojson(indent=-5) }}", vars).strip
+      result.should eq(%("hi"))
+    end
+
+    it "clamps an oversized indent instead of overflowing or exhausting memory" do
+      vars = {"items" => Crinja::Value.new([Crinja::Value.new(1)])}
+      result = render_filter("{{ items | tojson(indent=999999999999) }}", vars).strip
+      JSON.parse(result).as_a.map(&.as_i).should eq([1])
+      # Clamped to <= 16 spaces per level, not billions.
+      result.should_not match(/ {17,}/)
+    end
   end
 
   describe "default" do

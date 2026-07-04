@@ -45,7 +45,12 @@ module Hwaro
             # result is still safe to embed in an inline <script>.
             env.filters["tojson"] = Crinja.filter({indent: nil}) do
               raw_indent = arguments["indent"].raw
-              indent_str = raw_indent.is_a?(Int) ? " " * raw_indent.to_i : ""
+              # Clamp on the raw Int (Crinja stores it as Int64) BEFORE building
+              # the spaces string: a negative count makes `String#*` raise
+              # ArgumentError (aborting the whole build), and a huge one would
+              # overflow `to_i` or allocate a giant per-level indent. 0..16 is a
+              # sane range for JSON indentation.
+              indent_str = raw_indent.is_a?(Int) ? " " * raw_indent.clamp(0, 16) : ""
               JSON.build(indent_str) { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
             end
 
