@@ -1,6 +1,7 @@
 require "html"
 require "./fence_tracker"
 require "./inline_markdown"
+require "./markdown_attributes"
 require "../../models/config"
 require "../../utils/text_utils"
 
@@ -80,6 +81,43 @@ module Hwaro
                 end
               end
 
+              # F9 opt-in `{#id .class key=val}` attribute blocks. Runs
+              # AFTER heading_ids above: HEADING_ID_RE already consumed (and
+              # rewrote/removed) a pure `{#id}` block, so on a line where
+              # that happened `transformed` no longer contains it — the two
+              # regexes are disjoint on any single line, which is what keeps
+              # `## H {#id}` byte-identical when heading_ids=true regardless
+              # of this flag.
+              if config.attributes && transformed.includes?('{')
+                transformed = transformed.gsub(HEADING_ATTR_RE) do |full_match|
+                  if MarkdownAttributes.parse($4)
+                    if config.safe
+                      "#{$1}#{$2} #{$3.rstrip}"
+                    else
+                      "#{$1}#{$2} #{$3.rstrip} <!--HATTR:#{MarkdownAttributes.encode($4)}-->"
+                    end
+                  else
+                    full_match
+                  end
+                end
+              end
+
+              if config.attributes && transformed.includes?("![") && transformed.includes?('{')
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub(IMAGE_ATTR_RE) do |full_match|
+                    if MarkdownAttributes.parse($2)
+                      if config.safe
+                        $1
+                      else
+                        "#{$1}<!--HATTR:#{MarkdownAttributes.encode($2)}-->"
+                      end
+                    else
+                      full_match
+                    end
+                  end
+                end
+              end
+
               # F10 opt-in inline markup — each flag gets its own guarded
               # branch (not merged with strikethrough's) so the flags-off
               # byte path above stays the untouched pre-F10 code exactly.
@@ -143,6 +181,7 @@ module Hwaro
             end
           end
 
+          result = postprocess_attributes(result) if config.attributes
           result = postprocess_footnotes(result, flags: inline_flags(config)) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
 
@@ -685,6 +724,21 @@ module Hwaro
         # silently dropped.
         HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*\r?$/
 
+        # --- Custom Attributes (F9) ---
+        # Generalized `{#id .class key=val}` attribute blocks — headings and
+        # inline images. See `markdown_attributes.cr` for the token grammar.
+        # Deliberately broader than HEADING_ID_RE's brace group
+        # (`[^{}]+` vs `\#[A-Za-z][\w:-]*`): this is what makes the two
+        # regexes disjoint on `## H {#id}` (HEADING_ID_RE wins) while still
+        # catching `## H {#id .class}` (falls through to this one, since
+        # HEADING_ID_RE requires the braces to contain ONLY `#id`).
+        HEADING_ATTR_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{([^{}]+)\}[ \t]*\r?$/
+        # `![alt](url){.class key=val}` — an attribute block immediately
+        # following an inline image's closing `)`. Matched inside
+        # `transform_outside_code_spans` so a literal example in a code span
+        # isn't rewritten.
+        IMAGE_ATTR_RE = /(!\[[^\]]*\]\([^)]*\))\{([^{}]+)\}/
+
         # Engine-generated marker comments (footnote data blocks, shortcode
         # placeholders) start with this prefix and must pass through the
         # transforming passes verbatim: a footnote body containing `~~x~~` or
@@ -845,6 +899,67 @@ module Hwaro
               match
             end
           end
+        end
+
+        # --- Custom Attributes (F9) postprocess ---
+        # Resolves `<!--HATTR:HEXPAYLOAD-->` markers (left by the preprocess
+        # branches above) into real `id`/`class`/other attributes on the
+        # heading tag or `<img>` tag they trail. Runs BEFORE footnotes (an
+        # attribute block is only ever on a heading/image line, never inside
+        # footnote marker comments) and AFTER heading_ids (so a heading that
+        # got a `<!--HID:...-->` marker instead — the pure `{#id}` case — is
+        # already resolved and simply won't match `HATTR_MARKER_RE` here).
+        HATTR_MARKER_RE = /<!--HATTR:([0-9a-f]+)-->/
+        # `<img ...>` opening portion (quote-aware, so a `>` inside an
+        # attribute value like `alt="Home > Docs"` isn't mistaken for the
+        # tag end), its closer (`>` or `/>`, with any whitespace before it),
+        # and the trailing marker comment this preprocess pass appended.
+        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)\s*<!--HATTR:([0-9a-f]+)-->/
+
+        def postprocess_attributes(html : String) : String
+          return html unless html.includes?("<!--HATTR:")
+
+          result = html.gsub(HEADING_TAG_FOR_HID_RE) do |match|
+            tag = $1
+            attrs = $2
+            inner = $3
+
+            if hattr_match = inner.match(HATTR_MARKER_RE)
+              parsed = decode_and_parse_hattr(hattr_match[1])
+              if parsed
+                cleaned_inner = inner.sub(hattr_match[0], "").rstrip
+                new_attrs = MarkdownAttributes.apply_to_tag_attrs(attrs, parsed)
+                "<#{tag}#{new_attrs}>#{cleaned_inner}</#{tag}>"
+              else
+                match
+              end
+            else
+              match
+            end
+          end
+
+          result = result.gsub(IMG_HATTR_RE) do |match|
+            img_open = $1
+            closer = $2
+            parsed = decode_and_parse_hattr($3)
+            if parsed
+              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}"
+            else
+              match
+            end
+          end
+
+          # No marker may leak into published output, even a malformed one
+          # (defensive — the capture regexes above require 1+ hex chars, so
+          # an empty payload should never occur via the normal preprocess
+          # path, but this keeps the invariant regardless).
+          result.gsub(/<!--HATTR:[0-9a-f]*-->/, "")
+        end
+
+        private def decode_and_parse_hattr(payload : String) : MarkdownAttributes::Parsed?
+          decoded = MarkdownAttributes.decode(payload)
+          return unless decoded
+          MarkdownAttributes.parse(decoded)
         end
 
         # Inline-markdown renderer used by definition lists (and now footnote

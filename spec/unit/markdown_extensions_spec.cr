@@ -1167,4 +1167,85 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("x<sup>2</sup> formula")
     end
   end
+
+  describe "F9 markdown attributes — headings and images" do
+    it "renders id/class/other attrs end-to-end on a heading" do
+      cfg = make_config(attributes: true, heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render("## H {#i .c k=v}", markdown_config: cfg)
+      html.should contain(%(<h2 id="i" class="c" k="v">H</h2>))
+    end
+
+    it "renders a pure {#id} block byte-equal to attributes-off, when heading_ids is also on" do
+      cfg_on = make_config(attributes: true, heading_ids: true)
+      cfg_off = make_config(heading_ids: true)
+      content = "## H {#id}\n\nBody.\n"
+      html_on, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_on)
+      html_off, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_off)
+      html_on.should eq(html_off)
+    end
+
+    it "leaves {#id .class key=val} literal when the attributes flag is off" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render("## H {#i .c k=v}", markdown_config: cfg)
+      html.should contain("H {#i .c k=v}")
+      html.should_not contain(%(class="c"))
+    end
+
+    it "strips the attribute block under safe mode instead of leaking a marker" do
+      cfg = make_config(attributes: true)
+      cfg.safe = true
+      html, _ = Hwaro::Processor::Markdown.render("## H {#i .c}\n", safe: true, markdown_config: cfg)
+      html.should contain("H")
+      html.should_not contain("{#")
+      html.should_not contain("HATTR")
+    end
+
+    it "leaves an attribute-block-like line verbatim inside a fenced code block" do
+      cfg = make_config(attributes: true)
+      content = "```\n## H {#i .c}\n```\n"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg)
+      html.should contain("## H {#i .c}")
+      html.should_not contain(%(class="c"))
+    end
+
+    it "handles a CRLF-terminated heading attribute line" do
+      cfg = make_config(attributes: true)
+      html, _ = Hwaro::Processor::Markdown.render("## H {#id}\r\n\r\nBody\r\n", markdown_config: cfg)
+      html.should contain(%(<h2 id="id">H</h2>))
+    end
+
+    it "merges an inline image's attribute block onto the generated <img> tag" do
+      cfg = make_config(attributes: true)
+      html, _ = Hwaro::Processor::Markdown.render("![a](b){.r width=300}", markdown_config: cfg)
+      html.should contain(%(<img src="b" alt="a" class="r" width="300" />))
+    end
+
+    it "leaves an invalid attribute block literal" do
+      cfg = make_config(attributes: true, heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render("## H {#bad k=<}", markdown_config: cfg)
+      html.should contain("H {#bad k=&lt;}")
+    end
+
+    it "keeps working alongside lazy_loading's own <img> attribute injection" do
+      cfg = make_config(attributes: true)
+      html, _ = Hwaro::Processor::Markdown.render("![a](b.png){.r width=300}", lazy_loading: true, markdown_config: cfg)
+      html.should contain(%(<img loading="lazy" src="b.png" alt="a" class="r" width="300" />))
+    end
+
+    it "cleans up a stray/malformed HATTR marker rather than leaking it" do
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_attributes("<p>x</p><!--HATTR:00-->")
+      result.should_not contain("HATTR")
+    end
+
+    it "respects and dedupes an attribute id in the TOC, with anchors pointing at it" do
+      cfg = make_config(attributes: true)
+      content = "## A {#x}\n\nbody\n\n## B {#x}\n\nbody2\n"
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, markdown_config: cfg)
+      html.scan(/<h2 id="x">/).size.should eq(1)
+      html.scan(/<h2 id="x-1">/).size.should eq(1)
+      toc.size.should eq(2)
+      toc[0].id.should eq("x")
+      toc[1].id.should eq("x-1")
+    end
+  end
 end
