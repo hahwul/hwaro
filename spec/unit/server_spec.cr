@@ -457,6 +457,13 @@ describe Hwaro::Services::CharsetHandler do
     run_charset("image/svg+xml").headers["Content-Type"].should eq("image/svg+xml; charset=utf-8")
   end
 
+  it "appends charset to every [outputs] format's content type (json/xml/txt/csv)" do
+    run_charset("application/json").headers["Content-Type"].should eq("application/json; charset=utf-8")
+    run_charset("application/xml").headers["Content-Type"].should eq("application/xml; charset=utf-8")
+    run_charset("text/plain").headers["Content-Type"].should eq("text/plain; charset=utf-8")
+    run_charset("text/csv").headers["Content-Type"].should eq("text/csv; charset=utf-8")
+  end
+
   it "leaves binary types untouched (no charset)" do
     run_charset("image/png").headers["Content-Type"].should eq("image/png")
     run_charset("font/woff2").headers["Content-Type"].should eq("font/woff2")
