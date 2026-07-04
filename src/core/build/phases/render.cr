@@ -292,8 +292,8 @@ module Hwaro::Core::Build::Phases::Render
   # Markers in a page's resolved template closure that mean it renders content
   # derived from the global page/section set, so it must re-render when that set
   # changes (not only when its own source changes).
-  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy"]
-  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section"]
+  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__"]
+  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
 
   private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
     page_set_changed = cache.page_set_changed?(page_set_fp)
@@ -339,6 +339,7 @@ module Hwaro::Core::Build::Phases::Render
         io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0001'
         io << p.tags.join(',') << '\u0001'
         p.taxonomies.keys.sort!.each { |k| io << k << '=' << p.taxonomies[k].join(',') << ';' }
+        p.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(p.menus[k]) << ';' }
         io << '\u0002'
       end
     end)
@@ -349,9 +350,19 @@ module Hwaro::Core::Build::Phases::Render
     Digest::MD5.hexdigest(String.build do |io|
       sections.each do |s|
         io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001'
-        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0002'
+        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0001'
+        s.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(s.menus[k]) << ';' }
+        io << '\u0002'
       end
     end)
+  end
+
+  # Serializes a single front-matter menu registration for the page/section
+  # set fingerprints above. Any field change (including a page newly
+  # gaining/losing a registration) must bust the cache for pages whose
+  # template calls `get_menu` / `site.menus`.
+  private def menu_registration_fp(reg : Models::MenuRegistration) : String
+    "name=#{reg.name},weight=#{reg.weight},parent=#{reg.parent},identifier=#{reg.identifier}"
   end
 
   # Template closure fingerprint stored in this page's cache entry. With
