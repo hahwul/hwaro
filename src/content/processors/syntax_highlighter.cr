@@ -678,6 +678,19 @@ module Hwaro
             if hid_match = inner.match(MarkdownExtensions::HID_MARKER_RE)
               custom_id = hid_match[1]
               inner = inner.sub(hid_match[0], "").rstrip
+            elsif hattr_match = inner.match(MarkdownExtensions::HATTR_MARKER_RE)
+              # `## Heading {#id .class}` (generalized attributes extension)
+              # leaves a `<!--HATTR:...-->` marker instead. Pull just the
+              # custom `#id` out of it so the hook's `id` variable — and any
+              # `#{id}` anchors the template emits — match the id that
+              # `postprocess_attributes` will ultimately set on the tag.
+              # Leave the marker IN `inner`: postprocess still needs it to
+              # merge the block's classes/other attributes onto the heading.
+              if decoded = MarkdownAttributes.decode(hattr_match[1])
+                if parsed = MarkdownAttributes.parse(decoded)
+                  custom_id = parsed.id
+                end
+              end
             end
 
             title_text = strip_tags(inner)

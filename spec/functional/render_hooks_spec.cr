@@ -191,6 +191,75 @@ describe "Render hooks: heading ids, TOC, and anchors" do
   end
 end
 
+# Regression: with `[markdown] attributes = true`, a generalized
+# `{#id .class key=val}` block leaves a `<!--HATTR:...-->` marker resolved
+# in a post-pass AFTER the hook renders. The heading hook used to only
+# extract the narrow `<!--HID:-->` marker, so its `id` variable held the
+# auto-slug — any `#{id}` anchor the template emitted pointed at a fragment
+# the final tag didn't have. The image hook path dropped the block entirely
+# because the marker landed after the hook's `<figure>` wrapper, not glued
+# to the `<img>`.
+ATTR_CONFIG = <<-TOML
+  title = "Test Site"
+  base_url = "http://localhost"
+  [markdown]
+  attributes = true
+  TOML
+
+describe "Render hooks: generalized {#id .class} attribute blocks" do
+  it "passes the block's custom id to the heading hook so its anchors match the final id" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      ## Section Title {#custom-id .highlight data-index=3}
+      MD
+
+    build_site(
+      ATTR_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html"                 => "<body>{{ content }}</body>",
+        "hooks/render-heading.html" => %(<h{{ level }} id="{{ id }}"><a class="anchor" href="\#{{ id }}">#</a>{{ text }}</h{{ level }}>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      # The hook's `id` is the block's custom id, so the anchor it emits
+      # matches the id postprocess_attributes applies to the tag.
+      html.should contain(%(<a class="anchor" href="#custom-id">#</a>))
+      html.should_not contain("section-title")
+      # The block's class / data-* still merge onto the hooked <h2>.
+      html.should contain(%(id="custom-id"))
+      html.should contain(%(class="highlight"))
+      html.should contain(%(data-index="3"))
+      html.should_not contain("HATTR")
+    end
+  end
+
+  it "merges an image attribute block onto an <img> a render-image hook wraps" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      ![A diagram](http://example.com/d.png){.responsive width=800}
+      MD
+
+    build_site(
+      ATTR_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html"               => "<body>{{ content }}</body>",
+        "hooks/render-image.html" => %(<figure><img src="{{ destination }}" alt="{{ alt }}" loading="lazy" /></figure>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      # Attributes applied to the hook-wrapped <img>, not silently dropped.
+      html.should contain(%(<figure><img src="http://example.com/d.png" alt="A diagram" loading="lazy" class="responsive" width="800" /></figure>))
+      html.should_not contain("HATTR")
+    end
+  end
+end
+
 MERMAID_CONTENT = <<-MD
   +++
   title = "Home"

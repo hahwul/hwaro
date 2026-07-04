@@ -913,8 +913,16 @@ module Hwaro
         # `<img ...>` opening portion (quote-aware, so a `>` inside an
         # attribute value like `alt="Home > Docs"` isn't mistaken for the
         # tag end), its closer (`>` or `/>`, with any whitespace before it),
-        # and the trailing marker comment this preprocess pass appended.
-        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)\s*<!--HATTR:([0-9a-f]+)-->/
+        # an optional wrapper the image trails inside (group 3), and the
+        # marker comment this preprocess pass appended. The wrapper is what a
+        # `render-image.html` hook emits around the `<img>` (e.g. a
+        # `<figure>…</figure>`): the marker lands after the *whole* hook
+        # output, not glued to the `<img>`, so a naive "marker immediately
+        # follows the tag" match would drop the attributes silently. The
+        # tempered `(?!<img\b|<!--HATTR:)` gap stops at the next image or
+        # marker, so back-to-back attributed images each bind their own block,
+        # and the no-hook case (marker glued to the tag) keeps an empty group 3.
+        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)((?:(?!<img\b|<!--HATTR:).)*?)<!--HATTR:([0-9a-f]+)-->/m
 
         def postprocess_attributes(html : String) : String
           return html unless html.includes?("<!--HATTR:")
@@ -941,9 +949,10 @@ module Hwaro
           result = result.gsub(IMG_HATTR_RE) do |match|
             img_open = $1
             closer = $2
-            parsed = decode_and_parse_hattr($3)
+            wrapper = $3
+            parsed = decode_and_parse_hattr($4)
             if parsed
-              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}"
+              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}#{wrapper}"
             else
               match
             end
