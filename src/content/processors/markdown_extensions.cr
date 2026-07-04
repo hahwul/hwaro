@@ -24,7 +24,7 @@ module Hwaro
           # into a stash phase before the combined pass and an expand phase
           # after it, so `$…$` inside already-escaped <td>/<dd> bodies still
           # gets wrapped while `~~`/`[ ]` inside formulas stays verbatim.
-          result = preprocess_definition_lists(result, math: config.math) if config.definition_lists
+          result = preprocess_definition_lists(result, flags: inline_flags(config)) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
 
           # Math spans become opaque placeholders before the combined pass —
@@ -35,11 +35,15 @@ module Hwaro
           end
 
           # Combined single fence-aware pass for per-line safe extensions
-          # (task_lists + strikethrough + heading_ids) — reduces full
-          # document walks (#559).
+          # (task_lists + strikethrough + heading_ids + F10 inline markup) —
+          # reduces full document walks (#559).
           do_task_lists = config.task_lists
           do_strikethrough = true
           do_heading_ids = config.heading_ids
+          do_ins = config.ins
+          do_mark = config.mark
+          do_sub = config.sub
+          do_sup = config.sup
 
           # Whole-content marker pre-check (memchr-fast): with none of the
           # enabled extensions' markers present, the line pass is the
@@ -48,7 +52,10 @@ module Hwaro
           # passes this check transforms exactly as before.
           markers_present = (do_task_lists && (result.includes?("[ ]") || result.includes?("[x]") || result.includes?("[X]"))) ||
                             (do_strikethrough && result.includes?("~~")) ||
-                            (do_heading_ids && result.includes?("{#"))
+                            (do_heading_ids && result.includes?("{#")) ||
+                            (do_ins && result.includes?("++")) || (do_mark && result.includes?("==")) ||
+                            (do_sub && result.includes?('~')) || (do_sup && result.includes?('^')) ||
+                            (config.attributes && result.includes?('{'))
 
           if markers_present
             result = process_lines_fence_aware(result) do |line, _in_fence|
@@ -70,6 +77,34 @@ module Hwaro
                   else
                     "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
                   end
+                end
+              end
+
+              # F10 opt-in inline markup — each flag gets its own guarded
+              # branch (not merged with strikethrough's) so the flags-off
+              # byte path above stays the untouched pre-F10 code exactly.
+              # Fixed order: ins, mark, sub, sup.
+              if do_ins && transformed.includes?("++")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub(InlineMarkdown::INLINE_INS_RE) { "<ins>#{$1}</ins>" }
+                end
+              end
+
+              if do_mark && transformed.includes?("==")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub(InlineMarkdown::INLINE_MARK_RE) { "<mark>#{$1}</mark>" }
+                end
+              end
+
+              if do_sub && transformed.includes?('~')
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub(InlineMarkdown::INLINE_SUB_RE) { "<sub>#{$1}</sub>" }
+                end
+              end
+
+              if do_sup && transformed.includes?('^')
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub(InlineMarkdown::INLINE_SUP_RE) { "<sup>#{$1}</sup>" }
                 end
               end
 
@@ -108,7 +143,7 @@ module Hwaro
             end
           end
 
-          result = postprocess_footnotes(result, math: config.math) if config.footnotes
+          result = postprocess_footnotes(result, flags: inline_flags(config)) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
 
           result
@@ -135,8 +170,16 @@ module Hwaro
         # Fence-aware: `Term` / `: def` lines shown inside a ```/~~~ example
         # stay verbatim instead of becoming <dl> markup inside the code block.
         # `math: true` keeps `$…$` spans in <dt>/<dd> bodies untransformed
-        # for the later math pass (see InlineMarkdown.render).
+        # for the later math pass (see InlineMarkdown.render). Pre-F10
+        # signature — delegates to the `flags` overload (existing
+        # callers/specs keep calling this one directly).
         def preprocess_definition_lists(content : String, *, math : Bool = false) : String
+          preprocess_definition_lists(content, flags: InlineMarkdown::Flags.new(math: math))
+        end
+
+        # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
+        # sup) into term/definition bodies, alongside the math flag.
+        def preprocess_definition_lists(content : String, *, flags : InlineMarkdown::Flags) : String
           # Whole-content marker pre-check (memchr-fast): every definition line
           # must lstrip-start with ": " (see the loop conditions below), so a
           # content without ": " anywhere cannot contain a definition list and
@@ -175,13 +218,13 @@ module Hwaro
                   break
                 end
 
-                result << "<dt>#{render_inline_md(term, math)}</dt>"
+                result << "<dt>#{render_inline_md(term, flags)}</dt>"
                 i += 1
 
                 # Collect definitions for this term
                 while i < lines.size && !fenced[i] && lines[i].lstrip.starts_with?(": ")
                   definition = lines[i].lstrip.lchop(": ").strip
-                  result << "<dd>#{render_inline_md(definition, math)}</dd>"
+                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
                   i += 1
                 end
 
@@ -315,8 +358,16 @@ module Hwaro
         # Post-processing: convert footnote comments to HTML section.
         # `math: true` keeps `$…$` spans in footnote bodies untransformed
         # (math is not rendered in footnotes, but its internals must not be
-        # rewritten by emphasis/strikethrough either).
+        # rewritten by emphasis/strikethrough either). Pre-F10 signature —
+        # delegates to the `flags` overload (existing callers/specs keep
+        # calling this one directly).
         def postprocess_footnotes(html : String, *, math : Bool = false) : String
+          postprocess_footnotes(html, flags: InlineMarkdown::Flags.new(math: math))
+        end
+
+        # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
+        # sup) into footnote bodies, alongside the math flag.
+        def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags) : String
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
 
           # Extract footnote data from comments
@@ -343,7 +394,7 @@ module Hwaro
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
               escaped_key = footnote_id_token(fn[:key])
-              rendered_text = InlineMarkdown.render(fn[:text], math: math)
+              rendered_text = InlineMarkdown.render(fn[:text], flags: flags)
               str << "<li id=\"fn-#{escaped_key}\">\n"
               # One backref per reference occurrence so every `fnref-\u2026` id is
               # reachable (cmark-gfm/pandoc behavior): \u21A9, \u21A92, \u21A93, \u2026
@@ -801,6 +852,24 @@ module Hwaro
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
         private def render_inline_md(text : String, math : Bool = false) : String
           InlineMarkdown.render(text, math: math)
+        end
+
+        private def render_inline_md(text : String, flags : InlineMarkdown::Flags) : String
+          InlineMarkdown.render(text, flags: flags)
+        end
+
+        # Builds the shared `InlineMarkdown::Flags` for a markdown config —
+        # math plus the F10 opt-in inline markup — so table cells,
+        # definition lists, and footnote bodies all see the same set of
+        # enabled transforms as the main per-line pass above.
+        def inline_flags(config : Models::MarkdownConfig) : InlineMarkdown::Flags
+          InlineMarkdown::Flags.new(
+            math: config.math,
+            ins: config.ins,
+            mark: config.mark,
+            sub: config.sub,
+            sup: config.sup,
+          )
         end
       end
     end

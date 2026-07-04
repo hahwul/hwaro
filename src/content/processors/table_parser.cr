@@ -49,7 +49,8 @@ module Hwaro
 
           # Convert table to HTML. `math: true` keeps `$…$` spans in cells
           # untransformed for the later math pass (see InlineMarkdown.render).
-          def to_html(math : Bool = false) : String
+          def to_html(math : Bool = false, flags : InlineMarkdown::Flags? = nil) : String
+            effective = flags || InlineMarkdown::Flags.new(math: math)
             html = String.build do |str|
               str << "<table>\n"
               str << "<thead>\n<tr>\n"
@@ -57,7 +58,7 @@ module Hwaro
               @headers.each_with_index do |header, i|
                 alignment = @alignments[i]? || Alignment::Left
                 align_attr = alignment_attr(alignment)
-                str << "<th#{align_attr}>#{render_inline_markdown(header.strip, math)}</th>\n"
+                str << "<th#{align_attr}>#{render_inline_markdown(header.strip, effective)}</th>\n"
               end
 
               str << "</tr>\n</thead>\n"
@@ -69,7 +70,7 @@ module Hwaro
                   row.each_with_index do |cell, i|
                     alignment = @alignments[i]? || Alignment::Left
                     align_attr = alignment_attr(alignment)
-                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip, math)}</td>\n"
+                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip, effective)}</td>\n"
                   end
                   # Fill missing cells if row has fewer columns than headers
                   if row.size < @headers.size
@@ -100,8 +101,8 @@ module Hwaro
             end
           end
 
-          private def render_inline_markdown(text : String, math : Bool) : String
-            InlineMarkdown.render(text, math: math)
+          private def render_inline_markdown(text : String, flags : InlineMarkdown::Flags) : String
+            InlineMarkdown.render(text, flags: flags)
           end
         end
 
@@ -109,10 +110,13 @@ module Hwaro
         # Tables are converted to HTML placeholders, then markd processes the rest,
         # and placeholders are replaced with actual HTML tables.
         # `math: true` keeps `$…$` spans in cells untransformed for the later
-        # math pass.
-        def process(content : String, *, math : Bool = false) : String
+        # math pass. `flags` (when given) takes precedence over `math` and
+        # also threads the F10 inline markup flags (ins/mark/sub/sup) into
+        # cell rendering.
+        def process(content : String, *, math : Bool = false, flags : InlineMarkdown::Flags? = nil) : String
           return content unless has_table?(content)
 
+          effective = flags || InlineMarkdown::Flags.new(math: math)
           lines = content.split("\n")
           result = [] of String
           i = 0
@@ -134,7 +138,7 @@ module Hwaro
               # Try to parse the table
               table, consumed = parse_table(lines, i)
               if table
-                result << table.to_html(math)
+                result << table.to_html(flags: effective)
                 i += consumed
                 next
               end
