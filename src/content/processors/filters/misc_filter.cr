@@ -35,6 +35,25 @@ module Hwaro
               JSON.build { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
             end
 
+            # Override Crinja's built-in `tojson`. Crinja wraps its output in
+            # `SafeString.escape`, which HTML-entity-escapes the JSON (`"` ->
+            # `&quot;`, `&` -> `&amp;`) — that is invalid JSON in a standalone
+            # `.json`/output-format file, and also unusable inside a <script>
+            # (browsers don't HTML-decode there). Emit real JSON like `jsonify`
+            # while keeping the documented `tojson` name and its optional
+            # `indent` argument (spaces) working; `</` stays escaped so the
+            # result is still safe to embed in an inline <script>.
+            env.filters["tojson"] = Crinja.filter({indent: nil}) do
+              raw_indent = arguments["indent"].raw
+              # Clamp on the raw Int (Crinja stores it as Int64) BEFORE building
+              # the spaces string: a negative count makes `String#*` raise
+              # ArgumentError (aborting the whole build), and a huge one would
+              # overflow `to_i` or allocate a giant per-level indent. 0..16 is a
+              # sane range for JSON indentation.
+              indent_str = raw_indent.is_a?(Int) ? " " * raw_indent.clamp(0, 16) : ""
+              JSON.build(indent_str) { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
+            end
+
             # Default filter — returns fallback when target is nil/undefined or empty string
             env.filters["default"] = Crinja.filter({value: ""}) do
               if target.raw.nil? || target.undefined?

@@ -913,8 +913,24 @@ module Hwaro
         # `<img ...>` opening portion (quote-aware, so a `>` inside an
         # attribute value like `alt="Home > Docs"` isn't mistaken for the
         # tag end), its closer (`>` or `/>`, with any whitespace before it),
-        # and the trailing marker comment this preprocess pass appended.
-        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)\s*<!--HATTR:([0-9a-f]+)-->/
+        # an optional wrapper the image trails inside (group 3), and the
+        # marker comment this preprocess pass appended. The wrapper is what a
+        # `render-image.html` hook emits around the `<img>` (e.g. a
+        # `<figure>…</figure>`): the marker lands after the *whole* hook
+        # output, not glued to the `<img>`, so a naive "marker immediately
+        # follows the tag" match would drop the attributes silently. The
+        # tempered gap stops at the next image or marker, so back-to-back
+        # attributed images each bind their own block, and the no-hook case
+        # (marker glued to the tag) keeps an empty group 3. It also stops at a
+        # closing block tag Markd wraps the image in (`</p>`, `</li>`, table
+        # cells, `</hN>`, …): an image's own marker is always in the same block,
+        # so the gap never legitimately crosses one — this prevents a plain
+        # (marker-less) image from reaching forward and absorbing a *later*
+        # element's marker (e.g. a heading whose non-conformant hook emitted
+        # non-`<hN>` markup, leaving its HATTR marker unconsumed by the heading
+        # pass). Hook wrappers (`</figure>`, `</span>`, `</a>`, `</picture>`, …)
+        # are deliberately NOT excluded, so they still bind normally.
+        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)((?:(?!<img\b|<!--HATTR:|<\/(?:p|li|t[dh]|d[dt]|h[1-6])\b).)*?)<!--HATTR:([0-9a-f]+)-->/m
 
         def postprocess_attributes(html : String) : String
           return html unless html.includes?("<!--HATTR:")
@@ -941,9 +957,10 @@ module Hwaro
           result = result.gsub(IMG_HATTR_RE) do |match|
             img_open = $1
             closer = $2
-            parsed = decode_and_parse_hattr($3)
+            wrapper = $3
+            parsed = decode_and_parse_hattr($4)
             if parsed
-              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}"
+              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}#{wrapper}"
             else
               match
             end

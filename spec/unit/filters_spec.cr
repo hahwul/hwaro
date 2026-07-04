@@ -418,6 +418,66 @@ describe "MiscFilters" do
     end
   end
 
+  # Regression: Crinja's stock `tojson` wraps its output in
+  # `SafeString.escape`, HTML-entity-escaping the JSON (`"` -> `&quot;`),
+  # which is invalid JSON in a standalone output-format file (and unusable
+  # inside a <script>). Hwaro overrides it to emit real JSON like `jsonify`.
+  describe "tojson (hwaro override)" do
+    it "produces valid, non-HTML-escaped JSON for a string" do
+      vars = {"text" => Crinja::Value.new("hello world")}
+      result = render_filter("{{ text | tojson }}", vars)
+      result.strip.should eq("\"hello world\"")
+      result.should_not contain("&quot;")
+    end
+
+    it "escapes an embedded quote as a JSON escape, not an HTML entity" do
+      vars = {"text" => Crinja::Value.new(%(say "hi"))}
+      result = render_filter("{{ text | tojson }}", vars).strip
+      result.should eq(%("say \\"hi\\""))
+      result.should_not contain("&quot;")
+      JSON.parse(result).as_s.should eq(%(say "hi"))
+    end
+
+    it "emits raw JSON for an array (round-trips)" do
+      vars = {"items" => Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new("b")])}
+      result = render_filter("{{ items | tojson }}", vars).strip
+      result.should eq(%(["a","b"]))
+      JSON.parse(result).as_a.map(&.as_s).should eq(["a", "b"])
+    end
+
+    it "keeps </script> script-safe while staying valid JSON" do
+      vars = {"text" => Crinja::Value.new("</script>")}
+      result = render_filter("{{ text | tojson }}", vars).strip
+      result.should_not contain("</script>")
+      result.should contain("<\\/script>")
+      JSON.parse(result).as_s.should eq("</script>")
+    end
+
+    it "supports the indent argument" do
+      vars = {"items" => Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new(2)])}
+      result = render_filter("{{ items | tojson(indent=2) }}", vars).strip
+      result.should contain("\n")
+      JSON.parse(result).as_a.map(&.as_i).should eq([1, 2])
+    end
+
+    # A negative indent would make `String#*` raise ArgumentError (aborting the
+    # whole build); a huge one would overflow/allocate a giant string. Both are
+    # clamped to a sane range instead of crashing.
+    it "clamps a negative indent to compact output instead of crashing" do
+      vars = {"text" => Crinja::Value.new("hi")}
+      result = render_filter("{{ text | tojson(indent=-5) }}", vars).strip
+      result.should eq(%("hi"))
+    end
+
+    it "clamps an oversized indent instead of overflowing or exhausting memory" do
+      vars = {"items" => Crinja::Value.new([Crinja::Value.new(1)])}
+      result = render_filter("{{ items | tojson(indent=999999999999) }}", vars).strip
+      JSON.parse(result).as_a.map(&.as_i).should eq([1])
+      # Clamped to <= 16 spaces per level, not billions.
+      result.should_not match(/ {17,}/)
+    end
+  end
+
   describe "default" do
     it "returns original value when not empty" do
       vars = {"text" => Crinja::Value.new("hello")}
