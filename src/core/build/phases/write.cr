@@ -180,15 +180,18 @@ module Hwaro::Core::Build::Phases::Write
   # Avoids redundant mkdir_p syscalls (stat+mkdir) for large sites.
   # Mutex protects the Set during parallel rendering; mkdir_p is
   # itself idempotent, so the worst case without it is duplicate syscalls.
+  #
+  # The Set is recorded only AFTER mkdir_p returns, so membership truthfully
+  # implies the directory already exists on disk. Recording before creation
+  # let a second fiber writing into the same directory (two pages resolving
+  # to one output path) see it as "already created", skip its own mkdir, and
+  # race ahead to File.write on a directory that did not exist yet — a flaky
+  # "No such file or directory" under -Dpreview_mt. Two fibers may now both
+  # mkdir_p the same new directory, but mkdir_p is idempotent and MT-safe, so
+  # the worst case is one duplicate syscall, never a missing directory.
   private def ensure_dir(dir : String)
-    needs_create = @created_dirs_mutex.synchronize do
-      if @created_dirs.includes?(dir)
-        false
-      else
-        @created_dirs << dir
-        true
-      end
-    end
-    Hwaro::Utils::FileSafe.mkdir_p(dir) if needs_create
+    return if @created_dirs_mutex.synchronize { @created_dirs.includes?(dir) }
+    Hwaro::Utils::FileSafe.mkdir_p(dir)
+    @created_dirs_mutex.synchronize { @created_dirs << dir }
   end
 end
