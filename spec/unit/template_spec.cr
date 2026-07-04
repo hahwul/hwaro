@@ -1,5 +1,22 @@
 require "../spec_helper"
 
+# Builds a minimal `__menus__` Crinja value shape ({lang => {menu_name =>
+# [{"name" => ...}]}}) for the `get_menu function` tests below — just
+# enough for the function's own language-resolution logic to exercise,
+# not the full Entry shape `Content::Menus`/`build_global_vars` produce.
+private def menus_value(structure : Hash(String, Hash(String, Array(String)))) : Crinja::Value
+  lang_hash = {} of String => Crinja::Value
+  structure.each do |lang, menus|
+    menu_hash = {} of String => Crinja::Value
+    menus.each do |menu_name, names|
+      entries = names.map { |n| Crinja::Value.new({"name" => Crinja::Value.new(n)}) }
+      menu_hash[menu_name] = Crinja::Value.new(entries)
+    end
+    lang_hash[lang] = Crinja::Value.new(menu_hash)
+  end
+  Crinja::Value.new(lang_hash)
+end
+
 describe Hwaro::Content::Processors::Template do
   describe ".process" do
     it "processes simple if condition (true)" do
@@ -1051,6 +1068,58 @@ describe Hwaro::Content::Processors::Template do
       end
 
       err.cause.should be_a(Crinja::Error)
+    end
+  end
+
+  # `get_menu()` reads the `__menus__` global built by `build_global_vars`
+  # (see render.cr / Content::Menus.build). These tests inject a minimal
+  # `__menus__` shape directly via `context.add` so they exercise only the
+  # function's own language-resolution logic, not the full menu builder
+  # (covered separately by spec/unit/menus_spec.cr).
+  describe "get_menu function" do
+    it "resolves a named menu for the current page's language" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("page_language", "ko")
+      context.add("_i18n_default_language", "en")
+      context.add("__menus__", menus_value({
+        "en" => {"main" => ["Home"]},
+        "ko" => {"main" => ["홈"]},
+      }))
+
+      template = "{% for item in get_menu(name=\"main\") %}{{ item.name }}{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("홈")
+    end
+
+    it "falls back to the default language when the current language has no entries for that menu" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("page_language", "ko")
+      context.add("_i18n_default_language", "en")
+      context.add("__menus__", menus_value({
+        "en" => {"main" => ["Home"]},
+        "ko" => {} of String => Array(String),
+      }))
+
+      template = "{% for item in get_menu(name=\"main\") %}{{ item.name }}{% endfor %}"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("Home")
+    end
+
+    it "returns an empty array (not an error) for an unregistered menu name" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("page_language", "en")
+      context.add("_i18n_default_language", "en")
+      context.add("__menus__", menus_value({"en" => {"main" => ["Home"]}}))
+
+      template = "[{% for item in get_menu(name=\"missing\") %}{{ item.name }}{% endfor %}]"
+      result = Hwaro::Content::Processors::Template.process(template, context)
+      result.should eq("[]")
     end
   end
 end
