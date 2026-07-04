@@ -58,6 +58,7 @@ mode = "client"
 | theme | string | "github" | Highlight.js theme name |
 | use_cdn | bool | true | Load assets from CDN (false = local files) |
 | mode | string | "client" | `"client"` highlights in the browser via Highlight.js; `"server"` highlights at build time |
+| line_numbers | bool | false | Add line numbers to every fenced code block by default (see below) |
 
 ## Server-Side Highlighting
 
@@ -78,6 +79,59 @@ injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
 lexers, ported from Pygments/Chroma). Code blocks in languages without a
 lexer fall back to plain, unhighlighted output.
+
+## Line Numbers and Highlighted Lines
+
+A fenced code block's language can be followed by an options block —
+`{...}` — to add line numbers and/or highlight specific lines:
+
+````markdown
+```python {linenos=true, hl_lines="2-4 7", linenostart=5}
+def main():
+    setup()
+    run()
+    teardown()
+    return 0
+```
+````
+
+| Option | Value | Description |
+|--------|-------|--------------|
+| `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
+| `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
+| `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
+
+The block accepts a couple of equivalent forms: `python {linenos=true}`,
+`python{linenos=true}` (no space), or `{linenos=true}` alone (no
+language). A malformed or unrecognized options block (e.g. `{oops}`) is
+left as literal text in the language token, exactly as if fence options
+didn't exist.
+
+Setting `[highlight] line_numbers = true` turns line numbers on for
+*every* fenced code block with a language — a per-block `{linenos=false}`
+opts back out.
+
+**Server vs client mode:**
+
+- `mode = "server"` renders the full result at build time: each line is
+  wrapped in its own element, so line numbers and highlighted lines
+  appear with no JavaScript.
+- `mode = "client"` (default) does not re-render the body — instead the
+  `<pre>` tag gets `data-linenos="true"`, `data-linenostart="N"` (when
+  greater than 1), and/or `data-hl-lines="2-4 7"` attributes, so a
+  client-side script or custom CSS can act on them. Hwaro ships no such
+  script for client mode; full rendering requires `mode = "server"`.
+
+Scaffold sites style the server-mode markup out of the box. For a
+non-scaffold site, or a custom theme, add:
+
+```css
+pre code .line.hl { display: inline-block; width: 100%; background: color-mix(in srgb, var(--code-keyword) 12%, transparent); }
+pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
+```
+
+(Swap `var(--code-keyword)` for any color that fits your theme if you
+aren't using the Hwaro Ember token system.)
 
 ## Themes
 

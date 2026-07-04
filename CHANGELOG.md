@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- Fenced code blocks accept Zola/Pandoc-style options after the language — `` ```python {linenos=true, hl_lines="2-4 7", linenostart=5} `` — for line numbers and highlighted lines, plus a new `[highlight] line_numbers` config default. `mode = "server"` renders the wrapped result at build time with no JS; `mode = "client"` (default) exposes the same options as `data-linenos`/`data-linenostart`/`data-hl-lines` attributes on `<pre>` instead
+- Opt-in inline markup behind four new `[markdown]` flags, all off by default: `ins` (`++text++` → `<ins>`), `mark` (`==text==` → `<mark>`), `sub` (`~text~` → `<sub>`), and `sup` (`^text^` → `<sup>`) — apply consistently in body text, table cells, definition lists, and footnote bodies
+- Generalized `{#id .class key=val}` attribute blocks on headings and inline images behind `[markdown] attributes` — a superset of the existing `{#custom-id}` heading shorthand that also sets classes and arbitrary HTML attributes
 - `hwaro init --wizard` opens an interactive wizard in a terminal: directory, a scaffold picker with one-line descriptions, site title (written into the generated `config.toml`), and a confirm receipt
 - Scaffold design tokens: all init scaffolds share one "Hwaro Ember" `:root` vocabulary (`src/services/scaffolds/design_tokens.cr`) — every color is a `light-dark()` pair, plus fluid `--step-*` type scale, `--space-*` rhythm, `--measure`, radii, shadows, and motion tokens. Every scaffold (including `simple`) now adapts to the OS color scheme automatically; a `@supports` fallback pins the light palette on pre-2024 browsers
 - Scaffold theme switcher: every styled scaffold (`simple`, `blog`, `docs`, `book`) ships a header toggle that cycles auto → light → dark, persists the choice in `localStorage` (`hwaro-theme`), and applies it inline in `<head>` before first paint so a stored choice never flashes the OS scheme

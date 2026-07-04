@@ -259,6 +259,7 @@ module Hwaro
             # enabled = true
             # theme = "github"
             # use_cdn = true
+            # line_numbers = false
 
             TOML
         else
@@ -278,6 +279,7 @@ module Hwaro
             mode = "client"           # "client" = Highlight.js in the browser; "server" = build-time (no JS)
             theme = "github"          # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
             use_cdn = true            # true loads Highlight.js from a CDN; false expects a self-hosted build
+            line_numbers = false      # true adds line numbers to every fenced code block (override per-block with {linenos=false})
 
             TOML
         end
