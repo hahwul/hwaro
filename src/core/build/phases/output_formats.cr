@@ -26,12 +26,18 @@ module Hwaro::Core::Build::Phases::OutputFormats
 
     if extra_val = page.extra["outputs"]?
       arr = extra_val.as?(Array(String))
-      if arr && arr.all? { |f| Models::OutputsConfig::VALID_FORMATS.includes?(f) }
-        return arr
+      unless arr
+        warn_once(page, "Front matter 'outputs' for #{page.path} must be a list of format names (#{Models::OutputsConfig::VALID_FORMATS.join(", ")}); ignoring and rendering HTML only.")
+        return [] of String
       end
 
-      warn_once(page, "Front matter 'outputs' for #{page.path} must be an array of #{Models::OutputsConfig::VALID_FORMATS.join(", ")}; ignoring and rendering HTML only.")
-      return [] of String
+      invalid = arr.reject { |f| Models::OutputsConfig::VALID_FORMATS.includes?(f) }
+      unless invalid.empty?
+        warn_once(page, "Front matter 'outputs' for #{page.path} has unknown format(s) #{invalid.join(", ")} (valid: #{Models::OutputsConfig::VALID_FORMATS.join(", ")}); ignoring and rendering HTML only.")
+        return [] of String
+      end
+
+      return arr
     end
 
     base = page.is_a?(Models::Section) ? config.outputs.section : config.outputs.page
@@ -145,6 +151,11 @@ module Hwaro::Core::Build::Phases::OutputFormats
 
     base = config.base_url_stripped
     url_path = page.url.starts_with?("/") ? page.url : "/#{page.url}"
+    # The sibling file is written at `<url>/index.<fmt>` (a directory join),
+    # so the advertised href needs the separating slash too — otherwise a
+    # page whose URL lacks a trailing slash (e.g. a custom `path`) yields
+    # `/downloadsindex.json` instead of `/downloads/index.json`.
+    url_path += "/" unless url_path.ends_with?("/")
 
     formats.map do |fmt|
       mime = FORMAT_MIME[fmt]? || "application/octet-stream"

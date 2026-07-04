@@ -268,5 +268,18 @@ describe Hwaro::Core::Build::Phases::OutputFormats do
       tags = builder.test_alternate_output_tags(page, config)
       tags.should contain(%(href="https://example.com/blog/about/index.json"))
     end
+
+    it "inserts the separating slash when the page url has no trailing slash" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.outputs.page = ["json"]
+      page = Hwaro::Models::Page.new("downloads.md")
+      page.url = "/downloads"
+      tags = builder.test_alternate_output_tags(page, config)
+      # Must match the written file at /downloads/index.json, not
+      # /downloadsindex.json.
+      tags.should contain(%(href="https://example.com/downloads/index.json"))
+    end
   end
 end
