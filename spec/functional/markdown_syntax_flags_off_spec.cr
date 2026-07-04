@@ -137,7 +137,7 @@ describe "Markdown syntax additions — flags-off byte identity" do
     ) do
       html = File.read("public/index.html")
       html.should contain(<<-HTML
-        <pre><code class="language-crystal hljs">def foo
+        <code class="language-crystal hljs">def foo
           1
         end
         </code></pre>

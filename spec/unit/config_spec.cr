@@ -1047,6 +1047,7 @@ describe Hwaro::Models::Config do
       config.highlight.enabled.should be_true
       config.highlight.theme.should eq("github")
       config.highlight.use_cdn.should be_true
+      config.highlight.line_numbers.should be_false
     end
 
     it "can update highlight settings" do
@@ -1054,10 +1055,12 @@ describe Hwaro::Models::Config do
       config.highlight.enabled = false
       config.highlight.theme = "monokai"
       config.highlight.use_cdn = false
+      config.highlight.line_numbers = true
 
       config.highlight.enabled.should be_false
       config.highlight.theme.should eq("monokai")
       config.highlight.use_cdn.should be_false
+      config.highlight.line_numbers.should be_true
     end
 
     it "loads all highlight settings from TOML" do
@@ -1068,11 +1071,13 @@ describe Hwaro::Models::Config do
         enabled = true
         theme = "dracula"
         use_cdn = true
+        line_numbers = true
         TOML
 
       config.highlight.enabled.should be_true
       config.highlight.theme.should eq("dracula")
       config.highlight.use_cdn.should be_true
+      config.highlight.line_numbers.should be_true
     end
 
     it "loads highlight enabled = false from TOML (overrides default true)" do
@@ -1095,6 +1100,17 @@ describe Hwaro::Models::Config do
         TOML
 
       config.highlight.use_cdn.should be_false
+    end
+
+    it "defaults line_numbers to false when omitted from TOML" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [highlight]
+        enabled = true
+        TOML
+
+      config.highlight.line_numbers.should be_false
     end
   end
 

@@ -514,12 +514,18 @@ module Hwaro
       # "server" highlights at build time (Tartrazine lexers, hljs-compatible
       # CSS classes) so no JavaScript ships — theme CSS keeps working either way.
       property mode : String
+      # Global default for fence-level `linenos` (see FenceOptions): when
+      # true, every fenced code block with a language gets line numbers
+      # unless it opts out with a per-block `{linenos=false}`. Off by
+      # default so existing output is unaffected.
+      property line_numbers : Bool
 
       def initialize
         @enabled = true
         @theme = "github"
         @use_cdn = true
         @mode = "client"
+        @line_numbers = false
       end
 
       # True when code is highlighted at build time (no client-side JS).
@@ -1471,6 +1477,7 @@ module Hwaro
         config.highlight.enabled = bool_value(s["enabled"]?, config.highlight.enabled)
         config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
+        config.highlight.line_numbers = bool_value(s["line_numbers"]?, config.highlight.line_numbers)
         if mode = s["mode"]?.try(&.as_s?)
           if mode == "client" || mode == "server"
             config.highlight.mode = mode

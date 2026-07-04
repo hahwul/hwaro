@@ -990,6 +990,7 @@ module Hwaro
       def render_body_cached(content : String, safe : Bool = false, emoji : Bool = false, lazy_loading : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : String
         key = String.build do |io|
           io << (safe ? '1' : '0') << (emoji ? '1' : '0') << (lazy_loading ? '1' : '0') << ':'
+          io << Content::Processors::SyntaxHighlighter.body_fingerprint << ':'
           io << (markdown_config.try(&.cache_fingerprint) || "-") << ':'
           io << Digest::MD5.hexdigest(content)
         end
