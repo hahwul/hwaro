@@ -41,6 +41,8 @@
       url: /templates/functions/
     - title: Filters
       url: /templates/filters/
+    - title: Render Hooks
+      url: /templates/render-hooks/
 - title: Features
   section: features
   items:

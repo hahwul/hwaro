@@ -61,6 +61,11 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   the page, so editing a parent `_index.md` cascade rebuilds its descendants.
 - **Config checksum** — a hash of the effective merged config. A config
   change invalidates **all** entries.
+- **Render hooks** — a fingerprint of every configured `templates/hooks/render-*`
+  template (see [Render Hooks](/templates/render-hooks/)) is folded into every
+  page's template closure. Since a hook isn't reached via a page's
+  `{% include %}`/`{% extends %}` graph, editing one re-renders **every**
+  page rather than a narrowed set.
 
 Template dependency tracking requires every template reference to be a string
 literal. If any template uses a dynamic reference (`{% include some_var %}`),
@@ -87,7 +92,7 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 | Change Type | Strategy |
 |-------------|----------|
 | Content files only | Re-parse and re-render only affected pages + neighbors |
-| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off or the graph has dynamic references) |
+| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`) |
 | Config file | Full rebuild |
 | Static files only | Copy only changed files |
 
