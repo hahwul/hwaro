@@ -714,7 +714,16 @@ module Hwaro
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
               return
             end
-            affected_templates = deps.dependents_closure(changed)
+            if changed.any?(&.starts_with?("hooks/"))
+              # Hook templates aren't in the {% include %}/{% extends %}
+              # dependency graph (they're invoked from Markdown rendering,
+              # not template rendering) — dependents_closure has no way to
+              # know which pages a hook change affects, so fall back to a
+              # full re-render.
+              affected_templates = nil
+            else
+              affected_templates = deps.dependents_closure(changed)
+            end
             Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..." if options.verbose && !changed.empty?
           else
             Logger.info "Template change detected. Re-rendering all pages..." if options.verbose

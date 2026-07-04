@@ -401,6 +401,15 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
+    # Hook templates aren't part of the {% include %}/{% extends %} closure
+    # graph (they're invoked from Markdown rendering, not template
+    # rendering), so fold their fingerprint in here — otherwise editing
+    # templates/hooks/render-*.html wouldn't invalidate any page's
+    # --cache entry while per-page template hashing is active.
+    if reg = Content::Processors::RenderHooks.registry
+      hash = "#{hash}+hooks:#{reg.fingerprint}"
+    end
+
     @page_template_hash_mutex.synchronize { @page_template_hash_memo[page.path] = hash }
     hash
   end
@@ -689,14 +698,22 @@ module Hwaro::Core::Build::Phases::Render
     lazy_loading = site.config.markdown.lazy_loading
     emoji = site.config.markdown.emoji
 
+    # Render-hook context — nil (the zero-cost default) when no
+    # templates/hooks/render-* template is configured, in which case
+    # Processor::Markdown.render below constructs the exact same
+    # HighlightingRenderer it always has.
+    hooks_ctx = if reg = Content::Processors::RenderHooks.registry
+                  build_hook_render_context(reg, page, site, crinja_env_override, template_cache_override)
+                end
+
     # Use anchor links if enabled
     md_config = site.config.markdown
     md_start = profiler ? Time.instant : nil
     md_input_bytes = processed_content.bytesize.to_i64
     html_content, toc_headers = if page.insert_anchor_links
-                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config)
+                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
                                 else
-                                  Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config)
+                                  Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
                                 end
     if profiler && md_start
       md_elapsed = (Time.instant - md_start).total_milliseconds
@@ -767,6 +784,27 @@ module Hwaro::Core::Build::Phases::Render
       crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
 
     generate_aliases(page, site, output_dir, verbose)
+  end
+
+  # Builds the per-page render-hook context: the same per-worker Crinja env
+  # and compiled-template cache used for shortcodes/page templates
+  # (`render_shortcode_jinja`/`apply_template`), so a hook template shares
+  # cache warmth with everything else rendered on this page — just with its
+  # own salted cache keys (see `RenderHooks::HookRenderContext`). Only
+  # called when a registry exists (see the `if reg = ...` guard at the
+  # call site), so this never runs on the no-hooks path.
+  private def build_hook_render_context(
+    registry : Content::Processors::RenderHooks::Registry,
+    page : Models::Page,
+    site : Models::Site,
+    crinja_env_override : Crinja?,
+    template_cache_override : Hash(UInt64, Crinja::Template)?,
+  ) : Content::Processors::RenderHooks::HookRenderContext
+    env = crinja_env_override || crinja_env
+    cache = template_cache_override || @compiled_templates_cache
+    cache_mutex = template_cache_override ? nil : @crinja_cache_mutex
+    page_vars = Content::Processors::RenderHooks.page_vars(page, site.config)
+    Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars, site.config.markdown.mermaid)
   end
 
   private def generate_redirect_page(
