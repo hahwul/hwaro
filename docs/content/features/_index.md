@@ -9,7 +9,7 @@ Hwaro ships with a comprehensive set of built-in features — no plugins require
 
 **SEO & Discovery** — Sitemap, RSS/Atom feeds, robots.txt, OpenGraph, Twitter Cards, structured data (JSON-LD), and auto-generated OG images.
 
-**Content** — Syntax highlighting, search index generation, pagination, markdown extensions (footnotes, task lists, math, mermaid), series, and related posts.
+**Content** — Syntax highlighting, search index generation, pagination, markdown extensions (footnotes, task lists, math, mermaid), series, related posts, and named navigation menus.
 
 **Performance** — Incremental builds, streaming builds for large sites, asset pipeline with minification and fingerprinting, image processing with responsive variants and LQIP placeholders, and cache busting.
 

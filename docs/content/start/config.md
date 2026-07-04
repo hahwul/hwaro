@@ -125,6 +125,32 @@ feed = true
 | sitemap | bool | true | Include taxonomy pages in sitemap |
 | paginate_by | int | — | Items per page on term pages |
 
+## Menus
+
+Named navigation menus, rendered in templates via `site.menus` / `get_menu()`.
+
+```toml
+[[menus.main]]
+name = "Posts"
+url = "/posts/"
+weight = 1
+
+[[menus.main]]
+name = "About"
+url = "/about/"
+weight = 2
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| name | string | — | **Required.** Entry skipped (with a warning) if missing. |
+| url | string | "" | Root-relative or absolute `http(s)://`/`//` URL. |
+| weight | int | 0 | Sort order within the menu. |
+| identifier | string | `name` | Unique key other entries reference via `parent`. |
+| parent | string | none | Nest this entry under another entry's `identifier`. |
+
+Pages/sections can also join a menu from their own front matter (`menus = ["main"]`) without touching this file. A `[languages.<code>]` block with no menus table inherits this global set; declaring `[[languages.<code>.menus.<name>]]` replaces it for that language. See [Menus](/features/menus/) for the full reference (hierarchy, per-language behavior, `active_path` styling).
+
 ## Static Files
 
 Everything under `static/` is copied verbatim into the site root, preserving its directory structure — `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
@@ -191,6 +217,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[deployment]` | [Deploy](/deploy/) | Deploy targets configuration |
 | `[doctor]` | [Doctor](/start/tools/doctor/) | Suppress known diagnostic issues |
 | `languages.*` | [Multilingual](/features/multilingual/) | Multi-language support |
+| `[[menus.*]]` | [Menus](/features/menus/) | Named navigation menus |
 
 ## Plugins
 
@@ -236,6 +263,10 @@ feed = true
 
 [[taxonomies]]
 name = "categories"
+
+[[menus.main]]
+name = "Posts"
+url = "/posts/"
 
 # Feature sections — see Feature Configuration Reference above
 # [feeds], [sitemap], [robots], [og], [search], [highlight],
