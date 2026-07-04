@@ -31,6 +31,7 @@ HIGHLIGHT_TEMPLATE = "<head>{{ highlight_css }}{{ highlight_js }}</head><body>{{
 
 private def reset_highlight_mode
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
 end
 
 describe "Server-side syntax highlighting" do
@@ -179,5 +180,175 @@ describe "ServerHighlighter token mapping" do
 
   it "returns nil for unknown languages" do
     Hwaro::Content::Processors::ServerHighlighter.highlight("x", "definitely-not-a-language").should be_nil
+  end
+end
+
+# =============================================================================
+# Fence options ({linenos=true, hl_lines="...", linenostart=N}) — F5
+# =============================================================================
+
+FENCE_OPTIONS_CONTENT = <<-MD
+  +++
+  title = "Code"
+  +++
+  ```python {linenos=true, hl_lines="2"}
+  def main():
+      return 42  # answer
+  ```
+  MD
+
+describe "Fence options — server mode" do
+  it "wraps lines with gutter numbers and marks the requested hl_lines" do
+    build_site(
+      SERVER_HIGHLIGHT_CONFIG,
+      content_files: {"index.md" => FENCE_OPTIONS_CONTENT},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<span class="line">))
+      html.should contain(%(<span class="line hl">))
+      html.should contain(%(<span class="ln" aria-hidden="true">1 </span>))
+      html.should contain(%(<span class="ln" aria-hidden="true">2 </span>))
+      # Pre-existing exact hljs-span assertions still hold inside line spans.
+      html.should contain(%(<span class="hljs-keyword">def</span>))
+      html.should contain(%(<span class="hljs-number">42</span>))
+      html.should contain(%(<span class="hljs-comment"># answer</span>))
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "re-opens a token's class on every physical line it spans" do
+    content = <<-MD
+      +++
+      title = "Code"
+      +++
+      ```python {linenos=true}
+      x = """abc
+      def"""
+      ```
+      MD
+
+    build_site(
+      SERVER_HIGHLIGHT_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      code_lines = html.split("\n").select(&.includes?(%(<span class="line)))
+      code_lines.size.should eq(2)
+      code_lines.all?(&.includes?("hljs-string")).should be_true
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "leaves mermaid fences on the legacy (no line-span) path even with linenos requested" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [highlight]
+      enabled = true
+      mode = "server"
+
+      [markdown]
+      mermaid = true
+      TOML
+
+    content = <<-MD
+      +++
+      title = "Diagram"
+      +++
+      ```mermaid {linenos=true}
+      graph LR
+        A --> B
+      ```
+      MD
+
+    build_site(
+      config,
+      content_files: {"index.md" => content},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<div class="mermaid">))
+      html.should_not contain(%(<span class="line))
+      html.should_not contain("<pre>")
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "client mode emits data-* attributes on <pre> instead of line spans, and keeps the JS runtime" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [highlight]
+      enabled = true
+      TOML
+
+    build_site(
+      config,
+      content_files: {"index.md" => FENCE_OPTIONS_CONTENT},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(data-linenos="true"))
+      html.should contain(%(data-hl-lines="2"))
+      html.should_not contain(%(<span class="line))
+      html.should contain("highlight.min.js")
+      # Body stays exactly the plain escaped legacy text — no hljs spans at all
+      # (client mode never tokenizes).
+      html.should contain(%(<code class="language-python hljs">def main():))
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "the global [highlight] line_numbers default wraps a bare fence, and a per-block override opts out" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [highlight]
+      enabled = true
+      mode = "server"
+      line_numbers = true
+      TOML
+
+    content = <<-MD
+      +++
+      title = "Code"
+      +++
+      ```python
+      pass
+      ```
+
+      ```python {linenos=false}
+      pass
+      ```
+      MD
+
+    build_site(
+      config,
+      content_files: {"index.md" => content},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      # The bare fence picks up the global default.
+      html.should contain(%(<span class="ln" aria-hidden="true">1 </span>))
+      # Exactly one wrapped block: the `{linenos=false}` fence opted out and
+      # rendered through the byte-identical legacy path (no `.line` span).
+      html.scan(/class="line"/).size.should eq(1)
+    end
+  ensure
+    reset_highlight_mode
   end
 end

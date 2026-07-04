@@ -192,6 +192,10 @@ module Hwaro
             .hljs-deletion { color: var(--code-keyword); }
             .hljs-emphasis { font-style: italic; }
             .hljs-strong { font-weight: 700; }
+
+            /* Fence options: {linenos=true, hl_lines="..."} (server highlighting) */
+            pre code .line.hl { display: inline-block; width: 100%; background: color-mix(in srgb, var(--code-keyword) 12%, transparent); }
+            pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
             CSS
         end
 
