@@ -491,7 +491,12 @@ module Hwaro
           code_tag_attrs = attrs(node)
           pre_tag_attrs = nil
 
-          lang = code_block_language(languages)
+          resolved_lang, opts = resolve_options(node)
+          # When a fence-options block is present, the language for the class
+          # must come from FenceOptions' stripped parse — not the raw split,
+          # which for the no-space (`python{linenos=true}`) and no-language
+          # (`{linenos=true}`) forms would leak the `{...}` into the class.
+          lang = opts ? resolved_lang : code_block_language(languages)
 
           if @highlight_enabled && lang
             # Add classes for highlight.js
@@ -502,7 +507,6 @@ module Hwaro
             code_tag_attrs["class"] = "language-#{escape_lang(lang)}"
           end
 
-          _, opts = resolve_options(node)
           if opts
             linenos = effective_linenos(opts)
             active = linenos || !opts.hl_lines.empty?

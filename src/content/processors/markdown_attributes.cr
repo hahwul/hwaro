@@ -105,7 +105,12 @@ module Hwaro
         def decode(payload : String) : String?
           bytes = payload.hexbytes?
           return unless bytes
-          String.new(bytes)
+          str = String.new(bytes)
+          # Author-typed `<!--HATTR:ff-->` comments reach here in non-safe
+          # mode; invalid UTF-8 would make the caller's Regex#match raise, so
+          # reject it (upholding the "never raises" contract of `parse`).
+          return unless str.valid_encoding?
+          str
         end
 
         # Merges `id` (replace-or-append) and `classes`

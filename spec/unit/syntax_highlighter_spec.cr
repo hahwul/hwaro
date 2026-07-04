@@ -333,6 +333,26 @@ describe "fence options rendering (server mode)" do
     reset_fence_options_state
   end
 
+  it "strips the options block from the <code> class for the no-space form" do
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python{linenos=true}\ndef f():\n    pass\n```", highlight: true)
+    html.should contain(%(class="language-python hljs"))
+    html.should_not contain("language-python{linenos")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "emits no language class for a language-less options fence" do
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```{linenos=true}\nplain\n```", highlight: true)
+    html.should_not contain("language-{linenos")
+    html.should_not contain("language-")
+  ensure
+    reset_fence_options_state
+  end
+
   it "an explicit {linenos=false} fully cancels the global default" do
     Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
     Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = true
