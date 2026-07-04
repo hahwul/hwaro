@@ -101,6 +101,7 @@ module Hwaro
             str << series_config
             str << related_config
             str << taxonomies_config unless skip_taxonomies
+            str << menus_config
 
             # SEO & Feeds
             str << sitemap_config
@@ -123,6 +124,60 @@ module Hwaro
             str << deployment_config
           end
           config
+        end
+
+        # `[[menus.main]]` entries backing blog_nav_html's
+        # `get_menu(name="main")` loop — matches the three links the
+        # scaffold's own content creates (posts/_index.md, archives.md,
+        # about.md). Add a fourth entry here (or register a page into
+        # "main" from its own front matter with `menus = ["main"]`) to
+        # extend the nav without touching a template.
+        private def menu_entries_toml : String
+          <<-TOML
+
+            [[menus.main]]
+            name = "Posts"
+            url = "/posts/"
+            weight = 1
+
+            [[menus.main]]
+            name = "Archives"
+            url = "/archives/"
+            weight = 2
+
+            [[menus.main]]
+            name = "About"
+            url = "/about/"
+            weight = 3
+
+            TOML
+        end
+
+        # `--full-config` path: same entries as `minimal_config_content`
+        # below, with a discoverability banner matching the rest of
+        # `config_content`'s commented sections.
+        protected def menus_config : String
+          banner = <<-TOML
+
+            # =============================================================================
+            # Menus
+            # =============================================================================
+            # Named navigation menus, rendered by partials/nav.html via
+            # {% for item in get_menu(name="main") %}. Add/reorder entries
+            # here, or register a page/section into "main" from its own
+            # front matter with `menus = ["main"]` — no template edit
+            # required either way.
+            TOML
+          banner + menu_entries_toml
+        end
+
+        # `hwaro init`'s DEFAULT path (no `--full-config`) and
+        # `--minimal-config` both build on `minimal_config_content`, NOT
+        # `config_content` — without this override, blog_nav_html's
+        # `get_menu(name="main")` would resolve against a config with no
+        # `[[menus.*]]` at all, rendering an empty nav out of the box.
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          super + menu_entries_toml
         end
 
         # Override styles for blog - external CSS file
@@ -1048,23 +1103,11 @@ module Hwaro
               <div class="blog-header-inner">
                 <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title | e }}</a>
                 <nav>
-                  <!-- To add new top-level sections (e.g. /notes/, /projects/):
-                       1. Create content/SECTION/_index.md
-                       2. Replace the hardcoded links below with this dynamic
-                          loop. It shows only the current language's sections;
-                          s.url already carries the language prefix, so do NOT
-                          add lang_prefix. Sort by "weight" for explicit order.
-                       (The example below is wrapped in a raw block so it
-                       isn't executed while it lives in the comment.)
-                       {% raw %}
-                       {% for s in site.sections | sort(attribute="title") %}
-                         {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}
-                       {% endfor %}
-                       {% endraw %}
-                  -->
-                  <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
-                  <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
-                  <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
+                  <!-- Add/reorder links via [[menus.main]] in config.toml, or
+                       register a page/section into "main" from its own front
+                       matter with `menus = ["main"]` — no template edit
+                       required either way. -->
+                  {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
                 </nav>
                 <div class="header-right">
                   {% if page.translations | length > 0 %}
@@ -1265,14 +1308,13 @@ module Hwaro
             HTML
         end
 
-        # Override navigation (not used directly - kept for base class compatibility)
+        # Override navigation (not used directly - kept for base class
+        # compatibility). Mirrors blog_nav_html's menu-driven nav so this
+        # stays in sync with the real header if anything ever calls it.
         protected def navigation : String
           <<-NAV
             <nav>
-              <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
-              <a href="{{ base_url }}{{ lang_prefix }}/posts/">Posts</a>
-              <a href="{{ base_url }}{{ lang_prefix }}/archives/">Archives</a>
-              <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
             </nav>
             NAV
         end

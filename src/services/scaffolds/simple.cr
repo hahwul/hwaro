@@ -71,6 +71,7 @@ module Hwaro
             str << series_config
             str << related_config
             str << taxonomies_config unless skip_taxonomies
+            str << menus_config
 
             # SEO & Feeds
             str << sitemap_config
@@ -93,6 +94,67 @@ module Hwaro
             str << deployment_config
           end
           config
+        end
+
+        # `[[menus.main]]` entries backing the overridden `navigation` below
+        # (`{% for item in get_menu(name="main") %}`) — matches the two
+        # links the scaffold's own content creates (index.md, about.md).
+        # Add a third entry here (or register a page/section into "main"
+        # from its own front matter with `menus = ["main"]`) to extend the
+        # nav without touching a template.
+        private def menu_entries_toml : String
+          <<-TOML
+
+            [[menus.main]]
+            name = "Home"
+            url = "/"
+            weight = 1
+
+            [[menus.main]]
+            name = "About"
+            url = "/about/"
+            weight = 2
+
+            TOML
+        end
+
+        # `--full-config` path: same entries as `minimal_config_content`
+        # below, with a discoverability banner matching the rest of
+        # `config_content`'s commented sections.
+        protected def menus_config : String
+          banner = <<-TOML
+
+            # =============================================================================
+            # Menus
+            # =============================================================================
+            # Named navigation menus, rendered in templates/header.html via
+            # {% for item in get_menu(name="main") %}. Add/reorder entries
+            # here, or register a page/section into "main" from its own
+            # front matter with `menus = ["main"]` — no template edit
+            # required either way.
+            TOML
+          banner + menu_entries_toml
+        end
+
+        # `hwaro init`'s DEFAULT path (no `--full-config`) and
+        # `--minimal-config` both build on `minimal_config_content`, NOT
+        # `config_content` — without this override, the overridden
+        # `navigation`'s `get_menu(name="main")` would resolve against a
+        # config with no `[[menus.*]]` at all, rendering an empty nav out
+        # of the box.
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          super + menu_entries_toml
+        end
+
+        # Overrides Base#navigation: renders the "main" menu instead of two
+        # hardcoded links, so adding a nav item no longer requires editing
+        # this template.
+        protected def navigation : String
+          <<-NAV
+            <nav>
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
+            </nav>
+            NAV
         end
 
         # Content files. Bodies intentionally start at level 2 — `page.html`

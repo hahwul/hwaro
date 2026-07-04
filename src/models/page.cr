@@ -26,6 +26,17 @@ module Hwaro
       end
     end
 
+    # Front-matter registration of a page/section into a named menu (see
+    # `[[menus.*]]` in config for the config-side counterpart). All fields
+    # are optional: a bare `menus = ["main"]` entry yields a
+    # `MenuRegistration` with everything `nil`, and the menu builder falls
+    # back to the page's own title/weight/identifier/parent-less defaults.
+    record MenuRegistration,
+      name : String? = nil,
+      weight : Int32? = nil,
+      parent : String? = nil,
+      identifier : String? = nil
+
     class Page
       # Front Matter Properties
       property title : String
@@ -41,6 +52,9 @@ module Hwaro
       property aliases : Array(String)
       property tags : Array(String)
       property taxonomies : Hash(String, Array(String))
+      # Named-menu registrations from front matter (`menus`/`menu` keys),
+      # keyed by menu name. See `Content::Menus.build`.
+      property menus : Hash(String, MenuRegistration)
       property front_matter_keys : Array(String)
       property weight : Int32
       # Rendered HTML for the chunk before `<!-- more -->`. Populated by
@@ -131,6 +145,7 @@ module Hwaro
         @tags = [] of String
         @aliases = [] of String
         @taxonomies = {} of String => Array(String)
+        @menus = {} of String => MenuRegistration
         @front_matter_keys = [] of String
         @weight = 0
         @taxonomy_name = nil

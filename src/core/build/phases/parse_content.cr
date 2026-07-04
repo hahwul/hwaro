@@ -164,6 +164,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.aliases = data[:aliases]
     page.tags = data[:tags]
     page.taxonomies = data[:taxonomies]
+    page.menus = data[:menus]
     page.front_matter_keys = data[:front_matter_keys]
     page.taxonomy_name = nil
     page.taxonomy_term = nil

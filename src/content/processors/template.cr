@@ -228,6 +228,7 @@ module Hwaro
           Filters::MathFilters.register(@env)
           Filters::I18nFilters.register(@env)
           Filters::MiscFilters.register(@env)
+          Filters::MenuFilters.register(@env)
         end
 
         # Shared body for the `empty`/`present` Crinja tests: a value is empty
@@ -441,6 +442,37 @@ module Hwaro
               if taxonomy_val = raw_taxonomies[kind]?
                 result = Crinja::Value.new(taxonomy_val)
               end
+            end
+
+            result
+          end
+
+          # get_menu() function - get a named menu's resolved entry tree.
+          # Usage: {% for item in get_menu(name="main") %}
+          # Resolves against the CURRENT page's language (falling back to
+          # the site's default language), so the same template renders each
+          # language's own menu — unlike `site.menus`, which is fixed to the
+          # default language. Returns an empty array (not nil) for an unknown
+          # or unregistered menu name, so `{% for %}` never errors.
+          @env.functions["get_menu"] = Crinja.function({name: ""}) do
+            menu_name = arguments["name"].to_s
+            lang = env.resolve("page_language").to_s
+            default_lang = env.resolve("_i18n_default_language").to_s
+
+            menus_val = env.resolve("__menus__")
+            result = Crinja::Value.new([] of Crinja::Value)
+
+            raw_menus = menus_val.raw
+            if raw_menus.is_a?(Hash)
+              lang_menus = raw_menus[lang]?.try(&.raw)
+              found = lang_menus[menu_name]? if lang_menus.is_a?(Hash)
+
+              if !found && lang != default_lang
+                default_menus = raw_menus[default_lang]?.try(&.raw)
+                found = default_menus[menu_name]? if default_menus.is_a?(Hash)
+              end
+
+              result = found if found
             end
 
             result

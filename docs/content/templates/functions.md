@@ -164,6 +164,41 @@ Generate URL for a taxonomy term:
 
 ---
 
+### get_menu()
+
+Access a named menu's resolved entry tree ([Menus](/features/menus/)):
+
+```jinja
+{% for item in get_menu(name="main") %}
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+{% endfor %}
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| name | String | Menu name (e.g., "main", "footer") |
+
+**Returns:** Array\<Entry\> — resolved against the **current page's** language, falling back to the default language when that language has no entries for `name`. An unknown/unregistered menu name returns an empty array (never nil), so a `{% for %}` loop never errors.
+
+**Entry Properties:**
+
+| Property | Type | Description |
+|----------|------|--------------|
+| name | String | Display label |
+| url | String | Bare root-relative path, or untouched external URL |
+| href | String | `url` with `base_path` applied (internal) or unchanged (external) — use this in `<a href>` |
+| identifier | String | Unique key within the menu |
+| weight | Int | Sort order |
+| external | Bool | `true` for `http://`, `https://`, or `//` URLs |
+| children | Array\<Entry\> | Nested entries |
+| page | Page? | The registering page's data (front-matter-registered entries only) |
+
+Prefer `site.menus.<name>` only when you specifically need the **default language's** menu regardless of the current page — `get_menu()` is almost always the right choice inside a shared nav partial.
+
+---
+
 ## Data Loading
 
 ### load_data()

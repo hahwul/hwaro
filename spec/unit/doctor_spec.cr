@@ -202,6 +202,30 @@ describe Hwaro::Services::Doctor do
         issues = run_doctor(config)
         issues.any?(&.id.==("related-taxonomy-undefined")).should be_false
       end
+
+      # A `[[menus.*]]` entry's `parent` must reference another entry's
+      # `identifier` in the SAME menu. A typo silently gets promoted to
+      # root at build time with only a build-log warning.
+      it "warns when a menu entry's parent references an undefined identifier" do
+        config = base_config(%(\n[[menus.main]]\nname = "Posts"\nidentifier = "posts"\n\n[[menus.main]]\nname = "Orphan"\nparent = "nonexistent"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "menu-parent-undefined" && i.message.includes?("nonexistent") && i.message.includes?("main") }.should be_true
+      end
+
+      it "does not warn when a menu entry's parent matches a declared identifier" do
+        config = base_config(%(\n[[menus.main]]\nname = "Posts"\nidentifier = "posts"\n\n[[menus.main]]\nname = "First Post"\nparent = "posts"\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("menu-parent-undefined")).should be_false
+      end
+
+      it "validates a per-language menu override's parent references against its OWN identifiers" do
+        config = base_config(%(\n[[menus.main]]\nname = "Posts"\nidentifier = "posts"\n\n[languages.ko]\nlanguage_name = "Korean"\n\n[[languages.ko.menus.main]]\nname = "orphan-ko"\nparent = "posts"\n))
+        issues = run_doctor(config)
+        # "posts" is a GLOBAL identifier, not one declared in the ko override
+        # (a per-language menu set fully replaces the global one), so this
+        # must still be flagged even though "posts" exists in config.menus.
+        issues.any? { |i| i.id == "menu-parent-undefined" && i.message.includes?("languages.ko.menus.main") }.should be_true
+      end
     end
 
     describe "config — base_url format" do
@@ -353,6 +377,7 @@ describe Hwaro::Services::Doctor do
         messages.any?(&.includes?("[pwa]")).should be_false
         messages.any?(&.includes?("[amp]")).should be_false
         messages.any?(&.includes?("[build]")).should be_false
+        messages.any?(&.includes?("[menus]")).should be_false
       end
 
       it "does not report og.auto_image (optional sub-section) even when [og] exists" do
@@ -1098,6 +1123,34 @@ describe Hwaro::Services::Doctor do
             i.category == "content" && (i.file || "").ends_with?("bad.markdown")
           end.should be_true
         end
+      end
+
+      # A page/section can register a menu name that no [[menus.*]] block
+      # declares — but ONLY worth flagging when config declares at least one
+      # menu at all, since a fully front-matter-defined menu (no [[menus.*]]
+      # anywhere) is a legal, supported setup on its own.
+      it "warns when front matter registers a menu name not declared in config" do
+        issues = run_doctor(
+          base_config(%(\n[[menus.main]]\nname = "Home"\nurl = "/"\n)),
+          {"post.md" => %(+++\ntitle = "Post"\nmenus = ["sidebar"]\n+++\nBody\n)}
+        )
+        issues.any? { |i| i.id == "menu-undeclared" && i.message.includes?("sidebar") && i.message.includes?("main") }.should be_true
+      end
+
+      it "does not warn when front matter registers a menu name that config declares" do
+        issues = run_doctor(
+          base_config(%(\n[[menus.main]]\nname = "Home"\nurl = "/"\n)),
+          {"post.md" => %(+++\ntitle = "Post"\nmenus = ["main"]\n+++\nBody\n)}
+        )
+        issues.any?(&.id.==("menu-undeclared")).should be_false
+      end
+
+      it "does not warn about undeclared front-matter menus when config declares no menus at all" do
+        issues = run_doctor(
+          base_config,
+          {"post.md" => %(+++\ntitle = "Post"\nmenus = ["main"]\n+++\nBody\n)}
+        )
+        issues.any?(&.id.==("menu-undeclared")).should be_false
       end
     end
   end

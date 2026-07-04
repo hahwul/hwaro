@@ -292,8 +292,8 @@ module Hwaro::Core::Build::Phases::Render
   # Markers in a page's resolved template closure that mean it renders content
   # derived from the global page/section set, so it must re-render when that set
   # changes (not only when its own source changes).
-  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy"]
-  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section"]
+  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__"]
+  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
 
   private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
     page_set_changed = cache.page_set_changed?(page_set_fp)
@@ -339,6 +339,7 @@ module Hwaro::Core::Build::Phases::Render
         io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0001'
         io << p.tags.join(',') << '\u0001'
         p.taxonomies.keys.sort!.each { |k| io << k << '=' << p.taxonomies[k].join(',') << ';' }
+        p.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(p.menus[k]) << ';' }
         io << '\u0002'
       end
     end)
@@ -349,9 +350,19 @@ module Hwaro::Core::Build::Phases::Render
     Digest::MD5.hexdigest(String.build do |io|
       sections.each do |s|
         io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001'
-        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0002'
+        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0001'
+        s.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(s.menus[k]) << ';' }
+        io << '\u0002'
       end
     end)
+  end
+
+  # Serializes a single front-matter menu registration for the page/section
+  # set fingerprints above. Any field change (including a page newly
+  # gaining/losing a registration) must bust the cache for pages whose
+  # template calls `get_menu` / `site.menus`.
+  private def menu_registration_fp(reg : Models::MenuRegistration) : String
+    "name=#{reg.name},weight=#{reg.weight},parent=#{reg.parent},identifier=#{reg.identifier}"
   end
 
   # Template closure fingerprint stored in this page's cache entry. With
@@ -1591,6 +1602,22 @@ module Hwaro::Core::Build::Phases::Render
     vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
     vars["__taxonomy_slugs__"] = Crinja::Value.new(taxonomy_slugs)
 
+    # Menus: config [[menus.*]]-declared entries + front-matter menus/menu
+    # registrations, resolved into one tree per language. `__menus__` backs
+    # `get_menu()` (template.cr), which picks the CURRENT page's language
+    # with a default-language fallback; `site.menus` below is always the
+    # default language's set (site_obj has no per-page language context).
+    menus_by_lang = Content::Menus.build(config, site.pages, site.sections)
+    menus_crinja = {} of String => Crinja::Value
+    menus_by_lang.each do |lang, menus|
+      lang_hash = {} of String => Crinja::Value
+      menus.each do |menu_name, entries|
+        lang_hash[menu_name] = Crinja::Value.new(entries.map { |e| menu_entry_to_crinja(e, config, pages_by_path) })
+      end
+      menus_crinja[lang] = Crinja::Value.new(lang_hash)
+    end
+    vars["__menus__"] = Crinja::Value.new(menus_crinja)
+
     # Site object with full data
     site_obj = {
       "title"       => Crinja::Value.new(config.title),
@@ -1601,6 +1628,7 @@ module Hwaro::Core::Build::Phases::Render
       "taxonomies"  => Crinja::Value.new(taxonomies_hash),
       "data"        => Crinja::Value.new(site.data),
       "authors"     => Crinja::Value.new(site.authors),
+      "menus"       => menus_crinja[default_lang]? || Crinja::Value.new({} of String => Crinja::Value),
     }
     vars["site"] = Crinja::Value.new(site_obj)
 
@@ -1663,6 +1691,30 @@ module Hwaro::Core::Build::Phases::Render
     vars["_i18n_default_language"] = Crinja::Value.new(config.default_language)
 
     vars
+  end
+
+  # Converts a resolved menu `Entry` (see `Content::Menus`) to the Crinja
+  # hash templates iterate over: `{name, url, href, identifier, weight,
+  # external, children, page}`. `href` is `with_base_path(url)` for internal
+  # entries (so links work under a subpath deploy) and the untouched `url`
+  # for external ones; `url` itself stays bare and root-relative so it's
+  # directly comparable to `page.url` (see the `active_path` filter).
+  # `page` resolves the entry's registering page/section via the SAME
+  # `__pages_by_path__` map `get_page`/internal-link-resolution use — a
+  # section's `_index.md` isn't in that map (it's page-only), so a menu
+  # entry registered on a section resolves `page` to `nil`.
+  private def menu_entry_to_crinja(entry : Content::Menus::Entry, config : Models::Config, pages_by_path : Hash(String, Crinja::Value)) : Crinja::Value
+    page_value = entry.page_path.try { |pp| pages_by_path[pp]? }
+    Crinja::Value.new({
+      "name"       => Crinja::Value.new(entry.name),
+      "url"        => Crinja::Value.new(entry.url),
+      "href"       => Crinja::Value.new(entry.external ? entry.url : config.with_base_path(entry.url)),
+      "identifier" => Crinja::Value.new(entry.identifier),
+      "weight"     => Crinja::Value.new(entry.weight),
+      "external"   => Crinja::Value.new(entry.external),
+      "children"   => Crinja::Value.new(entry.children.map { |c| menu_entry_to_crinja(c, config, pages_by_path) }),
+      "page"       => page_value || Crinja::Value.new(nil),
+    })
   end
 
   # Public URLs of self-hosted highlight.js assets that are referenced

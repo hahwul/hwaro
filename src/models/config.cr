@@ -726,6 +726,22 @@ module Hwaro
       end
     end
 
+    # A single `[[menus.<name>]]` entry from config. `name` is the only
+    # required field (entries missing it are skipped with a warning by the
+    # loader); everything else defaults so `[[menus.main]]\nname = "Posts"`
+    # is valid on its own.
+    class MenuItemConfig
+      property name : String
+      property url : String
+      property identifier : String
+      property parent : String?
+      property weight : Int32
+
+      def initialize(@name : String, @url : String = "", identifier : String? = nil, @parent : String? = nil, @weight : Int32 = 0)
+        @identifier = identifier || @name
+      end
+    end
+
     # Language configuration for multilingual sites
     class LanguageConfig
       property code : String
@@ -734,6 +750,9 @@ module Hwaro
       property generate_feed : Bool
       property build_search_index : Bool
       property taxonomies : Array(String)
+      # `nil` means "no per-language override" → inherit the global
+      # `[[menus.*]]` set wholesale (see `load_languages`).
+      property menus : Hash(String, Array(MenuItemConfig))? = nil
 
       def initialize(@code : String)
         @language_name = code
@@ -993,6 +1012,7 @@ module Hwaro
       property auto_includes : AutoIncludesConfig
       property og : OpenGraphConfig
       property taxonomies : Array(TaxonomyConfig)
+      property menus : Hash(String, Array(MenuItemConfig))
       property default_language : String
       property languages : Hash(String, LanguageConfig)
       property build : BuildConfig
@@ -1030,6 +1050,7 @@ module Hwaro
         @auto_includes = AutoIncludesConfig.new
         @og = OpenGraphConfig.new
         @taxonomies = [] of TaxonomyConfig
+        @menus = {} of String => Array(MenuItemConfig)
         @default_language = "en"
         @languages = {} of String => LanguageConfig
         @build = BuildConfig.new
@@ -1239,6 +1260,7 @@ module Hwaro
         load_highlight(config)
         load_auto_includes(config)
         load_og(config)
+        load_menus(config)
         load_taxonomies(config)
         load_languages(config)
         load_build(config)
@@ -1591,6 +1613,48 @@ module Hwaro
         end
       end
 
+      # Parses a `menus` TOML table (either the top-level `[[menus.*]]` set
+      # or a per-language `[[languages.<code>.menus.*]]` override) into
+      # `{menu_name => [MenuItemConfig]}`. Shared by `load_menus` and
+      # `load_languages` so both surfaces accept identical entry shapes.
+      private def self.parse_menu_tables(h : Hash(String, TOML::Any)) : Hash(String, Array(MenuItemConfig))
+        result = {} of String => Array(MenuItemConfig)
+
+        h.each do |menu_name, menu_value|
+          entries = menu_value.as_a?
+          next unless entries
+
+          result[menu_name] = entries.compact_map do |entry_any|
+            entry_hash = entry_any.as_h?
+            unless entry_hash
+              Logger.warn "Ignoring non-table entry in [[menus.#{menu_name}]]"
+              next
+            end
+
+            name = entry_hash["name"]?.try(&.as_s?)
+            unless name
+              Logger.warn "Skipping [[menus.#{menu_name}]] entry missing required `name`"
+              next
+            end
+
+            item = MenuItemConfig.new(name)
+            item.url = entry_hash["url"]?.try(&.as_s?) || ""
+            item.weight = int_value(entry_hash["weight"]?, 0)
+            item.identifier = entry_hash["identifier"]?.try(&.as_s?) || name
+            item.parent = entry_hash["parent"]?.try(&.as_s?)
+            item
+          end
+        end
+
+        result
+      end
+
+      private def self.load_menus(config : Config)
+        return unless menus_section = config.raw["menus"]?.try(&.as_h?)
+
+        config.menus = parse_menu_tables(menus_section)
+      end
+
       private def self.load_taxonomies(config : Config)
         return unless taxonomies_section = config.raw["taxonomies"]?.try(&.as_a?)
 
@@ -1634,6 +1698,13 @@ module Hwaro
             # runs before `load_languages`, so `config.taxonomies` is populated.
             lang_config.taxonomies = config.taxonomies.map(&.name)
           end
+
+          if menus = lang_hash["menus"]?.try(&.as_h?)
+            lang_config.menus = parse_menu_tables(menus)
+          end
+          # No per-language `menus` key → leave `lang_config.menus` as `nil`,
+          # signalling "inherit the global `[[menus.*]]` set wholesale" to
+          # `Content::Menus.build`.
 
           config.languages[lang_code] = lang_config
         end

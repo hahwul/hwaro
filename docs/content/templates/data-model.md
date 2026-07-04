@@ -46,6 +46,7 @@ The root container. Configured in `config.toml`.
 | site.taxonomies | Object | All taxonomy groups and terms |
 | site.data | Object | Data loaded from `data/` directory |
 | site.authors | Object | Aggregated author data |
+| site.menus | Object | Named menus for the **default language** (see [Menus](#menus)) |
 
 ### Flat Aliases
 
@@ -650,6 +651,33 @@ Available in taxonomy templates:
 | content | String | Pre-rendered listing HTML (terms or pages) |
 
 For custom listings, use `get_taxonomy()` — see [Taxonomies](/writing/taxonomies/).
+
+---
+
+## Menus
+
+`site.menus` exposes the **default language's** named menus (config `[[menus.*]]` + front-matter `menus`/`menu` registrations). Inside a template, prefer `get_menu(name="...")` over `site.menus.<name>` — it resolves against the **current page's** language instead, falling back to the default language:
+
+```jinja
+{% for item in get_menu(name="main") %}
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+{% endfor %}
+```
+
+### Entry Properties
+
+| Property | Type | Description |
+|----------|------|--------------|
+| name | String | Display label |
+| url | String | Bare root-relative path, or untouched external URL — comparable to `page.url` |
+| href | String | `url` with the site's `base_path` applied (internal) or unchanged (external) — use this in `<a href>` |
+| identifier | String | Unique key within the menu |
+| weight | Int | Sort order |
+| external | Bool | `true` for `http://`, `https://`, or `//` URLs |
+| children | Array\<Entry\> | Nested entries whose `parent` matches this entry's `identifier` |
+| page | Page? | The registering page's data (front-matter-registered entries only; nil for config-only entries and for entries registered on a section) |
+
+See [Menus](/features/menus/) for the full config/front-matter reference, hierarchy, and per-language behavior.
 
 ---
 

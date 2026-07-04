@@ -89,6 +89,16 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 |--------|-------------|---------|
 | absolute_url | Full URL with base | {{ "/about/" \| absolute_url }} |
 | relative_url | Prefix base_url | {{ "/img.png" \| relative_url }} |
+| active_path | Is this URL the current page (or an ancestor of it)? | {{ item.url \| active_path }} |
+
+`active_path` compares a URL (typically a [menu](/features/menus/) entry's `item.url`) against the current page. It's an exact match by default; pass `ancestor=true` to also match descendant pages:
+
+```jinja
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+```
+
+Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) only ever matches exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches.
 
 ## Data Filters
 

@@ -109,6 +109,18 @@ describe Hwaro::Services::ConfigSnippets do
       uncommented.should contain("[doctor]")
       uncommented.should contain("ignore = []")
     end
+
+    it "menus: commented version has all values commented out" do
+      commented = Hwaro::Services::ConfigSnippets.menus(commented: true)
+      commented.should contain("# [[menus.main]]")
+      commented.should_not contain("\n[[menus.main]]\n")
+    end
+
+    it "menus: uncommented version has an active [[menus.main]] entry" do
+      uncommented = Hwaro::Services::ConfigSnippets.menus(commented: false)
+      uncommented.should contain("[[menus.main]]")
+      uncommented.should contain("name = \"Home\"")
+    end
   end
 
   describe "non-commented-only snippets" do
@@ -135,7 +147,7 @@ describe Hwaro::Services::ConfigSnippets do
     {% for method in ["plugins", "highlight", "og", "sitemap", "robots", "llms",
                       "feeds", "build", "permalinks", "auto_includes", "series",
                       "related", "search", "pagination", "markdown", "assets",
-                      "image_processing", "deployment", "pwa", "amp", "doctor"] %}
+                      "image_processing", "deployment", "pwa", "amp", "doctor", "menus"] %}
       it "{{ method.id }}(commented: true) is non-empty" do
         Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: true).should_not be_empty
       end

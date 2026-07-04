@@ -86,6 +86,7 @@ require "./content/seo/llms"
 require "./content/seo/jsonld"
 require "./content/search"
 require "./content/taxonomies"
+require "./content/menus"
 
 # Load pagination
 require "./content/pagination/paginator"

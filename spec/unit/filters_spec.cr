@@ -1127,3 +1127,58 @@ describe "I18nFilters" do
     end
   end
 end
+
+describe "MenuFilters" do
+  describe "active_path" do
+    it "matches the current page's own url exactly" do
+      vars = {"page_url" => Crinja::Value.new("/posts/")}
+      render_filter("{{ '/posts/' | active_path }}", vars).should eq("true")
+    end
+
+    it "does not match a sibling url" do
+      vars = {"page_url" => Crinja::Value.new("/posts/")}
+      render_filter("{{ '/about/' | active_path }}", vars).should eq("false")
+    end
+
+    it "treats missing/present trailing slash as equal" do
+      vars = {"page_url" => Crinja::Value.new("/posts")}
+      render_filter("{{ '/posts/' | active_path }}", vars).should eq("true")
+    end
+
+    it "does not match a descendant page without ancestor=true" do
+      vars = {"page_url" => Crinja::Value.new("/posts/first/")}
+      render_filter("{{ '/posts/' | active_path }}", vars).should eq("false")
+    end
+
+    it "matches a descendant page with ancestor=true" do
+      vars = {"page_url" => Crinja::Value.new("/posts/first/")}
+      render_filter("{{ '/posts/' | active_path(ancestor=true) }}", vars).should eq("true")
+    end
+
+    it "still matches the entry's own url exactly with ancestor=true" do
+      vars = {"page_url" => Crinja::Value.new("/posts/")}
+      render_filter("{{ '/posts/' | active_path(ancestor=true) }}", vars).should eq("true")
+    end
+
+    it "does not treat every page as a descendant of the root entry, even with ancestor=true" do
+      vars = {"page_url" => Crinja::Value.new("/posts/first/")}
+      render_filter("{{ '/' | active_path(ancestor=true) }}", vars).should eq("false")
+    end
+
+    it "matches the root entry only on the homepage itself" do
+      vars = {"page_url" => Crinja::Value.new("/")}
+      render_filter("{{ '/' | active_path }}", vars).should eq("true")
+      render_filter("{{ '/' | active_path(ancestor=true) }}", vars).should eq("true")
+    end
+
+    it "never matches an external http(s) entry" do
+      vars = {"page_url" => Crinja::Value.new("/posts/")}
+      render_filter("{{ 'https://example.com' | active_path }}", vars).should eq("false")
+    end
+
+    it "never matches an external protocol-relative entry" do
+      vars = {"page_url" => Crinja::Value.new("/posts/")}
+      render_filter("{{ '//cdn.example.com/x' | active_path }}", vars).should eq("false")
+    end
+  end
+end
