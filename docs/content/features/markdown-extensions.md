@@ -175,6 +175,8 @@ $$
 
 Render Mermaid diagram blocks as `<div class="mermaid">` elements.
 
+This is the one exception to [render hooks](/templates/render-hooks/)' "always applies" rule: with `mermaid = true`, a `` ```mermaid `` fence always goes through this pipeline instead of a `render-codeblock.html` hook, even if one is configured. Set `mermaid = false` to have a codeblock hook own mermaid fences like any other language.
+
 ### Syntax
 
 ````markdown
@@ -300,3 +302,4 @@ invalidates the whole block, leaving the source `{...}` untouched.
 
 - [Configuration](/start/config/) — Markdown configuration options
 - [Syntax Highlighting](/features/syntax-highlighting/) — Code block highlighting
+- [Render Hooks](/templates/render-hooks/) — Override how links, images, headings, and code blocks render

@@ -19,6 +19,8 @@ require "tartrazine"
 require "digest/md5"
 require "./table_parser"
 require "./markdown_extensions"
+require "./heading_ids"
+require "./render_hooks"
 require "set"
 
 module Hwaro
@@ -582,6 +584,166 @@ module Hwaro
         end
       end
 
+      # Renderer used only when at least one `templates/hooks/render-*`
+      # template is configured (`RenderHooks.registry` is non-nil). Every
+      # override starts with `return super unless @hooks.<hook>?`, so an
+      # element the registry has no hook for renders exactly as
+      # `HighlightingRenderer` would — this class adds no branches to the
+      # stock class itself.
+      #
+      # Link/Image/Heading are containers (Markd's walker visits them
+      # twice: entering, then leaving with their children already
+      # rendered in between); the hook needs the children's rendered HTML
+      # as a single string, so `push_capture`/`pop_capture` temporarily
+      # swap `@output_io`/`@last_output` (the same buffer
+      # `Markd::Renderer#literal`/`#output` write to) for a scratch
+      # buffer, nesting correctly via `@capture_stack` for e.g. a link
+      # inside a heading, or an image inside a link.
+      class HookedRenderer < HighlightingRenderer
+        @capture_stack = [] of {String::Builder, String}
+        @used_heading_ids = Set(String).new
+        @heading_id_counters = Hash(String, Int32).new(0)
+
+        def initialize(options : Markd::Options, highlight_enabled : Bool, server_mode : Bool, @hooks : Content::Processors::RenderHooks::HookRenderContext)
+          super(options, highlight_enabled, server_mode)
+        end
+
+        private def push_capture : Nil
+          @capture_stack << {@output_io, @last_output}
+          @output_io = String::Builder.new
+          @last_output = "\n"
+        end
+
+        private def pop_capture : String
+          inner = @output_io.to_s
+          frame = @capture_stack.pop
+          @output_io = frame[0]
+          @last_output = frame[1]
+          inner
+        end
+
+        def link(node : Markd::Node, entering : Bool)
+          return super unless @hooks.link?
+          return super if @disable_tag > 0
+
+          if entering
+            push_capture
+          else
+            text = pop_capture
+            destination = node.data["destination"].as(String)
+            title = node.data["title"].as(String)
+            dest_out = (@options.safe? && potentially_unsafe(destination)) ? "" : escape(destination)
+            literal(@hooks.render_link(destination: dest_out, title: escape(title), text: text))
+          end
+        end
+
+        # Mirrors Markd::HTMLRenderer#image's `@disable_tag` protocol
+        # exactly (see the module doc above): a link or another image
+        # nested inside this image's alt text never gets its own tag, and
+        # neither does a nested hook — it just contributes plain text to
+        # this image's `alt`, same as stock.
+        def image(node : Markd::Node, entering : Bool)
+          return super unless @hooks.image?
+
+          if entering
+            push_capture if @disable_tag == 0
+            @disable_tag += 1
+          else
+            @disable_tag -= 1
+            if @disable_tag == 0
+              alt = pop_capture
+              destination = node.data["destination"].as(String)
+              title = node.data["title"].as(String)
+              dest_out = (@options.safe? && potentially_unsafe(destination)) ? "" : escape(destination)
+              literal(@hooks.render_image(destination: dest_out, alt: alt, title: escape(title)))
+            end
+          end
+        end
+
+        def heading(node : Markd::Node, entering : Bool)
+          return super unless @hooks.heading?
+          return super if @disable_tag > 0
+
+          if entering
+            newline
+            push_capture
+          else
+            inner = pop_capture
+
+            # `## Heading {#custom-id}` (heading_ids extension) leaves a
+            # `<!--HID:custom-id-->` marker in the rendered inline content —
+            # extract it and strip it from the visible text, mirroring
+            # `MarkdownExtensions.postprocess_heading_ids`.
+            custom_id = nil
+            if hid_match = inner.match(MarkdownExtensions::HID_MARKER_RE)
+              custom_id = hid_match[1]
+              inner = inner.sub(hid_match[0], "").rstrip
+            end
+
+            title_text = strip_tags(inner)
+            id = HeadingIds.assign(title_text, custom_id, @used_heading_ids, @heading_id_counters)
+            level = node.data["level"].as(Int32)
+            literal(@hooks.render_heading(level: level, text: inner, id: id))
+            newline
+          end
+        end
+
+        # CodeBlock is a leaf — the walker yields exactly one (entering:
+        # true) event for it, matching `HighlightingRenderer#code_block`.
+        def code_block(node : Markd::Node, entering : Bool)
+          return super unless @hooks.codeblock?
+          return super if @disable_tag > 0
+
+          lang, _opts = FenceOptions.parse(node.fence_language.presence)
+
+          # `mermaid` fences stay on the existing pipeline (rendered as
+          # stock `<pre><code class="language-mermaid...">`, later turned
+          # into a `<div class="mermaid">` by `postprocess_mermaid`) when
+          # mermaid is enabled — config decides who owns that fence, not
+          # the hook template.
+          return super if lang.try(&.downcase) == "mermaid" && @hooks.mermaid_bypass?
+
+          info = node.fence_language.to_s.strip
+          options_str = if idx = info.index('{')
+                          info[idx..]
+                        elsif sp = info.index(' ')
+                          info[(sp + 1)..].strip
+                        else
+                          ""
+                        end
+
+          highlighted = (@highlight_enabled && @server_mode && lang) ? (ServerHighlighter.highlight(node.text, lang) || "") : ""
+
+          newline
+          literal(@hooks.render_codeblock(
+            lang: lang ? escape(lang) : "",
+            options: escape(options_str),
+            code: escape(node.text),
+            highlighted: highlighted,
+          ))
+          newline
+        end
+
+        # Plain-text extraction mirroring `Markdown#post_process_html`'s
+        # inline char-level tag strip, so a heading's title text is
+        # normalized identically on both the hook path and the stock
+        # `post_process_html` path (see `HeadingIds.assign`).
+        private def strip_tags(html : String) : String
+          String.build(html.bytesize) do |io|
+            in_tag = false
+            html.each_char do |c|
+              if c == '<'
+                in_tag = true
+              elsif c == '>'
+                in_tag = false
+              elsif !in_tag
+                io << c
+              end
+            end
+          end.strip
+        end
+      end
+
       # Syntax highlighter module for rendering markdown with highlighting support
       module SyntaxHighlighter
         extend self
@@ -621,7 +783,11 @@ module Hwaro
         # @param content - markdown content to render
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
-        def render(content : String, highlight : Bool = true, safe : Bool = false, *, tables_preprocessed : Bool = false) : String
+        # @param hooks - render-hook context (nil when no `templates/hooks/render-*`
+        #   template is configured); when nil the renderer construction below is
+        #   byte-identical to the pre-hooks code path.
+        def render(content : String, highlight : Bool = true, safe : Bool = false, *, tables_preprocessed : Bool = false,
+                   hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : String
           # Pre-process tables before passing to markd (markd doesn't support
           # GFM tables). Markdown#render already converts tables before the
           # extension passes and passes `tables_preprocessed: true` to skip the
@@ -631,7 +797,11 @@ module Hwaro
 
           options = Markd::Options.new(safe: safe)
           document = Markd::Parser.parse(processed_content, options)
-          renderer = HighlightingRenderer.new(options, highlight, @@server_mode)
+          renderer = if hooks
+                       HookedRenderer.new(options, highlight, @@server_mode, hooks)
+                     else
+                       HighlightingRenderer.new(options, highlight, @@server_mode)
+                     end
           renderer.render(document)
         end
 
