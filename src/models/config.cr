@@ -514,12 +514,18 @@ module Hwaro
       # "server" highlights at build time (Tartrazine lexers, hljs-compatible
       # CSS classes) so no JavaScript ships — theme CSS keeps working either way.
       property mode : String
+      # Global default for fence-level `linenos` (see FenceOptions): when
+      # true, every fenced code block with a language gets line numbers
+      # unless it opts out with a per-block `{linenos=false}`. Off by
+      # default so existing output is unaffected.
+      property line_numbers : Bool
 
       def initialize
         @enabled = true
         @theme = "github"
         @use_cdn = true
         @mode = "client"
+        @line_numbers = false
       end
 
       # True when code is highlighted at build time (no client-side JS).
@@ -634,6 +640,11 @@ module Hwaro
       property math_engine : String    # "katex" or "mathjax"
       property admonitions : Bool      # If true, GitHub-style `> [!NOTE]` blockquotes become admonition <div>s
       property heading_ids : Bool      # If true, `## Heading {#custom-id}` sets an explicit id
+      property ins : Bool              # If true, enables inserted-text syntax (++ins++)
+      property mark : Bool             # If true, enables highlighted-text syntax (==mark==)
+      property sub : Bool              # If true, enables subscript syntax (~sub~)
+      property sup : Bool              # If true, enables superscript syntax (^sup^)
+      property attributes : Bool       # If true, enables `{#id .class key=val}` attribute blocks on headings/images
 
       def initialize
         @safe = false
@@ -647,6 +658,11 @@ module Hwaro
         @math_engine = "katex"
         @admonitions = true
         @heading_ids = true
+        @ins = false
+        @mark = false
+        @sub = false
+        @sup = false
+        @attributes = false
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -654,11 +670,13 @@ module Hwaro
       # previous config (e.g. after a config reload in `serve`) can't be
       # served for a build running with different markdown options.
       def cache_fingerprint : String
-        String.build(12 + @math_engine.bytesize) do |io|
+        String.build(17 + @math_engine.bytesize) do |io|
           io << (@safe ? '1' : '0') << (@lazy_loading ? '1' : '0') << (@emoji ? '1' : '0')
           io << (@footnotes ? '1' : '0') << (@task_lists ? '1' : '0') << (@definition_lists ? '1' : '0')
           io << (@mermaid ? '1' : '0') << (@math ? '1' : '0') << (@admonitions ? '1' : '0')
-          io << (@heading_ids ? '1' : '0') << @math_engine
+          io << (@heading_ids ? '1' : '0')
+          io << (@ins ? '1' : '0') << (@mark ? '1' : '0') << (@sub ? '1' : '0')
+          io << (@sup ? '1' : '0') << (@attributes ? '1' : '0') << @math_engine
         end
       end
 
@@ -1503,6 +1521,7 @@ module Hwaro
         config.highlight.enabled = bool_value(s["enabled"]?, config.highlight.enabled)
         config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
+        config.highlight.line_numbers = bool_value(s["line_numbers"]?, config.highlight.line_numbers)
         if mode = s["mode"]?.try(&.as_s?)
           if mode == "client" || mode == "server"
             config.highlight.mode = mode
@@ -1668,6 +1687,11 @@ module Hwaro
         end
         config.markdown.admonitions = bool_value(s["admonitions"]?, config.markdown.admonitions)
         config.markdown.heading_ids = bool_value(s["heading_ids"]?, config.markdown.heading_ids)
+        config.markdown.ins = bool_value(s["ins"]?, config.markdown.ins)
+        config.markdown.mark = bool_value(s["mark"]?, config.markdown.mark)
+        config.markdown.sub = bool_value(s["sub"]?, config.markdown.sub)
+        config.markdown.sup = bool_value(s["sup"]?, config.markdown.sup)
+        config.markdown.attributes = bool_value(s["attributes"]?, config.markdown.attributes)
       end
 
       private def self.load_series(config : Config)

@@ -370,6 +370,8 @@ Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
 
 Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied — use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page produces duplicate id attributes; the first anchor wins.
 
+This `{#id}` shorthand is a special case of the more general `{#id .class key=val}` attribute block (`[markdown] attributes = true`), which also applies to inline images — see [Markdown Extensions](/features/markdown-extensions/).
+
 ### Definition Lists
 
 ```markdown
