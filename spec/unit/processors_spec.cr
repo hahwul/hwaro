@@ -648,6 +648,188 @@ describe Hwaro::Processor::Markdown do
     end
   end
 
+  describe "menu front matter registration" do
+    it "returns an empty hash when no menus/menu key is present" do
+      content = <<-MARKDOWN
+        +++
+        title = "Plain"
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].should eq({} of String => Hwaro::Models::MenuRegistration)
+    end
+
+    it "parses a bare string menus value in TOML" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+        menus = "main"
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.should eq(["main"])
+      result[:menus]["main"].name.should be_nil
+      result[:menus]["main"].weight.should be_nil
+    end
+
+    it "parses an array of menu names in TOML" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+        menus = ["main", "footer"]
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.sort!.should eq(["footer", "main"])
+    end
+
+    it "parses table-form menu registration with overrides in TOML" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+
+        [menus.main]
+        name = "All Posts"
+        weight = 5
+        parent = "content"
+        identifier = "posts"
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      reg = result[:menus]["main"]
+      reg.name.should eq("All Posts")
+      reg.weight.should eq(5)
+      reg.parent.should eq("content")
+      reg.identifier.should eq("posts")
+    end
+
+    it "prefers the plural menus key over the singular menu alias" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+        menus = ["main"]
+        menu = ["footer"]
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.should eq(["main"])
+    end
+
+    it "falls back to the singular menu alias when menus is absent" do
+      content = <<-MARKDOWN
+        +++
+        title = "Posts"
+        menu = "footer"
+        +++
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.should eq(["footer"])
+    end
+
+    it "parses a bare string menus value in YAML" do
+      content = <<-MARKDOWN
+        ---
+        title: Posts
+        menus: main
+        ---
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.should eq(["main"])
+    end
+
+    it "parses an array of menu names in YAML" do
+      content = <<-MARKDOWN
+        ---
+        title: Posts
+        menus:
+          - main
+          - footer
+        ---
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.sort!.should eq(["footer", "main"])
+    end
+
+    it "parses table-form menu registration with overrides in YAML" do
+      content = <<-MARKDOWN
+        ---
+        title: Posts
+        menus:
+          main:
+            name: All Posts
+            weight: 5
+            parent: content
+            identifier: posts
+        ---
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      reg = result[:menus]["main"]
+      reg.name.should eq("All Posts")
+      reg.weight.should eq(5)
+      reg.parent.should eq("content")
+      reg.identifier.should eq("posts")
+    end
+
+    it "parses a bare string menus value in JSON" do
+      content = <<-MARKDOWN
+        {
+          "title": "Posts",
+          "menus": "main"
+        }
+        Body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.should eq(["main"])
+    end
+
+    it "parses an array of menu names in JSON" do
+      content = <<-MARKDOWN
+        {
+          "title": "Posts",
+          "menus": ["main", "footer"]
+        }
+        Body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      result[:menus].keys.sort!.should eq(["footer", "main"])
+    end
+
+    it "parses table-form menu registration with overrides in JSON" do
+      content = <<-MARKDOWN
+        {
+          "title": "Posts",
+          "menus": {
+            "main": {
+              "name": "All Posts",
+              "weight": 5,
+              "parent": "content",
+              "identifier": "posts"
+            }
+          }
+        }
+        Body
+        MARKDOWN
+
+      result = Hwaro::Processor::Markdown.parse(content)
+      reg = result[:menus]["main"]
+      reg.name.should eq("All Posts")
+      reg.weight.should eq(5)
+      reg.parent.should eq("content")
+      reg.identifier.should eq("posts")
+    end
+  end
+
   describe "lazy loading images" do
     it "adds loading='lazy' attribute when enabled" do
       content = "![Alt text](image.jpg)"

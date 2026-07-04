@@ -64,7 +64,7 @@ module Hwaro
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
           "series", "series_weight", "expires", "paginate_by", "taxonomies",
-          "cascade",
+          "cascade", "menus", "menu",
         }
 
         # Warn about unknown front-matter keys that look like typos of known keys.
@@ -249,6 +249,7 @@ module Hwaro
               series_weight:       result[:series_weight],
               expires:             result[:expires],
               cascade:             result[:cascade],
+              menus:               result[:menus],
             }
           else
             # No front matter found — return defaults
@@ -288,6 +289,7 @@ module Hwaro
               series_weight:       0,
               expires:             nil.as(Time?),
               cascade:             {} of String => Models::ExtraValue,
+              menus:               {} of String => Models::MenuRegistration,
             }
           end
         end
@@ -555,6 +557,7 @@ module Hwaro
             taxonomies:          taxonomies,
             tags:                tags,
             cascade:             cascade,
+            menus:               extract_menus(fm),
           }
         end
 
@@ -900,6 +903,65 @@ module Hwaro
             #   instead of letting the exception unwind the whole parse.
             nil
           end
+        end
+
+        # Extract named-menu front-matter registrations. Accepts the plural
+        # `menus` key (wins if both are present) or the singular alias
+        # `menu`, in three shapes:
+        #   - bare string:    `menus = "main"`
+        #   - array of names: `menus = ["main", "footer"]`
+        #   - table form:     `[menus.main]` with name/weight/parent/identifier
+        # All fields in the table form are optional — the menu builder falls
+        # back to the page's own title/weight/no-parent/name-as-identifier.
+        private def extract_menus(fm : TOML::Table | YAML::Any | JSON::Any) : Hash(String, Models::MenuRegistration)
+          registrations = {} of String => Models::MenuRegistration
+          value = fm["menus"]? || fm["menu"]?
+          return registrations unless value
+
+          if name = value.as_s?
+            registrations[name] = Models::MenuRegistration.new
+            return registrations
+          end
+
+          if arr = value.as_a?
+            arr.compact_map(&.as_s?).each do |menu_name|
+              registrations[menu_name] = Models::MenuRegistration.new
+            end
+            return registrations
+          end
+
+          # Table form. TOML/JSON hashes keep String keys; YAML hashes are
+          # keyed by YAML::Any (mirrors `extract_taxonomies` below).
+          case value
+          when TOML::Any, JSON::Any
+            value.as_h?.try &.each do |menu_name, entry|
+              registrations[menu_name] = menu_registration_from(entry)
+            end
+          when YAML::Any
+            value.as_h?.try &.each do |menu_name_any, entry|
+              next unless menu_name = menu_name_any.as_s?
+              registrations[menu_name] = menu_registration_from(entry)
+            end
+          end
+
+          registrations
+        end
+
+        # Builds a single `MenuRegistration` from one table-form `[menus.<name>]`
+        # entry. Guards with `as_h?` first because `TOML::Any#[]?` /
+        # `YAML::Any#[]?` / `JSON::Any#[]?` raise (rather than returning nil)
+        # when the underlying value isn't a Hash — so a malformed
+        # `menus.main = "oops"` degrades to all-defaults instead of crashing
+        # the page parse.
+        private def menu_registration_from(entry : TOML::Any | YAML::Any | JSON::Any) : Models::MenuRegistration
+          return Models::MenuRegistration.new unless entry.as_h?
+
+          Models::MenuRegistration.new(
+            name: entry["name"]?.try(&.as_s?),
+            weight: entry["weight"]?.try(&.as_i?),
+            parent: entry["parent"]?.try(&.as_s?),
+            identifier: entry["identifier"]?.try(&.as_s?),
+          )
         end
 
         # Array-typed front matter keys that are NOT taxonomies.
