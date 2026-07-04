@@ -18,6 +18,7 @@ def build_site(
   minify : Bool = false,
   highlight : Bool = false,
   cache : Bool = false,
+  parallel : Bool = false,
   &
 )
   Dir.mktmpdir do |dir|
@@ -64,7 +65,7 @@ def build_site(
         output_dir: output_dir,
         drafts: drafts,
         minify: minify,
-        parallel: false,
+        parallel: parallel,
         cache: cache,
         highlight: highlight,
         verbose: false,
