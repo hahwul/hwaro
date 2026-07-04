@@ -267,6 +267,20 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
     html.should contain(%(<a href="http://x" title="T">hello</a>))
     log.should contain("Template error in render hook 'hooks/render-link'")
   end
+
+  it "falls back to stock markup on a RENDER-time hook error (not just compile)" do
+    # `{{ text.foo.bar }}` compiles cleanly but raises Crinja::UndefinedError
+    # at render — a subclass of Crinja::RuntimeError, not TemplateError. The
+    # rescue must catch the whole Crinja::Error tree so one bad expression
+    # degrades a single element instead of aborting the build.
+    hooks = make_hooks(link: "{{ text.foo.bar }}")
+    html = ""
+    log = with_captured_log do
+      html = SyntaxHighlighter.render(%([hello](http://x "T")), hooks: hooks)
+    end
+    html.should contain(%(<a href="http://x" title="T">hello</a>))
+    log.should contain("Template error in render hook 'hooks/render-link'")
+  end
 end
 
 describe "default-equivalent hook templates" do

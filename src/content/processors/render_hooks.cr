@@ -293,19 +293,28 @@ module Hwaro
 
           private def render_hook_template(template_key : String, hook : HookEntry, salt : UInt64, vars : Hash(String, Crinja::Value), & : -> String) : String
             cache_key = hook[:source].hash ^ salt
-            template = fetch_or_compile(cache_key, hook, template_key)
-            template.render(vars)
-          rescue ex : Crinja::TemplateError
+            # When a mutex is present the env is shared (the feed/search
+            # fallback env, or the sequential builder env), and
+            # `Crinja::Template#render` mutates that env's scope — so the
+            # render itself must be serialized, not just compilation.
+            # Worker-local contexts pass a nil mutex and render lock-free on
+            # their own per-worker env.
+            if mutex = @cache_mutex
+              mutex.synchronize do
+                template = fetch_or_compile_unsynced(cache_key, hook, template_key)
+                template.render(vars)
+              end
+            else
+              template = fetch_or_compile_unsynced(cache_key, hook, template_key)
+              template.render(vars)
+            end
+          rescue ex : Crinja::Error
+            # Catch render-time errors (TypeError/UndefinedError/…), not just
+            # compile-time TemplateError — a hook fires on every element, so a
+            # bad expression must degrade one element to stock markup, never
+            # abort the whole build.
             @registry.warn_once(template_key, "Template error in render hook '#{template_key}': #{ex.message}")
             yield
-          end
-
-          private def fetch_or_compile(cache_key : UInt64, hook : HookEntry, template_key : String) : Crinja::Template
-            if mutex = @cache_mutex
-              mutex.synchronize { fetch_or_compile_unsynced(cache_key, hook, template_key) }
-            else
-              fetch_or_compile_unsynced(cache_key, hook, template_key)
-            end
           end
 
           private def fetch_or_compile_unsynced(cache_key : UInt64, hook : HookEntry, template_key : String) : Crinja::Template
