@@ -130,7 +130,7 @@ module Hwaro
         config = check_config(issues)
         check_templates(issues)
         check_directory_structure(issues)
-        check_content_frontmatter(issues)
+        check_content_frontmatter(issues, config)
         check_referenced_paths(issues, config) if config
         ignore = config.try(&.doctor.ignore) || [] of String
         # `[doctor].ignore` exists to silence advisory noise. We refuse to
@@ -206,6 +206,8 @@ module Hwaro
         "assets",
         # Useful but not essential to nag about
         "related", "series", "pagination",
+        # Navigation menus — many sites hardcode nav in the theme instead
+        "menus",
         # Content authoring niceties
         "content.new",
         # Nice-to-have SEO / crawler files (most people can add manually if needed)
@@ -572,10 +574,38 @@ module Hwaro
           end
         end
 
+        # `[[menus.<name>]]` entries may set `parent` to another entry's
+        # `identifier` within the SAME menu (global or per-language). A typo
+        # silently falls through to Content::Menus's "promoted to root"
+        # fallback at build time with only a build-log warning — surface it
+        # here so it's caught before build. Per-language menu sets fully
+        # replace the global one (no per-language override ⇒ `menus` is
+        # `nil`, inheriting the global set already checked), so each is
+        # validated independently against its OWN identifiers.
+        check_menu_parent_undefined(issues, "", config.menus)
+        config.languages.keys.sort!.each do |code|
+          lang_menus = config.languages[code].menus
+          check_menu_parent_undefined(issues, code, lang_menus) if lang_menus
+        end
+
         # Check for missing config sections
         check_missing_config_sections(issues)
 
         config
+      end
+
+      private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)))
+        menus.each do |menu_name, items|
+          identifiers = items.map(&.identifier).to_set
+          scope = lang_code.empty? ? "[[menus.#{menu_name}]]" : "[[languages.#{lang_code}.menus.#{menu_name}]]"
+          items.each do |item|
+            parent = item.parent
+            next if parent.nil? || parent.empty?
+            next if identifiers.includes?(parent)
+            issues << Issue.new(id: "menu-parent-undefined", level: :warning, category: "config", file: @config_path,
+              message: "#{scope} entry \"#{item.name}\" has parent \"#{parent}\" but no entry in that menu declares identifier \"#{parent}\"")
+          end
+        end
       end
 
       private def check_missing_config_sections(issues : Array(Issue))
@@ -759,7 +789,7 @@ module Hwaro
       # actually runs concurrently across cores. Each worker returns
       # the file's issue list (size 0 or 1) so we never share a
       # mutable issues array across fibers.
-      private def check_content_frontmatter(issues : Array(Issue))
+      private def check_content_frontmatter(issues : Array(Issue), config : Models::Config?)
         return unless Dir.exists?(@content_dir)
 
         files = [] of String
@@ -770,16 +800,26 @@ module Hwaro
         end
         return if files.empty?
 
+        # Only front matter `menus`/`menu` names get cross-checked against
+        # `config.menus` — and only when the config declares at least one
+        # menu at all. A site with NO `[[menus.*]]` anywhere is legitimately
+        # using front-matter-only, fully ad-hoc menus (Content::Menus builds
+        # them regardless of whether config declares that name), so nagging
+        # about "undeclared" menus there would be a false positive on a
+        # supported, legal setup.
+        known_menu_names = config.try(&.menus.keys) || [] of String
+
         per_file = Hwaro::Core::Build::ParallelHelper.map(files) do |path|
-          scan_content_file_for_frontmatter(path)
+          scan_content_file_for_frontmatter(path, known_menu_names)
         end
         per_file.each { |arr| arr.each { |i| issues << i } }
       end
 
       # Pure function: read + parse one markdown file, return any issue
       # produced as a small array. Fiber-safe because it touches no
-      # shared state.
-      private def scan_content_file_for_frontmatter(path : String) : Array(Issue)
+      # shared state. `known_menu_names` is empty when config declares no
+      # `[[menus.*]]` at all — see `check_content_frontmatter`.
+      private def scan_content_file_for_frontmatter(path : String, known_menu_names : Array(String)) : Array(Issue)
         raw = begin
           File.read(path)
         rescue ex : IO::Error | File::Error
@@ -787,14 +827,23 @@ module Hwaro
             message: "Failed to read content file: #{ex.message}")]
         end
 
-        begin
+        data = begin
           Processor::Markdown.parse(raw, path)
         rescue ex : Hwaro::HwaroError
           first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
           return [Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
             message: first_line.empty? ? "Invalid front matter" : first_line)]
         end
-        [] of Issue
+
+        issues = [] of Issue
+        unless known_menu_names.empty?
+          data[:menus].each_key do |menu_name|
+            next if known_menu_names.includes?(menu_name)
+            issues << Issue.new(id: "menu-undeclared", level: :warning, category: "content", file: path,
+              message: "Front matter registers menu \"#{menu_name}\" but no [[menus.#{menu_name}]] is declared in config.toml (defined: #{known_menu_names.sort.join(", ")})")
+          end
+        end
+        issues
       end
 
       # Validate that path-shaped fields in `config.toml` actually point at

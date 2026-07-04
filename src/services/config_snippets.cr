@@ -39,6 +39,7 @@ module Hwaro
         "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: -> { image_processing(commented: true) }},
         "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: -> { pwa(commented: true) }},
         "amp"              => {description: "AMP page generation", snippet: -> { amp(commented: true) }},
+        "menus"            => {description: "Navigation menus (Hugo-style [[menus.*]])", snippet: -> { menus(commented: true) }},
       } of String => SectionEntry
 
       # Same idea for sub-sections (parent table must already exist
@@ -1004,6 +1005,60 @@ module Hwaro
             X-Content-Type-Options = "nosniff"
             Referrer-Policy = "strict-origin-when-cross-origin"
             # Cache-Control = "public, max-age=3600"
+
+            TOML
+        end
+      end
+
+      def self.menus(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Menus (Optional)
+            # =============================================================================
+            # Named navigation menus, resolved into a tree in templates via
+            # {% for item in get_menu(name="main") %} or site.menus.main.
+            # `name` is required; everything else defaults (weight = 0,
+            # identifier = name, parent = none, url = "").
+            # Pages/sections can also join a menu from their own front
+            # matter (`menus = ["main"]`) without touching this file.
+
+            # [[menus.main]]
+            # name = "Home"
+            # url = "/"
+            # weight = 1
+
+            # [[menus.main]]
+            # name = "Posts"
+            # url = "/posts/"
+            # weight = 2
+            # identifier = "posts"
+
+            # Per-language overrides replace the whole menu for that language
+            # (a [languages.<code>] block with no [[languages.<code>.menus.*]]
+            # inherits this global set instead):
+            # [[languages.ko.menus.main]]
+            # name = "홈"
+            # url = "/ko/"
+            # weight = 1
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Menus
+            # =============================================================================
+            # Named navigation menus. Render with:
+            #   {% for item in get_menu(name="main") %}
+            #     <a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+            #   {% endfor %}
+
+            [[menus.main]]
+            name = "Home"
+            url = "/"
+            weight = 1
 
             TOML
         end
