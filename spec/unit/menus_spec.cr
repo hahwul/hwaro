@@ -242,6 +242,19 @@ describe Hwaro::Content::Menus do
       trees["en"]["main"][0].url.should eq("/feed.xml")
     end
 
+    it "does not append a trailing slash to query-string or fragment urls" do
+      config = Hwaro::Models::Config.new
+      config.menus = {
+        "main" => [
+          menu_item("Search", "/search?q=foo"),
+          menu_item("Contact", "/#contact"),
+        ],
+      }
+
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [] of Hwaro::Models::Section)
+      trees["en"]["main"].map(&.url).should eq(["/#contact", "/search?q=foo"])
+    end
+
     it "flags http(s) and protocol-relative urls as external and leaves them untouched" do
       config = Hwaro::Models::Config.new
       config.menus = {

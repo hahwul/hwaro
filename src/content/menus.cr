@@ -88,6 +88,9 @@ module Hwaro
 
         content.each do |p|
           next if p.menus.empty?
+          # A headless page (`render = false`) is never written, so a menu
+          # entry pointing at its URL would be a dead link.
+          next unless p.render
           next unless (p.language || default_lang) == lang
 
           p.menus.each do |menu_name, reg|
@@ -127,7 +130,10 @@ module Hwaro
           end
 
           url = "/#{url}" unless url.starts_with?("/")
-          unless url.ends_with?("/")
+          # Don't force a trailing slash onto URLs carrying a query or
+          # fragment (`/search?q=x`, `/#contact`) — appending `/` there
+          # corrupts the link and breaks `active_path` matching.
+          unless url.ends_with?("/") || url.includes?('?') || url.includes?('#')
             last_segment = url.split("/").last? || ""
             url = "#{url}/" unless last_segment.includes?(".")
           end
