@@ -34,6 +34,13 @@ module Hwaro
         @[JSON::Field(key: "cascade_hash", emit_null: false)]
         property cascade_hash : String
 
+        # Secondary sibling output files this page emitted beyond
+        # `output_path` (e.g. `index.json`, `index.xml` — see `[outputs]`).
+        # Empty for pages with no extra formats and for every entry written
+        # before this feature existed (legacy cache JSON loads with `[]`).
+        @[JSON::Field(key: "output_paths", emit_null: false)]
+        property output_paths : Array(String)
+
         def initialize(
           @path : String,
           @mtime : Int64,
@@ -42,6 +49,7 @@ module Hwaro
           @template_hash : String = "",
           @config_hash : String = "",
           @cascade_hash : String = "",
+          @output_paths : Array(String) = [] of String,
         )
         end
 
@@ -54,6 +62,7 @@ module Hwaro
           template_hash = ""
           config_hash = ""
           cascade_hash = ""
+          output_paths = [] of String
 
           pull.read_object do |key|
             case key
@@ -64,12 +73,16 @@ module Hwaro
             when "template_hash" then template_hash = pull.read_string
             when "config_hash"   then config_hash = pull.read_string
             when "cascade_hash"  then cascade_hash = pull.read_string
-            else                      pull.skip
+            when "output_paths"
+              output_paths = [] of String
+              pull.read_array { output_paths << pull.read_string }
+            else pull.skip
             end
           end
 
           new(path: path, mtime: mtime, hash: hash, output_path: output_path,
-            template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash)
+            template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash,
+            output_paths: output_paths)
         end
       end
 
@@ -197,7 +210,10 @@ module Hwaro
         # Check if a file has changed since last build.
         # `template_hash` is the page's template closure fingerprint; nil
         # skips the comparison (non-page entries, or dependency tracking off).
-        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil) : Bool
+        # `extra_outputs` are secondary sibling output files (see `[outputs]`)
+        # that must also still exist on disk — a manually deleted `index.json`
+        # forces a rebuild just like a deleted `index.html` does.
+        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, extra_outputs : Array(String) = [] of String) : Bool
           return true unless @enabled
           return true unless File.exists?(file_path)
 
@@ -208,6 +224,8 @@ module Hwaro
           if !output_path.empty? && !File.exists?(output_path)
             return true
           end
+
+          return true if extra_outputs.any? { |p| !File.exists?(p) }
 
           # A parent section's [cascade] changed what this page inherits —
           # the source file is unchanged but the rendered output isn't.
@@ -255,11 +273,22 @@ module Hwaro
           files.select { |f| changed?(f) }
         end
 
+        # Secondary output files (beyond the primary HTML output) recorded for
+        # `file_path` on the last build, or `[]` when the entry has none (or
+        # doesn't exist). Used to detect a manually deleted sibling format
+        # file and to locate stale files when a page's source is removed
+        # (see `Builder#stale_outputs_for_removed`).
+        def output_paths_for(file_path : String) : Array(String)
+          @mutex.synchronize { @entries[file_path]?.try(&.output_paths) || [] of String }
+        end
+
         # Update cache entry for a file.
         # `template_hash` is the page's template closure fingerprint; nil
         # stores the global templates checksum (non-page entries).
+        # `output_paths` are the secondary sibling output files this page
+        # emitted (see `[outputs]`); empty when the feature isn't in use.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil)
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String)
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -272,7 +301,8 @@ module Hwaro
             @mutex.synchronize do
               existing = @entries[file_path]?
               if existing && existing.mtime == mtime && existing.output_path == output_path &&
-                 existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash
+                 existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash &&
+                 existing.output_paths == output_paths
                 return
               end
             end
@@ -288,6 +318,7 @@ module Hwaro
               template_hash: effective_template_hash,
               config_hash: @current_config_hash,
               cascade_hash: cascade_hash,
+              output_paths: output_paths,
             )
 
             @mutex.synchronize do
