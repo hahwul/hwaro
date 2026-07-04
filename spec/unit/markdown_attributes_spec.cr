@@ -94,6 +94,15 @@ describe Hwaro::Content::Processors::MarkdownAttributes do
     it "returns nil for a payload with non-hex characters" do
       Hwaro::Content::Processors::MarkdownAttributes.decode("zz").should be_nil
     end
+
+    it "returns nil for valid hex that decodes to invalid UTF-8 (never raises)" do
+      # An author-typed `<!--HATTR:ff-->` reaches decode in non-safe mode;
+      # 0xff is not valid UTF-8, and parse must get nil rather than a String
+      # that would make Regex#match raise and abort the build.
+      Hwaro::Content::Processors::MarkdownAttributes.decode("ff").should be_nil
+      Hwaro::Content::Processors::MarkdownAttributes.parse(
+        Hwaro::Content::Processors::MarkdownAttributes.decode("ff") || "").should be_nil
+    end
   end
 
   describe ".apply_to_tag_attrs" do
