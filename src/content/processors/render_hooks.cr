@@ -220,6 +220,13 @@ module Hwaro
             !@registry.codeblock.nil?
           end
 
+          # Exposed so cache-key builders (e.g. `render_body_cached`) can
+          # fold hook-template changes into their memo key without holding
+          # a `Registry` reference of their own.
+          def registry_fingerprint : String
+            @registry.fingerprint
+          end
+
           # Config-decided bypass: a `mermaid` fence renders through the
           # existing mermaid pipeline (postprocess_mermaid) instead of the
           # codeblock hook when `[markdown] mermaid = true`.

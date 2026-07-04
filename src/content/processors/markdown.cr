@@ -1047,12 +1047,24 @@ module Hwaro
       @@body_cache_mutex = Mutex.new
       BODY_CACHE_MAX_BYTES = 32_i64 * 1024 * 1024
 
-      def render_body_cached(content : String, safe : Bool = false, emoji : Bool = false, lazy_loading : Bool = false, markdown_config : Models::MarkdownConfig? = nil) : String
+      # @param hooks - render-hook context for feed/search fallback rendering
+      #   (see `RenderHooks.fallback_context`); nil when no registry is
+      #   configured, in which case the memo key and render call are
+      #   unaffected by this parameter.
+      # @param hooks_key - identifies the page for the hook page/config
+      #   vars (`"#{page.url}:#{page.language}"`); only consulted when
+      #   `hooks` is present, since the vars aren't otherwise part of the
+      #   cache key.
+      def render_body_cached(content : String, safe : Bool = false, emoji : Bool = false, lazy_loading : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
+                             hooks : Content::Processors::RenderHooks::HookRenderContext? = nil, hooks_key : String? = nil) : String
         key = String.build do |io|
           io << (safe ? '1' : '0') << (emoji ? '1' : '0') << (lazy_loading ? '1' : '0') << ':'
           io << Content::Processors::SyntaxHighlighter.body_fingerprint << ':'
           io << (markdown_config.try(&.cache_fingerprint) || "-") << ':'
           io << Digest::MD5.hexdigest(content)
+          if hooks
+            io << "|hooks:" << hooks.registry_fingerprint << "|" << hooks_key
+          end
         end
         @@body_cache_mutex.synchronize do
           if cached = @@body_cache[key]?
@@ -1060,7 +1072,7 @@ module Hwaro
           end
         end
 
-        html, _ = render(content, safe: safe, lazy_loading: lazy_loading, emoji: emoji, markdown_config: markdown_config)
+        html, _ = render(content, safe: safe, lazy_loading: lazy_loading, emoji: emoji, markdown_config: markdown_config, hooks: hooks)
 
         @@body_cache_mutex.synchronize do
           unless @@body_cache.has_key?(key) || @@body_cache_bytes + html.bytesize > BODY_CACHE_MAX_BYTES
