@@ -301,7 +301,8 @@ module Hwaro::Core::Build::Phases::Render
     listing_memo = {} of String => Tuple(Bool, Bool)
     pages.select do |page|
       source_path, output_path = cache_paths_for(page, output_dir)
-      next true if cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+      fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
+      next true if cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths)
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
@@ -375,14 +376,28 @@ module Hwaro::Core::Build::Phases::Render
 
     entry_template = determine_template(page, templates, site)
     hash = deps.closure_hash(entry_template, deps.shortcodes_used_in(page.raw_content))
+
+    # Fold each enabled output format's own template closure into the hash so
+    # editing e.g. templates/page.json.jinja invalidates the pages that
+    # render it, even though their entry (HTML) template is untouched. Pages
+    # with no formats take this branch's empty-array fast path and keep the
+    # exact hash a build without the feature would compute.
+    formats = effective_output_formats(page, site.config)
+    unless formats.empty?
+      formats.each do |fmt|
+        fmt_template = determine_format_template(page, fmt, templates, site)
+        hash = "#{hash}+#{deps.closure_hash(fmt_template)}"
+      end
+    end
+
     @page_template_hash_mutex.synchronize { @page_template_hash_memo[page.path] = hash }
     hash
   end
 
-  private def get_output_path(page : Models::Page, output_dir : String) : String
+  private def get_output_path(page : Models::Page, output_dir : String, filename : String = "index.html") : String
     url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
-    output_path = File.join(output_dir, url_path, "index.html")
-    Utils::OutputGuard.safe_output_path(output_path, output_dir) || File.join(output_dir, "index.html")
+    output_path = File.join(output_dir, url_path, filename)
+    Utils::OutputGuard.safe_output_path(output_path, output_dir) || File.join(output_dir, filename)
   end
 
   # Source + output path pair the cache keys a page by.
@@ -400,7 +415,8 @@ module Hwaro::Core::Build::Phases::Render
   private def record_page_cache_entry(page : Models::Page, cache : Cache, templates : Hash(String, String), site : Models::Site, output_dir : String)
     return unless cache.enabled?
     source_path, output_path = cache_paths_for(page, output_dir)
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site))
+    fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths)
   end
 
   private def process_files_parallel(
@@ -735,6 +751,9 @@ module Hwaro::Core::Build::Phases::Render
 
       write_output(page, output_dir, final_html, verbose)
     end
+
+    render_output_formats(page, site, templates, output_dir, html_content, toc_html, toc_headers, verbose, global_vars,
+      crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
 
     generate_aliases(page, site, output_dir, verbose)
   end

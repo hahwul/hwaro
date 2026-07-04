@@ -30,6 +30,7 @@ require "./phases/read_content"
 require "./phases/parse_content"
 require "./phases/transform"
 require "./phases/render"
+require "./phases/output_formats"
 require "./phases/generate"
 require "./phases/write"
 require "./phases/finalize"
@@ -79,6 +80,7 @@ module Hwaro
         include Phases::ParseContent
         include Phases::Transform
         include Phases::Render
+        include Phases::OutputFormats
         include Phases::Generate
         include Phases::Write
         include Phases::Finalize
