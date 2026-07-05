@@ -10,16 +10,15 @@ class Hwaro < Formula
   license "MIT"
 
   on_macos do
-    # macOS binaries are dynamically linked; openssl@3 is the only non-system
-    # dependency (enforced by an otool guard in release-binary.yml).
-    depends_on "openssl@3"
-
+    # macOS release archives are self-contained: scripts/package-macos.sh bundles
+    # every Homebrew-linked dylib (OpenSSL and its deps) next to the binary and
+    # rewrites load paths to @executable_path/lib, so no brew dependency is needed.
     on_arm do
-      url "https://github.com/hahwul/hwaro/releases/download/v__VERSION__/hwaro-v__VERSION__-osx-arm64"
+      url "https://github.com/hahwul/hwaro/releases/download/v__VERSION__/hwaro-v__VERSION__-osx-arm64.tar.gz"
       sha256 "__SHA_OSX_ARM64__"
     end
     on_intel do
-      url "https://github.com/hahwul/hwaro/releases/download/v__VERSION__/hwaro-v__VERSION__-osx-x86_64"
+      url "https://github.com/hahwul/hwaro/releases/download/v__VERSION__/hwaro-v__VERSION__-osx-x86_64.tar.gz"
       sha256 "__SHA_OSX_X86_64__"
     end
   end
@@ -37,7 +36,16 @@ class Hwaro < Formula
   end
 
   def install
-    bin.install Dir["hwaro-v__VERSION__-*"].first => "hwaro"
+    if OS.mac?
+      # The macOS tarball extracts to `hwaro` + `lib/*.dylib`. Keep them together
+      # in libexec (the binary resolves dylibs via @executable_path/lib) and expose
+      # the CLI through a symlink; execve canonicalizes the symlink so
+      # @executable_path still points at libexec.
+      libexec.install "hwaro", "lib"
+      bin.install_symlink libexec/"hwaro"
+    else
+      bin.install Dir["hwaro-v#{version}-linux-*"].first => "hwaro"
+    end
   end
 
   test do

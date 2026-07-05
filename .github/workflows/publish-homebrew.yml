@@ -1,66 +1,63 @@
 ---
 name: Homebrew tap Publish
+# Manual-only: publish the prebuilt formula to the Homebrew tap on demand.
+# The release binaries must already exist on the GitHub release for the given
+# version. Trigger this after "Build and Release Binaries" has finished.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. 0.15.2)"
+        description: "Version to publish (e.g. 0.17.0)"
         required: true
         type: string
-  workflow_run:
-    workflows: ["Build and Release Binaries"]
-    types: [completed]
 permissions:
   contents: read
 jobs:
   publish-formula:
     name: Publish prebuilt formula to tap
-    # Only run after a release-triggered binary build succeeds (mirrors release-deb.yml),
-    # or on manual dispatch. The prebuilt formula needs the release binaries to exist first.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'release')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source (formula template)
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.event.workflow_run.head_branch }}
-
       - name: Resolve version
         id: ver
         # Pass event data via env (never interpolate ${{ }} straight into the
-        # script body) so a crafted tag/branch name can't inject shell.
+        # script body) so a crafted input can't inject shell.
         env:
-          EVENT_NAME: ${{ github.event_name }}
           DISPATCH_VERSION: ${{ github.event.inputs.version }}
-          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            RAW="$DISPATCH_VERSION"
-          else
-            RAW="$RUN_BRANCH"
+          # Strip a leading 'v' if present.
+          VERSION="${DISPATCH_VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            echo "::error::version input is empty"; exit 1
           fi
-          # Strip leading 'v' if present
-          VERSION="${RAW#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION"
+
+      - name: Checkout source (formula template)
+        # Use the template from the branch this workflow runs on (not the release
+        # tag): the template is build tooling and must reflect the current release
+        # asset layout, while the `version` input drives which binaries to fetch.
+        uses: actions/checkout@v6
 
       - name: Download release binaries and compute checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           V: ${{ steps.ver.outputs.version }}
         run: |
-          # All release binaries are prebuilt: Linux is static musl; macOS is
-          # dynamically linked against openssl@3 (declared in the formula).
-          for asset in osx-arm64 osx-x86_64 linux-arm64 linux-x86_64; do
+          # macOS assets are self-contained .tar.gz bundles (binary + bundled
+          # dylibs, see scripts/package-macos.sh); Linux assets are bare static
+          # musl binaries. Homebrew downloads and checksums exactly these files,
+          # so compute sha256 over the same artifact it will fetch.
+          for asset in \
+            "hwaro-v$V-osx-arm64.tar.gz" \
+            "hwaro-v$V-osx-x86_64.tar.gz" \
+            "hwaro-v$V-linux-arm64" \
+            "hwaro-v$V-linux-x86_64"; do
             gh release download "v$V" --repo hahwul/hwaro \
-              --pattern "hwaro-v$V-$asset" --output "hwaro-v$V-$asset"
+              --pattern "$asset" --output "$asset"
           done
           {
-            echo "SHA_OSX_ARM64=$(sha256sum "hwaro-v$V-osx-arm64" | awk '{print $1}')"
-            echo "SHA_OSX_X86_64=$(sha256sum "hwaro-v$V-osx-x86_64" | awk '{print $1}')"
+            echo "SHA_OSX_ARM64=$(sha256sum "hwaro-v$V-osx-arm64.tar.gz" | awk '{print $1}')"
+            echo "SHA_OSX_X86_64=$(sha256sum "hwaro-v$V-osx-x86_64.tar.gz" | awk '{print $1}')"
             echo "SHA_LINUX_ARM64=$(sha256sum "hwaro-v$V-linux-arm64" | awk '{print $1}')"
             echo "SHA_LINUX_X86_64=$(sha256sum "hwaro-v$V-linux-x86_64" | awk '{print $1}')"
           } >> "$GITHUB_ENV"
