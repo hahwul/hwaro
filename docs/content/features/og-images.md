@@ -1,7 +1,7 @@
 +++
 title = "Auto OG Images"
 description = "Auto-generate Open Graph preview images from page titles"
-weight = 20
+weight = 3
 toc = true
 +++
 

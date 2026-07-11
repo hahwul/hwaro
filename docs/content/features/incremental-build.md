@@ -1,7 +1,7 @@
 +++
 title = "Incremental Build"
 description = "Only rebuild changed files for faster builds on large sites"
-weight = 10
+weight = 13
 toc = true
 +++
 

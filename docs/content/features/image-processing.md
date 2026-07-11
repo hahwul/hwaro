@@ -1,7 +1,7 @@
 +++
 title = "Image Processing"
 description = "Automatic image resizing, LQIP placeholders, and dominant color extraction during build"
-weight = 21
+weight = 23
 toc = true
 +++
 

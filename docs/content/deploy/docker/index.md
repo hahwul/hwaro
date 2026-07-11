@@ -1,7 +1,7 @@
 +++
 title = "Docker"
 description = "Deploy your Hwaro site using Docker"
-weight = 4
+weight = 8
 +++
 
 Deploy your Hwaro site using Docker.

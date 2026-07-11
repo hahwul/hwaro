@@ -1,3 +1,8 @@
+# Sidebar structure for the docs.
+#
+# KEEP IN SYNC WITH FRONT-MATTER WEIGHTS: prev/next navigation and section
+# card grids follow page `weight` (sections sort_by = "weight"), so when you
+# reorder or add links here, mirror the order in the pages' front matter.
 - title: Start
   section: start
   items:

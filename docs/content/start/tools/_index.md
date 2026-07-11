@@ -3,6 +3,7 @@ title = "Tools & Completion"
 description = "Utility tools for content management and shell completion"
 weight = 5
 toc = true
+sort_by = "weight"
 +++
 
 Hwaro includes utility tools for content management and shell completion scripts for a better CLI experience.

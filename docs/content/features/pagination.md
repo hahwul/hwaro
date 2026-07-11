@@ -1,7 +1,7 @@
 +++
 title = "Pagination"
 description = "Split large content lists into multiple pages"
-weight = 4
+weight = 6
 +++
 
 Split large content lists into multiple pages.

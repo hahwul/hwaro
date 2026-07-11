@@ -1,6 +1,8 @@
 +++
 title = "Templates"
 description = "Design your site with Jinja2 templates"
+weight = 3
+sort_by = "weight"
 +++
 
 Templates define how content becomes HTML. Hwaro uses Crinja, a Jinja2-compatible engine.

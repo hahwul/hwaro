@@ -3,12 +3,11 @@
 <div class="docs-container">
   {% include "sidebar.html" %}
   <main class="docs-main{% if not page.toc %} no-toc{% endif %}">
+    {% include "breadcrumbs.html" %}
     <h1>{{ page.title }}</h1>
     {{ content }}
-    <footer class="docs-footer">
-      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
-      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
-    </footer>
+    {% include "prevnext.html" %}
+    {% include "site-footer.html" %}
   </main>
   {% if page.toc %}
   <aside class="docs-toc">

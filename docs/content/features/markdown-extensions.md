@@ -1,7 +1,7 @@
 +++
 title = "Markdown Extensions"
 description = "Optional markdown extensions beyond standard CommonMark"
-weight = 7
+weight = 8
 toc = true
 +++
 

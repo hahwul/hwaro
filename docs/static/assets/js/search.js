@@ -28,37 +28,49 @@
   };
 
   var fuse = null;
+  var searchLoading = false;
   var selectedIndex = 0;
   var isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform || navigator.userAgent);
 
-  // Load Fuse.js from CDN if not already loaded
-  if (typeof Fuse === "undefined") {
-    var script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js";
-    script.onload = initSearch;
-    document.head.appendChild(script);
-  } else {
-    initSearch();
-  }
+  // Vendored Fuse.js and the index are loaded lazily, on the first time the
+  // palette opens, so regular page views cost zero search bytes.
+  function ensureSearch() {
+    if (fuse || searchLoading) return;
+    searchLoading = true;
 
-  function initSearch() {
-    fetch("/search.json")
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (data) {
-        fuse = new Fuse(data, {
-          keys: ["title", "content", "description"],
-          threshold: 0.3,
-          ignoreLocation: true,
-          includeMatches: true,
-          includeScore: true,
-          minMatchCharLength: 2,
+    function initIndex() {
+      fetch("/search.json")
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          fuse = new Fuse(data, {
+            keys: ["title", "content", "description"],
+            threshold: 0.3,
+            ignoreLocation: true,
+            includeMatches: true,
+            includeScore: true,
+            minMatchCharLength: 2,
+          });
+          if (searchInput.value.trim()) performSearch();
+        })
+        .catch(function (error) {
+          searchLoading = false;
+          console.error("Error loading search data:", error);
         });
-      })
-      .catch(function (error) {
-        console.error("Error loading search data:", error);
-      });
+    }
+
+    if (typeof Fuse === "undefined") {
+      var script = document.createElement("script");
+      script.src = "/vendor/fuse.basic.min.js";
+      script.onload = initIndex;
+      script.onerror = function () {
+        searchLoading = false;
+      };
+      document.head.appendChild(script);
+    } else {
+      initIndex();
+    }
   }
 
   // Build modal
@@ -160,6 +172,7 @@
   }
 
   function showSearch() {
+    ensureSearch();
     searchModal.style.display = "block";
     document.documentElement.style.overflow = "hidden";
     searchInput.value = "";

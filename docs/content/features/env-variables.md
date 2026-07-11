@@ -1,7 +1,7 @@
 +++
 title = "Environment Variables"
 description = "Reference environment variables in configuration files and templates"
-weight = 15
+weight = 18
 toc = true
 +++
 

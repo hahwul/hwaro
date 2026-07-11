@@ -1,7 +1,7 @@
 +++
 title = "Syntax Highlighting"
 description = "Automatic syntax highlighting for code blocks"
-weight = 3
+weight = 7
 +++
 
 Code blocks in Markdown are automatically syntax highlighted.

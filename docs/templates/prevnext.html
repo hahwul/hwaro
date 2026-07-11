@@ -1,0 +1,18 @@
+{% if page.higher or (page.lower and page.lower.url != "/") %}
+<nav class="docs-prevnext" aria-label="Pages">
+  {% if page.lower and page.lower.url != "/" %}
+  <a class="pn-card pn-prev" href="{{ base_url }}{{ page.lower.url }}" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">{{ page.lower.title }}</span>
+    {% if page.lower.description %}<span class="pn-desc">{{ page.lower.description }}</span>{% endif %}
+  </a>
+  {% endif %}
+  {% if page.higher %}
+  <a class="pn-card pn-next" href="{{ base_url }}{{ page.higher.url }}" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">{{ page.higher.title }}</span>
+    {% if page.higher.description %}<span class="pn-desc">{{ page.higher.description }}</span>{% endif %}
+  </a>
+  {% endif %}
+</nav>
+{% endif %}

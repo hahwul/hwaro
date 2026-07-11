@@ -1,7 +1,7 @@
 +++
 title = "PWA"
 description = "Progressive Web App support with manifest.json and service worker"
-weight = 17
+weight = 24
 toc = true
 +++
 

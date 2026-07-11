@@ -1,7 +1,7 @@
 +++
 title = "Asset Pipeline"
 description = "Built-in CSS/JS bundling, minification, and fingerprinting"
-weight = 11
+weight = 16
 toc = true
 +++
 

@@ -1,7 +1,7 @@
 +++
 title = "Search"
 description = "Generate a client-side search index with Fuse.js"
-weight = 2
+weight = 5
 +++
 
 Hwaro generates a search index that works with Fuse.js for client-side search.

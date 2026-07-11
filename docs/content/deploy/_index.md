@@ -1,6 +1,8 @@
 +++
 title = "Deploy"
 description = "Build and deploy your site to production"
+weight = 5
+sort_by = "weight"
 +++
 
 Deploy your Hwaro site to any static hosting provider.

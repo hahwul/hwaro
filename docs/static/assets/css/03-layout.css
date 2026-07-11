@@ -1,5 +1,11 @@
 /* =============================================================================
-   Header — matches landing nav style
+   Hwaro Docs — Layout
+   Header, sidebar, TOC, main column. Responsive rules live next to their
+   base rules (media queries add no specificity; keep them in one file).
+   ============================================================================= */
+
+/* =============================================================================
+   Header
    ============================================================================= */
 
 .docs-header {
@@ -8,105 +14,90 @@
     left: 0;
     right: 0;
     height: var(--header-h);
-    background: rgba(8, 8, 10, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border);
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
-    padding: 0 1.5rem;
+    padding: 0 var(--space-5);
     z-index: 100;
 }
 
 .docs-header .logo {
-    text-decoration: none;
-    margin-right: 2.5rem;
+    margin-right: var(--space-6);
     display: flex;
     align-items: center;
-    border-bottom: none;
-}
-
-.docs-header .logo:hover {
-    opacity: 0.8;
-    border-bottom: none;
 }
 
 .docs-header .logo img {
-    border-radius: 0;
-    border: none;
+    height: 30px;
+    width: auto;
+    transition: opacity var(--transition);
+}
+
+.docs-header .logo:hover img {
+    opacity: 0.8;
 }
 
 .docs-header nav {
     display: flex;
-    gap: 0.125rem;
+    gap: 2px;
 }
 
 .docs-header nav a {
-    position: relative;
-    font-family: var(--font-sans);
-    color: #888;
-    text-decoration: none;
     font-size: 0.85rem;
-    font-weight: 400;
-    padding: 0.4rem 0.85rem;
-    border-radius: 6px;
-    border: none;
-    border-bottom: none;
-    transition: color 0.2s ease;
+    font-weight: 450;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.8rem;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
 }
 
 .docs-header nav a:hover {
-    color: #fff;
-    border-bottom: none;
+    color: var(--heading);
+    background: var(--bg-subtle);
 }
 
 .docs-header nav a.active {
-    color: #fff;
+    color: var(--primary);
+    font-weight: 500;
 }
 
 .header-right {
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
 }
 
 .header-link {
-    font-family: var(--font-sans);
-    color: #888;
-    text-decoration: none;
     font-size: 0.85rem;
-    font-weight: 400;
-    padding: 0.4rem 0.85rem;
-    border-radius: 6px;
-    border: none;
-    border-bottom: none;
-    transition: color 0.2s ease;
+    font-weight: 450;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.8rem;
+    border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    transition: color var(--transition), background var(--transition);
 }
 
 .header-link:hover {
-    color: #fff;
-    border-bottom: none;
+    color: var(--heading);
+    background: var(--bg-subtle);
 }
 
 .github-link {
-    color: #888;
-    text-decoration: none;
-    padding: 0.4rem 0.85rem;
-    border-radius: 6px;
-    border: none;
-    border-bottom: none;
-    transition: color 0.2s ease;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
+    transition: color var(--transition);
 }
 
 .github-link:hover {
-    color: #fff;
-    border-bottom: none;
+    color: var(--heading);
 }
 
 .github-link svg {
@@ -115,27 +106,25 @@
     fill: currentColor;
 }
 
-/* Mobile hamburger — hidden on desktop, shown ≤768px (see responsive) */
+/* Mobile hamburger — hidden on desktop. */
 .mobile-menu-btn {
     display: none;
     align-items: center;
     justify-content: center;
     width: 34px;
     height: 34px;
-    margin-right: 0.6rem;
+    margin-right: var(--space-2);
     background: transparent;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     color: var(--text-muted);
     cursor: pointer;
-    transition:
-        color 0.15s ease,
-        background 0.15s ease;
+    transition: color var(--transition), background var(--transition);
 }
 
 .mobile-menu-btn:hover {
-    color: var(--text);
-    background: var(--surface-2);
+    color: var(--heading);
+    background: var(--bg-subtle);
 }
 
 /* ⌘K search trigger */
@@ -144,35 +133,28 @@
     align-items: center;
     gap: 0.5rem;
     height: 32px;
-    padding: 0 0.45rem 0 0.65rem;
+    padding: 0 0.45rem 0 0.7rem;
     font-family: var(--font-sans);
     font-size: 0.8rem;
-    font-weight: 400;
-    color: #888;
-    background: var(--surface-1);
-    border: 1px solid var(--hair);
-    border-radius: var(--radius-md);
+    font-weight: 450;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition:
-        color 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease,
+        color var(--transition),
+        border-color var(--transition),
         transform 0.12s ease;
 }
 
 .search-trigger:hover {
-    color: #fff;
-    border-color: var(--border-light);
-    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--text-muted);
 }
 
 .search-trigger:active {
     transform: scale(0.97);
-}
-
-.search-trigger:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
 }
 
 .search-trigger-icon {
@@ -192,22 +174,49 @@
     font-weight: 500;
     letter-spacing: 0.02em;
     line-height: 1.2;
-    color: var(--text-dim);
-    background: var(--surface-2);
-    border: 1px solid var(--hair-strong);
-    border-radius: var(--radius-sm);
-    transition: color 0.2s ease;
-}
-
-.search-trigger:hover .search-trigger-kbd {
     color: var(--text-muted);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 4px;
 }
 
 .header-divider {
     width: 1px;
     height: 16px;
-    margin: 0 0.45rem;
-    background: var(--hair-strong);
+    margin: 0 var(--space-2);
+    background: var(--border);
+}
+
+/* Theme switcher — pins light or dark (docs default to dark). */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+}
+
+.theme-toggle:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.theme-toggle svg {
+    display: none;
+    width: 15px;
+    height: 15px;
+}
+
+.theme-toggle[data-mode="light"] .tt-light,
+.theme-toggle[data-mode="dark"] .tt-dark {
+    display: block;
 }
 
 /* =============================================================================
@@ -217,11 +226,11 @@
 .docs-container {
     display: flex;
     padding-top: var(--header-h);
-    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 /* =============================================================================
-   Sidebar - fixed left navigation
+   Sidebar — fixed left navigation
    ============================================================================= */
 
 .docs-sidebar {
@@ -229,19 +238,14 @@
     top: var(--header-h);
     left: 0;
     width: var(--sidebar-w);
-    height: calc(100vh - var(--header-h));
-    /* Distinct nav surface — a faint white-overlay step over the canvas so the
-       panel reads as its own depth layer, brighter near the header. */
+    height: calc(100dvh - var(--header-h));
     background: var(--bg);
-    border-right: 1px solid var(--hair-strong);
-    box-shadow:
-        inset -1px 0 0 rgba(255, 255, 255, 0.02),
-        4px 0 24px -14px rgba(0, 0, 0, 0.9);
-    padding: 1.25rem 0.75rem;
+    border-right: 1px solid var(--border-subtle);
+    padding: var(--space-5) var(--space-3);
     overflow-y: auto;
     scrollbar-width: thin;
-    /* Hidden until you interact with the panel; color matches the global scrollbar. */
     scrollbar-color: transparent transparent;
+    z-index: 90;
 }
 
 .docs-sidebar:hover {
@@ -252,30 +256,18 @@
     width: 3px;
 }
 
-.docs-sidebar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
 .docs-sidebar::-webkit-scrollbar-thumb {
     background: transparent;
-    border-radius: var(--radius-pill);
-    transition: background 0.2s ease;
 }
 
 .docs-sidebar:hover::-webkit-scrollbar-thumb {
     background: var(--border);
 }
 
-.docs-sidebar:hover::-webkit-scrollbar-thumb:hover {
-    background: var(--border-light);
-}
-
-/* Collapsible sections — native <details>, server-rendered open state.
-   The ember dot is the state cue: lit (glowing) on the open section,
-   unlit coal on collapsed ones. */
+/* Collapsible sections — native <details>. The ember dot is the state cue:
+   lit on the open section, unlit coal on collapsed ones. */
 .sidebar-section {
-    margin-bottom: 0.25rem;
-    /* Lets ::details-content animate block-size to `auto` (inherited) */
+    margin-bottom: var(--space-1);
     interpolate-size: allow-keywords;
 }
 
@@ -284,20 +276,18 @@
     align-items: center;
     gap: 0.5rem;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 600;
     text-transform: uppercase;
-    color: var(--text-dim);
     letter-spacing: 0.12em;
+    color: var(--text-muted);
     padding: 0.5rem 0.5rem 0.5rem 0.75rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
     list-style: none;
-    transition:
-        color 0.15s var(--ease-out),
-        background 0.15s var(--ease-out);
+    transition: color var(--transition), background var(--transition);
 }
 
 .sidebar-title::-webkit-details-marker,
@@ -306,14 +296,8 @@
 }
 
 .sidebar-title:hover {
-    color: var(--text-muted);
-    background: var(--surface-1);
-}
-
-.sidebar-title:focus-visible,
-.sidebar-group-title:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: -2px;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
 }
 
 .sidebar-title::before {
@@ -321,48 +305,46 @@
     width: 5px;
     height: 5px;
     border-radius: 1px;
-    background: var(--border-light);
+    background: var(--border);
     flex-shrink: 0;
-    transition:
-        background 0.25s ease,
-        box-shadow 0.25s ease;
+    transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
 .sidebar-title:hover::before {
-    background: var(--primary-dark);
+    background: var(--text-muted);
 }
 
 .sidebar-section[open] > .sidebar-title {
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .sidebar-section[open] > .sidebar-title::before {
     background: var(--primary);
-    box-shadow: 0 0 8px var(--ember);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--primary) 55%, transparent);
 }
 
 .sidebar-chevron {
     width: 12px;
     height: 12px;
     margin-left: auto;
-    color: var(--text-dim);
+    color: var(--text-muted);
     opacity: 0.7;
     flex-shrink: 0;
-    transition: transform 0.2s var(--ease-out);
+    transition: transform 0.2s ease;
 }
 
 details[open] > summary .sidebar-chevron {
     transform: rotate(90deg);
 }
 
-/* Fold animation — progressive: Chromium/Safari animate via ::details-content,
+/* Fold animation — progressive: engines with ::details-content animate,
    others toggle instantly. */
 .sidebar-section::details-content,
 .sidebar-subgroup::details-content {
     block-size: 0;
     overflow: hidden;
     transition:
-        block-size 0.25s var(--ease-out),
+        block-size 0.25s ease,
         content-visibility 0.25s allow-discrete;
 }
 
@@ -373,10 +355,7 @@ details[open] > summary .sidebar-chevron {
 
 @media (prefers-reduced-motion: reduce) {
     .sidebar-section::details-content,
-    .sidebar-subgroup::details-content {
-        transition: none;
-    }
-
+    .sidebar-subgroup::details-content,
     .sidebar-chevron {
         transition: none;
     }
@@ -393,64 +372,50 @@ details[open] > summary .sidebar-chevron {
 }
 
 .sidebar-links a {
-    position: relative;
-    font-family: var(--font-sans);
     display: block;
-    padding: 0.4rem 0.75rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: 0.835rem;
+    padding: 0.38rem 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
     font-weight: 400;
-    transition:
-        color 0.15s var(--ease-out),
-        background 0.15s var(--ease-out);
-    border-radius: 6px;
-    border-bottom: none;
-    margin-left: 0;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
 }
 
 .sidebar-links a:hover {
-    background: var(--surface-2);
-    color: var(--text);
-    border-bottom: none;
+    background: var(--bg-subtle);
+    color: var(--heading);
 }
 
 .sidebar-links a.active {
-    background: linear-gradient(90deg, var(--ember-soft), transparent 88%);
-    color: var(--primary-light);
+    background: var(--primary-tint);
+    color: var(--primary);
     font-weight: 500;
-    border-bottom: none;
 }
 
-/* Nested groups (e.g., Features sub-categories) — collapsible, closed unless
-   they contain the active page */
+/* Nested groups (Features sub-categories) */
 .sidebar-group {
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
 }
 
 .sidebar-group-title {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-family: var(--font-sans);
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    color: var(--text-muted);
-    padding: 0.4rem 0.5rem 0.4rem 0.75rem;
-    letter-spacing: 0.01em;
-    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    padding: 0.38rem 0.5rem 0.38rem 0.75rem;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
     list-style: none;
-    transition:
-        color 0.15s var(--ease-out),
-        background 0.15s var(--ease-out);
+    transition: color var(--transition), background var(--transition);
 }
 
 .sidebar-group-title:hover {
-    color: var(--text);
-    background: var(--surface-2);
+    color: var(--heading);
+    background: var(--bg-subtle);
 }
 
 .sidebar-group-title .sidebar-chevron {
@@ -458,16 +423,11 @@ details[open] > summary .sidebar-chevron {
     height: 11px;
 }
 
-.sidebar-subgroup[open] > .sidebar-group-title {
-    color: var(--text-secondary);
-}
-
 .sidebar-sublinks {
     list-style: none;
     padding: 0;
-    /* Depth guide — a faint rail that visualises the nesting level */
     margin: 0.1rem 0 0.1rem 1rem;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--border-subtle);
 }
 
 .sidebar-sublinks li {
@@ -476,48 +436,40 @@ details[open] > summary .sidebar-chevron {
 
 .sidebar-sublinks a {
     position: relative;
-    font-family: var(--font-sans);
     display: block;
-    padding: 0.3rem 0.75rem 0.3rem 0.6rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: 0.8rem;
-    font-weight: 400;
-    transition:
-        color 0.15s var(--ease-out),
-        background 0.15s var(--ease-out);
-    border-radius: 6px;
-    border-bottom: none;
+    padding: 0.32rem 0.75rem 0.32rem 0.65rem;
+    color: var(--text-secondary);
+    font-size: 0.81rem;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    transition: color var(--transition), background var(--transition);
 }
 
 .sidebar-sublinks a:hover {
-    background: var(--surface-2);
-    color: var(--text);
-    border-bottom: none;
+    background: var(--bg-subtle);
+    color: var(--heading);
 }
 
 .sidebar-sublinks a.active {
-    background: linear-gradient(90deg, var(--ember-soft), transparent 88%);
-    color: var(--primary-light);
+    background: var(--primary-tint);
+    color: var(--primary);
     font-weight: 500;
-    border-bottom: none;
 }
 
+/* Ember rail on the active nested link. */
 .sidebar-sublinks a.active::before {
     content: "";
     position: absolute;
     left: -1px;
     top: 50%;
     transform: translateY(-50%);
-    width: 3px;
-    height: 56%;
-    border-radius: var(--radius-pill);
-    background: var(--rail-gradient);
-    box-shadow: 0 0 10px var(--ember);
+    width: 2px;
+    height: 60%;
+    border-radius: 999px;
+    background: var(--spark);
 }
 
 /* =============================================================================
-   TOC Sidebar - fixed right
+   TOC — fixed right
    ============================================================================= */
 
 .docs-toc {
@@ -525,154 +477,216 @@ details[open] > summary .sidebar-chevron {
     top: var(--header-h);
     right: 0;
     width: var(--toc-w);
-    height: calc(100vh - var(--header-h));
-    padding: 1.5rem 1rem 4rem 1rem;
+    height: calc(100dvh - var(--header-h));
+    padding: var(--space-6) var(--space-4) var(--space-7);
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
+    scrollbar-color: transparent transparent;
+}
+
+.docs-toc:hover {
+    scrollbar-color: var(--border) transparent;
 }
 
 .docs-toc::-webkit-scrollbar {
-    width: 5px;
-}
-
-.docs-toc::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.docs-toc::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: var(--radius-pill);
-}
-
-.docs-toc::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
+    width: 3px;
 }
 
 .toc-title {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 600;
     text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 0.75rem;
     letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
 }
 
-.docs-toc > ul,
-.toc-list {
+.docs-toc ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    border-left: 1px solid var(--border);
 }
 
-.docs-toc ul ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    border-left: none;
+.docs-toc > ul {
+    border-left: 1px solid var(--border-subtle);
 }
 
-.docs-toc li,
-.toc-list li {
-    margin-bottom: 0;
-}
-
-.docs-toc a,
-.toc-list a {
+.docs-toc a {
     position: relative;
-    font-family: var(--font-sans);
     display: block;
     padding: 0.3rem 0.75rem;
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-size: 0.79rem;
     line-height: 1.5;
-    transition: all 0.12s ease;
     border-left: 1px solid transparent;
     margin-left: -1px;
-    border-bottom: none;
+    transition: color var(--transition), border-color var(--transition);
 }
 
-.docs-toc a:hover,
-.toc-list a:hover {
-    color: var(--text-muted);
-    border-left-color: var(--border-light);
-    border-bottom: none;
-}
-
-.docs-toc a.active,
-.toc-list a.active {
+.docs-toc a:hover {
     color: var(--text);
-    border-bottom: none;
+    border-left-color: var(--border);
 }
 
-/* Active marker: a tapering ember streak that runs longer than the link and
-   thins out toward both ends, so it reads as flowing along the guide line.
-   drop-shadow follows the gradient's alpha, so the glow fades with the bar. */
-.docs-toc a.active::before,
-.toc-list a.active::before {
+.docs-toc a.active {
+    color: var(--primary);
+}
+
+/* Active marker — a tapering ember streak along the guide line. */
+.docs-toc a.active::before {
     content: "";
     position: absolute;
     left: -1px;
     top: 50%;
     transform: translateY(-50%);
     width: 2px;
-    height: 260%;
+    height: 180%;
     pointer-events: none;
-    border-radius: var(--radius-pill);
+    border-radius: 999px;
     background: linear-gradient(
         180deg,
         transparent 0%,
-        var(--ember) 22%,
+        var(--rule-from) 30%,
         var(--primary) 50%,
-        var(--ember) 78%,
+        var(--rule-to) 70%,
         transparent 100%
     );
-    filter: drop-shadow(0 0 3px var(--ember));
 }
 
-/* Nested TOC levels - indentation */
 .docs-toc ul ul a {
-    padding-left: 1.25rem;
-    font-size: 0.74rem;
+    padding-left: 1.35rem;
+    font-size: 0.75rem;
 }
 
 .docs-toc ul ul ul a {
-    padding-left: 1.75rem;
-    font-size: 0.74rem;
-}
-
-.toc-list .toc-h3 {
-    padding-left: 1.25rem;
-    font-size: 0.74rem;
-}
-
-.toc-list .toc-h4 {
-    padding-left: 1.75rem;
-    font-size: 0.74rem;
+    padding-left: 1.9rem;
+    font-size: 0.75rem;
 }
 
 /* =============================================================================
-   Main content area
+   Main content column
    ============================================================================= */
 
 .docs-main {
     flex: 1;
     margin-left: var(--sidebar-w);
     margin-right: var(--toc-w);
-    padding: 2.5rem 3.5rem;
+    padding: var(--space-6) var(--space-7) var(--space-7);
     max-width: calc(100% - var(--sidebar-w) - var(--toc-w));
     min-width: 0;
 }
 
-.docs-main > *:not(.docs-footer) {
-    max-width: 800px;
+.docs-main > * {
+    max-width: 44rem;
 }
 
-/* When TOC is hidden, expand main content */
 .docs-main.no-toc {
     margin-right: 0;
     max-width: calc(100% - var(--sidebar-w));
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+
+/* Hide TOC on medium screens. */
+@media (max-width: 1280px) {
+    .docs-toc {
+        display: none;
+    }
+
+    .docs-main {
+        margin-right: 0;
+        max-width: calc(100% - var(--sidebar-w));
+    }
+}
+
+/* Tighten the header before it can wrap: the sidebar still lists every
+   section, so the top section nav can go first. */
+@media (max-width: 1080px) {
+    .docs-header nav,
+    .header-link,
+    .header-divider {
+        display: none;
+    }
+
+    .search-trigger-label {
+        display: none;
+    }
+
+    .docs-main {
+        padding: var(--space-6) var(--space-6) var(--space-7);
+    }
+}
+
+/* Mobile: sidebar becomes a drawer. */
+@media (max-width: 768px) {
+    .docs-sidebar {
+        left: -110%;
+        width: min(300px, 84vw);
+        z-index: 200;
+        transition: left 0.25s ease;
+        background: var(--bg);
+        box-shadow: none;
+    }
+
+    .docs-sidebar.is-open {
+        left: 0;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 150;
+        background: var(--scrim);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+
+    .sidebar-overlay.is-visible {
+        display: block;
+    }
+
+    .docs-main,
+    .docs-main.no-toc {
+        margin-left: 0;
+        margin-right: 0;
+        padding: var(--space-5) var(--space-4) var(--space-6);
+        max-width: 100%;
+    }
+
+    .docs-header {
+        padding: 0 var(--space-4);
+    }
+
+    .docs-header .mobile-menu-btn {
+        display: flex;
+    }
+
+    .docs-header .logo {
+        margin-right: auto;
+    }
+
+    /* Search trigger collapses to an icon-only button. */
+    .search-trigger {
+        width: 34px;
+        height: 34px;
+        gap: 0;
+        padding: 0;
+        justify-content: center;
+        background: transparent;
+        border: none;
+    }
+
+    .search-trigger-kbd {
+        display: none;
+    }
+
+    .search-trigger-icon {
+        width: 16px;
+        height: 16px;
+    }
 }

@@ -1,7 +1,7 @@
 +++
 title = "Vercel"
 description = "Deploy your Hwaro site to Vercel"
-weight = 6
+weight = 5
 +++
 
 Deploy your Hwaro site to Vercel with zero-config deployments.
