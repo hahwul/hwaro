@@ -406,6 +406,10 @@ module Hwaro
           # Now identify pages that should be excluded (draft/expired/future)
           excluded_pages = [] of Models::Page
           now = Time.utc
+          # Re-stamp the publication window on re-parsed pages so pages kept
+          # via --include-future/--include-expired stay out of public
+          # artifacts and listings (same contract as the full parse phase).
+          changed_pages.each(&.refresh_unpublished!(now))
           unless include_drafts
             excluded = changed_pages.select(&.draft)
             excluded_pages.concat(excluded)

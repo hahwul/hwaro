@@ -24,7 +24,7 @@ module Hwaro
 
           # 1. Generate Main Site Feed
           if config.feeds.enabled
-            site_pages = pages.reject { |p| p.draft || !p.render || p.is_a?(Models::Section) }
+            site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.is_a?(Models::Section) }
 
             # Deduplicate by URL (keep last occurrence, matching build behavior)
             seen_urls = Set(String).new
@@ -54,13 +54,13 @@ module Hwaro
           # 2. Generate Section Feeds — pre-group pages by section for O(1) lookup
           pages_by_section = {} of String => Array(Models::Page)
           pages.each do |p|
-            next if p.draft || !p.render || p.is_a?(Models::Section)
+            next if p.draft || p.unpublished || !p.render || p.is_a?(Models::Section)
             (pages_by_section[p.section] ||= [] of Models::Page) << p
           end
 
           pages.each do |page|
             # Check if it's a section and has feed generation enabled
-            if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft
+            if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished
               section_pages = pages_by_section[page.section]? || [] of Models::Page
 
               # Construct output path for section feed
@@ -94,7 +94,7 @@ module Hwaro
 
             # Filter pages for this language (single pass)
             lang_pages = pages.select { |p|
-              !p.draft && p.render && !p.is_a?(Models::Section) && p.language == lang_code
+              !p.draft && !p.unpublished && p.render && !p.is_a?(Models::Section) && p.language == lang_code
             }
 
             # Apply section filter if configured on the main feed
