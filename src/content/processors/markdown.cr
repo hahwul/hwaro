@@ -493,8 +493,13 @@ module Hwaro
         # Shared helper: extract a string array from a front matter value.
         # Uses compact_map(&.as_s?) instead of map(&.as_s) to safely skip
         # non-string elements rather than raising at runtime.
+        #
+        # Values are stripped: a tag authored as `"  crystal  "` must be the
+        # SAME term as `"crystal"` — untrimmed values leaked verbatim into
+        # term-page titles/RSS and split one term into two slug-disambiguated
+        # term pages (slugification already trimmed; identity/display didn't).
         private def fm_string_array(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Array(String)
-          fm[key]?.try(&.as_a?.try { |a| a.compact_map(&.as_s?) }) || [] of String
+          fm[key]?.try(&.as_a?.try { |a| a.compact_map(&.as_s?).map(&.strip) }) || [] of String
         end
 
         # Build the front matter result NamedTuple from any front matter source.
@@ -964,10 +969,13 @@ module Hwaro
 
           # Iterate all keys: TOML::Table yields {String, TOML::Any},
           # YAML::Any#as_h yields {YAML::Any, YAML::Any}. Unify via keys list.
+          # Terms are stripped for the same reason as `fm_string_array`:
+          # whitespace-padded terms must not become distinct taxonomy terms
+          # or leak padded strings into term-page titles and feeds.
           keys.each do |key|
             next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
             if arr = front_matter[key]?.try(&.as_a?)
-              values = arr.compact_map(&.as_s?)
+              values = arr.compact_map(&.as_s?).map(&.strip)
               taxonomies[key] = values
             end
           end
@@ -983,14 +991,14 @@ module Hwaro
             when TOML::Any, JSON::Any
               table.as_h?.try &.each do |k, v|
                 if arr = v.as_a?
-                  taxonomies[k] = arr.compact_map(&.as_s?)
+                  taxonomies[k] = arr.compact_map(&.as_s?).map(&.strip)
                 end
               end
             when YAML::Any
               table.as_h?.try &.each do |k, v|
                 next unless key_str = k.as_s?
                 if arr = v.as_a?
-                  taxonomies[key_str] = arr.compact_map(&.as_s?)
+                  taxonomies[key_str] = arr.compact_map(&.as_s?).map(&.strip)
                 end
               end
             end

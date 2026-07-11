@@ -49,6 +49,33 @@ describe Hwaro::Content::Seo::Tags do
       tag = Hwaro::Content::Seo::Tags.canonical_tag(page, config)
       tag.should eq %(<link rel="canonical" href="https://example.com/test/">)
     end
+
+    it "percent-encodes non-ASCII paths like feeds/sitemap do" do
+      # A Unicode taxonomy term (`/tags/日本語タグ/`) must canonicalize to the
+      # exact same RFC 3986 URL its RSS/sitemap entries advertise — raw UTF-8
+      # here and percent-encoded there is two different URLs to a crawler.
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("tags/_index.md")
+      page.url = "/tags/日本語タグ/"
+
+      tag = Hwaro::Content::Seo::Tags.canonical_tag(page, config)
+      tag.should contain("https://example.com/tags/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%82%BF%E3%82%B0/")
+      tag.should_not contain("日本語タグ")
+    end
+
+    it "does not double-encode an already percent-encoded URL" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/tags/%E6%97%A5%E6%9C%AC/"
+
+      tag = Hwaro::Content::Seo::Tags.canonical_tag(page, config)
+      tag.should contain("/tags/%E6%97%A5%E6%9C%AC/")
+      tag.should_not contain("%25")
+    end
   end
 
   describe ".hreflang_tags" do

@@ -271,7 +271,10 @@ module Hwaro
                 recognized += 1
               end
             when "linenostart"
-              if LINENOSTART_RE.matches?(value) && (n = value.to_i?)
+              # `0` is rejected like a negative value (the regex already
+              # blocks `-`), not silently clamped to line 1 — renumbering
+              # from a line the author never asked for.
+              if LINENOSTART_RE.matches?(value) && (n = value.to_i?) && n >= 1
                 linenostart = n.clamp(1, LINENOSTART_MAX)
                 recognized += 1
               end
@@ -327,6 +330,10 @@ module Hwaro
             start_n = m[1].to_i?
             next unless start_n
             end_n = m[2]?.try(&.to_i?) || start_n
+            # Line numbers are 1-based: a literal `0` is invalid input and is
+            # dropped like any other malformed item, not clamped up to line 1
+            # (which silently highlighted a line the author never asked for).
+            next if start_n < 1 || end_n < 1
             start_clamped = start_n.clamp(1, HL_LINE_MAX)
             end_clamped = end_n.clamp(1, HL_LINE_MAX)
             next if end_clamped < start_clamped
