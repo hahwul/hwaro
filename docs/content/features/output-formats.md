@@ -1,7 +1,7 @@
 +++
 title = "Output Formats"
 description = "Render extra per-page/per-section output formats (JSON, XML, TXT, CSV) alongside HTML"
-weight = 25
+weight = 12
 toc = true
 +++
 

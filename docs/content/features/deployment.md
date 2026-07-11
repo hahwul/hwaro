@@ -1,7 +1,7 @@
 +++
 title = "Deployment"
 description = "Configure deploy targets for hwaro deploy"
-weight = 24
+weight = 26
 +++
 
 Hwaro includes a built-in `hwaro deploy` command that syncs your built site to configured targets — local directories, cloud storage, or any tool via custom commands.

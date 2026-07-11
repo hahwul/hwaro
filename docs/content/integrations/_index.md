@@ -1,6 +1,8 @@
 +++
 title = "Integrations"
 description = "Connect Hwaro to AI agents and the tools you already use"
+weight = 6
+sort_by = "weight"
 +++
 
 Hwaro is built to play well with the rest of your toolchain — especially AI

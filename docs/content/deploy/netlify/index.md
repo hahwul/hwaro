@@ -1,7 +1,7 @@
 +++
 title = "Netlify"
 description = "Deploy your Hwaro site to Netlify"
-weight = 5
+weight = 4
 +++
 
 Deploy your Hwaro site to Netlify with automatic builds and global CDN.

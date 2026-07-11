@@ -1,7 +1,7 @@
 +++
 title = "Series"
 description = "Group posts into ordered series for sequential reading"
-weight = 22
+weight = 9
 +++
 
 Group related posts into an ordered series so readers can follow content sequentially.

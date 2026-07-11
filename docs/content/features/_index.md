@@ -1,6 +1,8 @@
 +++
 title = "Features"
 description = "Built-in features for SEO, search, and more"
+weight = 4
+sort_by = "weight"
 +++
 
 Hwaro ships with a comprehensive set of built-in features — no plugins required. All features are configured through `config.toml` and work out of the box once enabled.

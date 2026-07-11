@@ -1,7 +1,7 @@
 +++
 title = "AMP"
 description = "Generate AMP-compliant versions of content pages"
-weight = 18
+weight = 25
 toc = true
 +++
 

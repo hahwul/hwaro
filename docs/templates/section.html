@@ -2,24 +2,26 @@
 {% include "nav.html" %}
 <div class="docs-container">
   {% include "sidebar.html" %}
-  <main class="docs-main">
+  <main class="docs-main no-toc">
+    {% include "breadcrumbs.html" %}
     <h1>{{ section.title }}</h1>
     {% if section.description %}
     <p>{{ section.description }}</p>
     {% endif %}
     {{ content }}
     {% if section.pages_count > 0 %}
-    <h2>In This Section</h2>
-    <ul class="page-list">
+    <h2>In this section</h2>
+    <div class="card-grid">
       {% for p in section.pages %}
-      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+      <a class="card{% if p.is_index %} card--section{% endif %}" href="{{ base_url }}{{ p.url }}">
+        <span class="card-title">{{ p.title }}</span>
+        {% if p.description %}<span class="card-desc">{{ p.description }}</span>{% endif %}
+      </a>
       {% endfor %}
-    </ul>
+    </div>
     {% endif %}
-    <footer class="docs-footer">
-      <p>Built with <a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">Hwaro</a></p>
-      <p><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></p>
-    </footer>
+    {% include "prevnext.html" %}
+    {% include "site-footer.html" %}
   </main>
 </div>
 {% include "footer.html" %}

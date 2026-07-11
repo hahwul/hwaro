@@ -1,7 +1,7 @@
 +++
 title = "Structured Data"
 description = "Extended Schema.org JSON-LD support for rich search results"
-weight = 19
+weight = 2
 toc = true
 +++
 

@@ -1,7 +1,7 @@
 +++
 title = "Build Hooks"
 description = "Run custom shell commands before and after the build process"
-weight = 8
+weight = 15
 toc = true
 +++
 

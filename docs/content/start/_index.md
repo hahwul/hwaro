@@ -1,6 +1,8 @@
 +++
 title = "Start"
 description = "Get up and running with Hwaro"
+weight = 1
+sort_by = "weight"
 +++
 
 ## What is Hwaro?

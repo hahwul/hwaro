@@ -1,7 +1,7 @@
 +++
 title = "Cloudflare Pages"
 description = "Deploy your Hwaro site to Cloudflare Pages"
-weight = 7
+weight = 6
 +++
 
 Deploy your Hwaro site to Cloudflare Pages for fast global delivery.

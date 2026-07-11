@@ -1,7 +1,7 @@
 +++
 title = "Menus"
 description = "Hugo-style named navigation menus, config-defined or front-matter-registered"
-weight = 25
+weight = 11
 toc = true
 +++
 

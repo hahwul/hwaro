@@ -1,7 +1,7 @@
 +++
 title = "Related Posts"
 description = "Recommend related content based on shared taxonomy terms"
-weight = 23
+weight = 10
 +++
 
 Automatically recommend related content based on shared taxonomy terms (tags, categories, etc.).

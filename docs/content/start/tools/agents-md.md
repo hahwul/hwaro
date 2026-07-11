@@ -1,7 +1,7 @@
 +++
 title = "agents-md"
 description = "Generate or update AGENTS.md file"
-weight = 8
+weight = 12
 +++
 
 Generate or update the AGENTS.md file for AI agent instructions. Useful for updating existing projects to the latest AGENTS.md or switching between content modes.

@@ -8,6 +8,33 @@
   var checkIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
   var copyIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>';
 
+  // Theme switcher: dark is the default scheme; "light" pins the light side
+  // of every light-dark() token via data-theme on <html>. The pre-paint
+  // script in header.html applies the stored choice before first render.
+  function initThemeToggle() {
+    var btn = document.querySelector('.theme-toggle');
+    if (!btn) return;
+    var html = document.documentElement;
+
+    function apply(mode) {
+      if (mode === 'light') {
+        html.setAttribute('data-theme', 'light');
+      } else {
+        html.removeAttribute('data-theme');
+      }
+      btn.setAttribute('data-mode', mode);
+      btn.setAttribute('aria-label', mode === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+    }
+
+    apply(html.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+
+    btn.addEventListener('click', function() {
+      var mode = btn.getAttribute('data-mode') === 'light' ? 'dark' : 'light';
+      apply(mode);
+      try { localStorage.setItem('hwaro-docs-theme', mode); } catch (e) {}
+    });
+  }
+
   // Add anchor links to headings
   function addHeadingAnchors() {
     var headings = document.querySelectorAll('.docs-main h1[id], .docs-main h2[id], .docs-main h3[id], .docs-main h4[id], .docs-main h5[id], .docs-main h6[id]');
@@ -47,8 +74,9 @@
     var codeBlocks = document.querySelectorAll('.docs-main pre');
 
     codeBlocks.forEach(function(pre) {
-      // Skip if already wrapped
+      // Skip if already wrapped, and skip mermaid sources
       if (pre.parentNode.classList.contains('code-wrapper')) return;
+      if (pre.classList.contains('mermaid')) return;
 
       // Create wrapper
       var wrapper = document.createElement('div');
@@ -84,7 +112,8 @@
     });
   }
 
-  // TOC scroll spy - highlight current section
+  // TOC scroll spy - IntersectionObserver drives updates (no scroll listener);
+  // each crossing recomputes the heading nearest above the reading line.
   function initTocScrollSpy() {
     var tocContainer = document.querySelector('.docs-toc');
     if (!tocContainer) return;
@@ -108,48 +137,32 @@
     var lastActive = null;
 
     function updateActiveLink() {
-      var scrollPos = window.scrollY + 120;
       var current = null;
 
-      // Find the current heading based on scroll position
       for (var i = 0; i < headings.length; i++) {
-        if (headings[i].el.offsetTop <= scrollPos) {
+        if (headings[i].el.getBoundingClientRect().top <= 120) {
           current = headings[i];
         } else {
           break;
         }
       }
 
-      // If at the bottom of the page, highlight the last item
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 50) {
-        current = headings[headings.length - 1];
-      }
+      if (!current) current = headings[0];
+      if (current === lastActive) return;
 
-      // Only update if changed
-      if (current !== lastActive) {
-        tocLinks.forEach(function(link) {
-          link.classList.remove('active');
-        });
-
-        if (current) {
-          current.link.classList.add('active');
-        }
-
-        lastActive = current;
-      }
+      if (lastActive) lastActive.link.classList.remove('active');
+      current.link.classList.add('active');
+      lastActive = current;
     }
 
-    // Throttle scroll handler for performance
-    var ticking = false;
-    window.addEventListener('scroll', function() {
-      if (!ticking) {
-        window.requestAnimationFrame(function() {
-          updateActiveLink();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    }, { passive: true });
+    var observer = new IntersectionObserver(updateActiveLink, {
+      rootMargin: '-120px 0px -55% 0px',
+      threshold: [0, 1]
+    });
+
+    headings.forEach(function(h) {
+      observer.observe(h.el);
+    });
 
     updateActiveLink();
   }
@@ -181,18 +194,18 @@
     });
   }
 
-  // Initialize on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      addHeadingAnchors();
-      addCodeCopyButtons();
-      initTocScrollSpy();
-      initMobileMenu();
-    });
-  } else {
+  function init() {
+    initThemeToggle();
     addHeadingAnchors();
     addCodeCopyButtons();
     initTocScrollSpy();
     initMobileMenu();
+  }
+
+  // Initialize on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 })();
