@@ -17,9 +17,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"My Post\"\ndate = \"2024-01-15\"\ndescription = \"A post\"\ntags = [\"crystal\"]\n+++\n\nHello world\n")
+        File.write(File.join(content_dir, "posts", "post.md"), "+++\ntitle = \"My Post\"\ndate = \"2024-01-15\"\ndescription = \"A post\"\ntags = [\"crystal\"]\n+++\n\nHello world\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(
@@ -50,9 +50,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "my-post.md"), "+++\ntitle = \"My Post\"\ndate = \"2024-03-15\"\n+++\n\nContent\n")
+        File.write(File.join(content_dir, "posts", "my-post.md"), "+++\ntitle = \"My Post\"\ndate = \"2024-03-15\"\n+++\n\nContent\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(
@@ -70,9 +70,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\ndate = \"2024-01-01\"\n+++\n\nDraft content\n")
+        File.write(File.join(content_dir, "posts", "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\ndate = \"2024-01-01\"\n+++\n\nDraft content\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(
@@ -180,9 +180,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "yaml.md"), "---\ntitle: YAML Post\ndate: \"2024-05-20\"\ntags:\n  - ruby\n---\n\nContent\n")
+        File.write(File.join(content_dir, "posts", "yaml.md"), "---\ntitle: YAML Post\ndate: \"2024-05-20\"\ntags:\n  - ruby\n---\n\nContent\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
@@ -200,9 +200,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\ndate = \"2024-06-15\"\n+++\n\nDraft\n")
+        File.write(File.join(content_dir, "posts", "draft.md"), "+++\ntitle = \"Draft\"\ndraft = true\ndate = \"2024-06-15\"\n+++\n\nDraft\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
@@ -239,9 +239,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\n+++\n\n[About](@/about/_index.md)\n")
+        File.write(File.join(content_dir, "posts", "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\n+++\n\n[About](@/about/_index.md)\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
@@ -257,9 +257,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ncategories:\n  - tech\n  - blog\n---\n\nContent\n")
+        File.write(File.join(content_dir, "posts", "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ncategories:\n  - tech\n  - blog\n---\n\nContent\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
@@ -276,11 +276,11 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
         # `tags: crystal` (scalar, not a list) must not be silently dropped —
         # that would lose the post's taxonomy membership in the migration.
-        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ntags: crystal\ncategories: news\n---\n\nBody\n")
+        File.write(File.join(content_dir, "posts", "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\ntags: crystal\ncategories: news\n---\n\nBody\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
@@ -299,9 +299,9 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
-        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
 
-        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\nauthors:\n  - Jane\n  - John\n---\n\nContent\n")
+        File.write(File.join(content_dir, "posts", "post.md"), "---\ntitle: Post\ndate: \"2024-01-01\"\nauthors:\n  - Jane\n  - John\n---\n\nContent\n")
 
         exporter = Hwaro::Services::Exporters::JekyllExporter.new
         options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
@@ -311,6 +311,87 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         content = File.read(files.first)
         content.should contain("authors:")
         content.should contain("- Jane")
+      end
+    end
+
+    it "keeps dated pages outside posts/blog sections as tree-preserved pages" do
+      # Hwaro auto-stamps `date` on every `hwaro new` page, so a date alone
+      # must not turn `about-us.md` or `team/engineering/deep-page.md` into
+      # a flat `_posts/` entry — that discards their section identity.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "team", "engineering"))
+
+        File.write(File.join(content_dir, "about-us.md"), "+++\ntitle = \"About Us\"\ndate = \"2024-01-01\"\n+++\n\nAbout\n")
+        File.write(File.join(content_dir, "team", "engineering", "deep-page.md"), "+++\ntitle = \"Deep\"\ndate = \"2024-01-02\"\n+++\n\nDeep\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "about-us.md")).should be_true
+        File.exists?(File.join(output_dir, "team", "engineering", "deep-page.md")).should be_true
+        Dir.exists?(File.join(output_dir, "_posts")).should be_false
+      end
+    end
+
+    it "uses the bundle directory as the slug for leaf-bundle posts" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "bundled-post"))
+
+        File.write(File.join(content_dir, "posts", "bundled-post", "index.md"), "+++\ntitle = \"Bundled\"\ndate = \"2024-04-01\"\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "_posts", "2024-04-01-bundled-post.md")).should be_true
+        File.exists?(File.join(output_dir, "_posts", "2024-04-01-index.md")).should be_false
+      end
+    end
+
+    it "disambiguates colliding destinations instead of overwriting" do
+      # Two same-day leaf bundles with identical directory names in nested
+      # subsections both flatten to the same `_posts/<date>-<slug>.md` —
+      # the second must not silently clobber the first.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "a", "launch"))
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "b", "launch"))
+
+        File.write(File.join(content_dir, "posts", "a", "launch", "index.md"), "+++\ntitle = \"Launch A\"\ndate = \"2024-05-01\"\n+++\n\nA\n")
+        File.write(File.join(content_dir, "posts", "b", "launch", "index.md"), "+++\ntitle = \"Launch B\"\ndate = \"2024-05-01\"\n+++\n\nB\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(2)
+        written = Dir.glob(File.join(output_dir, "_posts", "*.md")).sort
+        written.size.should eq(2)
+        contents = written.map { |f| File.read(f) }.join
+        contents.should contain("Launch A")
+        contents.should contain("Launch B")
+      end
+    end
+
+    it "sends undated drafts in a posts section to _drafts" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "posts", "wip.md"), "+++\ntitle = \"WIP\"\ndraft = true\n+++\n\nWip\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "_drafts", "wip.md")).should be_true
       end
     end
   end
