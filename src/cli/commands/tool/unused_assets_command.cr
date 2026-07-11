@@ -18,7 +18,7 @@ module Hwaro
       module Tool
         class UnusedAssetsCommand
           NAME               = "unused-assets"
-          DESCRIPTION        = "Find unreferenced static files"
+          DESCRIPTION        = "Find unreferenced static files (images, fonts, CSS/JS, media, pdf/zip)"
           POSITIONAL_ARGS    = [] of String
           POSITIONAL_CHOICES = [] of String
 
@@ -108,7 +108,7 @@ module Hwaro
             Logger.item("dynamic references (e.g. template variables) may cause false positives", glyph: :info)
 
             unless delete_mode
-              Logger.outcome("found", "#{result.unused_count} unused assets", glyph: :warn)
+              Logger.outcome("found", "#{result.unused_count} unused #{result.unused_count == 1 ? "asset" : "assets"}", glyph: :warn)
               return
             end
 

@@ -211,6 +211,38 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
         links.map(&.url).should eq(["/page/"])
       end
     end
+
+    it "keeps fence pairing after a 4-backtick fence nesting a 3-backtick fence" do
+      # Regression (dogfooding find): the old non-greedy /```[\s\S]*?```/
+      # treated the inner ``` of a ````markdown example as a closer, so every
+      # fence after it flipped polarity and example links inside later fences
+      # were reported as dead.
+      Dir.mktmpdir do |dir|
+        content = <<-MD
+          Nested fence example:
+
+          ````markdown
+          ```mermaid
+          graph TD
+          ```
+          ````
+
+          A later documentation-only snippet:
+
+          ```markdown
+          ![Diagram](/images/does-not-exist.png)
+          ```
+
+          But [this real link](/page/) should still be found.
+          MD
+        File.write(File.join(dir, "test.md"), content)
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        links = cmd.find_internal_links_for_test(dir)
+
+        links.map(&.url).should eq(["/page/"])
+      end
+    end
   end
 
   describe "#sanitize_for_terminal (terminal-injection protection)" do

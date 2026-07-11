@@ -204,10 +204,42 @@ module Hwaro
           # before scanning so `check-links` doesn't report false-positive dead
           # links — mirrors the code-stripping the scaffold link-integrity spec
           # already performs.
+          #
+          # Fences are tracked line-by-line, CommonMark-style: a fence opens
+          # with 3+ backticks/tildes (up to 3 spaces of indent) and only
+          # closes on a fence of the same character at least as long. The old
+          # non-greedy /```[\s\S]*?```/ mispaired nested fences — a 4-backtick
+          # example wrapping a 3-backtick fence desynchronized every fence
+          # after it, resurrecting example links as false positives.
           private def strip_code(content : String) : String
-            content
-              .gsub(/```[\s\S]*?```/, "")
-              .gsub(/`[^`\n]*`/, "")
+            result = String::Builder.new
+            fence_char : Char? = nil
+            fence_len = 0
+
+            content.each_line(chomp: false) do |line|
+              if m = line.match(/\A {0,3}(`{3,}|~{3,})/)
+                marker = m[1]
+                if fence_char.nil?
+                  fence_char = marker[0]
+                  fence_len = marker.size
+                  result << '\n'
+                  next
+                elsif marker[0] == fence_char && marker.size >= fence_len
+                  fence_char = nil
+                  fence_len = 0
+                  result << '\n'
+                  next
+                end
+              end
+
+              if fence_char
+                result << '\n'
+              else
+                result << line.gsub(/`[^`\n]*`/, "")
+              end
+            end
+
+            result.to_s
           end
 
           # Link URLs/paths come from semi-trusted content (e.g. a docs/blog

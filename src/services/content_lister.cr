@@ -161,7 +161,7 @@ module Hwaro
         table.emit
 
         Logger.info ""
-        Logger.outcome("listed", "#{contents.size} files")
+        Logger.outcome("listed", "#{contents.size} #{contents.size == 1 ? "file" : "files"}")
       end
 
       private def find_content_files : Array(String)

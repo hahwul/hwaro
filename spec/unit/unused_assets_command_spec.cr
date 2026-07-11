@@ -68,7 +68,7 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
         output.should contain("total:")
         output.should contain("unused files:")
         output.should contain("orphan.png")
-        output.should contain("found: 1 unused assets")
+        output.should contain("found: 1 unused asset")
       end
     end
   end
