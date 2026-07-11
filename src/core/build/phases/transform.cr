@@ -456,7 +456,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Rebuild groups only for affected series
     groups = {} of String => Array(Models::Page)
     site.pages.each do |page|
-      next if page.draft || !page.render
+      next if page.draft || page.unpublished || !page.render
       if name = page.series
         next unless affected_series.includes?(name)
         (groups[name] ||= [] of Models::Page) << page
@@ -491,7 +491,7 @@ module Hwaro::Core::Build::Phases::Transform
 
     taxonomy_names = config.taxonomies
     limit = config.limit
-    all_pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
+    all_pages = site.pages.reject { |p| p.draft || p.unpublished || p.is_index || p.generated || !p.render }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
     inverted, page_lookup = build_related_index(all_pages, taxonomy_names)
@@ -579,7 +579,7 @@ module Hwaro::Core::Build::Phases::Transform
     # under `--drafts` site.authors would list draft posts the generated author
     # page omits — two views of the same author disagreeing.
     site.pages.each do |page|
-      next if page.draft || page.generated
+      next if page.draft || page.unpublished || page.generated
       page.authors.each do |author_id|
         # Normalize ID: lower case, stripped
         id = author_id.strip.downcase
@@ -684,7 +684,7 @@ module Hwaro::Core::Build::Phases::Transform
     groups = {} of String => Array(Models::Page)
 
     site.pages.each do |page|
-      next if page.draft || !page.render
+      next if page.draft || page.unpublished || !page.render
       if name = page.series
         (groups[name] ||= [] of Models::Page) << page
       end
@@ -722,7 +722,7 @@ module Hwaro::Core::Build::Phases::Transform
     taxonomy_names = config.taxonomies
     limit = config.limit
     return if limit <= 0
-    pages = site.pages.reject { |p| p.draft || p.is_index || p.generated || !p.render }
+    pages = site.pages.reject { |p| p.draft || p.unpublished || p.is_index || p.generated || !p.render }
 
     # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
     # This avoids the O(N²) pairwise comparison

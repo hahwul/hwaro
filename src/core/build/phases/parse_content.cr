@@ -81,6 +81,13 @@ module Hwaro::Core::Build::Phases::ParseContent
     expired_count = 0
     future_count = 0
 
+    # Stamp the publication window on every page before filtering: pages
+    # admitted via --include-future / --include-expired keep unpublished=true
+    # so sitemap/feeds/search/llms and generated listings can exclude them,
+    # mirroring the --drafts contract (preview renders, artifacts don't leak).
+    ctx.pages.each(&.refresh_unpublished!(now))
+    ctx.sections.each(&.refresh_unpublished!(now))
+
     filter = ->(p : Models::Page) do
       if p.parse_failed
         failed_count += 1
@@ -446,11 +453,13 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain
   # string arrays. Non-string elements are skipped.
+  # Values are stripped to match `fm_string_array` — cascaded taxonomy
+  # terms must not become distinct whitespace-padded terms either.
   private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
     if value.is_a?(Array(String))
-      value
+      value.map(&.strip)
     elsif value.is_a?(Array(Models::ExtraValue))
-      value.compact_map(&.as?(String))
+      value.compact_map(&.as?(String)).map(&.strip)
     end
   end
 

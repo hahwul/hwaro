@@ -437,7 +437,10 @@ module Hwaro
         String.build(256) do |str|
           str << %(<meta property="og:title" content="#{Utils::TextUtils.escape_xml(title)}">\n  )
           str << %(<meta property="og:type" content="#{Utils::TextUtils.escape_xml(og_type)}">\n  )
-          str << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(url)}">)
+          # Percent-encode the path like feeds/sitemap do, so a non-ASCII URL
+          # (e.g. a Unicode taxonomy term) yields one consistent RFC 3986
+          # URL across every surface instead of raw UTF-8 here only.
+          str << %(<meta property="og:url" content="#{Utils::TextUtils.escape_xml(base_url)}#{Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path(url))}">)
           if desc = description
             append_meta(str, "property", "og:description", desc)
           end

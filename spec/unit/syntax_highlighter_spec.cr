@@ -246,9 +246,25 @@ describe Hwaro::Content::Processors::FenceOptions do
       opts.not_nil!.linenos.should be_true
     end
 
-    it "clamps linenostart=0 up to 1" do
-      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {linenostart=0}")
+    it "rejects linenostart=0 as invalid (line numbers are 1-based)" do
+      # A literal 0 used to be silently clamped up to 1 — renumbering from a
+      # line the author never asked for — while negatives were rejected.
+      # Now 0 is dropped like any other invalid value; with no other
+      # recognized option the `{...}` block doesn't activate at all.
+      lang, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {linenostart=0}")
+      lang.should eq("crystal")
+      opts.should be_nil
+    end
+
+    it "ignores linenostart=0 while honoring other options in the block" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {linenos=true linenostart=0}")
+      opts.not_nil!.linenos.should be_true
       opts.not_nil!.linenostart.should eq(1)
+    end
+
+    it "drops an hl_lines item containing 0" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hl_lines="0,3"}))
+      opts.not_nil!.hl_lines.should eq([{3, 3}])
     end
 
     it "parses a bare (unquoted) hl_lines value" do

@@ -120,23 +120,40 @@ describe Hwaro::Core::Build::Phases::OutputFormats do
       builder.test_effective_output_formats(page, config).should eq([] of String)
     end
 
-    it "applies the sections allowlist" do
+    it "applies the sections allowlist to section output" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.outputs.section = ["json"]
+      config.outputs.sections = ["posts"]
+
+      in_scope = Hwaro::Models::Section.new("posts/_index.md")
+      in_scope.section = "posts"
+      builder.test_effective_output_formats(in_scope, config).should eq(["json"])
+
+      nested = Hwaro::Models::Section.new("posts/sub/_index.md")
+      nested.section = "posts/sub"
+      builder.test_effective_output_formats(nested, config).should eq(["json"])
+
+      out_of_scope = Hwaro::Models::Section.new("docs/_index.md")
+      out_of_scope.section = "docs"
+      builder.test_effective_output_formats(out_of_scope, config).should eq([] of String)
+    end
+
+    it "does not apply the sections allowlist to page output" do
       builder = Hwaro::Core::Build::Builder.new
       config = Hwaro::Models::Config.new
       config.outputs.page = ["json"]
       config.outputs.sections = ["posts"]
 
-      in_scope = Hwaro::Models::Page.new("posts/hello.md")
-      in_scope.section = "posts"
-      builder.test_effective_output_formats(in_scope, config).should eq(["json"])
+      # The allowlist restricts *section* output only — a page outside the
+      # allowlisted sections must still emit the page-level formats.
+      outside = Hwaro::Models::Page.new("about.md")
+      outside.section = ""
+      builder.test_effective_output_formats(outside, config).should eq(["json"])
 
-      nested = Hwaro::Models::Page.new("posts/sub/hello.md")
-      nested.section = "posts/sub"
-      builder.test_effective_output_formats(nested, config).should eq(["json"])
-
-      out_of_scope = Hwaro::Models::Page.new("about.md")
-      out_of_scope.section = ""
-      builder.test_effective_output_formats(out_of_scope, config).should eq([] of String)
+      inside = Hwaro::Models::Page.new("posts/hello.md")
+      inside.section = "posts"
+      builder.test_effective_output_formats(inside, config).should eq(["json"])
     end
 
     it "front matter override bypasses the sections allowlist" do

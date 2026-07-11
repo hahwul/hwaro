@@ -83,6 +83,19 @@ module Hwaro
           LibStb.hwaro_font_has_glyph(info, codepoint) != 0
         end
 
+        # Drop codepoints `info` has no glyph for. stb draws missing glyphs
+        # as blank "tofu" boxes — emoji are the common case, since color
+        # emoji fonts can't be loaded here — so degrade "🔥 Title" to
+        # "Title" instead of "☐ Title". Whitespace always passes; leftover
+        # double spaces from removed runs are collapsed. Returns the
+        # original string untouched when everything is drawable.
+        def self.drop_missing_glyphs(info : LibStb::HwaroFontInfo, text : String) : String
+          return text if text.empty?
+          filtered = text.chars.select { |c| c.whitespace? || font_has_glyph?(info, c.ord) }.join
+          return text if filtered.size == text.size
+          filtered.gsub(/\s{2,}/, " ").strip
+        end
+
         # Try to find a system font, returns file path or nil
         def self.find_system_font(bold : Bool = false) : String?
           paths = bold ? BOLD_FONT_SEARCH_PATHS : FONT_SEARCH_PATHS
@@ -512,11 +525,16 @@ module Hwaro
                        else                  WIDTH - (margin_x * 2)
                        end
 
-          title_lines = word_wrap_measured(bold_info, bold_scale, page.title, wrap_width)
+          # Sanitize every string the fonts will draw: codepoints without a
+          # glyph (emoji, mostly) would render as tofu boxes otherwise.
+          title_text = drop_missing_glyphs(bold_info, page.title)
+          site_title = drop_missing_glyphs(bold_info, config.title)
+
+          title_lines = word_wrap_measured(bold_info, bold_scale, title_text, wrap_width)
           # The band style draws the title inside a fixed-height color band;
           # cap the lines so a long title can't overflow the band invisibly.
           title_lines = OgImage.cap_band_title(title_lines, font_size.to_i) if ai.style == "band"
-          desc_text = page.description || ""
+          desc_text = drop_missing_glyphs(r_info, page.description || "")
           desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, wrap_width)
 
           # Vertical positioning — ambitious styles get very bold, confident, centered placement
@@ -572,7 +590,7 @@ module Hwaro
           # Hero: oversized "ghost" echo of the title's first word behind
           # the composition for poster-style depth.
           if ai.style == "hero"
-            if ghost = page.title.split(/\s+/).first?
+            if ghost = title_text.split(/\s+/).first?
               unless ghost.empty?
                 ghost_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size * 2.6_f32)
                 LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, (margin_x - 10).to_f32, 34_f32, ghost_scale, ghost.upcase, text_color, 0.07_f32)
@@ -649,7 +667,7 @@ module Hwaro
               site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 18_f32)
               site_margin = 140_f32
               site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin
-              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 55 - 18).to_f32, site_scale, config.title, accent_color, 0.6_f32)
+              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 55 - 18).to_f32, site_scale, site_title, accent_color, 0.6_f32)
             else
               site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
               site_margin = case ai.style
@@ -664,7 +682,7 @@ module Hwaro
               site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
               # `split` renders the site name inside the accent block → readable color.
               site_color = ai.style == "split" ? text_color : accent_color
-              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, config.title, site_color, 1.0_f32)
+              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, site_title, site_color, 1.0_f32)
             end
           end
         end

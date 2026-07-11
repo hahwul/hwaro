@@ -59,6 +59,26 @@ describe Hwaro::Content::Processors::Markdown do
       result[:tags].should eq(["crystal", "programming", "web"])
     end
 
+    it "strips whitespace from tags and taxonomy terms" do
+      # `"  spaced-tag  "` slugified clean but leaked verbatim into the term
+      # page <h1>/<title> and RSS <title>/<category>, and a padded duplicate
+      # of an existing term split into a second `-2` term page.
+      raw = <<-MD
+        +++
+        title = "Post"
+        tags = ["  spaced-tag  ", "clean"]
+
+        [taxonomies]
+        series = ["  My Series "]
+        +++
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:tags].should eq(["spaced-tag", "clean"])
+      result[:taxonomies]["series"].should eq(["My Series"])
+    end
+
     it "parses aliases array" do
       raw = <<-MD
         +++

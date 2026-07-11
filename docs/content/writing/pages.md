@@ -298,7 +298,7 @@ console.log("Hello");
 | Cell   | Cell   |
 ```
 
-Table cells support inline Markdown: **bold**, *italic*, `code spans`, [links](url), ![images](url), and ~~strikethrough~~.
+Table cells support inline Markdown: **bold**, *italic*, `code spans`, `[links](url)`, `![images](url)`, and ~~strikethrough~~.
 
 ```markdown
 | Feature        | Example                          |

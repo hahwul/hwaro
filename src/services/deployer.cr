@@ -913,10 +913,15 @@ module Hwaro
 
       private def confirm?(prompt : String) : Bool
         unless CLI::Prompt.interactive?
+          # Note: `--force` does NOT bypass an explicit `--confirm` — it only
+          # skips the automatic confirmation added for dangerous shell
+          # commands. The old hint claimed otherwise and sent script authors
+          # down a dead end.
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
             message: "Cannot prompt for confirmation: stdin is not a TTY.",
-            hint: "Pass --force to skip confirmation prompts in non-interactive environments.",
+            hint: "Drop --confirm (or confirm = true in config.toml) for non-interactive deploys. " \
+                  "If this prompt came from a deploy command with shell metacharacters, --force skips that check.",
           )
         end
         CLI::Prompt.confirm?(prompt, default: false) == true

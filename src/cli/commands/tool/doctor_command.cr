@@ -192,13 +192,20 @@ module Hwaro
           private def render_human(issues : Array(Services::Issue), config_path : String)
             plain = plain_output?
 
+            # A missing/unparseable config aborts `check_config` before any of
+            # the other config sub-checks (and `check_referenced_paths`) run.
+            # Those checks must render as skipped — a green ✓ for a check that
+            # never executed is reassuring noise on top of a broken config.
+            config_blocked = issues.any? { |i| i.id == "config-not-found" || i.id == "config-parse-error" }
+
             Logger.heading("doctor")
             Logger.info ""
             Services::CHECK_GROUPS.each do |group|
               heading = group.key == :config ? config_path : group.default_heading
               Logger.info "  #{heading}"
               group.checks.each do |spec|
-                Logger.info "    #{render_check_line(spec, issues, plain)}"
+                skipped = config_blocked && group.key == :config && !spec.issue_ids.includes?("config-parse-error")
+                Logger.info "    #{render_check_line(spec, issues, plain, skipped)}"
               end
               Logger.info ""
             end
@@ -261,7 +268,16 @@ module Hwaro
           end
 
           # Format a single named check line with an inline status glyph.
-          private def render_check_line(spec : Services::CheckSpec, issues : Array(Services::Issue), plain : Bool) : String
+          # `skipped` marks a check that never executed (e.g. the config
+          # failed to parse before it could run) — rendered as a dim dash,
+          # never as a passing ✓.
+          private def render_check_line(spec : Services::CheckSpec, issues : Array(Services::Issue), plain : Bool, skipped : Bool = false) : String
+            if skipped
+              glyph = plain ? "[--]  " : Logger.paint("–", Logger::Role::Dim)
+              label = plain ? "#{spec.label} (skipped)" : "#{spec.label} #{Logger.paint("(skipped)", Logger::Role::Dim)}"
+              return "#{glyph} #{label}"
+            end
+
             matched = issues.select { |i| spec.issue_ids.includes?(i.id) }
             level = worst_level(matched)
             "#{status_glyph(level, plain)} #{spec.label}"

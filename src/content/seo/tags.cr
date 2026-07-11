@@ -1,6 +1,7 @@
 require "html"
 require "../../models/config"
 require "../../models/page"
+require "../../utils/text_utils"
 
 module Hwaro
   module Content
@@ -16,10 +17,16 @@ module Hwaro
           # self-canonicalize. `page.permalink` is the generated absolute URL
           # (base_url + page.url), i.e. the page-1/section URL — using it for a
           # paginated render would point every page at page 1.
-          if u = url_override
-            return "#{config.base_url_stripped}#{u.starts_with?("/") ? u : "/#{u}"}"
-          end
-          page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+          #
+          # The result is percent-encoded like feeds/sitemap URLs so a
+          # non-ASCII path (e.g. a Unicode taxonomy term) canonicalizes to
+          # the exact same RFC 3986 URL those XML surfaces advertise.
+          raw = if u = url_override
+                  "#{config.base_url_stripped}#{u.starts_with?("/") ? u : "/#{u}"}"
+                else
+                  page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+                end
+          Utils::TextUtils.encode_url_path(raw)
         end
 
         def canonical_tag(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
@@ -36,8 +43,10 @@ module Hwaro
           base = config.base_url_stripped
 
           String.build(page.translations.size * 80) do |str|
-            # Add current page
+            # Add current page. URLs are percent-encoded to match the
+            # sitemap's xhtml:link alternates for the same pages.
             current_url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+            current_url = Utils::TextUtils.encode_url_path(current_url)
             lang_code = page.language || config.default_language
             str << %(<link rel="alternate" hreflang="#{HTML.escape(lang_code)}" href="#{HTML.escape(current_url)}">)
 
@@ -45,6 +54,7 @@ module Hwaro
             page.translations.each do |t|
               next if t.is_current
               abs_url = t.url.starts_with?("http") ? t.url : "#{base}#{t.url.starts_with?("/") ? t.url : "/#{t.url}"}"
+              abs_url = Utils::TextUtils.encode_url_path(abs_url)
               str << '\n'
               str << %(<link rel="alternate" hreflang="#{HTML.escape(t.code)}" href="#{HTML.escape(abs_url)}">)
             end

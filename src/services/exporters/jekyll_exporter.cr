@@ -4,12 +4,27 @@ module Hwaro
   module Services
     module Exporters
       class JekyllExporter < Base
+        # Top-level sections whose dated content maps to Jekyll's `_posts/`
+        # collection. `posts` is what the Jekyll importer itself produces
+        # (round-trip symmetric) and `blog` is the other common Hwaro layout.
+        # Membership in one of these sections — not the mere presence of a
+        # `date` — is what makes a file a blog post: Hwaro auto-stamps `date`
+        # on every `hwaro new` page, so "has a date" alone misclassified
+        # ordinary pages (`about.md`, deep section pages) as posts.
+        POST_SECTIONS = %w[posts blog]
+
+        # Destinations already written this run, used to disambiguate
+        # collisions (e.g. two same-day leaf bundles both named `index.md`)
+        # instead of silently overwriting the earlier export.
+        @written_paths = Set(String).new
+
         def run(options : Config::Options::ExportOptions) : ExportResult
           content_dir = options.content_dir
           output_dir = options.output_dir
           include_drafts = options.drafts
           verbose = options.verbose
 
+          @written_paths.clear
           files = scan_content_files(content_dir)
 
           if files.empty?
@@ -107,9 +122,28 @@ module Hwaro
           body = rewrite_internal_links(body)
 
           out_path = resolve_jekyll_path(file_path, content_dir, output_dir, fields, is_draft, include_drafts)
+          out_path = disambiguate_path(out_path)
 
           write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
           :exported
+        end
+
+        # Reserve `path` for this run, appending `-1`, `-2`, … (with a
+        # warning) when an earlier file already claimed it. Flattening into
+        # `_posts/` makes collisions possible — two leaf bundles published
+        # the same day used to silently clobber each other.
+        private def disambiguate_path(path : String) : String
+          return path if @written_paths.add?(path)
+
+          ext = File.extname(path)
+          stem = path.chomp(ext)
+          n = 1
+          until @written_paths.add?("#{stem}-#{n}#{ext}")
+            n += 1
+          end
+          unique = "#{stem}-#{n}#{ext}"
+          Logger.warn "Export destination collision: #{path} already written this run; writing #{File.basename(unique)} instead."
+          unique
         end
 
         # Map a Hwaro content path to its Jekyll-conventional destination.
@@ -120,7 +154,10 @@ module Hwaro
         #     `_posts/posts/foo.md` would erroneously put every post in a
         #     `posts` category.
         #   - `_drafts/<slug>.md` — drafts, no date prefix.
-        #   - Root pages (`about.md`, `index.md`, ...) — anything else.
+        #   - Regular pages (`about.md`, `team/engineering/…`) — anything
+        #     else, exported with its directory layout preserved.
+        # Only dated files under a POST_SECTIONS top-level section become
+        # posts; everything else keeps its tree, whatever its `date` says.
         # `_index.md` (Hwaro's section index) maps to `<section>/index.md`,
         # the closest Jekyll equivalent (a normal page that happens to be
         # the section landing page).
@@ -147,22 +184,31 @@ module Hwaro
           dated = date_prefix && date_prefix.matches?(/^\d{4}-\d{2}-\d{2}$/)
           slug = filename.sub(/\.(md|markdown)$/, "")
 
-          # Files with a `date` are blog posts. Place them flat in `_posts/`
-          # (or `_drafts/` for drafts) — any source subdirectory like
-          # `content/posts/` or `content/blog/` is collapsed, because Jekyll
-          # treats subdirs under `_posts/` as category hints and re-applying
-          # the source folder as a category is almost never what the author
-          # meant on a Hwaro→Jekyll migration.
-          if dated
+          # Leaf bundle (`posts/my-post/index.md`): the slug is the bundle
+          # directory, not "index" — a literal "index" slug collided across
+          # every same-day bundle once flattened into `_posts/`.
+          if slug == "index" && dir_part != "." && !dir_part.empty?
+            slug = File.basename(dir_part)
+          end
+
+          # Content under a posts-like top-level section is a blog post:
+          # flat in `_posts/` when dated (or `_drafts/` for drafts — Jekyll
+          # draft filenames carry no date, so validity doesn't matter there),
+          # collapsing the source subdirectory — Jekyll treats subdirs under
+          # `_posts/` as category hints, and re-applying the source folder
+          # as a category is almost never what the author meant on a
+          # Hwaro→Jekyll migration.
+          top_section = relative.includes?('/') ? relative.split('/').first : nil
+          if top_section && POST_SECTIONS.includes?(top_section)
             if is_draft && include_drafts
               return File.join(output_dir, "_drafts", "#{slug}.md")
             end
-            return File.join(output_dir, "_posts", "#{date_prefix}-#{slug}.md")
+            return File.join(output_dir, "_posts", "#{date_prefix}-#{slug}.md") if dated
           end
 
-          # Non-dated content (about, index, archives, etc.) → keep the
-          # on-disk layout under the export root so Jekyll picks them up as
-          # regular pages (not as posts hidden under `_posts/`).
+          # Everything else (about, team/…, archives, dated or not) → keep
+          # the on-disk layout under the export root so Jekyll picks them up
+          # as regular pages and their section identity survives.
           File.join(output_dir, relative)
         end
       end

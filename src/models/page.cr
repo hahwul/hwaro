@@ -102,6 +102,15 @@ module Hwaro
       # Whether parsing (front-matter / markdown) failed for this page
       property parse_failed : Bool
 
+      # True when the page is outside its publication window at build time
+      # (future `date` or past `expires`). Such pages only survive the parse
+      # filter under --include-future / --include-expired — preview flags —
+      # and must then behave exactly like drafts under --drafts: the HTML
+      # page renders, but the page stays out of every public discovery
+      # surface (sitemap, feeds, search index, llms.txt) and out of
+      # generated listings (taxonomies, series, related posts, authors).
+      property unpublished : Bool
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
@@ -155,6 +164,7 @@ module Hwaro
         @content = ""
         @raw_content = ""
         @section = ""
+        @unpublished = false
         @url = ""
         @is_index = false
         @in_sitemap = true
@@ -193,16 +203,26 @@ module Hwaro
       end
 
       # True when a page should be omitted from generated listings (taxonomy
-      # indexes, related posts, …): drafts and synthetic generated pages.
+      # indexes, related posts, …): drafts, preview-only unpublished pages,
+      # and synthetic generated pages.
       def excluded_from_listings? : Bool
-        draft || generated
+        draft || unpublished || generated
       end
 
       # True when a page is eligible for the search index / llms.txt: it emits
-      # HTML, isn't a draft, opts into the search index, and isn't a synthetic
-      # generated listing page.
+      # HTML, isn't a draft or preview-only unpublished page, opts into the
+      # search index, and isn't a synthetic generated listing page.
       def search_index_eligible? : Bool
-        render && !draft && in_search_index && !generated
+        render && !draft && !unpublished && in_search_index && !generated
+      end
+
+      # Recompute `unpublished` from the publication window (`date` in the
+      # future or `expires` in the past) relative to the build's single `now`.
+      # Called by the parse-phase filter and the incremental (--cache)
+      # re-parse path so every downstream consumer sees a consistent value.
+      def refresh_unpublished!(now : Time)
+        @unpublished = (expires.try { |e| e <= now } || false) ||
+                       (date.try { |d| d > now } || false)
       end
 
       # Resolve the term list for a configured taxonomy `name`. Most

@@ -82,10 +82,16 @@ These four templates reproduce hwaro's stock output exactly — a useful startin
 
 ```jinja
 {# templates/hooks/render-codeblock.html #}
-<pre><code{% if lang is present %} class="language-{{ lang }}"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>
+<pre><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>
 ```
 
 Note `{% if title is present %}`, not a bare `{% if title %}` — Crinja's truthiness only treats `false`/`0`/nil as falsy, so a bare `{% if title %}` would render `title=""` even when there's no title. The custom `is present`/`is empty` tests (also used throughout hwaro's own templates) check for that correctly.
+
+The codeblock template's ` hljs` class matches stock output under the
+default config (`[highlight] enabled = true` — most Highlight.js themes key
+their base styling off that class). If you've disabled highlighting
+entirely, stock output emits `class="language-{{ lang }}"` with no ` hljs`;
+drop it from your hook to stay byte-identical.
 
 ## Example: Figure-Wrapped Images
 

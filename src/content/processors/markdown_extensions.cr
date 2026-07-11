@@ -943,7 +943,17 @@ module Hwaro
             if hattr_match = inner.match(HATTR_MARKER_RE)
               parsed = decode_and_parse_hattr(hattr_match[1])
               if parsed
-                cleaned_inner = inner.sub(hattr_match[0], "").rstrip
+                # The preprocess step glued the marker on with a leading
+                # space (`… title <!--HATTR:…-->`); remove them together.
+                # Dropping only the marker left a doubled space behind when
+                # a heading render hook appends markup after `{{ text }}`.
+                marker_with_space = " #{hattr_match[0]}"
+                cleaned_inner = if inner.includes?(marker_with_space)
+                                  inner.sub(marker_with_space, "")
+                                else
+                                  inner.sub(hattr_match[0], "")
+                                end
+                cleaned_inner = cleaned_inner.rstrip
                 new_attrs = MarkdownAttributes.apply_to_tag_attrs(attrs, parsed)
                 "<#{tag}#{new_attrs}>#{cleaned_inner}</#{tag}>"
               else

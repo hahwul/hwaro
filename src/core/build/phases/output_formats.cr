@@ -42,6 +42,12 @@ module Hwaro::Core::Build::Phases::OutputFormats
 
     base = page.is_a?(Models::Section) ? config.outputs.section : config.outputs.page
     return [] of String if base.empty?
+    # The `sections` allowlist scopes *section* output only (the documented
+    # contract); page-level output is unscoped. Gating pages on it too meant
+    # `sections = ["posts"]` silently dropped `page` formats everywhere
+    # outside posts/ — scope page output per-section via `[cascade.extra]`
+    # instead.
+    return base unless page.is_a?(Models::Section)
     return base if config.outputs.sections.empty?
 
     matches_section = config.outputs.sections.any? { |s| page.section == s || page.section.starts_with?("#{s}/") }

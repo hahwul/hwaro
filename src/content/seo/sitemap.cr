@@ -16,9 +16,11 @@ module Hwaro
             return
           end
 
-          # Match feeds/llms/search behavior: drafts are excluded from public
-          # discovery surfaces even when the build is run with --drafts.
-          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft }
+          # Match feeds/llms/search behavior: drafts and preview-only
+          # unpublished pages (--include-future/--include-expired) are
+          # excluded from public discovery surfaces even when the build is
+          # run with the corresponding include flag.
+          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished }
 
           # Deduplicate by URL (keep last occurrence, matching build behavior)
           seen_urls = Set(String).new

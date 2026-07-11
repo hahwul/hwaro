@@ -9,6 +9,7 @@
 
 require "html"
 require "../../utils/text_utils"
+require "../../utils/logger"
 
 module Hwaro
   module Content
@@ -45,6 +46,14 @@ module Hwaro
             while used_ids.includes?(id)
               id_counters[base_id] += 1
               id = "#{base_id}-#{id_counters[base_id]}"
+            end
+            # Renaming an auto-generated slug is routine (repeated section
+            # titles), but renaming an AUTHOR-WRITTEN `{#id}` silently moves
+            # the anchor the author explicitly asked for — warn, like menus
+            # already do for duplicate identifiers. `used_ids` is page-scoped,
+            # so this only fires for a duplicate within one page.
+            if existing_id
+              Logger.warn "Duplicate explicit heading id '##{base_id}' — this heading was renamed to '##{id}'; links to '##{base_id}' resolve to the first occurrence."
             end
           end
           used_ids << id

@@ -69,7 +69,15 @@ module Hwaro
             converter = Services::FrontmatterConverter.new(content_dir)
 
             fmt = format.as(String).downcase
-            Logger.heading(NAME, fmt) if POSITIONAL_CHOICES.includes?(fmt)
+            if POSITIONAL_CHOICES.includes?(fmt)
+              Logger.heading(NAME, fmt)
+              # Conversion round-trips parsed values, so front-matter comments
+              # (and exact formatting) have no representation to survive in.
+              # Say so up front instead of silently discarding them —
+              # `doctor --fix` edits config.toml as raw text for this exact
+              # reason, but a format conversion can't.
+              Logger.item("comments in front matter are not preserved by conversion", glyph: :info) unless json_output
+            end
 
             case fmt
             when "to-yaml"

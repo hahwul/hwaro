@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- `[outputs].sections` no longer suppresses page-level output formats outside the allowlisted sections — it scopes `section` output only, as documented
+- `--include-future` / `--include-expired` are preview flags like `--drafts`: admitted pages render HTML but stay out of sitemap.xml, RSS/Atom feeds, search index, llms.txt, and generated listings (taxonomies, series, related posts, authors)
+- `hwaro tool export jekyll`: only content under `posts/`/`blog/` becomes `_posts/` entries (every Hwaro page has an auto-stamped `date`, so "dated ⇒ post" misfiled ordinary pages); other pages keep their directory tree; leaf-bundle posts slug from the bundle directory instead of `index`; destination collisions are disambiguated with a warning instead of silently overwritten
+- `hwaro tool check-links`: fenced-code stripping is now line-based CommonMark fence tracking — a 4-backtick example wrapping a 3-backtick fence no longer desyncs later fences into false-positive dead links
+- `hwaro doctor`: when config.toml fails to parse, the config sub-checks that never ran render as `(skipped)` instead of a false green `[ok]`
+- `hwaro deploy`: the non-TTY confirmation error no longer claims `--force` skips `--confirm` (it doesn't); the hint now explains the actual outs
+- Canonical URL, `og:url`, and hreflang tags percent-encode non-ASCII paths, matching the RFC 3986 URLs feeds/sitemap already emit for the same pages
+- Taxonomy terms (and tags/authors/aliases) are whitespace-trimmed at parse time — a padded term no longer leaks verbatim into term-page titles/RSS or splits into a second slug-disambiguated term page
+- Auto OG images skip codepoints the loaded font can't draw (emoji, mostly) instead of rendering blank tofu boxes
+- Heading render hook + `{#id .class}` attributes no longer leave a doubled space where the internal marker was removed
+- Fence options treat `linenostart=0` / `hl_lines="0"` as invalid (dropped) instead of silently clamping to line 1
+- Duplicate explicit `{#id}` heading ids now warn when renamed (`#dup` → `#dup-1`), matching menus' duplicate-identifier warning
+- CLI polish: singular/plural agreement for 1-item counts (`1 file`, `1 draft`, `1 unused asset`); `tool convert` notes that front-matter comments are not preserved; `unused-assets --help` names the scanned asset types
+
 ## v0.17.0
 
 ### Added

@@ -94,8 +94,8 @@ module Hwaro
             # Context receipt: totals, word counts (published only — matches
             # what `build` ships), then bar-chart sections and one outcome.
             receipt = Logger::Receipt.new("stats", content_dir)
-            receipt.row("total", "#{result.total.format} files",
-              emphasis: result.drafts > 0 ? "#{result.drafts.format} drafts" : nil)
+            receipt.row("total", "#{result.total.format} #{result.total == 1 ? "file" : "files"}",
+              emphasis: result.drafts > 0 ? "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}" : nil)
             receipt.row("words", "#{result.words_total.format} total · #{result.words_avg.format} avg")
             receipt.row("range", "#{result.words_min.format} min · #{result.words_max.format} max")
             receipt.emit
@@ -127,7 +127,7 @@ module Hwaro
 
             Logger.info ""
             Logger.outcome("counted",
-              "#{result.total.format} files · #{result.published.format} published · #{result.drafts.format} drafts")
+              "#{result.total.format} #{result.total == 1 ? "file" : "files"} · #{result.published.format} published · #{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}")
           end
 
           # Cap a bar-chart label to the column width, marking the cut with an
