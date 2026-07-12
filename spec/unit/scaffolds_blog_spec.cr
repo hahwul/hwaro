@@ -137,5 +137,30 @@ describe Hwaro::Services::Scaffolds::Blog do
       css.should contain("color-scheme: light dark")
       css.should contain("var(--glass)")
     end
+
+    # Regression: the archives page markup (.archive-list/.archive-entry)
+    # shipped with NO styles at all, rendering as a bare unstyled list.
+    # Both ledgers (home feed + archives) share the date-rail grid rhythm.
+    it "styles the archives ledger and the home feed with the date rail" do
+      css = Hwaro::Services::Scaffolds::Blog.new.static_files["css/style.css"]
+      css.should contain(".archive-entry {")
+      css.should contain(".post-date {")
+      css.scan(/grid-template-columns: 6\.5rem 1fr;/).size.should be >= 2
+    end
+
+    it "marks the active nav item" do
+      css = Hwaro::Services::Scaffolds::Blog.new.static_files["css/style.css"]
+      css.should contain(%(.blog-header nav a[aria-current="page"]))
+    end
+  end
+
+  describe "home template" do
+    it "renders the post feed as date-rail entries inside the hero'd landing" do
+      tpl = Hwaro::Services::Scaffolds::Blog.new.template_files["index.html"].not_nil!
+      tpl.should contain(%(<time class="post-date"))
+      tpl.should contain(%(class="post-item-body"))
+      # The intro copy lives inside the hero, not stranded below it.
+      tpl.index!("home-intro").should be < tpl.index!("</header>")
+    end
   end
 end

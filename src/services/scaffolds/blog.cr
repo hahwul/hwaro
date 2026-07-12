@@ -220,11 +220,12 @@ module Hwaro
             HTML
         end
 
-        # Override footer for blog (Jinja2 syntax)
+        # Override footer for blog (Jinja2 syntax). The colophon carries the
+        # site's own name — an imprint line, not a generator ad.
         protected def footer_template : String
           <<-HTML
                 <footer class="blog-footer">
-                  <p>Powered by Hwaro</p>
+                  <p>{{ site.title | e }} · Powered by <a href="https://github.com/hahwul/hwaro">Hwaro</a></p>
                 </footer>
               </main>
             </div>
@@ -356,10 +357,12 @@ module Hwaro
               font-size: var(--step--1);
               font-weight: 400;
               padding: 0.25rem 0;
-              transition: color var(--transition);
+              border-bottom: 2px solid transparent;
+              transition: color var(--transition), border-color var(--transition);
             }
 
             .blog-header nav a:hover { color: var(--text); }
+            .blog-header nav a[aria-current="page"] { color: var(--heading); border-bottom-color: var(--primary); }
 
             .header-right {
               margin-left: auto;
@@ -550,11 +553,11 @@ module Hwaro
             /* Images */
             img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid var(--edge); outline-offset: -1px; }
 
-            /* Home */
+            /* Home — a compact masthead: title, tagline, and the intro copy
+               all live in the hero so the feed starts within reach. */
             .home-hero {
-              padding: var(--space-7) 0 var(--space-6);
-              margin-bottom: var(--space-6);
-              border-bottom: 1px solid var(--border-subtle);
+              padding: var(--space-6) 0 var(--space-5);
+              margin-bottom: var(--space-5);
             }
 
             .home-title {
@@ -594,8 +597,10 @@ module Hwaro
 
             .home-intro {
               color: var(--text-secondary);
-              margin-bottom: 2.5rem;
+              max-width: var(--measure);
+              margin-top: 1.1rem;
             }
+            .home-intro p { margin: 0.5em 0; }
             .home-intro p:last-child { margin-bottom: 0; }
 
             /* `.blog-main h2` (0,1,1) outranks a bare `.home-section-title`
@@ -620,20 +625,41 @@ module Hwaro
               font-weight: 500;
               text-decoration: none;
             }
-            .home-more a:hover { color: var(--primary-strong); text-decoration: underline; }
+            .home-more a::after {
+              content: "\\2192";
+              display: inline-block;
+              margin-left: 0.35rem;
+              transition: transform var(--transition);
+            }
+            .home-more a:hover { color: var(--primary-strong); }
+            .home-more a:hover::after { transform: translateX(3px); }
 
-            /* Post list */
+            /* Post list — an editorial ledger: tabular dates down a quiet
+               left rail, serif titles and excerpts beside them. */
             .post-list { list-style: none; padding: 0; }
 
             .post-item {
-              padding: var(--space-5) 0;
+              display: grid;
+              grid-template-columns: 6.5rem 1fr;
+              gap: var(--space-4);
+              padding: var(--space-4) 0;
               border-bottom: 1px solid var(--border-subtle);
-              transition: background 0.1s;
             }
 
             .post-item:last-child { border-bottom: none; }
 
-            .post-title {
+            .post-date {
+              color: var(--text-muted);
+              font-size: var(--step--1);
+              font-variant-numeric: tabular-nums;
+              letter-spacing: 0.02em;
+              padding-top: 0.3rem;
+            }
+
+            /* `.blog-main h3` (0,1,1) would outrank a bare `.post-title`
+               (0,1,0) and push feed titles below their date rail, so the
+               feed/prose scopes are spelled out. */
+            .blog-main .post-title, .post-title {
               font-family: var(--font-serif);
               margin: 0 0 0.3rem 0;
               font-size: var(--step-1);
@@ -641,15 +667,26 @@ module Hwaro
               line-height: 1.3;
             }
 
-            /* List titles read as ink; hover warms the color only — no
-               underline soup in the feed. */
+            /* List titles read as ink; hover warms the color and slides an
+               ember arrow in — no underline soup in the feed. */
             .post-title a {
               color: var(--heading);
               text-decoration: none;
               transition: color var(--transition);
             }
 
+            .post-title a::after {
+              content: "\\2192";
+              display: inline-block;
+              margin-left: 0.45rem;
+              color: var(--primary);
+              opacity: 0;
+              transform: translateX(-4px);
+              transition: opacity var(--transition), transform var(--transition);
+            }
+
             .post-title a:hover { color: var(--primary); text-decoration: none; }
+            @media (hover: hover) { .post-title a:hover::after { opacity: 1; transform: translateX(0); } }
 
             .post-meta {
               color: var(--text-muted);
@@ -770,6 +807,33 @@ module Hwaro
             .pagination-current span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: var(--primary-tint); color: var(--primary); }
             .pagination-disabled span { display: inline-block; padding: 0.25rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); color: var(--text-muted); opacity: 0.5; }
 
+            /* Archives — the same date-rail ledger rhythm as the home feed,
+               tightened for scanning whole years at a glance. */
+            .archive-list { list-style: none; padding: 0; margin: var(--space-5) 0; }
+            .archive-entry {
+              display: grid;
+              grid-template-columns: 6.5rem 1fr;
+              gap: var(--space-4);
+              padding: 0.55rem 0;
+              border-bottom: 1px solid var(--border-subtle);
+            }
+            .archive-entry:first-child { border-top: 1px solid var(--border-subtle); }
+            .archive-entry time {
+              color: var(--text-muted);
+              font-size: var(--step--1);
+              font-variant-numeric: tabular-nums;
+              letter-spacing: 0.02em;
+              padding-top: 0.15rem;
+            }
+            .archive-entry a {
+              font-family: var(--font-serif);
+              font-weight: 500;
+              color: var(--text);
+              text-decoration: none;
+              transition: color var(--transition);
+            }
+            .archive-entry a:hover { color: var(--primary); }
+
             /* Footer as colophon: a centered spark over a serif italic
                imprint line, like the last page of a well-set book. */
             .blog-footer {
@@ -790,6 +854,8 @@ module Hwaro
               background: var(--spark);
             }
             .blog-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
+            .blog-footer a { color: inherit; text-decoration: none; transition: color var(--transition); }
+            .blog-footer a:hover { color: var(--primary); }
 
             /* Search trigger */
             .search-trigger {
@@ -929,11 +995,13 @@ module Hwaro
             .search-trigger:active { transform: scale(0.96); }
 
             /* Responsive — the type scale is fluid, so only the frame
-               needs to adapt. */
+               needs to adapt. The date rails stack above their entries. */
             @media (max-width: 640px) {
               .blog-header nav { display: none; }
               .blog-main { padding: var(--space-5) var(--space-4); }
-              .home-hero { padding-top: var(--space-6); }
+              .home-hero { padding-top: var(--space-5); }
+              .post-item, .archive-entry { grid-template-columns: 1fr; gap: 0.2rem; }
+              .post-date, .archive-entry time { padding-top: 0; }
             }
 
             @media (prefers-reduced-motion: reduce) {
@@ -1149,22 +1217,24 @@ module Hwaro
                 <header class="home-hero">
                   <h1 class="home-title">{{ site.title | e }}</h1>
                   {% if site.description %}<p class="home-tagline">{{ site.description | e }}</p>{% endif %}
+                  {% if content %}<div class="home-intro">{{ content }}</div>{% endif %}
                 </header>
-                {% if content %}<div class="home-intro">{{ content }}</div>{% endif %}
                 <section class="home-latest" aria-labelledby="home-latest-title">
                   <h2 id="home-latest-title" class="home-section-title">Latest posts</h2>
                   <ul class="post-list">
                     {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
                     {% if loop.index <= 5 %}
                       <li class="post-item">
-                        <div class="post-meta"><time datetime="{{ p.date }}">{{ p.date }}</time></div>
-                        <h3 class="post-title"><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h3>
-                        {% if p.description %}<p class="post-excerpt">{{ p.description | e }}</p>{% endif %}
+                        <time class="post-date" datetime="{{ p.date }}">{{ p.date }}</time>
+                        <div class="post-item-body">
+                          <h3 class="post-title"><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h3>
+                          {% if p.description %}<p class="post-excerpt">{{ p.description | e }}</p>{% endif %}
+                        </div>
                       </li>
                     {% endif %}
                     {% endfor %}
                   </ul>
-                  <p class="home-more"><a href="{{ base_url }}{{ lang_prefix }}/posts/">View all posts &rarr;</a></p>
+                  <p class="home-more"><a href="{{ base_url }}{{ lang_prefix }}/posts/">View all posts</a></p>
                 </section>
             {% include "footer.html" %}
             HTML
@@ -1386,11 +1456,11 @@ module Hwaro
 
         private def about_content(skip_taxonomies : Bool) : String
           body = <<-BODY
-            Welcome to my blog! I write about technology, programming, and other interesting topics.
+            Welcome! This blog runs on [Hwaro](https://github.com/hahwul/hwaro), a static site generator written in Crystal.
 
-            ## Contact
+            ## Make it yours
 
-            Feel free to reach out through social media or email.
+            Edit `content/about.md` and introduce yourself in a paragraph or two: who writes here, what you write about, and where readers can reach you. One honest paragraph beats any template text.
             BODY
 
           render_page(
@@ -1419,17 +1489,17 @@ module Hwaro
 
         private def sample_post_1(skip_taxonomies : Bool) : String
           body = <<-BODY
-            Welcome to my first blog post! This blog is powered by Hwaro, a fast and lightweight static site generator written in Crystal.
+            Every blog starts somewhere, and this one starts here. The site around this post is powered by Hwaro, a fast static site generator written in Crystal.
 
-            ## Why Hwaro?
+            ## What the samples show
 
-            Hwaro offers a simple yet powerful way to create static websites:
+            Three sample posts (including this one) demonstrate how dates, tags, and categories flow through the homepage feed, the archives, and the taxonomy pages. When you're ready to write for real:
 
-            - **Fast**: Built with Crystal for blazing fast build times
-            - **Simple**: Easy to understand directory structure
-            - **Flexible**: Supports custom templates and shortcodes
+            - Delete the samples under `content/posts/`.
+            - Run `hwaro new posts/my-first-post.md` to start a post; the archetype fills in the front matter.
+            - Publish with `hwaro build`.
 
-            Stay tuned for more posts!
+            The feed and archives pick up new posts automatically. Nothing else to wire up.
             BODY
 
           render_page(
@@ -1437,7 +1507,7 @@ module Hwaro
             body: body,
             skip_taxonomies: skip_taxonomies,
             date: sample_date(10),
-            description: "My first blog post using Hwaro static site generator.",
+            description: "Where this blog starts, and how to make it yours.",
             tags: ["introduction", "hello"],
             categories: ["general"],
             authors: ["admin"]
@@ -1522,6 +1592,14 @@ module Hwaro
             Create a link with square brackets around the text and parentheses
             around the URL — for example, [Hwaro on GitHub](https://github.com/hahwul/hwaro).
             Prefix the same form with `!` to embed an image instead.
+
+            ## Tables
+
+            | Syntax | Renders as |
+            |--------|------------|
+            | `**bold**` | **bold** |
+            | `*italic*` | *italic* |
+            | `` `code` `` | `code` |
 
             ## Blockquotes
 

@@ -363,16 +363,20 @@ module Hwaro
 
       def initialize
         @enabled = false
-        @background = "#1a1a2e"
-        @text_color = "#ffffff"
-        @accent_color = "#e94560"
+        # Ember identity defaults (warm charcoal / warm off-white / ember),
+        # matching the scaffold and docs design tokens.
+        @background = "#171310"
+        @text_color = "#f4ede4"
+        @accent_color = "#ec7a66"
         @secondary_color = nil
         @font_size = 48
         @logo = nil
         @output_dir = "og-images"
         @show_title = true
         @style = "default"
-        @pattern_opacity = 0.12
+        # Peak alpha for the pattern styles — each pattern applies its own
+        # internal falloff, so this is visible without being loud.
+        @pattern_opacity = 0.35
         @pattern_scale = 1.0
         @background_image = nil
         @overlay_opacity = 0.45

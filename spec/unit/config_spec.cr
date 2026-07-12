@@ -2456,7 +2456,7 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
       # clamp(0.0, 1.0) (NaN comparisons are all false) and crashes the
       # pixel blend's `.to_u8` with OverflowError, so the loader must
       # reject non-finite values.
-      load_config("[og.auto_image]\npattern_opacity = nan").og.auto_image.pattern_opacity.should eq(0.12)
+      load_config("[og.auto_image]\npattern_opacity = nan").og.auto_image.pattern_opacity.should eq(0.35)
       load_config("[og.auto_image]\noverlay_opacity = inf").og.auto_image.overlay_opacity.should eq(0.45)
       load_config("[og.auto_image]\ntext_panel = nan").og.auto_image.text_panel.should eq(0.0)
     end

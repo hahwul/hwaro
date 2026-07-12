@@ -31,6 +31,11 @@ private def extract_internal_links(body : String) : Array(String)
   sanitized.scan(/!?\[[^\]]*\]\((\/[^)\s]*)\)/).each do |m|
     links << m[1]
   end
+  # Raw-HTML links too — scaffold bodies compose designed blocks like the
+  # docs landing's `<a class="link-card" href="/getting-started/">`.
+  sanitized.scan(/href="(\/[^"]*)"/).each do |m|
+    links << m[1]
+  end
   links
 end
 

@@ -5,7 +5,7 @@ private CANONICAL_TOKENS = %w[
   --primary --primary-strong --primary-tint --selection
   --rule-from --rule-to
   --heading --text --text-secondary --text-muted
-  --bg --bg-subtle --bg-code --border --border-subtle
+  --bg --bg-subtle --bg-raised --bg-code --border --border-subtle
   --edge --glass --scrim
   --warn --ok
   --code-comment --code-keyword --code-string --code-number

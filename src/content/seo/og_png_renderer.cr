@@ -15,8 +15,18 @@ module Hwaro
         HEIGHT   =  630
         CHANNELS =    4 # RGBA
 
-        # Bundled DejaVu Sans Bold font (compiled into the binary as fallback)
+        # Bundled DejaVu Sans Bold font (compiled into the binary as the
+        # wide-coverage Latin/Cyrillic/Greek fallback at the end of every
+        # font chain).
         BUNDLED_FONT_BOLD = {{ read_file("#{__DIR__}/../../ext/fonts/DejaVuSans-Bold.ttf") }}
+
+        # Bundled brand fonts (OFL 1.1 — license texts live next to the
+        # TTFs). Space Grotesk carries titles and descriptions; JetBrains
+        # Mono carries the `terminal` style. Static instances, not variable
+        # fonts — stb_truetype ignores variation axes.
+        BUNDLED_FONT_DISPLAY = {{ read_file("#{__DIR__}/../../ext/fonts/SpaceGrotesk-Bold.ttf") }}
+        BUNDLED_FONT_TEXT    = {{ read_file("#{__DIR__}/../../ext/fonts/SpaceGrotesk-Medium.ttf") }}
+        BUNDLED_FONT_MONO    = {{ read_file("#{__DIR__}/../../ext/fonts/JetBrainsMono-Bold.ttf") }}
 
         # System font search paths (platform-dependent)
         FONT_SEARCH_PATHS = [
@@ -96,6 +106,15 @@ module Hwaro
           filtered.gsub(/\s{2,}/, " ").strip
         end
 
+        # Chain variant: drop a codepoint only when *no* font in the chain
+        # covers it.
+        def self.drop_missing_glyphs(chain : Array(FontEntry), text : String) : String
+          return text if text.empty?
+          filtered = text.chars.select { |c| c.whitespace? || chain_font_index(chain, c.ord) }.join
+          return text if filtered.size == text.size
+          filtered.gsub(/\s{2,}/, " ").strip
+        end
+
         # Try to find a system font, returns file path or nil
         def self.find_system_font(bold : Bool = false) : String?
           paths = bold ? BOLD_FONT_SEARCH_PATHS : FONT_SEARCH_PATHS
@@ -164,22 +183,41 @@ module Hwaro
           end
         end
 
-        # Pre-loaded font context for reuse across multiple render calls.
-        # Holds font data bytes (must stay alive while font_info is in use)
-        # and the opaque stbtt_fontinfo pointer.
-        class FontContext
-          getter bold_data : Bytes
-          getter bold_info : LibStb::HwaroFontInfo
-          getter regular_data : Bytes?
-          getter regular_info : LibStb::HwaroFontInfo?
+        # One loaded font: the opaque stbtt_fontinfo pointer plus the raw
+        # TTF bytes it points into (the bytes must stay alive as long as
+        # the info is in use).
+        alias FontEntry = {LibStb::HwaroFontInfo, Bytes}
 
-          def initialize(@bold_data, @bold_info, @regular_data = nil, @regular_info = nil)
+        # Pre-loaded font context for reuse across multiple render calls.
+        # Holds one fallback *chain* per typographic role — brand font
+        # first, then (when the content needs it) a CJK-capable system
+        # font, then the wide-coverage bundled DejaVu. Text is rendered
+        # run-by-run using the first chain font that covers each glyph.
+        # The same underlying font may appear in several chains; finalize
+        # frees each unique font exactly once.
+        class FontContext
+          getter display : Array(FontEntry) # titles, eyebrows, site name
+          getter text : Array(FontEntry)    # descriptions
+          getter mono : Array(FontEntry)    # `terminal` style
+
+          def initialize(@display, @text, @mono)
+          end
+
+          # True when any font in any chain covers `codepoint`.
+          def covers?(codepoint : Int32) : Bool
+            {@display, @text, @mono}.any? do |chain|
+              chain.any? { |info, _| LibStb.hwaro_font_has_glyph(info, codepoint) != 0 }
+            end
           end
 
           def finalize
-            LibStb.hwaro_font_free(@bold_info) unless @bold_info.null?
-            if ri = @regular_info
-              LibStb.hwaro_font_free(ri) unless ri.null?
+            freed = Set(UInt64).new
+            {@display, @text, @mono}.each do |chain|
+              chain.each do |info, _|
+                next if info.null?
+                next unless freed.add?(info.address)
+                LibStb.hwaro_font_free(info)
+              end
             end
           end
         end
@@ -214,76 +252,182 @@ module Hwaro
           init_font(data)
         end
 
-        # Load fonts once, return a reusable context. Returns nil if no font found.
-        # Priority: custom font_path > system fonts > bundled DejaVu Sans Bold.
-        # Results are memoized so repeated calls (fast-start priority + deferred passes,
-        # or watch rebuilds) do not re-scan the filesystem or re-parse TTF data.
+        # Load fonts once, return a reusable context of per-role fallback
+        # chains. Priority within every chain:
+        #   user font_path → bundled brand font (Space Grotesk / JetBrains
+        #   Mono) → CJK-capable system font when the content needs it →
+        #   bundled DejaVu Sans Bold (wide coverage).
+        # A user font no longer *replaces* everything — it merely leads the
+        # chain, so glyphs it lacks still fall back to the bundled fonts.
+        # Results are memoized so repeated calls (fast-start priority +
+        # deferred passes, or watch rebuilds) do not re-scan the filesystem
+        # or re-parse TTF data.
         def self.load_fonts(custom_font_path : String? = nil, prefer_cjk : Bool = false) : FontContext?
-          key = custom_font_path || (prefer_cjk ? "system-cjk" : "system")
+          key = "#{custom_font_path}|#{prefer_cjk}"
 
           if @@cached_font_key == key && (cached = @@cached_font_ctx)
             return cached
           end
 
-          ctx : FontContext? = nil
-
-          # 1) Custom font path (user-specified via config)
+          # Chain head: a user-specified font overrides the brand fonts in
+          # every role (it may be a CJK font — that's the documented use).
+          custom : FontEntry? = nil
           if cfp = custom_font_path
             abs = cfp.starts_with?("/") ? cfp : File.join(Dir.current, cfp)
-            if result = load_font_file(abs)
-              bold_info, bold_data = result
-              ctx = FontContext.new(bold_data, bold_info)
-            else
-              Logger.warn "  Custom font '#{cfp}' not found or failed to load. Trying system fonts."
+            custom = load_font_file(abs)
+            unless custom
+              Logger.warn "  Custom font '#{cfp}' not found or failed to load. Using bundled fonts."
             end
           end
 
-          # 2) CJK-capable system font, when the content needs it. A CJK font
-          #    covers Latin too, so the whole title renders (instead of "tofu"
-          #    boxes for the CJK characters). Skipped when a custom font is set.
-          if ctx.nil? && prefer_cjk && (cjk_path = find_cjk_font)
-            if result = load_font_file(cjk_path)
-              bold_info, bold_data = result
-              ctx = FontContext.new(bold_data, bold_info)
+          # Shared chain tail: CJK coverage (when needed), then DejaVu.
+          tail = [] of FontEntry
+          if prefer_cjk && (cjk_path = find_cjk_font)
+            if cjk = load_font_file(cjk_path)
+              tail << cjk
             end
           end
+          if dejavu = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
+            tail << dejavu
+          end
 
-          # 3) System fonts
-          if ctx.nil?
-            bold_path = find_system_font(bold: true)
-            regular_path = find_system_font(bold: false)
-            font_path = bold_path || regular_path
+          display = [] of FontEntry
+          text = [] of FontEntry
+          mono = [] of FontEntry
+          if c = custom
+            display << c
+            text << c
+            mono << c
+          end
+          if d = init_font(BUNDLED_FONT_DISPLAY.to_slice.dup)
+            display << d
+          end
+          if t = init_font(BUNDLED_FONT_TEXT.to_slice.dup)
+            text << t
+          end
+          if m = init_font(BUNDLED_FONT_MONO.to_slice.dup)
+            mono << m
+          end
+          display.concat(tail)
+          text.concat(tail)
+          mono.concat(tail)
 
-            if font_path
-              if result = load_font_file(font_path)
-                bold_info, bold_data = result
-                # Try loading a separate regular font
-                regular_info = nil
-                regular_data = nil
-                r_path = regular_path
-                if r_path && r_path != font_path
-                  if r_result = load_font_file(r_path)
-                    regular_info, regular_data = r_result
+          # Last-ditch: if even the bundled fonts failed to parse, fall
+          # back to any system font so PNG output stays possible.
+          if display.empty?
+            if (path = find_system_font(bold: true)) && (sys = load_font_file(path))
+              display << sys
+            end
+          end
+          return if display.empty?
+          text = display if text.empty?
+          mono = display if mono.empty?
+
+          ctx = FontContext.new(display, text, mono)
+          @@cached_font_ctx = ctx
+          @@cached_font_key = key
+          ctx
+        end
+
+        # --- Font-chain rendering helpers ---
+
+        # Index of the first font in `chain` that has a glyph for
+        # `codepoint`, or nil when none covers it.
+        protected def self.chain_font_index(chain : Array(FontEntry), codepoint : Int32) : Int32?
+          chain.each_with_index do |(info, _), i|
+            return i if LibStb.hwaro_font_has_glyph(info, codepoint) != 0
+          end
+          nil
+        end
+
+        # Split `text` into runs of consecutive characters drawable by the
+        # same (first-covering) chain font. Whitespace sticks to the current
+        # run so spaces never force a font switch. Characters covered by no
+        # font are skipped (drop_missing_glyphs upstream makes this a no-op
+        # in practice).
+        private def self.chain_split_runs(chain : Array(FontEntry), text : String) : Array({Int32, String})
+          runs = [] of {Int32, String}
+          current = -1
+          buf = IO::Memory.new
+          text.each_char do |ch|
+            idx = if ch.whitespace? && current >= 0
+                    current
+                  else
+                    chain_font_index(chain, ch.ord)
                   end
-                end
-                ctx = FontContext.new(bold_data, bold_info, regular_data, regular_info)
+            next unless idx
+            if idx != current && buf.size > 0
+              runs << {current, buf.to_s}
+              buf = IO::Memory.new
+            end
+            current = idx
+            buf << ch
+          end
+          runs << {current, buf.to_s} if buf.size > 0 && current >= 0
+          runs
+        end
+
+        # Per-font {scale, y-offset} so different chain fonts share one
+        # baseline: the chain's primary font defines the baseline for the
+        # requested pixel height; every other font is shifted so its own
+        # ascent lands on that same baseline.
+        private def self.chain_metrics(chain : Array(FontEntry), px_size : Float32) : Array({Float32, Float32})
+          primary_scale = LibStb.hwaro_font_scale_for_pixel_height(chain.first[0], px_size)
+          pa = 0; pd = 0; pg = 0
+          LibStb.hwaro_font_get_vmetrics(chain.first[0], pointerof(pa), pointerof(pd), pointerof(pg))
+          baseline = primary_scale * pa
+          chain.map do |(info, _)|
+            scale = LibStb.hwaro_font_scale_for_pixel_height(info, px_size)
+            a = 0; d = 0; g = 0
+            LibStb.hwaro_font_get_vmetrics(info, pointerof(a), pointerof(d), pointerof(g))
+            {scale, baseline - scale * a}
+          end
+        end
+
+        # Measure `text` at `px_size` across the chain. `tracking` adds a
+        # fixed per-character advance (used for eyebrow/brand labels).
+        def self.chain_measure(chain : Array(FontEntry), px_size : Float32, text : String, tracking : Float32 = 0_f32) : Float32
+          return 0_f32 if text.empty? || chain.empty?
+          metrics = chain_metrics(chain, px_size)
+          width = 0_f32
+          drawn = 0
+          chain_split_runs(chain, text).each do |idx, run|
+            info = chain[idx][0]
+            scale = metrics[idx][0]
+            if tracking.zero?
+              width += LibStb.hwaro_font_measure_text(info, run, scale)
+            else
+              run.each_char do |ch|
+                width += LibStb.hwaro_font_measure_text(info, ch.to_s, scale) + tracking
+                drawn += 1
               end
             end
           end
+          width -= tracking if !tracking.zero? && drawn > 0
+          width
+        end
 
-          # 4) Bundled fallback (DejaVu Sans Bold)
-          if ctx.nil?
-            if result = init_font(BUNDLED_FONT_BOLD.to_slice.dup)
-              bold_info, bold_data = result
-              ctx = FontContext.new(bold_data, bold_info)
+        # Render `text` at `px_size` with per-glyph font fallback. `y_top`
+        # is the top of the text box (same convention as
+        # hwaro_font_render_text: baseline = y_top + scale * ascent).
+        # Returns the final x position.
+        def self.chain_render(chain : Array(FontEntry), pixels : UInt8*, x : Float32, y_top : Float32, px_size : Float32, text : String, color : UInt32, opacity : Float32, tracking : Float32 = 0_f32) : Float32
+          return x if text.empty? || chain.empty?
+          metrics = chain_metrics(chain, px_size)
+          cursor = x
+          chain_split_runs(chain, text).each do |idx, run|
+            info = chain[idx][0]
+            scale, y_off = metrics[idx]
+            if tracking.zero?
+              cursor = LibStb.hwaro_font_render_text(info, pixels, WIDTH, HEIGHT, cursor, y_top + y_off, scale, run, color, opacity)
+            else
+              run.each_char do |ch|
+                cursor = LibStb.hwaro_font_render_text(info, pixels, WIDTH, HEIGHT, cursor, y_top + y_off, scale, ch.to_s, color, opacity)
+                cursor += tracking
+              end
             end
           end
-
-          if ctx
-            @@cached_font_ctx = ctx
-            @@cached_font_key = key
-          end
-          ctx
+          cursor
         end
 
         # Pre-render the config-only layers (background fill, background
@@ -464,95 +608,108 @@ module Hwaro
           bg_color : UInt32,
         )
           ai = config.og.auto_image
+          style = ai.style
           font_size = Math.max(ai.font_size, 1).to_f32
 
-          # Ambitious + geometric styles get much bolder default typography
-          case ai.style
-          when "hero", "monument", "brutalist"
-            if ai.font_size <= 48
-              font_size = 78.0
-            end
-          when "artistic", "surreal", "bauhaus", "halftone"
-            if ai.font_size <= 48
-              font_size = 64.0
-            end
-          when "band"
-            if ai.font_size <= 48
-              font_size = 60.0
-            end
-          when "split"
-            if ai.font_size <= 48
-              font_size = 58.0
-            end
-          when "terminal"
-            if ai.font_size <= 48
-              font_size = 54.0
-            end
+          # Style-tuned default type scale unless the user raised it explicitly.
+          if ai.font_size <= 48
+            font_size = case style
+                        when "monument"          then 84.0_f32
+                        when "hero", "brutalist" then 78.0_f32
+                        when "artistic", "surreal", "bauhaus", "halftone", "minimal"
+                          64.0_f32
+                        when "band"     then 60.0_f32
+                        when "split"    then 58.0_f32
+                        when "terminal" then 54.0_f32
+                        else                 56.0_f32
+                        end
           end
-          desc_size = Math.max((font_size * 0.38).to_i, 1).to_f32 # smaller desc ratio for ambitious styles
+          desc_size = Math.max((font_size * OgImage::DESC_RATIO).to_i, 1).to_f32
 
-          bold_info = ctx.bold_info
-          bold_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size)
+          # `terminal` is a full monospace composition; everything else sets
+          # titles in the display face and descriptions in the text face.
+          title_chain = style == "terminal" ? ctx.mono : ctx.display
+          desc_chain = style == "terminal" ? ctx.mono : ctx.text
+          brand_chain = style == "terminal" ? ctx.mono : ctx.display
 
-          # Use regular font if available, otherwise fall back to bold
-          r_info = ctx.regular_info || bold_info
-          r_scale = LibStb.hwaro_font_scale_for_pixel_height(r_info, desc_size)
+          title_line_h = (font_size * OgImage::TITLE_LINE_H).to_f32
+          desc_line_h = (desc_size * OgImage::DESC_LINE_H).to_f32
 
           # `terminal` prefixes the title with an accent "$" prompt; the title
           # block shifts right by this advance on every line.
           prompt_advance = 0_f32
-          if ai.style == "terminal"
-            prompt_advance = LibStb.hwaro_font_measure_text(bold_info, "$", bold_scale) + font_size * 0.4_f32
+          if style == "terminal"
+            prompt_advance = chain_measure(ctx.mono, font_size, "$") + font_size * 0.4_f32
           end
 
           # Word-wrap width and margins — modern + geometric styles get tailored treatment
-          margin_x = case ai.style
-                     when "editorial", "framed"                     then 110
-                     when "artistic", "hero", "surreal", "monument" then 140
-                     when "split"                                   then OgImage::SPLIT_TEXT_X
-                     when "brutalist"                               then OgImage::BRUTALIST_TEXT_X
-                     when "terminal"                                then OgImage::TERMINAL_TEXT_X
-                     when "bauhaus"                                 then OgImage::BAUHAUS_TEXT_X
-                     when "halftone"                                then OgImage::HALFTONE_TEXT_X
-                     else                                                80
+          margin_x = case style
+                     when "artistic", "hero", "surreal" then 140
+                     when "split"                       then OgImage::SPLIT_TEXT_X
+                     when "brutalist"                   then OgImage::BRUTALIST_TEXT_X
+                     when "terminal"                    then OgImage::TERMINAL_TEXT_X
+                     when "bauhaus"                     then OgImage::BAUHAUS_TEXT_X
+                     when "halftone"                    then OgImage::HALFTONE_TEXT_X
+                     else                                    OgImage::MARGIN_X
                      end
-          wrap_width = case ai.style
-                       when "split"     then WIDTH - OgImage::SPLIT_TEXT_X - 80
-                       when "brutalist" then WIDTH - OgImage::BRUTALIST_TEXT_X - (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 40)
-                       when "terminal"  then WIDTH - OgImage::TERMINAL_TEXT_X * 2 - prompt_advance.to_i
-                       when "bauhaus"   then OgImage::BAUHAUS_TEXT_W
-                       when "halftone"  then OgImage::HALFTONE_TEXT_W
-                       else                  WIDTH - (margin_x * 2)
+          wrap_width = case style
+                       when "split"                       then WIDTH - OgImage::SPLIT_TEXT_X - 80
+                       when "brutalist"                   then WIDTH - OgImage::BRUTALIST_TEXT_X - (OgImage::BRUTALIST_INSET + OgImage::BRUTALIST_FRAME + 40)
+                       when "terminal"                    then WIDTH - OgImage::TERMINAL_TEXT_X * 2 - prompt_advance.to_i
+                       when "bauhaus"                     then OgImage::BAUHAUS_TEXT_W
+                       when "halftone"                    then OgImage::HALFTONE_TEXT_W
+                       when "framed"                      then OgImage::FRAMED_WRAP_W
+                       when "artistic", "hero", "surreal" then WIDTH - 280
+                       else                                    Math.min(WIDTH - margin_x * 2, 980)
                        end
 
           # Sanitize every string the fonts will draw: codepoints without a
-          # glyph (emoji, mostly) would render as tofu boxes otherwise.
-          title_text = drop_missing_glyphs(bold_info, page.title)
-          site_title = drop_missing_glyphs(bold_info, config.title)
+          # glyph in any chain font (emoji, mostly) would render as tofu
+          # boxes otherwise.
+          title_text = drop_missing_glyphs(title_chain, page.title)
+          site_title = drop_missing_glyphs(brand_chain, config.title)
 
-          title_lines = word_wrap_measured(bold_info, bold_scale, title_text, wrap_width)
+          title_lines = balanced_wrap_chain(title_chain, font_size, title_text, wrap_width)
           # The band style draws the title inside a fixed-height color band;
           # cap the lines so a long title can't overflow the band invisibly.
-          title_lines = OgImage.cap_band_title(title_lines, font_size.to_i) if ai.style == "band"
-          desc_text = drop_missing_glyphs(r_info, page.description || "")
-          desc_lines = desc_text.empty? ? [] of String : word_wrap_measured(r_info, r_scale, desc_text, wrap_width)
+          title_cap = case style
+                      when "monument" then 2
+                      when "band"     then OgImage.band_line_capacity(font_size.to_i)
+                      else                 OgImage::TITLE_MAX_LINES
+                      end
+          title_lines = OgImage.cap_lines(title_lines, title_cap)
 
-          # Vertical positioning — ambitious styles get very bold, confident, centered placement
-          title_block_height = title_lines.size * (font_size + 8)
-          desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * (desc_size + 6)
-          total_text_height = title_block_height + desc_block_height + 20
+          desc_text = drop_missing_glyphs(desc_chain, page.description || "")
+          desc_lines = desc_text.empty? ? [] of String : word_wrap_chain(desc_chain, desc_size, desc_text, wrap_width)
+          desc_lines = OgImage.cap_lines(desc_lines, style == "monument" ? 1 : OgImage::DESC_MAX_LINES)
 
-          case ai.style
-          when "editorial", "framed"
-            title_start_y = Math.max(font_size + 32, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 12)
+          # Vertical geometry. `title_start_y` is the BASELINE of the first
+          # title line (rendering converts to top with `y - font_size`).
+          title_block_height = title_lines.size * title_line_h
+          desc_gap = font_size * 0.55_f32
+          desc_block_height = desc_lines.empty? ? 0_f32 : desc_lines.size * desc_line_h
+          total_text_height = title_block_height + (desc_lines.empty? ? 0_f32 : desc_gap + desc_block_height)
+
+          case style
+          when "default"
+            title_start_y = OgImage::MASTHEAD_TITLE_TOP + font_size
+          when "dots"
+            title_start_y = OgImage::DOTS_TITLE_TOP + font_size
+          when "waves"
+            # Centered over the calm region above the tide bands.
+            region = OgImage::WAVES_TEXT_REGION_H.to_f32
+            title_start_y = Math.max(font_size + 20, ((region - total_text_height) / 2) + font_size)
+          when "editorial"
+            title_start_y = OgImage::EDITORIAL_TITLE_TOP + font_size
+          when "framed"
+            title_start_y = OgImage::FRAMED_TITLE_TOP + font_size
+          when "monument"
+            title_start_y = OgImage::MONUMENT_TITLE_TOP + font_size
           when "artistic", "surreal"
             title_start_y = Math.max(font_size + 48, ((HEIGHT - total_text_height) / 2).to_f32 + font_size - 28)
           when "hero"
             # Hero: Title dominates, pushed higher for impact
             title_start_y = Math.max(font_size + 20, 180_f32)
-          when "monument"
-            # Monument: Extremely dominant title with massive breathing room
-            title_start_y = Math.max(font_size + 10, 120_f32)
           when "band"
             # Band: vertically centered inside the color band.
             band_center = (OgImage::BAND_TOP + OgImage::BAND_HEIGHT // 2).to_f32
@@ -577,7 +734,7 @@ module Hwaro
           # signature reads clearly.
           if panel < 0.01
             has_bg = !((bgi = ai.background_image).nil? || bgi.empty?)
-            case ai.style
+            case style
             when "artistic"  then panel = has_bg ? 0.78 : 0.26
             when "surreal"   then panel = has_bg ? 0.80 : 0.34
             when "hero"      then panel = has_bg ? 0.65 : 0.30
@@ -588,108 +745,190 @@ module Hwaro
           end
 
           # Hero: oversized "ghost" echo of the title's first word behind
-          # the composition for poster-style depth.
-          if ai.style == "hero"
+          # the composition for poster-style depth. Kept fully on-canvas
+          # (the old fixed placement clipped its cap at the top edge) and
+          # width-capped so a long first word can't run off both sides.
+          if style == "hero"
             if ghost = title_text.split(/\s+/).first?
               unless ghost.empty?
-                ghost_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, font_size * 2.6_f32)
-                LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, (margin_x - 10).to_f32, 34_f32, ghost_scale, ghost.upcase, text_color, 0.07_f32)
+                ghost_text = ghost.upcase
+                ghost_size = font_size * 2.6_f32
+                gw = chain_measure(ctx.display, ghost_size, ghost_text)
+                ghost_size *= 1500_f32 / gw if gw > 1500
+                ghost_top = Math.max(title_start_y - font_size * 2.35_f32, 16_f32)
+                chain_render(ctx.display, pixels, (margin_x - 10).to_f32, ghost_top, ghost_size, ghost_text, text_color, 0.06_f32)
               end
             end
           end
 
           # Geometric and signature styles are intentionally flat — they never use the soft panel.
-          if panel > 0.01 && !OgImage.geometric?(ai.style) && !OgImage.signature?(ai.style)
-            top_offset : Float32 = ai.style == "framed" ? 48_f32 : 36_f32
-            bottom_offset : Float32 = ai.style == "framed" ? 52_f32 : 40_f32
+          if panel > 0.01 && !OgImage.geometric?(style) && !OgImage.signature?(style)
+            top_offset : Float32 = style == "framed" ? 48_f32 : 36_f32
+            bottom_offset : Float32 = style == "framed" ? 52_f32 : 40_f32
             panel_top = (title_start_y - font_size - top_offset).to_f32.clamp(16_f32, HEIGHT * 0.52_f32)
             panel_bottom = (title_start_y + total_text_height + bottom_offset).to_f32.clamp(panel_top + 90, HEIGHT - 60_f32)
             draw_text_panel(pixels, panel_top, panel_bottom, panel, bg_color, accent_color)
           end
 
           # Terminal: accent "$" prompt before the first title line.
-          if ai.style == "terminal"
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, margin_x.to_f32, title_start_y - font_size, bold_scale, "$", accent_color, 1.0_f32)
+          if style == "terminal"
+            chain_render(ctx.mono, pixels, margin_x.to_f32, title_start_y - font_size, font_size, "$", accent_color, 1.0_f32)
+          end
+
+          # `default` masthead: uppercase tracked site-name eyebrow at the
+          # top instead of the bottom brand row (an accent tick stands in
+          # when the site name is hidden).
+          if style == "default"
+            if ai.show_title && !site_title.empty?
+              chain_render(ctx.display, pixels, OgImage::MARGIN_X.to_f32,
+                (OgImage::MASTHEAD_EYEBROW_Y - OgImage::MASTHEAD_EYEBROW_SIZE).to_f32,
+                OgImage::MASTHEAD_EYEBROW_SIZE.to_f32, site_title.upcase, accent_color, 1.0_f32, 2.0_f32)
+            else
+              fill_rect(pixels, OgImage::MARGIN_X, OgImage::MASTHEAD_EYEBROW_Y - 6, 48, 6, accent_color)
+            end
+          end
+
+          # Editorial: uppercase tracked kicker between the hairline rules.
+          if style == "editorial" && ai.show_title && !site_title.empty?
+            chain_render(ctx.display, pixels, margin_x.to_f32,
+              (OgImage::EDITORIAL_KICKER_Y - OgImage::EDITORIAL_KICKER_SIZE).to_f32,
+              OgImage::EDITORIAL_KICKER_SIZE.to_f32, site_title.upcase, accent_color, 1.0_f32, 2.0_f32)
           end
 
           # Render title lines. `band` knocks the title out of the color band
           # using the background color for strong magazine-cover contrast.
-          title_color = ai.style == "band" ? bg_color : text_color
+          # `framed` centers every line; `monument` sets tight tracking.
+          title_color = style == "band" ? bg_color : text_color
+          title_tracking = style == "monument" ? -1.0_f32 : 0.0_f32
           title_x = margin_x.to_f32 + prompt_advance
+          last_line_end_x = title_x
           title_lines.each_with_index do |line, i|
-            y = title_start_y + i * (font_size + 8)
-            LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, title_x, y - font_size, bold_scale, line, title_color, 1.0_f32)
+            y = title_start_y + i * title_line_h
+            x = if style == "framed"
+                  (WIDTH - chain_measure(title_chain, font_size, line)) / 2
+                else
+                  title_x
+                end
+            end_x = chain_render(title_chain, pixels, x, y - font_size, font_size, line, title_color, 1.0_f32, title_tracking)
+            last_line_end_x = end_x if i == title_lines.size - 1
           end
 
           # Terminal: block cursor after the last title line.
-          if ai.style == "terminal" && !title_lines.empty?
-            last_w = LibStb.hwaro_font_measure_text(bold_info, title_lines.last, bold_scale)
-            cursor_x = (title_x + last_w + font_size * 0.25_f32).to_i
-            cursor_y = (title_start_y + (title_lines.size - 1) * (font_size + 8) - font_size * 0.88_f32).to_i
+          if style == "terminal" && !title_lines.empty?
+            cursor_x = (last_line_end_x + font_size * 0.25_f32).to_i
+            cursor_y = (title_start_y + (title_lines.size - 1) * title_line_h - font_size * 0.88_f32).to_i
             fill_rect(pixels, cursor_x, cursor_y, (font_size * 0.52_f32).to_i, (font_size * 0.95_f32).to_i, accent_color)
           end
 
-          # Editorial: thin vertical accent rule to the left of the title.
-          if ai.style == "editorial"
-            rule_x = margin_x - 28
-            rule_top = (title_start_y - font_size).to_i.clamp(0, HEIGHT)
-            rule_h = title_block_height.to_i
-            fill_rect(pixels, rule_x, rule_top, 6, rule_h, accent_color) if rule_x >= 0
+          # Minimal: an accent full stop after the last title line — the
+          # entire composition is type plus one period.
+          if style == "minimal" && !title_lines.empty?
+            r = Math.max((font_size * 0.11_f32).to_i, 3)
+            last_baseline = title_start_y + (title_lines.size - 1) * title_line_h
+            dot_cx = (last_line_end_x + font_size * 0.18_f32).to_i + r
+            dot_cy = (last_baseline - r).to_i
+            draw_filled_circle(pixels, dot_cx, dot_cy, r, accent_color, 1.0)
           end
 
-          # Monument: a single long thin rule under the title.
-          if ai.style == "monument"
-            rule_y = (title_start_y + (title_lines.size - 1) * (font_size + 8) + 30).to_i.clamp(0, HEIGHT - 5)
-            fill_rect(pixels, margin_x, rule_y, 220, 5, accent_color)
+          # Editorial: thin vertical accent rule, cap-height aligned to the title.
+          if style == "editorial"
+            rule_x = margin_x - 28
+            rule_top = (title_start_y - font_size * 0.72_f32).to_i.clamp(0, HEIGHT)
+            rule_bottom = (title_start_y + (title_lines.size - 1) * title_line_h).to_i.clamp(rule_top, HEIGHT)
+            fill_rect(pixels, rule_x, rule_top, 4, rule_bottom - rule_top, accent_color) if rule_x >= 0
           end
 
           # Render description — hero and monument get very small or minimal desc treatment
+          desc_last_baseline = title_start_y + (title_lines.size - 1) * title_line_h
           unless desc_lines.empty?
-            desc_start_y = ai.style == "band" ? (OgImage::BAND_TOP + OgImage::BAND_HEIGHT + 24).to_f32 + desc_size : title_start_y + title_block_height + 16
+            desc_start_y = if style == "band"
+                             (OgImage::BAND_TOP + OgImage::BAND_HEIGHT + 24).to_f32 + desc_size
+                           else
+                             desc_last_baseline + desc_gap + desc_size
+                           end
 
             # For hero/monument, make description much more subtle
-            desc_opacity = if ai.style == "hero" || ai.style == "monument"
+            desc_opacity = if style == "hero" || style == "monument"
                              0.45_f32
                            else
-                             0.75_f32
+                             OgImage::DESC_OPACITY.to_f32
                            end
 
             desc_lines.each_with_index do |line, i|
-              y = desc_start_y + i * (desc_size + 6)
-              LibStb.hwaro_font_render_text(r_info, pixels, WIDTH, HEIGHT, margin_x.to_f32 + prompt_advance, y - desc_size, r_scale, line, text_color, desc_opacity)
+              y = desc_start_y + i * desc_line_h
+              x = if style == "framed"
+                    (WIDTH - chain_measure(desc_chain, desc_size, line)) / 2
+                  else
+                    margin_x.to_f32 + prompt_advance
+                  end
+              chain_render(desc_chain, pixels, x, y - desc_size, desc_size, line, text_color, desc_opacity)
+              desc_last_baseline = y
             end
           end
 
-          # Site name — hide or minimize for the most ambitious styles
-          if ai.show_title
-            if ai.style == "hero" || ai.style == "monument"
-              # Very small and subtle for hero/monument
-              site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 18_f32)
-              site_margin = 140_f32
-              site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin
-              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 55 - 18).to_f32, site_scale, site_title, accent_color, 0.6_f32)
+          # Terminal: faint "output" skeleton rows under the text, like a
+          # command that already printed something.
+          if style == "terminal"
+            rows_top = desc_last_baseline + 44_f32
+            OgImage::TERMINAL_GHOST_ROWS.each_with_index do |w, i|
+              ry = (rows_top + i * 32).to_i
+              break if ry + 10 > HEIGHT - OgImage::TERMINAL_INSET - 24
+              fill_rounded_rect(pixels, OgImage::TERMINAL_TEXT_X, ry, w, 10, 5, text_color, 0.08)
+            end
+          end
+
+          # Site name / brand row. Several styles relocate it: terminal puts
+          # it in the window title bar, default/editorial replace it with the
+          # eyebrow/kicker, monument right-aligns it, framed centers it.
+          if ai.show_title && !site_title.empty?
+            case style
+            when "default", "editorial"
+              # handled above (eyebrow / kicker)
+            when "terminal"
+              name_size = 20_f32
+              name_w = chain_measure(ctx.mono, name_size, site_title)
+              bar_center_y = (OgImage::TERMINAL_INSET + 2 + OgImage::TERMINAL_BAR_H // 2).to_f32
+              chain_render(ctx.mono, pixels, (WIDTH - name_w) / 2, bar_center_y - name_size / 2, name_size, site_title, text_color, 0.5_f32)
+            when "monument"
+              name_w = chain_measure(brand_chain, OgImage::BRAND_SIZE.to_f32, site_title, 1.0_f32)
+              tick_x = (OgImage::MONUMENT_BRAND_RIGHT - name_w - OgImage::BRAND_TICK_W - OgImage::BRAND_GAP).to_i
+              fill_rect(pixels, tick_x, OgImage::BRAND_BASELINE - OgImage::BRAND_TICK_H + 4, OgImage::BRAND_TICK_W, OgImage::BRAND_TICK_H, accent_color)
+              chain_render(brand_chain, pixels, (tick_x + OgImage::BRAND_TICK_W + OgImage::BRAND_GAP).to_f32,
+                (OgImage::BRAND_BASELINE - OgImage::BRAND_SIZE).to_f32, OgImage::BRAND_SIZE.to_f32,
+                site_title, text_color, 0.92_f32, 1.0_f32)
+            when "framed"
+              name_w = chain_measure(brand_chain, OgImage::BRAND_SIZE.to_f32, site_title, 1.0_f32)
+              chain_render(brand_chain, pixels, (WIDTH - name_w) / 2,
+                (OgImage::FRAMED_BRAND_Y - OgImage::BRAND_SIZE).to_f32, OgImage::BRAND_SIZE.to_f32,
+                site_title, text_color, 0.7_f32, 1.0_f32)
             else
-              site_scale = LibStb.hwaro_font_scale_for_pixel_height(bold_info, 22_f32)
-              site_margin = case ai.style
-                            when "editorial", "framed" then 110
-                            when "artistic", "surreal" then 140
-                            when "split"               then 80
-                            when "brutalist"           then OgImage::BRUTALIST_TEXT_X
-                            when "terminal"            then OgImage::TERMINAL_TEXT_X
-                            when "bauhaus", "halftone" then OgImage::BAUHAUS_TEXT_X
-                            else                            OgImage::LOGO_MARGIN
+              base_margin = case style
+                            when "split"                       then 80
+                            when "brutalist"                   then OgImage::BRUTALIST_TEXT_X
+                            when "bauhaus", "halftone"         then OgImage::BAUHAUS_TEXT_X
+                            when "artistic", "surreal", "hero" then 140
+                            else                                    OgImage::LOGO_MARGIN
                             end
-              site_x = (ai.logo && ai.logo_position == "bottom-left") ? (site_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP).to_f32 : site_margin.to_f32
-              # `split` renders the site name inside the accent block → readable color.
-              site_color = ai.style == "split" ? text_color : accent_color
-              LibStb.hwaro_font_render_text(bold_info, pixels, WIDTH, HEIGHT, site_x, (HEIGHT - 65 - 22).to_f32, site_scale, site_title, site_color, 1.0_f32)
+              site_x = (ai.logo && ai.logo_position == "bottom-left") ? (base_margin + OgImage::LOGO_SIZE + OgImage::LOGO_TEXT_GAP) : base_margin
+              row_opacity = style == "minimal" ? 0.5_f32 : 0.92_f32
+              if style == "split"
+                # Inside the accent block an accent tick would vanish — name only.
+                chain_render(brand_chain, pixels, site_x.to_f32, (OgImage::BRAND_BASELINE - OgImage::BRAND_SIZE).to_f32,
+                  OgImage::BRAND_SIZE.to_f32, site_title, text_color, 1.0_f32, 1.0_f32)
+              else
+                fill_rect_alpha(pixels, site_x, OgImage::BRAND_BASELINE - OgImage::BRAND_TICK_H + 4,
+                  OgImage::BRAND_TICK_W, OgImage::BRAND_TICK_H, accent_color, row_opacity.to_f64)
+                chain_render(brand_chain, pixels, (site_x + OgImage::BRAND_TICK_W + OgImage::BRAND_GAP).to_f32,
+                  (OgImage::BRAND_BASELINE - OgImage::BRAND_SIZE).to_f32, OgImage::BRAND_SIZE.to_f32,
+                  site_title, text_color, row_opacity, 1.0_f32)
+              end
             end
           end
         end
 
-        # Word-wrap using incremental measured text width.
+        # Word-wrap using incremental chain-measured text width.
         # Handles CJK characters by allowing breaks between any CJK characters.
-        private def self.word_wrap_measured(font_info : LibStb::HwaroFontInfo, scale : Float32, text : String, max_width : Int32) : Array(String)
+        private def self.word_wrap_chain(chain : Array(FontEntry), px_size : Float32, text : String, max_width : Int32) : Array(String)
           return [] of String if text.empty?
           segments = Content::Seo::OgImage.split_into_segments(text)
           lines = [] of String
@@ -697,7 +936,7 @@ module Hwaro
           current_width = 0_f32
 
           segments.each do |seg|
-            seg_width = LibStb.hwaro_font_measure_text(font_info, seg, scale)
+            seg_width = chain_measure(chain, px_size, seg)
             if current_line.empty?
               current_line = seg
               current_width = seg_width
@@ -707,11 +946,26 @@ module Hwaro
             else
               lines << current_line.strip
               current_line = seg.lstrip
-              current_width = LibStb.hwaro_font_measure_text(font_info, current_line, scale)
+              current_width = chain_measure(chain, px_size, current_line)
             end
           end
           lines << current_line.strip unless current_line.strip.empty?
-          lines.first(4)
+          lines
+        end
+
+        # Balanced title wrap: greedy first; when the last line is an orphan
+        # (much shorter than the widest line), re-wrap against a tighter
+        # target width so line lengths even out. Only accepted when it does
+        # not add lines.
+        private def self.balanced_wrap_chain(chain : Array(FontEntry), px_size : Float32, text : String, max_width : Int32) : Array(String)
+          lines = word_wrap_chain(chain, px_size, text, max_width)
+          return lines if lines.size < 2 || lines.size > 3
+          widths = lines.map { |l| chain_measure(chain, px_size, l) }
+          widest = widths.max
+          return lines if widest <= 0 || widths.last >= widest * 0.55_f32
+          target = Math.max(widths.sum / lines.size * 1.08_f32, widest * 0.6_f32)
+          rebalanced = word_wrap_chain(chain, px_size, text, target.to_i)
+          rebalanced.size <= lines.size ? rebalanced : lines
         end
 
         # Parse "#RRGGBB" to 0xRRGGBB. Also accepts "#rgb" shorthand and
@@ -906,103 +1160,58 @@ module Hwaro
           end
         end
 
-        # Render style patterns onto pixel buffer
+        # Render style patterns onto pixel buffer. Every pattern is a
+        # composition with a focal point rather than uniform wallpaper;
+        # `opacity` acts as the peak alpha with internal falloff.
         private def self.render_pattern(pixels : UInt8*, style : String, accent : UInt32, opacity : Float64, scale : Float64)
           case style
           when "dots"
-            spacing = Math.max((20 * scale).to_i, 2)
-            radius = Math.max((3 * scale).to_i, 1)
+            # Corner-weighted halftone fade: staggered dots grow and
+            # brighten toward the top-right focal corner.
+            spacing = Math.max((26 * scale).to_i, 4)
+            row = 0
             y = spacing // 2
             while y < HEIGHT
-              x = spacing // 2
-              while x < WIDTH
-                draw_filled_circle(pixels, x, y, radius, accent, opacity)
+              x = row.odd? ? spacing // 2 : 0
+              while x < WIDTH + spacing
+                dx = (WIDTH - x).to_f
+                dy = y.to_f
+                t = (1.0 - Math.sqrt(dx * dx + dy * dy) / 950.0).clamp(0.0, 1.0)
+                r = 1.0 + 4.2 * (t ** 1.8)
+                alpha = opacity * t
+                draw_filled_circle(pixels, x, y, r.to_i, accent, alpha) if r >= 0.8 && alpha > 0.004
                 x += spacing
               end
               y += spacing
+              row += 1
             end
           when "grid"
-            spacing = Math.max((40 * scale).to_i, 4)
-            # Horizontal lines
+            # Blueprint: a fine quiet grid plus one focal crosshair with
+            # registration marks.
+            spacing = Math.max((48 * scale).to_i, 8)
+            minor = (opacity * 0.4).clamp(0.0, 1.0)
             y = 0
             while y < HEIGHT
-              fill_rect_alpha(pixels, 0, y, WIDTH, 1, accent, opacity)
+              fill_rect_alpha(pixels, 0, y, WIDTH, 1, accent, minor)
               y += spacing
             end
-            # Vertical lines
             x = 0
             while x < WIDTH
-              fill_rect_alpha(pixels, x, 0, 1, HEIGHT, accent, opacity)
+              fill_rect_alpha(pixels, x, 0, 1, HEIGHT, accent, minor)
               x += spacing
             end
+            focal = (opacity * 1.3).clamp(0.0, 1.0)
+            fill_rect_alpha(pixels, OgImage::GRID_FOCAL_X, 0, 1, HEIGHT, accent, focal)
+            fill_rect_alpha(pixels, 0, OgImage::GRID_FOCAL_Y, WIDTH, 1, accent, focal)
+            draw_filled_circle(pixels, OgImage::GRID_FOCAL_X, OgImage::GRID_FOCAL_Y, 7, accent, (opacity * 2.0).clamp(0.0, 1.0))
+            draw_border(pixels, 435, OgImage::GRID_FOCAL_Y - 5, 10, 10, 1, accent)
           when "diagonal"
-            spacing = Math.max((20 * scale).to_i, 4)
-            step = 0
-            while step < WIDTH + HEIGHT
-              # Draw a 1px diagonal line
-              ix = 0
-              while ix < WIDTH && (step - ix) >= 0
-                iy = step - ix
-                if iy < HEIGHT
-                  idx = (iy * WIDTH + ix) * CHANNELS
-                  r = ((accent >> 16) & 0xFF).to_u8
-                  g = ((accent >> 8) & 0xFF).to_u8
-                  b = (accent & 0xFF).to_u8
-                  alpha = opacity.clamp(0.0, 1.0)
-                  dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
-                  pixels[idx] = (dr + (r.to_f - dr) * alpha).to_u8
-                  pixels[idx + 1] = (dg + (g.to_f - dg) * alpha).to_u8
-                  pixels[idx + 2] = (db + (b.to_f - db) * alpha).to_u8
-                end
-                ix += 1
-              end
-              step += spacing
-            end
-          when "gradient"
-            r = ((accent >> 16) & 0xFF).to_f
-            g = ((accent >> 8) & 0xFF).to_f
-            b = (accent & 0xFF).to_f
-            diagonal = Math.sqrt((WIDTH * WIDTH + HEIGHT * HEIGHT).to_f)
-            HEIGHT.times do |py|
-              WIDTH.times do |px|
-                t = (px + py).to_f / diagonal
-                # Clamp like every other style branch: an opacity above 1.0
-                # would push the blend past 255 (or below 0) and the `.to_u8`
-                # conversions below raise OverflowError.
-                alpha = (opacity * (1.0 - t)).clamp(0.0, 1.0)
-                next if alpha <= 0
-                idx = (py * WIDTH + px) * CHANNELS
-                dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
-                pixels[idx] = (dr + (r - dr) * alpha).to_u8
-                pixels[idx + 1] = (dg + (g - dg) * alpha).to_u8
-                pixels[idx + 2] = (db + (b - db) * alpha).to_u8
-              end
-            end
+            stripe_wedge(pixels, accent, opacity)
           when "waves"
-            amp = (20 * scale).to_i
-            3.times do |i|
-              y_center = HEIGHT // 3 + i * (80 * scale).to_i
-              WIDTH.times do |px|
-                # Simple sine wave approximation
-                angle = px.to_f * Math::PI * 2 / 600.0
-                py = y_center + (Math.sin(angle) * amp).to_i
-                next if py < 0 || py >= HEIGHT
-                # Draw 2px thick
-                (-1..1).each do |dy|
-                  ppy = py + dy
-                  next if ppy < 0 || ppy >= HEIGHT
-                  idx = (ppy * WIDTH + px) * CHANNELS
-                  r = ((accent >> 16) & 0xFF).to_u8
-                  g = ((accent >> 8) & 0xFF).to_u8
-                  b = (accent & 0xFF).to_u8
-                  alpha = opacity.clamp(0.0, 1.0)
-                  dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
-                  pixels[idx] = (dr + (r.to_f - dr) * alpha).to_u8
-                  pixels[idx + 1] = (dg + (g.to_f - dg) * alpha).to_u8
-                  pixels[idx + 2] = (db + (b.to_f - db) * alpha).to_u8
-                end
-              end
-            end
+            # Layered tide bands anchored to the bottom edge.
+            fill_wave_band(pixels, 430.0, 26.0, 1050.0, 0.0, shifted_hue(accent, -16.0), opacity * 0.35)
+            fill_wave_band(pixels, 474.0, 34.0, 800.0, 1.9, accent, opacity * 0.5)
+            fill_wave_band(pixels, 522.0, 22.0, 1250.0, 4.1, shifted_hue(accent, 18.0), opacity * 0.75)
           end
         end
 
@@ -1015,12 +1224,42 @@ module Hwaro
         # user-supplied photo shows through untouched.
         private def self.render_style_decoration(pixels : UInt8*, style : String, bg : UInt32, accent : UInt32, secondary : UInt32, has_bg_image : Bool)
           case style
+          when "default"
+            # Masthead: a low corner glow + gentle vignette give the flat
+            # canvas depth without competing with the type.
+            unless has_bg_image
+              draw_radial_glow(pixels, 1160, 700, 720, accent, 0.14)
+              draw_vignette(pixels, 0.12)
+            end
+          when "gradient"
+            # Duotone wash: accent-tinted diagonal gradient + corner glow +
+            # vignette + grain — real depth instead of a fade-to-nothing.
+            unless has_bg_image
+              c1 = shifted_lightness(lerp_color(bg, accent, 0.45), -0.06)
+              c2 = shifted_lightness(bg, -0.03)
+              fill_linear_gradient(pixels, c1, c2)
+              draw_radial_glow(pixels, 140, 640, 560, accent, 0.20)
+              draw_vignette(pixels, 0.15)
+              apply_grain(pixels, 0.035)
+            end
+          when "editorial"
+            # Magazine front: quiet full-width hairline rules above and
+            # below the content area (the kicker/title live between them).
+            rule = neutral_line(bg)
+            fill_rect(pixels, OgImage::EDITORIAL_RULE_X0, OgImage::EDITORIAL_RULE_TOP, OgImage::EDITORIAL_RULE_X1 - OgImage::EDITORIAL_RULE_X0, 1, rule)
+            fill_rect(pixels, OgImage::EDITORIAL_RULE_X0, OgImage::EDITORIAL_RULE_BOT, OgImage::EDITORIAL_RULE_X1 - OgImage::EDITORIAL_RULE_X0, 1, rule)
+          when "monument"
+            # A short accent rule ABOVE the title; the vast top-left
+            # whitespace is the design.
+            fill_rect(pixels, OgImage::MARGIN_X, OgImage::MONUMENT_RULE_Y, OgImage::MONUMENT_RULE_W, OgImage::MONUMENT_RULE_H, accent)
           when "split"
             # Secondary strip first (wider), then the accent block on top —
             # leaving a two-tone diagonal seam between them.
             fill_left_diagonal(pixels, secondary, OgImage::SPLIT_TOP_X + OgImage::SPLIT_EDGE, OgImage::SPLIT_BOTTOM_X + OgImage::SPLIT_EDGE)
             fill_left_diagonal(pixels, accent, OgImage::SPLIT_TOP_X, OgImage::SPLIT_BOTTOM_X)
           when "band"
+            # A thin muted echo band above the main band for print feel.
+            fill_rect_alpha(pixels, 0, OgImage::BAND_TOP - OgImage::BAND_ECHO_GAP, WIDTH, OgImage::BAND_ECHO_H, accent, 0.4)
             fill_rect(pixels, 0, OgImage::BAND_TOP, WIDTH, OgImage::BAND_HEIGHT, accent)
           when "brutalist"
             inset = OgImage::BRUTALIST_INSET
@@ -1035,12 +1274,13 @@ module Hwaro
             # Thick accent border around the panel.
             draw_border(pixels, inset, inset, iw, ih, frame, accent)
           when "artistic"
-            # Mesh-gradient color field: diagonal base + hue-shifted blobs +
-            # a dark anchor for text legibility + film grain.
+            # Mesh-gradient color field: diagonal base + analogous-hue blobs
+            # (arbitrary rotations read as AI-purple) + a dark anchor for
+            # text legibility + film grain.
             unless has_bg_image
               fill_linear_gradient(pixels, accent, secondary)
-              draw_radial_glow(pixels, 210, 60, 540, shifted_hue(accent, 45.0), 0.55)
-              draw_radial_glow(pixels, 1060, 570, 580, shifted_hue(secondary, -40.0), 0.5)
+              draw_radial_glow(pixels, 210, 60, 540, shifted_hue(accent, 28.0), 0.55)
+              draw_radial_glow(pixels, 1060, 570, 580, shifted_hue(secondary, -20.0), 0.5)
               draw_radial_glow(pixels, 600, 730, 580, bg, 0.6)
               apply_grain(pixels, 0.05)
             end
@@ -1056,22 +1296,30 @@ module Hwaro
             unless has_bg_image
               draw_radial_glow(pixels, 300, 190, 470, accent, 0.55)
               draw_radial_glow(pixels, 960, 390, 540, secondary, 0.5)
-              draw_radial_glow(pixels, 620, 600, 460, shifted_hue(accent, 60.0), 0.35)
+              draw_radial_glow(pixels, 620, 600, 460, shifted_hue(accent, 40.0), 0.35)
               draw_ribbon(pixels, 230.0, 55.0, 56.0, accent, 0.30, 760.0, 0.6)
               draw_ribbon(pixels, 410.0, 70.0, 90.0, secondary, 0.25, 920.0, 2.4)
               apply_grain(pixels, 0.05)
             end
           when "framed"
-            # Elegant thin frame inset from the edges.
+            # Invitation card: a neutral hairline frame plus accent corner
+            # brackets inset from it.
             fi = OgImage::FRAMED_INSET
-            draw_border(pixels, fi, fi, WIDTH - 2 * fi, HEIGHT - 2 * fi, OgImage::FRAMED_WIDTH, accent)
+            draw_border(pixels, fi, fi, WIDTH - 2 * fi, HEIGHT - 2 * fi, OgImage::FRAMED_WIDTH, neutral_line(bg))
+            bi = OgImage::FRAMED_BRACKET_INSET
+            arm = OgImage::FRAMED_BRACKET_ARM
+            bw = OgImage::FRAMED_BRACKET_W
+            draw_corner_bracket(pixels, bi, bi, arm, bw, accent, :tl)
+            draw_corner_bracket(pixels, WIDTH - bi, bi, arm, bw, accent, :tr)
+            draw_corner_bracket(pixels, bi, HEIGHT - bi, arm, bw, accent, :bl)
+            draw_corner_bracket(pixels, WIDTH - bi, HEIGHT - bi, arm, bw, accent, :br)
           when "terminal"
             draw_terminal_window(pixels, bg, has_bg_image)
           when "bauhaus"
             # Flat geometric art composition on the right: circle, dot,
             # triangle, quarter disc — layered in accent/secondary/derived.
             tertiary = shifted_hue(accent, 60.0, 0.45)
-            draw_filled_circle(pixels, 950, 150, 220, accent, 1.0)
+            draw_filled_circle(pixels, 940, 190, 220, accent, 1.0)
             draw_filled_circle(pixels, 690, 150, 30, secondary, 1.0)
             fill_triangle(pixels, 690, 500, 830, 260, 970, 500, tertiary)
             # Quarter disc at the bottom-right corner (canvas clips it).
@@ -1079,6 +1327,13 @@ module Hwaro
           when "halftone"
             draw_halftone_field(pixels, accent)
           end
+        end
+
+        # A quiet hairline color derived from the background: slightly
+        # lighter on dark backgrounds, slightly darker on light ones.
+        private def self.neutral_line(bg : UInt32) : UInt32
+          _, _, l = OgImage.hex_to_hsl("#%06x" % bg)
+          shifted_lightness(bg, l > 0.5 ? -0.30 : 0.32)
         end
 
         # Rotate a packed RGB color's hue by `degrees` (HSL round-trip).
@@ -1222,24 +1477,132 @@ module Hwaro
         end
 
         # `halftone`: print-style dot field — dots grow toward the right
-        # edge, rows staggered like a press halftone screen.
+        # edge, rows staggered like a press halftone screen, with a gentle
+        # vertical cosine weight so the field breathes instead of tiling.
         private def self.draw_halftone_field(pixels : UInt8*, accent : UInt32)
-          spacing = 30
-          max_r = 13.0
+          spacing = 28
+          max_r = 15.0
           field_x = OgImage::HALFTONE_FIELD_X
           field_w = (WIDTH - field_x).to_f
+          mid_y = HEIGHT / 2.0
           row = 0
           y = spacing // 2
           while y < HEIGHT
             x = field_x + (row.odd? ? spacing // 2 : 0)
+            breath = 0.65 + 0.35 * Math.cos((y - mid_y) / mid_y * Math::PI / 2.0)
             while x < WIDTH + spacing
               tx = ((x - field_x).to_f / field_w).clamp(0.0, 1.0)
-              r = max_r * (tx ** 1.6)
+              r = max_r * (tx ** 1.6) * breath
               draw_filled_circle(pixels, x, y, r.to_i, accent, 0.92) if r >= 1.0
               x += spacing
             end
             y += spacing
             row += 1
+          end
+        end
+
+        # Darken toward the corners (inverse radial vignette). `strength`
+        # is the blend factor at the farthest corner; falloff is quadratic
+        # so the center stays untouched.
+        private def self.draw_vignette(pixels : UInt8*, strength : Float64)
+          return if strength <= 0.0
+          cx = WIDTH / 2.0
+          cy = HEIGHT / 2.0
+          max_d2 = cx * cx + cy * cy
+          HEIGHT.times do |py|
+            dy = py - cy
+            WIDTH.times do |px|
+              dx = px - cx
+              a = strength * ((dx * dx + dy * dy) / max_d2)
+              next if a <= 0.002
+              idx = (py * WIDTH + px) * CHANNELS
+              keep = 1.0 - a
+              pixels[idx] = (pixels[idx] * keep).to_u8
+              pixels[idx + 1] = (pixels[idx + 1] * keep).to_u8
+              pixels[idx + 2] = (pixels[idx + 2] * keep).to_u8
+            end
+          end
+        end
+
+        # Fill from a sine curve down to the bottom edge — one "tide band".
+        # Overlapping bands accumulate, which is the point.
+        private def self.fill_wave_band(pixels : UInt8*, base_y : Float64, amplitude : Float64, wavelength : Float64, phase : Float64, color : UInt32, alpha : Float64)
+          alpha = alpha.clamp(0.0, 1.0)
+          return if alpha <= 0.0
+          cr = ((color >> 16) & 0xFF).to_f
+          cg = ((color >> 8) & 0xFF).to_f
+          cb = (color & 0xFF).to_f
+          WIDTH.times do |px|
+            edge = base_y + Math.sin(px.to_f * Math::PI * 2.0 / wavelength + phase) * amplitude
+            y0 = edge.to_i.clamp(0, HEIGHT)
+            (y0...HEIGHT).each do |py|
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
+              pixels[idx] = (dr + (cr - dr) * alpha).to_u8
+              pixels[idx + 1] = (dg + (cg - dg) * alpha).to_u8
+              pixels[idx + 2] = (db + (cb - db) * alpha).to_u8
+            end
+          end
+        end
+
+        # Two rects forming an L-shaped bracket at a corner point (x, y).
+        private def self.draw_corner_bracket(pixels : UInt8*, x : Int32, y : Int32, arm : Int32, thickness : Int32, color : UInt32, corner : Symbol)
+          case corner
+          when :tl
+            fill_rect(pixels, x, y, arm, thickness, color)
+            fill_rect(pixels, x, y, thickness, arm, color)
+          when :tr
+            fill_rect(pixels, x - arm, y, arm, thickness, color)
+            fill_rect(pixels, x - thickness, y, thickness, arm, color)
+          when :bl
+            fill_rect(pixels, x, y - thickness, arm, thickness, color)
+            fill_rect(pixels, x, y - arm, thickness, arm, color)
+          when :br
+            fill_rect(pixels, x - arm, y - thickness, arm, thickness, color)
+            fill_rect(pixels, x - thickness, y - arm, thickness, arm, color)
+          end
+        end
+
+        # `diagonal`: 45° stripes clipped to the bottom-right corner wedge
+        # with an alpha ramp from the hypotenuse (0) to the corner (peak),
+        # plus an accent rule along the hypotenuse.
+        private def self.stripe_wedge(pixels : UInt8*, accent : UInt32, opacity : Float64)
+          x0 = OgImage::DIAG_WEDGE_X0
+          y1 = OgImage::DIAG_WEDGE_Y1
+          # Edge function: 0 on the hypotenuse (x0,HEIGHT)-(WIDTH,y1), most
+          # negative at the (WIDTH,HEIGHT) corner.
+          e_corner = ((WIDTH - x0) * (y1 - HEIGHT)).to_f
+          cr = ((accent >> 16) & 0xFF).to_f
+          cg = ((accent >> 8) & 0xFF).to_f
+          cb = (accent & 0xFF).to_f
+          (y1...HEIGHT).each do |py|
+            (x0...WIDTH).each do |px|
+              e = ((px - x0) * (y1 - HEIGHT) - (py - HEIGHT) * (WIDTH - x0)).to_f
+              next if e > 0 # hypotenuse side — outside the wedge
+              next unless ((px + py) % 36) < 14
+              a = (opacity * (e / e_corner)).clamp(0.0, 1.0)
+              next if a <= 0.004
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
+              pixels[idx] = (dr + (cr - dr) * a).to_u8
+              pixels[idx + 1] = (dg + (cg - dg) * a).to_u8
+              pixels[idx + 2] = (db + (cb - db) * a).to_u8
+            end
+          end
+          # Accent rule along the hypotenuse.
+          rule_a = (opacity * 1.4).clamp(0.0, 1.0)
+          slope = (y1 - HEIGHT).to_f / (WIDTH - x0)
+          (x0...WIDTH).each do |px|
+            yline = HEIGHT + ((px - x0) * slope)
+            3.times do |o|
+              py = yline.to_i - o
+              next if py < 0 || py >= HEIGHT
+              idx = (py * WIDTH + px) * CHANNELS
+              dr = pixels[idx]; dg = pixels[idx + 1]; db = pixels[idx + 2]
+              pixels[idx] = (dr + (cr - dr) * rule_a).to_u8
+              pixels[idx + 1] = (dg + (cg - dg) * rule_a).to_u8
+              pixels[idx + 2] = (db + (cb - db) * rule_a).to_u8
+            end
           end
         end
 

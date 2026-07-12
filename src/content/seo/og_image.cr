@@ -78,6 +78,66 @@ module Hwaro
           style == "minimal" || modern?(style) || geometric?(style) || signature?(style)
         end
 
+        # --- Shared typographic design system (SVG + PNG renderers) ---
+        # One margin grid, one line-height model, one description hierarchy,
+        # and one brand treatment — so the styles differ in composition, not
+        # in sloppy metrics.
+        MARGIN_X        =   80 # base left/right text margin (matches LOGO_MARGIN)
+        TITLE_LINE_H    = 1.12 # title line height as a multiple of font_size
+        DESC_RATIO      = 0.42 # desc font size = font_size * DESC_RATIO
+        DESC_LINE_H     = 1.45 # desc line height as a multiple of desc size
+        DESC_OPACITY    = 0.62 # quiet description hierarchy
+        TITLE_MAX_LINES =    3 # capped with a visible ellipsis
+        DESC_MAX_LINES  =    2
+
+        # Brand row: a small accent tick + the site name in text color.
+        BRAND_SIZE     = 24
+        BRAND_TICK_W   =  5
+        BRAND_TICK_H   = 24
+        BRAND_GAP      = 14 # gap between the tick and the site name
+        BRAND_BASELINE = HEIGHT - 64
+
+        # Bump to invalidate incremental OG caches when the renderer's
+        # design changes without any config change (it feeds
+        # compute_config_hash). rev 2: 2026-07 typography + style redesign.
+        RENDER_REVISION = 2
+
+        # `default` ("masthead"): eyebrow on top, title anchored high.
+        MASTHEAD_EYEBROW_Y    =  96 # eyebrow baseline
+        MASTHEAD_EYEBROW_SIZE =  20
+        MASTHEAD_TITLE_TOP    = 210
+
+        # `dots`: corner-weighted halftone fade; text sits lower-left.
+        DOTS_TITLE_TOP = 330
+
+        # `waves`: text centers over the calm region above the tide bands.
+        WAVES_TEXT_REGION_H = 410
+
+        # `grid` ("blueprint"): focal crosshair + registration marks.
+        GRID_FOCAL_X =  56
+        GRID_FOCAL_Y = 470
+
+        # `diagonal`: stripe wedge in the bottom-right corner triangle
+        # (DIAG_WEDGE_X0, HEIGHT) - (WIDTH, HEIGHT) - (WIDTH, DIAG_WEDGE_Y1).
+        DIAG_WEDGE_X0 = 700
+        DIAG_WEDGE_Y1 = 150
+
+        # `editorial` ("magazine front"): hairline rules + kicker.
+        EDITORIAL_RULE_X0     =   80
+        EDITORIAL_RULE_X1     = 1120
+        EDITORIAL_RULE_TOP    =   84
+        EDITORIAL_RULE_BOT    =  546
+        EDITORIAL_KICKER_Y    =  132 # kicker baseline
+        EDITORIAL_KICKER_SIZE =   19
+        EDITORIAL_TITLE_TOP   =  190
+
+        # `monument`: accent rule ABOVE the title, brand row bottom-right.
+        MONUMENT_TITLE_TOP   =  250
+        MONUMENT_RULE_Y      =  208
+        MONUMENT_RULE_W      =   64
+        MONUMENT_RULE_H      =    6
+        MONUMENT_BRAND_RIGHT = 1120
+
         # --- Geometric style layout (shared by SVG + PNG so both stay in sync) ---
         # `split`: a diagonal color block on the left; text lives on the right.
         SPLIT_TOP_X    = 480 # block's right edge at the top
@@ -85,13 +145,23 @@ module Hwaro
         SPLIT_EDGE     =  16 # secondary-color accent strip along the diagonal
         SPLIT_TEXT_X   = 540 # left margin of the title/description block
 
-        # `band`: a full-width solid band behind the (knocked-out) title.
-        BAND_TOP    = 210
-        BAND_HEIGHT = 200
+        # `band`: a full-width solid band behind the (knocked-out) title,
+        # echoed by a thin secondary band above it.
+        BAND_TOP      = 210
+        BAND_HEIGHT   = 200
+        BAND_ECHO_H   =   8
+        BAND_ECHO_GAP =  22
 
-        # `framed`: an elegant thin frame inset from the canvas edge.
-        FRAMED_INSET = 30
-        FRAMED_WIDTH =  3
+        # `framed` ("invitation card"): a neutral hairline frame + accent
+        # corner brackets; the only centered composition.
+        FRAMED_INSET         =  26
+        FRAMED_WIDTH         =   1
+        FRAMED_BRACKET_INSET =  44
+        FRAMED_BRACKET_ARM   =  40
+        FRAMED_BRACKET_W     =   3
+        FRAMED_WRAP_W        = 880
+        FRAMED_TITLE_TOP     = 250
+        FRAMED_BRAND_Y       = HEIGHT - 88
 
         # `brutalist`: thick framed panel with a hard offset shadow block.
         BRUTALIST_INSET  = 36 # gap from the canvas edge to the panel
@@ -100,11 +170,12 @@ module Hwaro
         BRUTALIST_TEXT_X = 88 # left margin of the title inside the frame
 
         # `terminal`: a code-editor window with a title bar + traffic lights.
-        TERMINAL_INSET  =  36                               # window inset from the canvas edge
-        TERMINAL_RADIUS =  18                               # window corner radius
-        TERMINAL_BAR_H  =  64                               # title-bar height
-        TERMINAL_TEXT_X = 110                               # left margin of the prompt/title inside the window
-        TERMINAL_LIGHTS = {"#ff5f57", "#febc2e", "#28c840"} # classic traffic lights
+        TERMINAL_INSET      =  36                               # window inset from the canvas edge
+        TERMINAL_RADIUS     =  18                               # window corner radius
+        TERMINAL_BAR_H      =  64                               # title-bar height
+        TERMINAL_TEXT_X     = 110                               # left margin of the prompt/title inside the window
+        TERMINAL_LIGHTS     = {"#ff5f57", "#febc2e", "#28c840"} # classic traffic lights
+        TERMINAL_GHOST_ROWS = {300, 440, 240}                   # widths of the faint "output" skeleton rows
 
         # `bauhaus`: flat geometric art composition on the right side.
         BAUHAUS_TEXT_X =  90
@@ -457,6 +528,12 @@ module Hwaro
           {generated: generated, skipped: skipped}
         end
 
+        # Font stacks for the SVG fallback renderer. They lead with the
+        # bundled brand faces so environments that have them render in
+        # parity with the PNG output, then degrade gracefully.
+        SVG_DISPLAY_FONT = "'Space Grotesk', 'DejaVu Sans', system-ui, -apple-system, sans-serif"
+        SVG_MONO_FONT    = "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+
         # Render an SVG image for a page
         def self.render_svg(page : Models::Page, config : Models::Config, logo_data_uri : String? = nil, bg_data_uri : String? = nil) : String
           ai = config.og.auto_image
@@ -467,20 +544,23 @@ module Hwaro
           style = ai.style
           site_name = escape_xml(config.title)
 
-          # Geometric styles get bolder default typography unless the user
-          # explicitly raised the font size.
+          # Style-tuned default type scale unless the user raised it explicitly.
           font_size = Math.max(ai.font_size, 1)
           if ai.font_size <= 48
-            case style
-            when "brutalist", "hero", "monument" then font_size = 78
-            when "artistic", "surreal"           then font_size = 64
-            when "bauhaus", "halftone"           then font_size = 64
-            when "band"                          then font_size = 60
-            when "split"                         then font_size = 58
-            when "terminal"                      then font_size = 54
-            end
+            font_size = case style
+                        when "monument"          then 84
+                        when "hero", "brutalist" then 78
+                        when "artistic", "surreal", "bauhaus", "halftone", "minimal"
+                          64
+                        when "band"     then 60
+                        when "split"    then 58
+                        when "terminal" then 54
+                        else                 56
+                        end
           end
-          desc_size = Math.max((font_size * 0.45).to_i, 1)
+          desc_size = Math.max((font_size * DESC_RATIO).to_i, 1)
+          title_line_h = (font_size * TITLE_LINE_H).to_i
+          desc_line_h = (desc_size * DESC_LINE_H).to_i
 
           # `terminal` prefixes the title with an accent "$" prompt; the title
           # block shifts right by this advance on every line.
@@ -488,51 +568,72 @@ module Hwaro
 
           # Per-style horizontal text box (left margin + wrap width).
           text_x = case style
-                   when "split"                                   then SPLIT_TEXT_X
-                   when "brutalist"                               then BRUTALIST_TEXT_X
-                   when "terminal"                                then TERMINAL_TEXT_X
-                   when "bauhaus"                                 then BAUHAUS_TEXT_X
-                   when "halftone"                                then HALFTONE_TEXT_X
-                   when "editorial", "framed"                     then 110
-                   when "artistic", "hero", "surreal", "monument" then 140
-                   else                                                80
+                   when "split"                       then SPLIT_TEXT_X
+                   when "brutalist"                   then BRUTALIST_TEXT_X
+                   when "terminal"                    then TERMINAL_TEXT_X
+                   when "bauhaus"                     then BAUHAUS_TEXT_X
+                   when "halftone"                    then HALFTONE_TEXT_X
+                   when "artistic", "hero", "surreal" then 140
+                   else                                    MARGIN_X
                    end
           text_w = case style
-                   when "split"     then WIDTH - SPLIT_TEXT_X - 80
-                   when "brutalist" then WIDTH - BRUTALIST_TEXT_X - (BRUTALIST_INSET + BRUTALIST_FRAME + 40)
-                   when "terminal"  then WIDTH - TERMINAL_TEXT_X * 2 - prompt_advance
-                   when "bauhaus"   then BAUHAUS_TEXT_W
-                   when "halftone"  then HALFTONE_TEXT_W
-                   else                  WIDTH - text_x - 80
+                   when "split"                       then WIDTH - SPLIT_TEXT_X - 80
+                   when "brutalist"                   then WIDTH - BRUTALIST_TEXT_X - (BRUTALIST_INSET + BRUTALIST_FRAME + 40)
+                   when "terminal"                    then WIDTH - TERMINAL_TEXT_X * 2 - prompt_advance
+                   when "bauhaus"                     then BAUHAUS_TEXT_W
+                   when "halftone"                    then HALFTONE_TEXT_W
+                   when "framed"                      then FRAMED_WRAP_W
+                   when "artistic", "hero", "surreal" then WIDTH - 280
+                   else                                    Math.min(WIDTH - text_x - 80, 980)
                    end
           chars_per_line = Math.max((text_w / (font_size * 0.55)).to_i, 1)
           desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
 
-          title_lines = word_wrap(page.title, chars_per_line)
+          title_lines = balanced_word_wrap(page.title, chars_per_line)
           # The band style draws the title inside a fixed-height color band;
           # cap the lines so a long title can't overflow the band invisibly.
-          title_lines = cap_band_title(title_lines, font_size) if style == "band"
+          title_cap = case style
+                      when "monument" then 2
+                      when "band"     then band_line_capacity(font_size)
+                      else                 TITLE_MAX_LINES
+                      end
+          title_lines = cap_lines(title_lines, title_cap)
           desc_lines = word_wrap(page.description || "", desc_chars)
+          desc_lines = cap_lines(desc_lines, style == "monument" ? 1 : DESC_MAX_LINES)
 
-          title_block_height = title_lines.size * (font_size + 8)
-          desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * (desc_size + 6)
-          total_text_height = title_block_height + desc_block_height + 20
+          title_block_height = title_lines.size * title_line_h
+          desc_gap = (font_size * 0.55).to_i
+          desc_block_height = desc_lines.empty? ? 0 : desc_lines.size * desc_line_h
+          total_text_height = title_block_height + (desc_lines.empty? ? 0 : desc_gap + desc_block_height)
 
-          # Per-style vertical placement + title color.
+          # Per-style vertical placement + title color. `title_start_y` is
+          # the baseline of the first title line.
           title_fill = text_color
           case style
+          when "default"
+            title_start_y = MASTHEAD_TITLE_TOP + font_size
+          when "dots"
+            title_start_y = DOTS_TITLE_TOP + font_size
+          when "waves"
+            title_start_y = Math.max(font_size + 20, ((WAVES_TEXT_REGION_H - total_text_height) / 2).to_i + font_size)
+          when "editorial"
+            title_start_y = EDITORIAL_TITLE_TOP + font_size
+          when "framed"
+            title_start_y = FRAMED_TITLE_TOP + font_size
           when "band"
             title_fill = bg # knock the title out of the color band
             band_center = BAND_TOP + BAND_HEIGHT // 2
-            title_start_y = band_center - title_block_height // 2 + font_size
+            title_start_y = band_center - title_block_height // 2 + font_size - 6
           when "brutalist"
             title_start_y = BRUTALIST_INSET + BRUTALIST_FRAME + 100
           when "split"
-            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_i + font_size)
+            title_start_y = Math.max(font_size + 40, ((HEIGHT - total_text_height) / 2).to_i + font_size - 10)
           when "hero"
             title_start_y = Math.max(font_size + 20, 180)
           when "monument"
-            title_start_y = Math.max(font_size + 10, 120)
+            title_start_y = MONUMENT_TITLE_TOP + font_size
+          when "artistic", "surreal"
+            title_start_y = Math.max(font_size + 48, ((HEIGHT - total_text_height) / 2).to_i + font_size - 28)
           when "terminal"
             # Anchored near the top of the window content area, prompt-style.
             title_start_y = TERMINAL_INSET + TERMINAL_BAR_H + 60 + font_size
@@ -561,6 +662,8 @@ module Hwaro
             end
           end
 
+          title_font = style == "terminal" ? SVG_MONO_FONT : SVG_DISPLAY_FONT
+
           String.build do |svg|
             svg << %(<?xml version="1.0" encoding="UTF-8"?>\n)
             svg << %(<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" )
@@ -575,7 +678,7 @@ module Hwaro
               svg << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="#{bg}" opacity="#{ai.overlay_opacity.clamp(0.0, 1.0)}" />\n)
             end
 
-            # Classic background pattern (dots/grid/diagonal/gradient/waves)
+            # Classic background pattern (dots/grid/diagonal/waves)
             pattern_svg = render_style_pattern(style, accent, bg, ai.pattern_opacity, ai.pattern_scale)
             svg << pattern_svg unless pattern_svg.empty?
 
@@ -585,15 +688,21 @@ module Hwaro
             svg << geo_svg unless geo_svg.empty?
 
             # Hero: oversized "ghost" echo of the title's first word behind
-            # the composition for poster-style depth.
+            # the composition for poster-style depth. Kept on-canvas and
+            # width-capped so a long first word can't run off both sides.
             if style == "hero"
               if ghost = page.title.split(/\s+/).first?
-                ghost_size = (font_size * 2.6).to_i
-                svg << %(<text x="#{text_x - 10}" y="#{ghost_size + 30}" )
-                svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-                svg << %(font-size="#{ghost_size}" font-weight="800" letter-spacing="4" fill="#{text_color}" opacity="0.07">)
-                svg << escape_xml(ghost.upcase)
-                svg << %(</text>\n)
+                unless ghost.empty?
+                  ghost_size = (font_size * 2.6).to_i
+                  approx_w = (ghost.size * ghost_size * 0.62).to_i
+                  ghost_size = (ghost_size * 1500.0 / approx_w).to_i if approx_w > 1500
+                  ghost_top = Math.max(title_start_y - (font_size * 2.35).to_i, 16)
+                  svg << %(<text x="#{text_x - 10}" y="#{ghost_top + (ghost_size * 0.78).to_i}" )
+                  svg << %(font-family="#{SVG_DISPLAY_FONT}" )
+                  svg << %(font-size="#{ghost_size}" font-weight="700" letter-spacing="4" fill="#{text_color}" opacity="0.06">)
+                  svg << escape_xml(ghost.upcase)
+                  svg << %(</text>\n)
+                end
               end
             end
 
@@ -609,19 +718,43 @@ module Hwaro
               svg << %(<rect width="#{WIDTH}" height="6" fill="#{accent}" />\n)
             end
 
+            # `default` masthead: uppercase tracked site-name eyebrow at the
+            # top (an accent tick stands in when the site name is hidden).
+            if style == "default"
+              if ai.show_title && !site_name.empty?
+                svg << %(<text x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y}" font-family="#{SVG_DISPLAY_FONT}" )
+                svg << %(font-size="#{MASTHEAD_EYEBROW_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
+                svg << site_name.upcase
+                svg << %(</text>\n)
+              else
+                svg << %(<rect x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y - 6}" width="48" height="6" fill="#{accent}" />\n)
+              end
+            end
+
+            # Editorial: uppercase tracked kicker between the hairline rules.
+            if style == "editorial" && ai.show_title && !site_name.empty?
+              svg << %(<text x="#{MARGIN_X}" y="#{EDITORIAL_KICKER_Y}" font-family="#{SVG_DISPLAY_FONT}" )
+              svg << %(font-size="#{EDITORIAL_KICKER_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
+              svg << site_name.upcase
+              svg << %(</text>\n)
+            end
+
             # Terminal: accent "$" prompt on the first title line.
             if style == "terminal"
               svg << %(<text x="#{text_x}" y="#{title_start_y}" )
-              svg << %(font-family="ui-monospace, 'SF Mono', Menlo, monospace" )
+              svg << %(font-family="#{SVG_MONO_FONT}" )
               svg << %(font-size="#{font_size}" font-weight="700" fill="#{accent}">$</text>\n)
             end
 
-            # Title text
+            # Title text. `framed` centers every line; `monument` sets tight
+            # tracking.
             title_text_x = text_x + prompt_advance
-            title_font = style == "terminal" ? "ui-monospace, 'SF Mono', Menlo, monospace" : "system-ui, -apple-system, 'Segoe UI', sans-serif"
+            title_anchor = style == "framed" ? %( text-anchor="middle") : ""
+            title_tracking = style == "monument" ? %( letter-spacing="-1") : ""
             title_lines.each_with_index do |line, i|
-              y = title_start_y + i * (font_size + 8)
-              svg << %(<text x="#{title_text_x}" y="#{y}" )
+              y = title_start_y + i * title_line_h
+              x = style == "framed" ? WIDTH // 2 : title_text_x
+              svg << %(<text x="#{x}" y="#{y}"#{title_anchor}#{title_tracking} )
               svg << %(font-family="#{title_font}" )
               svg << %(font-size="#{font_size}" font-weight="700" fill="#{title_fill}">)
               svg << escape_xml(line)
@@ -632,53 +765,106 @@ module Hwaro
               svg << %(</text>\n)
             end
 
-            # Editorial: thin vertical accent rule to the left of the title.
-            if style == "editorial"
-              rule_top = title_start_y - font_size
-              svg << %(<rect x="#{text_x - 28}" y="#{rule_top}" width="6" height="#{title_block_height}" fill="#{accent}" />\n)
+            # Minimal: an accent full stop after the last title line.
+            if style == "minimal" && !title_lines.empty?
+              r = Math.max((font_size * 0.11).to_i, 3)
+              last_line = title_lines.last
+              approx_w = (last_line.size * font_size * 0.52).to_i
+              dot_cx = text_x + approx_w + (font_size * 0.18).to_i + r
+              dot_cy = title_start_y + (title_lines.size - 1) * title_line_h - r
+              svg << %(<circle cx="#{dot_cx}" cy="#{dot_cy}" r="#{r}" fill="#{accent}" />\n)
             end
 
-            # Monument: a single long thin rule under the title.
-            if style == "monument"
-              rule_y = title_start_y + (title_lines.size - 1) * (font_size + 8) + 30
-              svg << %(<rect x="#{text_x}" y="#{rule_y}" width="220" height="5" fill="#{accent}" />\n)
+            # Editorial: thin vertical accent rule, cap-height aligned.
+            if style == "editorial"
+              rule_top = title_start_y - (font_size * 0.72).to_i
+              rule_h = (title_lines.size - 1) * title_line_h + (font_size * 0.72).to_i
+              svg << %(<rect x="#{text_x - 28}" y="#{rule_top}" width="4" height="#{rule_h}" fill="#{accent}" />\n)
             end
 
             # Description text (terminal indents it under the prompt's title)
+            desc_last_y = title_start_y + (title_lines.size - 1) * title_line_h
             unless desc_lines.empty?
-              desc_start_y = style == "band" ? BAND_TOP + BAND_HEIGHT + desc_size + 24 : title_start_y + title_block_height + 16
+              desc_start_y = style == "band" ? BAND_TOP + BAND_HEIGHT + desc_size + 24 : desc_last_y + desc_gap + desc_size
+              desc_opacity = (style == "hero" || style == "monument") ? 0.45 : DESC_OPACITY
+              desc_anchor = style == "framed" ? %( text-anchor="middle") : ""
+              desc_x = style == "framed" ? WIDTH // 2 : title_text_x
               desc_lines.each_with_index do |line, i|
-                y = desc_start_y + i * (desc_size + 6)
-                svg << %(<text x="#{title_text_x}" y="#{y}" )
-                svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-                svg << %(font-size="#{desc_size}" font-weight="400" fill="#{text_color}" opacity="0.78">)
+                y = desc_start_y + i * desc_line_h
+                svg << %(<text x="#{desc_x}" y="#{y}"#{desc_anchor} )
+                svg << %(font-family="#{SVG_DISPLAY_FONT}" )
+                svg << %(font-size="#{desc_size}" font-weight="500" fill="#{text_color}" opacity="#{desc_opacity}">)
                 svg << escape_xml(line)
                 svg << %(</text>\n)
               end
+              desc_last_y = desc_start_y + (desc_lines.size - 1) * desc_line_h
             end
 
-            # Site name at bottom (controlled by show_title)
-            if ai.show_title
-              # `split` places the site name inside the accent block, so it
-              # must use the readable text color rather than the accent.
-              site_name_fill = style == "split" ? text_color : accent
-              base_margin = case style
-                            when "split"               then 80
-                            when "brutalist"           then BRUTALIST_TEXT_X
-                            when "terminal"            then TERMINAL_TEXT_X
-                            when "bauhaus", "halftone" then BAUHAUS_TEXT_X
-                            else                            LOGO_MARGIN
-                            end
-              site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
-                              base_margin + LOGO_SIZE + LOGO_TEXT_GAP
-                            else
-                              base_margin
-                            end
-              svg << %(<text x="#{site_name_x}" y="#{HEIGHT - 65}" )
-              svg << %(font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" )
-              svg << %(font-size="22" font-weight="600" fill="#{site_name_fill}">)
-              svg << site_name
-              svg << %(</text>\n)
+            # Terminal: faint "output" skeleton rows under the text.
+            if style == "terminal"
+              rows_top = desc_last_y + 44
+              TERMINAL_GHOST_ROWS.each_with_index do |w, i|
+                ry = rows_top + i * 32
+                break if ry + 10 > HEIGHT - TERMINAL_INSET - 24
+                svg << %(<rect x="#{TERMINAL_TEXT_X}" y="#{ry}" width="#{w}" height="10" rx="5" fill="#{text_color}" opacity="0.08" />\n)
+              end
+            end
+
+            # Site name / brand row. Several styles relocate it: terminal
+            # puts it in the window title bar, default/editorial replace it
+            # with the eyebrow/kicker, monument right-aligns it, framed
+            # centers it. Everything else gets the accent tick + name row.
+            if ai.show_title && !site_name.empty?
+              case style
+              when "default", "editorial"
+                # handled above (eyebrow / kicker)
+              when "terminal"
+                bar_text_y = TERMINAL_INSET + 2 + TERMINAL_BAR_H // 2 + 7
+                svg << %(<text x="#{WIDTH // 2}" y="#{bar_text_y}" text-anchor="middle" )
+                svg << %(font-family="#{SVG_MONO_FONT}" font-size="20" font-weight="700" fill="#{text_color}" opacity="0.5">)
+                svg << site_name
+                svg << %(</text>\n)
+              when "monument"
+                approx_w = (config.title.size * BRAND_SIZE * 0.6).to_i
+                tick_x = MONUMENT_BRAND_RIGHT - approx_w - BRAND_TICK_W - BRAND_GAP
+                svg << %(<rect x="#{tick_x}" y="#{BRAND_BASELINE - BRAND_TICK_H + 4}" width="#{BRAND_TICK_W}" height="#{BRAND_TICK_H}" fill="#{accent}" />\n)
+                svg << %(<text x="#{MONUMENT_BRAND_RIGHT}" y="#{BRAND_BASELINE}" text-anchor="end" )
+                svg << %(font-family="#{SVG_DISPLAY_FONT}" font-size="#{BRAND_SIZE}" font-weight="700" letter-spacing="1" fill="#{text_color}" opacity="0.92">)
+                svg << site_name
+                svg << %(</text>\n)
+              when "framed"
+                svg << %(<text x="#{WIDTH // 2}" y="#{FRAMED_BRAND_Y}" text-anchor="middle" )
+                svg << %(font-family="#{SVG_DISPLAY_FONT}" font-size="#{BRAND_SIZE}" font-weight="700" letter-spacing="1" fill="#{text_color}" opacity="0.7">)
+                svg << site_name
+                svg << %(</text>\n)
+              else
+                base_margin = case style
+                              when "split"                       then 80
+                              when "brutalist"                   then BRUTALIST_TEXT_X
+                              when "bauhaus", "halftone"         then BAUHAUS_TEXT_X
+                              when "artistic", "surreal", "hero" then 140
+                              else                                    LOGO_MARGIN
+                              end
+                site_name_x = if !logo_svg.empty? && ai.logo_position == "bottom-left"
+                                base_margin + LOGO_SIZE + LOGO_TEXT_GAP
+                              else
+                                base_margin
+                              end
+                row_opacity = style == "minimal" ? 0.5 : 0.92
+                if style == "split"
+                  # Inside the accent block an accent tick would vanish — name only.
+                  svg << %(<text x="#{site_name_x}" y="#{BRAND_BASELINE}" )
+                  svg << %(font-family="#{SVG_DISPLAY_FONT}" font-size="#{BRAND_SIZE}" font-weight="700" letter-spacing="1" fill="#{text_color}">)
+                  svg << site_name
+                  svg << %(</text>\n)
+                else
+                  svg << %(<rect x="#{site_name_x}" y="#{BRAND_BASELINE - BRAND_TICK_H + 4}" width="#{BRAND_TICK_W}" height="#{BRAND_TICK_H}" fill="#{accent}" opacity="#{row_opacity}" />\n)
+                  svg << %(<text x="#{site_name_x + BRAND_TICK_W + BRAND_GAP}" y="#{BRAND_BASELINE}" )
+                  svg << %(font-family="#{SVG_DISPLAY_FONT}" font-size="#{BRAND_SIZE}" font-weight="700" letter-spacing="1" fill="#{text_color}" opacity="#{row_opacity}">)
+                  svg << site_name
+                  svg << %(</text>\n)
+                end
+              end
             end
 
             # Logo
@@ -700,12 +886,53 @@ module Hwaro
         # present so a user photo shows through. Returns "" for plain styles.
         def self.render_style_background(style : String, accent : String, bg : String, secondary : String, has_bg_image : Bool = false) : String
           case style
+          when "default"
+            # Masthead: a low corner glow + gentle vignette for depth.
+            return "" if has_bg_image
+            String.build do |s|
+              s << %(<defs><radialGradient id="ogMastGlow" gradientUnits="userSpaceOnUse" cx="1160" cy="700" r="720">)
+              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="0.14" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
+              s << vignette_def("ogMastVig", 0.12)
+              s << %(</defs>\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogMastGlow)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogMastVig)" />\n)
+            end
+          when "gradient"
+            # Duotone wash: accent-tinted diagonal gradient + corner glow +
+            # vignette + grain — real depth instead of a fade-to-nothing.
+            return "" if has_bg_image
+            c1 = adjust_lightness(mix_hex(bg, accent, 0.45), -0.06)
+            c2 = adjust_lightness(bg, -0.03)
+            String.build do |s|
+              s << %(<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">)
+              s << %(<stop offset="0%" stop-color="#{c1}" /><stop offset="100%" stop-color="#{c2}" /></linearGradient>)
+              s << %(<radialGradient id="ogGradGlow" gradientUnits="userSpaceOnUse" cx="140" cy="640" r="560">)
+              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="0.2" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
+              s << vignette_def("ogGradVig", 0.15)
+              s << grain_filter_def
+              s << %(</defs>\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#grad)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGradGlow)" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogGradVig)" />\n)
+              s << grain_rect
+            end
+          when "editorial"
+            # Magazine front: quiet hairline rules above and below the
+            # content area.
+            rule = neutral_line_hex(bg)
+            String.build do |s|
+              s << %(<rect x="#{EDITORIAL_RULE_X0}" y="#{EDITORIAL_RULE_TOP}" width="#{EDITORIAL_RULE_X1 - EDITORIAL_RULE_X0}" height="1" fill="#{rule}" />\n)
+              s << %(<rect x="#{EDITORIAL_RULE_X0}" y="#{EDITORIAL_RULE_BOT}" width="#{EDITORIAL_RULE_X1 - EDITORIAL_RULE_X0}" height="1" fill="#{rule}" />\n)
+            end
+          when "monument"
+            # A short accent rule ABOVE the title; the whitespace is the design.
+            %(<rect x="#{MARGIN_X}" y="#{MONUMENT_RULE_Y}" width="#{MONUMENT_RULE_W}" height="#{MONUMENT_RULE_H}" fill="#{accent}" />\n)
           when "artistic"
             return "" if has_bg_image
-            # Mesh-gradient color field: diagonal base + hue-shifted color
+            # Mesh-gradient color field: diagonal base + analogous-hue color
             # blobs + a dark anchor for text legibility + film grain.
-            a2 = shift_hue(accent, 45.0)
-            s2 = shift_hue(secondary, -40.0)
+            a2 = shift_hue(accent, 28.0)
+            s2 = shift_hue(secondary, -20.0)
             String.build do |s|
               s << %(<defs><linearGradient id="ogGrad" x1="0%" y1="0%" x2="100%" y2="100%">)
               s << %(<stop offset="0%" stop-color="#{accent}" /><stop offset="100%" stop-color="#{secondary}" />)
@@ -741,7 +968,7 @@ module Hwaro
           when "surreal"
             return "" if has_bg_image
             # Aurora: soft orbs plus blurred ribbon bands flowing across.
-            a3 = shift_hue(accent, 60.0)
+            a3 = shift_hue(accent, 40.0)
             String.build do |s|
               s << %(<defs>)
               s << %(<radialGradient id="ogO1" cx="25%" cy="30%" r="42%"><stop offset="0%" stop-color="#{accent}" stop-opacity="0.55" /><stop offset="100%" stop-color="#{accent}" stop-opacity="0" /></radialGradient>)
@@ -764,7 +991,7 @@ module Hwaro
             # triangle, quarter disc — layered in accent/secondary/derived.
             tertiary = shift_hue(accent, 60.0, 0.45)
             String.build do |s|
-              s << %(<circle cx="950" cy="150" r="220" fill="#{accent}" />\n)
+              s << %(<circle cx="940" cy="190" r="220" fill="#{accent}" />\n)
               s << %(<circle cx="690" cy="150" r="30" fill="#{secondary}" />\n)
               s << %(<polygon points="690,500 830,260 970,500" fill="#{tertiary}" />\n)
               s << %(<path d="M 1200 630 L 1200 320 A 310 310 0 0 0 890 630 Z" fill="#{secondary}" />\n)
@@ -772,7 +999,22 @@ module Hwaro
           when "halftone"
             render_halftone_field(accent)
           when "framed"
-            %(<rect x="#{FRAMED_INSET}" y="#{FRAMED_INSET}" width="#{WIDTH - 2 * FRAMED_INSET}" height="#{HEIGHT - 2 * FRAMED_INSET}" fill="none" stroke="#{accent}" stroke-width="#{FRAMED_WIDTH}" />\n)
+            # Invitation card: a neutral hairline frame plus accent corner
+            # brackets inset from it.
+            rule = neutral_line_hex(bg)
+            bi = FRAMED_BRACKET_INSET
+            arm = FRAMED_BRACKET_ARM
+            bw = FRAMED_BRACKET_W
+            String.build do |s|
+              s << %(<rect x="#{FRAMED_INSET}" y="#{FRAMED_INSET}" width="#{WIDTH - 2 * FRAMED_INSET}" height="#{HEIGHT - 2 * FRAMED_INSET}" fill="none" stroke="#{rule}" stroke-width="#{FRAMED_WIDTH}" />\n)
+              # Corner brackets: two rects per corner.
+              s << %(<g fill="#{accent}">)
+              s << %(<rect x="#{bi}" y="#{bi}" width="#{arm}" height="#{bw}" /><rect x="#{bi}" y="#{bi}" width="#{bw}" height="#{arm}" />)
+              s << %(<rect x="#{WIDTH - bi - arm}" y="#{bi}" width="#{arm}" height="#{bw}" /><rect x="#{WIDTH - bi - bw}" y="#{bi}" width="#{bw}" height="#{arm}" />)
+              s << %(<rect x="#{bi}" y="#{HEIGHT - bi - bw}" width="#{arm}" height="#{bw}" /><rect x="#{bi}" y="#{HEIGHT - bi - arm}" width="#{bw}" height="#{arm}" />)
+              s << %(<rect x="#{WIDTH - bi - arm}" y="#{HEIGHT - bi - bw}" width="#{arm}" height="#{bw}" /><rect x="#{WIDTH - bi - bw}" y="#{HEIGHT - bi - arm}" width="#{bw}" height="#{arm}" />)
+              s << %(</g>\n)
+            end
           when "split"
             String.build do |s|
               # Diagonal accent color block on the left.
@@ -782,7 +1024,11 @@ module Hwaro
               s << %(#{SPLIT_BOTTOM_X + SPLIT_EDGE},#{HEIGHT} #{SPLIT_BOTTOM_X},#{HEIGHT}" fill="#{secondary}" />\n)
             end
           when "band"
-            %(<rect x="0" y="#{BAND_TOP}" width="#{WIDTH}" height="#{BAND_HEIGHT}" fill="#{accent}" />\n)
+            # A thin muted echo band above the main band for print feel.
+            String.build do |s|
+              s << %(<rect x="0" y="#{BAND_TOP - BAND_ECHO_GAP}" width="#{WIDTH}" height="#{BAND_ECHO_H}" fill="#{accent}" opacity="0.4" />\n)
+              s << %(<rect x="0" y="#{BAND_TOP}" width="#{WIDTH}" height="#{BAND_HEIGHT}" fill="#{accent}" />\n)
+            end
           when "brutalist"
             iw = WIDTH - 2 * BRUTALIST_INSET
             ih = HEIGHT - 2 * BRUTALIST_INSET
@@ -813,6 +1059,30 @@ module Hwaro
 
         private def self.grain_rect : String
           %(<rect width="#{WIDTH}" height="#{HEIGHT}" filter="url(#ogGrain)" opacity="0.16" />\n)
+        end
+
+        # Corner-darkening vignette as a radial gradient definition
+        # (transparent center, black edges). `strength` is the corner opacity.
+        private def self.vignette_def(id : String, strength : Float64) : String
+          %(<radialGradient id="#{id}" cx="50%" cy="50%" r="75%">) +
+            %(<stop offset="0%" stop-color="#000000" stop-opacity="0" />) +
+            %(<stop offset="55%" stop-color="#000000" stop-opacity="0" />) +
+            %(<stop offset="100%" stop-color="#000000" stop-opacity="#{strength}" />) +
+            %(</radialGradient>)
+        end
+
+        # Mix two hex colors in RGB space (`t` toward `other`). Mirrors the
+        # PNG renderer's lerp_color so gradient stops match across formats.
+        def self.mix_hex(base : String, other : String, t : Float64) : String
+          b = normalize_hex(base) || "000000"
+          o = normalize_hex(other) || "000000"
+          t = t.clamp(0.0, 1.0)
+          ch = {0, 2, 4}.map do |i|
+            bv = b[i, 2].to_i(16)
+            ov = o[i, 2].to_i(16)
+            (bv + (ov - bv) * t).round.to_i.clamp(0, 255)
+          end
+          "#%02x%02x%02x" % {ch[0], ch[1], ch[2]}
         end
 
         # `terminal`: code-editor window — rounded panel, title bar with
@@ -847,20 +1117,23 @@ module Hwaro
         end
 
         # `halftone`: print-style dot field — dots grow toward the right
-        # edge, rows staggered like a press halftone screen.
+        # edge, rows staggered like a press halftone screen, with a gentle
+        # vertical cosine weight so the field breathes instead of tiling.
         private def self.render_halftone_field(accent : String) : String
-          spacing = 30
-          max_r = 13.0
+          spacing = 28
+          max_r = 15.0
           field_w = (WIDTH - HALFTONE_FIELD_X).to_f
+          mid_y = HEIGHT / 2.0
           String.build do |s|
             row = 0
             y = spacing // 2
             while y < HEIGHT
               x_off = row.odd? ? spacing // 2 : 0
               x = HALFTONE_FIELD_X + x_off
+              breath = 0.65 + 0.35 * Math.cos((y - mid_y) / mid_y * Math::PI / 2.0)
               while x < WIDTH + spacing
                 tx = ((x - HALFTONE_FIELD_X).to_f / field_w).clamp(0.0, 1.0)
-                r = max_r * (tx ** 1.6)
+                r = max_r * (tx ** 1.6) * breath
                 if r >= 1.0
                   s << %(<circle cx="#{x}" cy="#{y}" r="#{r.round(1)}" fill="#{accent}" opacity="0.92" />\n)
                 end
@@ -872,56 +1145,92 @@ module Hwaro
           end
         end
 
-        # Render a style/pattern SVG snippet based on the configured style
+        # Render a style/pattern SVG snippet based on the configured style.
+        # Every pattern is a composition with a focal point rather than
+        # uniform wallpaper; `opacity` acts as the peak alpha with internal
+        # falloff. Mirrors the PNG renderer's render_pattern.
         def self.render_style_pattern(style : String, accent : String, bg : String, opacity : Float64, scale : Float64) : String
           opacity = opacity.clamp(0.0, 1.0)
           scale = Math.max(scale, 0.1)
 
           case style
           when "dots"
-            spacing = Math.max((20 * scale).to_i, 1)
-            radius = Math.max((3 * scale).to_i, 1)
+            # Corner-weighted halftone fade: staggered dots grow and
+            # brighten toward the top-right focal corner.
+            spacing = Math.max((26 * scale).to_i, 4)
             String.build do |s|
-              s << %(<defs><pattern id="dots" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse">)
-              s << %(<circle cx="#{spacing // 2}" cy="#{spacing // 2}" r="#{radius}" fill="#{accent}" />)
-              s << %(</pattern></defs>\n)
-              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#dots)" opacity="#{opacity}" />\n)
+              row = 0
+              y = spacing // 2
+              while y < HEIGHT
+                x = row.odd? ? spacing // 2 : 0
+                while x < WIDTH + spacing
+                  dx = (WIDTH - x).to_f
+                  dy = y.to_f
+                  t = (1.0 - Math.sqrt(dx * dx + dy * dy) / 950.0).clamp(0.0, 1.0)
+                  r = 1.0 + 4.2 * (t ** 1.8)
+                  alpha = opacity * t
+                  if r >= 0.8 && alpha > 0.004
+                    s << %(<circle cx="#{x}" cy="#{y}" r="#{r.round(1)}" fill="#{accent}" opacity="#{alpha.round(3)}" />\n)
+                  end
+                  x += spacing
+                end
+                y += spacing
+                row += 1
+              end
             end
           when "grid"
-            spacing = Math.max((40 * scale).to_i, 1)
+            # Blueprint: a fine quiet grid plus one focal crosshair with
+            # registration marks.
+            spacing = Math.max((48 * scale).to_i, 8)
+            minor = (opacity * 0.4).clamp(0.0, 1.0)
+            focal = (opacity * 1.3).clamp(0.0, 1.0)
             String.build do |s|
               s << %(<defs><pattern id="grid" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse">)
               s << %(<path d="M #{spacing} 0 L 0 0 0 #{spacing}" fill="none" stroke="#{accent}" stroke-width="1" />)
               s << %(</pattern></defs>\n)
-              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#grid)" opacity="#{opacity}" />\n)
+              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#grid)" opacity="#{minor}" />\n)
+              s << %(<rect x="#{GRID_FOCAL_X}" y="0" width="1" height="#{HEIGHT}" fill="#{accent}" opacity="#{focal}" />\n)
+              s << %(<rect x="0" y="#{GRID_FOCAL_Y}" width="#{WIDTH}" height="1" fill="#{accent}" opacity="#{focal}" />\n)
+              s << %(<circle cx="#{GRID_FOCAL_X}" cy="#{GRID_FOCAL_Y}" r="7" fill="#{accent}" opacity="#{(opacity * 2.0).clamp(0.0, 1.0)}" />\n)
+              s << %(<rect x="435" y="#{GRID_FOCAL_Y - 5}" width="10" height="10" fill="none" stroke="#{accent}" stroke-width="1" />\n)
             end
           when "diagonal"
-            spacing = Math.max((20 * scale).to_i, 1)
+            # 45° stripes clipped to the bottom-right corner wedge with an
+            # alpha ramp from the hypotenuse to the corner, plus an accent
+            # rule along the hypotenuse.
+            mid_x = (DIAG_WEDGE_X0 + WIDTH) // 2
+            mid_y = (HEIGHT + DIAG_WEDGE_Y1) // 2
             String.build do |s|
-              s << %(<defs><pattern id="diagonal" width="#{spacing}" height="#{spacing}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">)
-              s << %(<line x1="0" y1="0" x2="0" y2="#{spacing}" stroke="#{accent}" stroke-width="1" />)
-              s << %(</pattern></defs>\n)
-              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#diagonal)" opacity="#{opacity}" />\n)
-            end
-          when "gradient"
-            String.build do |s|
-              s << %(<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">)
-              s << %(<stop offset="0%" stop-color="#{accent}" stop-opacity="#{opacity}" />)
-              s << %(<stop offset="100%" stop-color="#{accent}" stop-opacity="0" />)
-              s << %(</linearGradient></defs>\n)
-              s << %(<rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#grad)" />\n)
+              s << %(<defs>)
+              s << %(<pattern id="diagonal" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">)
+              s << %(<rect x="0" y="0" width="10" height="26" fill="#{accent}" /></pattern>)
+              s << %(<linearGradient id="ogWedgeGrad" gradientUnits="userSpaceOnUse" x1="#{mid_x}" y1="#{mid_y}" x2="#{WIDTH}" y2="#{HEIGHT}">)
+              s << %(<stop offset="0%" stop-color="#ffffff" stop-opacity="0" /><stop offset="100%" stop-color="#ffffff" stop-opacity="1" /></linearGradient>)
+              s << %(<mask id="ogWedgeMask"><rect width="#{WIDTH}" height="#{HEIGHT}" fill="url(#ogWedgeGrad)" /></mask>)
+              s << %(</defs>\n)
+              s << %(<polygon points="#{DIAG_WEDGE_X0},#{HEIGHT} #{WIDTH},#{HEIGHT} #{WIDTH},#{DIAG_WEDGE_Y1}" fill="url(#diagonal)" mask="url(#ogWedgeMask)" opacity="#{opacity}" />\n)
+              s << %(<line x1="#{DIAG_WEDGE_X0}" y1="#{HEIGHT}" x2="#{WIDTH}" y2="#{DIAG_WEDGE_Y1}" stroke="#{accent}" stroke-width="3" opacity="#{(opacity * 1.4).clamp(0.0, 1.0)}" />\n)
             end
           when "waves"
-            amp = (20 * scale).to_i
+            # Layered tide bands anchored to the bottom edge (closed filled
+            # paths sampled from the same sine curves the PNG renderer uses).
             String.build do |s|
-              3.times do |i|
-                y_offset = HEIGHT // 3 + i * (80 * scale).to_i
-                s << %(<path d="M 0 #{y_offset} Q 300 #{y_offset - amp} 600 #{y_offset} T 1200 #{y_offset}" )
-                s << %(fill="none" stroke="#{accent}" stroke-width="2" opacity="#{opacity}" />\n)
+              bands = {
+                {430.0, 26.0, 1050.0, 0.0, shift_hue(accent, -16.0), opacity * 0.35},
+                {474.0, 34.0, 800.0, 1.9, accent, opacity * 0.5},
+                {522.0, 22.0, 1250.0, 4.1, shift_hue(accent, 18.0), opacity * 0.75},
+              }
+              bands.each do |base_y, amp, wavelength, phase, color, alpha|
+                s << %(<path d="M -20 #{HEIGHT} L -20 #{(base_y + Math.sin(-20.0 * Math::PI * 2.0 / wavelength + phase) * amp).round(1)})
+                x = 0
+                while x <= WIDTH + 20
+                  yv = base_y + Math.sin(x.to_f * Math::PI * 2.0 / wavelength + phase) * amp
+                  s << %( L #{x} #{yv.round(1)})
+                  x += 24
+                end
+                s << %( L #{WIDTH + 20} #{HEIGHT} Z" fill="#{color}" opacity="#{alpha.clamp(0.0, 1.0).round(3)}" />\n)
               end
             end
-          when "minimal", "default"
-            ""
           else
             ""
           end
@@ -976,7 +1285,7 @@ module Hwaro
           end
 
           lines << current_line.strip unless current_line.strip.empty?
-          lines.first(4)
+          lines
         end
 
         # Split text into wrappable segments: whitespace-separated words
@@ -1032,21 +1341,48 @@ module Hwaro
         # the `band` style. Beyond this the title overflows the band and, being
         # drawn in the background color, renders invisibly off-band.
         def self.band_line_capacity(font_size : Int32) : Int32
-          Math.max(1, BAND_HEIGHT // (font_size + 8))
+          Math.max(1, (BAND_HEIGHT / (font_size * TITLE_LINE_H)).to_i)
         end
 
-        # Cap a `band`-style title to the lines that fit the band, marking the
-        # last kept line with an ellipsis so the truncation is visible rather
-        # than silent.
-        def self.cap_band_title(lines : Array(String), font_size : Int32) : Array(String)
-          cap = band_line_capacity(font_size)
-          return lines if lines.size <= cap
-          capped = lines.first(cap)
+        # Cap `lines` to `max`, marking the last kept line with an ellipsis
+        # so the truncation is visible rather than silent.
+        def self.cap_lines(lines : Array(String), max : Int32) : Array(String)
+          return lines if lines.size <= max
+          capped = lines.first(max)
           capped[-1] = "#{capped[-1].rstrip}…"
           capped
         end
 
-        # Compute a hash of OG-relevant config properties.
+        # Cap a `band`-style title to the lines that fit the band.
+        def self.cap_band_title(lines : Array(String), font_size : Int32) : Array(String)
+          cap_lines(lines, band_line_capacity(font_size))
+        end
+
+        # A quiet hairline color derived from the background: slightly
+        # lighter on dark backgrounds, slightly darker on light ones.
+        def self.neutral_line_hex(bg_hex : String) : String
+          _, _, l = hex_to_hsl(bg_hex)
+          adjust_lightness(bg_hex, l > 0.5 ? -0.30 : 0.32)
+        end
+
+        # Balanced title wrap (character-count analog of the PNG renderer's
+        # measured version): greedy wrap first; when the last line is an
+        # orphan (much shorter than the longest line), re-wrap against a
+        # tighter target so line lengths even out. Only accepted when it
+        # does not add lines.
+        def self.balanced_word_wrap(text : String, max_chars : Int32) : Array(String)
+          lines = word_wrap(text, max_chars)
+          return lines if lines.size < 2 || lines.size > 3
+          longest = lines.max_of(&.size)
+          return lines if longest <= 0 || lines.last.size >= longest * 0.55
+          target = Math.max((lines.sum(&.size) / lines.size * 1.08).to_i, (longest * 0.6).to_i)
+          rebalanced = word_wrap(text, target)
+          rebalanced.size <= lines.size ? rebalanced : lines
+        end
+
+        # Compute a hash of OG-relevant config properties. RENDER_REVISION
+        # is folded in so a renderer design change regenerates cached images
+        # on existing sites even though no config value changed.
         def self.compute_config_hash(config : Models::Config) : String
           ai = config.og.auto_image
           Digest::SHA256.hexdigest(
@@ -1055,7 +1391,8 @@ module Hwaro
             "#{ai.style}|#{ai.pattern_opacity}|#{ai.pattern_scale}|" \
             "#{ai.background_image}|#{ai.overlay_opacity}|#{ai.format}|#{ai.font_path}|" \
             "#{ai.accent_bars}|#{ai.text_panel}|" \
-            "#{asset_digest(ai.logo)}|#{asset_digest(ai.background_image)}" # pixel-affecting; changing them must invalidate the cache
+            "#{asset_digest(ai.logo)}|#{asset_digest(ai.background_image)}|" \
+            "r#{RENDER_REVISION}" # pixel-affecting; changing them must invalidate the cache
           )
         end
 

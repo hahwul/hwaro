@@ -82,7 +82,7 @@ module Hwaro
           prefix = "/#{lang}/"
           # Allow an optional Markdown link title (`(/posts/ "All posts")`) and
           # preserve it — otherwise titled links keep the default-language URL.
-          body.gsub(/(!?)\[([^\]]*)\]\((\/[^)\s]+)(\s+"[^"]*")?\)/) do |match|
+          result = body.gsub(/(!?)\[([^\]]*)\]\((\/[^)\s]+)(\s+"[^"]*")?\)/) do |match|
             bang = $~[1]
             label = $~[2]
             target = $~[3]
@@ -93,6 +93,21 @@ module Hwaro
               match
             else
               "[#{label}](#{prefix}#{target.lchop("/")}#{title})"
+            end
+          end
+
+          # Raw-HTML links get the same treatment: scaffold bodies compose
+          # designed blocks like the docs landing's `<a class="link-card"
+          # href="/getting-started/">`, and leaving those hrefs unprefixed
+          # would reintroduce gh#524 through the HTML side door. Only
+          # root-absolute paths are rewritten (no schemes, no `//host`,
+          # no asset-looking targets with file extensions).
+          result.gsub(/href="(\/[^"\/][^"]*|\/)"/) do |match|
+            target = $~[1]
+            if target.starts_with?(prefix) || target == "/#{lang}" || target.includes?(".")
+              match
+            else
+              %(href="#{prefix}#{target.lchop("/")}")
             end
           end
         end
@@ -518,11 +533,12 @@ module Hwaro
             HTML
         end
 
-        # Common template: footer (Jinja2 syntax)
+        # Common template: footer (Jinja2 syntax). The colophon carries the
+        # site's own name — an imprint line, not a generator ad.
         protected def footer_template : String
           <<-HTML
                 <footer class="site-footer">
-                  <p>Powered by Hwaro</p>
+                  <p>{{ site.title | e }} · Powered by <a href="https://github.com/hahwul/hwaro">Hwaro</a></p>
                 </footer>
               </div>
               {{ highlight_js }}
@@ -631,8 +647,9 @@ module Hwaro
               .site-logo:hover { color: var(--primary); }
               .site-header-right { display: flex; align-items: center; gap: 1.4rem; }
               .site-header nav { display: flex; gap: 1.4rem; }
-              .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); transition: color var(--transition); }
+              .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); letter-spacing: 0.01em; padding-bottom: 2px; border-bottom: 2px solid transparent; transition: color var(--transition), border-color var(--transition); }
               .site-header nav a:hover { color: var(--primary); }
+              .site-header nav a[aria-current="page"] { color: var(--heading); border-bottom-color: var(--primary); }
               #{theme_toggle_css}
               .site-main { min-height: calc(100vh - 260px); }
 
@@ -641,6 +658,8 @@ module Hwaro
               .site-footer { margin-top: var(--space-8); padding: 0 0 var(--space-6); text-align: center; color: var(--text-muted); font-size: var(--step--1); }
               .site-footer::before { content: ""; display: block; width: 7px; height: 7px; margin: 0 auto var(--space-4); border-radius: 1px; transform: rotate(45deg); background: var(--spark); }
               .site-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
+              .site-footer a { color: inherit; text-decoration: none; transition: color var(--transition); }
+              .site-footer a:hover { color: var(--primary); }
 
               /* Typography — the fluid minor-third scale, with a display-size
                  page title. Tracking tightens as size grows so the serif
@@ -669,6 +688,14 @@ module Hwaro
               .site-main ol > li::marker { font-family: var(--font-serif); font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
               .site-main ul > li::marker { color: var(--primary); }
               .site-main li { margin-bottom: 0.35em; }
+
+              /* Top-level ordered lists read as a designed step sequence:
+                 serif numerals in ember-tinted coins over hairline rows.
+                 Nested lists keep the plain serif markers above. */
+              .site-main > ol { list-style: none; counter-reset: step; padding-left: 0; max-width: var(--measure); }
+              .site-main > ol > li { position: relative; padding: 0.7rem 0 0.7rem 3.1rem; margin-bottom: 0; border-bottom: 1px solid var(--border-subtle); }
+              .site-main > ol > li:first-child { border-top: 1px solid var(--border-subtle); }
+              .site-main > ol > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0.62rem; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; font-family: var(--font-serif); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primary); background: var(--primary-tint); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); border-radius: 50%; }
 
               code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); overflow-wrap: break-word; }
               pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius-sm); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }

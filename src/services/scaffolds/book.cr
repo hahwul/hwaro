@@ -444,12 +444,12 @@ module Hwaro
               width: 100%;
             }
 
+            /* TOC: a hairline rail instead of a boxed grey card — quieter,
+               and it mirrors the sidebar's active-rail language. */
             .book-toc {
               margin: 1.5rem 0 2rem 0;
-              padding: 1rem 1.25rem;
-              background: var(--bg-subtle);
-              border: 1px solid var(--border-subtle);
-              border-radius: var(--radius);
+              padding: 0.25rem 0 0.25rem 1.1rem;
+              border-left: 2px solid var(--border-subtle);
             }
 
             /* Same overline treatment as the sidebar chapter titles. */
@@ -913,6 +913,8 @@ module Hwaro
             }
 
             .book-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
+            .book-footer a { color: inherit; text-decoration: none; transition: color var(--transition); }
+            .book-footer a:hover { color: var(--primary); }
 
             /* ── Search Overlay ── */
             .search-overlay {
@@ -1378,7 +1380,7 @@ module Hwaro
         protected def footer_template : String
           <<-HTML
                 <div class="book-footer">
-                  <p>Powered by Hwaro</p>
+                  <p>{{ site.title | e }} · Powered by <a href="https://github.com/hahwul/hwaro">Hwaro</a></p>
                 </div>
               </main>
             </div>
@@ -1571,22 +1573,22 @@ module Hwaro
 
             Welcome to **My Book**. This book is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
 
-            ## What This Book Covers
+            ## The chapters
 
-            This book is organized into the following chapters:
+            Three sample chapters sketch the shape of a book; each is a folder under `content/` with its own pages:
 
-            - **Chapter 1: Getting Started** - Learn the fundamentals and get set up
-            - **Chapter 2: Usage** - Understand basic usage and configuration
-            - **Chapter 3: Advanced** - Dive into advanced topics and techniques
+            1. [Getting Started](/chapter-1/) covers the fundamentals and setup.
+            2. [Usage](/chapter-2/) walks through everyday writing and configuration.
+            3. [Advanced](/chapter-3/) digs into the deeper topics.
 
-            ## How to Navigate
+            Rename them, reorder them with `weight`, or delete them and start fresh.
 
-            You can navigate this book using:
+            ## How to navigate
 
-            - The **sidebar** on the left to jump to any chapter
-            - The **previous/next links** at the bottom of each page
-            - **Keyboard shortcuts**: press `←` and `→` arrow keys to go to the previous or next page
-            - **Search**: press `Ctrl+K` or `⌘K` to search the entire book
+            - The **sidebar** on the left jumps to any chapter.
+            - The **previous/next links** at the bottom of each page keep you moving.
+            - **Keyboard shortcuts**: press `←` and `→` to turn pages.
+            - **Search**: press `Ctrl+K` or `⌘K` to search the entire book.
             CONTENT
         end
 

@@ -67,6 +67,7 @@ module Hwaro
               /* Surfaces & edges. */
               --bg:            light-dark(#faf7f2, #0f0f0e);
               --bg-subtle:     light-dark(#f1eae0, #1a1917);
+              --bg-raised:     light-dark(#fffdf8, #1c1a18);
               --bg-code:       light-dark(#f1eae0, #1e1c19);
               --border:        light-dark(#e4dacd, #2b2926);
               --border-subtle: light-dark(#efe8dd, #201e1c);
@@ -141,6 +142,7 @@ module Hwaro
                 --text-muted: #6f6358;
                 --bg: #faf7f2;
                 --bg-subtle: #f1eae0;
+                --bg-raised: #fffdf8;
                 --bg-code: #f1eae0;
                 --border: #e4dacd;
                 --border-subtle: #efe8dd;

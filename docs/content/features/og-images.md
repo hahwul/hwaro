@@ -26,24 +26,26 @@ logo = "static/logo.png"
 |-----|------|---------|-------------|
 | enabled | bool | `false` | Enable auto OG image generation |
 | style | string | `"default"` | Composition preset — see [Style Presets](#style-presets) |
-| background | string | `"#1a1a2e"` | Background color (hex) |
-| text_color | string | `"#ffffff"` | Title and description text color |
-| accent_color | string | `"#e94560"` | Accent color for rules, site name, and color blocks |
+| background | string | `"#171310"` | Background color (hex) |
+| text_color | string | `"#f4ede4"` | Title and description text color |
+| accent_color | string | `"#ec7a66"` | Accent color for rules, brand marks, and color blocks |
 | secondary_color | string | — | Second color for two-tone styles (`split`, `brutalist`, `bauhaus`, …). Auto-derived from `accent_color` when omitted |
-| font_size | int | `48` | Title font size in pixels. Bold styles raise this automatically unless you set a larger value |
+| font_size | int | `48` | Title font size in pixels. Every style raises this to its own scale automatically unless you set a larger value |
 | logo | string | — | Logo file path (e.g., `static/logo.png`), embedded into the image |
 | logo_position | string | `"bottom-left"` | `bottom-left`, `bottom-right`, `top-left`, `top-right` |
-| show_title | bool | `true` | Show the site name at the bottom |
+| show_title | bool | `true` | Show the site name (bottom brand row, or the style's own placement — eyebrow, kicker, window title bar) |
 | output_dir | string | `"og-images"` | Directory for generated images |
 | format | string | `"png"` | `"png"` or `"svg"`. Social platforms don't render SVG `og:image`, so PNG is the default |
-| font_path | string | — | Custom `.ttf`/`.otf` for PNG output. Falls back to system fonts, then bundled DejaVu Sans Bold |
+| font_path | string | — | Custom `.ttf`/`.otf` for PNG output. Leads the font chain; glyphs it lacks fall back to the bundled fonts |
 | background_image | string | — | Background photo composited behind the text |
 | overlay_opacity | float | `0.45` | How much `background` color covers the photo (0.0 = full photo, 1.0 = hidden) |
 | text_panel | float | `0.0` | 0.0–0.6. Soft panel behind the text for legibility on busy backgrounds |
-| pattern_opacity | float | `0.12` | Opacity of the pattern styles (`dots`, `grid`, …) |
+| pattern_opacity | float | `0.35` | Peak alpha of the pattern styles (`dots`, `grid`, …). Each pattern fades internally from this peak |
 | pattern_scale | float | `1.0` | Scale multiplier for the pattern styles (min 0.1) |
 | accent_bars | bool | `false` | Classic thin top/bottom accent bars on the pattern styles |
 | lazy_generate | bool | `false` | Skip bulk generation during `hwaro serve`; images render on first request. Recommended for large sites. No effect on `hwaro build` |
+
+Titles render in Space Grotesk, descriptions in Space Grotesk Medium, and the `terminal` style in JetBrains Mono — all bundled into the binary, so PNG output looks the same on every machine. A CJK-capable system font is appended to the chain automatically when your titles need it, and DejaVu Sans Bold backstops everything else.
 
 ## Style Presets
 
@@ -61,30 +63,32 @@ The `style` option controls the entire composition. Click any preview below to z
 
 | Style | Description |
 |-------|-------------|
-| `editorial` | Clean type with a vertical accent rule. A safe, harmonious default |
+| `editorial` | Magazine front: hairline rules, an uppercase site-name kicker, and a vertical accent rule. A safe, harmonious default |
 | `artistic` | Mesh-gradient color field with film grain. Rich, high-production feel |
 | `hero` | Spotlight glow, oversized ghost echo of the first title word, poster typography |
 | `surreal` | Aurora orbs and flowing ribbon bands with grain |
-| `monument` | Extreme minimalism — massive type, huge whitespace, a single rule |
-| `framed` | Thin inset frame for elegant separation |
+| `monument` | Extreme minimalism — massive type, vast whitespace, an accent rule above the title, brand row bottom-right |
+| `framed` | Invitation card: a neutral hairline frame with accent corner brackets and centered type |
 
 **Geometric** — bold flat color blocking:
 
 | Style | Description |
 |-------|-------------|
 | `split` | Diagonal two-tone color block on the left, title on the right |
-| `band` | Full-width color band with the title knocked out of it, magazine-cover style |
+| `band` | Full-width color band with the title knocked out of it, echoed by a thin rule above — magazine-cover style |
 | `brutalist` | Thick framed panel with a hard offset shadow and oversized type |
 
-**Patterns** — classic background treatments:
+**Patterns** — compositions with a focal point (each fades internally from `pattern_opacity`):
 
 | Style | Description |
 |-------|-------------|
-| `default` | Solid background, no pattern |
-| `minimal` | Solid background, no accent bars |
-| `dots` / `grid` / `diagonal` | Repeating dot / line / stripe patterns |
-| `gradient` | Diagonal accent-color gradient |
-| `waves` | Horizontal wave curves |
+| `default` | Masthead: uppercase site-name eyebrow on top, a low corner glow, and a gentle vignette |
+| `minimal` | Nothing but type — and an accent full stop after the title |
+| `dots` | Staggered halftone dots fading in from the top-right corner |
+| `grid` | Fine blueprint grid with a focal crosshair and registration marks |
+| `diagonal` | 45° stripe wedge in the bottom-right corner with an accent rule on the hypotenuse |
+| `gradient` | Accent-tinted duotone wash with a corner glow, vignette, and grain |
+| `waves` | Layered tide bands anchored to the bottom edge |
 
 ### Preview
 
@@ -129,7 +133,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-editorial.png" alt="editorial style" />
-        <p><code>editorial</code> — Clean type with a vertical accent rule</p>
+        <p><code>editorial</code> — Magazine front: rules, kicker, and a vertical accent rule</p>
       </div>
     </dialog>
   </div>
@@ -173,7 +177,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-monument.png" alt="monument style" />
-        <p><code>monument</code> — Massive type with a single rule</p>
+        <p><code>monument</code> — Massive type with an accent rule above the title</p>
       </div>
     </dialog>
   </div>
@@ -184,7 +188,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-framed.png" alt="framed style" />
-        <p><code>framed</code> — Elegant thin inset frame</p>
+        <p><code>framed</code> — Hairline frame with accent corner brackets</p>
       </div>
     </dialog>
   </div>
@@ -228,7 +232,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-default.png" alt="default style" />
-        <p><code>default</code> — Solid background, no pattern</p>
+        <p><code>default</code> — Masthead: eyebrow, corner glow, and vignette</p>
       </div>
     </dialog>
   </div>
@@ -239,7 +243,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-minimal.png" alt="minimal style" />
-        <p><code>minimal</code> — Clean layout without accent bars</p>
+        <p><code>minimal</code> — Nothing but type and an accent full stop</p>
       </div>
     </dialog>
   </div>
@@ -250,7 +254,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-dots.png" alt="dots style" />
-        <p><code>dots</code> — Repeating dot grid</p>
+        <p><code>dots</code> — Halftone dots fading from the top-right corner</p>
       </div>
     </dialog>
   </div>
@@ -261,7 +265,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-grid.png" alt="grid style" />
-        <p><code>grid</code> — Repeating line grid</p>
+        <p><code>grid</code> — Blueprint grid with a focal crosshair</p>
       </div>
     </dialog>
   </div>
@@ -272,7 +276,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-diagonal.png" alt="diagonal style" />
-        <p><code>diagonal</code> — Diagonal stripe pattern</p>
+        <p><code>diagonal</code> — Stripe wedge with an accent hypotenuse rule</p>
       </div>
     </dialog>
   </div>
@@ -283,7 +287,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-gradient.png" alt="gradient style" />
-        <p><code>gradient</code> — Diagonal gradient using the accent color</p>
+        <p><code>gradient</code> — Duotone wash with glow, vignette, and grain</p>
       </div>
     </dialog>
   </div>
@@ -294,7 +298,7 @@ The `style` option controls the entire composition. Click any preview below to z
       <div class="og-style-dialog">
         <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
         <img src="/images/og-style-examples/style-waves.png" alt="waves style" />
-        <p><code>waves</code> — Horizontal wave curves</p>
+        <p><code>waves</code> — Layered tide bands along the bottom edge</p>
       </div>
     </dialog>
   </div>

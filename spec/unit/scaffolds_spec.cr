@@ -77,6 +77,20 @@ describe Hwaro::Services::Scaffolds::Simple do
       header.should contain("img {")
     end
 
+    it "styles top-level ordered lists as a numbered step sequence" do
+      # The getting-started list is the first thing a new user reads;
+      # it renders as ember-numbered steps instead of a plain <ol>.
+      header = Hwaro::Services::Scaffolds::Simple.new.template_files["header.html"]
+      header.should contain(".site-main > ol")
+      header.should contain("counter-reset: step;")
+      header.should contain("counter(step)")
+    end
+
+    it "marks the active nav item" do
+      header = Hwaro::Services::Scaffolds::Simple.new.template_files["header.html"]
+      header.should contain(%(.site-header nav a[aria-current="page"]))
+    end
+
     it "wires JSON-LD structured data into the header of SEO scaffolds" do
       # Regression: the engine generates JSON-LD and exposes it as `{{ jsonld }}`,
       # but no scaffold included it, so the advertised structured-data feature

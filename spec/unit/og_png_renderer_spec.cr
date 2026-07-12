@@ -74,8 +74,31 @@ describe Hwaro::Content::Seo::OgPngRenderer do
 
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts(nil, prefer_cjk: true)
       ctx.should_not be_nil
-      # U+D55C '한' (Hangul) must resolve to a real glyph in the loaded font.
-      Hwaro::Content::Seo::OgPngRenderer.font_has_glyph?(ctx.not_nil!.bold_info, 0xD55C).should be_true
+      # U+D55C '한' (Hangul) must resolve to a real glyph somewhere in the
+      # font chains (the CJK fallback is appended to every role chain).
+      ctx.not_nil!.covers?(0xD55C).should be_true
+    end
+
+    it "builds fallback chains with the brand font first and DejaVu last" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      ctx.should_not be_nil
+      ctx = ctx.not_nil!
+      # Each role chain carries at least the brand font plus the DejaVu tail.
+      ctx.display.size.should be >= 2
+      ctx.text.size.should be >= 2
+      ctx.mono.size.should be >= 2
+      # Basic Latin must be drawable by every chain.
+      ctx.covers?('A'.ord).should be_true
+    end
+
+    it "measures mixed-script text as a positive width" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      ctx.should_not be_nil
+      w = Hwaro::Content::Seo::OgPngRenderer.chain_measure(ctx.not_nil!.display, 48_f32, "Hello 123")
+      w.should be > 0
+      # Tracking adds per-character advance.
+      wt = Hwaro::Content::Seo::OgPngRenderer.chain_measure(ctx.not_nil!.display, 48_f32, "Hello 123", 2.0_f32)
+      wt.should be > w
     end
   end
 
