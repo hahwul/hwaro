@@ -135,5 +135,44 @@ describe Hwaro::Services::Scaffolds::Docs do
       nav = scaffold.template_files["partials/nav.html"]
       nav.should contain("{{ base_url }}{{ lang_prefix }}/getting-started/")
     end
+
+    # Sidebar pages sort by weight (path as stable tiebreak) so each
+    # section reads in learning order — Installation before Configuration
+    # — instead of alphabetically.
+    it "orders sidebar pages by weight with a stable path tiebreak" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      sidebar = scaffold.template_files["partials/sidebar.html"]
+      sidebar.should contain(%(sort(attribute="path") | sort(attribute="weight")))
+
+      files = scaffold.content_files
+      files["getting-started/installation.md"].should contain("weight = 1")
+      files["getting-started/quick-start.md"].should contain("weight = 2")
+      files["getting-started/configuration.md"].should contain("weight = 3")
+    end
+  end
+
+  describe "landing composition" do
+    it "ships section link-cards and a typographic feature grid" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      index = scaffold.content_files["index.md"]
+      index.should contain(%(class="link-cards"))
+      index.should contain(%(class="feature-grid"))
+
+      css = scaffold.static_files["css/style.css"]
+      css.should contain("a.link-card {")
+      css.should contain(".feature-grid {")
+      css.should contain("var(--bg-raised)")
+    end
+
+    # The raw-HTML card links must localize like Markdown links do —
+    # otherwise the cards reintroduce gh#524 through the HTML side door.
+    it "rewrites card hrefs in localized stubs (gh#524)" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      multi = scaffold.multilingual_content_files(["en", "ko"])
+
+      ko_index = multi["index.ko.md"]
+      ko_index.should contain(%(href="/ko/getting-started/"))
+      ko_index.should_not contain(%(href="/getting-started/"))
+    end
   end
 end

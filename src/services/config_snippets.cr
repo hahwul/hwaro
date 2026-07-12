@@ -576,16 +576,16 @@ module Hwaro
 
           # [og.auto_image]
           # enabled = true
-          # background = "#0f0f12"
-          # text_color = "#ffffff"
-          # accent_color = "#ff4d6d"
+          # background = "#171310"
+          # text_color = "#f4ede4"
+          # accent_color = "#ec7a66"
           # secondary_color = ""           # 2nd color for split/brutalist (auto-derived if empty)
-          # font_size = 52
+          # font_size = 56
           # logo = "static/logo.png"
           # logo_position = "bottom-left"  # bottom-left, bottom-right, top-left, top-right
           # output_dir = "og-images"
           # show_title = true
-          # style = "default"              # classic solid background (current default)
+          # style = "default"              # masthead layout: eyebrow + corner glow (current default)
           # # Recommended modern styles (much more distinctive):
           # # style = "editorial"   # clean + harmonious (great default for most sites)
           # # style = "artistic"    # rich/illustrative backgrounds
@@ -600,7 +600,7 @@ module Hwaro
           # # style = "terminal"    # code-editor window with prompt + cursor
           # # style = "bauhaus"     # flat geometric art-poster shapes
           # # style = "halftone"    # print-style halftone dot fade
-          # pattern_opacity = 0.12
+          # pattern_opacity = 0.35
           # pattern_scale = 1.0
           # background_image = ""          # Background image file path (embedded as base64)
           # overlay_opacity = 0.45

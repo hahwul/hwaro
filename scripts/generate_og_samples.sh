@@ -24,7 +24,6 @@ echo "Generating OG image style samples..."
 echo "──────────────────────────────────────────────"
 
 STYLES=("default" "editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "terminal" "bauhaus" "halftone" "minimal" "gradient" "waves" "dots" "grid" "diagonal")
-MODERN_STYLES=("editorial" "framed" "artistic" "hero" "surreal" "monument" "split" "band" "brutalist" "terminal" "bauhaus" "halftone")
 
 mkdir -p "$OUT_DIR"
 
@@ -34,122 +33,117 @@ for style in "${STYLES[@]}"; do
     TMP=$(mktemp -d -t hwaro-og-sample-XXXXXX)
     pushd "$TMP" >/dev/null
 
-    # For modern/ambitious styles, use a richer base so previews look more realistic
-    if [[ " ${MODERN_STYLES[*]} " =~ " ${style} " ]]; then
-        "$HWARO_BIN" init . --scaffold docs --skip-agents-md --skip-sample-content -q 2>/dev/null || true
-    else
-        "$HWARO_BIN" init . --scaffold bare --skip-agents-md --skip-sample-content -q 2>/dev/null || true
-    fi
+    "$HWARO_BIN" init . --scaffold bare --skip-agents-md --skip-sample-content -q 2>/dev/null || true
 
-    # Prepare assets for rich samples
-    mkdir -p static/images
-
-    # Per-style background and settings to make the samples visually distinct and modern
-    TEXT="#ffffff"
+    # Curated per-style palette + copy so every preview shows the style at
+    # its best. No AI-purple defaults; hues stay in each style's family.
+    TEXT="#f4ede4"
     SECONDARY=""
-    SHOW_TITLE="false"
-    BG_IMAGE=""
     case "${style}" in
-        artistic)
-            # Built-in two-color gradient backdrop (no background image needed).
-            BG="#1a1430"
-            ACCENT="#7c3aed"
-            SECONDARY="#06b6d4"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="64"
-            SHOW_TITLE="true"
+        default)
+            BG="#171310"; ACCENT="#ec7a66"
+            TITLE="Make It Yours"
+            DESC="Every page ships with a handsome preview. Zero config."
             ;;
-        hero)
-            BG="#0a0a0e"
-            ACCENT="#ff2d55"
-            TEXT_PANEL="0.0"   # rely on the built-in spotlight glow
-            FONT_SIZE="72"
-            SHOW_TITLE="true"
+        minimal)
+            BG="#101013"; ACCENT="#ec7a66"; TEXT="#f2f0ec"
+            TITLE="Less, but better"
+            DESC="One accent. Nothing else."
             ;;
-        surreal)
-            BG="#0c0818"
-            ACCENT="#a855f7"
-            SECONDARY="#22d3ee"
-            TEXT_PANEL="0.0"   # rely on the built-in aurora orbs
-            FONT_SIZE="60"
-            SHOW_TITLE="true"
+        dots)
+            BG="#0f1417"; ACCENT="#4cc9f0"; TEXT="#edf3f6"
+            TITLE="Signal in the Noise"
+            DESC="A halftone fade that points at the headline."
             ;;
-        monument)
-            BG="#0f0f11"
-            ACCENT="#e0e0e0"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="82"
-            SHOW_TITLE="true"
+        grid)
+            BG="#101014"; ACCENT="#ffb703"; TEXT="#f3f1ec"
+            TITLE="Built on a Grid"
+            DESC="Blueprint lines you can actually see."
             ;;
-        split)
-            BG="#10131c"
-            ACCENT="#ff3b6b"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="58"
-            SHOW_TITLE="true"   # site name fills the color block
+        diagonal)
+            BG="#15100e"; ACCENT="#ff7a45"
+            TITLE="Cut to the Chase"
+            DESC="A corner of momentum."
             ;;
-        band)
-            BG="#0e1116"
-            ACCENT="#ffd23f"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="60"
-            SHOW_TITLE="true"
+        gradient)
+            BG="#141216"; ACCENT="#e85d75"; TEXT="#f5eff1"
+            TITLE="Warm Front"
+            DESC="A duotone wash with real depth."
             ;;
-        brutalist)
-            BG="#f6f1e7"
-            ACCENT="#161616"
-            TEXT="#161616"
-            SECONDARY="#ff5b2e"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="78"
-            SHOW_TITLE="true"
-            ;;
-        framed)
-            BG="#14141b"
-            ACCENT="#e2c044"
-            TEXT_PANEL="0.0"   # rely on the built-in thin frame
-            FONT_SIZE="56"
-            SHOW_TITLE="true"
+        waves)
+            BG="#0d1420"; ACCENT="#38bdf8"; TEXT="#ebf2f8"
+            TITLE="Below the Fold"
+            DESC="Layered tides, calm typography."
             ;;
         editorial)
-            BG="#14141b"
-            ACCENT="#ff4d6d"
-            TEXT_PANEL="0.0"   # rely on the built-in vertical rule
-            FONT_SIZE="52"
-            SHOW_TITLE="true"
+            BG="#14141b"; ACCENT="#ff4d6d"; TEXT="#f2f1f4"
+            TITLE="Field Notes"
+            DESC="Thoughtful writing deserves thoughtful presentation."
+            ;;
+        framed)
+            BG="#14141b"; ACCENT="#e2c044"; TEXT="#f2f1f4"
+            TITLE="Boundary"
+            DESC="A quiet frame and four corners."
+            ;;
+        monument)
+            BG="#0f0f11"; ACCENT="#e0e0e0"; TEXT="#f1f1f2"
+            TITLE="SILENCE"
+            DESC="A statement in negative space."
+            ;;
+        artistic)
+            BG="#1c1210"; ACCENT="#ff6b5e"; SECONDARY="#2ec4b6"
+            TITLE="Winter '26"
+            DESC="High-production design for ambitious brands."
+            ;;
+        hero)
+            BG="#0a0a0e"; ACCENT="#ff2d55"; TEXT="#f4f2f3"
+            TITLE="THE DROP"
+            DESC="Bold design for those who move first."
+            ;;
+        surreal)
+            BG="#0e1216"; ACCENT="#ff8c66"; SECONDARY="#5eead4"; TEXT="#eff3f4"
+            TITLE="Echo Chamber"
+            DESC="Where form dissolves and meaning multiplies."
+            ;;
+        split)
+            BG="#10131c"; ACCENT="#ff3b6b"; TEXT="#f3f1f2"
+            TITLE="A Field Guide to Bold Layouts"
+            DESC="A diagonal color block anchors the whole composition."
+            ;;
+        band)
+            BG="#0e1116"; ACCENT="#ffd23f"; TEXT="#f2f2ee"
+            TITLE="Cover Story"
+            DESC="A magazine-style color band behind a knocked-out title."
+            ;;
+        brutalist)
+            BG="#f6f1e7"; ACCENT="#161616"; TEXT="#161616"; SECONDARY="#ff5b2e"
+            TITLE="Raw & Loud"
+            DESC="Thick frames, hard shadows, and oversized type."
             ;;
         terminal)
-            BG="#0d1117"
-            ACCENT="#2ee66b"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="54"
-            SHOW_TITLE="true"
+            BG="#0d1117"; ACCENT="#2ee66b"; TEXT="#e9eef4"
+            TITLE="hwaro serve --fast-start"
+            DESC="Your dev server, rendered like it deserves."
             ;;
         bauhaus)
-            BG="#f4f1ea"
-            ACCENT="#e8453c"
-            TEXT="#18181b"
-            SECONDARY="#2563eb"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="64"
-            SHOW_TITLE="true"
+            BG="#f4f1ea"; ACCENT="#e8453c"; TEXT="#18181b"; SECONDARY="#2563eb"
+            TITLE="Form Follows Function"
+            DESC="Geometry, color, and type in balance."
             ;;
         halftone)
-            BG="#0e0e11"
-            ACCENT="#ff2e88"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="64"
-            SHOW_TITLE="true"
+            BG="#0e0e11"; ACCENT="#ff2e88"; TEXT="#f3f0f2"
+            TITLE="Print Isn't Dead"
+            DESC="Halftone texture straight from the press."
             ;;
         *)
-            BG="#0f0f12"
-            ACCENT="#ff4d6d"
-            TEXT_PANEL="0.0"
-            FONT_SIZE="48"
+            BG="#171310"; ACCENT="#ec7a66"
+            TITLE="OG Sample"
+            DESC="Preview image for style: ${style}"
             ;;
     esac
 
-    # Override config with our desired OG settings for preview
+    # Override config with our desired OG settings for preview. Font size
+    # is left at the default — every style self-sizes its typography.
     {
         echo 'title = "Hwaro"'
         echo 'base_url = "https://hwaro.dev"'
@@ -158,80 +152,16 @@ for style in "${STYLES[@]}"; do
         echo '[og.auto_image]'
         echo 'enabled = true'
         echo "style = \"${style}\""
-        echo "text_panel = ${TEXT_PANEL}"
         echo "background = \"${BG}\""
         echo "accent_color = \"${ACCENT}\""
         echo "text_color = \"${TEXT}\""
         if [ -n "${SECONDARY:-}" ]; then
             echo "secondary_color = \"${SECONDARY}\""
         fi
-        echo "font_size = ${FONT_SIZE}"
-        echo "show_title = ${SHOW_TITLE}"
+        echo 'show_title = true'
         echo 'format = "png"'
         echo 'output_dir = "og-images"'
-
-        if [ -n "${BG_IMAGE:-}" ]; then
-            echo "background_image = \"${BG_IMAGE}\""
-            echo "overlay_opacity = ${OVERLAY:-0.55}"
-        fi
     } > config.toml
-
-    # Create richer sample content for modern styles
-    if [[ " ${MODERN_STYLES[*]} " =~ " ${style} " ]]; then
-        case "${style}" in
-            artistic)
-                TITLE="Winter '26"
-                DESC="High-production design for ambitious brands. Rich backgrounds meet confident typography."
-                ;;
-            hero)
-                TITLE="THE DROP"
-                DESC="Limited drop. Bold design for those who move first."
-                ;;
-            surreal)
-                TITLE="Echo Chamber"
-                DESC="Where form dissolves and meaning multiplies."
-                ;;
-            monument)
-                TITLE="SILENCE"
-                DESC="A statement in negative space."
-                ;;
-            framed)
-                TITLE="Boundary"
-                DESC="Clear separation. Modern presence on complex backgrounds."
-                ;;
-            editorial)
-                TITLE="Field Notes"
-                DESC="Thoughtful writing deserves thoughtful presentation."
-                ;;
-            split)
-                TITLE="A Field Guide to Bold Layouts"
-                DESC="A diagonal color block anchors the whole composition."
-                ;;
-            band)
-                TITLE="Cover Story"
-                DESC="A magazine-style color band behind a knocked-out title."
-                ;;
-            brutalist)
-                TITLE="Raw & Loud"
-                DESC="Thick frames, hard shadows, and oversized type."
-                ;;
-            terminal)
-                TITLE="hwaro serve --fast-start"
-                DESC="Your dev server, rendered like it deserves."
-                ;;
-            bauhaus)
-                TITLE="Form Follows Function"
-                DESC="Geometry, color, and type in balance."
-                ;;
-            halftone)
-                TITLE="Print Isn't Dead"
-                DESC="Halftone texture straight from the press."
-                ;;
-        esac
-    else
-        TITLE="OG Sample"
-        DESC="Preview image for style: ${style}"
-    fi
 
     cat > content/index.md <<EOPAGE
 +++

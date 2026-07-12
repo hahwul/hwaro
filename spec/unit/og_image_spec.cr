@@ -21,8 +21,10 @@ describe Hwaro::Models::AutoImageConfig do
     it "is disabled by default" do
       config = Hwaro::Models::Config.new
       config.og.auto_image.enabled.should be_false
-      config.og.auto_image.background.should eq("#1a1a2e")
-      config.og.auto_image.text_color.should eq("#ffffff")
+      # Ember identity defaults (warm charcoal / warm off-white / ember).
+      config.og.auto_image.background.should eq("#171310")
+      config.og.auto_image.text_color.should eq("#f4ede4")
+      config.og.auto_image.accent_color.should eq("#ec7a66")
       config.og.auto_image.font_size.should eq(48)
       config.og.auto_image.output_dir.should eq("og-images")
     end
@@ -32,7 +34,7 @@ describe Hwaro::Models::AutoImageConfig do
       ai = config.og.auto_image
       ai.show_title.should be_true
       ai.style.should eq("default")
-      ai.pattern_opacity.should eq(0.12)
+      ai.pattern_opacity.should eq(0.35)
       ai.pattern_scale.should eq(1.0)
       ai.background_image.should be_nil
       ai.overlay_opacity.should eq(0.45)
@@ -164,7 +166,9 @@ describe Hwaro::Content::Seo::OgImage do
       svg.should contain("630")
       svg.should contain("Hello World")
       svg.should contain("A great post about things")
-      svg.should contain("My Site")
+      # The default masthead style renders the site name as an uppercase
+      # tracked eyebrow at the top.
+      svg.should contain("MY SITE")
     end
 
     it "uses configured colors" do
@@ -309,14 +313,17 @@ describe Hwaro::Content::Seo::OgImage do
 
         config = Hwaro::Models::Config.new
         config.title = "My Site"
+        config.og.auto_image.style = "dots" # a style that uses the bottom brand row
         config.og.auto_image.logo = logo_path
         config.og.auto_image.logo_position = "bottom-right"
 
         logo_data_uri = Hwaro::Content::Seo::OgImage.file_to_data_uri(logo_path)
         svg = Hwaro::Content::Seo::OgImage.render_svg(page, config, logo_data_uri)
 
-        # Site name should be at x=80 (not offset to 140) since logo is not bottom-left
-        svg.should contain("<text x=\"80\" y=\"#{Hwaro::Content::Seo::OgImage::HEIGHT - 65}\"")
+        # Brand row starts at the base margin (not offset to 140) since the
+        # logo is not bottom-left: tick at x=80, name after tick + gap.
+        svg.should contain("<rect x=\"80\" y=\"#{Hwaro::Content::Seo::OgImage::BRAND_BASELINE - Hwaro::Content::Seo::OgImage::BRAND_TICK_H + 4}\"")
+        svg.should contain("<text x=\"99\" y=\"#{Hwaro::Content::Seo::OgImage::BRAND_BASELINE}\"")
       end
     end
 
@@ -344,8 +351,9 @@ describe Hwaro::Content::Seo::OgImage do
       config.title = "My Site"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain("My Site")
-      svg.should contain("font-size=\"22\"")
+      # Default masthead style: uppercase eyebrow at the top.
+      svg.should contain("MY SITE")
+      svg.should contain("font-size=\"#{Hwaro::Content::Seo::OgImage::MASTHEAD_EYEBROW_SIZE}\"")
     end
 
     it "renders dots style pattern" do
@@ -356,7 +364,9 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.style = "dots"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain("<pattern id=\"dots\"")
+      # Compositional corner fade: individual circles with per-dot opacity,
+      # no uniform <pattern> tile.
+      svg.should_not contain("<pattern id=\"dots\"")
       svg.should contain("<circle")
     end
 
@@ -379,8 +389,11 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.style = "diagonal"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+      # Corner wedge: masked stripe polygon + accent rule on the hypotenuse.
       svg.should contain("<pattern id=\"diagonal\"")
-      svg.should contain("patternTransform=\"rotate(45)\"")
+      svg.should contain("mask=\"url(#ogWedgeMask)\"")
+      svg.should contain("<polygon points=\"700,630 1200,630 1200,150\"")
+      svg.should contain("<line x1=\"700\" y1=\"630\" x2=\"1200\" y2=\"150\"")
     end
 
     it "renders gradient style" do
@@ -402,7 +415,9 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.style = "waves"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain("<path d=\"M 0")
+      # Filled tide bands: closed paths anchored to the bottom edge.
+      svg.should contain("<path d=\"M -20 630")
+      svg.scan(/ Z" fill="/).size.should eq(3)
     end
 
     it "minimal style removes accent bars" do
@@ -564,7 +579,12 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.accent_color = "#e2c044"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain("fill=\"none\" stroke=\"#e2c044\"")
+      # Invitation card: a neutral hairline frame plus accent corner
+      # brackets, with the title centered.
+      svg.should contain("fill=\"none\" stroke=")
+      svg.should contain("stroke-width=\"1\"")
+      svg.should contain(%(<g fill="#e2c044">))
+      svg.should contain(%(text-anchor="middle"))
     end
 
     it "skips the generated gradient when a background image is present" do
@@ -598,7 +618,7 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.accent_color = "#e8453c"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain(%(<circle cx="950" cy="150" r="220" fill="#e8453c" />))
+      svg.should contain(%(<circle cx="940" cy="190" r="220" fill="#e8453c" />))
       svg.should contain("<polygon")
     end
 
@@ -620,7 +640,7 @@ describe Hwaro::Content::Seo::OgImage do
       config.og.auto_image.style = "hero"
 
       svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
-      svg.should contain(%(opacity="0.07">VELOCITY</text>))
+      svg.should contain(%(opacity="0.06">VELOCITY</text>))
     end
   end
 

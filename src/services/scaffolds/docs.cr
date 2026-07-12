@@ -431,6 +431,91 @@ module Hwaro
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
 
+            /* The first paragraph under the page title reads as a serif
+               lede — the same focal move simple and blog make. */
+            .docs-main > h1:first-child + p {
+              font-family: var(--font-serif);
+              font-size: var(--step-1);
+              line-height: 1.55;
+              color: var(--text-secondary);
+            }
+
+            /* Landing wayfinding: one raised card per section. The border
+               warms and the arrow nudges on hover — quiet, not boxy. */
+            .link-cards {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+              gap: var(--space-3);
+              margin: var(--space-5) 0 var(--space-6);
+            }
+
+            a.link-card {
+              display: block;
+              padding: var(--space-4) var(--space-5);
+              background: var(--bg-raised);
+              border: 1px solid var(--border);
+              border-radius: var(--radius);
+              text-decoration: none;
+              transition: border-color var(--transition), box-shadow var(--transition);
+            }
+
+            a.link-card strong {
+              display: block;
+              font-family: var(--font-serif);
+              font-size: var(--step-1);
+              font-weight: 700;
+              color: var(--heading);
+              margin-bottom: 0.3rem;
+            }
+
+            a.link-card strong::after {
+              content: "\\2192";
+              display: inline-block;
+              margin-left: 0.4rem;
+              color: var(--primary);
+              opacity: 0;
+              transform: translateX(-4px);
+              transition: opacity var(--transition), transform var(--transition);
+            }
+
+            a.link-card span {
+              display: block;
+              font-size: var(--step--1);
+              line-height: 1.55;
+              color: var(--text-secondary);
+            }
+
+            a.link-card:hover {
+              border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+              box-shadow: var(--shadow-sm);
+            }
+
+            @media (hover: hover) {
+              a.link-card:hover strong::after { opacity: 1; transform: translateX(0); }
+            }
+
+            /* Feature grid — typography-led, no boxes: bold lead-ins over
+               quiet descriptions, two columns when there's room. */
+            .feature-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+              gap: var(--space-4) var(--space-6);
+              margin: var(--space-5) 0;
+            }
+
+            .feature strong {
+              display: block;
+              color: var(--heading);
+              margin-bottom: 0.15rem;
+            }
+
+            .feature span {
+              display: block;
+              font-size: var(--step--1);
+              line-height: 1.55;
+              color: var(--text-secondary);
+            }
+
             /* TOC: a hairline rail instead of a boxed grey card — quieter,
                and it mirrors the sidebar's active-rail language. */
             .docs-toc {
@@ -775,6 +860,8 @@ module Hwaro
             }
 
             .docs-footer p { font-family: var(--font-serif); font-style: italic; margin: 0; }
+            .docs-footer a { color: inherit; text-decoration: none; transition: color var(--transition); }
+            .docs-footer a:hover { color: var(--primary); }
 
             /* Search trigger button */
             .search-trigger {
@@ -1133,7 +1220,7 @@ module Hwaro
         protected def footer_template : String
           <<-HTML
                 <div class="docs-footer">
-                  <p>Powered by Hwaro</p>
+                  <p>{{ site.title | e }} · Powered by <a href="https://github.com/hahwul/hwaro">Hwaro</a></p>
                 </div>
               </main>
             </div>
@@ -1191,6 +1278,9 @@ module Hwaro
         # Section / page order follows whatever `site.sections` returns
         # (filesystem / weight-driven). Set `weight = N` in front
         # matter to reorder.
+        # Pages sort by `weight` (with `path` first as a stable tiebreak),
+        # so each section reads in learning order — Installation before
+        # Configuration — instead of alphabetically.
         private def docs_sidebar_html : String
           <<-HTML
             <aside class="docs-sidebar">
@@ -1199,7 +1289,7 @@ module Hwaro
                 <div class="sidebar-title">{{ sec.title | e }}</div>
                 <ul class="sidebar-links">
                   <li><a href="{{ base_url }}{{ sec.url }}">Overview</a></li>
-                  {% for p in sec.pages | sort(attribute="path") %}{% if not p.is_index %}
+                  {% for p in sec.pages | sort(attribute="path") | sort(attribute="weight") %}{% if not p.is_index %}
                   <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
                   {% endif %}{% endfor %}
                 </ul>
@@ -1302,7 +1392,9 @@ module Hwaro
             HTML
         end
 
-        # Content files
+        # Content files. The landing composes designed blocks (raw HTML
+        # passes through Markdown untouched): section cards for wayfinding,
+        # then a typographic feature grid — no bullet walls.
         private def index_content : String
           <<-CONTENT
             +++
@@ -1310,22 +1402,24 @@ module Hwaro
             description = "Project documentation powered by Hwaro."
             +++
 
-            This documentation site is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.
+            This documentation site is powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator. Three sections, a sidebar, and search come wired up, ready for your own docs.
 
-            ## Quick Links
-
-            - **[Getting Started](/getting-started/)** - Installation, setup, and basic usage
-            - **[Guide](/guide/)** - In-depth guides on content, templates, and more
-            - **[Reference](/reference/)** - CLI commands and configuration options
+            <div class="link-cards">
+              <a class="link-card" href="/getting-started/"><strong>Getting Started</strong><span>Install, set up, and run your first build.</span></a>
+              <a class="link-card" href="/guide/"><strong>Guide</strong><span>Content, templates, and shortcodes in depth.</span></a>
+              <a class="link-card" href="/reference/"><strong>Reference</strong><span>Every CLI command and configuration key.</span></a>
+            </div>
 
             ## Features
 
-            - **Write in Markdown** - Simple, readable content authoring
-            - **Jinja2 Templates** - Customizable templates via Crinja engine
-            - **Fast Builds** - Powered by Crystal for blazing fast build times
-            - **Built-in Search** - Client-side search with keyboard shortcuts
-            - **Responsive Layout** - Documentation layout that works on all devices
-            - **Syntax Highlighting** - Code blocks with automatic syntax highlighting
+            <div class="feature-grid">
+              <div class="feature"><strong>Write in Markdown</strong><span>Simple, readable content authoring.</span></div>
+              <div class="feature"><strong>Jinja2 Templates</strong><span>Customizable templates via the Crinja engine.</span></div>
+              <div class="feature"><strong>Fast Builds</strong><span>Powered by Crystal for quick rebuild cycles.</span></div>
+              <div class="feature"><strong>Built-in Search</strong><span>Client-side search with keyboard shortcuts.</span></div>
+              <div class="feature"><strong>Responsive Layout</strong><span>A documentation layout that works on all devices.</span></div>
+              <div class="feature"><strong>Syntax Highlighting</strong><span>Code blocks highlighted at build time.</span></div>
+            </div>
             CONTENT
         end
 
@@ -1352,6 +1446,7 @@ module Hwaro
             +++
             title = "Installation"
             description = "Install Hwaro on your system."
+            weight = 1
             +++
 
             Learn how to install Hwaro on your system.
@@ -1389,6 +1484,7 @@ module Hwaro
             +++
             title = "Quick Start"
             description = "Get up and running with a new Hwaro docs site in minutes."
+            weight = 2
             +++
 
             Get up and running with Hwaro in minutes.
@@ -1441,6 +1537,7 @@ module Hwaro
             +++
             title = "Configuration"
             description = "Configure your Hwaro site via config.toml."
+            weight = 3
             +++
 
             Hwaro is configured through a `config.toml` file in your project root.
@@ -1502,6 +1599,7 @@ module Hwaro
             +++
             title = "Content Management"
             description = "How to organize, author, and front-matter your content."
+            weight = 1
             +++
 
             Learn how to organize and write content in Hwaro.
@@ -1562,6 +1660,7 @@ module Hwaro
             +++
             title = "Templates"
             description = "Customize your site's look with Crinja (Jinja2) templates."
+            weight = 2
             +++
 
             Hwaro uses Jinja2-compatible templates (via Crinja) for rendering pages.
@@ -1619,6 +1718,7 @@ module Hwaro
             +++
             title = "Shortcodes"
             description = "Reusable template snippets you can embed in Markdown."
+            weight = 3
             +++
 
             Shortcodes are reusable content snippets you can embed in your Markdown.
@@ -1710,6 +1810,7 @@ module Hwaro
             +++
             title = "CLI Commands"
             description = "Complete reference for every hwaro subcommand."
+            weight = 1
             +++
 
             Reference for all Hwaro command-line commands.
@@ -1786,6 +1887,7 @@ module Hwaro
             +++
             title = "Configuration Reference"
             description = "Every option you can set in config.toml."
+            weight = 2
             +++
 
             Complete reference for `config.toml` options.
