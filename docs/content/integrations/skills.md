@@ -13,7 +13,7 @@ when it detects a Hwaro task.
 | Skill | What it teaches |
 |-------|-----------------|
 | **`hwaro`** | Operating the CLI — scaffolding (`init`), content (`new`), preview (`serve`), production builds (`build`), and the `doctor`/`tool`/`deploy` subcommands. Emphasizes the agent-safe output contract: `--json`, `--quiet`, `NO_COLOR`, and the classified `HWARO_E_*` error/exit codes, plus safe `config.toml` and Crinja template edits. |
-| **`hwaro-design`** | Designing and restyling a site. It **interviews you about your taste first**, then produces distinctive, production-grade design within Hwaro's Crinja templates and CSS-variable token system — with a quality bar and pre-ship checklist that steer away from generic AI aesthetics. |
+| **`hwaro-design`** | Designing and restyling a site. It **reads your brief, declares a one-line Design Read, and sets three design dials** (asking questions only when your intent is genuinely ambiguous), then produces distinctive, production-grade design within Hwaro's Crinja templates and CSS-variable token system — under a strict anti-slop discipline and a mechanical pre-flight check that filter out generic AI aesthetics. |
 
 ## Install with `npx skills`
 
@@ -81,18 +81,24 @@ correct location.
 
 ### `hwaro-design` — designing the site
 
-- **Interview-first:** captures a *design brief* (purpose, personality,
-  references, color, type, density, motion, constraints) before writing any CSS,
-  so the result reflects **your** taste rather than a default.
-- **Quality bar:** typography scale, intentional palette with a single accent,
-  a spacing system, hierarchy, restrained detail, purposeful motion,
-  responsiveness, and accessibility — with an explicit list of generic-AI tells
-  to avoid.
+- **Design Read first:** reads your brief and declares a one-line design
+  direction plus three dials (`DESIGN_VARIANCE` / `MOTION_INTENSITY` /
+  `VISUAL_DENSITY`) before writing any CSS. It asks a short, focused question
+  round only when your intent is genuinely ambiguous — and runs a full taste
+  interview only when you ask for one — so the result reflects **your** taste
+  rather than a default.
+- **Anti-slop discipline:** an extensive list of hard bans on the signatures of
+  AI-generated design — em-dashes in page copy, eyebrow-label overuse, repeated
+  section layouts, hero-overflow, fake screenshots built from `<div>`s,
+  AI-purple gradients, decorative dots and locale strips, "Jane Doe" demo
+  content — plus layout, copy-density, and imagery rules, all enforced by a
+  mechanical pre-flight checklist before anything is declared done.
 - **Hwaro mechanics:** Crinja template structure, the three CSS-delivery options
   (inline, `[auto_includes]`, the `[assets]` pipeline), the shared `light-dark()`
   design-token vocabulary all built-in scaffolds theme through (light and dark
-  come automatically; retheme by overriding the token pairs), and
-  responsive images via `resize_image`.
+  come automatically; retheme by overriding the token pairs), responsive images
+  via `resize_image`, and static-site motion via CSS scroll-driven animations
+  and `IntersectionObserver` — no framework required.
 
 ## Prerequisite
 
