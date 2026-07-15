@@ -2524,6 +2524,12 @@ describe "watcher ignore patterns" do
     "emacs lock file"       => ".#note.md",
     "emacs autosave"        => "#note.md#",
     ".DS_Store"             => ".DS_Store",
+    ".tmp atomic-save file" => "page.html.tmp",
+    "VS Code crswap"        => "page.html.crswap",
+    "JetBrains safe write"  => "page.html___jb_tmp___",
+    "JetBrains old backup"  => "page.html___jb_old___",
+    "gedit atomic save"     => ".goutputstream-4XQ2K1",
+    "vim write probe"       => "4913",
   }.each do |label, name|
     it "ignores #{label} (#{name})" do
       Hwaro::Services::Server.test_watcher_ignored?(name).should be_true
@@ -2549,6 +2555,16 @@ describe "watcher ignore patterns" do
     # leading .#) should be dropped.
     Hwaro::Services::Server.test_watcher_ignored?("notes-for-~user.md").should be_false
     Hwaro::Services::Server.test_watcher_ignored?("tag-#python.md").should be_false
+  end
+
+  it "does NOT ignore files that merely resemble atomic-save byproducts" do
+    # "tmp" inside a name (or as a stem) is fine — only the trailing
+    # `.tmp` extension is a save byproduct. Same for a numeric name that
+    # isn't exactly vim's `4913` probe.
+    Hwaro::Services::Server.test_watcher_ignored?("tmp.html").should be_false
+    Hwaro::Services::Server.test_watcher_ignored?("templates/tmpl.html").should be_false
+    Hwaro::Services::Server.test_watcher_ignored?("content/posts/14913.md").should be_false
+    Hwaro::Services::Server.test_watcher_ignored?("static/img/4913.png").should be_false
   end
 
   it "excludes matched files from scan_mtimes" do

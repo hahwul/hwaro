@@ -418,6 +418,13 @@ module Hwaro
     class Server
       @builder : Core::Build::Builder
       @live_reload_handler : LiveReloadHandler?
+      # True after a watch rebuild raised. A failed rebuild can leave the
+      # builder's in-memory state (reloaded templates, partially updated
+      # site relationships) ahead of what's on disk, and the pages that
+      # failed to render are not re-selected when the NEXT event touches an
+      # unrelated file — so the next changeset escalates to a full rebuild
+      # to guarantee convergence, whatever the user saves.
+      @rebuild_failed : Bool = false
 
       # Debounce interval: after detecting changes, wait this long for
       # additional changes to settle before triggering a rebuild.
@@ -598,6 +605,11 @@ module Hwaro
               @builder.render_deferred(deferred_options)
               @live_reload_handler.try(&.notify_reload)
             rescue ex
+              # Deferred pages have no HTML on disk yet and incremental
+              # strategies will never render them — flag the failure so the
+              # first watch rebuild escalates to a full one (the watcher only
+              # starts after this fiber signals done, so no race on the flag).
+              @rebuild_failed = true
               Logger.error "[Fast-start] Background render failed: #{ex.message}"
               Logger.debug "[Fast-start] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
               @live_reload_handler.try(&.notify_build_error(ex.message || "Background render failed"))
@@ -705,11 +717,13 @@ module Hwaro
 
                 begin
                   apply_changeset(changeset, build_options)
+                  @rebuild_failed = false
                 rescue ex
                   # Surface the failure both in the terminal and the
                   # browser. Without the WS push the developer sees the
                   # stale page and keeps editing on top of a broken
                   # build until they happen to glance at the terminal.
+                  @rebuild_failed = true
                   Logger.error "[Watch] Build failed: #{ex.message}"
                   Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
                   @live_reload_handler.try(&.notify_build_error(ex.message || "Build failed"))
@@ -829,6 +843,13 @@ module Hwaro
       # Choose the cheapest rebuild strategy for a given ChangeSet and execute it.
       private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         strategy = changeset.rebuild_strategy
+        # After a failed rebuild the cheap strategies can't be trusted to
+        # cover the pages the failure left stale — rebuild everything once,
+        # then return to incremental strategies (see @rebuild_failed).
+        if @rebuild_failed && strategy != :full
+          Logger.info "  Previous rebuild failed — running a full rebuild to recover."
+          strategy = :full
+        end
         # Calm watch timeline: one "↻ changed <what> · time" event, then the
         # rebuild's own "▴ rebuilt …" outcome line below it, both on the same
         # 2-space grid so the verbs and values column-align. The strategy is
@@ -948,6 +969,17 @@ module Hwaro
         # emacs autosave:    #filename#
         /(?:\A|\/)\.#[^\/]+$/,
         /(?:\A|\/)#[^\/]+#$/,
+        # Atomic-save temp files: write-to-temp-then-rename editors create
+        # these next to the target for a moment. Watching them turned every
+        # such save into an add+remove pair — a needless FULL rebuild — and,
+        # worse, could trigger a rebuild while the real file was still being
+        # swapped in.
+        /\.tmp$/,
+        /\.crswap$/,                        # VS Code safe-write swap
+        /___jb_tmp___$/,                    # JetBrains safe write
+        /___jb_old___$/,                    # JetBrains safe-write backup
+        /(?:\A|\/)\.goutputstream-[^\/]+$/, # GNOME (gedit) atomic save
+        /(?:\A|\/)4913$/,                   # vim's write-permission probe
       ]
 
       protected def self.watcher_ignored?(path : String) : Bool

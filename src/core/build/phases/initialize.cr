@@ -254,7 +254,9 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     templates = {} of String => String
-    @template_paths.clear
+    # Built fresh and swapped in (never mutated in place) so a loader
+    # holding the previous snapshot keeps a consistent pair of hashes.
+    template_paths = {} of String => String
     if Dir.exists?("templates")
       # Single glob for all supported template extensions.
       # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
@@ -270,8 +272,10 @@ module Hwaro::Core::Build::Phases::Initialize
         name = relative.to_s.gsub(Builder::TEMPLATE_EXTENSION_REGEX, "")
         # Don't overwrite if already loaded (higher priority extensions loaded first)
         unless templates.has_key?(name)
-          templates[name] = File.read(path)
-          @template_paths[name] = path
+          if source = read_template_source(path)
+            templates[name] = source
+            template_paths[name] = path
+          end
         end
       end
     end
@@ -279,11 +283,12 @@ module Hwaro::Core::Build::Phases::Initialize
     unless templates.has_key?("page")
       if templates.has_key?("default")
         templates["page"] = templates["default"]
-        if default_path = @template_paths["default"]?
-          @template_paths["page"] = default_path
+        if default_path = template_paths["default"]?
+          template_paths["page"] = default_path
         end
       end
     end
+    @template_paths = template_paths
 
     # (Re)build the template dependency graph for selective invalidation
     @template_deps = TemplateDeps.new(templates)
@@ -304,10 +309,39 @@ module Hwaro::Core::Build::Phases::Initialize
 
     compute_template_var_features(templates)
 
-    # Initialize Crinja environment with file system loader
+    # Publish the snapshot BEFORE (re)building the Crinja environment so its
+    # snapshot-backed loader captures this load's template set.
+    @templates = templates
+
+    # Initialize Crinja environment with the snapshot-backed loader
     @crinja_env = setup_crinja_env
 
-    @templates = templates
+    templates
+  end
+
+  # How long `read_template_source` rides out a template file that a glob
+  # just found but a read can't open — the delete-then-recreate window of
+  # editors using "safe write" saves (vim without backupcopy, some IDEs).
+  TEMPLATE_READ_RETRIES        = 4
+  TEMPLATE_READ_RETRY_INTERVAL = 25.milliseconds
+
+  # Read a template's source, retrying briefly when the file is momentarily
+  # unreadable mid-save. A file that stays unreadable is treated as deleted
+  # (skipped with a warning) rather than aborting the whole build — during
+  # serve, the watcher's removed-file detection follows up with a full
+  # rebuild once the filesystem settles.
+  private def read_template_source(path : String) : String?
+    attempts = 0
+    loop do
+      return File.read(path)
+    rescue ex : IO::Error
+      attempts += 1
+      if attempts >= TEMPLATE_READ_RETRIES
+        Logger.warn "Could not read template #{path} (#{ex.message}); skipping it for this build."
+        return
+      end
+      sleep TEMPLATE_READ_RETRY_INTERVAL
+    end
   end
 
   # Decide, per entry template, which expensive per-page variables its static
@@ -347,9 +381,9 @@ module Hwaro::Core::Build::Phases::Initialize
   private def setup_crinja_env : Crinja
     env = Content::Processors::Template.engine.env
 
-    # Set up file system loader for template inheritance and includes
-    if Dir.exists?("templates")
-      env.loader = Crinja::Loader::FileSystemLoader.new("templates/")
+    # Set up template loader for template inheritance and includes
+    if loader = build_template_loader
+      env.loader = loader
     end
 
     env
@@ -366,10 +400,25 @@ module Hwaro::Core::Build::Phases::Initialize
   private def create_fresh_crinja_env : Crinja
     engine = Content::Processors::TemplateEngine.new
     env = engine.env
-    if Dir.exists?("templates")
-      env.loader = Crinja::Loader::FileSystemLoader.new("templates/")
+    if loader = build_template_loader
+      env.loader = loader
     end
     env
+  end
+
+  # Loader for `{% include %}`/`{% extends %}` resolution. Once templates
+  # are loaded, references resolve against the in-memory snapshot (see
+  # SnapshotTemplateLoader) so a rebuild can't observe half-written files
+  # an editor is rewriting mid-render; before that (or for names outside
+  # the snapshot) the filesystem loader answers, exactly as before.
+  private def build_template_loader : Crinja::Loader?
+    return unless Dir.exists?("templates")
+    disk = Crinja::Loader::FileSystemLoader.new("templates/")
+    if (templates = @templates) && !templates.empty?
+      SnapshotTemplateLoader.new(templates, @template_paths, disk)
+    else
+      disk
+    end
   end
 
   # Tree node used while assembling `site.data` from the `data/` directory.

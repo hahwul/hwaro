@@ -24,6 +24,7 @@ require "./cache"
 require "./cache_manager"
 require "./parallel"
 require "./template_deps"
+require "./template_loader"
 require "./shortcode_processor"
 require "./phases/initialize"
 require "./phases/read_content"
@@ -737,7 +738,8 @@ module Hwaro
                               selected = renderable_pages.select do |page|
                                 entry = determine_template(page, templates, site)
                                 affected_templates.includes?(entry) ||
-                                  deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) }
+                                  deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) } ||
+                                  format_templates_affected?(page, templates, site, affected_templates)
                               end
                               if forced = force_pages
                                 seen = selected.map(&.path).to_set
@@ -776,10 +778,22 @@ module Hwaro
           # resolution falls back taxonomy_term -> taxonomy -> page, so any
           # of those being affected triggers the regeneration. Forced content
           # pages may have changed taxonomy membership — regenerate then too.
-          if affected_templates.nil? ||
-             (force_pages && !force_pages.empty?) ||
-             ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
-            Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
+          taxonomy_sections = if affected_templates.nil? ||
+                                 (force_pages && !force_pages.empty?) ||
+                                 ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
+                                Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
+                              else
+                                [] of Models::Section
+                              end
+
+          # Content changed in this pass (run_incremental_then_rerender):
+          # sitemap/feeds/search/llms read page content and metadata, so
+          # refresh them like run_incremental does. Pure template edits skip
+          # this — template output doesn't feed the SEO surfaces.
+          if (forced = force_pages) && !forced.empty?
+            seo_pages = (site.pages + site.sections).as(Array(Models::Page))
+            seo_pages += taxonomy_sections unless taxonomy_sections.empty?
+            regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
           end
 
           cache.save if options.cache
