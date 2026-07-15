@@ -16,7 +16,6 @@ source_dir = "public"
 confirm = false
 dry_run = false
 max_deletes = 256
-workers = 10
 ```
 
 | Key | Type | Default | Description |
@@ -26,8 +25,7 @@ workers = 10
 | confirm | bool | false | Prompt for confirmation before deploying |
 | dry_run | bool | false | Show what would be deployed without making changes |
 | force | bool | false | Force deployment even if no changes detected |
-| max_deletes | int | 256 | Safety limit on file deletions (-1 disables the limit) |
-| workers | int | 10 | Number of concurrent workers |
+| max_deletes | int | 256 | Safety limit on file deletions (any negative value disables the limit) |
 
 ## Targets
 
@@ -57,7 +55,9 @@ command = "aws s3 sync {source}/ {url} --delete --exclude '.git/*'"
 | `file://` | Built-in directory sync | — |
 | `s3://` | `aws s3 sync {source}/ {url} --delete` | AWS CLI |
 | `gs://` | `gsutil -m rsync -r -d {source}/ {url}` | Google Cloud SDK |
-| `az://` | `az storage blob sync --source {source} --container {url}` | Azure CLI |
+| `az://` | `az storage blob sync --source {source} --container <container> [--destination <path>]` | Azure CLI |
+
+For `az://container/sub/dir` URLs the path becomes the `--destination` prefix inside the container.
 
 If a `command` field is set, it always takes priority over auto-generation.
 
@@ -84,23 +84,22 @@ Configure per-file deployment settings using pattern matchers:
 
 ```toml
 [[deployment.matchers]]
-pattern = "^.+\\.css$"
-cache_control = "max-age=31536000"
-gzip = true
-
-[[deployment.matchers]]
 pattern = "^.+\\.html$"
-cache_control = "max-age=3600"
-gzip = true
+force = true
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | pattern | string | — | Regex pattern to match file paths |
-| cache_control | string | — | Cache-Control header value |
-| content_type | string | — | Override Content-Type header |
-| gzip | bool | false | Gzip compress matched files |
-| force | bool | false | Always upload matched files |
+| force | bool | false | Always copy matched files, even when identical at the destination |
+| cache_control | string | — | Reserved — not applied by the built-in sync (see below) |
+| content_type | string | — | Reserved — not applied by the built-in sync (see below) |
+| gzip | bool | false | Reserved — not applied by the built-in sync (see below) |
+
+The built-in sync copies files and runs external CLIs; it does not talk to
+an object-store API, so it can only honor `force`. Setting `cache_control`,
+`content_type`, or `gzip` prints a warning — configure headers and
+compression at your host or CDN instead.
 
 ## See Also
 
