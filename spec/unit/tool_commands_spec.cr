@@ -220,6 +220,14 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
       flag.not_nil!.takes_value.should be_true
       flag.not_nil!.value_hint.should eq("DIR")
     end
+
+    it "includes max-warnings flag which takes a value" do
+      meta = Hwaro::CLI::Commands::Tool::DoctorCommand.metadata
+      flag = meta.flags.find { |f| f.long == "--max-warnings" }
+      flag.should_not be_nil
+      flag.not_nil!.takes_value.should be_true
+      flag.not_nil!.value_hint.should eq("N")
+    end
   end
 
   # Pin the exit-code contract so CI pipelines can rely on

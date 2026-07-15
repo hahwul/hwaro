@@ -114,8 +114,8 @@ module Hwaro
 
         # Sort by date (newest first), then by path
         contents.sort_by! do |info|
-          {info.date.try(&.to_unix) || 0_i64, info.path}
-        end.reverse!
+          {-(info.date.try(&.to_unix) || 0_i64), info.path}
+        end
 
         contents
       end
@@ -253,25 +253,30 @@ module Hwaro
 
       private def parse_time(time_str : String?) : Time?
         return unless time_str
+        str = time_str.strip
+
+        begin
+          return Time.parse_rfc3339(str)
+        rescue Time::Format::Error
+        end
 
         formats = [
-          "%Y-%m-%d %H:%M:%S",
+          "%Y-%m-%dT%H:%M:%S%:z",
+          "%Y-%m-%dT%H:%M:%S%z",
+          "%Y-%m-%d %H:%M:%S %:z",
+          "%Y-%m-%d %H:%M:%S %z",
           "%Y-%m-%dT%H:%M:%S",
+          "%Y-%m-%d %H:%M:%S",
           "%Y-%m-%d",
         ]
 
         formats.each do |fmt|
-          return Time.parse(time_str, fmt, Time::Location::UTC)
-        rescue Time::Format::Error
+          return Time.parse(str, fmt, Time::Location::UTC)
+        rescue Time::Format::Error | ArgumentError
           next
         end
 
-        # Try ISO 8601 parsing as last resort
-        begin
-          Time.parse_rfc3339(time_str)
-        rescue Time::Format::Error
-          nil
-        end
+        nil
       end
 
       private def truncate(str : String, max_length : Int32) : String

@@ -164,6 +164,39 @@ describe Hwaro::Services::PlatformConfig do
             result.should contain("from = \"/another-old-url/\"")
             result.should contain("to = \"/posts/new-post/\"")
             result.should contain("status = 301")
+            result.should contain("force = true")
+          end
+        end
+      end
+
+      it "skips draft aliases" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/draft-post.md", "---\ntitle: Draft Post\ndraft: true\naliases:\n  - /old-draft-url/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should_not contain("/old-draft-url/")
+          end
+        end
+      end
+
+      it "calculates multilingual aliases correctly" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/hello.ko.md", "---\ntitle: Hello KO\naliases:\n  - /old-ko-url/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should contain("from = \"/old-ko-url/\"")
+            result.should contain("to = \"/ko/posts/hello/\"")
           end
         end
       end
@@ -322,6 +355,20 @@ describe Hwaro::Services::PlatformConfig do
             result.should_not contain("to = \"//contact/form/\"")
           end
         end
+      end
+    end
+
+    describe "gitlab-ci" do
+      it "generates a valid GitLab CI configuration with entrypoint override and correct default branch rule" do
+        config = Hwaro::Models::Config.new
+        generator = Hwaro::Services::PlatformConfig.new(config)
+        result = generator.generate("gitlab-ci")
+
+        result.should contain("image:")
+        result.should contain("name: ghcr.io/hahwul/hwaro:latest")
+        result.should contain("entrypoint: [\"\"]")
+        result.should contain("rules:")
+        result.should contain("- if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH")
       end
     end
 

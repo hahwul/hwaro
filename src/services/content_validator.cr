@@ -56,8 +56,7 @@ module Hwaro
       private def validate_file(file_path : String, issues : Array(Issue))
         content = File.read(file_path)
 
-        frontmatter = parse_frontmatter(file_path, content, issues)
-        return unless frontmatter
+        frontmatter = parse_frontmatter(file_path, content, issues) || {} of String => FrontmatterValue
 
         title = frontmatter["title"]?
         description = frontmatter["description"]?
@@ -213,6 +212,12 @@ module Hwaro
       end
 
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
+        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
+          issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
+            message: "Date format may be invalid: \"#{date_str}\"")
+          return
+        end
+
         formats = [
           "%Y-%m-%d %H:%M:%S",
           "%Y-%m-%dT%H:%M:%S",
@@ -226,7 +231,7 @@ module Hwaro
           Time.parse(date_str, fmt, Time::Location::UTC)
           parsed = true
           break
-        rescue Time::Format::Error
+        rescue Time::Format::Error | ArgumentError
           next
         end
 
@@ -235,7 +240,7 @@ module Hwaro
           begin
             Time.parse_rfc3339(date_str)
             parsed = true
-          rescue Time::Format::Error
+          rescue Time::Format::Error | ArgumentError
           end
         end
 
@@ -288,7 +293,11 @@ module Hwaro
       end
 
       private def extract_body(content : String) : String
-        content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+        if content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+          content.byte_slice(end_idx)
+        else
+          content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+        end
       end
 
       private def strip_code_blocks(text : String) : String

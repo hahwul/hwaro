@@ -535,4 +535,42 @@ describe Hwaro::Services::ContentInfo do
       parsed.date.should be_nil
     end
   end
+
+  describe "date parsing and sorting regression tests" do
+    it "preserves timezone offset in parse_time (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Offset Post\ndate: 2024-06-15T10:30:00+09:00\n---\n\nBody")
+
+        lister = Hwaro::Services::ContentLister.new(content_dir)
+        result = lister.list_all
+
+        result.size.should eq(1)
+        result.first.date.should_not be_nil
+        result.first.date.not_nil!.to_utc.hour.should eq(1)
+        result.first.date.not_nil!.to_utc.minute.should eq(30)
+      end
+    end
+
+    it "sorts tie-breaker paths ascending (A-Z) (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "c.md"), "---\ntitle: C\ndate: 2024-01-01\n---\n\nC")
+        File.write(File.join(content_dir, "a.md"), "---\ntitle: A\ndate: 2024-01-01\n---\n\nA")
+        File.write(File.join(content_dir, "b.md"), "---\ntitle: B\ndate: 2024-01-01\n---\n\nB")
+
+        lister = Hwaro::Services::ContentLister.new(content_dir)
+        result = lister.list_all
+
+        result.size.should eq(3)
+        File.basename(result[0].path).should eq("a.md")
+        File.basename(result[1].path).should eq("b.md")
+        File.basename(result[2].path).should eq("c.md")
+      end
+    end
+  end
 end

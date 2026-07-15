@@ -285,5 +285,19 @@ describe Hwaro::Services::ContentStats do
         result.tags.should be_empty
       end
     end
+
+    it "excludes JSON frontmatter from word count (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "json-words.md"), %({"title": "Post", "description": "This is a very long description with many words"}\n\nOnlyOneWord\n))
+
+        stats = Hwaro::Services::ContentStats.new(content_dir)
+        result = stats.run
+
+        result.words_total.should eq(1)
+      end
+    end
   end
 end

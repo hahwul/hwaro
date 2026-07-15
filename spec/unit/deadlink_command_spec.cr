@@ -519,6 +519,36 @@ end
 
 # Test helper to expose private methods
 class Hwaro::CLI::Commands::Tool::DeadlinkCommand
+  @@disable_private_host_check = false
+
+  def self.disable_private_host_check=(val : Bool)
+    @@disable_private_host_check = val
+  end
+
+  private def private_host?(host : String) : Bool
+    return false if @@disable_private_host_check
+    return true if host == "localhost" || host.ends_with?(".local") || host.ends_with?(".internal")
+
+    begin
+      addrs = Socket::Addrinfo.resolve(host, 80, type: Socket::Type::STREAM)
+      addrs.any? do |addr|
+        ip = addr.ip_address.address
+        ip.starts_with?("127.") ||
+          ip.starts_with?("10.") ||
+          ip.starts_with?("192.168.") ||
+          ip.starts_with?("169.254.") ||
+          ip == "0.0.0.0" ||
+          ip == "::1" ||
+          ip == "::" ||
+          ip.starts_with?("fc") || ip.starts_with?("fd") ||
+          ip.starts_with?("fe80") ||
+          private_172?(ip)
+      end
+    rescue Socket::Error
+      false
+    end
+  end
+
   def find_links_for_test(dir : String) : Array(Link)
     find_external_links(dir)
   end
@@ -527,8 +557,12 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     find_internal_links(dir)
   end
 
-  def check_internal_links_for_test(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String) : Array(Result)
-    check_internal_links(links, content_dir, taxonomy_names)
+  def check_internal_links_for_test(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "") : Array(Result)
+    check_internal_links(links, content_dir, taxonomy_names, base_path)
+  end
+
+  def check_links_concurrently_for_test(links : Array(Link), timeout_seconds : Int32, max_concurrency : Int32) : Array(Result)
+    check_links_concurrently(links, timeout_seconds, max_concurrency)
   end
 
   def private_host_for_test?(host : String) : Bool
@@ -572,6 +606,123 @@ describe "check-links ember output" do
       end
 
       output.should contain("checked: no links found")
+    end
+  end
+
+  it "allows one level of balanced parens in Wikipedia-style URLs" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "test.md"), "[Wiki](https://en.wikipedia.org/wiki/Array_(data_structure))")
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      links = cmd.find_links_for_test(dir)
+      links.size.should eq(1)
+      links[0].url.should eq("https://en.wikipedia.org/wiki/Array_(data_structure)")
+    end
+  end
+
+  it "skips tel: and protocol-relative links" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "test.md"), "[Tel](tel:123456) [Relative](//example.com/foo) [Valid](/internal)")
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      links = cmd.find_internal_links_for_test(dir)
+      links.size.should eq(1)
+      links[0].url.should eq("/internal")
+    end
+  end
+
+  it "decodes percent-encoded internal paths" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "user guide.pdf"), "content")
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: File.join(dir, "test.md"), url: "/user%20guide.pdf", kind: :internal
+      )
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      results = cmd.check_internal_links_for_test([link], dir)
+      results.should be_empty
+    end
+  end
+
+  it "strips base path prefix from root-relative URLs" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "hello.md"), "hello")
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: File.join(dir, "test.md"), url: "/repo/posts/hello/", kind: :internal
+      )
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      results = cmd.check_internal_links_for_test([link], dir, base_path: "/repo")
+      results.should be_empty
+    end
+  end
+
+  it "follows redirects, retries on 405 with GET, and sends User-Agent header" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+
+    begin
+      user_agent = ""
+      requests = [] of String
+
+      server = HTTP::Server.new do |context|
+        user_agent = context.request.headers["User-Agent"]? || ""
+        requests << context.request.method
+
+        case context.request.path
+        when "/redirect"
+          context.response.status_code = 301
+          context.response.headers["Location"] = "/target"
+        when "/target"
+          context.response.status_code = 200
+        when "/method-retry"
+          if context.request.method == "HEAD"
+            context.response.status_code = 405
+          else
+            context.response.status_code = 200
+          end
+        else
+          context.response.status_code = 404
+        end
+      end
+
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      port = address.port
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+
+      link1 = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{port}/redirect", kind: :external
+      )
+      results = cmd.check_links_concurrently_for_test([link1], 5, 1)
+      results.size.should eq(1)
+      results[0].status.should eq(200)
+      user_agent.should eq("hwaro-link-checker/1.0")
+
+      requests.clear
+      link2 = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{port}/method-retry", kind: :external
+      )
+      results2 = cmd.check_links_concurrently_for_test([link2], 5, 1)
+      results2.size.should eq(1)
+      results2[0].status.should eq(200)
+      requests.should eq(["HEAD", "GET"])
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  it "skips private hosts, reporting status -1 and info logs" do
+    cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "test.md"), "[Private](http://127.0.0.1/foo)")
+
+      output = with_captured_log do
+        cmd.run(["-c", dir, "--external-only"])
+      end
+
+      output.should contain("Skipped: private/internal address")
+      output.should_not contain("✗")
     end
   end
 end

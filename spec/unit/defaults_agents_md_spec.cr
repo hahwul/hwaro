@@ -44,6 +44,12 @@ describe Hwaro::Services::Defaults::AgentsMd do
       content = Hwaro::Services::Defaults::AgentsMd.content
       content.should contain "Site-Specific Instructions"
     end
+
+    it "lists correct Crinja join filter syntax" do
+      content = Hwaro::Services::Defaults::AgentsMd.content
+      content.should contain "join(\", \")"
+      content.should_not contain "join(sep="
+    end
   end
 
   describe ".remote_content" do

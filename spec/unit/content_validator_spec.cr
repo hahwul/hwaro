@@ -465,5 +465,58 @@ describe Hwaro::Services::ContentValidator do
         issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
       end
     end
+
+    it "handles out-of-range dates raising ArgumentError as content-date-invalid (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad-date.md"), "---\ntitle: Post\ndescription: Desc\ndate: 2024-02-30\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-date-invalid" }.should be_true
+      end
+    end
+
+    it "flags dates with trailing garbage suffix (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "garbage-date.md"), "---\ntitle: Post\ndescription: Desc\ndate: 2024-06-15 lol\n---\n\n# Content\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-date-invalid" }.should be_true
+      end
+    end
+
+    it "runs alt-text and internal link checks on no-frontmatter files (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "no-frontmatter.md"), "# Heading\n\n![](missing-alt.png)\n\n[Link](@/nonexistent-link.md)\n")
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-alt-text-missing" }.should be_true
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_true
+      end
+    end
+
+    it "excludes JSON frontmatter from body scans (regression)" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "json-fm.md"), %({"title": "Post", "description": "Desc", "some_field": "![](image.png)"}\n\n# Body\n))
+
+        validator = Hwaro::Services::ContentValidator.new(content_dir)
+        issues = validator.run
+        issues.any? { |i| i.id == "content-alt-text-missing" }.should be_false
+      end
+    end
   end
 end

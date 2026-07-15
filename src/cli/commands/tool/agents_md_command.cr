@@ -74,7 +74,8 @@ module Hwaro
 
             if write
               filename = "AGENTS.md"
-              if File.exists?(filename) && !force
+              existed = File.exists?(filename)
+              if existed && !force
                 # `confirm?` returns nil on EOF (piped/non-interactive stdin) —
                 # treat that the same as "no" and abort without writing.
                 unless Prompt.confirm?("AGENTS.md already exists. Overwrite?", default: false) == true
@@ -85,7 +86,8 @@ module Hwaro
 
               File.write(filename, content)
               mode_name = remote ? "remote" : "local"
-              Logger.outcome("created", "AGENTS.md · #{mode_name} mode")
+              outcome_verb = existed ? "updated" : "created"
+              Logger.outcome(outcome_verb, "AGENTS.md · #{mode_name} mode")
             else
               puts content
             end

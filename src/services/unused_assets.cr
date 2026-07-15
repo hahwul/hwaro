@@ -5,6 +5,7 @@
 # Reports unreferenced files that may be candidates for removal.
 
 require "json"
+require "uri"
 require "../models/config"
 require "../utils/logger"
 
@@ -42,12 +43,35 @@ module Hwaro
       @content_dir : String
       @static_dir : String
       @templates_dir : String
+      @project_root : String
 
       def initialize(
         @content_dir : String = "content",
         @static_dir : String = "static",
         @templates_dir : String = "templates",
       )
+        if File.exists?("config.toml")
+          @project_root = "."
+        else
+          @project_root = find_project_root(@content_dir)
+        end
+
+        if @templates_dir == "templates"
+          @templates_dir = File.join(@project_root, "templates")
+        end
+      end
+
+      private def find_project_root(content_dir : String) : String
+        if File.basename(content_dir) == "content"
+          parent = File.dirname(content_dir)
+          return parent.empty? || parent == "." ? "." : parent
+        end
+
+        if Dir.exists?(File.join(content_dir, "content")) || Dir.exists?(File.join(content_dir, "../content"))
+          return content_dir
+        end
+
+        content_dir
       end
 
       def run : UnusedAssetsResult
@@ -73,6 +97,7 @@ module Hwaro
           # genuinely-unused `header.png` flagged when only `page-header.png` is
           # referenced (their shared suffix is preceded by `-`, inside the token).
           next if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(basename)}(?![\w\-.])/)
+          next if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(URI.encode_path(basename))}(?![\w\-.])/)
           unused << asset_path
         end
 
@@ -154,6 +179,14 @@ module Hwaro
             end
             sb << text << '\n'
           end
+
+          config_path = File.join(@project_root, "config.toml")
+          if File.exists?(config_path)
+            begin
+              sb << File.read(config_path) << '\n'
+            rescue IO::Error
+            end
+          end
         end
       end
 
@@ -162,10 +195,14 @@ module Hwaro
       # substring false positives from plain string matching.
       private def build_referenced_basenames(scanned_text : String) : Set(String)
         refs = Set(String).new
-        ext_pattern = /[\w\-\.]+\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|tiff?|css|js|woff2?|ttf|eot|otf|mp[34]|webm|ogg|wav|pdf|zip)\b/i
+        ext_pattern = /[\w\-\.%]+\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|tiff?|css|js|woff2?|ttf|eot|otf|mp[34]|webm|ogg|wav|pdf|zip)\b/i
 
         scanned_text.scan(ext_pattern) do |match|
-          refs << match[0]
+          token = match[0]
+          refs << token
+          if token.includes?('%')
+            refs << URI.decode(token)
+          end
         end
 
         # Files declared in `config.toml` (`[[assets.bundles]] files`,
@@ -179,8 +216,9 @@ module Hwaro
       end
 
       private def add_config_references(refs : Set(String)) : Nil
-        return unless File.exists?("config.toml")
-        config = Models::Config.load
+        config_path = File.join(@project_root, "config.toml")
+        return unless File.exists?(config_path)
+        config = Models::Config.load(config_path)
         config.assets.bundles.each do |bundle|
           bundle.files.each { |path| refs << File.basename(path) }
           # The compiled bundle name (e.g. `main.css`) is referenced

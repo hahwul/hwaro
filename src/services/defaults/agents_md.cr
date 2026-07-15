@@ -293,7 +293,7 @@ module Hwaro
             | `markdownify` | Render markdown to HTML |
             | `date(format="%Y-%m-%d")` | Format date |
             | `upper` / `lower` | Case conversion |
-            | `join(sep=", ")` | Join array |
+            | `join(", ")` | Join array |
 
             ## Configuration
 

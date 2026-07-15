@@ -345,5 +345,78 @@ describe Hwaro::Services::UnusedAssets do
         end
       end
     end
+
+    it "percent-encoded references are not flagged as unused (regression)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("templates")
+
+          File.write(File.join("static", "team photo.png"), "png data")
+          File.write(File.join("content", "post.md"), "---\ntitle: Post\n---\n\n![Team](/team%20photo.png)\n")
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates"
+          )
+          result = service.run
+          result.unused_count.should eq(0)
+        end
+      end
+    end
+
+    it "config.toml raw references are not flagged as unused (regression)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("templates")
+
+          File.write(File.join("static", "og-main.png"), "png data")
+          File.write("config.toml", <<-TOML)
+            title = "T"
+            [og]
+            default_image = "static/og-main.png"
+            TOML
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates"
+          )
+          result = service.run
+          result.unused_count.should eq(0)
+        end
+      end
+    end
+
+    it "CWD independence resolves config.toml and templates relative to content parent (regression)" do
+      Dir.mktmpdir do |project_dir|
+        content_dir = File.join(project_dir, "content")
+        static_dir = File.join(project_dir, "static")
+        templates_dir = File.join(project_dir, "templates")
+
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(templates_dir)
+
+        File.write(File.join(project_dir, "config.toml"), <<-TOML)
+          title = "Project Title"
+          [og]
+          default_image = "static/og-image.png"
+          TOML
+
+        File.write(File.join(static_dir, "og-image.png"), "png data")
+
+        service = Hwaro::Services::UnusedAssets.new(
+          content_dir: content_dir,
+          static_dir: static_dir
+        )
+        result = service.run
+        result.unused_count.should eq(0)
+      end
+    end
   end
 end
