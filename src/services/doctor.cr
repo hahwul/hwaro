@@ -153,25 +153,19 @@ module Hwaro
         raw = parse_config_toml(raw_text)
         return [] of String unless raw
 
-        # Collect commented section headers (e.g. "# [pwa]", "# [og.auto_image]")
-        # For dotted keys like "serve.headers", we also record the parent ("serve")
-        # so that top-level container sections are not repeatedly re-added by doctor --fix.
-        commented_sections = Set(String).new
-        raw_text.each_line do |line|
-          if match = line.match(/^\s*#\s*\[(?!\[)([^\]]+)\]/)
-            dotted = match[1]
-            commented_sections << dotted
-            if dotted.includes?(".")
-              parent = dotted.split(".")[0]
-              commented_sections << parent
-            end
-          end
-        end
+        missing_config_sections(raw_text, raw)
+      end
 
+      # Snapshot variant: computes against an already-read text + parsed
+      # table so `fix_config` decides everything from the single read it
+      # performed up front — no second `File.read` that could observe a
+      # different file than the one it's about to rewrite.
+      private def missing_config_sections(raw_text : String, raw : TOML::Table) : Array(String)
+        mentioned = mentioned_sections(raw_text)
         missing = [] of String
 
         KNOWN_CONFIG_SECTIONS.each_key do |key|
-          unless raw.has_key?(key) || commented_sections.includes?(key)
+          unless raw.has_key?(key) || mentioned.includes?(key)
             missing << key
           end
         end
@@ -180,7 +174,7 @@ module Hwaro
         KNOWN_SUB_SECTIONS.each_key do |parent, child|
           sub_key = "#{parent}.#{child}"
           if parent_hash = raw[parent]?.try(&.as_h?)
-            unless parent_hash.has_key?(child) || commented_sections.includes?(sub_key)
+            unless parent_hash.has_key?(child) || mentioned.includes?(sub_key)
               missing << sub_key
             end
           end
@@ -188,6 +182,28 @@ module Hwaro
         end
 
         missing
+      end
+
+      # Every section path mentioned by a table header in the config
+      # text — active (`[pwa]`, `[[menus.main]]`) or commented out
+      # (`# [pwa]`, `# [[menus.main]]`) — plus each dotted ancestor, so
+      # `[[menus.main]]` also covers "menus". Lowercased for lookups.
+      #
+      # This single scan backs both the missing-section report and the
+      # `--fix` duplicate guard so the two can't drift apart. They used
+      # to be separate scans, and neither recognized `[[array.tables]]`
+      # headers: the commented [menus] snippet only contains
+      # `# [[menus.main]]` lines, so every `--approve` run re-reported
+      # "menus" as missing and appended the snippet again, growing the
+      # config forever.
+      private def mentioned_sections(text : String) : Set(String)
+        found = Set(String).new
+        text.each_line do |line|
+          next unless m = line.match(/^\s*(?:#\s*)?\[\[?\s*([^\[\]]+?)\s*\]\]?/)
+          parts = m[1].downcase.split('.').map(&.strip)
+          parts.each_index { |i| found << parts[0..i].join('.') }
+        end
+        found
       end
 
       # Sections that are advanced/niche or low-value for most users.
@@ -216,28 +232,6 @@ module Hwaro
         "serve",
       }
 
-      # Broad full-text check to prevent appending a duplicate commented section.
-      # Used as a final safety net in fix_config even after missing_config_sections
-      # has already filtered the list.
-      private def would_cause_duplicate_section?(text : String, key : String) : Bool
-        lowered = text.downcase
-        section = "[#{key.downcase}]"
-
-        # Check for active section
-        return true if lowered.includes?(section)
-
-        # Check for common commented forms
-        # "# [key]", "#[key]", "  #   [key]", etc.
-        commented_variants = [
-          "# #{section}",
-          "##{section}",
-          " # #{section}",
-          "\t# #{section}",
-        ]
-
-        commented_variants.any? { |v| lowered.includes?(v) }
-      end
-
       # A surgical edit `--fix` applied to an existing config value.
       # Distinct from "section appends" because it modifies the user's
       # real configuration rather than adding commented documentation.
@@ -261,13 +255,15 @@ module Hwaro
       # Apply real fixes (Phase 1: value corrections like base_url trailing slash)
       # and optionally approve/add recommended config sections (Phase 2).
       #
+      # - apply_value_fixes: Phase 1 value corrections. `--fix` and `--full`
+      #   enable this; a bare `--approve` must NOT edit real values — the
+      #   documented model is "--fix normalizes, --approve adds sections".
       # - approve_sections: When true, doctor will add the recommended/optional
-      #   config sections as commented documentation.
-      # - When false (default with plain --fix), only real value fixes are performed.
+      #   config sections as commented documentation (`--approve` / `--full`).
       #
       # This separation makes --fix focused on corrections, while --approve / --full
       # controls bringing in the larger set of recommendations.
-      def fix_config(approve_sections : Bool = false, dry_run : Bool = false) : FixSummary
+      def fix_config(approve_sections : Bool = false, dry_run : Bool = false, apply_value_fixes : Bool = true) : FixSummary
         unless File.exists?(@config_path)
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
@@ -300,40 +296,35 @@ module Hwaro
         current_text = raw_text
         value_fixes = [] of ValueFix
 
-        if applied = trim_base_url_trailing_slash(current_text)
-          current_text = applied[:text]
-          value_fixes << applied[:fix]
+        if apply_value_fixes
+          if applied = trim_base_url_trailing_slash(current_text)
+            current_text = applied[:text]
+            value_fixes << applied[:fix]
+          end
+
+          if applied = clamp_sitemap_priority(current_text)
+            current_text = applied[:text]
+            value_fixes << applied[:fix]
+          end
         end
 
-        if applied = clamp_sitemap_priority(current_text)
-          current_text = applied[:text]
-          value_fixes << applied[:fix]
-        end
-
-        # Phase 2: section appends.
-        missing = missing_config_sections
+        # Phase 2: section appends — only when the user opted in via
+        # --approve / --full; plain --fix stays focused on value
+        # corrections and never injects dozens of commented sections.
         snippets = [] of String
         added = [] of String
 
-        missing.each do |key|
-          # With the new --fix / --approve model:
-          # - Plain --fix only performs real value corrections (Phase 1).
-          # - Adding recommended/optional sections (Phase 2) only happens when
-          #   approve_sections is true (i.e. user used --approve or --full).
-          #
-          # This is the key change to stop over-injection of dozens of commented sections.
-          unless approve_sections
-            next
-          end
-
-          # Extra safety net against duplication (from earlier work)
-          if would_cause_duplicate_section?(current_text, key)
-            next
-          end
-
-          if snippet = config_snippet_for(key)
-            snippets << snippet
-            added << key
+        if approve_sections
+          # Safety net against re-appending: even though the missing list
+          # was just computed from the same snapshot, re-scan the (value-
+          # fixed) text we are actually about to write.
+          mentioned = mentioned_sections(current_text)
+          missing_config_sections(raw_text, raw).each do |key|
+            next if mentioned.includes?(key)
+            if snippet = config_snippet_for(key)
+              snippets << snippet
+              added << key
+            end
           end
         end
 
@@ -344,14 +335,19 @@ module Hwaro
         # Write atomically: compose the final file contents in a temp
         # file beside `config.toml`, then `File.rename` into place so a
         # mid-write interruption (SIGINT, disk full) can't leave a
-        # partially-appended config behind.
+        # partially-appended config behind. The original file's
+        # permissions carry over to the temp file — without that, the
+        # rename would silently reset e.g. a 0600 config to the default
+        # umask.
         tmp_path = "#{@config_path}.hwaro-tmp"
         begin
+          original_permissions = File.info(@config_path).permissions
           File.open(tmp_path, "w") do |f|
             f.print(current_text)
             f.print("\n") unless current_text.ends_with?("\n")
             snippets.each { |s| f.print(s) }
           end
+          File.chmod(tmp_path, original_permissions)
           File.rename(tmp_path, @config_path)
         rescue ex : IO::Error | File::Error
           # Clean the half-written temp file so re-running isn't blocked.
@@ -368,40 +364,69 @@ module Hwaro
 
       # Strip trailing slashes from a top-level `base_url = "..."` line.
       # Top-level only — anything past the first `[section]` header is
-      # left alone. Returns nil when no edit is needed (no match, empty
-      # value, or already slash-free) so the caller can skip emitting a
-      # spurious ValueFix.
+      # left alone. Handles both TOML basic (`"..."`) and literal
+      # (`'...'`) strings; doctor's advisory fires on either form, so
+      # `--fix` must be able to repair either form too. Returns nil when
+      # no edit is needed (no match, empty value, or already slash-free)
+      # so the caller can skip emitting a spurious ValueFix.
       private def trim_base_url_trailing_slash(text : String) : NamedTuple(text: String, fix: ValueFix)?
         lines = text.split('\n', remove_empty: false)
         lines.each_with_index do |line, idx|
           break if line =~ /^\s*\[/ # entered a section table; base_url is top-level only
-          next unless m = line.match(/^([ \t]*)base_url([ \t]*=[ \t]*)"([^"]*)"(.*)$/)
-          url = m[3]
+          # `[^"']*` refuses values containing either quote char, so a
+          # string this regex can't round-trip safely is skipped rather
+          # than mangled.
+          next unless m = line.match(/^([ \t]*)base_url([ \t]*=[ \t]*)(["'])([^"']*)\3(.*)$/)
+          quote = m[3]
+          url = m[4]
           next if url.empty?
           next unless url.ends_with?("/")
           trimmed = url.rstrip('/')
           next if trimmed.empty? # avoid mangling oddities like base_url = "/"
-          lines[idx] = "#{m[1]}base_url#{m[2]}\"#{trimmed}\"#{m[4]}"
+          lines[idx] = "#{m[1]}base_url#{m[2]}#{quote}#{trimmed}#{quote}#{m[5]}"
           return {text: lines.join('\n'), fix: ValueFix.new("base_url", url, trimmed)}
         end
         nil
       end
 
-      # Clamp `priority = N` under `[sitemap]` to [0.0, 1.0]. Walks the
-      # file line-by-line so we only ever rewrite the priority that
-      # belongs to the [sitemap] table — a top-level `priority = …` or
-      # `[other_section] priority = …` is left intact.
+      # Clamp the sitemap priority to [0.0, 1.0]. Walks the file
+      # line-by-line so we only ever rewrite a priority that actually
+      # belongs to the sitemap config: `priority = …` inside the
+      # `[sitemap]` table, or a top-level dotted `sitemap.priority = …`
+      # key. Any other `priority` key is left intact.
+      #
+      # Header tracking must recognize EVERY table header form —
+      # `[name]`, `[[array.of.tables]]`, optional trailing comment —
+      # because a header that fails to match leaves the previous state
+      # in place. The old `[name]`-only regex skipped `[[taxonomies]]`
+      # style headers entirely, so `in_sitemap` stayed true across them
+      # and `--fix` clamped priority keys in unrelated tables further
+      # down the file — silent corruption of user data.
       private def clamp_sitemap_priority(text : String) : NamedTuple(text: String, fix: ValueFix)?
         lines = text.split('\n', remove_empty: false)
         in_sitemap = false
+        top_level = true
+        number = /[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/
         lines.each_with_index do |line, idx|
-          if header = line.match(/^\s*\[([^\[\]]+)\]\s*$/)
+          if header = line.match(/^\s*\[\[?\s*([^\[\]]+?)\s*\]\]?\s*(?:#.*)?$/)
             in_sitemap = (header[1] == "sitemap")
+            top_level = false
             next
           end
-          next unless in_sitemap
-          next unless m = line.match(/^([ \t]*)priority([ \t]*=[ \t]*)([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(.*)$/)
-          val = m[3].to_f?
+
+          # The dotted spelling is only the sitemap's priority while we
+          # are still above the first table header; after that it would
+          # name `<current_table>.sitemap.priority` instead.
+          key = if in_sitemap
+                  /priority/
+                elsif top_level
+                  /sitemap[ \t]*\.[ \t]*priority/
+                else
+                  next
+                end
+
+          next unless m = line.match(/^([ \t]*)(#{key})([ \t]*=[ \t]*)(#{number})(.*)$/)
+          val = m[4].to_f?
           next unless val
           next if 0.0 <= val <= 1.0
           clamped = val.clamp(0.0, 1.0)
@@ -409,8 +434,8 @@ module Hwaro
           # so it stays a TOML float (mirrors how the scaffolded snippet
           # writes it: `priority = 0.5`).
           after = clamped == clamped.to_i ? "#{clamped.to_i}.0" : clamped.to_s
-          lines[idx] = "#{m[1]}priority#{m[2]}#{after}#{m[4]}"
-          return {text: lines.join('\n'), fix: ValueFix.new("sitemap.priority", m[3], after)}
+          lines[idx] = "#{m[1]}#{m[2]}#{m[3]}#{after}#{m[5]}"
+          return {text: lines.join('\n'), fix: ValueFix.new("sitemap.priority", m[4], after)}
         end
         nil
       end

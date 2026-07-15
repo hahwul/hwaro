@@ -87,10 +87,6 @@ module Hwaro
 
             doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
 
-            if approve_mode && !fix_mode && !full_mode
-              # --approve without --fix or --full is allowed (just add recommendations)
-            end
-
             if dry_run_mode && !fix_mode && !approve_mode && !full_mode
               Logger.warn "--dry-run has no effect without --fix, --approve, or --full"
             end
@@ -101,7 +97,9 @@ module Hwaro
             end
 
             if fix_mode || approve_mode
-              run_fix(doctor, approve_mode, dry_run_mode, json_output)
+              # `--fix` gates value normalization, `--approve` gates section
+              # appends — a bare `--approve` must not silently edit values.
+              run_fix(doctor, fix_values: fix_mode, approve_sections: approve_mode, dry_run: dry_run_mode, json_output: json_output)
               return
             end
 
@@ -325,8 +323,8 @@ module Hwaro
             plain ? "[ok]" : Logger.paint("✓", Logger::Role::Success)
           end
 
-          private def run_fix(doctor : Services::Doctor, approve_sections : Bool, dry_run : Bool, json_output : Bool)
-            summary = doctor.fix_config(approve_sections: approve_sections, dry_run: dry_run)
+          private def run_fix(doctor : Services::Doctor, fix_values : Bool, approve_sections : Bool, dry_run : Bool, json_output : Bool)
+            summary = doctor.fix_config(approve_sections: approve_sections, dry_run: dry_run, apply_value_fixes: fix_values)
 
             if json_output
               puts summary.to_json

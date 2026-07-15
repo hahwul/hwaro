@@ -624,6 +624,133 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # Regression: the header tracker only matched `[name]` headers, so a
+      # `[[array.of.tables]]` header after `[sitemap]` did not reset the
+      # in-sitemap state and `--fix` clamped priority keys belonging to
+      # completely unrelated tables — silent corruption of user data.
+      it "does not clamp priority keys in unrelated [[array-of-tables]] after [sitemap]" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          original = %(title = "S"\nbase_url = "https://example.com"\n\n[sitemap]\nchangefreq = "weekly"\n\n[[taxonomies]]\nname = "tags"\npriority = 2\n)
+          File.write(config_path, original)
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.should be_empty
+          File.read(config_path).should eq(original)
+        end
+      end
+
+      it "clamps sitemap.priority when the [sitemap] header carries a trailing comment" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com"\n\n[sitemap] # sitemap tuning\npriority = 5.0\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "sitemap.priority" && f.after == "1.0" }.should be_true
+          File.read(config_path).should contain("priority = 1.0")
+        end
+      end
+
+      it "clamps a top-level dotted sitemap.priority key" do
+        # `sitemap.priority = N` above the first table header is the same
+        # config value as `[sitemap] priority = N`; doctor's advisory fires
+        # on it, so --fix must be able to repair it too.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com"\nsitemap.priority = 3.0\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "sitemap.priority" && f.after == "1.0" }.should be_true
+          File.read(config_path).should contain("sitemap.priority = 1.0")
+        end
+      end
+
+      it "does not clamp a dotted sitemap.priority spelling below a table header" do
+        # After a header, `sitemap.priority` names `<table>.sitemap.priority`,
+        # which is not the sitemap config value.
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          original = %(title = "S"\nbase_url = "https://example.com"\n\n[extra]\nsitemap.priority = 3.0\n)
+          File.write(config_path, original)
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          doctor.fix_config.value_fixes.should be_empty
+          File.read(config_path).should eq(original)
+        end
+      end
+
+      it "clamps a negative sitemap.priority up to 0.0" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com"\n[sitemap]\npriority = -0.5\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "sitemap.priority" && f.after == "0.0" }.should be_true
+          File.read(config_path).should contain("priority = 0.0")
+        end
+      end
+
+      it "trims trailing slash from a single-quoted (TOML literal string) base_url" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = 'https://example.com/'\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config
+          summary.value_fixes.any? { |f| f.field == "base_url" }.should be_true
+          File.read(config_path).should contain(%(base_url = 'https://example.com'))
+        end
+      end
+
+      # Regression: the commented [menus] snippet only contains
+      # `# [[menus.main]]` lines (no `# [menus]` header), which neither the
+      # missing-section scan nor the duplicate guard recognized — so every
+      # approve run re-reported "menus" as missing and appended the snippet
+      # again, growing config.toml forever.
+      it "is idempotent: a second approve_sections run adds nothing" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          doctor.fix_config(approve_sections: true).sections_added.should_not be_empty
+          after_first = File.read(config_path)
+
+          doctor.fix_config(approve_sections: true).sections_added.should be_empty
+          File.read(config_path).should eq(after_first)
+        end
+      end
+
+      it "preserves file permissions when rewriting config.toml" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com/"\n))
+          File.chmod(config_path, 0o600)
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          doctor.fix_config.value_fixes.should_not be_empty
+          (File.info(config_path).permissions.value & 0o777).should eq(0o600)
+        end
+      end
+
+      it "does not apply value fixes when apply_value_fixes is false (bare --approve)" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "S"\nbase_url = "https://example.com/"\n))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          summary = doctor.fix_config(approve_sections: true, apply_value_fixes: false)
+          summary.value_fixes.should be_empty
+          summary.sections_added.should_not be_empty
+          # The trailing slash must survive — --approve only adds sections.
+          File.read(config_path).should contain(%(base_url = "https://example.com/"))
+        end
+      end
+
       it "returns empty when nothing is missing" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
