@@ -155,5 +155,106 @@ describe Hwaro::Core::Build::Builder do
         File.exists?("public/about/index.html").should be_true
       end
     end
+
+    it "refreshes the search index after a combined content+template change" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", <<-TOML)
+            title = "T"
+            base_url = "http://localhost"
+
+            [search]
+            enabled = true
+            TOML
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.read("public/search.json").should contain("About")
+
+          # Save content and template together — the watcher's
+          # :content_and_template strategy. The SEO surfaces read page
+          # content/metadata, so they must refresh here just like the
+          # pure content-incremental path does.
+          File.write("content/about.md", "---\ntitle: Refreshed\n---\nbody")
+          File.write("templates/page.html", "<div>{{ content }}</div>")
+          builder.run_incremental_then_rerender(["content/about.md"], options)
+
+          File.read("public/search.json").should contain("Refreshed")
+        end
+      end
+    end
+  end
+
+  describe "#run_rerender output formats" do
+    it "re-renders sibling format outputs when only the format template changed" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", <<-TOML)
+            title = "T"
+            base_url = "http://localhost"
+
+            [outputs]
+            page = ["json"]
+            TOML
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+          File.write("templates/page.json.jinja", %({"v": 1}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.read("public/about/index.json").should contain(%("v": 1))
+
+          # Edit ONLY the format template. Its pages' HTML entry template is
+          # untouched, so the selective re-render must pick them up through
+          # the format-template check or index.json stays stale.
+          File.write("templates/page.json.jinja", %({"v": 2}))
+          builder.run_rerender(options)
+
+          File.read("public/about/index.json").should contain(%("v": 2))
+        end
+      end
+    end
+  end
+
+  describe "template snapshot consistency" do
+    it "renders with the loaded template snapshot even when a partial changed on disk" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          FileUtils.mkdir_p("templates/partials")
+          File.write("templates/partials/nav.html", "NAV-OLD")
+          File.write("templates/page.html", %({% include "partials/nav.html" %}|{{ content }}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.read("public/about/index.html").should contain("NAV-OLD")
+
+          # An editor rewrites the partial while no template reload has
+          # happened (mid-rebuild in serve terms). A content-only
+          # incremental pass must keep rendering the snapshot the build
+          # loaded — half-written disk state must not leak into output.
+          File.write("templates/partials/nav.html", "NAV-DISK")
+          File.write("content/about.md", "---\ntitle: About\n---\nbody v2")
+          builder.run_incremental(["content/about.md"], options)
+          File.read("public/about/index.html").should contain("NAV-OLD")
+
+          # The template edit's own rebuild (run_rerender reloads the
+          # snapshot from disk) then converges on the new partial.
+          builder.run_rerender(options)
+          File.read("public/about/index.html").should contain("NAV-DISK")
+        end
+      end
+    end
   end
 end

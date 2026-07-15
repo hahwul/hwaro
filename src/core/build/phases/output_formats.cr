@@ -88,6 +88,28 @@ module Hwaro::Core::Build::Phases::OutputFormats
     )
   end
 
+  # True when one of `page`'s extra output formats resolves to a template in
+  # `affected`. The serve-mode selective re-render checks this alongside the
+  # HTML entry template: editing e.g. `templates/page.json.jinja` leaves the
+  # entry template untouched, so without this check no page re-renders and
+  # the sibling `index.json` files serve stale content until a full rebuild.
+  def format_templates_affected?(page : Models::Page, templates : Hash(String, String), site : Models::Site, affected : Set(String)) : Bool
+    formats = effective_output_formats(page, site.config)
+    return false if formats.empty?
+
+    formats.any? do |fmt|
+      name = begin
+        determine_format_template(page, fmt, templates, site)
+      rescue Hwaro::HwaroError
+        # No template exists for this format — render_page will surface that
+        # for the page when something else selects it; a missing template
+        # can't be the one that changed.
+        nil
+      end
+      name ? affected.includes?(name) : false
+    end
+  end
+
   # Render and write every enabled extra format for `page`. No-op when
   # `effective_output_formats` is empty — the common case when the feature
   # isn't configured at all, so this is a cheap guard on every page.
