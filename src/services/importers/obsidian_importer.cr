@@ -47,7 +47,7 @@ module Hwaro
           # The pass also caches each file's raw bytes so the second pass below
           # reuses them instead of re-reading every note from disk (2N → N reads).
           content_cache = {} of String => String
-          link_map = build_link_map(files, path, content_cache)
+          link_map = build_link_map(files, path, options.drafts, content_cache)
 
           files.each do |file_path|
             result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
@@ -84,22 +84,36 @@ module Hwaro
         # The lookup is case-insensitive because Obsidian itself treats
         # wiki-links that way (`[[Note]]` and `[[note]]` resolve to the same
         # file), and Hwaro authors typically lowercase slugs on publish.
-        private def build_link_map(files : Array(String), base_path : String, content_cache : Hash(String, String) = {} of String => String) : Hash(String, String)
+        private def build_link_map(
+          files : Array(String),
+          base_path : String,
+          include_drafts : Bool,
+          content_cache : Hash(String, String) = {} of String => String,
+        ) : Hash(String, String)
           map = Hash(String, String).new
           files.each do |file_path|
-            raw = File.read(file_path)
+            raw = read_text(file_path)
             content_cache[file_path] = raw
             fm_yaml, _ = split_yaml_frontmatter(raw)
 
             # Section mirrors `import_file`'s computation so the URL we
             # emit lands at the same path the file will be written to.
             section, _ = section_from_path(file_path, base_path, "posts")
+            section = section.split('/').reject(&.empty?).map { |s| slugify(s) }.join('/')
 
             basename = File.basename(file_path, File.extname(file_path))
             title = basename
             aliases = [] of String
 
-            if fm_yaml && (yaml = YAML.parse(fm_yaml))
+            if fm_yaml && (yaml = YAML.parse(fm_yaml).as_h?)
+              if draft = yaml["draft"]?
+                if draft.raw == true
+                  unless include_drafts
+                    next
+                  end
+                end
+              end
+
               if t = yaml["title"]?
                 title = t.as_s? || t.raw.to_s
               end
@@ -113,11 +127,14 @@ module Hwaro
               end
             end
 
+            relative_path = file_path.sub(base_path, "").lstrip('/')
+            relative_path_no_ext = relative_path.sub(File.extname(relative_path), "")
+
             slug = slugify(title)
             url = "/#{section}/#{slug}/"
 
             # Register every name a wiki-link could plausibly use.
-            [basename, "#{basename}.md", title, *aliases].each do |key|
+            [basename, "#{basename}.md", title, relative_path, relative_path_no_ext, *aliases].each do |key|
               next if key.empty?
               map[key.downcase.strip] = url
             end
@@ -164,75 +181,75 @@ module Hwaro
           link_map : Hash(String, String) = {} of String => String,
           content_cache : Hash(String, String) = {} of String => String,
         ) : Symbol
-          raw = content_cache[file_path]? || File.read(file_path)
+          raw = content_cache[file_path]? || read_text(file_path)
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
-          fields = Hash(String, (String | Bool | Array(String))?).new
+          fields = Hash(String, FieldValue).new
           tags = [] of String
 
           if frontmatter_yaml
-            yaml = YAML.parse(frontmatter_yaml)
-
-            if title = yaml["title"]?
-              fields["title"] = title.as_s? || title.raw.to_s
-            end
-
-            if date_val = yaml["date"]?
-              case date_val.raw
-              when Time
-                fields["date"] = format_date(date_val.raw.as(Time))
-              when String
-                parsed = parse_date(date_val.as_s)
-                fields["date"] = format_date(parsed) if parsed
+            if yaml = YAML.parse(frontmatter_yaml).as_h?
+              if title = yaml["title"]?
+                fields["title"] = title.as_s? || title.raw.to_s
               end
-            end
 
-            if created = yaml["created"]?
-              unless fields.has_key?("date")
-                case created.raw
+              if date_val = yaml["date"]?
+                case date_val.raw
                 when Time
-                  fields["date"] = format_date(created.raw.as(Time))
+                  fields["date"] = format_date(date_val.raw.as(Time))
                 when String
-                  parsed = parse_date(created.as_s)
+                  parsed = parse_date(date_val.as_s)
                   fields["date"] = format_date(parsed) if parsed
                 end
               end
-            end
 
-            # Tags from frontmatter
-            if tags_val = yaml["tags"]?
-              case tags_val.raw
-              when Array
-                flatten_yaml_strings(tags_val).each { |t| tags << t }
-              when String
-                tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
-              end
-            end
-
-            if desc = yaml["description"]?
-              fields["description"] = desc.as_s? || desc.raw.to_s
-            end
-
-            # Draft status
-            if draft = yaml["draft"]?
-              if draft.raw == true
-                unless include_drafts
-                  return :skipped
+              if created = yaml["created"]?
+                unless fields.has_key?("date")
+                  case created.raw
+                  when Time
+                    fields["date"] = format_date(created.raw.as(Time))
+                  when String
+                    parsed = parse_date(created.as_s)
+                    fields["date"] = format_date(parsed) if parsed
+                  end
                 end
-                fields["draft"] = true
               end
-            end
 
-            # Aliases
-            if aliases_val = yaml["aliases"]?
-              aliases = [] of String
-              case aliases_val.raw
-              when Array
-                flatten_yaml_strings(aliases_val).each { |a| aliases << a }
-              when String
-                aliases << aliases_val.as_s
+              # Tags from frontmatter
+              if tags_val = yaml["tags"]?
+                case tags_val.raw
+                when Array
+                  flatten_yaml_strings(tags_val).each { |t| tags << t }
+                when String
+                  tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
+                end
               end
-              fields["aliases"] = aliases unless aliases.empty?
+
+              if desc = yaml["description"]?
+                fields["description"] = desc.as_s? || desc.raw.to_s
+              end
+
+              # Draft status
+              if draft = yaml["draft"]?
+                if draft.raw == true
+                  unless include_drafts
+                    return :skipped
+                  end
+                  fields["draft"] = true
+                end
+              end
+
+              # Aliases
+              if aliases_val = yaml["aliases"]?
+                aliases = [] of String
+                case aliases_val.raw
+                when Array
+                  flatten_yaml_strings(aliases_val).each { |a| aliases << a }
+                when String
+                  aliases << aliases_val.as_s
+                end
+                fields["aliases"] = aliases unless aliases.empty?
+              end
             end
           end
 
@@ -259,6 +276,7 @@ module Hwaro
 
           # Determine section from vault folder structure
           section, _ = section_from_path(file_path, base_path, "posts")
+          section = section.split('/').reject(&.empty?).map { |s| slugify(s) }.join('/')
 
           slug = slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
 
@@ -290,6 +308,33 @@ module Hwaro
           result
         end
 
+        private def inline_code_ranges(line : String) : Array(Range(Int32, Int32))
+          ranges = [] of Range(Int32, Int32)
+          i = 0
+          len = line.size
+
+          while i < len
+            if line[i] == '`'
+              start_bt_count = 0
+              while i < len && line[i] == '`'
+                start_bt_count += 1
+                i += 1
+              end
+
+              end_idx = line.index("`" * start_bt_count, i)
+              if end_idx
+                start_pos = i - start_bt_count
+                end_pos = end_idx + start_bt_count - 1
+                ranges << (start_pos..end_pos)
+                i = end_idx + start_bt_count
+              end
+            else
+              i += 1
+            end
+          end
+          ranges
+        end
+
         private def extract_inline_tags(body : String) : Array(String)
           tags = [] of String
           # Skip code blocks when extracting tags
@@ -311,7 +356,12 @@ module Hwaro
             # Skip headings (all markdown heading levels)
             next if line.matches?(/^\s*\#{1,6}\s/)
 
+            next if line.starts_with?('\t') || line.match(/^ {4,}/)
+
+            ranges = inline_code_ranges(line)
+
             line.scan(OBSIDIAN_TAG_PATTERN) do |tag_match|
+              next if ranges.any?(&.includes?(tag_match.begin(0)))
               tag = tag_match[1]
               # Convert nested tags (tag/subtag) to just the leaf
               tags << tag.gsub("/", "-")
@@ -321,34 +371,9 @@ module Hwaro
         end
 
         private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String) : String
-          result = body
-
-          # Convert embeds ![[file]] to markdown image/link
-          result = result.gsub(EMBED_PATTERN) do
-            filename = $1
-            if filename.matches?(/\.(png|jpg|jpeg|gif|svg|webp|avif)$/i)
-              "![#{filename}](#{filename})"
-            else
-              "[#{filename}](#{filename})"
-            end
-          end
-
-          # Convert wiki-links [[Page|Display]] to standard markdown links.
-          # Resolve against the prebuilt link_map so the output is an absolute
-          # site URL (e.g. `/posts/note-2/`) rather than a same-page-relative
-          # slug — the old behavior wrote `[Note2](note2)` which the browser
-          # resolved as `<current-page>/note2`, producing 404s.
-          result = result.gsub(WIKILINK_PATTERN) do
-            page = $1
-            display = $~[2]? || page
-            target = resolve_wikilink(page, link_map)
-            "[#{display}](#{target})"
-          end
-
-          # Remove inline tags (already extracted to frontmatter)
           in_code_block = false
           fence_close_re : Regex? = nil
-          lines = result.split("\n").map do |line|
+          lines = body.split("\n").map do |line|
             if in_code_block
               if fence_close_re.try(&.match(line))
                 in_code_block = false
@@ -363,12 +388,54 @@ module Hwaro
               # Preserve markdown headings
               line
             else
-              # Strip inline `#tag` references (already extracted to
-              # frontmatter), but require start-of-line or whitespace before
-              # the `#` — otherwise we'd eat the `#section` anchor inside a
-              # markdown link URL like `[Note](/posts/note/#section)` that
-              # the wiki-link conversion above just emitted.
-              line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/, "").rstrip
+              if line.starts_with?('\t') || line.match(/^ {4,}/)
+                line
+              else
+                ranges = inline_code_ranges(line)
+
+                line = line.gsub(EMBED_PATTERN) do |match|
+                  if ranges.any?(&.includes?($~.begin(0)))
+                    match
+                  else
+                    full_match = $1
+                    parts = full_match.split('|', 2)
+                    target = parts[0].strip
+                    alt_or_width = parts.size > 1 ? parts[1].strip : ""
+
+                    if target.matches?(/\.(png|jpg|jpeg|gif|svg|webp|avif)$/i)
+                      alt = alt_or_width.empty? ? target : alt_or_width
+                      "![#{alt}](#{target})"
+                    else
+                      display = alt_or_width.empty? ? target : alt_or_width
+                      resolved_url = resolve_wikilink(target, link_map)
+                      "[#{display}](#{resolved_url})"
+                    end
+                  end
+                end
+
+                ranges = inline_code_ranges(line)
+
+                line = line.gsub(WIKILINK_PATTERN) do |match|
+                  if ranges.any?(&.includes?($~.begin(0)))
+                    match
+                  else
+                    page = $1
+                    display = $~[2]? || page
+                    target = resolve_wikilink(page, link_map)
+                    "[#{display}](#{target})"
+                  end
+                end
+
+                ranges = inline_code_ranges(line)
+
+                line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/) do |match|
+                  if ranges.any?(&.includes?($~.begin(0)))
+                    match
+                  else
+                    ""
+                  end
+                end.rstrip
+              end
             end
           end
           result = lines.join("\n")

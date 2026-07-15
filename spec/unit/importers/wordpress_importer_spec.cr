@@ -219,7 +219,7 @@ describe Hwaro::Services::Importers::WordPressImporter do
 
         content = File.read(file_path)
         content.should contain("title = \"Hello World\"")
-        content.should contain("date = \"2024-01-15 10:30:00\"")
+        content.should contain("date = \"2024-01-15T10:30:00Z\"")
         content.should contain("description = \"A short excerpt\"")
         content.should contain(%(tags = ["Crystal", "Web"]))
         content.should contain(%(categories = ["Tutorial"]))
@@ -241,7 +241,7 @@ describe Hwaro::Services::Importers::WordPressImporter do
         # RFC 822 → canonical frontmatter date format. Some exporters
         # omit <wp:post_date> and only populate the RSS <pubDate>; we
         # don't want those posts to arrive dateless.
-        content.should contain(%(date = "2024-01-01 00:00:00"))
+        content.should contain(%(date = "2024-01-01"))
       end
     end
 

@@ -165,11 +165,11 @@ describe Hwaro::Services::Importers::HugoImporter do
 
         content = File.read(file_path)
         content.should contain("title = \"Hello from Hugo\"")
-        content.should contain("date = \"2024-06-15 10:00:00\"")
+        content.should contain("date = \"2024-06-15T10:00:00Z\"")
         content.should contain("description = \"A test post\"")
         content.should contain("\"crystal\"")
         content.should contain("\"static-site\"")
-        content.should contain("weight = \"10\"")
+        content.should contain("weight = 10")
         content.should contain("This is the body of the post.")
       end
     end
@@ -361,7 +361,7 @@ describe Hwaro::Services::Importers::HugoImporter do
 
         file_path = File.join(output_dir, "posts", "expiry.md")
         content = File.read(file_path)
-        content.should contain("expires = \"2025-06-01 00:00:00\"")
+        content.should contain("expires = \"2025-06-01\"")
       end
     end
 

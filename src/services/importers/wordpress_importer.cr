@@ -1,3 +1,4 @@
+require "uri"
 require "xml"
 require "./base"
 require "./html_to_markdown"
@@ -141,6 +142,7 @@ module Hwaro
           post_name = ""
           content_html = ""
           excerpt = ""
+          author = ""
           tags = [] of String
           categories = [] of String
 
@@ -170,6 +172,9 @@ module Hwaro
               elsif ns_href == EXCERPT_NS
                 excerpt = child.content.strip
               end
+            when "creator"
+              # <dc:creator> — carry author attribution across.
+              author = child.content.strip
             when "category"
               # WXR encodes both tags and categories as <category> elements
               # distinguished by the `domain` attribute. Keep them as
@@ -189,17 +194,23 @@ module Hwaro
             end
           end
 
-          # Only handle posts and pages
+          # Only handle posts and pages; trashed items are gone content.
           return :skipped unless post_type == "post" || post_type == "page"
+          return :skipped if status == "trash"
 
-          # Handle draft status
-          is_draft = status == "draft"
+          # Anything not published — draft, private, pending, future — must
+          # not silently become public content on the next build. An "All
+          # content" WXR export includes all of these.
+          is_draft = status != "publish"
           if is_draft && !include_drafts
             return :skipped
           end
 
-          # Determine slug
-          slug = post_name.empty? ? slugify(title) : post_name
+          # Determine slug. WordPress stores non-ASCII slugs percent-encoded
+          # (`sanitize_title`); decode so the filename matches what servers
+          # and browsers will show for the URL. Traversal is neutralized at
+          # the write_content_file sink.
+          slug = post_name.empty? ? slugify(title) : URI.decode(post_name)
           return :skipped if slug.empty?
 
           # Determine section
@@ -215,13 +226,14 @@ module Hwaro
           end
 
           # Build frontmatter fields
-          fields = {} of String => (String | Bool | Array(String))?
+          fields = {} of String => FieldValue
           fields["title"] = title unless title.empty?
           fields["date"] = date_str
           fields["description"] = excerpt unless excerpt.empty?
           fields["draft"] = true if is_draft
           fields["tags"] = tags.uniq unless tags.empty?
           fields["categories"] = categories.uniq unless categories.empty?
+          fields["authors"] = [author] unless author.empty?
 
           frontmatter = generate_frontmatter(fields)
 

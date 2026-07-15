@@ -68,7 +68,7 @@ module Hwaro
           verbose : Bool,
           force : Bool,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = read_text(file_path)
           fm_data, body = extract_frontmatter(raw)
 
           # Check draft status (only if frontmatter exists)
@@ -86,7 +86,7 @@ module Hwaro
           end
 
           # Map Hugo fields to Hwaro frontmatter
-          fields = {} of String => (String | Bool | Array(String))?
+          fields = {} of String => FieldValue
           slug_val : String? = nil
 
           if data = fm_data
@@ -95,8 +95,9 @@ module Hwaro
               fields["title"] = title
             end
 
-            # date
-            if date_str = string_value(data, "date")
+            # date (falling back to Hugo's publishDate so a page dated only
+            # via publishDate doesn't lose its date entirely)
+            if date_str = string_value(data, "date") || string_value(data, "publishDate")
               parsed = parse_date(date_str)
               fields["date"] = format_date(parsed) if parsed
             end
@@ -131,9 +132,15 @@ module Hwaro
               fields["series"] = series_arr.first? unless series_arr.empty?
             end
 
-            # weight
-            if weight = string_value(data, "weight")
-              fields["weight"] = weight
+            # weight — must stay numeric: hwaro's frontmatter reader takes
+            # `as_i?`, so a quoted `weight = "3"` silently reads as weight 0
+            # and every imported page loses its ordering.
+            if weight_val = data["weight"]?
+              case weight_raw = weight_val.raw
+              when Int64   then fields["weight"] = weight_raw
+              when Float64 then fields["weight"] = weight_raw.to_i64
+              when String  then fields["weight"] = weight_raw.to_i64?
+              end
             end
 
             # slug
@@ -203,7 +210,14 @@ module Hwaro
                     data[key_str] = yaml_any_to_toml_any(v)
                   end
                   return {data, body}
+                elsif yaml_data.raw.nil?
+                  # Empty/comment-only frontmatter: no fields, but drop the
+                  # fences — returning `raw` leaked literal `---` lines into
+                  # the imported page body.
+                  return {nil, body}
                 end
+                # Non-mapping block (a leading horizontal rule): treat the
+                # whole document as body.
               rescue ex : YAML::ParseException
                 Logger.debug "YAML front matter parse failed: #{ex.message}"
                 return {nil, raw}

@@ -147,23 +147,40 @@ describe Hwaro::Services::Importers::Base do
   end
 
   describe "#format_date" do
-    it "formats a Time as 'YYYY-MM-DD HH:MM:SS'" do
+    it "formats a UTC timestamp as RFC 3339" do
       t = Time.utc(2026, 4, 17, 9, 30, 45)
-      TestImporter.new.test_format_date(t).should eq("2026-04-17 09:30:45")
+      TestImporter.new.test_format_date(t).should eq("2026-04-17T09:30:45Z")
     end
 
-    it "round-trips with parse_date for the standard space-separated format" do
+    it "emits a bare date for midnight values" do
+      t = Time.utc(2026, 4, 17)
+      TestImporter.new.test_format_date(t).should eq("2026-04-17")
+    end
+
+    it "round-trips through parse_date without changing the instant" do
       importer = TestImporter.new
-      original = "2026-04-17 09:30:45"
-      parsed = importer.test_parse_date(original).not_nil!
-      importer.test_format_date(parsed).should eq(original)
+      parsed = importer.test_parse_date("2026-04-17 09:30:45").not_nil!
+      importer.test_format_date(parsed).should eq("2026-04-17T09:30:45Z")
     end
 
-    it "respects timezone-aware times by formatting in the same instant" do
-      # Time#to_s with the standard format renders local components — for a
-      # UTC Time the output should match the components as constructed.
-      t = Time.utc(2026, 12, 31, 23, 59, 59)
-      TestImporter.new.test_format_date(t).should eq("2026-12-31 23:59:59")
+    it "preserves the source offset instead of dropping it" do
+      # The zone-less "%Y-%m-%d %H:%M:%S" output dropped the offset, so a
+      # +09:00 post re-parsed as UTC shifted by nine hours.
+      t = Time.local(2026, 12, 31, 23, 59, 59, location: Time::Location.fixed(9 * 3600))
+      TestImporter.new.test_format_date(t).should eq("2026-12-31T23:59:59+09:00")
+    end
+
+    it "parses an offset date without silently ignoring the zone" do
+      importer = TestImporter.new
+      parsed = importer.test_parse_date("2026-07-01T10:00:00+09:00").not_nil!
+      parsed.offset.should eq(9 * 3600)
+      importer.test_format_date(parsed).should eq("2026-07-01T10:00:00+09:00")
+    end
+
+    it "parses Jekyll's space-separated offset format" do
+      importer = TestImporter.new
+      parsed = importer.test_parse_date("2024-01-15 10:00:00 +0900").not_nil!
+      parsed.offset.should eq(9 * 3600)
     end
   end
 end

@@ -1,6 +1,7 @@
 require "file_utils"
 require "../../config/options/import_options"
 require "../../utils/file_safe"
+require "../../utils/frontmatter_writer"
 require "../../utils/logger"
 require "../../utils/text_utils"
 require "../../utils/path_utils"
@@ -9,6 +10,10 @@ require "../../utils/output_guard"
 module Hwaro
   module Services
     module Importers
+      # Value union for the normalized frontmatter each importer builds before
+      # `generate_frontmatter` renders it as TOML.
+      alias FieldValue = (String | Bool | Int64 | Array(String))?
+
       struct ImportResult
         property success : Bool
         property message : String
@@ -33,11 +38,22 @@ module Hwaro
         # closing `---` on its own line (multiline mode so ^ matches line starts).
         YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
 
+        # Read a content file for import, normalizing CRLF line endings.
+        # Windows-authored sources (or `core.autocrlf=true` checkouts) would
+        # otherwise defeat the `\n`-anchored frontmatter regexes, silently
+        # dropping every field and leaking raw YAML into the page body.
+        protected def read_text(path : String) : String
+          File.read(path).gsub("\r\n", "\n")
+        end
+
         # Split YAML frontmatter from a document body. Returns {frontmatter, body}
-        # with both stripped, or {nil, content.strip} when no frontmatter present.
+        # with both stripped, or {nil, ...} when no frontmatter is present — an
+        # empty or whitespace-only block (`---\n---`) counts as absent, since
+        # `YAML.parse("")` yields a nil document whose `[]?` raises.
         protected def split_yaml_frontmatter(content : String) : {String?, String}
           if match = YAML_FM_REGEX.match(content)
-            return {match[1].strip, match[2].strip}
+            fm = match[1].strip
+            return {fm.empty? ? nil : fm, match[2].strip}
           end
           {nil, content.strip}
         end
@@ -84,24 +100,29 @@ module Hwaro
           parts.size > 1 ? parts[0] : default
         end
 
-        # Generate TOML frontmatter string from fields hash
-        protected def generate_frontmatter(fields : Hash(String, (String | Bool | Array(String))?)) : String
+        # Generate TOML frontmatter string from fields hash. Strings go
+        # through the shared TOML escaper — Crystal's `String#inspect` emits
+        # escapes TOML rejects (`\a`, `\e`, `\v`, and `\uXXXX` sequences that
+        # toml.cr misreads before a hex digit), which made the imported file
+        # break the user's own build.
+        protected def generate_frontmatter(fields : Hash(String, FieldValue)) : String
           lines = [] of String
           lines << "+++"
 
           fields.each do |key, value|
+            k = Hwaro::Utils::FrontmatterWriter.format_toml_key(key)
             case value
             when Nil
               next
-            when Bool
-              lines << "#{key} = #{value}"
+            when Bool, Int64
+              lines << "#{k} = #{value}"
             when String
               next if value.empty?
-              lines << "#{key} = #{value.inspect}"
+              lines << "#{k} = \"#{Hwaro::Utils::FrontmatterWriter.escape_toml_string(value)}\""
             when Array(String)
               next if value.empty?
-              formatted = value.map(&.inspect).join(", ")
-              lines << "#{key} = [#{formatted}]"
+              formatted = value.map { |v| "\"#{Hwaro::Utils::FrontmatterWriter.escape_toml_string(v)}\"" }.join(", ")
+              lines << "#{k} = [#{formatted}]"
             end
           end
 
@@ -217,13 +238,29 @@ module Hwaro
             .last? || ""
         end
 
-        # Parse a date string in common formats, returns nil on failure
+        # Parse a date string in common formats, returns nil on failure.
+        #
+        # Zone-bearing formats come FIRST: Crystal's `Time.parse` ignores
+        # trailing input, so a zone-less pattern would happily match
+        # `2026-07-01T10:00:00+09:00`, silently drop the `+09:00`, and shift
+        # the instant by the whole offset.
         protected def parse_date(date_str : String) : Time?
+          str = date_str.strip
+
+          begin
+            return Time.parse_rfc3339(str)
+          rescue Time::Format::Error
+            # Not RFC 3339; fall through to the lenient formats.
+          end
+
           formats = [
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S%z",
             "%Y-%m-%dT%H:%M:%S%:z",
+            "%Y-%m-%dT%H:%M:%S%z",
+            # Jekyll's conventional `2024-01-15 10:00:00 +0900`
+            "%Y-%m-%d %H:%M:%S %:z",
+            "%Y-%m-%d %H:%M:%S %z",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%d",
             "%B %d, %Y",
             # RFC 822 (WordPress <pubDate>, RSS feeds)
@@ -231,17 +268,20 @@ module Hwaro
           ]
 
           formats.each do |fmt|
-            return Time.parse(date_str.strip, fmt, Time::Location::UTC)
-          rescue Time::Format::Error
+            return Time.parse(str, fmt, Time::Location::UTC)
+          rescue Time::Format::Error | ArgumentError
             next
           end
 
           nil
         end
 
-        # Format a Time to the standard frontmatter date format
+        # Format a Time to the standard frontmatter date format, keeping the
+        # source's zone offset — the previous zone-less `%Y-%m-%d %H:%M:%S`
+        # dropped the offset, so a `+09:00` post re-parsed as UTC shifted by
+        # nine hours in feeds and sort order.
         protected def format_date(time : Time) : String
-          time.to_s("%Y-%m-%d %H:%M:%S")
+          Hwaro::Utils::FrontmatterWriter.serialize_time(time)
         end
       end
     end

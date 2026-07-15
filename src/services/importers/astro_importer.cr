@@ -82,14 +82,16 @@ module Hwaro
           verbose : Bool,
           force : Bool,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = read_text(file_path)
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
-          fields = Hash(String, (String | Bool | Array(String))?).new
+          fields = Hash(String, FieldValue).new
 
-          if frontmatter_yaml
-            yaml = YAML.parse(frontmatter_yaml)
+          # Non-mapping frontmatter (comment-only, scalar) would raise on []?.
+          yaml = frontmatter_yaml ? YAML.parse(frontmatter_yaml) : nil
+          yaml = nil unless yaml.try(&.as_h?)
 
+          if yaml
             # Title
             if title = yaml["title"]?
               fields["title"] = title.as_s? || title.raw.to_s
@@ -193,7 +195,10 @@ module Hwaro
           # can emit a single summary warning.
           has_mdx_components = false
           if file_path.ends_with?(".mdx")
-            body = body.gsub(/^import\s+.+$\n?/m, "")
+            # [^\n], not `.+`: Crystal's /m makes `.` match newlines, so `.+$`
+            # swallowed everything from the first import line to EOF —
+            # deleting the entire article body of any real MDX file.
+            body = body.gsub(/^import[ \t]+[^\n]+$\n?/m, "")
             if body.matches?(/<[A-Z]/)
               Logger.warn "MDX components detected in #{file_path} — manual conversion needed."
               has_mdx_components = true
@@ -203,7 +208,15 @@ module Hwaro
           # Determine section from content collection name (e.g. "blog", "posts")
           section = top_section_from_path(file_path, content_dir, "posts")
 
-          slug = slugify(File.basename(file_path, File.extname(file_path)))
+          # Page bundles (`blog/my-post/index.md`): the slug is the bundle
+          # directory — a literal "index" slug collides across every bundle
+          # in the section, silently dropping all but the first.
+          base = File.basename(file_path, File.extname(file_path))
+          if base == "index"
+            parent = File.basename(File.dirname(file_path))
+            base = parent unless File.same?(File.dirname(file_path), content_dir)
+          end
+          slug = slugify(base)
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))

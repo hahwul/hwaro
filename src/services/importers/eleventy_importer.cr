@@ -1,5 +1,6 @@
 require "yaml"
 require "json"
+require "set"
 require "./base"
 
 module Hwaro
@@ -11,6 +12,9 @@ module Hwaro
         # Nunjucks/Liquid tag patterns
         TEMPLATE_TAG_PATTERN = /\{[%{].*?[%}]\}/
 
+        # Paths (section/slug) written this run, to disambiguate collisions.
+        @used_paths = Set(String).new
+
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
@@ -18,6 +22,8 @@ module Hwaro
           skipped = 0
           errors = 0
           wrapped = 0
+
+          @used_paths.clear
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -157,90 +163,97 @@ module Hwaro
           verbose : Bool,
           force : Bool,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = read_text(file_path)
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
 
-          fields = Hash(String, (String | Bool | Array(String))?).new
+          fields = Hash(String, FieldValue).new
 
           # Merge directory data as defaults
           relative_dir = File.dirname(file_path).sub(base_path, "").lstrip('/')
+          is_collection_root = relative_dir.empty? || !relative_dir.includes?('/')
           merged_yaml = merge_directory_data(dir_data, relative_dir, frontmatter_yaml)
 
           if merged_yaml
-            yaml = YAML.parse(merged_yaml)
+            if yaml_hash = YAML.parse(merged_yaml).as_h?
+              # Title
+              if title = yaml_hash["title"]?
+                fields["title"] = title.as_s? || title.raw.to_s
+              end
 
-            # Title
-            if title = yaml["title"]?
-              fields["title"] = title.as_s? || title.raw.to_s
-            end
-
-            # Date
-            if date_val = yaml["date"]?
-              case date_val.raw
-              when Time
-                fields["date"] = format_date(date_val.raw.as(Time))
-              when String
-                date_str = date_val.as_s
-                # 11ty special date values
-                unless date_str == "Last Modified" || date_str == "Created" || date_str == "git Last Modified" || date_str == "git Created"
-                  parsed = parse_date(date_str)
-                  fields["date"] = format_date(parsed) if parsed
+              # Date
+              if date_val = yaml_hash["date"]?
+                case date_val.raw
+                when Time
+                  fields["date"] = format_date(date_val.raw.as(Time))
+                when String
+                  date_str = date_val.as_s
+                  # 11ty special date values
+                  unless date_str == "Last Modified" || date_str == "Created" || date_str == "git Last Modified" || date_str == "git Created"
+                    parsed = parse_date(date_str)
+                    fields["date"] = format_date(parsed) if parsed
+                  end
                 end
               end
-            end
 
-            # Draft or excluded from collections
-            draft_val = yaml["draft"]?
-            exclude_val = yaml["eleventyExcludeFromCollections"]?
-            is_draft = !draft_val.nil? && draft_val.raw == true
-            is_excluded = !exclude_val.nil? && exclude_val.raw == true
-            if is_draft || is_excluded
-              unless include_drafts
-                return :skipped
-              end
-              fields["draft"] = true
-            end
-
-            # Tags (11ty uses tags for collection membership)
-            if tags_val = yaml["tags"]?
-              tags = [] of String
-              case tags_val.raw
-              when Array
-                tags_val.as_a.each do |t|
-                  tag_str = t.as_s? || t.raw.to_s
-                  # Skip 11ty collection tags like "post", "posts", "all"
-                  next if tag_str == "post" || tag_str == "posts" || tag_str == "all"
-                  tags << tag_str
+              # Draft or excluded from collections
+              draft_val = yaml_hash["draft"]?
+              exclude_val = yaml_hash["eleventyExcludeFromCollections"]?
+              is_draft = !draft_val.nil? && draft_val.raw == true
+              is_excluded = !exclude_val.nil? && exclude_val.raw == true
+              if is_draft || is_excluded
+                unless include_drafts
+                  return :skipped
                 end
-              when String
-                tag_str = tags_val.as_s
-                unless tag_str == "post" || tag_str == "posts" || tag_str == "all"
-                  tags << tag_str
-                end
+                fields["draft"] = true
               end
-              fields["tags"] = tags unless tags.empty?
-            end
 
-            # Description
-            if desc = yaml["description"]? || yaml["excerpt"]? || yaml["summary"]?
-              fields["description"] = desc.as_s? || desc.raw.to_s
-            end
+              # Tags (11ty uses tags for collection membership)
+              if tags_val = yaml_hash["tags"]?
+                tags = [] of String
+                case tags_val.raw
+                when Array
+                  tags_val.as_a.each do |t|
+                    tag_str = t.as_s? || t.raw.to_s
+                    # Skip 11ty collection tags like "post", "posts", "all"
+                    next if tag_str == "post" || tag_str == "posts" || tag_str == "all"
+                    tags << tag_str
+                  end
+                when String
+                  tag_str = tags_val.as_s
+                  unless tag_str == "post" || tag_str == "posts" || tag_str == "all"
+                    tags << tag_str
+                  end
+                end
+                fields["tags"] = tags unless tags.empty?
+              end
 
-            # Image
-            if image = yaml["image"]? || yaml["featuredImage"]? || yaml["cover"]?
-              fields["image"] = image.as_s? || image.raw.to_s
-            end
+              # Description
+              if desc = yaml_hash["description"]? || yaml_hash["excerpt"]? || yaml_hash["summary"]?
+                fields["description"] = desc.as_s? || desc.raw.to_s
+              end
 
-            # Template / layout
-            if layout = yaml["layout"]?
-              fields["template"] = layout.as_s? || layout.raw.to_s
+              # Image
+              if image = yaml_hash["image"]? || yaml_hash["featuredImage"]? || yaml_hash["cover"]?
+                fields["image"] = image.as_s? || image.raw.to_s
+              end
+
+              # Template / layout
+              if layout = yaml_hash["layout"]?
+                fields["template"] = layout.as_s? || layout.raw.to_s
+              end
             end
           end
 
           # Fallback title from filename
           unless fields.has_key?("title")
             name = File.basename(file_path, File.extname(file_path))
-            return :skipped if name == "index" # Skip index files without title
+            if name == "index"
+              if is_collection_root
+                return :skipped
+              else
+                name = File.basename(File.dirname(file_path))
+              end
+            end
             fields["title"] = name.gsub(/[-_]/, " ").split.map(&.capitalize).join(" ")
           end
 
@@ -267,7 +280,29 @@ module Hwaro
           # Determine section
           section = top_section_from_path(file_path, base_path, "posts")
 
-          slug = slugify(File.basename(file_path, File.extname(file_path)))
+          basename = File.basename(file_path, File.extname(file_path))
+          slug = if basename == "index" && !is_collection_root
+                   slugify(File.basename(File.dirname(file_path)))
+                 else
+                   slugify(basename)
+                 end
+
+          # Avoid collision on section/slug path
+          path_key = "#{section}/#{slug}"
+          unless @used_paths.add?(path_key)
+            base_slug = slug
+            n = 1
+            loop do
+              candidate = "#{base_slug}-#{n}"
+              path_key = "#{section}/#{candidate}"
+              if @used_paths.add?(path_key)
+                slug = candidate
+                break
+              end
+              n += 1
+            end
+            Logger.warn "Slug collision: #{section}/#{base_slug} already used, renamed to #{section}/#{slug}"
+          end
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))

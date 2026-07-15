@@ -156,5 +156,68 @@ describe Hwaro::Services::Importers::NotionImporter do
         result.imported_count.should eq(0)
       end
     end
+
+    it "handles slug collisions by appending suffix and logging a warning" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "Meeting Notes abc123def4567890.md"), "# Meeting Notes\nContent 1")
+        File.write(File.join(dir, "Meeting Notes def123def4567890.md"), "# Meeting Notes\nContent 2")
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "notion",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::NotionImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(2)
+        File.exists?(File.join(output_dir, "posts", "meeting-notes.md")).should be_true
+        File.exists?(File.join(output_dir, "posts", "meeting-notes-1.md")).should be_true
+      end
+    end
+
+    it "handles callouts correctly with FE0F and handles multiple callouts in same file" do
+      Dir.mktmpdir do |dir|
+        post_content = "# Page\n\n> 💡\u{FE0F} First callout\n\nSome text\n\n> ⚠️ Second callout"
+        File.write(File.join(dir, "page.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "notion",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::NotionImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "page.md"))
+        content.should contain("> First callout")
+        content.should contain("> Second callout")
+      end
+    end
+
+    it "rewrites internal subpage links with 32-hex suffix to flattened posts links" do
+      Dir.mktmpdir do |dir|
+        post_content = "# Main Page\n\nLink: [Subpage](Parent%20Name%20abc123def4567890abc123def4567890/Sub%20Name%20def123def4567890def123def4567890.md)\n\nHTTP: [Google](https://google.com)"
+        File.write(File.join(dir, "main.md"), post_content)
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "notion",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::NotionImporter.new
+        importer.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "main.md"))
+        content.should contain("[Subpage](/posts/sub-name/)")
+        content.should contain("[Google](https://google.com)")
+      end
+    end
   end
 end

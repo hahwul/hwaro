@@ -11,6 +11,9 @@ module Hwaro
         # Regex to detect Liquid tags in content
         LIQUID_TAG_PATTERN = /\{[%{].*?[%}]\}/
 
+        # Slugs written this run, to disambiguate date-prefix-strip collisions.
+        @used_slugs = Set(String).new
+
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
@@ -26,6 +29,7 @@ module Hwaro
             )
           end
 
+          @used_slugs.clear
           files = collect_files(path, options.drafts)
 
           if files.empty?
@@ -67,9 +71,12 @@ module Hwaro
         private def collect_files(path : String, include_drafts : Bool) : Array(NamedTuple(path: String, draft: Bool))
           files = [] of NamedTuple(path: String, draft: Bool)
 
+          # Recursive: Jekyll supports organizing posts in subfolders
+          # (`_posts/tech/2024-01-02-post.md` is a common category layout);
+          # a flat glob silently ignored every nested post.
           posts_dir = File.join(path, "_posts")
           if Dir.exists?(posts_dir)
-            Dir.glob(File.join(posts_dir, "*.{md,markdown}")).each do |file|
+            walk_files(posts_dir).sort.each do |file|
               files << {path: file, draft: false}
             end
           end
@@ -77,7 +84,7 @@ module Hwaro
           if include_drafts
             drafts_dir = File.join(path, "_drafts")
             if Dir.exists?(drafts_dir)
-              Dir.glob(File.join(drafts_dir, "*.{md,markdown}")).each do |file|
+              walk_files(drafts_dir).sort.each do |file|
                 files << {path: file, draft: true}
               end
             end
@@ -92,7 +99,7 @@ module Hwaro
           verbose : Bool,
           force : Bool,
         ) : Symbol
-          raw = File.read(file_info[:path])
+          raw = read_text(file_info[:path])
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
           filename = File.basename(file_info[:path])
 
@@ -100,18 +107,22 @@ module Hwaro
           slug = extract_slug(filename)
           filename_date = extract_date_from_filename(filename)
 
-          # Parse YAML frontmatter
-          fields = Hash(String, (String | Bool | Array(String))?).new
+          # Parse YAML frontmatter. Comment-only or scalar frontmatter parses
+          # to a non-hash document whose `[]?` raises ("Expected Array or
+          # Hash, not Nil"), which used to drop the whole post as an error —
+          # treat anything but a mapping as no frontmatter.
+          fields = Hash(String, FieldValue).new
+          yaml = frontmatter_yaml ? YAML.parse(frontmatter_yaml) : nil
+          yaml = nil unless yaml.try(&.as_h?)
 
-          if frontmatter_yaml
-            yaml = YAML.parse(frontmatter_yaml)
-
+          if yaml
             # Title
             if title = yaml["title"]?
               fields["title"] = title.as_s? || title.raw.to_s
             end
 
-            # Date: prefer frontmatter, fall back to filename
+            # Date from frontmatter (filename fallback below also covers an
+            # unparseable frontmatter date, which used to suppress it)
             if date_val = yaml["date"]?
               case date_val.raw
               when Time
@@ -120,8 +131,6 @@ module Hwaro
                 parsed = parse_date(date_val.as_s)
                 fields["date"] = format_date(parsed) if parsed
               end
-            elsif filename_date
-              fields["date"] = format_date(filename_date)
             end
 
             # Layout -> template
@@ -199,11 +208,12 @@ module Hwaro
                 fields["image"] = (header_image.as_s? || header_image.raw.to_s) unless fields.has_key?("image")
               end
             end
-          else
-            # No frontmatter; use filename date if available
-            if filename_date
-              fields["date"] = format_date(filename_date)
-            end
+          end
+
+          # Fall back to the filename date when frontmatter had none (or an
+          # unparseable one).
+          if !fields.has_key?("date") && filename_date
+            fields["date"] = format_date(filename_date)
           end
 
           # Mark drafts
@@ -228,6 +238,20 @@ module Hwaro
             else
               slug = "untitled"
             end
+          end
+
+          # Stripping the unique `YYYY-MM-DD-` prefix can collide two posts
+          # (`2023-01-01-recap.md` + `2024-01-01-recap.md` → `recap.md`);
+          # re-attach the date to the later one instead of losing it.
+          unless @used_slugs.add?(slug)
+            candidate = filename_date ? "#{slug}-#{filename_date.to_s("%Y-%m-%d")}" : slug
+            n = 1
+            until @used_slugs.add?(candidate)
+              candidate = "#{slug}-#{n}"
+              n += 1
+            end
+            Logger.warn "Slug collision after date-prefix strip: writing #{candidate} for #{file_info[:path]}"
+            slug = candidate
           end
 
           frontmatter = generate_frontmatter(fields)

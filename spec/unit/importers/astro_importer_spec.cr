@@ -146,7 +146,7 @@ describe Hwaro::Services::Importers::AstroImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "blog", "date-test.md"))
-        content.should contain("date = \"2024-05-20 00:00:00\"")
+        content.should contain("date = \"2024-05-20\"")
       end
     end
 
@@ -177,7 +177,7 @@ describe Hwaro::Services::Importers::AstroImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "blog", "updated-test.md"))
-        content.should contain("updated = \"2024-06-01 00:00:00\"")
+        content.should contain("updated = \"2024-06-01\"")
       end
     end
 

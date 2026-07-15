@@ -97,18 +97,21 @@ module Hwaro
           verbose : Bool,
           force : Bool,
         ) : Symbol
-          raw = File.read(file_info[:path])
+          raw = read_text(file_info[:path])
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
           filename = File.basename(file_info[:path])
 
-          fields = Hash(String, (String | Bool | Array(String))?).new
+          fields = Hash(String, FieldValue).new
 
           slug = extract_slug(filename)
           filename_date = extract_date_from_filename(filename)
 
-          if frontmatter_yaml
-            yaml = YAML.parse(frontmatter_yaml)
+          # Comment-only or scalar frontmatter parses to a non-hash document
+          # whose `[]?` raises — treat anything but a mapping as no frontmatter.
+          yaml = frontmatter_yaml ? YAML.parse(frontmatter_yaml) : nil
+          yaml = nil unless yaml.try(&.as_h?)
 
+          if yaml
             # Title
             if title = yaml["title"]?
               fields["title"] = title.as_s? || title.raw.to_s
@@ -123,8 +126,6 @@ module Hwaro
                 parsed = parse_date(date_val.as_s)
                 fields["date"] = format_date(parsed) if parsed
               end
-            elsif filename_date
-              fields["date"] = format_date(filename_date)
             end
 
             # Updated
@@ -203,10 +204,12 @@ module Hwaro
                 end
               end
             end
-          else
-            if filename_date
-              fields["date"] = format_date(filename_date)
-            end
+          end
+
+          # Fall back to the filename date when frontmatter had none (or an
+          # unparseable one).
+          if !fields.has_key?("date") && filename_date
+            fields["date"] = format_date(filename_date)
           end
 
           # Mark drafts
