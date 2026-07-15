@@ -67,21 +67,24 @@ module Hwaro
 
       # Build a list of planned operations across all configured (or explicitly
       # requested) targets without performing any filesystem writes or external
-      # commands. Returns an empty array when no targets resolve (caller is
-      # responsible for surfacing that as a friendly message or JSON error).
+      # commands. Raises the same classified errors as `#run` (missing source,
+      # no/unknown targets, bad target config, overlap, delete cap) so
+      # `hwaro deploy --dry-run --json` fails the same way a real deploy
+      # would instead of reporting an empty plan.
       def plan(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(PlannedOp)
         ops = [] of PlannedOp
         config ||= Models::Config.load(env: options.env)
         deployment = config.deployment
 
         source_dir = resolve_source_dir(options, deployment)
-        return ops unless Dir.exists?(source_dir)
+        require_source_dir!(source_dir)
 
         target_names = resolve_target_names(options, deployment)
-        return ops if target_names.empty?
+        require_target_names!(target_names)
 
-        targets = target_names.compact_map { |name| deployment.target_named(name) }
-        return ops if targets.empty?
+        targets = resolve_targets!(target_names, deployment)
+        effective = EffectiveOptions.new(deployment, options)
+        force_patterns = force_matcher_patterns(deployment)
 
         targets.each do |target|
           if command = target.command
@@ -96,27 +99,29 @@ module Hwaro
           end
 
           url = target.url
-          next if url.empty?
+          raise_missing_url!(target) if url.empty?
 
           if directory_destination = local_directory_destination(url)
             dest_dir = File.expand_path(directory_destination)
+            check_overlap!(source_dir, dest_dir)
+
             desired = build_desired_map(source_dir, target)
             existing = list_existing_files(dest_dir)
+
+            to_delete = compute_deletes(existing, desired.keys, target)
+            check_max_deletes!(to_delete.size, effective)
 
             desired.each do |dest_rel, src_path|
               dest_path = File.join(dest_dir, dest_rel)
               if File.exists?(dest_path)
-                next if same_file?(src_path, dest_path)
+                next if !effective.force && !force_match?(dest_rel, force_patterns) && same_file?(src_path, dest_path)
                 ops << PlannedOp.new(target: target.name, action: "update", path: dest_rel, source: src_path, destination: dest_path)
               else
                 ops << PlannedOp.new(target: target.name, action: "create", path: dest_rel, source: src_path, destination: dest_path)
               end
             end
 
-            desired_set = desired.keys.to_set
-            existing.each do |rel|
-              next if desired_set.includes?(rel)
-              next unless delete_candidate?(rel, target)
+            to_delete.each do |rel|
               ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
@@ -127,6 +132,8 @@ module Hwaro
               source: source_dir,
               destination: url,
             )
+          else
+            raise_unsupported_scheme!(target, url)
           end
         end
 
@@ -151,6 +158,8 @@ module Hwaro
 
         target_names = resolve_target_names(options, deployment)
         require_target_names!(target_names)
+
+        warn_unapplied_matchers(deployment)
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
@@ -275,22 +284,10 @@ module Hwaro
         end
 
         url = target.url
-        if url.empty?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Target '#{target.name}' is missing 'url' (or 'path' / 'command').",
-            hint: "Set one of:\n" \
-                  "  path    = \"/abs/local/dir\"   # copy to a local directory\n" \
-                  "  url     = \"file:///abs/dir\"  # same, file:// scheme\n" \
-                  "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`\n" \
-                  "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`\n" \
-                  "  url     = \"az://container\"   # auto-runs `az storage blob sync …`\n" \
-                  "  command = \"rsync … {source} user@host:/var/www/\"  # arbitrary shell command",
-          )
-        end
+        raise_missing_url!(target) if url.empty?
 
         if directory_destination = local_directory_destination(url)
-          return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective)
+          return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment)
         end
 
         if auto_command = auto_command_for_url(url, source_dir)
@@ -299,12 +296,7 @@ module Hwaro
           return {ok, TargetCounts.new}
         end
 
-        raise Hwaro::HwaroError.new(
-          code: Hwaro::Errors::HWARO_E_CONFIG,
-          message: "Unsupported deploy target URL scheme for '#{target.name}': #{url}",
-          hint: "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc). " \
-                "Example: command = \"aws s3 sync {source}/ {url} --delete\"",
-        )
+        raise_unsupported_scheme!(target, url)
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
@@ -317,23 +309,8 @@ module Hwaro
         target_names = resolve_target_names(options, deployment)
         require_target_names!(target_names)
 
-        targets = target_names.map do |name|
-          target = deployment.target_named(name)
-          unless target
-            available = deployment.targets.map(&.name).join(", ")
-            hint = if available.empty?
-                     "No targets are configured. Add '[[deployment.targets]]' to config.toml."
-                   else
-                     "Configured targets: #{available}."
-                   end
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_USAGE,
-              message: "Unknown deploy target: #{name}",
-              hint: hint,
-            )
-          end
-          target
-        end
+        targets = resolve_targets!(target_names, deployment)
+        warn_unapplied_matchers(deployment)
 
         effective = EffectiveOptions.new(deployment, options)
 
@@ -374,22 +351,10 @@ module Hwaro
         end
 
         url = target.url
-        if url.empty?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Target '#{target.name}' is missing 'url' (or 'path' / 'command').",
-            hint: "Set one of:\n" \
-                  "  path    = \"/abs/local/dir\"   # copy to a local directory\n" \
-                  "  url     = \"file:///abs/dir\"  # same, file:// scheme\n" \
-                  "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`\n" \
-                  "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`\n" \
-                  "  url     = \"az://container\"   # auto-runs `az storage blob sync …`\n" \
-                  "  command = \"rsync … {source} user@host:/var/www/\"  # arbitrary shell command",
-          )
-        end
+        raise_missing_url!(target) if url.empty?
 
         if directory_destination = local_directory_destination(url)
-          return deploy_to_directory(target, source_dir, directory_destination, effective)
+          return deploy_to_directory(target, source_dir, directory_destination, effective, deployment)
         end
 
         if auto_command = auto_command_for_url(url, source_dir)
@@ -397,12 +362,7 @@ module Hwaro
           return deploy_via_command(target, source_dir, auto_command, effective)
         end
 
-        raise Hwaro::HwaroError.new(
-          code: Hwaro::Errors::HWARO_E_CONFIG,
-          message: "Unsupported deploy target URL scheme for '#{target.name}': #{url}",
-          hint: "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc). " \
-                "Example: command = \"aws s3 sync {source}/ {url} --delete\"",
-        )
+        raise_unsupported_scheme!(target, url)
       end
 
       # Shell metacharacters that indicate potentially dangerous commands.
@@ -474,18 +434,13 @@ module Hwaro
         source_dir : String,
         dest_dir : String,
         effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
       ) : {Bool, TargetCounts}
         Logger.heading("deploy", target.name)
         counts = TargetCounts.new
         dest_dir_expanded = File.expand_path(dest_dir)
 
-        if nested_path?(source_dir, dest_dir_expanded) || nested_path?(dest_dir_expanded, source_dir)
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Refusing to deploy: source and destination overlap.",
-            hint: "source: #{source_dir} / dest: #{dest_dir_expanded}",
-          )
-        end
+        check_overlap!(source_dir, dest_dir_expanded)
 
         Hwaro::Utils::FileSafe.mkdir_p(dest_dir_expanded)
 
@@ -496,15 +451,9 @@ module Hwaro
         validate_destination_paths(dest_dir_expanded, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
-        if effective.max_deletes != -1 && to_delete.size > effective.max_deletes
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes}).",
-            hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
-          )
-        end
+        check_max_deletes!(to_delete.size, effective)
 
-        to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force)
+        to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force, force_matcher_patterns(deployment))
 
         if effective.dry_run
           return {true, counts}
@@ -544,16 +493,11 @@ module Hwaro
         source_dir : String,
         dest_dir : String,
         effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
       ) : Bool
         dest_dir = File.expand_path(dest_dir)
 
-        if nested_path?(source_dir, dest_dir) || nested_path?(dest_dir, source_dir)
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Refusing to deploy: source and destination overlap.",
-            hint: "source: #{source_dir} / dest: #{dest_dir}",
-          )
-        end
+        check_overlap!(source_dir, dest_dir)
 
         Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
 
@@ -564,15 +508,9 @@ module Hwaro
         validate_destination_paths(dest_dir, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
-        if effective.max_deletes != -1 && to_delete.size > effective.max_deletes
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Refusing to delete #{to_delete.size} files (max_deletes: #{effective.max_deletes}).",
-            hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
-          )
-        end
+        check_max_deletes!(to_delete.size, effective)
 
-        to_copy, skipped = compute_copies(desired, dest_dir, effective.force)
+        to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_matcher_patterns(deployment))
 
         Logger::Receipt.new("deploy", target.name)
           .row("source", source_dir)
@@ -624,20 +562,23 @@ module Hwaro
           desired[dest_rel] = path
         end
 
-        desired
+        # Deterministic order: plan JSON, progress lines, and copy order must
+        # not depend on the OS directory-read order.
+        desired.to_a.sort_by!(&.[0]).to_h
       end
 
       private def compute_copies(
         desired : Hash(String, String),
         dest_dir : String,
         force : Bool,
+        force_patterns : Array(Regex) = [] of Regex,
       ) : {Array({String, String}), Int32}
         to_copy = [] of {String, String}
         skipped = 0
 
         desired.each do |dest_rel, src_path|
           dest_path = File.join(dest_dir, dest_rel)
-          if !force && File.exists?(dest_path) && same_file?(src_path, dest_path)
+          if !force && !force_match?(dest_rel, force_patterns) && File.exists?(dest_path) && same_file?(src_path, dest_path)
             skipped += 1
             next
           end
@@ -662,7 +603,12 @@ module Hwaro
       end
 
       private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
-        included_by_target?(rel, target)
+        return true if included_by_target?(rel, target)
+        # With strip_index_html the on-disk name for `foo/index.html` is just
+        # `foo`, so include/exclude globs written against source paths (e.g.
+        # include = "**/*.html") never match the stored name and stale pages
+        # would survive every sync. Consider the un-stripped form too.
+        target.strip_index_html && included_by_target?("#{rel}/index.html", target)
       end
 
       private def list_existing_files(dest_dir : String) : Array(String)
@@ -676,7 +622,7 @@ module Hwaro
           files << rel
         end
 
-        files
+        files.sort!
       end
 
       # Resolve the deploy source directory from options/config (expanded).
@@ -686,9 +632,11 @@ module Hwaro
 
       # Resolve which deploy target names to act on: explicit CLI targets, then
       # the configured default target, then the first configured target.
+      # Duplicate CLI names are collapsed so `hwaro deploy prod prod` doesn't
+      # deploy (and report) the same target twice.
       private def resolve_target_names(options, deployment) : Array(String)
         if options.targets.present?
-          options.targets
+          options.targets.uniq
         elsif default_target = deployment.target
           [default_target]
         elsif deployment.targets.size > 0
@@ -696,6 +644,129 @@ module Hwaro
         else
           [] of String
         end
+      end
+
+      # Map target names to configured targets; unknown names raise
+      # HWARO_E_USAGE with the configured-target list in the hint. Shared by
+      # `#run` and `#plan` so dry-run and real deploys fail identically.
+      private def resolve_targets!(
+        target_names : Array(String),
+        deployment : Models::DeploymentConfig,
+      ) : Array(Models::DeploymentTarget)
+        target_names.map do |name|
+          target = deployment.target_named(name)
+          unless target
+            available = deployment.targets.map(&.name).join(", ")
+            hint = if available.empty?
+                     "No targets are configured. Add '[[deployment.targets]]' to config.toml."
+                   else
+                     "Configured targets: #{available}."
+                   end
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Unknown deploy target: #{name}",
+              hint: hint,
+            )
+          end
+          target
+        end
+      end
+
+      private def raise_missing_url!(target : Models::DeploymentTarget) : NoReturn
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Target '#{target.name}' is missing 'url' (or 'path' / 'command').",
+          hint: "Set one of:\n" \
+                "  path    = \"/abs/local/dir\"   # copy to a local directory\n" \
+                "  url     = \"file:///abs/dir\"  # same, file:// scheme\n" \
+                "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`\n" \
+                "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`\n" \
+                "  url     = \"az://container\"   # auto-runs `az storage blob sync …`\n" \
+                "  command = \"rsync … {source} user@host:/var/www/\"  # arbitrary shell command",
+        )
+      end
+
+      private def raise_unsupported_scheme!(target : Models::DeploymentTarget, url : String) : NoReturn
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Unsupported deploy target URL scheme for '#{target.name}': #{url}",
+          hint: "Set 'command' for this target to use external tools (rsync/aws/gsutil/etc). " \
+                "Example: command = \"aws s3 sync {source}/ {url} --delete\"",
+        )
+      end
+
+      # Refuse overlapping source/destination. Symlinks are resolved first so
+      # a destination that is a symlink back into the source tree still trips
+      # the refusal (a lexical-only comparison would let a strip_index_html
+      # target mutate or delete the source).
+      private def check_overlap!(source_dir : String, dest_dir : String)
+        src = existing_real_path(source_dir)
+        dst = existing_real_path(dest_dir)
+        if nested_path?(src, dst) || nested_path?(dst, src)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to deploy: source and destination overlap.",
+            hint: "source: #{source_dir} / dest: #{dest_dir}",
+          )
+        end
+      end
+
+      # Resolve symlinks for the deepest existing ancestor and re-append the
+      # not-yet-created remainder. Resolving only the paths that fully exist
+      # would compare a resolved source against a lexical destination (e.g.
+      # /private/var vs /var on macOS) and miss real overlaps.
+      private def existing_real_path(path : String) : String
+        suffix = [] of String
+        current = path
+        until File.exists?(current)
+          parent = File.dirname(current)
+          return path if parent == current
+          suffix << File.basename(current)
+          current = parent
+        end
+        real = File.realpath(current)
+        suffix.reverse_each { |part| real = File.join(real, part) }
+        real
+      rescue File::Error | IO::Error
+        path
+      end
+
+      # Enforce the delete safety cap. Any negative value disables the cap —
+      # previously only exactly -1 did, so `--max-deletes -3` refused every
+      # deploy with "Refusing to delete 0 files".
+      private def check_max_deletes!(count : Int32, effective : EffectiveOptions)
+        return if effective.max_deletes < 0
+        return if count <= effective.max_deletes
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: "Refusing to delete #{count} files (max_deletes: #{effective.max_deletes}).",
+          hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
+        )
+      end
+
+      # Compile `force = true` matcher patterns (regex, per the deploy docs).
+      # An invalid pattern warns and is skipped instead of crashing the deploy.
+      private def force_matcher_patterns(deployment : Models::DeploymentConfig) : Array(Regex)
+        deployment.matchers.select(&.force).compact_map do |matcher|
+          Regex.new(matcher.pattern)
+        rescue ex : ArgumentError
+          Logger.warn "Ignoring invalid deployment matcher pattern #{matcher.pattern.inspect}: #{ex.message}"
+          nil
+        end
+      end
+
+      private def force_match?(rel : String, patterns : Array(Regex)) : Bool
+        return false if patterns.empty?
+        normalized = rel.gsub('\\', '/')
+        patterns.any?(&.matches?(normalized))
+      end
+
+      # The built-in sync only honors matcher `force`; header/compression
+      # keys need an object-store/CDN API that hwaro's copy/exec deploys
+      # don't speak. Warn instead of silently ignoring configured intent.
+      private def warn_unapplied_matchers(deployment : Models::DeploymentConfig)
+        return if deployment.matchers.none? { |m| m.cache_control || m.content_type || m.gzip }
+        Logger.warn "deployment.matchers: cache_control/content_type/gzip are not applied by hwaro's built-in sync (only 'force' is). Configure headers/compression at your host or CDN."
       end
 
       # Raise HWARO_E_CONFIG when the deploy source directory doesn't exist.
@@ -828,8 +899,11 @@ module Hwaro
             buf_a = Bytes.new(8192)
             buf_b = Bytes.new(8192)
             loop do
-              read_a = fa.read(buf_a)
-              read_b = fb.read(buf_b)
+              # IO#read may return fewer bytes than requested without being at
+              # EOF; fill each buffer fully so a short read on one side isn't
+              # mistaken for a content difference.
+              read_a = read_fully(fa, buf_a)
+              read_b = read_fully(fb, buf_b)
               return false unless read_a == read_b
               return true if read_a == 0
               return false unless buf_a[0, read_a] == buf_b[0, read_b]
@@ -844,6 +918,18 @@ module Hwaro
         false
       end
 
+      # Read until `slice` is full or EOF; returns the byte count (< slice
+      # size only at EOF).
+      private def read_fully(io : IO, slice : Bytes) : Int32
+        total = 0
+        while total < slice.size
+          read = io.read(slice[total, slice.size - total])
+          break if read == 0
+          total += read
+        end
+        total
+      end
+
       private def remove_empty_directories(root : String)
         dirs = Dir.glob(File.join(root, "**", "*")).select { |p| Dir.exists?(p) }
         dirs.sort_by! { |p| -p.count('/') }
@@ -856,19 +942,38 @@ module Hwaro
       end
 
       private def each_project_file(root : String, &block : String ->)
-        walk_project_files(root, &block)
+        visited = Set(String).new
+        visited << existing_real_path(root)
+        walk_project_files(root, visited, &block)
       end
 
-      private def walk_project_files(dir : String, &block : String ->)
+      private def walk_project_files(dir : String, visited : Set(String), &block : String ->)
         Dir.each_child(dir) do |entry|
           next if entry == ".DS_Store"
           full = File.join(dir, entry)
-          if Dir.exists?(full)
+          # info? follows symlinks; broken links and ELOOP entries are
+          # skipped instead of crashing the deploy mid-walk.
+          info = begin
+            File.info?(full)
+          rescue File::Error | IO::Error
+            nil
+          end
+          next unless info
+          if info.directory?
             if entry.starts_with?(".") && entry != ".well-known"
               next
             end
-            walk_project_files(full, &block)
-          elsif File.file?(full)
+            # Track resolved paths so symlink cycles (public/a → public) and
+            # multiple links to the same directory are walked at most once.
+            real = begin
+              File.realpath(full)
+            rescue File::Error | IO::Error
+              next
+            end
+            next if visited.includes?(real)
+            visited << real
+            walk_project_files(full, visited, &block)
+          elsif info.file?
             block.call(full)
           end
         end
@@ -933,31 +1038,38 @@ module Hwaro
       # name, etc.) instead of sending the literal to the shell.
       COMMAND_PLACEHOLDERS = {"source", "url", "target"}
 
-      # Pattern used to detect *remaining* placeholders after expansion.
-      # Anything that still matches is unknown and rejected.
+      # Pattern for `{name}` placeholder tokens in command templates.
       private COMMAND_PLACEHOLDER_RE = /\{([a-zA-Z_][\w-]*)\}/
 
       private def expand_placeholders(command : String, source_dir : String, target : Models::DeploymentTarget) : String
-        expanded = command
-          .gsub("{source}", shell_escape(source_dir))
-          .gsub("{url}", shell_escape(target.url))
-          .gsub("{target}", shell_escape(target.name))
+        # Validate the ORIGINAL template, then substitute in a single pass:
+        # expanded values (paths, urls) may legitimately contain `{...}` text
+        # and must be neither re-validated nor re-expanded. The previous
+        # sequential gsub let a source path containing a literal `{url}` get
+        # substituted a second time, corrupting the command and splicing the
+        # shell quoting.
+        validate_no_unexpanded_placeholders!(command, target)
 
-        validate_no_unexpanded_placeholders!(command, expanded, target)
-        expanded
+        command.gsub(COMMAND_PLACEHOLDER_RE) do |token|
+          case $~[1]
+          when "source" then shell_escape(source_dir)
+          when "url"    then shell_escape(target.url)
+          when "target" then shell_escape(target.name)
+          else               token
+          end
+        end
       end
 
-      # Raise HWARO_E_CONFIG if the expanded command still contains any
+      # Raise HWARO_E_CONFIG if the command template contains any unknown
       # `{name}` tokens — catches typos like `{srouce}` and forward-
       # looking placeholders (`{bucket}`, `{region}`) before the literal
       # reaches the underlying deploy tool and produces a confusing
       # downstream error.
       private def validate_no_unexpanded_placeholders!(
-        original : String,
-        expanded : String,
+        command : String,
         target : Models::DeploymentTarget,
       ) : Nil
-        unresolved = expanded.scan(COMMAND_PLACEHOLDER_RE)
+        unresolved = command.scan(COMMAND_PLACEHOLDER_RE)
           .map { |m| m[1] }
           .uniq!
           .reject { |name| COMMAND_PLACEHOLDERS.includes?(name) }
@@ -999,7 +1111,12 @@ module Hwaro
           # `az://container` URL, which the az CLI rejects as a container name.
           container = uri.host
           return if container.nil? || container.empty?
-          "az storage blob sync --source {source} --container #{shell_escape(container)}"
+          command = "az storage blob sync --source {source} --container #{shell_escape(container)}"
+          # az://container/sub/dir → sync under the sub/dir prefix; dropping
+          # the path silently deployed to the container root.
+          prefix = uri.path.lchop('/')
+          command += " --destination #{shell_escape(URI.decode(prefix))}" unless prefix.empty?
+          command
         end
       end
 
@@ -1016,7 +1133,10 @@ module Hwaro
             path = host + path unless host.empty?
           end
           return if path.empty?
-          return path
+          # URI components stay percent-encoded (a space is `%20`); decode so
+          # `file:///var/www/my%20site` deploys to the real directory instead
+          # of creating a literal `my%20site` one.
+          return URI.decode(path)
         end
 
         # No scheme: treat as local path

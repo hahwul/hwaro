@@ -53,36 +53,45 @@ module Hwaro
             return
           end
 
-          # --dry-run + --json: return the planned ops as a JSON array and
-          # exit without actually deploying. Schema per issue #356:
-          #   [{target, action: "create"|"update"|"delete"|"command", path, source, destination}]
-          if json_output && options.dry_run == true
-            begin
-              ops = Services::Deployer.new.plan(options)
-              STDOUT.puts ops.to_json
+          if json_output
+            # Config-load errors surface as a top-level error payload for
+            # both JSON shapes (unchanged from #356).
+            config = begin
+              Models::Config.load(env: options.env)
             rescue ex : Hwaro::HwaroError
               STDOUT.puts ex.to_error_payload.to_json
               exit(ex.exit_code)
-            rescue ex
-              # Any plain exception that reaches us here is no longer a
-              # config-load error (Models::Config.load raises HwaroError
-              # directly) — keep the legacy minimal envelope and exit 1.
-              STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy plan failed"}}.to_json)
-              exit(1)
             end
-            return
-          end
 
-          if json_output
-            # Real deploy with --json (no --dry-run) returns a per-target
-            # summary. Schema per issue #374:
+            # Effective dry-run (the --dry-run flag OR deployment.dryRun in
+            # config) returns the planned ops as a JSON array and exits
+            # without deploying. Schema per issue #356:
+            #   [{target, action: "create"|"update"|"delete"|"command", path, source, destination}]
+            # Previously only the CLI flag was honored here, so a config-level
+            # dryRun fell through to the deploy path and reported
+            # {"status":"ok"} with zero counts as if a real deploy happened.
+            effective_dry_run = options.dry_run.nil? ? config.deployment.dry_run : options.dry_run
+            if effective_dry_run
+              begin
+                ops = Services::Deployer.new.plan(options, config)
+                STDOUT.puts ops.to_json
+              rescue ex : Hwaro::HwaroError
+                STDOUT.puts ex.to_error_payload.to_json
+                exit(ex.exit_code)
+              rescue ex
+                STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy plan failed"}}.to_json)
+                exit(1)
+              end
+              return
+            end
+
+            # Real deploy with --json returns a per-target summary. Schema
+            # per issue #374:
             #   {"status": "ok"|"error",
             #    "targets": [{"name","status","created","updated",
             #                 "deleted","duration_ms","error"?}]}
-            # Config-load errors bubble up here as HwaroError and become a
-            # top-level error payload (shape unchanged from #356).
             results = begin
-              Services::Deployer.new.deploy_structured(options)
+              Services::Deployer.new.deploy_structured(options, config)
             rescue ex : Hwaro::HwaroError
               STDOUT.puts ex.to_error_payload.to_json
               exit(ex.exit_code)

@@ -959,9 +959,8 @@ module Hwaro
             # command = "aws s3 sync {source}/ {url} --delete"
 
             # [[deployment.matchers]]
-            # pattern = "^.+\\.css$"
-            # cacheControl = "max-age=31536000"
-            # gzip = true
+            # pattern = "^.+\\.html$"
+            # force = true          # always re-copy matches, even when identical
 
             TOML
         end
