@@ -84,26 +84,42 @@ describe Hwaro::Services::Exporters::Base do
   end
 
   describe "#parse_content" do
-    it "parses TOML frontmatter into a string fields hash" do
+    it "parses TOML frontmatter into a YAML::Any fields hash preserving types" do
       raw = "+++\ntitle = \"Hello\"\ndraft = false\ntags = [\"a\", \"b\"]\nweight = 5\n+++\n\nbody text"
       fields, body = TestExporter.new.test_parse_content(raw)
 
       fields["title"].should eq("Hello")
       fields["draft"].should be_false
-      fields["tags"].as(Array(String)).sort.should eq(["a", "b"])
-      fields["weight"].should eq("5")
+      fields["tags"].as_a.map(&.as_s).sort!.should eq(["a", "b"])
+      fields["weight"].should eq(5)
       body.should eq("body text")
     end
 
-    it "parses YAML frontmatter into a string fields hash" do
+    it "parses YAML frontmatter into a YAML::Any fields hash preserving types" do
       raw = "---\ntitle: Hello\ndraft: true\ntags:\n  - a\n  - b\nweight: 7\n---\n\nbody text"
       fields, body = TestExporter.new.test_parse_content(raw)
 
       fields["title"].should eq("Hello")
       fields["draft"].should be_true
-      fields["tags"].as(Array(String)).sort.should eq(["a", "b"])
-      fields["weight"].should eq("7")
+      fields["tags"].as_a.map(&.as_s).sort!.should eq(["a", "b"])
+      fields["weight"].should eq(7)
       body.should eq("body text")
+    end
+
+    it "preserves nested tables and non-string arrays" do
+      raw = "+++\ntitle = \"X\"\nnumbers = [1, 2, 3]\n[extra]\nsubtitle = \"hi\"\n[taxonomies]\ncategories = [\"tech\"]\n+++\n\nbody"
+      fields, _ = TestExporter.new.test_parse_content(raw)
+
+      fields["numbers"].as_a.map(&.as_i64).should eq([1, 2, 3])
+      fields["extra"].as_h.size.should eq(1)
+      fields["extra"]["subtitle"].should eq("hi")
+      fields["taxonomies"]["categories"].as_a.first.should eq("tech")
+    end
+
+    it "does not overflow on integers beyond Int32 range" do
+      raw = "---\ntitle: X\nid: 99999999999\n---\n\nbody"
+      fields, _ = TestExporter.new.test_parse_content(raw)
+      fields["id"].should eq(99999999999_i64)
     end
 
     it "returns the raw content unchanged when there is no frontmatter" do
@@ -113,37 +129,41 @@ describe Hwaro::Services::Exporters::Base do
       body.should eq(raw)
     end
 
-    it "returns empty fields when TOML frontmatter is malformed" do
+    it "raises on malformed TOML frontmatter instead of exporting stripped metadata" do
       raw = "+++\nnot valid toml = =\n+++\n\nbody"
-      fields, body = TestExporter.new.test_parse_content(raw)
-      fields.should be_empty
-      body.should eq("body")
+      expect_raises(TOML::ParseException) do
+        TestExporter.new.test_parse_content(raw)
+      end
     end
 
-    it "skips empty arrays in frontmatter" do
+    it "treats a leading --- pair around non-mapping text as body, not frontmatter" do
+      raw = "---\nIntro paragraph between two rules.\n---\n\nRest of document."
+      fields, body = TestExporter.new.test_parse_content(raw)
+      fields.should be_empty
+      body.should eq(raw)
+    end
+
+    it "preserves empty arrays in frontmatter" do
       raw = "+++\ntitle = \"X\"\ntags = []\n+++\n\nbody"
       fields, _ = TestExporter.new.test_parse_content(raw)
       fields["title"].should eq("X")
-      fields.has_key?("tags").should be_false
+      fields["tags"].as_a.should be_empty
     end
 
-    it "formats TOML Time values as ISO8601 with offset" do
-      # TOML's native datetime values land in the special Time branch in
-      # exporters/base.cr — the value should be re-emitted as
-      # "%Y-%m-%dT%H:%M:%S%:z".
+    it "formats TOML Time values as frontmatter date strings" do
+      # toml.cr normalizes offset datetimes to UTC at parse time; the value
+      # should be re-emitted as an RFC 3339 string.
       raw = "+++\ntitle = \"X\"\ndate = 2026-04-17T09:30:45+09:00\n+++\n\nbody"
       fields, _ = TestExporter.new.test_parse_content(raw)
       fields["title"].should eq("X")
-      fields["date"].as(String).should match(/^2026-04-17T\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/)
+      fields["date"].as_s.should match(/^2026-04-1[67]T\d{2}:\d{2}:\d{2}(?:Z|[+\-]\d{2}:\d{2})$/)
     end
 
-    it "formats YAML Time values as ISO8601 with offset" do
-      # YAML's native ISO 8601 datetime triggers value.as_time? in the
-      # YAML branch; should also be re-emitted via the same format.
-      raw = "---\ntitle: X\ndate: 2026-04-17T09:30:45Z\n---\n\nbody"
+    it "formats YAML Time values preserving the authored offset" do
+      raw = "---\ntitle: X\ndate: 2026-04-17T09:30:45+09:00\n---\n\nbody"
       fields, _ = TestExporter.new.test_parse_content(raw)
       fields["title"].should eq("X")
-      fields["date"].as(String).should match(/^2026-04-17T\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/)
+      fields["date"].as_s.should eq("2026-04-17T09:30:45+09:00")
     end
   end
 

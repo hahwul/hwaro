@@ -313,5 +313,77 @@ describe Hwaro::Services::Exporters::HugoExporter do
         fm.should contain(%("my key" = "value"))
       end
     end
+
+    it "preserves nested tables, typed scalars, and non-string arrays" do
+      # `[extra]`/`[taxonomies]` and typed values used to be flattened
+      # through a String|Bool|Array(String) union and silently dropped.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), <<-MD)
+          +++
+          title = "Post"
+          weight = 10
+          rating = 4.5
+          numbers = [1, 2, 3]
+          [taxonomies]
+          categories = ["tech"]
+          [extra]
+          subtitle = "hello"
+          [extra.nested]
+          key = "value"
+          +++
+
+          Body
+          MD
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(
+          target_type: "hugo",
+          content_dir: content_dir,
+          output_dir: output_dir,
+        )
+        result = exporter.run(options)
+        result.success.should be_true
+        result.error_count.should eq(0)
+
+        content = File.read(File.join(output_dir, "content", "post.md"))
+        fm = content.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        parsed = TOML.parse(fm)
+        parsed["weight"].raw.should eq(10)
+        parsed["rating"].raw.should eq(4.5)
+        parsed["numbers"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([1, 2, 3])
+        parsed["taxonomies"]["categories"].raw.as(Array).first.as(TOML::Any).raw.should eq("tech")
+        parsed["extra"]["subtitle"].raw.should eq("hello")
+        parsed["extra"]["nested"]["key"].raw.should eq("value")
+      end
+    end
+
+    it "counts files with malformed frontmatter as errors instead of stripping metadata" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        # The +++ inside the multiline string truncates the frontmatter
+        # regex match; the leftover used to be exported as a corrupted body
+        # with ALL metadata silently dropped.
+        File.write(File.join(content_dir, "tricky.md"), "+++\ntitle = \"M\"\ndescription = \"\"\"\nfoo\n+++\nbar\n\"\"\"\n+++\n\nActual body\n")
+
+        exporter = Hwaro::Services::Exporters::HugoExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(
+          target_type: "hugo",
+          content_dir: content_dir,
+          output_dir: output_dir,
+        )
+        result = exporter.run(options)
+
+        result.error_count.should eq(1)
+        result.exported_count.should eq(0)
+        File.exists?(File.join(output_dir, "content", "tricky.md")).should be_false
+      end
+    end
   end
 end
