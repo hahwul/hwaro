@@ -146,14 +146,18 @@ module Hwaro
 
             # Check external links
             external_results = check_links_concurrently(external_links, timeout, concurrency)
-            dead_external = external_results.select { |r| !(200..299).includes?(r.status) }
+            skipped_external = external_results.select { |r| r.error == "Skipped: private/internal address" }
+            dead_external = external_results.select { |r| !(200..299).includes?(r.status) && r.error != "Skipped: private/internal address" }
 
             # Check internal links. Load taxonomy names from config.toml so
             # URLs like `/tags/` or `/categories/foo/` that Hwaro generates
             # at build time aren't reported as dead (the source-only check
             # has no way to discover these otherwise).
             project_root = find_project_root(target_dir)
-            dead_internal = check_internal_links(internal_links, target_dir, load_taxonomy_names(project_root))
+            config = load_config(project_root)
+            taxonomy_names = config ? config.taxonomies.map(&.name) : [] of String
+            base_path = config ? config.base_path : ""
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path)
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -172,13 +176,15 @@ module Hwaro
             Logger.section("scan", "#{external_links.size} external · #{internal_links.size} internal")
             links_noun = total == 1 ? "link" : "links"
 
-            if dead_total == 0
+            if dead_total == 0 && skipped_external.empty?
               Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
             else
-              Logger.info ""
-              # One ✗ item per dead link, with the URL and reason as an →
-              # detail line. Every content-derived string passes through
-              # `sanitize_for_terminal` so a crafted URL can't inject ANSI.
+              Logger.info "" if dead_total > 0 || !skipped_external.empty?
+              skipped_external.each do |result|
+                Logger.item(sanitize_for_terminal(result.link.file), glyph: :info)
+                detail = "#{sanitize_for_terminal(result.link.url)} — #{sanitize_for_terminal(result.error.to_s)}"
+                Logger.item(detail, glyph: :arrow, indent: 6)
+              end
               dead_external.each do |result|
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
                 detail = "#{sanitize_for_terminal(result.link.url)}  #{result.status}"
@@ -189,7 +195,11 @@ module Hwaro
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
                 Logger.item("#{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}", glyph: :arrow, indent: 6)
               end
-              Logger.outcome("checked", "#{total} #{links_noun} · #{dead_total} dead", :err)
+              if dead_total == 0
+                Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
+              else
+                Logger.outcome("checked", "#{total} #{links_noun} · #{dead_total} dead", :err)
+              end
             end
 
             # A dead-links result must fail the process so `check-links` is
@@ -253,7 +263,7 @@ module Hwaro
 
           private def find_external_links(dir : String) : Array(Link)
             links = [] of Link
-            link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/[^\s\)]+)\)/
+            link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/(?:\([^\s()]*\)|[^\s()])+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
               content = strip_code(File.read(file))
@@ -286,36 +296,46 @@ module Hwaro
               # Regular links (exclude images by using negative lookbehind)
               content.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://") || url.starts_with?("mailto:") || url.starts_with?("#")
+                next if url.empty? || url.starts_with?("#") || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
                 links << Link.new(file: file, url: url, kind: :internal)
               end
 
               # Image links
               content.scan(/!\[([^\]]*)\]\(([^\)]+)\)/) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("http://") || url.starts_with?("https://")
+                next if url.empty? || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
                 links << Link.new(file: file, url: url, kind: :image)
               end
             end
             links
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String) : Array(Result)
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "") : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
             links.each do |link|
+              decoded_url = URI.decode(link.url)
+              resolved_url = decoded_url
+              if resolved_url.starts_with?("/") && !base_path.empty?
+                if resolved_url == base_path
+                  resolved_url = "/"
+                elsif resolved_url.starts_with?(base_path + "/")
+                  resolved_url = resolved_url[base_path.size..]
+                end
+              end
+
               base_dir = File.dirname(link.file)
-              target = if link.url.starts_with?("@/")
+              target = if resolved_url.starts_with?("@/")
                          # Zola-style content-root link (`@/posts/hello.md`).
                          # The build resolves these against the content dir,
                          # so the checker must too — otherwise valid links
                          # like `@/index.md` were reported dead (dogfooding find).
-                         File.join(content_dir, link.url[2..])
-                       elsif link.url.starts_with?("/")
-                         File.join(content_dir, link.url.lstrip("/"))
+                         File.join(content_dir, resolved_url[2..])
+                       elsif resolved_url.starts_with?("/")
+                         File.join(content_dir, resolved_url.lstrip("/"))
                        else
-                         File.join(base_dir, link.url)
+                         File.join(base_dir, resolved_url)
                        end
 
               # Most internal URLs are written with a trailing slash
@@ -331,7 +351,7 @@ module Hwaro
                        File.exists?(target_no_slash + ".markdown") ||
                        File.exists?(File.join(target_no_slash, "_index.md")) ||
                        File.exists?(File.join(target_no_slash, "index.md")) ||
-                       (link.kind != :image && taxonomy_url?(link.url, taxonomy_names))
+                       (link.kind != :image && taxonomy_url?(resolved_url, taxonomy_names))
 
               # Also accept assets that live in static/ (source) or public/ (after build).
               # This prevents false positives for:
@@ -339,7 +359,7 @@ module Hwaro
               # - Resized/LQIP versions generated by the image pipeline (in public/)
               # - Any other files published via [content.files] or the asset pipeline.
               unless exists
-                asset_path = link.url.lstrip("/")
+                asset_path = resolved_url.lstrip("/")
                 static_candidate = File.join(project_root, "static", asset_path)
                 public_candidate = File.join(project_root, "public", asset_path)
                 exists = File.exists?(static_candidate) || File.exists?(public_candidate)
@@ -383,21 +403,15 @@ module Hwaro
             names.includes?(segments.first)
           end
 
-          # Load taxonomy names from config.toml when present. A missing or
-          # malformed config is not fatal here — the check falls back to
-          # behaving as if no taxonomies were declared, which preserves the
-          # old strict behavior for projects that haven't configured any.
-          private def load_taxonomy_names(project_root : String = ".") : Array(String)
+          private def load_config(project_root : String = ".") : Models::Config?
             config_path = File.join(project_root, "config.toml")
-            return [] of String unless File.exists?(config_path)
+            return unless File.exists?(config_path)
 
-            # Temporarily chdir so Models::Config.load finds the right file
             Dir.cd(project_root) do
-              config = Models::Config.load
-              return config.taxonomies.map(&.name)
+              Models::Config.load
             end
           rescue Exception
-            [] of String
+            nil
           end
 
           private def check_links_concurrently(links : Array(Link), timeout_seconds : Int32, max_concurrency : Int32) : Array(Result)
@@ -410,18 +424,63 @@ module Hwaro
                 while link = work_channel.receive?
                   error_message : String? = nil
                   status = begin
-                    uri = URI.parse(link.url)
-                    host = uri.host
-                    if host && private_host?(host)
-                      error_message = "Skipped: private/internal address"
-                      results_channel.send(Result.new(link: link, status: -1, error: error_message))
-                      next
+                    current_uri = URI.parse(link.url)
+                    method = "HEAD"
+                    redirects_left = 5
+                    response_status = -1
+
+                    loop do
+                      host = current_uri.host
+                      if host && private_host?(host)
+                        error_message = "Skipped: private/internal address"
+                        response_status = -1
+                        break
+                      end
+
+                      client = HTTP::Client.new(current_uri)
+                      client.connect_timeout = timeout_seconds.seconds
+                      client.read_timeout = timeout_seconds.seconds
+
+                      begin
+                        headers = HTTP::Headers{"User-Agent" => "hwaro-link-checker/1.0"}
+                        response = if method == "HEAD"
+                                     client.head(current_uri.request_target, headers: headers)
+                                   else
+                                     client.get(current_uri.request_target, headers: headers)
+                                   end
+
+                        status_code = response.status_code
+
+                        if {301, 302, 307, 308}.includes?(status_code)
+                          if redirects_left > 0
+                            location = response.headers["Location"]?
+                            if location
+                              current_uri = current_uri.resolve(location)
+                              redirects_left -= 1
+                              next
+                            else
+                              error_message = "Redirect without Location header"
+                              response_status = status_code
+                              break
+                            end
+                          else
+                            error_message = "Too many redirects"
+                            response_status = status_code
+                            break
+                          end
+                        elsif method == "HEAD" && {405, 403, 501}.includes?(status_code)
+                          method = "GET"
+                          next
+                        else
+                          response_status = status_code
+                          break
+                        end
+                      ensure
+                        client.close
+                      end
                     end
-                    client = HTTP::Client.new(uri)
-                    client.connect_timeout = timeout_seconds.seconds
-                    client.read_timeout = timeout_seconds.seconds
-                    response = client.head(uri.request_target)
-                    response.status_code
+
+                    response_status
                   rescue ex : Socket::ConnectError
                     error_message = "Connection failed: #{ex.message}"
                     -1

@@ -3,6 +3,7 @@ require "yaml"
 require "toml"
 require "../../config/options/export_options"
 require "../../utils/file_safe"
+require "../../utils/frontmatter_writer"
 require "../../utils/logger"
 
 module Hwaro
@@ -40,61 +41,63 @@ module Hwaro
           files.sort
         end
 
-        # Parse frontmatter from content, returns {fields_hash, body}
-        protected def parse_content(content : String) : {Hash(String, (String | Bool | Array(String))?), String}
-          fields = {} of String => (String | Bool | Array(String))?
+        # Parse frontmatter from content, returns {fields_hash, body}.
+        #
+        # The full parsed tree is preserved as `YAML::Any` values — nested
+        # tables (`[extra]`, `[taxonomies]`), typed scalars, and non-string
+        # arrays used to be flattened through a `String | Bool | Array(String)`
+        # union and silently dropped from every export. Time values are
+        # normalized to frontmatter date strings so downstream date logic can
+        # treat `date` uniformly.
+        #
+        # Malformed frontmatter RAISES (surfacing as a per-file export error)
+        # instead of exporting the file with all metadata stripped.
+        protected def parse_content(content : String) : {Hash(String, YAML::Any), String}
+          fields = {} of String => YAML::Any
 
           if match = content.match(TOML_FRONTMATTER_RE)
             body = content.sub(TOML_FRONTMATTER_RE, "").lstrip('\n')
-            begin
-              toml_data = TOML.parse(match[1])
-              toml_data.each do |key, value|
-                raw = value.raw
-                case raw
-                when String  then fields[key] = raw
-                when Bool    then fields[key] = raw
-                when Int64   then fields[key] = raw.to_s
-                when Float64 then fields[key] = raw.to_s
-                when Time    then fields[key] = raw.to_s("%Y-%m-%dT%H:%M:%S%:z")
-                when Array
-                  arr = raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
-                  fields[key] = arr unless arr.empty?
-                end
-              end
-            rescue TOML::ParseException
-              # Malformed TOML front matter: surface no fields, keep body.
+            TOML.parse(match[1]).each do |key, value|
+              fields[key] = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value)
             end
             return {fields, body}
           elsif match = content.match(YAML_FRONTMATTER_RE)
-            body = content.sub(YAML_FRONTMATTER_RE, "").lstrip('\n')
-            begin
-              yaml_data = YAML.parse(match[1])
-              if h = yaml_data.as_h?
-                h.each do |key, value|
-                  k = key.as_s? || next
-                  if s = value.as_s?
-                    fields[k] = s
-                  elsif b = value.as_bool?
-                    fields[k] = b
-                  elsif i = value.as_i?
-                    fields[k] = i.to_s
-                  elsif f = value.as_f?
-                    fields[k] = f.to_s
-                  elsif t = value.as_time?
-                    fields[k] = t.to_s("%Y-%m-%dT%H:%M:%S%:z")
-                  elsif arr = value.as_a?
-                    strs = arr.compact_map(&.as_s?)
-                    fields[k] = strs unless strs.empty?
-                  end
-                end
+            yaml_data = YAML.parse(match[1])
+            if h = yaml_data.as_h?
+              body = content.sub(YAML_FRONTMATTER_RE, "").lstrip('\n')
+              h.each do |key, value|
+                k = key.as_s? || key.to_s
+                fields[k] = normalize_scalar_times(value)
               end
-            rescue YAML::ParseException
-              # Malformed YAML front matter: surface no fields, keep body.
+              return {fields, body}
+            elsif yaml_data.raw.nil?
+              # Genuinely empty frontmatter block.
+              return {fields, content.sub(YAML_FRONTMATTER_RE, "").lstrip('\n')}
+            else
+              # A leading `---` pair around non-mapping text is a horizontal
+              # rule, not frontmatter — keep the whole document as body.
+              return {fields, content}
             end
-            return {fields, body}
           end
 
           {fields, content}
+        end
+
+        # Recursively replace Time leaves with frontmatter date strings.
+        private def normalize_scalar_times(value : YAML::Any) : YAML::Any
+          raw = value.raw
+          case raw
+          when Time
+            YAML::Any.new(Hwaro::Utils::FrontmatterWriter.serialize_time(raw))
+          when Array
+            YAML::Any.new(value.as_a.map { |v| normalize_scalar_times(v) })
+          when Hash
+            hash = {} of YAML::Any => YAML::Any
+            value.as_h.each { |k, v| hash[k] = normalize_scalar_times(v) }
+            YAML::Any.new(hash)
+          else
+            value
+          end
         end
 
         # Write a file, creating parent directories as needed
@@ -105,13 +108,27 @@ module Hwaro
         end
 
         # Normalize a front-matter field that may be authored as either a list
-        # (`tags: [a, b]`) or a single scalar (`tags: crystal`) into an array,
-        # so the scalar shorthand isn't silently dropped on export. Returns nil
-        # when the value is absent or empty.
-        protected def string_list_field(value : (String | Bool | Array(String))?) : Array(String)?
-          case value
-          when Array(String) then value.empty? ? nil : value
-          when String        then value.empty? ? nil : [value]
+        # (`tags: [a, b]`) or a single scalar (`tags: crystal`, `tags: 2024`)
+        # into an array of strings, so shorthand isn't silently dropped on
+        # export. Returns nil when the value is absent or empty.
+        protected def string_list_field(value : YAML::Any?) : Array(String)?
+          return unless value
+
+          case raw = value.raw
+          when Array
+            strs = value.as_a.compact_map do |item|
+              item.as_s? || begin
+                item_raw = item.raw
+                item_raw.is_a?(Hash) || item_raw.is_a?(Array) || item_raw.nil? ? nil : item_raw.to_s
+              end
+            end
+            strs.empty? ? nil : strs
+          when String
+            raw.empty? ? nil : [raw]
+          when Nil, Hash
+            nil
+          else
+            [raw.to_s]
           end
         end
 

@@ -337,5 +337,83 @@ describe Hwaro::Services::Importers::EleventyImporter do
       result.success.should be_false
       result.message.should contain("not found")
     end
+
+    it "handles bundle-index files (index.md layout) correctly" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        bundle_a = File.join(posts_dir, "post-a")
+        bundle_b = File.join(posts_dir, "post-b")
+        FileUtils.mkdir_p(bundle_a)
+        FileUtils.mkdir_p(bundle_b)
+
+        # File at root of collection posts/index.md (without title) should still be skipped
+        File.write(File.join(posts_dir, "index.md"), "Content at root index.")
+
+        # Files at nested folders posts/post-a/index.md should use parent dir name as slug and fallback title
+        File.write(File.join(bundle_a, "index.md"), "Content A.")
+        # and if title is specified, it should still use the parent dir name as slug
+        File.write(File.join(bundle_b, "index.md"), "---\ntitle: \"Custom Title\"\n---\nContent B.")
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::EleventyImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(2) # post-a/index.md and post-b/index.md
+        result.skipped_count.should eq(1)  # root index.md skipped
+
+        File.exists?(File.join(output_dir, "posts", "post-a.md")).should be_true
+        content_a = File.read(File.join(output_dir, "posts", "post-a.md"))
+        content_a.should contain("title = \"Post A\"")
+        content_a.should contain("Content A.")
+
+        File.exists?(File.join(output_dir, "posts", "post-b.md")).should be_true
+        content_b = File.read(File.join(output_dir, "posts", "post-b.md"))
+        content_b.should contain("title = \"Custom Title\"")
+        content_b.should contain("Content B.")
+      end
+    end
+
+    it "handles nested directory/slug collisions by appending a suffix and warning" do
+      Dir.mktmpdir do |dir|
+        blog_dir = File.join(dir, "blog")
+        dir_2023 = File.join(blog_dir, "2023")
+        dir_2024 = File.join(blog_dir, "2024")
+        FileUtils.mkdir_p(dir_2023)
+        FileUtils.mkdir_p(dir_2024)
+
+        File.write(File.join(dir_2023, "foo.md"), "---\ntitle: \"Foo 2023\"\n---\nContent 2023.")
+        File.write(File.join(dir_2024, "foo.md"), "---\ntitle: \"Foo 2024\"\n---\nContent 2024.")
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::EleventyImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(2)
+        File.exists?(File.join(output_dir, "blog", "foo.md")).should be_true
+        File.exists?(File.join(output_dir, "blog", "foo-1.md")).should be_true
+
+        content_foo = File.read(File.join(output_dir, "blog", "foo.md"))
+        content_foo1 = File.read(File.join(output_dir, "blog", "foo-1.md"))
+
+        if content_foo.includes?("Content 2023.")
+          content_foo1.should contain("Content 2024.")
+        else
+          content_foo.should contain("Content 2024.")
+          content_foo1.should contain("Content 2023.")
+        end
+      end
+    end
   end
 end

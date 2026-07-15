@@ -73,7 +73,7 @@ describe Hwaro::Services::Importers::HexoImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "posts", "date-prefix.md"))
-        content.should contain("date = \"2024-03-15 00:00:00\"")
+        content.should contain("date = \"2024-03-15\"")
       end
     end
 
@@ -218,7 +218,7 @@ describe Hwaro::Services::Importers::HexoImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "posts", "updated-post.md"))
-        content.should contain("updated = \"2024-06-15 00:00:00\"")
+        content.should contain("updated = \"2024-06-15\"")
       end
     end
 

@@ -351,6 +351,135 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    it "handles non-image embeds and target note with alt/width option" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "embed-test.md"), <<-OBSIDIAN)
+          ---
+          title: "Embed Test"
+          ---
+          Image embed with width: ![[photo.png|400]]
+          Note embed: ![[other-page]]
+          Note embed with section: ![[other-page#Section]]
+          Note embed with alias: ![[other-page|Some Display]]
+          OBSIDIAN
+        File.write(File.join(dir, "other-page.md"), <<-OBSIDIAN)
+          ---
+          title: "Other Page"
+          ---
+          Body.
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        ))
+
+        content = File.read(File.join(output_dir, "posts", "embed-test.md"))
+        content.should contain("Image embed with width: ![400](photo.png)")
+        content.should contain("Note embed: [other-page](/posts/other-page/)")
+        content.should contain("Note embed with section: [other-page#Section](/posts/other-page/#section)")
+        content.should contain("Note embed with alias: [Some Display](/posts/other-page/)")
+      end
+    end
+
+    it "slugifies section path segments for folders with spaces" do
+      Dir.mktmpdir do |dir|
+        subdir = File.join(dir, "Daily Notes")
+        FileUtils.mkdir_p(subdir)
+        File.write(File.join(subdir, "my-note.md"), <<-OBSIDIAN)
+          ---
+          title: "My Note"
+          ---
+          See [[Daily Notes/my-note]].
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        ))
+
+        # Check file was written under slugified section
+        output_file = File.join(output_dir, "daily-notes", "my-note.md")
+        File.exists?(output_file).should be_true
+
+        # Check URL was resolved correctly via slugified section
+        content = File.read(output_file)
+        content.should contain("[Daily Notes/my-note](/daily-notes/my-note/)")
+      end
+    end
+
+    it "ignores embeds, wiki-links, and tags inside fenced code blocks and inline code" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "code-blocks.md"), <<-OBSIDIAN)
+          ---
+          title: "Code Blocks"
+          ---
+          ```
+          Keep ![[photo.png]] as is.
+          Keep [[other-page]] as is.
+          Keep #tag as is.
+          ```
+          Inline `[[other-page]]` and `![[photo.png]]` and `#tag`.
+          4-space indented code:
+              #tag
+              [[other-page]]
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        ))
+
+        content = File.read(File.join(output_dir, "posts", "code-blocks.md"))
+        content.should contain("Keep ![[photo.png]] as is.")
+        content.should contain("Keep [[other-page]] as is.")
+        content.should contain("Keep #tag as is.")
+        content.should contain("Inline `[[other-page]]` and `![[photo.png]]` and `#tag`.")
+        content.should contain("    #tag")
+        content.should contain("    [[other-page]]")
+      end
+    end
+
+    it "excludes drafts from the link map when drafts: false" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "linker.md"), <<-OBSIDIAN)
+          ---
+          title: "Linker"
+          ---
+          See [[draft-note]].
+          OBSIDIAN
+        File.write(File.join(dir, "draft-note.md"), <<-OBSIDIAN)
+          ---
+          title: "Draft Note"
+          draft: true
+          ---
+          Draft.
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        importer = Hwaro::Services::Importers::ObsidianImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+          drafts: false,
+        ))
+
+        content = File.read(File.join(output_dir, "posts", "linker.md"))
+        # Since draft-note was skipped, resolving [[draft-note]] should fall back to relative slug, not '/posts/draft-note/'
+        content.should contain("[draft-note](draft-note)")
+      end
+    end
+
     it "returns error result for non-existent directory" do
       options = Hwaro::Config::Options::ImportOptions.new(
         source_type: "obsidian",

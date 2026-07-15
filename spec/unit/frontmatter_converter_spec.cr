@@ -792,5 +792,162 @@ describe Hwaro::Services::ConversionResult do
         converted.should_not contain("2026-05-19")
       end
     end
+
+    it "preserves the authored offset of a YAML timestamp when converting to TOML" do
+      # Regression: `to_rfc3339` converted `08:00+09:00` to the *previous
+      # day's* `23:00Z`, silently changing the post's calendar date.
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "post.md")
+        File.write(file_path, "---\ntitle: Post\ndate: 2026-07-01T08:00:00+09:00\n---\n\nContent")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        converted.should contain("2026-07-01T08:00:00+09:00")
+        converted.should_not contain("2026-06-30")
+      end
+    end
+  end
+
+  describe "non-frontmatter leading blocks" do
+    # Regression: a document whose first lines form a `---` … `---` pair that
+    # is NOT a mapping (horizontal rule + prose, a list, an unclosed rule) was
+    # "converted" by replacing the block with empty frontmatter — silently
+    # deleting the author's content.
+    it "skips a horizontal-rule pair without touching the file" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "hr.md")
+        original = "---\nIntro paragraph between two rules.\n---\n\nRest of document.\n"
+        File.write(file_path, original)
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_false
+        File.read(file_path).should eq(original)
+
+        result = converter.convert_to_toml
+        result.success.should be_true
+        result.skipped_count.should eq(1)
+        result.error_count.should eq(0)
+        File.read(file_path).should eq(original)
+      end
+    end
+
+    it "skips a list-shaped leading block without destroying it" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "list.md")
+        original = "---\n- a\n- b\n---\n\nBody.\n"
+        File.write(file_path, original)
+
+        result = converter.convert_to_json
+        result.success.should be_true
+        result.error_count.should eq(0)
+        File.read(file_path).should eq(original)
+      end
+    end
+
+    it "skips a lone leading rule with no closing delimiter (no error exit)" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "lone.md")
+        original = "---\n\nJust a thematic break at the top.\n"
+        File.write(file_path, original)
+
+        result = converter.convert_to_toml
+        result.success.should be_true
+        result.error_count.should eq(0)
+        File.read(file_path).should eq(original)
+      end
+    end
+
+    it "does not mistake a leading shortcode brace block for JSON frontmatter" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "shortcode.md")
+        original = "{{< figure src=\"x.png\" >}}\n\nBody text.\n"
+        File.write(file_path, original)
+
+        converter.detect_format(original).should eq(Hwaro::Services::FrontmatterFormat::Unknown)
+
+        result = converter.convert_to_yaml
+        result.success.should be_true
+        result.error_count.should eq(0)
+        File.read(file_path).should eq(original)
+      end
+    end
+  end
+
+  describe "TOML value emission" do
+    it "emits non-finite floats as TOML inf/nan and reparses cleanly" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "floats.md")
+        File.write(file_path, "---\ntitle: F\nscore: .inf\npenalty: -.inf\nmiss: .nan\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        converted.should contain("score = inf")
+        converted.should contain("penalty = -inf")
+        converted.should contain("miss = nan")
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        TOML.parse(fm)["score"].raw.as(Float64).infinite?.should eq(1)
+      end
+    end
+
+    it "coerces mixed-type arrays so toml.cr can reparse the file" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "mixed.md")
+        File.write(file_path, "---\ntitle: M\nstuff:\n  - 1\n  - two\nratio:\n  - 1\n  - 2.5\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        parsed = TOML.parse(fm)
+        parsed["stuff"].raw.as(Array).map(&.as(TOML::Any).raw).should eq(["1", "two"])
+        parsed["ratio"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([1.0, 2.5])
+      end
+    end
+
+    it "emits maps inside arrays as inline tables" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "inline.md")
+        File.write(file_path, "---\ntitle: I\nlinks:\n  - name: home\n    url: /\n  - plain\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        converted.should contain("{name = \"home\", url = \"/\"}")
+      end
+    end
+
+    it "keeps an empty table's key instead of dropping it" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "empty.md")
+        File.write(file_path, "---\ntitle: E\nextra: {}\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        File.read(file_path).should contain("[extra]")
+      end
+    end
+
+    it "escapes control characters with TOML-legal sequences" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "ctrl.md")
+        File.write(file_path, "---\ntitle: \"ding\\a dong\"\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        TOML.parse(fm)["title"].raw.as(String).should contain("ding")
+      end
+    end
   end
 end

@@ -110,6 +110,7 @@ describe Hwaro::CLI::Commands::Tool::ImportCommand do
 
         output.should contain("skipped")
         output.should contain("--force")
+        output.should contain("--drafts")
       end
     end
   end

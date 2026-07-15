@@ -54,7 +54,7 @@ module Hwaro
           fields, body = parse_content(raw)
 
           # Skip drafts unless requested
-          is_draft = fields["draft"]?.try { |v| v == true }
+          is_draft = fields["draft"]?.try(&.raw) == true
           if is_draft && !include_drafts
             return :skipped
           end
@@ -63,22 +63,26 @@ module Hwaro
           #
           # Strategy: walk every parsed frontmatter key and either rename
           # it to its Hugo equivalent (`updated`→`lastmod`, `image`→`images`,
-          # `expires`→`expiryDate`) or pass it through unchanged. Hugo
+          # `expires`→`expiryDate`) or pass it through unchanged — including
+          # nested tables (`[extra]`, `[taxonomies]`) and typed scalars. Hugo
           # accepts arbitrary keys as page params, so dropping them was a
           # silent data-loss bug for `categories`, `authors`, and any
           # custom field the user added (gh#527). Source-iteration order
           # is preserved so Hugo frontmatter reads similarly to the
           # original.
-          hugo_fields = {} of String => (String | Bool | Array(String))?
+          hugo_fields = {} of String => YAML::Any
           fields.each do |key, value|
+            next if value.raw.nil?
             case key
             when "updated"
               hugo_fields["lastmod"] = value
             when "expires"
               hugo_fields["expiryDate"] = value
             when "image"
-              if image = value.as?(String)
-                hugo_fields["images"] = [image] of String
+              if image = value.as_s?
+                hugo_fields["images"] = YAML::Any.new([YAML::Any.new(image)])
+              else
+                hugo_fields["images"] = value
               end
             else
               hugo_fields[key] = value
@@ -96,33 +100,9 @@ module Hwaro
           :exported
         end
 
-        private def generate_toml_frontmatter(fields : Hash(String, (String | Bool | Array(String))?)) : String
-          lines = ["+++"]
-
-          fields.each do |key, value|
-            k = toml_key(key)
-            case value
-            when Nil  then next
-            when Bool then lines << "#{k} = #{value}"
-            when String
-              next if value.empty?
-              lines << "#{k} = #{value.inspect}"
-            when Array(String)
-              next if value.empty?
-              formatted = value.map(&.inspect).join(", ")
-              lines << "#{k} = [#{formatted}]"
-            end
-          end
-
-          lines << "+++"
-          lines.join("\n")
-        end
-
-        # Quote a front-matter key that isn't a bare TOML key. A key with a
-        # space, dot, or non-ASCII char (valid in YAML/JSON source) would emit
-        # unparseable TOML like `my key = "x"`; render it as `"my key" = "x"`.
-        private def toml_key(key : String) : String
-          key.matches?(/\A[A-Za-z0-9_-]+\z/) ? key : key.inspect
+        private def generate_toml_frontmatter(fields : Hash(String, YAML::Any)) : String
+          body = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new.build(fields)
+          "+++\n#{body}+++"
         end
       end
     end

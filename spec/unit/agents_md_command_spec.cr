@@ -67,5 +67,21 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
         end
       end
     end
+
+    it "logs 'updated' when overwriting an existing AGENTS.md with --force" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("AGENTS.md", "stale content")
+
+          output = with_captured_log do
+            cmd = Hwaro::CLI::Commands::Tool::AgentsMdCommand.new
+            cmd.run(["--write", "--force"])
+          end
+
+          output.should contain("updated")
+          output.should_not contain("created")
+        end
+      end
+    end
   end
 end

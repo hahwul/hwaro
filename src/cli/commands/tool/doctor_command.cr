@@ -21,6 +21,8 @@ module Hwaro
           # that machine consumers may rely on.
           JSON_SCHEMA_VERSION = 1
 
+          MAX_WARNINGS_FLAG = FlagInfo.new(short: nil, long: "--max-warnings", description: "Exit non-zero when warning count exceeds N (default: unlimited)", takes_value: true, value_hint: "N")
+
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
@@ -29,7 +31,7 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--full", description: "Equivalent to --fix --approve (real fixes + all recommended sections)"),
             FlagInfo.new(short: nil, long: "--dry-run", description: "Preview changes without writing config.toml"),
             FlagInfo.new(short: nil, long: "--strict", description: "Treat warnings as errors when computing the exit code"),
-            FlagInfo.new(short: nil, long: "--max-warnings=N", description: "Exit non-zero when warning count exceeds N (default: unlimited)"),
+            MAX_WARNINGS_FLAG,
             JSON_FLAG,
             QUIET_FLAG,
             HELP_FLAG,
@@ -72,7 +74,7 @@ module Hwaro
               parser.on("--full", "Perform real fixes and approve all recommended sections (equivalent to --fix --approve)") { full_mode = true }
               parser.on("--dry-run", "Preview changes without writing config.toml") { dry_run_mode = true }
               parser.on("--strict", "Treat warnings as errors when computing the exit code") { strict_mode = true }
-              parser.on("--max-warnings=N", "Exit non-zero when warning count exceeds N") do |v|
+              CLI.register_flag(parser, MAX_WARNINGS_FLAG) do |v|
                 parsed = v.to_i?
                 unless parsed && parsed >= 0
                   Logger.error "--max-warnings expects a non-negative integer (got: #{v.inspect})"

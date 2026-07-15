@@ -127,7 +127,7 @@ module Hwaro
             Logger.outcome("imported", summary, glyph: result.error_count > 0 ? :err : :result)
 
             if result.skipped_count > 0 && !options.force
-              Logger.warn "#{result.skipped_count} file(s) skipped because the destination already exists. Re-run with --force to overwrite."
+              Logger.warn "#{result.skipped_count} file(s) skipped because they may already exist (use --force to overwrite) or be drafts (use --drafts to import)."
             end
           end
 

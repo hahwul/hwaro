@@ -58,6 +58,12 @@ module Hwaro
           )
         end
 
+        # Keys emitted explicitly below; everything else passes through as a
+        # Jekyll page variable (Jekyll accepts arbitrary front-matter keys, so
+        # dropping `slug`, `weight`, `layout`, `extra.*`, … was silent data
+        # loss — the same bug class gh#527 fixed for the Hugo exporter).
+        HANDLED_KEYS = Set{"title", "date", "description", "draft", "tags", "categories", "authors", "image"}
+
         private def export_file(
           file_path : String,
           content_dir : String,
@@ -68,7 +74,7 @@ module Hwaro
           raw = File.read(file_path)
           fields, body = parse_content(raw)
 
-          is_draft = (fields["draft"]?.try { |v| v == true }) == true
+          is_draft = fields["draft"]?.try(&.raw) == true
           if is_draft && !include_drafts
             return :skipped
           end
@@ -76,15 +82,15 @@ module Hwaro
           # Build Jekyll YAML frontmatter
           yaml_lines = [] of String
 
-          if title = fields["title"]?.as?(String)
+          if title = fields["title"]?.try(&.as_s?)
             yaml_lines << "title: #{title.inspect}"
           end
 
-          if date = fields["date"]?.as?(String)
+          if date = fields["date"]?.try(&.as_s?)
             yaml_lines << "date: #{date}"
           end
 
-          if desc = fields["description"]?.as?(String)
+          if desc = fields["description"]?.try(&.as_s?)
             yaml_lines << "description: #{desc.inspect}"
           end
 
@@ -95,27 +101,33 @@ module Hwaro
 
           # Accept both list (`tags: [a, b]`) and scalar (`tags: crystal`)
           # shorthand — a scalar would otherwise fail the Array(String) cast
-          # and silently drop the post's taxonomy membership.
+          # and silently drop the post's taxonomy membership. Items are
+          # YAML-quoted when needed: a bare `- beta: gamma` reparses as a
+          # mapping and `- NO` as `false` under Jekyll's YAML 1.1 loader.
           if tags = string_list_field(fields["tags"]?)
             yaml_lines << "tags:"
-            tags.each { |t| yaml_lines << "  - #{t}" }
+            tags.each { |t| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(t)}" }
           end
 
           # categories from taxonomies if present
           if cats = string_list_field(fields["categories"]?)
             yaml_lines << "categories:"
-            cats.each { |c| yaml_lines << "  - #{c}" }
+            cats.each { |c| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(c)}" }
           end
 
           # Jekyll natively understands an `authors` front-matter list, so
           # carry it across instead of dropping author attribution.
-          if authors = fields["authors"]?.as?(Array(String))
+          if authors = string_list_field(fields["authors"]?)
             yaml_lines << "authors:"
-            authors.each { |a| yaml_lines << "  - #{a}" }
+            authors.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
           end
 
-          if image = fields["image"]?.as?(String)
-            yaml_lines << "image: #{image}"
+          if image = fields["image"]?.try(&.as_s?)
+            yaml_lines << "image: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(image)}"
+          end
+
+          if passthrough = passthrough_yaml(fields)
+            yaml_lines << passthrough
           end
 
           frontmatter = "---\n#{yaml_lines.join("\n")}\n---"
@@ -126,6 +138,21 @@ module Hwaro
 
           write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
           :exported
+        end
+
+        # Serialize the non-allowlisted fields through the YAML emitter (which
+        # handles nesting, typing, and quoting), returning frontmatter lines
+        # without the `---` fences, or nil when there is nothing to carry.
+        private def passthrough_yaml(fields : Hash(String, YAML::Any)) : String?
+          leftovers = {} of YAML::Any => YAML::Any
+          fields.each do |key, value|
+            next if HANDLED_KEYS.includes?(key)
+            next if value.raw.nil?
+            leftovers[YAML::Any.new(key)] = value
+          end
+          return if leftovers.empty?
+
+          YAML::Any.new(leftovers).to_yaml.lchop("---\n").chomp
         end
 
         # Reserve `path` for this run, appending `-1`, `-2`, … (with a
@@ -165,7 +192,7 @@ module Hwaro
           file_path : String,
           content_dir : String,
           output_dir : String,
-          fields : Hash(String, (String | Bool | Array(String))?),
+          fields : Hash(String, YAML::Any),
           is_draft : Bool,
           include_drafts : Bool,
         ) : String
@@ -174,12 +201,14 @@ module Hwaro
           dir_part = File.dirname(relative)
 
           # Section indices become regular pages (Jekyll has no `_index`).
+          # The site root maps to `index.md` at the export root — an
+          # `index/index.md` would be served at `/index/`, leaving `/` empty.
           if filename == "_index.md" || filename == "_index.markdown"
-            slug = (dir_part == "." || dir_part.empty?) ? "index" : dir_part
-            return File.join(output_dir, slug, "index.md")
+            return File.join(output_dir, "index.md") if dir_part == "." || dir_part.empty?
+            return File.join(output_dir, dir_part, "index.md")
           end
 
-          date_str = fields["date"]?.as?(String)
+          date_str = fields["date"]?.try(&.as_s?)
           date_prefix = date_str && date_str.size >= 10 ? date_str[0, 10] : nil
           dated = date_prefix && date_prefix.matches?(/^\d{4}-\d{2}-\d{2}$/)
           slug = filename.sub(/\.(md|markdown)$/, "")
@@ -189,6 +218,15 @@ module Hwaro
           # every same-day bundle once flattened into `_posts/`.
           if slug == "index" && dir_part != "." && !dir_part.empty?
             slug = File.basename(dir_part)
+          end
+
+          # A source already named `YYYY-MM-DD-slug` (file or bundle dir)
+          # would double up (`_posts/2024-01-15-2024-01-15-hello.md`) once the
+          # date prefix is re-applied below; Jekyll would then derive a dated
+          # slug/URL.
+          if dated
+            stripped = slug.sub(/\A\d{4}-\d{2}-\d{2}-/, "")
+            slug = stripped unless stripped.empty?
           end
 
           # Content under a posts-like top-level section is a blog post:

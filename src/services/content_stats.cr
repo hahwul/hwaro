@@ -7,6 +7,7 @@ require "json"
 require "yaml"
 require "toml"
 require "./content_lister"
+require "../utils/frontmatter_scanner"
 require "../utils/logger"
 
 module Hwaro
@@ -118,7 +119,11 @@ module Hwaro
       end
 
       private def extract_body(content : String) : String
-        content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+        if content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+          content.byte_slice(end_idx)
+        else
+          content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+        end
       end
 
       private def count_words(body : String) : Int32

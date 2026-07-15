@@ -48,7 +48,7 @@ describe Hwaro::Services::CIConfig do
         result.should contain("deploy:")
         result.should contain("Build and Deploy")
         result.should contain("token: ${{ secrets.GITHUB_TOKEN }}")
-        result.should contain("github.event_name == 'push'")
+        result.should contain("(github.event_name == 'push' || github.event_name == 'workflow_dispatch')")
         result.should contain("github.ref == 'refs/heads/main'")
       end
 

@@ -35,7 +35,7 @@ module Hwaro
         lines << ""
         lines << "  deploy:"
         lines << "    runs-on: ubuntu-latest"
-        lines << "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        lines << "    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'"
         lines << "    steps:"
         lines << "      - name: Checkout"
         lines << "        uses: actions/checkout@v6"

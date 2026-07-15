@@ -394,5 +394,106 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         File.exists?(File.join(output_dir, "_drafts", "wip.md")).should be_true
       end
     end
+
+    it "maps the site root _index.md to index.md, not index/index.md" do
+      # `index/index.md` is served at `/index/`, leaving the site root empty.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "_index.md"), "+++\ntitle = \"Home\"\n+++\n\nWelcome\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "index.md")).should be_true
+        File.exists?(File.join(output_dir, "index", "index.md")).should be_false
+      end
+    end
+
+    it "quotes list items and images that YAML would reinterpret" do
+      # `- beta: gamma` reparses as a mapping and `- NO` as boolean false
+      # under Jekyll's YAML 1.1 loader.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "posts", "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\ntags = [\"beta: gamma\", \"NO\", \"plain\"]\nimage = \"a: b.png\"\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(Dir.glob(File.join(output_dir, "_posts", "*.md")).first)
+        content.should contain(%(- "beta: gamma"))
+        content.should contain(%(- "NO"))
+        content.should contain("- plain")
+        content.should contain(%(image: "a: b.png"))
+
+        # The emitted frontmatter must reparse to the original values.
+        fm = content.match!(/\A---\n(.*?)\n---/m)[1]
+        parsed = YAML.parse(fm)
+        parsed["tags"].as_a.map(&.as_s).should eq(["beta: gamma", "NO", "plain"])
+      end
+    end
+
+    it "passes through custom keys and nested extra instead of dropping them" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "posts", "post.md"), "+++\ntitle = \"Post\"\ndate = \"2024-01-01\"\nslug = \"custom-slug\"\nweight = 3\n[extra]\nsubtitle = \"hi\"\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        content = File.read(Dir.glob(File.join(output_dir, "_posts", "*.md")).first)
+        fm = content.match!(/\A---\n(.*?)\n---/m)[1]
+        parsed = YAML.parse(fm)
+        parsed["slug"].should eq("custom-slug")
+        parsed["weight"].should eq(3)
+        parsed["extra"]["subtitle"].should eq("hi")
+      end
+    end
+
+    it "does not double the date prefix for already-prefixed sources" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "posts", "2024-01-15-hello.md"), "+++\ntitle = \"Hello\"\ndate = \"2024-01-15\"\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "_posts", "2024-01-15-hello.md")).should be_true
+        File.exists?(File.join(output_dir, "_posts", "2024-01-15-2024-01-15-hello.md")).should be_false
+      end
+    end
+
+    it "counts files with malformed frontmatter as errors instead of stripping metadata" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad.md"), "+++\nnot valid toml = =\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        result.error_count.should eq(1)
+        result.exported_count.should eq(0)
+        Dir.glob(File.join(output_dir, "**", "*.md")).should be_empty
+      end
+    end
   end
 end

@@ -81,6 +81,7 @@ module Hwaro
             lines << "  from = \"#{toml_escape(from)}\""
             lines << "  to = \"#{toml_escape(to)}\""
             lines << "  status = 301"
+            lines << "  force = true"
             lines << ""
           end
         end
@@ -190,7 +191,9 @@ module Hwaro
 
       private def generate_gitlab_ci : String
         lines = [] of String
-        lines << "image: ghcr.io/hahwul/hwaro:latest"
+        lines << "image:"
+        lines << "  name: ghcr.io/hahwul/hwaro:latest"
+        lines << "  entrypoint: [\"\"]"
         lines << ""
         lines << "pages:"
         lines << "  stage: deploy"
@@ -199,8 +202,8 @@ module Hwaro
         lines << "  artifacts:"
         lines << "    paths:"
         lines << "      - public"
-        lines << "  only:"
-        lines << "    - main"
+        lines << "  rules:"
+        lines << "    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
         lines << ""
 
         lines.join("\n")
@@ -288,16 +291,32 @@ module Hwaro
         end
       end
 
+      LANGUAGE_FILENAME_PATTERN = /^(.+)\.([a-z]{2,3})\.md$/
+
+      private def extract_language_from_filename(basename : String) : String?
+        return unless @config.multilingual?
+
+        if match = basename.match(LANGUAGE_FILENAME_PATTERN)
+          lang_code = match[2]
+          return lang_code if @config.languages.has_key?(lang_code) || lang_code == @config.default_language
+        end
+
+        nil
+      end
+
       private def extract_aliases_from_file(path : String, redirects : Array(Tuple(String, String)))
         raw_content = File.read(path)
         data = Processor::Markdown.parse(raw_content, path)
+        return if data[:draft]
 
         aliases = data[:aliases]
         return if aliases.empty?
 
         # Build a minimal Page to calculate its URL using the same logic as the build pipeline
         relative_path = path.lchop("content/")
-        target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path])
+        basename = Path[path].basename
+        language = extract_language_from_filename(basename)
+        target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language)
 
         aliases.each do |alias_path|
           # Carry base_path so generated redirects match the build's own
@@ -313,36 +332,50 @@ module Hwaro
       # Calculate the URL for a page, mirroring the ParseContent phase's
       # calculate_page_url (src/core/build/phases/parse_content.cr).
       # Handles slug overrides, custom_path, permalinks, and index pages.
-      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?) : String
+      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?, language : String? = nil) : String
         directory_path = Path[relative_path].dirname.to_s
 
         # Apply permalinks mapping from config
         effective_dir = @config.resolve_permalink_dir(directory_path)
 
+        lang_prefix = if language && language != @config.default_language
+                        "/#{language}"
+                      else
+                        ""
+                      end
+
         if custom_path
           custom = custom_path.lchop("/")
-          url = "/#{custom}"
+          url = "#{lang_prefix}/#{custom}"
           url += "/" unless url.ends_with?("/")
           return url
         end
 
         stem = Path[relative_path].stem
-        is_index = stem == "_index" || stem == "index"
+
+        # Remove language suffix from stem if present in language
+        clean_stem = if language
+                       stem.chomp(".#{language}")
+                     else
+                       stem
+                     end
+
+        is_index = clean_stem == "_index" || clean_stem == "index"
 
         if is_index
           if effective_dir == "." || effective_dir.empty?
-            return "/"
+            return lang_prefix.empty? ? "/" : "#{lang_prefix}/"
           else
-            return "/#{effective_dir}/"
+            return "#{lang_prefix}/#{effective_dir}/"
           end
         end
 
-        leaf = slug || stem
+        leaf = slug || clean_stem
 
         if effective_dir == "." || effective_dir.empty?
-          "/#{leaf}/"
+          "#{lang_prefix}/#{leaf}/"
         else
-          "/#{effective_dir}/#{leaf}/"
+          "#{lang_prefix}/#{effective_dir}/#{leaf}/"
         end
       end
     end

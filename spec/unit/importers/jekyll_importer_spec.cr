@@ -138,7 +138,7 @@ describe Hwaro::Services::Importers::JekyllImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "posts", "no-date-post.md"))
-        content.should contain("date = \"2023-12-25 00:00:00\"")
+        content.should contain("date = \"2023-12-25\"")
       end
     end
 
@@ -553,12 +553,10 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
-    it "silently drops one of two source files that collide on the same slug" do
+    it "disambiguates two source files that collide on the same date-stripped slug" do
       # Two distinct posts whose date-stripped slug is identical ("hello")
-      # both map to posts/hello.md. Under no-force, the first (sorted) input
-      # is imported and the second is skipped — silent data loss in a one-shot
-      # migration. This pins the current behavior and would catch a regression
-      # (or motivate a de-dup / slug-suffix fix).
+      # used to both map to posts/hello.md, silently dropping the second in
+      # a one-shot migration; the later file now gets a date-suffixed slug.
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")
         FileUtils.mkdir_p(posts_dir)
@@ -588,16 +586,14 @@ describe Hwaro::Services::Importers::JekyllImporter do
         importer = Hwaro::Services::Importers::JekyllImporter.new
         result = importer.run(options)
 
-        # Exactly one survives; the other is silently dropped.
-        result.imported_count.should eq(1)
-        result.skipped_count.should eq(1)
+        # Both survive; the later (sorted) file gets a date-suffixed slug.
+        result.imported_count.should eq(2)
+        result.skipped_count.should eq(0)
 
-        # Dir.glob yields sorted paths, so the 2024-01-01 file wins.
-        output_file = File.join(output_dir, "posts", "hello.md")
-        File.exists?(output_file).should be_true
-        content = File.read(output_file)
-        content.should contain("First post body.")
-        content.should_not contain("Second post body.")
+        first = File.read(File.join(output_dir, "posts", "hello.md"))
+        first.should contain("First post body.")
+        second = File.read(File.join(output_dir, "posts", "hello-2024-06-02.md"))
+        second.should contain("Second post body.")
       end
     end
 
