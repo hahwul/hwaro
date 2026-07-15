@@ -1,21 +1,26 @@
 # Changelog
 
-## Unreleased
+## v0.17.1
+
+### Changed
+- Auto OG images redesigned: bundled Space Grotesk + JetBrains Mono with Latin/CJK fallback chains, seven reworked pattern styles, ember default palette (#687)
+- Scaffolds refreshed under the ember identity (`simple`/`blog`/`docs`/`book`; `bare` untouched) (#687)
+- Documentation site rebuilt on the ember design system: dark-default with light toggle, breadcrumbs/prev-next, server-side highlighting, self-hosted fonts (#685)
 
 ### Fixed
-- `[outputs].sections` no longer suppresses page-level output formats outside the allowlisted sections — it scopes `section` output only, as documented
-- `--include-future` / `--include-expired` are preview flags like `--drafts`: admitted pages render HTML but stay out of sitemap.xml, RSS/Atom feeds, search index, llms.txt, and generated listings (taxonomies, series, related posts, authors)
-- `hwaro tool export jekyll`: only content under `posts/`/`blog/` becomes `_posts/` entries (every Hwaro page has an auto-stamped `date`, so "dated ⇒ post" misfiled ordinary pages); other pages keep their directory tree; leaf-bundle posts slug from the bundle directory instead of `index`; destination collisions are disambiguated with a warning instead of silently overwritten
-- `hwaro tool check-links`: fenced-code stripping is now line-based CommonMark fence tracking — a 4-backtick example wrapping a 3-backtick fence no longer desyncs later fences into false-positive dead links
-- `hwaro doctor`: when config.toml fails to parse, the config sub-checks that never ran render as `(skipped)` instead of a false green `[ok]`
-- `hwaro deploy`: the non-TTY confirmation error no longer claims `--force` skips `--confirm` (it doesn't); the hint now explains the actual outs
-- Canonical URL, `og:url`, and hreflang tags percent-encode non-ASCII paths, matching the RFC 3986 URLs feeds/sitemap already emit for the same pages
-- Taxonomy terms (and tags/authors/aliases) are whitespace-trimmed at parse time — a padded term no longer leaks verbatim into term-page titles/RSS or splits into a second slug-disambiguated term page
-- Auto OG images skip codepoints the loaded font can't draw (emoji, mostly) instead of rendering blank tofu boxes
-- Heading render hook + `{#id .class}` attributes no longer leave a doubled space where the internal marker was removed
-- Fence options treat `linenostart=0` / `hl_lines="0"` as invalid (dropped) instead of silently clamping to line 1
-- Duplicate explicit `{#id}` heading ids now warn when renamed (`#dup` → `#dup-1`), matching menus' duplicate-identifier warning
-- CLI polish: singular/plural agreement for 1-item counts (`1 file`, `1 draft`, `1 unused asset`); `tool convert` notes that front-matter comments are not preserved; `unused-assets --help` names the scanned asset types
+- `hwaro serve`: rewriting templates mid-rebuild no longer breaks the served site — snapshot-consistent `{% include %}`/`{% extends %}`, output-format edits re-render, SEO surfaces refresh, atomic-save temp files ignored (#688)
+- `hwaro doctor --fix`: hardened against cross-section corruption — `[[array.of.tables]]` headers no longer leak `[sitemap]` state, `--full` is idempotent, `--approve` adds sections while `--fix` normalizes values (#689)
+- `hwaro deploy`: hardened against error-swallowing and stale deletes — classified errors under `--dry-run --json`, no stranded deletions, single-pass placeholder expansion, symlink/overlap safety (#690)
+- `hwaro tool`: 50+ fixes across `convert`/`export`/`import`, analysis tools, and platform generators — front-matter preservation, zone-bearing dates, false-positive removal, working CI configs; shared `Utils::FrontmatterWriter` (#691)
+- `[outputs].sections` scopes `section` output only, not page-level formats
+- `--include-future`/`--include-expired` are preview flags: admitted pages render but stay out of sitemap, feeds, search index, llms.txt, and listings
+- Canonical/`og:url`/hreflang percent-encode non-ASCII paths, matching feeds/sitemap
+- Taxonomy terms (tags/authors/aliases) whitespace-trimmed at parse time
+- Auto OG images skip undrawable codepoints (emoji) instead of rendering tofu boxes
+- Heading render hook + `{#id .class}` no longer leaves a doubled space
+- Fence options reject `linenostart=0` / `hl_lines="0"` instead of clamping to line 1
+- Duplicate explicit `{#id}` heading ids warn when renamed (`#dup` → `#dup-1`)
+- CLI polish: singular/plural agreement for 1-item counts; clearer `tool convert` / `unused-assets --help` text
 
 ## v0.17.0
 
