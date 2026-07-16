@@ -986,6 +986,73 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "custom containers" do
+    it "renders a basic container with a custom title" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::note My Title\nBody with **bold**.\n:::",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="admonition admonition-note">))
+      html.should contain(%(<p class="admonition-title">My Title</p>))
+      html.should contain("<strong>bold</strong>")
+      html.should contain("</div>")
+    end
+
+    it "defaults the title to the capitalized type" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::warning\ncareful\n:::", markdown_config: cfg)
+      html.should contain(%(<p class="admonition-title">Warning</p>))
+    end
+
+    it "nests containers with longer runs" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "::::outer\nabove\n:::inner\ninside\n:::\nbelow\n::::",
+        markdown_config: cfg,
+      )
+      html.scan("admonition-outer").size.should eq(1)
+      html.scan("admonition-inner").size.should eq(1)
+      html.scan("</div>").size.should eq(2)
+    end
+
+    it "keeps fences working inside a container and ::: inside fences literal" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::note\n```\n:::not-a-container\n```\n:::",
+        markdown_config: cfg,
+      )
+      html.should contain("admonition-note")
+      html.should contain(":::not-a-container")
+      # Exactly one container opened — the fenced ::: line spawned nothing.
+      html.scan(%(<div class="admonition)).size.should eq(1)
+      html.scan("</div>").size.should eq(1)
+    end
+
+    it "auto-closes at EOF" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::tip\nno closer", markdown_config: cfg)
+      html.should contain("admonition-tip")
+      html.should contain("</div>")
+    end
+
+    it "is off by default and skipped in safe mode" do
+      html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
+      html.should_not contain("admonition")
+
+      cfg = make_config
+      cfg.containers = true
+      cfg.safe = true
+      html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: cfg, safe: true)
+      html.should_not contain("admonition")
+    end
+  end
+
   describe "multi-line footnotes" do
     it "joins indented continuation lines into one paragraph" do
       cfg = make_config(footnotes: true)
