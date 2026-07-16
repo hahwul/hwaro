@@ -1567,6 +1567,25 @@ describe Hwaro::Models::Config do
       attributes_only.cache_fingerprint.should_not eq(base_fp)
     end
 
+    it "loads insert_anchor_links and rejects unknown values" do
+      config = load_config(<<-TOML)
+        [markdown]
+        insert_anchor_links = "right"
+        TOML
+      config.markdown.insert_anchor_links.should eq("right")
+
+      config = load_config(<<-TOML)
+        [markdown]
+        insert_anchor_links = "heading"
+        TOML
+      config.markdown.insert_anchor_links.should eq("none")
+
+      base_fp = Hwaro::Models::MarkdownConfig.new.cache_fingerprint
+      right = Hwaro::Models::MarkdownConfig.new
+      right.insert_anchor_links = "right"
+      right.cache_fingerprint.should_not eq(base_fp)
+    end
+
     it "loads smart_punctuation and includes it in cache_fingerprint" do
       base_fp = Hwaro::Models::MarkdownConfig.new.cache_fingerprint
 

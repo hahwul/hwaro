@@ -661,6 +661,10 @@ module Hwaro
       # If true, task-list markup gets GFM's classes (task-list-item /
       # task-list-item-checkbox / contains-task-list) for CSS parity.
       property task_list_classes : Bool
+      # Site-wide heading anchor links: "none" (default), "left", or
+      # "right" (Zola's values; "before"/"after" accepted as aliases for
+      # the internal style names). Page front matter overrides per page.
+      property insert_anchor_links : String
 
       def initialize
         @safe = false
@@ -684,6 +688,7 @@ module Hwaro
         @external_links_no_follow = false
         @external_links_no_referrer = false
         @task_list_classes = false
+        @insert_anchor_links = "none"
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -700,7 +705,7 @@ module Hwaro
           io << (@sup ? '1' : '0') << (@attributes ? '1' : '0') << (@smart_punctuation ? '1' : '0')
           io << (@external_links_target_blank ? '1' : '0') << (@external_links_no_follow ? '1' : '0')
           io << (@external_links_no_referrer ? '1' : '0') << (@task_list_classes ? '1' : '0')
-          io << @math_engine
+          io << @math_engine << ':' << @insert_anchor_links
         end
       end
 
@@ -1816,6 +1821,16 @@ module Hwaro
         config.markdown.external_links_no_follow = bool_value(s["external_links_no_follow"]?, config.markdown.external_links_no_follow)
         config.markdown.external_links_no_referrer = bool_value(s["external_links_no_referrer"]?, config.markdown.external_links_no_referrer)
         config.markdown.task_list_classes = bool_value(s["task_list_classes"]?, config.markdown.task_list_classes)
+        if anchors = s["insert_anchor_links"]?.try(&.as_s?)
+          if anchors.in?("none", "left", "right", "before", "after")
+            config.markdown.insert_anchor_links = anchors
+          else
+            # Zola's "heading" style (whole heading as a link) is not
+            # implemented — warn and keep the default rather than silently
+            # rendering something different from what was asked for.
+            Logger.warn "config: unknown [markdown] insert_anchor_links value #{anchors.inspect} (expected none/left/right); using \"none\""
+          end
+        end
       end
 
       private def self.load_series(config : Config)

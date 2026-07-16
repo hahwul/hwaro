@@ -433,9 +433,9 @@ describe Hwaro::Models::Page do
       page.in_search_index.should be_false
     end
 
-    it "initializes insert_anchor_links as false" do
+    it "initializes insert_anchor_links as nil (site config decides)" do
       page = Hwaro::Models::Page.new("test.md")
-      page.insert_anchor_links.should be_false
+      page.insert_anchor_links.should be_nil
     end
 
     it "can set insert_anchor_links" do

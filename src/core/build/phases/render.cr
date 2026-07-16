@@ -718,12 +718,18 @@ module Hwaro::Core::Build::Phases::Render
                   build_hook_render_context(reg, page, site, crinja_env_override, template_cache_override)
                 end
 
-    # Use anchor links if enabled
+    # Use anchor links if enabled: page front matter (tri-state) overrides
+    # the site-wide `[markdown] insert_anchor_links` ("none"/"left"/"right";
+    # "before"/"after" accepted as internal-style aliases). A page-level
+    # `true` with config "none" keeps today's hard-coded "after" placement.
     md_config = site.config.markdown
+    anchors_cfg = md_config.insert_anchor_links
+    anchors_on = page.insert_anchor_links.nil? ? anchors_cfg != "none" : page.insert_anchor_links
+    anchor_style = anchors_cfg.in?("left", "before") ? "before" : "after"
     md_start = profiler ? Time.instant : nil
     md_input_bytes = processed_content.bytesize.to_i64
-    html_content, toc_headers = if page.insert_anchor_links
-                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, "after", lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
+    html_content, toc_headers = if anchors_on
+                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
                                 else
                                   Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
                                 end
