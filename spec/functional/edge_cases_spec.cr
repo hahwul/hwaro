@@ -474,4 +474,143 @@ describe "Edge Cases: Duplicate output path detection" do
 
     log.should contain("Duplicate alias output path")
   end
+
+  it "writes the first page in source-path order on a slug collision (deterministic winner)" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "posts/a.md" => "---\ntitle: A\nslug: dup\n---\nAAA-WINNER",
+        "posts/b.md" => "---\ntitle: B\nslug: dup\n---\nBBB-LOSER",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/posts/dup/index.html")
+      html.should contain("AAA-WINNER")
+      html.should_not contain("BBB-LOSER")
+    end
+  end
+
+  it "keeps the deterministic winner under parallel render too" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "posts/a.md" => "---\ntitle: A\nslug: dup\n---\nAAA-WINNER",
+        "posts/b.md" => "---\ntitle: B\nslug: dup\n---\nBBB-LOSER",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+      parallel: true,
+    ) do
+      html = File.read("public/posts/dup/index.html")
+      html.should contain("AAA-WINNER")
+      html.should_not contain("BBB-LOSER")
+    end
+  end
+
+  it "keeps the real page when a later page's alias collides with its URL" do
+    # zzz.md's alias points at /about/, which about.md already owns. The
+    # alias redirect must not stomp the real page's index.html.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "about.md" => "---\ntitle: About\n---\nREAL-PAGE-BODY",
+        "zzz.md"   => "---\ntitle: Z\naliases:\n  - /about/\n---\nZ",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("REAL-PAGE-BODY")
+    end
+  end
+
+  it "writes the alias redirect of the first claimant on alias collisions" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "one.md" => "---\ntitle: One\naliases:\n  - /shared/\n---\nOne",
+        "two.md" => "---\ntitle: Two\naliases:\n  - /shared/\n---\nTwo",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/shared/index.html")
+      html.should contain("/one/")
+      html.should_not contain("/two/")
+    end
+  end
+
+  it "lets the real page beat an earlier page's alias for the same URL" do
+    # a-legacy.md sorts before guide.md, but a page's own content always
+    # outranks a redirect stub — real URLs claim before aliases.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "a-legacy.md" => "---\ntitle: Legacy\naliases:\n  - /guide/\n---\nLEGACY",
+        "guide.md"    => "---\ntitle: Guide\n---\nREAL-GUIDE-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/guide/index.html")
+      html.should contain("REAL-GUIDE-BODY")
+    end
+  end
+
+  it "does not let a render:false page claim a URL from a real page" do
+    # A headless page never writes output, so it must not suppress the
+    # real page that shares its URL.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "a-headless.md" => "---\ntitle: Headless\nrender: false\nslug: about\n---\nHIDDEN",
+        "z-about.md"    => "---\ntitle: About\nslug: about\n---\nREAL-ABOUT-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("REAL-ABOUT-BODY")
+    end
+  end
+
+  it "ignores an alias that duplicates the page's own URL" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "about.md" => "---\ntitle: About\naliases:\n  - /about/\n---\nOWN-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("OWN-BODY")
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 14. Sequential render failure aggregation
+# ---------------------------------------------------------------------------
+describe "Edge Cases: sequential render failure aggregation" do
+  it "renders past a failing page and reports every failure once (no first-error abort)" do
+    # build_helper runs with parallel: false, so this exercises
+    # process_files_sequential. Two pages share a broken template; the loop
+    # must attempt both (grouped "Render failed for 2 pages" summary) instead
+    # of aborting on the first, and still fail loud with the classified error.
+    err = nil
+    log = with_captured_log do
+      err = expect_raises(Hwaro::HwaroError) do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {
+            "bad1.md" => "---\ntitle: B1\ntemplate: broken\n---\nx",
+            "bad2.md" => "---\ntitle: B2\ntemplate: broken\n---\nx",
+            "good.md" => "---\ntitle: Good\n---\nok",
+          },
+          template_files: {
+            "page.html"   => "{{ content }}",
+            "broken.html" => "{{ page.title.nonexistent_attr }}",
+          },
+        ) { }
+      end
+    end
+
+    err.not_nil!.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    log.should contain("Render failed for 2 pages")
+  end
 end

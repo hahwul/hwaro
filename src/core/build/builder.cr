@@ -205,6 +205,13 @@ module Hwaro
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
         @deferred_pages : Array(Models::Page)? = nil
+        # Deterministic owner (page.path) of every claimed output URL — page
+        # URLs and alias destinations. A page that is not the recorded winner
+        # for a URL must not write it; under parallel render the colliding
+        # file's bytes were whichever worker finished last. Recomputed per
+        # full build and per incremental/rerender pass (see
+        # compute_output_url_winners). Nil until the first render pass.
+        @output_url_winners : Hash(String, String)? = nil
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -398,6 +405,17 @@ module Hwaro
             Logger.info "  No matching pages found – skipping."
             return
           end
+
+          # Re-render <!-- more --> summaries for the re-parsed pages with the
+          # body pipeline (parse_single_page reset summary_html to nil); the
+          # listing pages re-rendered below read it.
+          render_page_summaries(changed_pages, site, templates, highlight,
+            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
+
+          # Re-claim output URLs: the edit may have introduced or resolved a
+          # slug/alias collision, and a stale winner map would keep
+          # suppressing (or racing) writes for the rest of the serve session.
+          @output_url_winners = compute_output_url_winners((site.pages + site.sections).as(Array(Models::Page)))
 
           # --- 2. Incrementally update relationships ---
           # Run taxonomy update on ALL re-parsed pages first (including those about
@@ -709,12 +727,14 @@ module Hwaro
 
           # Selective re-render: same template set, fully static graph
           affected_templates : Set(String)? = nil
+          changed_template_names : Set(String)? = nil
           if @per_page_template_hash && deps && old_templates &&
              old_templates.keys.sort! == templates.keys.sort!
             changed = Set(String).new
             templates.each do |name, source|
               changed << name if old_templates[name]? != source
             end
+            changed_template_names = changed
             if changed.empty? && (force_pages.nil? || force_pages.empty?)
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
               return
@@ -759,6 +779,30 @@ module Hwaro
           global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
+
+          # Recompute <!-- more --> summaries with the reloaded templates —
+          # but only when they can actually change: a shortcode/hook template
+          # edit, an unclassifiable template change (changed_template_names
+          # nil), or force_pages arriving from run_incremental_then_rerender
+          # with summary_html reset to nil by parse_single_page. A layout-only
+          # edit skips the recompute entirely (it can't affect summaries and
+          # would re-run per-page Crinja work on every keystroke).
+          forced = force_pages || [] of Models::Page
+          summaries_affected = !forced.empty? ||
+                               changed_template_names.nil? ||
+                               changed_template_names.any? { |n| n.starts_with?("shortcodes/") || n.starts_with?("hooks/") }
+          if summaries_affected
+            # force_pages with render:true are already in pages_to_render;
+            # render:false ones are excluded from the render set but their
+            # summaries still feed listings and feeds.
+            summary_pages = pages_to_render + forced.reject(&.render)
+            render_page_summaries(summary_pages, site, templates, highlight,
+              link_targets: all_pages, global_vars: global_vars)
+          end
+
+          # Re-claim output URLs (see run_incremental): forced content edits
+          # may have introduced or resolved a slug/alias collision.
+          @output_url_winners = compute_output_url_winners(all_pages)
 
           error_overlay = options.error_overlay
           count = if pages_to_render.empty?

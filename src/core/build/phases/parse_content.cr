@@ -30,7 +30,84 @@ module Hwaro::Core::Build::Phases::ParseContent
     collect_assets(ctx)
     populate_taxonomies(ctx)
 
+    # Render <!-- more --> summaries with the body's pipeline now that every
+    # page's URL is final (internal-link resolution) — and before Transform,
+    # which bakes summary_html into Crinja page values.
+    if (site = @site) && (templates = @templates)
+      render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled)
+    end
+
     Lifecycle::HookResult::Continue
+  end
+
+  # Render each page's `<!-- more -->` summary through the same sub-pipeline
+  # as the body: shortcodes → configured Markdown (extensions, safe mode,
+  # emoji) → placeholder replacement → internal-link resolution. Rendering
+  # the raw chunk with bare Markdown.render leaked literal `{{ … }}` syntax
+  # into list pages / feeds / meta descriptions and silently dropped
+  # tables, footnotes, and emoji the body renders fine.
+  #
+  # Runs single-fiber between the parse fan-out and Transform. Site
+  # relationships (taxonomies, related posts) are not assembled yet, so a
+  # summary shortcode that queries them sees pre-Transform state — fine for
+  # the presentational shortcodes summaries realistically contain.
+  # `link_targets` is the page set internal `@/` links may point at —
+  # defaults to `pages`, which is correct for the full build (all pages) but
+  # must be passed explicitly by incremental callers that re-render only a
+  # subset. It can't come from `site.pages`: Transform populates that AFTER
+  # this runs in the full build (`site.pages = ctx.pages`, transform.cr).
+  #
+  # `global_vars` is a compute-once optimization for post-Transform callers
+  # (run_rerender). When nil, build_template_variables self-heals by building
+  # globals per shortcode-bearing page — cheap during the full-build call
+  # (site.pages is still empty pre-Transform) but O(site) per page after.
+  private def render_page_summaries(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+    use_highlight : Bool,
+    link_targets : Array(Models::Page) = pages,
+    global_vars : Hash(String, Crinja::Value)? = nil,
+  )
+    md_config = site.config.markdown
+    pages_by_path : Hash(String, Models::Page)? = nil
+
+    pages.each do |page|
+      # parse_single_page already extracted the chunk into page.summary;
+      # extract_summary is only a fallback for hook-based parse paths that
+      # skipped it (it re-scans the whole raw_content, so don't repeat it).
+      summary_md = page.summary || page.extract_summary
+      next unless summary_md
+
+      shortcode_results = {} of String => String
+      processed = if content_may_contain_shortcodes?(summary_md)
+                    context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                    process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
+                  else
+                    summary_md
+                  end
+
+      html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+      html = replace_shortcode_placeholders(html, shortcode_results)
+
+      pbp = (pages_by_path ||= begin
+        map = {} of String => Models::Page
+        link_targets.each { |p| map[p.path] ||= p }
+        map
+      end)
+      html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
+      html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url)
+
+      page.summary_html = html
+    rescue ex
+      # A broken shortcode in a summary must not abort the whole parse
+      # phase — fall back to plain-Markdown rendering (same config flags,
+      # critically including safe mode) and let the body render surface
+      # the real error with full diagnostics.
+      Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
+      fallback, _ = Processor::Markdown.render(summary_md.to_s, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+      page.summary_html = fallback
+    end
   end
 
   # Default parsing when no hooks are registered.
@@ -197,14 +274,12 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.calculate_word_count
     page.calculate_reading_time
 
-    # Extract summary from <!-- more --> marker. Stores the raw markdown
-    # chunk on the model; render it to HTML now so `page.summary` can
-    # expose proper HTML (not raw `# Heading` text) at template time —
-    # see https://github.com/hahwul/hwaro/issues/491.
-    if summary_md = page.extract_summary
-      summary_html, _ = Processor::Markdown.render(summary_md)
-      page.summary_html = summary_html
-    end
+    # Extract the <!-- more --> summary chunk (raw markdown) onto the model.
+    # Rendering to HTML happens in render_page_summaries after the parse
+    # fan-out — it needs every page's final URL (internal links) and the
+    # body's full pipeline (shortcodes, markdown extensions, emoji), none of
+    # which are available while pages are still being parsed in parallel.
+    page.extract_summary
 
     if page.is_a?(Models::Section)
       page.transparent = data[:transparent]

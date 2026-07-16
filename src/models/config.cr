@@ -1239,6 +1239,8 @@ module Hwaro
           end
         end
 
+        warn_unknown_top_level_keys(config.raw, config_path)
+
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
         if raw_base_url = config.raw["base_url"]?.try(&.as_s?)
@@ -1289,6 +1291,28 @@ module Hwaro
       end
 
       # --- Private helpers -----------------------------------------------------------
+
+      # Every top-level key `load` reads (scalars + `load_*` section names).
+      # Used to warn on unrecognized keys instead of silently ignoring them —
+      # a typo'd `[markdonw]` or `titel =` otherwise disables a feature with
+      # zero feedback. Templates cannot read arbitrary raw config keys (the
+      # site/config objects expose structured fields only), so an unknown
+      # top-level key is always dead configuration.
+      KNOWN_TOP_LEVEL_KEYS = %w[
+        title description base_url default_language
+        amp assets auto_includes build content deployment doctor feeds
+        highlight image_processing languages llms markdown menus og outputs
+        pagination permalinks plugins pwa related robots search series serve
+        sitemap static taxonomies
+      ]
+
+      private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
+        raw.each_key do |key|
+          next if KNOWN_TOP_LEVEL_KEYS.includes?(key)
+          hint = Utils::CommandSuggester.suggest(key, KNOWN_TOP_LEVEL_KEYS).try { |s| " Did you mean '#{s}'?" } || ""
+          Logger.warn "Unknown key '#{key}' in #{config_path} — hwaro does not read it.#{hint}"
+        end
+      end
 
       # Parse a TOML string, re-raising any parser failure as a classified
       # `HWARO_E_CONFIG` error so the CLI maps it to exit code 3 and the

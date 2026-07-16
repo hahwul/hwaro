@@ -26,6 +26,14 @@ module Hwaro
         @fence_char = '`'
         @fence_len = 0
 
+        # True while inside an open fence: after the opener line was fed,
+        # until (and excluding) the line after the closer. Lets callers that
+        # need to route in-fence lines differently (e.g. the shortcode
+        # processor's chunk buffering) branch before feeding the line.
+        def in_fence? : Bool
+          @in_fence
+        end
+
         # Feed the next line (with or without its trailing newline).
         # Returns true when the line must pass through verbatim: a fence
         # delimiter or any line inside an open fence.

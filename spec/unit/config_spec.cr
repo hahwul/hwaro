@@ -1,4 +1,5 @@
 require "../spec_helper"
+require "../../src/services/defaults/config"
 
 # Helper to load a Config from a TOML string via a temp file.
 private def load_config(toml : String) : Hwaro::Models::Config
@@ -2483,6 +2484,65 @@ describe "Hwaro::Models::Config#resolve_permalink_dir" do
 
     it "clamps an oversized integer [deployment] max_deletes to Int32::MAX (int_or_nil)" do
       load_config("[deployment]\nmax_deletes = 99999999999").deployment.max_deletes.should eq(Int32::MAX)
+    end
+  end
+
+  describe "unknown top-level key warnings" do
+    it "warns with a did-you-mean suggestion for a typo'd section" do
+      log = with_captured_log do
+        load_config("[markdonw]\nemoji = true")
+      end
+      log.should contain("Unknown key 'markdonw'")
+      log.should contain("Did you mean 'markdown'?")
+    end
+
+    it "warns with a did-you-mean suggestion for a typo'd scalar" do
+      log = with_captured_log do
+        load_config(%(titel = "My Site"))
+      end
+      log.should contain("Unknown key 'titel'")
+      log.should contain("Did you mean 'title'?")
+    end
+
+    it "warns without a suggestion for a key nothing resembles" do
+      log = with_captured_log do
+        load_config("[zzqxy]\nfoo = 1")
+      end
+      log.should contain("Unknown key 'zzqxy'")
+      log.should_not contain("Did you mean")
+    end
+
+    it "does not warn for any known top-level key" do
+      toml = String.build do |io|
+        io << %(title = "t"\ndescription = "d"\nbase_url = "https://example.com"\ndefault_language = "en"\n)
+        (Hwaro::Models::Config::KNOWN_TOP_LEVEL_KEYS -
+          %w[title description base_url default_language taxonomies menus outputs languages permalinks]).each do |key|
+          io << "[" << key << "]\n"
+        end
+      end
+      log = with_captured_log { load_config(toml) }
+      log.should_not contain("Unknown key")
+    end
+
+    # Drift guard: every section doctor/config-snippets knows about must be
+    # in the loader's known-key list, or a valid section would be flagged.
+    it "covers every SECTION_REGISTRY section" do
+      Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.each_key do |section|
+        Hwaro::Models::Config::KNOWN_TOP_LEVEL_KEYS.includes?(section).should be_true
+      end
+    end
+
+    # Drift guard: the scaffolded default configs must load without any
+    # unknown-key warning — they exercise the full documented key surface.
+    it "does not warn on the generated default configs" do
+      {
+        Hwaro::Services::Defaults::ConfigSamples.config,
+        Hwaro::Services::Defaults::ConfigSamples.config_without_taxonomies,
+        Hwaro::Services::Defaults::ConfigSamples.config_multilingual(["en", "ko"]),
+      }.each do |toml|
+        log = with_captured_log { load_config(toml) }
+        log.should_not contain("Unknown key")
+      end
     end
   end
 end

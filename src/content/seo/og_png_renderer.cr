@@ -168,7 +168,7 @@ module Hwaro
             resized = LibC.malloc(buf_size).as(UInt8*)
             return if resized.null?
 
-            result = LibStb.stbir_resize_uint8_linear(
+            result = LibStb.stbir_resize_uint8_srgb(
               src_pixels, src_w, src_h, 0,
               resized, target_w, target_h, 0, 4
             )
@@ -1129,7 +1129,7 @@ module Hwaro
             return if resized.null?
 
             begin
-              result = LibStb.stbir_resize_uint8_linear(
+              result = LibStb.stbir_resize_uint8_srgb(
                 src_pixels, src_w, src_h, 0,
                 resized, dw, dh, 0, 4
               )

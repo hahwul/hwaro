@@ -107,10 +107,10 @@ module Hwaro
             end
 
             begin
-              result = LibStb.stbir_resize_uint8_linear(
+              result = LibStb.stbir_resize_uint8_srgb(
                 pixels, src_w, src_h, 0,
                 out_pixels, out_w, out_h, 0,
-                channels
+                stbir_layout(channels)
               )
 
               if result.null?
@@ -198,10 +198,10 @@ module Hwaro
           return if thumb_pixels.null?
 
           begin
-            resized = LibStb.stbir_resize_uint8_linear(
+            resized = LibStb.stbir_resize_uint8_srgb(
               pixels, src_w, src_h, 0,
               thumb_pixels, out_w, out_h, 0,
-              channels
+              stbir_layout(channels)
             )
             return if resized.null?
 
@@ -327,10 +327,10 @@ module Hwaro
               next if out_pixels.null?
 
               begin
-                resized = LibStb.stbir_resize_uint8_linear(
+                resized = LibStb.stbir_resize_uint8_srgb(
                   pixels, src_w, src_h, 0,
                   out_pixels, out_w, out_h, 0,
-                  channels
+                  stbir_layout(channels)
                 )
                 unless resized.null?
                   if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
@@ -375,6 +375,16 @@ module Hwaro
 
         # Calculate output dimensions preserving aspect ratio.
         # Returns {0, 0} for invalid inputs to signal caller to skip.
+        # Map a decoded channel count to the stbir_pixel_layout the sRGB
+        # resize entry point expects. Counts map 1:1 (1→1CHANNEL, 3→RGB,
+        # 4→RGBA) EXCEPT gray+alpha: layout 2 (STBIR_2CHANNEL) declares "no
+        # transparency channel", so the sRGB codepath would gamma-decode the
+        # alpha bytes as if they were color, warping transparency gradients.
+        # STBIR_RA (9) keeps alpha linear and alpha-weights the filter.
+        private def stbir_layout(channels : Int32) : Int32
+          channels == 2 ? 9 : channels
+        end
+
         private def calculate_dimensions(src_w : Int32, src_h : Int32, target_w : Int32, target_h : Int32) : {Int32, Int32}
           # Guard against zero source dimensions (prevents division by zero)
           return {0, 0} if src_w <= 0 || src_h <= 0

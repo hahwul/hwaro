@@ -1357,6 +1357,61 @@ describe "Build Integration: Summary via page_summary variable" do
       html.should contain("SUMMARY=Fallback summary")
     end
   end
+
+  # Summaries render through the same sub-pipeline as the body — shortcodes,
+  # markdown extensions, and internal links must not diverge between the
+  # article and its list-page/feed summary.
+  it "expands shortcodes in the summary instead of leaking literal syntax" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "post.md" => %(---\ntitle: Post\n---\nIntro {{ badge(label="new") }} text.\n\n<!-- more -->\n\nBody.),
+      },
+      template_files: {
+        "page.html"             => "SUMMARY={{ page_summary }}|{{ content }}",
+        "shortcodes/badge.html" => %(<span class="badge">{{ label }}</span>),
+      },
+    ) do
+      html = File.read("public/post/index.html")
+      html.should contain(%(SUMMARY=))
+      html.should contain(%(<span class="badge">new</span>))
+      html.should_not contain("{{ badge")
+    end
+  end
+
+  it "renders markdown-extension syntax (tables) in the summary like the body" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "post.md" => "---\ntitle: Post\n---\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<!-- more -->\n\nBody.",
+      },
+      template_files: {
+        "page.html" => "SUMMARY[{{ page_summary }}]|{{ content }}",
+      },
+    ) do
+      html = File.read("public/post/index.html")
+      summary_part = html.split("|").first
+      summary_part.should contain("<table")
+    end
+  end
+
+  it "resolves internal @/ links inside the summary" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "post.md"  => "---\ntitle: Post\n---\nSee [other](@/other.md) first.\n\n<!-- more -->\n\nBody.",
+        "other.md" => "---\ntitle: Other\n---\nOther body.",
+      },
+      template_files: {
+        "page.html" => "SUMMARY={{ page_summary }}|{{ content }}",
+      },
+    ) do
+      html = File.read("public/post/index.html")
+      html.should contain(%(SUMMARY=))
+      html.should contain(%(href="/other/"))
+      html.should_not contain("@/other.md")
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

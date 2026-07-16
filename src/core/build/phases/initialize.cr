@@ -440,10 +440,14 @@ module Hwaro::Core::Build::Phases::Initialize
   # the existing "config change invalidates all entries" path. Returns "" when
   # there is no `data/` directory.
   private def compute_data_hash : String
-    return "" unless Dir.exists?("data")
+    return "" unless Dir.exists?("data") || Dir.exists?("i18n")
 
     paths = [] of String
-    Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
+    # i18n translations feed every localized string the same way data files
+    # feed templates — an i18n edit must invalidate cached pages too, or
+    # `build --cache` ships stale translations while `serve` (which watches
+    # i18n/) rebuilds correctly.
+    Dir.glob("data/**/*.{yml,yaml,json,toml}", "i18n/**/*.{yml,yaml,json,toml}") do |path|
       next if File.directory?(path)
       paths << path
     end
