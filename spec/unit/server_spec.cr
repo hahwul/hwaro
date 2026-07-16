@@ -703,6 +703,20 @@ describe Hwaro::Services::ChangeSet do
       cs.needs_full_rebuild?.should be_true
     end
 
+    it "returns true when data/i18n files were modified" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_data: ["data/authors.yml"],
+      )
+      cs.needs_full_rebuild?.should be_true
+      cs.empty?.should be_false
+    end
+
     it "returns false for content-only modification" do
       cs = Hwaro::Services::ChangeSet.new(
         modified_content: ["content/posts/hello.md"],
@@ -1079,6 +1093,31 @@ describe Hwaro::Services::ChangeSet do
       ])
       merged.content_files_only?.should be_true
     end
+
+    it "merges modified_data with deduplication" do
+      cs1 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_data: ["data/authors.yml"],
+      )
+      cs2 = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_data: ["data/authors.yml", "i18n/ko.toml"],
+      )
+
+      merged = cs1.merge(cs2)
+      merged.modified_data.should eq(["data/authors.yml", "i18n/ko.toml"])
+      merged.rebuild_strategy.should eq(:full)
+    end
   end
 
   describe "#rebuild_strategy" do
@@ -1427,6 +1466,22 @@ describe "Server#detect_changes" do
     cs = server.test_detect_changes(old, new_m)
     cs.config_changed.should be_true
     cs.needs_full_rebuild?.should be_true
+  end
+
+  it "detects modified data and i18n files and forces a full rebuild" do
+    server = Hwaro::Services::Server.new
+    t1 = Time.utc(2025, 1, 1, 0, 0, 0)
+    t2 = Time.utc(2025, 1, 1, 0, 0, 5)
+
+    old = {"data/authors.yml" => t1, "i18n/en.toml" => t1}
+    new_m = {"data/authors.yml" => t2, "i18n/en.toml" => t2}
+
+    cs = server.test_detect_changes(old, new_m)
+    cs.modified_data.sort.should eq(["data/authors.yml", "i18n/en.toml"])
+    cs.modified_content.should be_empty
+    cs.empty?.should be_false
+    cs.needs_full_rebuild?.should be_true
+    cs.rebuild_strategy.should eq(:full)
   end
 
   it "detects added files" do

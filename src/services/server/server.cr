@@ -236,6 +236,10 @@ module Hwaro
       getter modified_templates : Array(String)
       # Static files that were *modified*
       getter modified_static : Array(String)
+      # Data / i18n files (data/**, i18n/**) that were *modified*. Templates
+      # read `site.data` and translations feed every localized string, so any
+      # page may depend on these — a change here forces a full rebuild.
+      getter modified_data : Array(String)
       # Files that were added (new) – present in current scan but not previous
       getter added_files : Array(String)
       # Files that were removed – present in previous scan but not current
@@ -251,6 +255,7 @@ module Hwaro
         @removed_files : Array(String),
         @config_changed : Bool,
         @modified_content_files : Array(String) = [] of String,
+        @modified_data : Array(String) = [] of String,
       )
       end
 
@@ -260,16 +265,19 @@ module Hwaro
           @modified_content_files.empty? &&
           @modified_templates.empty? &&
           @modified_static.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
       end
 
       # True when a full rebuild is unavoidable:
-      # config changed, or files were added / deleted (which affects
-      # section lists, navigation, taxonomy indices, etc.)
+      # config changed, data/i18n changed (any page may read them), or files
+      # were added / deleted (which affects section lists, navigation,
+      # taxonomy indices, etc.)
       def needs_full_rebuild? : Bool
-        @config_changed || !@added_files.empty? || !@removed_files.empty?
+        @config_changed || !@added_files.empty? || !@removed_files.empty? ||
+          !@modified_data.empty?
       end
 
       # True when only template files were modified (no content / static / structural changes)
@@ -278,6 +286,7 @@ module Hwaro
           @modified_content.empty? &&
           @modified_content_files.empty? &&
           @modified_static.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -289,6 +298,7 @@ module Hwaro
           @modified_content.empty? &&
           @modified_content_files.empty? &&
           @modified_templates.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -301,6 +311,7 @@ module Hwaro
           @modified_content.empty? &&
           @modified_templates.empty? &&
           @modified_static.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -310,6 +321,7 @@ module Hwaro
       def content_and_template_only? : Bool
         !@modified_content.empty? &&
           !@modified_templates.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -320,6 +332,7 @@ module Hwaro
       def content_incremental? : Bool
         !@modified_content.empty? &&
           @modified_templates.empty? &&
+          @modified_data.empty? &&
           @added_files.empty? &&
           @removed_files.empty? &&
           !@config_changed
@@ -350,6 +363,7 @@ module Hwaro
           modified_content_files: (@modified_content_files + other.modified_content_files).uniq,
           modified_templates: (@modified_templates + other.modified_templates).uniq,
           modified_static: (@modified_static + other.modified_static).uniq,
+          modified_data: (@modified_data + other.modified_data).uniq,
           added_files: net_added,
           removed_files: net_removed,
           config_changed: @config_changed || other.config_changed,
@@ -386,6 +400,7 @@ module Hwaro
           "content-asset" => @modified_content_files,
           "template"      => @modified_templates,
           "static"        => @modified_static,
+          "data"          => @modified_data,
           "added"         => @added_files,
           "removed"       => @removed_files,
         }.each do |label, list|
@@ -411,7 +426,7 @@ module Hwaro
 
       private def all_changed_files : Array(String)
         @modified_content + @modified_content_files + @modified_templates +
-          @modified_static + @added_files + @removed_files
+          @modified_static + @modified_data + @added_files + @removed_files
       end
     end
 
@@ -540,7 +555,7 @@ module Hwaro
         serve_receipt = Logger::Receipt.new("serve")
         serve_receipt.row("url", url, Logger::Role::Accent)
         serve_receipt.row("reload", live_reload ? "enabled" : "disabled")
-        serve_receipt.row("watch", "content · templates · static · config")
+        serve_receipt.row("watch", "content · templates · static · data · i18n · config")
         serve_receipt.outcome("ready", "Ctrl+C to stop", :ready)
         serve_receipt.emit
 
@@ -776,6 +791,7 @@ module Hwaro
         modified_content_files = [] of String
         modified_templates = [] of String
         modified_static = [] of String
+        modified_data = [] of String
         added_files = [] of String
         removed_files = [] of String
         config_changed = false
@@ -788,7 +804,7 @@ module Hwaro
             if path == "config.toml"
               config_changed = true
             else
-              classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static)
+              classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
             end
           else
             # New file (exists now, didn't before)
@@ -808,6 +824,7 @@ module Hwaro
           modified_content_files: modified_content_files,
           modified_templates: modified_templates,
           modified_static: modified_static,
+          modified_data: modified_data,
           added_files: added_files,
           removed_files: removed_files,
           config_changed: config_changed,
@@ -826,6 +843,7 @@ module Hwaro
         content_files : Array(String),
         templates : Array(String),
         static : Array(String),
+        data : Array(String),
       )
         if path.starts_with?("content/")
           if path.downcase.ends_with?(".md")
@@ -837,6 +855,8 @@ module Hwaro
           templates << path
         elsif path.starts_with?("static/")
           static << path
+        elsif path.starts_with?("data/") || path.starts_with?("i18n/")
+          data << path
         end
       end
 
@@ -989,7 +1009,7 @@ module Hwaro
 
       private def scan_mtimes : Hash(String, Time)
         mtimes = {} of String => Time
-        dirs_to_watch = ["content", "templates", "static"]
+        dirs_to_watch = ["content", "templates", "static", "data", "i18n"]
 
         dirs_to_watch.each do |dir|
           next unless Dir.exists?(dir)
