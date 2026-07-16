@@ -76,6 +76,16 @@ module Hwaro
         DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
         INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
 
+        # Placeholder comments left by `Core::Build::ShortcodeProcessor` for
+        # already-rendered shortcodes (canonical home here, next to the other
+        # inline patterns; the shortcode processor aliases it and emits the
+        # matching text). They must ride through `render` untouched: the
+        # HTML.escape at the top would otherwise turn them into
+        # `&lt;!--…--&gt;`, which the post-Markdown replacement pass cannot
+        # find — leaking the escaped comment into table cells, definition
+        # bodies, and footnotes.
+        SHORTCODE_PLACEHOLDER_RE = /<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/
+
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
         # the other passes verbatim.
@@ -89,6 +99,14 @@ module Hwaro
         # in addition to math — see `render(text, *, math:)` below, which is
         # the pre-F10 signature every existing caller/spec still uses.
         def render(text : String, *, flags : Flags) : String
+          placeholders = [] of String
+          if text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+            text = text.gsub(SHORTCODE_PLACEHOLDER_RE) do |comment|
+              placeholders << comment
+              "\x00SCPH#{placeholders.size - 1}\x00"
+            end
+          end
+
           result = HTML.escape(text)
 
           code_spans = [] of String
@@ -150,6 +168,13 @@ module Hwaro
 
           code_spans.each_with_index do |content, idx|
             result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")
+          end
+
+          # Last, so a placeholder that ended up inside a restored code
+          # span still resolves (consistent with paragraph text, where the
+          # comment also rides through Markd verbatim).
+          placeholders.each_with_index do |comment, idx|
+            result = result.sub("\x00SCPH#{idx}\x00", comment)
           end
 
           result

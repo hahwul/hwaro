@@ -13,6 +13,7 @@
 require "crinja"
 require "../../utils/logger"
 require "../../content/processors/fence_tracker"
+require "../../content/processors/inline_markdown"
 require "./builtin_shortcodes"
 
 module Hwaro
@@ -50,7 +51,10 @@ module Hwaro
         # the regex is used by `replace_shortcode_placeholders` after Markdown.
         SHORTCODE_PLACEHOLDER_PREFIX = "<!--HWARO-SHORTCODE-PLACEHOLDER-"
         SHORTCODE_PLACEHOLDER_SUFFIX = "-->"
-        SHORTCODE_PLACEHOLDER_RE     = /#{Regex.escape(SHORTCODE_PLACEHOLDER_PREFIX)}\d+#{Regex.escape(SHORTCODE_PLACEHOLDER_SUFFIX)}/
+        # The matching regex lives in InlineMarkdown, which must stash the
+        # comment before its HTML.escape pass (a spec pins the alias against
+        # PREFIX/SUFFIX so the two can't drift).
+        SHORTCODE_PLACEHOLDER_RE = Content::Processors::InlineMarkdown::SHORTCODE_PLACEHOLDER_RE
 
         # Matches CommonMark-style inline code spans on a single line
         # (1 to 3 leading backticks; the same count must close the span).

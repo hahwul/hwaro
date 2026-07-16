@@ -355,6 +355,54 @@ describe Hwaro::Core::Build::Builder do
       output.should eq("<b>found</b> <!--HWARO-SHORTCODE-PLACEHOLDER-99-->")
     end
 
+    it "aliases the placeholder regex that InlineMarkdown stashes" do
+      # InlineMarkdown owns the matching regex; the processor owns the
+      # emitted text. Pin them together so neither can drift.
+      placeholder = "#{Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_PLACEHOLDER_PREFIX}0" \
+                    "#{Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_PLACEHOLDER_SUFFIX}"
+      Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_PLACEHOLDER_RE.matches?(placeholder).should be_true
+    end
+
+    it "keeps placeholders unescaped through InlineMarkdown.render" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render(
+        "a <!--HWARO-SHORTCODE-PLACEHOLDER-0--> b <!-- more -->"
+      )
+      out.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0-->")
+      # Ordinary comments still escape like any other cell text.
+      out.should contain("&lt;!-- more --&gt;")
+    end
+
+    it "resolves shortcodes inside table cells, definitions, and footnotes" do
+      # End-to-end pipe: shortcode substitution → Markdown → placeholder
+      # replace. The placeholder used to be HTML-escaped by the inline
+      # renderer for all three surfaces, leaking
+      # `&lt;!--HWARO-SHORTCODE-PLACEHOLDER-N--&gt;` into the page.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/badge" => "<em>badge</em>"}
+      context = {} of String => Crinja::Value
+      results = {} of String => String
+
+      content = <<-MD
+        | col |
+        |-----|
+        | {{ badge() }} |
+
+        Term
+        : has a {{ badge() }} definition
+
+        Body text.[^1]
+
+        [^1]: footnote with {{ badge() }}
+        MD
+      substituted = builder.test_process_shortcodes_jinja(content, templates, context, results, crinja_env_override: env)
+      rendered, _ = Hwaro::Processor::Markdown.render(substituted, markdown_config: Hwaro::Models::MarkdownConfig.new)
+      output = builder.test_replace_shortcode_placeholders(rendered, results)
+
+      output.scan("<em>badge</em>").size.should eq 3
+      output.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+
     it "does not wrap block-level shortcode output in <p> when on its own line" do
       # End-to-end pipe: shortcode substitution → Markdown → placeholder replace.
       # Regression test for https://github.com/hahwul/hwaro/issues/473.
