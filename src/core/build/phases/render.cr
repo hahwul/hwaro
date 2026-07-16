@@ -701,8 +701,12 @@ module Hwaro::Core::Build::Phases::Render
 
     processed_content = if has_shortcodes
                           shortcode_context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                          # `warnings:` routes shortcode template errors into
+                          # page.build_warnings so the serve error overlay can
+                          # surface them (the render itself "succeeds").
                           process_shortcodes_jinja(raw, templates, shortcode_context, shortcode_results,
-                            crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                            crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
+                            warnings: page.build_warnings)
                         else
                           raw
                         end
@@ -902,7 +906,7 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
-    File.write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
+    Hwaro::Utils::FileSafe.atomic_write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
     Logger.action :create, output_path if verbose
   end
 
@@ -978,7 +982,7 @@ module Hwaro::Core::Build::Phases::Render
     return unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
 
     ensure_dir(Path[output_path].dirname.to_s)
-    File.write(output_path, content)
+    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
     Logger.action :create, output_path if verbose
   end
 
@@ -1057,7 +1061,7 @@ module Hwaro::Core::Build::Phases::Render
       # `with_base_path` is a no-op for a domain-root deployment.
       target = page.url.starts_with?('/') ? page.url : "/#{page.url}"
       redirect_url = site.config.with_base_path(target)
-      File.write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
+      Hwaro::Utils::FileSafe.atomic_write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
       Logger.action :create, dest_path, Logger::Role::Warn if verbose
     end
   end
@@ -1224,7 +1228,8 @@ module Hwaro::Core::Build::Phases::Render
                              template
                            else
                              process_shortcodes_in_text(template, templates, vars,
-                               crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                               crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
+                               warnings: page.build_warnings)
                            end
 
       # Cache compiled Crinja templates by content hash.

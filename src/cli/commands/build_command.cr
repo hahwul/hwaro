@@ -109,7 +109,16 @@ module Hwaro
 
           start = Time.instant
           begin
-            builder.run(options)
+            unless builder.run(options)
+              # The build aborted without raising (pre-hook failure or a
+              # phase abort from a non-classified exception). It used to
+              # slip through as exit 0 / `"status": "ok"` — fail loud with
+              # the same envelope classified errors get.
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_INTERNAL,
+                message: "Build failed — see the log above for the failing phase or hook.",
+              )
+            end
           rescue ex : Hwaro::HwaroError
             # Classified errors (config, template, content, …) are raised at
             # their source sites now, so we just forward the payload / rethrow.

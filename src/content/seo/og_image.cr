@@ -477,14 +477,14 @@ module Hwaro
                   # Fallback to SVG on render failure
                   svg_filename = "#{slug}.svg"
                   svg = render_svg(page, config, logo_data_uri, bg_data_uri)
-                  File.write(File.join(img_dir, svg_filename), svg)
+                  Hwaro::Utils::FileSafe.atomic_write(File.join(img_dir, svg_filename), svg)
                   page.image = "/#{ai.output_dir}/#{svg_filename}"
                   Logger.warn "  PNG render failed for #{slug}, falling back to SVG"
                 end
               else
                 svg_filename = "#{slug}.svg"
                 svg = render_svg(page, config, logo_data_uri, bg_data_uri)
-                File.write(File.join(img_dir, svg_filename), svg)
+                Hwaro::Utils::FileSafe.atomic_write(File.join(img_dir, svg_filename), svg)
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
               end
               Logger.debug "  OG image: #{page.image}" if verbose

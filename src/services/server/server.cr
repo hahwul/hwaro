@@ -35,7 +35,12 @@ module Hwaro
 
         if path.ends_with?("/")
           context.request.path += "index.html"
-        elsif File.extname(path).empty?
+        else
+          # No extname pre-filter here: deciding by extension 404'd every
+          # directory with a dot in its last segment (/docs/v1.2, /node.js)
+          # because stdlib's StaticFileHandler only appends the trailing
+          # slash when directory_listing is on. What's on disk decides.
+          #
           # Sanitize to prevent directory traversal before filesystem access
           sanitized = Utils::PathUtils.sanitize_path(path)
           fs_path = Path[@public_dir, sanitized]
@@ -57,10 +62,21 @@ module Hwaro
                        end
                      end
           if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
-            context.response.status_code = 301
+            # 302, not 301: browsers cache permanent redirects per URL, so a
+            # 301 would keep redirecting to a section long after a rebuild
+            # removed or renamed it (or after a different project reuses the
+            # port) until the user clears their browser cache.
+            context.response.status_code = 302
             # Use the already-sanitized path for the Location header to prevent
-            # CRLF injection and path traversal in the redirect target.
-            context.response.headers["Location"] = "/" + sanitized + "/"
+            # CRLF injection and path traversal in the redirect target. Keep
+            # the query string — /search?q=term must land on /search/?q=term,
+            # not an empty-query page. (A request-line query can't contain
+            # CR/LF; percent-encoded bytes stay encoded.)
+            location = "/" + sanitized + "/"
+            if (query = context.request.query) && !query.empty?
+              location += "?#{query}"
+            end
+            context.response.headers["Location"] = location
             return
           end
         end
@@ -72,7 +88,12 @@ module Hwaro
     class NotFoundHandler
       include HTTP::Handler
 
-      def initialize(@public_dir : String)
+      # With live reload on, 404 responses embed the reload script too: a
+      # tab parked on a not-yet-rendered URL (a page still building, a
+      # --fast-start deferred page) then refreshes itself the moment its
+      # HTML lands on disk, and build-error overlays reach 404 tabs as well.
+      # Without the script those tabs sat on the 404 forever.
+      def initialize(@public_dir : String, @injector : LiveReloadInjectHandler? = nil)
       end
 
       def call(context)
@@ -80,11 +101,29 @@ module Hwaro
         context.response.content_type = "text/html; charset=utf-8"
 
         path_404 = File.join(@public_dir, "404.html")
-        if File.exists?(path_404)
-          context.response.print File.read(path_404)
-        else
-          context.response.print "404 Not Found"
+        body = File.exists?(path_404) ? File.read(path_404) : "404 Not Found"
+        if injector = @injector
+          body = injector.inject_script(body)
         end
+        context.response.print body
+      end
+    end
+
+    # Dev responses must never be cached by the browser: watch rebuilds
+    # rewrite files whose Etag/Last-Modified derive from second-granularity
+    # mtimes, so two quick saves inside one second produce a "new" version
+    # whose validators match the cached one — the browser then 304s onto the
+    # stale copy until a hard refresh. `no-store` matches what other SSG dev
+    # servers ship. The header is set BEFORE call_next so it also reaches
+    # responses that flush their headers mid-body (static files larger than
+    # the response's 8KB output buffer). Skipped entirely when the user
+    # supplies their own Cache-Control via [serve.headers]/--header.
+    class NoCacheHandler
+      include HTTP::Handler
+
+      def call(context)
+        context.response.headers["Cache-Control"] = "no-store"
+        call_next(context)
       end
     end
 
@@ -207,10 +246,21 @@ module Hwaro
       end
 
       def call(context)
+        # Pre-set BEFORE call_next so the values survive responses that
+        # flush their headers mid-body: files larger than the response's
+        # 8KB output buffer serialize headers at first flush, and
+        # post-call_next edits never reach the wire for those.
+        apply_headers(context)
         call_next(context)
+        # Re-assert after so user values still win over anything a
+        # downstream handler set in between (Content-Type charset, CORS)
+        # for the buffered small-response case. Only headers the static
+        # handler itself overwrites (Content-Type, validators) remain
+        # theirs on >8KB responses.
+        apply_headers(context)
+      end
 
-        # Apply after all other handlers so user values override built-ins
-        # (including Content-Type adjustments and dev CORS headers).
+      private def apply_headers(context)
         @headers.each do |name, value|
           # Final guard: never emit control characters in headers even if they
           # somehow made it through config/CLI validation.
@@ -431,6 +481,12 @@ module Hwaro
     end
 
     class Server
+      # What the watcher records per file: mtime plus size. Size catches
+      # same-tick rewrites on coarse-mtime filesystems (Docker bind mounts,
+      # NFS/SMB shares, exFAT) where two quick saves can share a timestamp —
+      # an mtime-only comparison would permanently miss the second save.
+      alias FileStamp = {Time, Int64}
+
       @builder : Core::Build::Builder
       @live_reload_handler : LiveReloadHandler?
       # True after a watch rebuild raised. A failed rebuild can leave the
@@ -440,6 +496,12 @@ module Hwaro
       # unrelated file — so the next changeset escalates to a full rebuild
       # to guarantee convergence, whatever the user saves.
       @rebuild_failed : Bool = false
+      # "config.<env>.toml" when serve runs with --env/HWARO_ENV, nil
+      # otherwise. Watched alongside config.toml (both force full rebuilds).
+      @env_config_file : String? = nil
+      # [serve] table captured at startup — the baseline for warning that a
+      # config edit changed restart-only settings (headers, fast).
+      @startup_serve_config : Models::ServeConfig? = nil
 
       # Debounce interval: after detecting changes, wait this long for
       # additional changes to settle before triggering a rebuild.
@@ -474,8 +536,34 @@ module Hwaro
       end
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
+        # The env-specific config overlay (config.<env>.toml) feeds every
+        # rebuild via Models::Config.load, so the watcher must see its edits
+        # — scan_mtimes stats it alongside config.toml.
+        @env_config_file = build_options.env.try { |e| "config.#{e}.toml" }
+
         # The initial build prints its own receipt; no preamble needed.
-        @builder.run(build_options)
+        #
+        # A broken site at startup (template syntax error, failing hook)
+        # used to kill serve before the server or watcher existed — the user
+        # had to fix blind and rerun, while the very same error during a
+        # running session gets the fix-and-save loop plus a browser overlay.
+        # Start anyway: @rebuild_failed forces the first watch rebuild to be
+        # a full one, and the error is replayed to the first live-reload
+        # client so the browser shows the overlay instead of a bare 404.
+        initial_error : String? = nil
+        begin
+          unless @builder.run(build_options)
+            initial_error = "Initial build failed — check the terminal, fix the error, and save to rebuild."
+          end
+        rescue ex : Hwaro::HwaroError
+          initial_error = ex.message || "Initial build failed"
+          Logger.error "Initial build failed: #{ex.message}"
+          ex.hint.try { |hint| Logger.info "  Hint: #{hint}" }
+        end
+        if initial_error
+          @rebuild_failed = true
+          Logger.warn "Serving the previous output (if any) — the watcher will rebuild on your next save."
+        end
 
         # Watch-triggered rebuilds should preserve the already-built output
         # so per-image mtime-skip (and any future incremental hook logic)
@@ -490,6 +578,14 @@ module Hwaro
         watch_options.fast_start = false
 
         output_dir = sanitize_output_dir(build_options.output_dir)
+        # The static handler needs an existing root even when the initial
+        # build failed before creating one.
+        Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+
+        # Baseline for the restart-only [serve.*] warning after config edits.
+        # Nil when the initial build never loaded a config; established lazily
+        # by the first successful config-changed rebuild in that case.
+        @startup_serve_config = @builder.config.try(&.serve)
 
         # Loopback literals plus the concrete bound host (a 0.0.0.0/:: wildcard
         # bind has no single host, so it contributes nothing here). The
@@ -501,11 +597,14 @@ module Hwaro
         handlers = [] of HTTP::Handler
         handlers << HTTP::LogHandler.new if access_log
         # Reflect CORS for loopback/bound origins first so it applies to every
-        # downstream response, including 301 redirects from IndexRewriteHandler
+        # downstream response, including redirects from IndexRewriteHandler
         # and 404s from NotFoundHandler. This preserves the localhost-vs-
         # 127.0.0.1 fetch() ergonomic without granting arbitrary websites
         # cross-origin read access (the old blanket `*`).
         handlers << DevCorsHandler.new(cors_hosts)
+        # Dev cache-busting (see NoCacheHandler). A user-supplied
+        # Cache-Control from [serve.headers]/--header wins outright.
+        handlers << NoCacheHandler.new unless headers.keys.any? { |k| k.downcase == "cache-control" }
         # Run before StaticFileHandler so we can append `; charset=utf-8`
         # to text-shaped Content-Type headers after the static handler
         # sets them — Crystal's `HTTP::Server::Response` buffers the
@@ -516,17 +615,25 @@ module Hwaro
         # - it wraps IndexRewrite / LiveReloadInject (catches their early returns)
         # - it runs after DevCors + Charset on the return path (user values win)
         handlers << CustomHeadersHandler.new(headers) unless headers.empty?
+        inject_handler : LiveReloadInjectHandler? = nil
         if live_reload
           lr_handler = LiveReloadHandler.new
           @live_reload_handler = lr_handler
           handlers << lr_handler
           handlers << IndexRewriteHandler.new(output_dir)
-          handlers << LiveReloadInjectHandler.new(output_dir)
+          inject_handler = LiveReloadInjectHandler.new(output_dir)
+          handlers << inject_handler
         else
           handlers << IndexRewriteHandler.new(output_dir)
         end
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
-        handlers << NotFoundHandler.new(output_dir)
+        handlers << NotFoundHandler.new(output_dir, inject_handler)
+
+        # Replay a startup failure to the first live-reload client(s) so the
+        # browser shows the overlay instead of a bare 404/stale page.
+        if (msg = initial_error) && (lr = @live_reload_handler)
+          lr.notify_build_error(msg)
+        end
 
         server = HTTP::Server.new(handlers)
 
@@ -754,7 +861,7 @@ module Hwaro
 
       # Wait for rapid successive changes to settle, merging all detected
       # changesets into one.  Returns the merged changeset.
-      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, Time)) : {ChangeSet, Hash(String, Time)}
+      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, FileStamp)) : {ChangeSet, Hash(String, FileStamp)}
         merged = initial
         current_mtimes = last_mtimes
         iterations = 0
@@ -784,8 +891,8 @@ module Hwaro
 
       # Diff two mtime snapshots and return a categorised ChangeSet.
       private def detect_changes(
-        old_mtimes : Hash(String, Time),
-        new_mtimes : Hash(String, Time),
+        old_mtimes : Hash(String, FileStamp),
+        new_mtimes : Hash(String, FileStamp),
       ) : ChangeSet
         modified_content = [] of String
         modified_content_files = [] of String
@@ -801,7 +908,7 @@ module Hwaro
           if old_mtime = old_mtimes[path]?
             next if old_mtime == new_mtime # unchanged
 
-            if path == "config.toml"
+            if path == "config.toml" || path == @env_config_file
               config_changed = true
             else
               classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
@@ -890,20 +997,41 @@ module Hwaro
                           @builder.stale_outputs_for_removed(changeset.removed_files, sanitize_output_dir(build_options.output_dir))
                         end
 
-        case strategy
-        when :full
-          @builder.run(build_options)
-        when :templates
-          @builder.run_rerender(build_options)
-        when :incremental
-          @builder.run_incremental(changeset.modified_content, build_options)
-        when :content_and_template
-          @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
-        when :static
-          copy_static(changeset, build_options)
-        when :content_files
-          copy_content_files(changeset, build_options)
+        success = case strategy
+                  when :full
+                    @builder.run(build_options)
+                  when :templates
+                    @builder.run_rerender(build_options)
+                  when :incremental
+                    @builder.run_incremental(changeset.modified_content, build_options)
+                  when :content_and_template
+                    @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
+                  when :static
+                    copy_static(changeset, build_options)
+                    true
+                  when :content_files
+                    copy_content_files(changeset, build_options)
+                    true
+                  else
+                    true
+                  end
+
+        # A build can fail WITHOUT raising: pre-hook failures and phase
+        # aborts (non-classified exceptions become HookResult::Abort) return
+        # false. Treat that exactly like the rescue path in the caller —
+        # flag it so the next changeset escalates to a full rebuild, push
+        # the overlay, and skip the reload so the browser doesn't refresh
+        # onto a half-built site with no visible error.
+        unless success
+          @rebuild_failed = true
+          @live_reload_handler.try(&.notify_build_error("Build failed — check the terminal for details."))
+          return
         end
+
+        # A config edit rebuilt the site with the new values, but [serve.*]
+        # keys were consumed at startup — warn instead of silently looking
+        # like they applied.
+        warn_restart_only_serve_settings if changeset.config_changed
 
         # Copy static files if they changed alongside content/template changes
         if strategy != :static && strategy != :full && !changeset.modified_static.empty?
@@ -922,6 +1050,24 @@ module Hwaro
         remove_stale_outputs(stale_outputs, sanitize_output_dir(build_options.output_dir))
 
         @live_reload_handler.try(&.notify_reload)
+      end
+
+      # [serve.*] keys are consumed once at startup (headers baked into the
+      # handler chain, fast → skip flags in the frozen watch options). A
+      # config edit triggers a full rebuild that LOOKS like it applied them —
+      # say so instead of leaving the user chasing a phantom.
+      private def warn_restart_only_serve_settings
+        current = @builder.config.try(&.serve)
+        return unless current
+        unless startup = @startup_serve_config
+          # Initial build never loaded a config (it failed) — this rebuild's
+          # values become the baseline.
+          @startup_serve_config = current
+          return
+        end
+        if startup.headers != current.headers || startup.fast != current.fast
+          Logger.warn "  [serve] settings changed in config — restart `hwaro serve` to apply them."
+        end
       end
 
       # Delete output files orphaned by removed sources, pruning any
@@ -1000,6 +1146,11 @@ module Hwaro
         /___jb_old___$/,                    # JetBrains safe-write backup
         /(?:\A|\/)\.goutputstream-[^\/]+$/, # GNOME (gedit) atomic save
         /(?:\A|\/)4913$/,                   # vim's write-permission probe
+        # Hidden state directories editors/VCS maintain inside watched roots
+        # (Obsidian vaults under content/ are common). The scan includes
+        # dotfiles — publishable ones like static/.well-known/* must be
+        # watched — so this churn has to be filtered by name.
+        /(?:\A|\/)\.(?:git|obsidian|idea|vscode)\//,
       ]
 
       protected def self.watcher_ignored?(path : String) : Bool
@@ -1007,28 +1158,41 @@ module Hwaro
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end
 
-      private def scan_mtimes : Hash(String, Time)
-        mtimes = {} of String => Time
+      private def scan_mtimes : Hash(String, FileStamp)
+        mtimes = {} of String => FileStamp
         dirs_to_watch = ["content", "templates", "static", "data", "i18n"]
 
         dirs_to_watch.each do |dir|
           next unless Dir.exists?(dir)
-          Dir.glob(File.join(dir, "**", "*")) do |file|
+          # DotFiles: the build publishes hidden files (static/.well-known/*,
+          # see the equivalent build-side fix), so the watcher must see their
+          # edits too — a default glob never descends into dot-directories,
+          # leaving those files permanently stale during serve. Editor/VCS
+          # noise stays filtered by watcher_ignored?.
+          Dir.glob(File.join(dir, "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
             next if File.directory?(file)
             next if Server.watcher_ignored?(file)
             begin
-              mtimes[file] = File.info(file).modification_time
+              info = File.info(file)
+              mtimes[file] = {info.modification_time, info.size.to_i64}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
           end
         end
 
-        if File.exists?("config.toml")
+        config_files = ["config.toml"]
+        # The env overlay feeds every rebuild through Models::Config.load —
+        # its edits were invisible to the watcher (silently ignored for the
+        # whole session) before it was stat'ed here.
+        @env_config_file.try { |ec| config_files << ec }
+        config_files.each do |cfg|
+          next unless File.exists?(cfg)
           begin
-            mtimes["config.toml"] = File.info("config.toml").modification_time
+            info = File.info(cfg)
+            mtimes[cfg] = {info.modification_time, info.size.to_i64}
           rescue ex
-            Logger.debug "Failed to read config.toml info: #{ex.message}"
+            Logger.debug "Failed to read #{cfg} info: #{ex.message}"
           end
         end
 

@@ -97,6 +97,12 @@ module Hwaro
         # Static extends/include/import graph over the loaded templates.
         # Rebuilt whenever templates reload; nil before the first load.
         @template_deps : TemplateDeps?
+        # Content hashes of extension-shadowed template files (foo.j2 while
+        # foo.html holds the "foo" slot), keyed by source path. Renders can
+        # reach these by explicit name through the loader's disk fallback,
+        # so run_rerender must treat their edits as template changes even
+        # though the snapshot hash itself is unchanged.
+        @shadowed_template_hashes : Hash(String, String) = {} of String => String
         # Combined checksum of all templates for the current build — the
         # fallback per-entry template hash when dependency tracking is off.
         @global_templates_hash : String = ""
@@ -238,6 +244,13 @@ module Hwaro
           @context
         end
 
+        # The most recently loaded site config (nil before the first build).
+        # The serve watcher reads it to diff restart-only [serve] settings
+        # after a config-triggered rebuild.
+        def config : Models::Config?
+          @config
+        end
+
         # Register all cache layers with the unified manager
         private def setup_cache_manager
           @cache_manager.register("compiled_templates", "Compiled Crinja template ASTs", runtime: true) do
@@ -281,7 +294,10 @@ module Hwaro
           self
         end
 
-        def run(options : Config::Options::BuildOptions)
+        # Returns false when the build failed without raising (pre-hook
+        # failure or a phase abort) — the serve watcher branches on this to
+        # surface the failure instead of live-reloading onto a broken site.
+        def run(options : Config::Options::BuildOptions) : Bool
           @render_workers = options.workers
           run(
             output_dir: options.output_dir,
@@ -319,7 +335,7 @@ module Hwaro
         # - Re-links navigation only for affected sections
         # - Recomputes series/related posts only for affected pages
         # - Selectively invalidates Crinja caches
-        def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+        def run_incremental(changed_content_files : Array(String), options : Config::Options::BuildOptions) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -344,6 +360,11 @@ module Hwaro
           affected_sections = Set(String).new
           old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
           old_series_names = {} of String => String?
+          # Output files each changed page occupied BEFORE re-parse — a slug/
+          # custom_path edit relocates the page, and the original file would
+          # otherwise keep serving 200 for the rest of the session (and ship
+          # if `public/` is deployed from it).
+          old_output_paths = {} of String => Array(String)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -362,10 +383,15 @@ module Hwaro
 
             page = pages_map[relative_path]?
             unless page
-              # A section _index that isn't in the site model (e.g. its own
-              # front matter says draft = true) can still cascade to its
-              # descendants — an edit to it is untrackable incrementally.
-              if File.basename(relative_path).starts_with?("_index.")
+              # Not in the site model: an excluded page (draft / future /
+              # expired / parse-failed at startup) whose edit may have just
+              # made it publishable, or a filtered section _index whose
+              # [cascade] still reaches descendants. Incremental bookkeeping
+              # can't see either — un-drafting a post used to be silently
+              # skipped here until serve restart. A full rebuild re-admits
+              # whatever this save changed. Files gone from disk are the
+              # watcher's removed-file path; still skip those.
+              if File.exists?(file)
                 Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
                 return run(options)
               end
@@ -378,6 +404,7 @@ module Hwaro
             old_series_names[page.path] = page.series
             old_neighbors[page.path] = {page.lower, page.higher}
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
+            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
 
             # Re-read, re-parse front-matter and recalculate URL
             parse_single_page(page)
@@ -403,7 +430,7 @@ module Hwaro
 
           if changed_pages.empty?
             Logger.info "  No matching pages found – skipping."
-            return
+            return true
           end
 
           # Re-render <!-- more --> summaries for the re-parsed pages with the
@@ -418,11 +445,11 @@ module Hwaro
           @output_url_winners = compute_output_url_winners((site.pages + site.sections).as(Array(Models::Page)))
 
           # --- 2. Incrementally update relationships ---
-          # Run taxonomy update on ALL re-parsed pages first (including those about
-          # to be excluded), so excluded pages' old entries are properly removed.
-          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
-
-          # Now identify pages that should be excluded (draft/expired/future)
+          # Identify pages that should be excluded (draft/expired/future)
+          # BEFORE the taxonomy update, so their re-parsed terms don't get
+          # re-added to site.taxonomies — pages rendered in this same pass
+          # would otherwise still show the drafted page in tag clouds and
+          # term counts until the next full build.
           excluded_pages = [] of Models::Page
           now = Time.utc
           # Re-stamp the publication window on re-parsed pages so pages kept
@@ -430,31 +457,42 @@ module Hwaro
           # artifacts and listings (same contract as the full parse phase).
           changed_pages.each(&.refresh_unpublished!(now))
           unless include_drafts
-            excluded = changed_pages.select(&.draft)
-            excluded_pages.concat(excluded)
+            excluded_pages.concat(changed_pages.select(&.draft))
             changed_pages.reject!(&.draft)
           end
           unless options.include_expired
-            expired = changed_pages.select { |p| p.expires.try { |e| e <= now } || false }
-            excluded_pages.concat(expired)
+            excluded_pages.concat(changed_pages.select { |p| p.expires.try { |e| e <= now } || false })
             changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
           end
           unless options.include_future
-            future = changed_pages.select { |p| p.date.try { |d| d > now } || false }
-            excluded_pages.concat(future)
+            excluded_pages.concat(changed_pages.select { |p| p.date.try { |d| d > now } || false })
             changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
           end
+          excluded_paths = excluded_pages.map(&.path).to_set
+
+          # Run taxonomy update on ALL re-parsed pages (including the excluded
+          # ones — their OLD entries must be removed; excluded_paths keeps
+          # their new terms from being re-added).
+          update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
 
           # Remove excluded pages from site indices and delete stale output files
           unless excluded_pages.empty?
-            excluded_paths = excluded_pages.map(&.path).to_set
             site.pages.reject! { |p| excluded_paths.includes?(p.path) }
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
-              stale_output = get_output_path(p, output_dir)
-              File.delete(stale_output) if File.exists?(stale_output)
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              delete_orphaned_outputs(stale, output_dir)
             end
           end
+
+          # Delete originals of pages whose edit relocated their output file
+          # (slug/custom_path change) — excluded pages were handled above.
+          relocated = [] of String
+          changed_pages.each do |page|
+            next unless olds = old_output_paths[page.path]?
+            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+          end
+          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
 
@@ -475,8 +513,7 @@ module Hwaro
 
           # Recompute related posts selectively (if enabled). Pass the excluded
           # pages' paths so pages that listed a now-removed page as related drop it.
-          excluded_related_paths = excluded_pages.map(&.path).to_set
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_related_paths)
+          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -572,6 +609,11 @@ module Hwaro
 
           # --- 4. Re-render the affected pages ---
           global_vars = build_global_vars(site, options.cache_busting)
+          # Refresh the stash render_global_vars_or_build serves — taxonomy
+          # pages regenerated below (and any later 404 rebuild) would
+          # otherwise render against the site snapshot of the last FULL
+          # build: old titles, old term sets, old menus.
+          @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
@@ -604,11 +646,12 @@ module Hwaro
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size} / #{all_pages.size} pages", :result, elapsed.total_milliseconds)
           report_cache_stats(options.verbose)
+          true
         end
 
         # Incremental parse of changed content + full re-render with reloaded templates.
         # Used when both content and templates changed simultaneously.
-        def run_incremental_then_rerender(changed_content_files : Array(String), options : Config::Options::BuildOptions)
+        def run_incremental_then_rerender(changed_content_files : Array(String), options : Config::Options::BuildOptions) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -619,11 +662,13 @@ module Hwaro
 
           Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
 
+          output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
           changed_pages = [] of Models::Page
           affected_sections = Set(String).new
           old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
           old_series_names = {} of String => String?
+          old_output_paths = {} of String => Array(String)
 
           # Same cascade context as run_incremental — re-parsed pages must
           # get their inherited section defaults back before rendering.
@@ -634,9 +679,10 @@ module Hwaro
 
             page = pages_map[relative_path]?
             unless page
-              # See run_incremental: an excluded section's _index can still
-              # cascade to descendants — escalate rather than miss it.
-              if File.basename(relative_path).starts_with?("_index.")
+              # See run_incremental: an excluded page's edit may have just
+              # made it publishable, and an excluded section's _index can
+              # still cascade to descendants — escalate rather than miss it.
+              if File.exists?(file)
                 Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
                 return run(options)
               end
@@ -648,6 +694,7 @@ module Hwaro
             old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
             old_series_names[page.path] = page.series
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
+            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
 
             parse_single_page(page)
             page.generate_permalink(config.base_url)
@@ -667,12 +714,55 @@ module Hwaro
             page.ancestors.each { |ancestor| affected_sections << ancestor.section }
           end
 
-          # Update all derived relationships before full re-render
-          update_taxonomies_incremental(site, changed_pages, old_taxonomies_snapshot)
+          # Exclusion pass, mirroring run_incremental: a save that flips a
+          # page to draft (or into the expired/future window) alongside a
+          # template edit used to leave it published — still in listings,
+          # feeds, and on disk — because only the content-only strategy
+          # applied the filters.
+          excluded_pages = [] of Models::Page
+          now = Time.utc
+          changed_pages.each(&.refresh_unpublished!(now))
+          unless options.drafts
+            excluded_pages.concat(changed_pages.select(&.draft))
+            changed_pages.reject!(&.draft)
+          end
+          unless options.include_expired
+            excluded_pages.concat(changed_pages.select { |p| p.expires.try { |e| e <= now } || false })
+            changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
+          end
+          unless options.include_future
+            excluded_pages.concat(changed_pages.select { |p| p.date.try { |d| d > now } || false })
+            changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
+          end
+          excluded_paths = excluded_pages.map(&.path).to_set
+
+          # Update all derived relationships before full re-render (removal
+          # runs for every re-parsed page; excluded pages' new terms are not
+          # re-added — see update_taxonomies_incremental).
+          update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
+
+          unless excluded_pages.empty?
+            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
+            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
+            excluded_pages.each do |p|
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              delete_orphaned_outputs(stale, output_dir)
+            end
+          end
+
+          # Delete originals of pages whose edit relocated their output file
+          # (slug/custom_path change) — mirrors run_incremental.
+          relocated = [] of String
+          changed_pages.each do |page|
+            next unless olds = old_output_paths[page.path]?
+            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+          end
+          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
+
           site.build_lookup_index
           relink_navigation_for_sections(site, affected_sections)
           recompute_series_for_pages(site, changed_pages, old_series_names) if site.config.series.enabled
-          recompute_related_posts_for_pages(site, changed_pages) if site.config.related.enabled
+          recompute_related_posts_for_pages(site, changed_pages, excluded_paths) if site.config.related.enabled
 
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
@@ -692,7 +782,7 @@ module Hwaro
         # the selective path can't skip a content-changed page. Their taxonomy
         # membership may have changed too, so taxonomy pages regenerate
         # whenever force_pages are present.
-        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil)
+        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -706,6 +796,7 @@ module Hwaro
           # Reload templates from disk & reset all runtime caches.
           # Keep the old sources so the dependency graph can diff them.
           old_templates = @templates
+          old_shadowed = @shadowed_template_hashes
           @templates = nil
           @cache_manager.clear_runtime
           templates = load_templates
@@ -725,11 +816,20 @@ module Hwaro
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           renderable_pages = all_pages.select(&.render)
 
-          # Selective re-render: same template set, fully static graph
+          # Selective re-render: same template set, fully static graph.
+          # `old_shadowed` guards extension-shadowed variants (foo.j2 next to
+          # foo.html): they aren't in the snapshot hash, but an explicit
+          # `{% include "foo.j2" %}` reads them from disk — an edit there
+          # used to hit the "contents are identical" early return forever.
           affected_templates : Set(String)? = nil
           changed_template_names : Set(String)? = nil
+          # True when the change can alter page CONTENT and summaries
+          # (shortcode/hook templates in the affected closure), not just the
+          # layout — drives the summary recompute and SEO-surface refresh.
+          content_semantics_changed = false
           if @per_page_template_hash && deps && old_templates &&
-             old_templates.keys.sort! == templates.keys.sort!
+             old_templates.keys.sort! == templates.keys.sort! &&
+             old_shadowed == @shadowed_template_hashes
             changed = Set(String).new
             templates.each do |name, source|
               changed << name if old_templates[name]? != source
@@ -737,17 +837,22 @@ module Hwaro
             changed_template_names = changed
             if changed.empty? && (force_pages.nil? || force_pages.empty?)
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
-              return
+              return true
             end
-            if changed.any?(&.starts_with?("hooks/"))
+            affected = deps.dependents_closure(changed)
+            if affected.any? { |n| n.starts_with?("hooks/") || n.starts_with?("shortcodes/") }
               # Hook templates aren't in the {% include %}/{% extends %}
               # dependency graph (they're invoked from Markdown rendering,
-              # not template rendering) — dependents_closure has no way to
-              # know which pages a hook change affects, so fall back to a
-              # full re-render.
+              # not template rendering), and shortcode output is embedded in
+              # page content AND summaries that listing pages and feeds
+              # re-print — the per-page graph can't scope either, so fall
+              # back to a full re-render. Checking the CLOSURE (not just the
+              # changed set) also catches a partial included by a
+              # shortcode/hook template.
               affected_templates = nil
+              content_semantics_changed = true
             else
-              affected_templates = deps.dependents_closure(changed)
+              affected_templates = affected
             end
             Logger.info "Template change detected (#{changed.join(", ")}). Re-rendering affected pages..." if options.verbose && !changed.empty?
           else
@@ -777,20 +882,25 @@ module Hwaro
           end
 
           global_vars = build_global_vars(site, options.cache_busting)
+          # Refresh the stash render_global_vars_or_build serves — the 404
+          # page and taxonomy regeneration below would otherwise render
+          # against the site snapshot of the last FULL build.
+          @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)
           cache = @cache || Cache.new(enabled: false)
 
           # Recompute <!-- more --> summaries with the reloaded templates —
           # but only when they can actually change: a shortcode/hook template
-          # edit, an unclassifiable template change (changed_template_names
-          # nil), or force_pages arriving from run_incremental_then_rerender
-          # with summary_html reset to nil by parse_single_page. A layout-only
+          # anywhere in the affected closure (content_semantics_changed), an
+          # unclassifiable template change (changed_template_names nil), or
+          # force_pages arriving from run_incremental_then_rerender with
+          # summary_html reset to nil by parse_single_page. A layout-only
           # edit skips the recompute entirely (it can't affect summaries and
           # would re-run per-page Crinja work on every keystroke).
           forced = force_pages || [] of Models::Page
           summaries_affected = !forced.empty? ||
                                changed_template_names.nil? ||
-                               changed_template_names.any? { |n| n.starts_with?("shortcodes/") || n.starts_with?("hooks/") }
+                               content_semantics_changed
           if summaries_affected
             # force_pages with render:true are already in pages_to_render;
             # render:false ones are excluded from the render set but their
@@ -798,6 +908,20 @@ module Hwaro
             summary_pages = pages_to_render + forced.reject(&.render)
             render_page_summaries(summary_pages, site, templates, highlight,
               link_targets: all_pages, global_vars: global_vars)
+
+            # The Crinja value caches and `global_vars` above were built
+            # BEFORE the recompute, so they still embed the OLD summary_html
+            # — a listing page printing `{{ p.summary }}` would re-render
+            # with the stale output (page body new, its summary everywhere
+            # else old). Drop the page-value caches and rebuild the globals
+            # from the fresh summaries.
+            @crinja_cache_mutex.synchronize do
+              @page_crinja_value_cache.clear
+              @section_pages_crinja_cache.clear
+              @section_pages_url_index_cache.clear
+            end
+            global_vars = build_global_vars(site, options.cache_busting)
+            @render_global_vars = global_vars
           end
 
           # Re-claim output URLs (see run_incremental): forced content edits
@@ -830,11 +954,12 @@ module Hwaro
                                 [] of Models::Section
                               end
 
-          # Content changed in this pass (run_incremental_then_rerender):
-          # sitemap/feeds/search/llms read page content and metadata, so
-          # refresh them like run_incremental does. Pure template edits skip
-          # this — template output doesn't feed the SEO surfaces.
-          if (forced = force_pages) && !forced.empty?
+          # Content semantics changed in this pass — either re-parsed content
+          # (run_incremental_then_rerender) or shortcode/hook template edits
+          # that rewrote the page.content / summary_html that sitemap, feeds,
+          # search, and llms embed. Refresh those surfaces. A pure layout
+          # edit still skips this — template output doesn't feed them.
+          if summaries_affected
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
             regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
@@ -845,6 +970,7 @@ module Hwaro
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{count} pages · re-render", :result, elapsed.total_milliseconds)
           report_cache_stats(verbose)
+          true
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?
@@ -918,6 +1044,8 @@ module Hwaro
           @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
 
           global_vars = build_global_vars(site, options.cache_busting)
+          # Keep the 404/taxonomy stash in sync (see run_incremental).
+          @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)
           renderable = pages.select(&.render)
 
@@ -1034,7 +1162,9 @@ module Hwaro
               if path.downcase.ends_with?(".md")
                 next unless site
                 rel = path.lchop("content/")
-                if page = site.pages.find { |p| p.path == rel }
+                # Section _index pages live in site.sections, not site.pages —
+                # deleting one used to leave its index.html served forever.
+                if page = site.pages.find { |p| p.path == rel } || site.sections.find { |s| s.path == rel }
                   outputs << get_output_path(page, output_dir)
 
                   # Sibling output-format files (see `[outputs]`): prefer what
@@ -1056,6 +1186,38 @@ module Hwaro
             end
           end
           outputs
+        end
+
+        # Primary output file plus output-format siblings for a page — used
+        # to prune the old files when an edit relocates the page's URL or
+        # excludes the page from the site.
+        private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
+          paths = [get_output_path(page, output_dir)]
+          if cfg = @config
+            paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
+          end
+          paths
+        end
+
+        # Delete output files an incremental rebuild has orphaned (slug
+        # change, page newly excluded), pruning directories the deletion
+        # leaves empty. Guarded so a corrupt path can never delete outside
+        # the output directory. Mirrors Server#remove_stale_outputs.
+        private def delete_orphaned_outputs(paths : Array(String), output_dir : String)
+          paths.each do |path|
+            next unless File.exists?(path)
+            next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+            File.delete(path)
+            Logger.info "  Removed stale output: #{path}"
+
+            dir = File.dirname(path)
+            while dir != output_dir && Utils::OutputGuard.within_output_dir?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
+              Dir.delete(dir)
+              dir = File.dirname(dir)
+            end
+          rescue ex
+            Logger.debug "  Could not remove stale output #{path}: #{ex.message}"
+          end
         end
 
         def run(
@@ -1082,7 +1244,7 @@ module Hwaro
           skip_image_processing : Bool = false,
           preserve_output : Bool = false,
           cache_busting : Bool = true,
-        )
+        ) : Bool
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
           # for missing files and TOML parse failures, so callers (and
@@ -1097,7 +1259,7 @@ module Hwaro
           unless pre_hooks.empty?
             unless Utils::CommandRunner.run_pre_hooks(pre_hooks)
               Logger.error "Build aborted due to pre-build hook failure."
-              return
+              return false
             end
           end
 
@@ -1166,8 +1328,12 @@ module Hwaro
           ctx.stats.end_time = Time.instant
 
           if result == Lifecycle::HookResult::Abort
+            # Phase bodies convert non-classified exceptions into Abort (see
+            # Lifecycle::Manager); returning false lets callers that can't
+            # rely on an exception — the serve watcher, `hwaro build`'s exit
+            # code — still observe the failure.
             Logger.error "Build failed!"
-            return
+            return false
           end
 
           elapsed = Time.instant - start_time
@@ -1207,6 +1373,8 @@ module Hwaro
               Utils::DebugPrinter.print(debug_site)
             end
           end
+
+          true
         end
 
         # Resolve `path` relative to `root`, falling back to a plain prefix

@@ -271,6 +271,22 @@ describe "Template deps: review regressions" do
     deps.shortcodes_used_in(%(a {% badge type="x" %}body{% end %} b)).should eq(Set{"shortcodes/badge"})
   end
 
+  it "records an include edge when no space follows the include keyword" do
+    templates = {
+      "page"            => %({% include"partials/banner.html" %}),
+      "partials/banner" => "<div>banner</div>",
+    }
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates)
+
+    deps.dynamic?.should be_false
+    deps.dependents_closure(Set{"partials/banner"}).should contain("page")
+  end
+
+  it "detects explicit shortcode() calls with a space before the paren" do
+    deps = Hwaro::Core::Build::TemplateDeps.new({"shortcodes/alert" => "<b>!</b>"})
+    deps.shortcodes_used_in(%(a {{ shortcode ("alert", msg="hi") }} b)).should contain("shortcodes/alert")
+  end
+
   it "rebuilds a page using explicit shortcode() syntax when the shortcode changes (cached)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

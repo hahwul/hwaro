@@ -49,6 +49,29 @@ module Hwaro
       rescue ex : File::AlreadyExistsError
         raise ex unless Dir.exists?(path)
       end
+
+      # Write `content` to `path` atomically: write to a same-directory
+      # temp file, then rename over the target. `hwaro serve` rewrites
+      # output files while HTTP fibers stream them to the browser — a plain
+      # `File.write` truncates first, so a request landing mid-rebuild could
+      # read an empty or half-written page. Rename is atomic on the same
+      # filesystem, so readers see either the old bytes or the new bytes.
+      #
+      # The temp name is unique per process AND fiber so parallel render
+      # workers writing sibling outputs can't collide on it.
+      def self.atomic_write(path : String | Path, content : String) : Nil
+        target = path.to_s
+        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        begin
+          File.write(tmp, content)
+          File.rename(tmp, target)
+        rescue ex
+          # Never leave the temp file behind — a failed write must look
+          # exactly like the old non-atomic failure (target unchanged).
+          File.delete(tmp) if File.exists?(tmp)
+          raise ex
+        end
+      end
     end
   end
 end

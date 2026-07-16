@@ -54,7 +54,7 @@ module Hwaro::Core::Build::Phases::Write
 
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
-    File.write(output_path, final_html)
+    Hwaro::Utils::FileSafe.atomic_write(output_path, final_html)
     Logger.action :create, output_path if verbose
   end
 
@@ -84,7 +84,7 @@ module Hwaro::Core::Build::Phases::Write
         )
         result = processor.process(content, context)
         if result.success
-          File.write(output_path, result.content)
+          Hwaro::Utils::FileSafe.atomic_write(output_path, result.content)
         else
           Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
           FileUtils.cp(raw_file.source_path, output_path)
@@ -175,7 +175,7 @@ module Hwaro::Core::Build::Phases::Write
     output_path = get_output_path(page, output_dir)
 
     ensure_dir(Path[output_path].dirname.to_s)
-    File.write(output_path, content)
+    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
     Logger.action :create, output_path if verbose
   end
 

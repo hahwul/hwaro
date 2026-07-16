@@ -9,8 +9,21 @@ module Hwaro
 
       LIVE_RELOAD_PATH = "/__hwaro_livereload"
 
-      @sockets : Array(HTTP::WebSocket) = [] of HTTP::WebSocket
-      # Guards every access to @sockets and @current_error. Under -Dpreview_mt
+      # A connected client: the socket plus a per-socket write mutex.
+      # HTTP::WebSocket::Protocol#send has no internal lock, so the
+      # connect-time replay (connection fiber) and the watcher fiber's
+      # broadcast could interleave frame bytes on the same socket under
+      # -Dpreview_mt — a WebSocket protocol error that drops the client.
+      private class Client
+        getter socket : HTTP::WebSocket
+        getter write_mutex : Mutex = Mutex.new
+
+        def initialize(@socket)
+        end
+      end
+
+      @clients : Array(Client) = [] of Client
+      # Guards every access to @clients and @current_error. Under -Dpreview_mt
       # (the CI/release build flag) HTTP::Server runs each connection in its own
       # fiber across worker threads, so the per-client `<<`/`delete` callbacks
       # race with the watcher fiber's broadcast. Array#<< triggering a resize
@@ -68,23 +81,32 @@ module Hwaro
           end
 
           ws = HTTP::WebSocketHandler.new do |socket, _ctx|
+            client = Client.new(socket)
             message = @sockets_mutex.synchronize do
-              @sockets << socket
+              @clients << client
               @current_error
             end
             # Replay the current build-error so a tab opened while the
             # build is broken sees the overlay immediately instead of
             # silently rendering whatever stale HTML happens to be on
-            # disk.
-            if message
-              begin
-                socket.send("error:#{{"message" => message}.to_json}")
-              rescue IO::Error | Socket::Error
-                # Connection torn down before the replay; harmless.
+            # disk. With NO pending error, send an explicit clear instead:
+            # a tab that showed the overlay, lost its socket (laptop sleep,
+            # the long recovery rebuild), and reconnected after the fix
+            # would otherwise display "Build failed" forever over a healthy
+            # site — the successful build's `reload` broadcast is long gone.
+            begin
+              client.write_mutex.synchronize do
+                if message
+                  socket.send("error:#{{"message" => message}.to_json}")
+                else
+                  socket.send("clear-error")
+                end
               end
+            rescue IO::Error | Socket::Error
+              # Connection torn down before the replay; harmless.
             end
             socket.on_close do
-              @sockets_mutex.synchronize { @sockets.delete(socket) }
+              @sockets_mutex.synchronize { @clients.delete(client) }
             end
           end
           ws.call(context)
@@ -121,17 +143,19 @@ module Hwaro
 
       private def broadcast(message : String)
         # Snapshot under the lock: a connection fiber may `<<`/`delete` from
-        # @sockets concurrently. We send outside the lock so a slow/blocked
-        # socket doesn't stall connection handling.
-        snapshot = @sockets_mutex.synchronize { @sockets.dup }
-        dead = [] of HTTP::WebSocket
-        snapshot.each do |socket|
-          socket.send(message)
+        # @clients concurrently. We send outside the global lock so a slow/
+        # blocked socket doesn't stall connection handling; the per-client
+        # write mutex only serializes writes to that one socket (against the
+        # connect-time replay).
+        snapshot = @sockets_mutex.synchronize { @clients.dup }
+        dead = [] of Client
+        snapshot.each do |client|
+          client.write_mutex.synchronize { client.socket.send(message) }
         rescue IO::Error | Socket::Error
-          dead << socket
+          dead << client
         end
         unless dead.empty?
-          @sockets_mutex.synchronize { dead.each { |s| @sockets.delete(s) } }
+          @sockets_mutex.synchronize { dead.each { |c| @clients.delete(c) } }
         end
       end
     end
@@ -211,6 +235,15 @@ module Hwaro
 
       def call(context)
         path = context.request.path
+
+        # GET only: StaticFileHandler correctly rejects other methods, and a
+        # full HTML body on HEAD (Crystal never suppresses it for handlers
+        # that print) desyncs spec-conformant keep-alive clients — the body
+        # bytes read as the start of the next response.
+        unless context.request.method == "GET"
+          call_next(context)
+          return
+        end
 
         unless path.ends_with?(".html")
           call_next(context)

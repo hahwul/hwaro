@@ -71,6 +71,12 @@ module Hwaro::Core::Build::Phases::ParseContent
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
+    # Pages whose summary_html this pass (re)assigns. The shortcode-context
+    # build below caches the page's own Crinja value BEFORE the assignment,
+    # so without invalidation every `{{ p.summary }}` in a listing would
+    # render that poisoned nil-summary value (the raw markdown chunk) for
+    # the rest of the build.
+    recomputed_paths = [] of String
 
     pages.each do |page|
       # parse_single_page already extracted the chunk into page.summary;
@@ -99,6 +105,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url)
 
       page.summary_html = html
+      recomputed_paths << page.path
     rescue ex
       # A broken shortcode in a summary must not abort the whole parse
       # phase — fall back to plain-Markdown rendering (same config flags,
@@ -107,6 +114,19 @@ module Hwaro::Core::Build::Phases::ParseContent
       Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
       fallback, _ = Processor::Markdown.render(summary_md.to_s, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
       page.summary_html = fallback
+      recomputed_paths << page.path
+    end
+
+    # Drop Crinja values cached before the summaries above were assigned —
+    # only the recomputed pages' entries, so incremental callers don't pay
+    # an O(site) re-conversion on every save. Section lists embed those
+    # page values wholesale, so they go too (rebuilt lazily on next use).
+    unless recomputed_paths.empty?
+      @crinja_cache_mutex.synchronize do
+        recomputed_paths.each { |path| @page_crinja_value_cache.delete(path) }
+        @section_pages_crinja_cache.clear
+        @section_pages_url_index_cache.clear
+      end
     end
   end
 

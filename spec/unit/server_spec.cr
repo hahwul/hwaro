@@ -200,8 +200,50 @@ describe Hwaro::Services::IndexRewriteHandler do
 
       handler.call(context)
 
-      response.status_code.should eq(301)
+      response.status_code.should eq(302)
       response.headers["Location"].should eq("/some/dir/")
+      dummy.called.should be_false
+    end
+  end
+
+  it "preserves the query string when redirecting a directory to its slash form" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "search"))
+
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/search?q=term")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      response.status_code.should eq(302)
+      response.headers["Location"].should eq("/search/?q=term")
+      dummy.called.should be_false
+    end
+  end
+
+  it "redirects a directory whose last segment contains a dot" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "docs/v1.2"))
+
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "/docs/v1.2")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+
+      response.status_code.should eq(302)
+      response.headers["Location"].should eq("/docs/v1.2/")
       dummy.called.should be_false
     end
   end
@@ -222,7 +264,7 @@ describe Hwaro::Services::IndexRewriteHandler do
 
       handler.call(context)
 
-      response.status_code.should eq(301)
+      response.status_code.should eq(302)
       location = response.headers["Location"]
       location.should eq("/safe/dir/")
       location.should_not contain("\r")
@@ -308,6 +350,119 @@ describe Hwaro::Services::NotFoundHandler do
       content = io.to_s
       content.should contain("404 Not Found")
     end
+  end
+
+  it "injects the live-reload script into a custom 404.html" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "404.html"), "<html><body>Custom 404</body></html>")
+
+      injector = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      handler = Hwaro::Services::NotFoundHandler.new(dir, injector)
+
+      request = HTTP::Request.new("GET", "/nonexistent")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+      response.close
+
+      response.status_code.should eq(404)
+      io.rewind
+      content = io.to_s
+      content.should contain("Custom 404")
+      content.should contain("__hwaro_livereload")
+      # Script lands before the closing </body>, not after it
+      content.index!("__hwaro_livereload").should be < content.rindex!("</body>")
+    end
+  end
+
+  it "injects the live-reload script into the plain-text fallback body" do
+    Dir.mktmpdir do |dir|
+      injector = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      handler = Hwaro::Services::NotFoundHandler.new(dir, injector)
+
+      request = HTTP::Request.new("GET", "/nonexistent")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+      response.close
+
+      response.status_code.should eq(404)
+      io.rewind
+      content = io.to_s
+      content.should contain("404 Not Found")
+      content.should contain("__hwaro_livereload")
+    end
+  end
+
+  it "does not inject the live-reload script without an injector" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "404.html"), "<html><body>Custom 404</body></html>")
+
+      handler = Hwaro::Services::NotFoundHandler.new(dir)
+
+      request = HTTP::Request.new("GET", "/nonexistent")
+      io = IO::Memory.new
+      response = HTTP::Server::Response.new(io)
+      context = HTTP::Server::Context.new(request, response)
+
+      handler.call(context)
+      response.close
+
+      io.rewind
+      io.to_s.should_not contain("__hwaro_livereload")
+    end
+  end
+end
+
+# Downstream handler that records the Cache-Control value visible at the
+# time it runs, proving upstream handlers set headers BEFORE call_next.
+class CacheControlCaptureHandler
+  include HTTP::Handler
+
+  getter seen_cache_control : String?
+  property called : Bool = false
+
+  def call(context)
+    @called = true
+    @seen_cache_control = context.response.headers["Cache-Control"]?
+  end
+end
+
+describe Hwaro::Services::NoCacheHandler do
+  it "sets Cache-Control: no-store on the response" do
+    handler = Hwaro::Services::NoCacheHandler.new
+    dummy = DummyHandler.new
+    handler.next = dummy
+
+    request = HTTP::Request.new("GET", "/index.html")
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    response.headers["Cache-Control"].should eq("no-store")
+    dummy.called.should be_true
+  end
+
+  it "sets the header before delegating so mid-body flushes carry it" do
+    handler = Hwaro::Services::NoCacheHandler.new
+    capture = CacheControlCaptureHandler.new
+    handler.next = capture
+
+    request = HTTP::Request.new("GET", "/big-file.bin")
+    io = IO::Memory.new
+    response = HTTP::Server::Response.new(io)
+    context = HTTP::Server::Context.new(request, response)
+
+    handler.call(context)
+
+    capture.called.should be_true
+    capture.seen_cache_control.should eq("no-store")
   end
 end
 
@@ -1343,11 +1498,21 @@ describe Hwaro::Services::ChangeSet do
   end
 end
 
-# Expose private detect_changes and classify_modified for testing
+# Expose private detect_changes and classify_modified for testing.
+# The Time-keyed overload converts to FileStamp (size 0) so specs that only
+# care about mtime semantics stay concise; the FileStamp overload passes
+# stamps through for size-delta cases.
 module Hwaro
   module Services
     class Server
       def test_detect_changes(old_mtimes : Hash(String, Time), new_mtimes : Hash(String, Time)) : ChangeSet
+        detect_changes(
+          old_mtimes.transform_values { |t| {t, 0_i64} },
+          new_mtimes.transform_values { |t| {t, 0_i64} },
+        )
+      end
+
+      def test_detect_changes(old_mtimes : Hash(String, FileStamp), new_mtimes : Hash(String, FileStamp)) : ChangeSet
         detect_changes(old_mtimes, new_mtimes)
       end
     end
@@ -1427,6 +1592,19 @@ describe "Server#detect_changes" do
     cs.added_files.should be_empty
     cs.removed_files.should be_empty
     cs.config_changed.should be_false
+  end
+
+  it "detects a size change with an identical mtime (coarse-mtime filesystems)" do
+    server = Hwaro::Services::Server.new
+    t1 = Time.utc(2025, 1, 1, 0, 0, 0)
+
+    old = {"content/posts/hello.md" => {t1, 10_i64}}
+    new_m = {"content/posts/hello.md" => {t1, 42_i64}}
+
+    cs = server.test_detect_changes(old, new_m)
+    cs.modified_content.should eq(["content/posts/hello.md"])
+    cs.added_files.should be_empty
+    cs.removed_files.should be_empty
   end
 
   it "detects modified template files" do
@@ -2620,6 +2798,15 @@ describe "watcher ignore patterns" do
     Hwaro::Services::Server.test_watcher_ignored?("templates/tmpl.html").should be_false
     Hwaro::Services::Server.test_watcher_ignored?("content/posts/14913.md").should be_false
     Hwaro::Services::Server.test_watcher_ignored?("static/img/4913.png").should be_false
+  end
+
+  it "ignores hidden editor/VCS state directories inside watched roots" do
+    Hwaro::Services::Server.test_watcher_ignored?("content/.obsidian/workspace.json").should be_true
+    Hwaro::Services::Server.test_watcher_ignored?("content/.git/index").should be_true
+  end
+
+  it "does NOT ignore publishable dot-directories like .well-known" do
+    Hwaro::Services::Server.test_watcher_ignored?("static/.well-known/security.txt").should be_false
   end
 
   it "excludes matched files from scan_mtimes" do

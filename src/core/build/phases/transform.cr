@@ -309,10 +309,17 @@ module Hwaro::Core::Build::Phases::Transform
   # than "name:term" strings: a taxonomy name containing ":" would make the
   # joined form ambiguous to split back apart, silently skipping that term's
   # re-sort below.
+  #
+  # `excluded_paths` are changed pages the caller is about to drop from the
+  # site model (newly draft/expired/future). Their OLD terms still need the
+  # removal pass, but re-adding their NEW terms would resurrect them in
+  # site.taxonomies — every page rendered in the same pass would then show
+  # the drafted page in tag clouds / term counts until the next full build.
   private def update_taxonomies_incremental(
     site : Models::Site,
     changed_pages : Array(Models::Page),
     old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
+    excluded_paths : Set(String) = Set(String).new,
   ) : Set({String, String})
     affected_tax_keys = Set({String, String}).new
 
@@ -337,7 +344,11 @@ module Hwaro::Core::Build::Phases::Transform
         end
       end
 
-      # 2. Add new assignments from re-parsed page
+      # 2. Add new assignments from re-parsed page — unless the caller is
+      # about to exclude it from the site model (removal above still ran,
+      # so its old terms are gone; skipping the add keeps it gone).
+      next if excluded_paths.includes?(page_path)
+
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
         terms.each do |term|
