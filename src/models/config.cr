@@ -653,6 +653,11 @@ module Hwaro
       property sup : Bool               # If true, enables superscript syntax (^sup^)
       property attributes : Bool        # If true, enables `{#id .class key=val}` attribute blocks on headings/images
       property smart_punctuation : Bool # If true, straight quotes/dashes/ellipses become typographic ones (markd smart mode)
+      # Site-wide policy for absolute http(s) links in rendered markdown
+      # (Zola parity). target_blank also adds rel="noopener".
+      property external_links_target_blank : Bool
+      property external_links_no_follow : Bool
+      property external_links_no_referrer : Bool
 
       def initialize
         @safe = false
@@ -672,6 +677,9 @@ module Hwaro
         @sup = false
         @attributes = false
         @smart_punctuation = false
+        @external_links_target_blank = false
+        @external_links_no_follow = false
+        @external_links_no_referrer = false
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -679,13 +687,15 @@ module Hwaro
       # previous config (e.g. after a config reload in `serve`) can't be
       # served for a build running with different markdown options.
       def cache_fingerprint : String
-        String.build(18 + @math_engine.bytesize) do |io|
+        String.build(21 + @math_engine.bytesize) do |io|
           io << (@safe ? '1' : '0') << (@lazy_loading ? '1' : '0') << (@emoji ? '1' : '0')
           io << (@footnotes ? '1' : '0') << (@task_lists ? '1' : '0') << (@definition_lists ? '1' : '0')
           io << (@mermaid ? '1' : '0') << (@math ? '1' : '0') << (@admonitions ? '1' : '0')
           io << (@heading_ids ? '1' : '0')
           io << (@ins ? '1' : '0') << (@mark ? '1' : '0') << (@sub ? '1' : '0')
           io << (@sup ? '1' : '0') << (@attributes ? '1' : '0') << (@smart_punctuation ? '1' : '0')
+          io << (@external_links_target_blank ? '1' : '0') << (@external_links_no_follow ? '1' : '0')
+          io << (@external_links_no_referrer ? '1' : '0')
           io << @math_engine
         end
       end
@@ -1798,6 +1808,9 @@ module Hwaro
         config.markdown.sup = bool_value(s["sup"]?, config.markdown.sup)
         config.markdown.attributes = bool_value(s["attributes"]?, config.markdown.attributes)
         config.markdown.smart_punctuation = bool_value(s["smart_punctuation"]?, config.markdown.smart_punctuation)
+        config.markdown.external_links_target_blank = bool_value(s["external_links_target_blank"]?, config.markdown.external_links_target_blank)
+        config.markdown.external_links_no_follow = bool_value(s["external_links_no_follow"]?, config.markdown.external_links_no_follow)
+        config.markdown.external_links_no_referrer = bool_value(s["external_links_no_referrer"]?, config.markdown.external_links_no_referrer)
       end
 
       private def self.load_series(config : Config)

@@ -986,6 +986,79 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "external link policy" do
+    it "adds target and noopener to absolute links when enabled" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ext](https://example.com) and [int](/docs/)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com" target="_blank" rel="noopener"))
+      html.should contain(%(<a href="/docs/">int</a>))
+    end
+
+    it "merges rel tokens into an existing rel without duplicating" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" rel="noopener me">x</a>), cfg
+      )
+      html.should contain(%(rel="noopener me nofollow"))
+      html.scan("noopener").size.should eq(1)
+    end
+
+    it "respects an existing target attribute" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" target="_self">x</a>), cfg
+      )
+      html.should contain(%(target="_self"))
+      html.should_not contain("_blank")
+    end
+
+    it "adds nofollow and noreferrer without target_blank" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      cfg.external_links_no_referrer = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="http://e.com">x</a>), cfg
+      )
+      html.should contain(%(rel="nofollow noreferrer"))
+      html.should_not contain("target=")
+    end
+
+    it "leaves links inside code blocks and mailto links alone" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "```\n<a href=\"https://e.com\">x</a>\n```\n\n[m](mailto:a@b.c)",
+        markdown_config: cfg,
+      )
+      html.should_not contain("_blank")
+    end
+
+    it "processes footnote-body links" do
+      cfg = make_config(footnotes: true)
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: see [ref](https://e.com)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(target="_blank"))
+    end
+
+    it "is off by default (byte-identity)" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ext](https://example.com)",
+        markdown_config: make_config,
+      )
+      html.should eq(%(<p><a href="https://example.com">ext</a></p>\n))
+    end
+  end
+
   describe "indented code blocks" do
     it "leaves transforms alone inside an indented code run" do
       config = make_config(math: true)
