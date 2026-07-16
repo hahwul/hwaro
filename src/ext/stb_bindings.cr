@@ -26,7 +26,13 @@ lib LibStb
                              quality : LibC::Int, out_buf : UInt8**, out_len : LibC::Int*) : LibC::Int
 
   # --- stb_image_resize2 ---
-  fun stbir_resize_uint8_linear(input_pixels : UInt8*, input_w : LibC::Int, input_h : LibC::Int, input_stride_in_bytes : LibC::Int, output_pixels : UInt8*, output_w : LibC::Int, output_h : LibC::Int, output_stride_in_bytes : LibC::Int, num_channels : LibC::Int) : UInt8*
+  # sRGB-aware resize: JPG/PNG pixel data is gamma-encoded, so filtering must
+  # happen in linear light and re-encode. The `_linear` variant treats sRGB
+  # bytes as linear-light values, which visibly darkens edges/thin lines on
+  # downscale. The last parameter is stbir_pixel_layout; casting the channel
+  # count maps 1→1CHANNEL, 2→2CHANNEL, 3→RGB, 4→RGBA (alpha kept linear and
+  # weighted during filtering), matching how these callers decode.
+  fun stbir_resize_uint8_srgb(input_pixels : UInt8*, input_w : LibC::Int, input_h : LibC::Int, input_stride_in_bytes : LibC::Int, output_pixels : UInt8*, output_w : LibC::Int, output_h : LibC::Int, output_stride_in_bytes : LibC::Int, pixel_layout : LibC::Int) : UInt8*
 
   # --- stb_truetype (via hwaro C wrappers) ---
   # Font info is an opaque pointer managed by hwaro_font_alloc/free

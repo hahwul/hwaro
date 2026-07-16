@@ -107,7 +107,7 @@ module Hwaro
             end
 
             begin
-              result = LibStb.stbir_resize_uint8_linear(
+              result = LibStb.stbir_resize_uint8_srgb(
                 pixels, src_w, src_h, 0,
                 out_pixels, out_w, out_h, 0,
                 channels
@@ -198,7 +198,7 @@ module Hwaro
           return if thumb_pixels.null?
 
           begin
-            resized = LibStb.stbir_resize_uint8_linear(
+            resized = LibStb.stbir_resize_uint8_srgb(
               pixels, src_w, src_h, 0,
               thumb_pixels, out_w, out_h, 0,
               channels
@@ -327,7 +327,7 @@ module Hwaro
               next if out_pixels.null?
 
               begin
-                resized = LibStb.stbir_resize_uint8_linear(
+                resized = LibStb.stbir_resize_uint8_srgb(
                   pixels, src_w, src_h, 0,
                   out_pixels, out_w, out_h, 0,
                   channels
