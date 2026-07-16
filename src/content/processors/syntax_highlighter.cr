@@ -16,6 +16,7 @@
 
 require "markd"
 require "tartrazine"
+require "../../ext/tartrazine_mt_fix"
 require "digest/md5"
 require "./table_parser"
 require "./markdown_extensions"
@@ -91,21 +92,34 @@ module Hwaro
         @@unknown_languages = Set(String).new
         @@unknown_mutex = Mutex.new
 
-        # Serializes ALL Tartrazine work (lexer acquisition + tokenization).
-        # The shard's compiled rules each hold a single PCRE2 match_data
-        # buffer reused by every match() call (bytes_regex.cr), and those
-        # rules are shared across lexer instances via the template cache —
-        # so two -Dpreview_mt workers tokenizing the same language corrupt
-        # each other's matches. That raised intermittently, and the rescue
-        # below silently degraded random code blocks to plain output,
-        # making build output nondeterministic.
-        @@tartrazine_mutex = Mutex.new
+        # Tokenization runs in parallel across -Dpreview_mt workers.
+        # It used to be serialized behind a global mutex here: the shard's
+        # compiled rules each held a single PCRE2 match_data buffer reused
+        # by every match() call and shared across lexer instances via the
+        # template cache, so two workers tokenizing the same language
+        # corrupted each other's matches (raising intermittently, which the
+        # rescue below degraded to nondeterministic plain output). That
+        # shared state — and the template cache's unsynchronized fast path,
+        # and `combined` actions mutating the shared states Hash — is fixed
+        # at the source in ext/tartrazine_mt_fix.cr, so correctness no
+        # longer needs a lock around Tartrazine work.
+        #
+        # Concurrency is still BOUNDED, not unlimited: tokenization is
+        # allocation-dense (token values, per-rule arrays), and past ~4
+        # simultaneous tokenizers the Boehm GC's global allocation lock
+        # becomes a convoy that slows the WHOLE build (measured: a
+        # 5k-page site with 10k unique code blocks at 8 workers built
+        # ~25% slower fully unbounded than with this cap, while small and
+        # mid-size sites kept their full parallel speedup). A buffered
+        # channel acts as a counting semaphore; blocked fibers suspend —
+        # the worker thread moves on to other pages meanwhile.
+        TOKENIZE_SLOTS = 4
+        @@tokenize_gate = Channel(Nil).new(TOKENIZE_SLOTS)
 
         # Highlighted-output memo keyed by (language, code digest). Output
         # is a pure function of the input pair, so identical code blocks —
         # repeated install snippets, shortcode bodies, serve-mode rebuilds —
-        # skip tokenization entirely. Also keeps the serialized section
-        # above from becoming a bottleneck on code-heavy sites. `nil`
+        # skip tokenization entirely. `nil`
         # (tokenization failed, deterministic now) is cached too.
         #
         # Cache holds pre-wrap span HTML only; key (lang, md5(code)) stays
@@ -138,31 +152,35 @@ module Hwaro
             end
           end
 
-          result = @@tartrazine_mutex.synchronize do
-            lexer = begin
-              Tartrazine.lexer(normalized)
-            rescue
-              @@unknown_mutex.synchronize { @@unknown_languages << normalized }
-              Logger.debug "Server highlight: no lexer for '#{normalized}', falling back to plain output"
-              return
-            end
+          lexer = begin
+            Tartrazine.lexer(normalized)
+          rescue
+            @@unknown_mutex.synchronize { @@unknown_languages << normalized }
+            Logger.debug "Server highlight: no lexer for '#{normalized}', falling back to plain output"
+            return
+          end
 
-            begin
-              String.build do |io|
-                lexer.tokenizer(code).each do |token|
-                  value = HTML.escape(token[:value])
-                  if css_class = class_for(token[:type])
-                    io << %(<span class=") << css_class << %(">) << value << "</span>"
-                  else
-                    io << value
-                  end
+          @@tokenize_gate.send(nil)
+          result = begin
+            String.build do |io|
+              lexer.tokenizer(code).each do |token|
+                value = token[:value]
+                # Most tokens (keywords, identifiers, whitespace) need no
+                # escaping — skip HTML.escape's char-by-char rebuild for them.
+                value = HTML.escape(value) if needs_html_escape?(value)
+                if css_class = class_for(token[:type])
+                  io << %(<span class=") << css_class << %(">) << value << "</span>"
+                else
+                  io << value
                 end
               end
-            rescue ex
-              # A lexer bug must never take down the build — degrade to plain.
-              Logger.debug "Server highlight failed for '#{lang}': #{ex.message}"
-              nil
             end
+          rescue ex
+            # A lexer bug must never take down the build — degrade to plain.
+            Logger.debug "Server highlight failed for '#{lang}': #{ex.message}"
+            nil
+          ensure
+            @@tokenize_gate.receive
           end
 
           if cache_key
@@ -172,6 +190,34 @@ module Hwaro
             end
           end
           result
+        end
+
+        # True when `value` contains any character HTML.escape substitutes
+        # (`& < > " '` — see HTML::SUBSTITUTIONS) or any non-ASCII byte.
+        # The five specials are ASCII, so the byte scan is exact for UTF-8.
+        #
+        # Bytes >= 0x80 are routed through HTML.escape too — NOT because
+        # they need escaping, but because a token can be invalid UTF-8:
+        # the tokenizer's Error fallback emits unmatched input one BYTE at
+        # a time, so a multi-byte character no rule matched arrives as
+        # lone lead/continuation bytes. The String-returning HTML.escape
+        # iterates chars and replaces those with U+FFFD, exactly like the
+        # pre-fast-path code always did; skipping it would leak invalid
+        # UTF-8 into the output HTML. (Valid multi-byte text passes
+        # through escape content-unchanged, so this only costs the clean
+        # fast path for non-ASCII tokens — do not "optimize" this onto
+        # the HTML.escape(value, io) overload, which copies raw bytes and
+        # performs no U+FFFD replacement.)
+        private def needs_html_escape?(value : String) : Bool
+          value.each_byte do |byte|
+            case byte
+            when 0x26_u8, 0x3C_u8, 0x3E_u8, 0x22_u8, 0x27_u8 # & < > " '
+              return true
+            else
+              return true if byte >= 0x80_u8
+            end
+          end
+          false
         end
 
         private def class_for(token_type : String) : String?
@@ -346,8 +392,8 @@ module Hwaro
       # Wraps already-highlighted (or plain-escaped) code body HTML with
       # per-line `<span class="line">` markup for line numbers / highlighted
       # lines — pure string post-processing, zero Tartrazine calls, applied
-      # AFTER (and outside) `ServerHighlighter`'s mutex-guarded tokenization,
-      # over its already-cached result.
+      # AFTER (and outside) `ServerHighlighter`'s gated tokenization, over
+      # its already-cached result.
       module LineWrapper
         extend self
 
