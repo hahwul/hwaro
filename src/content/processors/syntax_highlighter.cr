@@ -791,18 +791,27 @@ module Hwaro
         end
 
         # Plain-text extraction mirroring `Markdown#post_process_html`'s
-        # inline char-level tag strip, so a heading's title text is
-        # normalized identically on both the hook path and the stock
-        # `post_process_html` path (see `HeadingIds.assign`).
+        # inline char-level tag strip (including its quote-awareness: a `>`
+        # inside a quoted attribute value must not end the tag), so a
+        # heading's title text is normalized identically on both the hook
+        # path and the stock `post_process_html` path (see
+        # `HeadingIds.assign`).
         private def strip_tags(html : String) : String
           String.build(html.bytesize) do |io|
             in_tag = false
+            quote = nil.as(Char?)
             html.each_char do |c|
-              if c == '<'
+              if in_tag
+                if quote
+                  quote = nil if c == quote
+                elsif c == '"' || c == '\''
+                  quote = c
+                elsif c == '>'
+                  in_tag = false
+                end
+              elsif c == '<'
                 in_tag = true
-              elsif c == '>'
-                in_tag = false
-              elsif !in_tag
+              else
                 io << c
               end
             end

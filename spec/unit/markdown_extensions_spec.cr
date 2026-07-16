@@ -481,6 +481,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       )
       html.should contain(%(<div class="math math-display">\\[x\\]</div>))
     end
+
+    it "keeps a <code> span with a quoted '>' attribute opaque to math" do
+      content = %(<code data-x="a>b">$x$</code> and $y$)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("$x$")
+      result.scan("math-inline").size.should eq(1)
+    end
   end
 
   describe "mermaid (extended)" do
@@ -663,6 +670,21 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain(%(id="wanted"))
       result.should_not contain("auto-slug")
       result.should contain(%(class="foo"))
+    end
+
+    it "does not mistake data-id for an existing id attribute" do
+      html = %(<h3 data-id="tracker">Heading <!--HID:wanted--></h3>)
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(data-id="tracker"))
+      result.should contain(%(id="wanted"))
+    end
+
+    it "resolves the marker on a heading with a quoted '>' attribute" do
+      html = %(<h2 title="a > b">Heading <!--HID:wanted--></h2>)
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(id="wanted"))
+      result.should contain(%(title="a > b"))
+      result.should_not contain("HID:")
     end
 
     it "handles each heading level h1-h6" do

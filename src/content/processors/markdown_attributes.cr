@@ -129,9 +129,11 @@ module Hwaro
           merge_attrs(img_open, parsed)
         end
 
-        ID_ATTR_RE    = /\bid\s*=\s*"[^"]*"/i
-        ID_PRESENT_RE = /\bid\s*=/i
-        CLASS_ATTR_RE = /\bclass\s*=\s*"([^"]*)"/i
+        # `(?<![\w-])` guards keep `data-id=`/`data-class=` from counting
+        # as the element's own id/class.
+        ID_ATTR_RE    = /(?<![\w-])id\s*=\s*"[^"]*"/i
+        ID_PRESENT_RE = /(?<![\w-])id\s*=/i
+        CLASS_ATTR_RE = /(?<![\w-])class\s*=\s*"([^"]*)"/i
 
         # Shared merge logic for both entry points above: id and classes get
         # their own dedicated attribute; every other `key=value` pair is

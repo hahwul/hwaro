@@ -30,19 +30,22 @@ module Hwaro
     module Processors
       # Markdown processor implementation
       class Markdown < Base
-        # Regex for matching h1-h6 tags with IDs to insert anchor links
-        ANCHOR_LINK_REGEX = /<(h[1-6])([^>]*id="([^"]+)"[^>]*)>(.*?)<\/\1>/m
+        # Regex for matching h1-h6 tags with IDs to insert anchor links.
+        # Attribute scans here and below are quote-aware (a `>` inside a
+        # quoted value, e.g. title="a > b", is legal HTML5 and must not end
+        # the tag) and the `id` key uses a `(?<![\w-])` guard so `data-id=`
+        # never counts as the element's id.
+        ANCHOR_LINK_REGEX = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*?(?<![\w-])id="([^"]+)"(?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
 
         # Regex for post_process_html — lightweight replacements for XML.parse_html
         # Matches <h1>…</h1> through <h6>…</h6>, capturing tag name, level digit, attributes, and inner HTML
-        HEADING_TAG_REGEX = /<(h([1-6]))(\s[^>]*)?>(.+?)<\/h\2>/mi
+        HEADING_TAG_REGEX = /<(h([1-6]))(\s(?:[^>"']|"[^"]*"|'[^']*')*)?>(.+?)<\/h\2>/mi
         # Matches <img ...> tags that do NOT already have a loading= attribute
-        # Quote-aware attribute scan: a `>` inside a quoted attribute value
-        # (legal HTML5, e.g. alt="Home > Docs") must not be treated as the tag
-        # end, or the lazy-load rewrite corrupts the raw <img> into broken markup.
-        IMG_LAZY_REGEX = /<img(?![^>]*\bloading\s*=)((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/i
+        # (the lookahead is quote-aware too, so a loading= sitting after a
+        # quoted `>` is still seen, and `data-loading=` doesn't count).
+        IMG_LAZY_REGEX = /<img(?!(?:[^>"']|"[^"]*"|'[^']*')*(?<![\w-])loading\s*=)((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/i
         # Extracts id="value" from an attribute string
-        ID_ATTR_REGEX = /\bid\s*=\s*["']([^"']+)["']/
+        ID_ATTR_REGEX = /(?<![\w-])id\s*=\s*["']([^"']+)["']/
         # Strips HTML tags to get plain text
         HTML_TAG_STRIP_REGEX = /<[^>]+>/
 
@@ -718,15 +721,25 @@ module Hwaro
               attrs = $3? || "" # existing attributes (may be empty)
               inner_html = $4   # inner content (may contain inline HTML)
 
-              # Extract plain text for TOC title (inline char-level strip avoids regex + alloc)
+              # Extract plain text for TOC title (inline char-level strip
+              # avoids regex + alloc). Quote-aware: a `>` inside a quoted
+              # attribute value must not end the tag, or the value's tail
+              # leaks into the title.
               title = String.build(inner_html.bytesize) do |io|
                 in_tag = false
+                quote = nil.as(Char?)
                 inner_html.each_char do |c|
-                  if c == '<'
+                  if in_tag
+                    if quote
+                      quote = nil if c == quote
+                    elsif c == '"' || c == '\''
+                      quote = c
+                    elsif c == '>'
+                      in_tag = false
+                    end
+                  elsif c == '<'
                     in_tag = true
-                  elsif c == '>'
-                    in_tag = false
-                  elsif !in_tag
+                  else
                     io << c
                   end
                 end

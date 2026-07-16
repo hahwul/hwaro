@@ -860,6 +860,20 @@ describe Hwaro::Processor::Markdown do
       html.should_not contain("loading=\"lazy\"")
     end
 
+    it "sees a loading attribute that sits after a quoted '>'" do
+      content = "<img alt=\"Home > Docs\" src=\"a.png\" loading=\"eager\">"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)
+      html.should contain("loading=\"eager\"")
+      html.should_not contain("loading=\"lazy\"")
+    end
+
+    it "does not mistake data-loading for the loading attribute" do
+      content = "<img src=\"a.png\" data-loading=\"spinner\">"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)
+      html.should contain("loading=\"lazy\"")
+      html.should contain("data-loading=\"spinner\"")
+    end
+
     it "works with render_with_anchors" do
       content = "# Title\n![Img](img.jpg)"
       html, _ = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, lazy_loading: true)

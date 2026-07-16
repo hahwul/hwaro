@@ -477,8 +477,10 @@ module Hwaro
         # are already consumed), or author-written raw HTML. Their content
         # is code: the strikethrough/footnote/math passes must treat it as
         # opaque, exactly like backtick spans. `[^<]*` keeps the match to a
-        # flat element (generated spans never contain tags).
-        HTML_CODE_SPAN_RE = /<code(?:\s[^>]*)?>[^<]*<\/code>/
+        # flat element (generated spans never contain tags); the attribute
+        # scan is quote-aware so a `>` inside a quoted value doesn't end
+        # the opening tag early.
+        HTML_CODE_SPAN_RE = /<code(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?>[^<]*<\/code>/
         # CommonMark "type 6" HTML-block start condition (common block tags,
         # including the <table>/<dl>/<div> markup hwaro itself generates).
         # A line opening one of these starts a raw-HTML block that runs to
@@ -888,10 +890,13 @@ module Hwaro
           rewritten
         end
 
-        HEADING_TAG_FOR_HID_RE = /<(h[1-6])([^>]*)>(.*?)<\/\1>/m
+        # Quote-aware attrs (a `>` inside a quoted value must not end the
+        # tag); the id checks guard with `(?<![\w-])` so `data-id=` never
+        # counts as the element's id.
+        HEADING_TAG_FOR_HID_RE = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
         HID_MARKER_RE          = /<!--HID:([A-Za-z][\w:-]*)-->/
-        EXISTING_ID_RE         = /\bid\s*=\s*"[^"]*"/i
-        ANY_ID_ATTR_PRESENT_RE = /\bid\s*=/i
+        EXISTING_ID_RE         = /(?<![\w-])id\s*=\s*"[^"]*"/i
+        ANY_ID_ATTR_PRESENT_RE = /(?<![\w-])id\s*=/i
 
         def postprocess_heading_ids(html : String) : String
           return html unless html.includes?("<!--HID:")
