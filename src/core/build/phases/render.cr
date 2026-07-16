@@ -538,24 +538,32 @@ module Hwaro::Core::Build::Phases::Render
       count += 1 if results.receive
     end
 
-    # Emit the (deduped) failure summary before surfacing the classified
-    # error, so users see both the list of affected pages and the final
-    # `Error [HWARO_E_TEMPLATE]: …` line.
+    finalize_render_failures(failures, classified_error, verbose)
+
+    count
+  end
+
+  # Shared failure epilogue for the parallel and sequential render loops —
+  # one copy of the exit-code/message contract so the two paths can't drift.
+  #
+  # Emits the (deduped) failure summary first, then surfaces the first
+  # classified error so the CLI sees the documented exit code / JSON payload
+  # instead of a silent `status=ok, pages_generated=0`. Generic exceptions
+  # (Crystal-level bugs, non-Crinja crashes) used to slip through — with no
+  # classified error to raise the build returned its success count and the
+  # CLI happily printed `Build complete!` even when pages crashed. Promote
+  # the first such failure to `HWARO_E_TEMPLATE` so the build fails loud (#490).
+  private def finalize_render_failures(
+    failures : Array(NamedTuple(page_path: String, message: String)),
+    classified_error : Hwaro::HwaroError?,
+    verbose : Bool,
+  )
     report_render_failures(failures, verbose) unless failures.empty?
 
-    # Surface the first classified error now that all workers have drained
-    # so the CLI sees the documented exit code / JSON payload instead of
-    # a silent `status=ok, pages_generated=0`.
     if err = classified_error
       raise err
     end
 
-    # Generic exceptions (Crystal-level bugs, non-Crinja crashes) used to
-    # slip through here — workers logged them to `failures`, but with no
-    # classified error to raise the build returned its success count and
-    # the CLI happily printed `Build complete! Generated 2 pages` even
-    # when 9 pages crashed. Promote the first such failure to a
-    # `HWARO_E_TEMPLATE` so the build fails loud (#490).
     unless failures.empty?
       first = failures.first
       raise Hwaro::HwaroError.new(
@@ -563,8 +571,6 @@ module Hwaro::Core::Build::Phases::Render
         message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{first[:message]}",
       )
     end
-
-    count
   end
 
   # Collapse identical errors raised across many pages (typical of a
@@ -647,22 +653,7 @@ module Hwaro::Core::Build::Phases::Render
       Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
     end
 
-    report_render_failures(failures, verbose) unless failures.empty?
-
-    # Same contract as process_files_parallel: surface the first classified
-    # error for the documented exit code, and promote generic exceptions so
-    # a crash can't report success.
-    if err = classified_error
-      raise err
-    end
-
-    unless failures.empty?
-      first = failures.first
-      raise Hwaro::HwaroError.new(
-        code: Hwaro::Errors::HWARO_E_TEMPLATE,
-        message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{first[:message]}",
-      )
-    end
+    finalize_render_failures(failures, classified_error, verbose)
 
     count
   end
