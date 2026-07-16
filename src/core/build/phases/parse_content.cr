@@ -56,23 +56,32 @@ module Hwaro::Core::Build::Phases::ParseContent
   # must be passed explicitly by incremental callers that re-render only a
   # subset. It can't come from `site.pages`: Transform populates that AFTER
   # this runs in the full build (`site.pages = ctx.pages`, transform.cr).
+  #
+  # `global_vars` is a compute-once optimization for post-Transform callers
+  # (run_rerender). When nil, build_template_variables self-heals by building
+  # globals per shortcode-bearing page — cheap during the full-build call
+  # (site.pages is still empty pre-Transform) but O(site) per page after.
   private def render_page_summaries(
     pages : Array(Models::Page),
     site : Models::Site,
     templates : Hash(String, String),
     use_highlight : Bool,
     link_targets : Array(Models::Page) = pages,
+    global_vars : Hash(String, Crinja::Value)? = nil,
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
 
     pages.each do |page|
-      summary_md = page.extract_summary
+      # parse_single_page already extracted the chunk into page.summary;
+      # extract_summary is only a fallback for hook-based parse paths that
+      # skipped it (it re-scans the whole raw_content, so don't repeat it).
+      summary_md = page.summary || page.extract_summary
       next unless summary_md
 
       shortcode_results = {} of String => String
       processed = if content_may_contain_shortcodes?(summary_md)
-                    context = build_template_variables(page, site, "", "", "")
+                    context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
                     process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
                   else
                     summary_md
@@ -92,10 +101,11 @@ module Hwaro::Core::Build::Phases::ParseContent
       page.summary_html = html
     rescue ex
       # A broken shortcode in a summary must not abort the whole parse
-      # phase — fall back to the plain-Markdown rendering and let the
-      # body render surface the real error with full diagnostics.
-      Logger.debug "Summary render failed for #{page.path}: #{ex.message}"
-      fallback, _ = Processor::Markdown.render(summary_md.to_s, markdown_config: md_config)
+      # phase — fall back to plain-Markdown rendering (same config flags,
+      # critically including safe mode) and let the body render surface
+      # the real error with full diagnostics.
+      Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
+      fallback, _ = Processor::Markdown.render(summary_md.to_s, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
       page.summary_html = fallback
     end
   end
