@@ -84,10 +84,17 @@ math_engine = "katex"
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
 | footnotes | bool | true | Enable footnote syntax (`[^1]`) |
 | task_lists | bool | true | Enable task list syntax (`- [ ]` / `- [x]`) |
+| task_list_classes | bool | false | Add GFM classes (`task-list-item`, `contains-task-list`) to task-list markup |
 | definition_lists | bool | true | Enable definition list syntax (`Term\n: Definition`) |
 | mermaid | bool | false | Render ` ```mermaid ` blocks as `<div class="mermaid">` |
 | math | bool | false | Enable math syntax (`$...$` and `$$...$$`) |
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
+| smart_punctuation | bool | false | Typographic quotes/dashes/ellipses (`"x"` → “x”, `--` → –, `...` → …) |
+| containers | bool | false | `:::note Title` … `:::` custom containers (admonition markup) |
+| insert_anchor_links | string | "none" | Site-wide heading anchor links: `"none"`, `"left"`, or `"right"` (page front matter overrides) |
+| external_links_target_blank | bool | false | Add `target="_blank" rel="noopener"` to absolute http(s) links |
+| external_links_no_follow | bool | false | Add `rel="nofollow"` to absolute http(s) links |
+| external_links_no_referrer | bool | false | Add `rel="noreferrer"` to absolute http(s) links |
 
 See [Markdown Extensions](/features/markdown-extensions/) for syntax details and examples.
 

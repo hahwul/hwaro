@@ -100,6 +100,18 @@ def main():
 | `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
 | `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
 | `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
+| `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
+
+A named block is wrapped for styling (the `<pre>` inside is unchanged):
+
+```html
+<div class="code-block"><div class="code-filename">main.cr</div>
+<pre><code class="language-crystal hljs">…</code></pre>
+</div>
+```
+
+Scaffolded sites ship matching `.code-block` / `.code-filename` styles;
+bring your own CSS otherwise.
 
 The block accepts a couple of equivalent forms: `python {linenos=true}`,
 `python{linenos=true}` (no space), or `{linenos=true}` alone (no

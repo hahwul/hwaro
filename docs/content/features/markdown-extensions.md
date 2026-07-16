@@ -37,6 +37,13 @@ mermaid = true
 | safe | bool | false | Strip raw HTML from output (replaced with comments) |
 | lazy_loading | bool | false | Add `loading="lazy"` to `<img>` tags |
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
+| smart_punctuation | bool | false | Typographic quotes/dashes/ellipses |
+| containers | bool | false | `:::note Title` … `:::` custom containers |
+| task_list_classes | bool | false | GFM classes on task-list markup |
+| insert_anchor_links | string | "none" | Site-wide heading anchor links (`"none"`/`"left"`/`"right"`) |
+| external_links_target_blank | bool | false | `target="_blank" rel="noopener"` on absolute http(s) links |
+| external_links_no_follow | bool | false | `rel="nofollow"` on absolute http(s) links |
+| external_links_no_referrer | bool | false | `rel="noreferrer"` on absolute http(s) links |
 
 ## Task Lists
 
@@ -297,6 +304,89 @@ invalidates the whole block, leaving the source `{...}` untouched.
 - **Safe mode drops the block**: with `markdown.safe = true`, `{...}`
   attribute blocks are stripped from the output (like `heading_ids`) —
   no attributes are applied.
+
+## Smart Punctuation
+
+With `smart_punctuation = true`, straight quotes, double/triple dashes,
+and three dots become their typographic forms:
+
+| Input | Output |
+|-------|--------|
+| `"quoted"` / `'quoted'` | “quoted” / ‘quoted’ |
+| `--` | – (en dash) |
+| `---` | — (em dash) |
+| `...` | … (ellipsis) |
+
+Code spans, code blocks, raw HTML, and math bodies are never rewritten.
+Table cells, definition bodies, and footnote bodies are pre-rendered
+HTML, so smart punctuation does not apply inside them. The `markdownify`
+template filter follows the site's setting.
+
+## Custom Containers
+
+With `containers = true`, fenced `:::` blocks render with the same
+markup (and CSS) as admonitions:
+
+```markdown
+:::note Optional Title
+Any **markdown** body — code fences and task lists included.
+:::
+```
+
+The title defaults to the capitalized type. Longer runs nest
+(`::::outer` … `:::inner` … `:::` … `::::`), a bare `:::` closes the
+innermost open container, and unclosed containers auto-close at the end
+of the page. `:::` lines inside code fences stay literal. Not supported
+with `safe = true` (the raw wrapper would be stripped).
+
+## Task List Classes
+
+With `task_list_classes = true`, task-list markup gets GFM's classes so
+GitHub-targeted CSS applies as-is: `<li class="task-list-item">`,
+`class="task-list-item-checkbox"` on the checkbox, and
+`class="contains-task-list"` on every list that directly contains a
+task item. Off by default so existing sites keep byte-identical output.
+
+## Heading Anchor Links
+
+`insert_anchor_links = "left"` (or `"right"`) adds a `🔗` anchor link
+to every heading site-wide — before or after the heading text. Page
+front matter `insert_anchor_links = true/false` overrides the site
+setting per page. Customize the markup entirely with a
+[render-heading hook](/templates/render-hooks/).
+
+## External Link Policy
+
+Three flags apply a site-wide policy to absolute `http(s)://` links in
+rendered markdown (including table cells and footnotes):
+
+```toml
+[markdown]
+external_links_target_blank = true # target="_blank" + rel="noopener"
+external_links_no_follow = true    # rel="nofollow"
+external_links_no_referrer = true  # rel="noreferrer"
+```
+
+Links that already carry a `target=` keep it, and `rel` tokens merge
+into an existing `rel` attribute without duplicating — so a
+render-link hook's explicit choices win. The policy applies to every
+absolute http(s) link, including ones pointing at your own domain.
+
+## Multi-line Footnotes and Definitions
+
+Footnote definitions collect 4-space (or tab) indented continuation
+lines, including blank-line-separated paragraphs:
+
+```markdown
+[^1]: First paragraph of the note,
+    soft-wrapped onto a second line.
+
+    Second paragraph of the same note.
+```
+
+Definition list bodies soft-wrap the same way (indented lines join the
+same `<dd>`). Unindented (lazy) continuation, block elements inside
+footnote bodies, and multi-paragraph `<dd>` are not supported.
 
 ## See Also
 

@@ -763,12 +763,19 @@ module Hwaro
             # emoji = false
             # footnotes = true
             # task_lists = true
+            # task_list_classes = false
             # definition_lists = true
             # admonitions = true
             # heading_ids = true
             # mermaid = false
             # math = false
             # math_engine = "katex"
+            # smart_punctuation = false
+            # containers = false
+            # insert_anchor_links = "none"
+            # external_links_target_blank = false
+            # external_links_no_follow = false
+            # external_links_no_referrer = false
 
             TOML
         else
@@ -788,12 +795,19 @@ module Hwaro
             emoji = false            # If true, convert emoji shortcodes (e.g. :smile:) to emoji characters
             footnotes = true         # GitHub-flavored footnote syntax: [^1] / [^1]: definition
             task_lists = true        # Task list syntax: - [ ] todo / - [x] done
+            task_list_classes = false # GFM classes (task-list-item / contains-task-list) on task-list markup
             definition_lists = true  # Definition list syntax (Term newline ": Definition")
             admonitions = true       # GitHub-style `> [!NOTE]` blockquotes render as admonition <div>s
             heading_ids = true       # `## Heading {#custom-id}` sets an explicit id
             mermaid = false          # Render ```mermaid code blocks as diagrams (loads mermaid.js)
             math = false             # Inline ($...$) and block ($$...$$) math (loads math_engine)
             math_engine = "katex"    # "katex" or "mathjax"
+            smart_punctuation = false # Typographic quotes/dashes/ellipses ("x" -> curly, -- -> dash, ... -> ellipsis)
+            containers = false       # :::note Title ... ::: custom containers (admonition markup)
+            insert_anchor_links = "none" # Site-wide heading anchor links: "none", "left", or "right"
+            external_links_target_blank = false # target="_blank" rel="noopener" on absolute http(s) links
+            external_links_no_follow = false    # rel="nofollow" on absolute http(s) links
+            external_links_no_referrer = false  # rel="noreferrer" on absolute http(s) links
 
             TOML
         end
