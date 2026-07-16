@@ -278,8 +278,10 @@ module Hwaro
           # `lang`/`options`/`code` arrive already escaped; `highlighted` is
           # the pre-highlighted (server mode) body HTML, or "" when
           # highlighting didn't apply — templates choose between
-          # `{{ highlighted }}` and `{{ code }}`.
-          def render_codeblock(lang : String, options : String, code : String, highlighted : String) : String
+          # `{{ highlighted }}` and `{{ code }}`. `name` is the parsed
+          # `{name=...}`/`{title=...}` label ("" when absent) so templates
+          # don't have to re-parse `options`.
+          def render_codeblock(lang : String, options : String, code : String, highlighted : String, name : String = "") : String
             hook = @registry.codeblock
             return stock_codeblock(lang, code) unless hook
 
@@ -288,6 +290,7 @@ module Hwaro
             vars["options"] = Crinja::Value.new(options)
             vars["code"] = Crinja::Value.new(code)
             vars["highlighted"] = Crinja::Value.new(highlighted)
+            vars["name"] = Crinja::Value.new(name)
             render_hook_template("hooks/render-codeblock", hook, SALT_CODEBLOCK, vars) { stock_codeblock(lang, code) }
           end
 
