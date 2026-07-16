@@ -418,6 +418,86 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(<div class="math math-display">\\[))
       html.should contain(%(\\]</div>))
     end
+
+    it "keeps an escaped dollar inside inline math" do
+      content = "The price $x = \\$5$ is fixed."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.scan("math-inline").size.should eq(1)
+      # The whole formula (including the escaped dollar) lands in the span;
+      # nothing dangles after it.
+      result.should contain("$5")
+      result.should_not contain("5$")
+    end
+
+    it "leaves a body ending in a lone backslash unmatched" do
+      content = "literal $a\\$ text"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should_not contain("math-inline")
+    end
+
+    it "does not pair display math across a blank line" do
+      content = "before $$ stray\n\nprose here\n\n$$x$$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("$$ stray")
+      result.should contain("prose here")
+      result.scan("math-display").size.should eq(1)
+    end
+
+    it "does not pair display math across a whitespace-only line" do
+      content = "$$ stray\n \t\nprose"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should_not contain("math-display")
+    end
+
+    it "renders mid-paragraph display math as an inline-safe span" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Euler: $$e_a * e_b$$ inline.",
+        markdown_config: cfg,
+      )
+      # Doubled delimiters and escaped `*`/`_` collapse back through Markd's
+      # inline parser — no emphasis, no dropped brackets, wrapper stays a
+      # span inside the paragraph.
+      html.should contain(%(<span class="math math-display">\\[e_a * e_b\\]</span>))
+      html.should_not contain("<em>")
+      html.should_not contain("<div class=\"math math-display\">")
+    end
+
+    it "keeps blockquoted standalone display math as a div" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> $$x$$",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[x\\]</div>))
+      html.should_not contain("math-display\">\\\\[")
+    end
+
+    it "keeps standalone display math as a div HTML block" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "before\n\n$$\nx * y\n$$\n\nafter",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[))
+      html.should_not contain("math-display\">\\\\[")
+    end
+
+    it "keeps display math in a table cell as a div (raw HTML context)" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "| f |\n|---|\n| $$x$$ |",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[x\\]</div>))
+    end
+
+    it "keeps a <code> span with a quoted '>' attribute opaque to math" do
+      content = %(<code data-x="a>b">$x$</code> and $y$)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("$x$")
+      result.scan("math-inline").size.should eq(1)
+    end
   end
 
   describe "mermaid (extended)" do
@@ -600,6 +680,39 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain(%(id="wanted"))
       result.should_not contain("auto-slug")
       result.should contain(%(class="foo"))
+    end
+
+    it "does not mistake data-id for an existing id attribute" do
+      html = %(<h3 data-id="tracker">Heading <!--HID:wanted--></h3>)
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(data-id="tracker"))
+      result.should contain(%(id="wanted"))
+    end
+
+    it "neutralizes an author-typed HID marker in prose" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "## Heading <!--HID:evil--> {#real}\n\ntext",
+        markdown_config: cfg,
+      )
+      html.should contain(%(id="real"))
+      html.should_not contain(%(id="evil"))
+    end
+
+    it "keeps author-typed markers verbatim in code spans and fences" do
+      cfg = make_config(heading_ids: true, attributes: true)
+      content = "Use `<!--HID:x-->` inline.\n\n```\n<!--HATTR:41-->\n```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, cfg)
+      result.should contain("`<!--HID:x-->`")
+      result.should contain("\n<!--HATTR:41-->\n")
+    end
+
+    it "resolves the marker on a heading with a quoted '>' attribute" do
+      html = %(<h2 title="a > b">Heading <!--HID:wanted--></h2>)
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
+      result.should contain(%(id="wanted"))
+      result.should contain(%(title="a > b"))
+      result.should_not contain("HID:")
     end
 
     it "handles each heading level h1-h6" do
@@ -793,6 +906,64 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
       result.should contain("~~code~~")
       result.should contain("<del>real</del>")
+    end
+  end
+
+  describe "blockquoted fences" do
+    it "leaves transforms alone inside a > ``` fence" do
+      config = make_config(heading_ids: true, task_lists: true)
+      content = "> ```\n> ~~x~~\n> - [ ] task\n> ## H {#nope}\n> ```\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("~~x~~")
+      result.should contain("- [ ] task")
+      result.should_not contain("HID:nope")
+      result.should contain("<del>real</del>")
+    end
+
+    it "leaves $ and $$ alone inside a > ``` fence" do
+      content = "> ```make\n> echo $$PATH $HOME\n> ```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should eq(content)
+    end
+
+    it "still transforms blockquote text outside the quoted fence" do
+      content = "> ~~quoted~~\n> ```\n> ~~code~~\n> ```\n> ~~after~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<del>quoted</del>")
+      result.should contain("~~code~~")
+      result.should contain("<del>after</del>")
+    end
+
+    it "resumes transforms when an unclosed quoted fence ends with its blockquote" do
+      content = "> ```\n> ~~code~~\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("~~code~~")
+      result.should contain("<del>real</del>")
+    end
+  end
+
+  describe "indented code blocks" do
+    it "leaves transforms alone inside an indented code run" do
+      config = make_config(math: true)
+      content = "Build:\n\n\techo ${A}/${B}\n\t~~x~~\n\n~~real~~ and $y$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("${A}/${B}")
+      result.should contain("~~x~~")
+      result.should contain("<del>real</del>")
+      result.should contain("math-inline")
+    end
+
+    it "still transforms 4-space list continuations" do
+      content = "- item\n\n    ~~strike~~ continues"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<del>strike</del>")
+    end
+
+    it "still converts nested task lists at 4-space indent" do
+      config = make_config(task_lists: true)
+      content = "- [ ] outer\n    - [ ] nested"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.scan("checkbox").size.should eq 2
     end
   end
 

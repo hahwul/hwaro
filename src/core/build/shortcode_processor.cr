@@ -13,6 +13,7 @@
 require "crinja"
 require "../../utils/logger"
 require "../../content/processors/fence_tracker"
+require "../../content/processors/inline_markdown"
 require "./builtin_shortcodes"
 
 module Hwaro
@@ -50,7 +51,10 @@ module Hwaro
         # the regex is used by `replace_shortcode_placeholders` after Markdown.
         SHORTCODE_PLACEHOLDER_PREFIX = "<!--HWARO-SHORTCODE-PLACEHOLDER-"
         SHORTCODE_PLACEHOLDER_SUFFIX = "-->"
-        SHORTCODE_PLACEHOLDER_RE     = /#{Regex.escape(SHORTCODE_PLACEHOLDER_PREFIX)}\d+#{Regex.escape(SHORTCODE_PLACEHOLDER_SUFFIX)}/
+        # The matching regex lives in InlineMarkdown, which must stash the
+        # comment before its HTML.escape pass (a spec pins the alias against
+        # PREFIX/SUFFIX so the two can't drift).
+        SHORTCODE_PLACEHOLDER_RE = Content::Processors::InlineMarkdown::SHORTCODE_PLACEHOLDER_RE
 
         # Matches CommonMark-style inline code spans on a single line
         # (1 to 3 leading backticks; the same count must close the span).
@@ -122,8 +126,19 @@ module Hwaro
             block_depth = 0
 
             content.each_line(chomp: false) do |line|
-              if tracker.in_fence?
-                tracker.fence_line?(line)
+              # Fence lines flush the pending chunk and pass through
+              # verbatim. This check runs BEFORE the depth scans so fence
+              # content is never depth-counted — a fenced `{% name %}`
+              # example would otherwise pin block_depth > 0 and silently
+              # disable fence protection for the rest of the document.
+              # The tracker is only fed outside block-shortcode bodies:
+              # a fence inside a block body is part of the body, not a
+              # chunk boundary. (A fence can only open at depth 0 and no
+              # scan runs on fence lines, so in_fence ∧ depth > 0 is
+              # unreachable.)
+              if block_depth == 0 && tracker.fence_line?(line)
+                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+                buffer = String::Builder.new
                 io << line
                 next
               end
@@ -133,27 +148,20 @@ module Hwaro
               # control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …) are
               # ignored — counting them would desync the depth (an unbalanced
               # `{% set %}` would pin depth > 0 and break fence protection).
-              line.scan(BLOCK_OPEN_RE) do |m|
+              # Inline code spans are masked first for the same reason: a
+              # literal `{% alert %}` in backticks must not count.
+              scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
+              scan_line.scan(BLOCK_OPEN_RE) do |m|
                 tag = m[0]
                 next if CRINJA_CONTROL_TAG_RE.matches?(tag) || BLOCK_ANY_CLOSE_RE.matches?(tag)
                 block_depth += 1
               end
-              line.scan(BLOCK_ANY_CLOSE_RE) do |m|
+              scan_line.scan(BLOCK_ANY_CLOSE_RE) do |m|
                 next if CRINJA_CONTROL_TAG_RE.matches?(m[0])
                 block_depth -= 1 if block_depth > 0
               end
 
-              # The tracker is only fed outside block-shortcode bodies (the
-              # short-circuit below), mirroring the previous behaviour where
-              # a fence inside a block body is part of the body, not a chunk
-              # boundary.
-              if block_depth == 0 && tracker.fence_line?(line)
-                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
-                buffer = String::Builder.new
-                io << line
-              else
-                buffer << line
-              end
+              buffer << line
             end
 
             io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)

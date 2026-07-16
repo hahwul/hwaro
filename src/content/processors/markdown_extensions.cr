@@ -53,14 +53,34 @@ module Hwaro
           # passes this check transforms exactly as before.
           markers_present = (do_task_lists && (result.includes?("[ ]") || result.includes?("[x]") || result.includes?("[X]"))) ||
                             (do_strikethrough && result.includes?("~~")) ||
-                            (do_heading_ids && result.includes?("{#")) ||
+                            (do_heading_ids && (result.includes?("{#") || result.includes?("<!--HID:"))) ||
                             (do_ins && result.includes?("++")) || (do_mark && result.includes?("==")) ||
                             (do_sub && result.includes?('~')) || (do_sup && result.includes?('^')) ||
-                            (config.attributes && result.includes?('{'))
+                            (config.attributes && (result.includes?('{') || result.includes?("<!--HATTR:")))
 
           if markers_present
             result = process_lines_fence_aware(result) do |line, _in_fence|
               transformed = line
+
+              # Author-typed engine markers are neutralized before the
+              # branches below inject the real ones — same in-band-signaling
+              # protection footnotes get (see preprocess_footnotes), but
+              # per-line and code-span-safe: a literal `<!--HID:x-->` in
+              # inline code or a fenced example stays byte-identical (it's
+              # inert there — Markd entity-escapes it), while one typed in
+              # prose can no longer smuggle an id or attributes onto a
+              # heading.
+              if do_heading_ids && transformed.includes?("<!--HID:")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub("<!--HID:", "<!-- HID:")
+                end
+              end
+
+              if config.attributes && transformed.includes?("<!--HATTR:")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub("<!--HATTR:", "<!-- HATTR:")
+                end
+              end
 
               if do_task_lists && !_in_fence &&
                  (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))
@@ -477,8 +497,10 @@ module Hwaro
         # are already consumed), or author-written raw HTML. Their content
         # is code: the strikethrough/footnote/math passes must treat it as
         # opaque, exactly like backtick spans. `[^<]*` keeps the match to a
-        # flat element (generated spans never contain tags).
-        HTML_CODE_SPAN_RE = /<code(?:\s[^>]*)?>[^<]*<\/code>/
+        # flat element (generated spans never contain tags); the attribute
+        # scan is quote-aware so a `>` inside a quoted value doesn't end
+        # the opening tag early.
+        HTML_CODE_SPAN_RE = /<code(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?>[^<]*<\/code>/
         # CommonMark "type 6" HTML-block start condition (common block tags,
         # including the <table>/<dl>/<div> markup hwaro itself generates).
         # A line opening one of these starts a raw-HTML block that runs to
@@ -490,6 +512,13 @@ module Hwaro
         record MathSpan, display : Bool, body : String
 
         MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
+        # A line whose sole content is one math placeholder — the standalone
+        # display-math case, where the emitted <div> starts at line start and
+        # is a real CommonMark HTML block. Leading blockquote markers are
+        # stripped before the check: `> $$x$$` is block position too (the
+        # div becomes an HTML block inside the blockquote).
+        BARE_MATH_LINE_RE     = /\A\x00MATH\d+\x00\z/
+        BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)+/
 
         # One-shot math transform (stash + immediate expand). `preprocess`
         # itself uses the two phases separately so the combined pass runs in
@@ -582,9 +611,15 @@ module Hwaro
 
         # Phase 2: expand stashed math spans into final HTML.
         #
-        # Display math always emits single-backslash `\[…\]`: its `<div>` is
-        # an HTML block, opaque to Markd in every context. Inline math
-        # delimiter escaping depends on block context:
+        # Display math emits single-backslash `\[…\]` in a `<div>` when the
+        # div actually lands in HTML-block position — on a line of its own,
+        # or inside a raw HTML block. Mid-paragraph `$$…$$` gets a `<span>`
+        # instead: there the tags are *inline* raw HTML, Markd inline-parses
+        # the content between them (collapsing `\[` to `[`, reading `*`/`_`
+        # as emphasis), and a div can't legally sit inside the paragraph
+        # anyway. KaTeX/MathJax auto-render keys display style off the
+        # `\[…\]` delimiters, not the wrapper tag. Inline math delimiter
+        # escaping depends on block context:
         #
         # - In normal inline context the `<span>` content participates in
         #   CommonMark inline parsing, so the delimiters need an extra
@@ -622,13 +657,22 @@ module Hwaro
               end
 
               raw_context = in_html_block
+              bare_line = line.strip
+              bare_line = bare_line.sub(BLOCKQUOTE_MARKERS_RE, "") if bare_line.starts_with?('>')
+              bare_display = bare_line.matches?(BARE_MATH_LINE_RE)
               io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
                 span = $~[1].to_i?.try { |idx| store[idx]? }
                 next match unless span
 
                 escaped = Utils::TextUtils.escape_xml(span.body)
-                if span.display
+                if span.display && (raw_context || bare_display)
                   "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+                elsif span.display
+                  # Mid-paragraph display math (inline raw HTML): escape the
+                  # body like the inline branch below, and double the
+                  # delimiters' backslashes so `\\[` collapses to `\[`.
+                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
                 elsif raw_context
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
                 else
@@ -871,10 +915,13 @@ module Hwaro
           rewritten
         end
 
-        HEADING_TAG_FOR_HID_RE = /<(h[1-6])([^>]*)>(.*?)<\/\1>/m
+        # Quote-aware attrs (a `>` inside a quoted value must not end the
+        # tag); the id checks guard with `(?<![\w-])` so `data-id=` never
+        # counts as the element's id.
+        HEADING_TAG_FOR_HID_RE = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
         HID_MARKER_RE          = /<!--HID:([A-Za-z][\w:-]*)-->/
-        EXISTING_ID_RE         = /\bid\s*=\s*"[^"]*"/i
-        ANY_ID_ATTR_PRESENT_RE = /\bid\s*=/i
+        EXISTING_ID_RE         = /(?<![\w-])id\s*=\s*"[^"]*"/i
+        ANY_ID_ATTR_PRESENT_RE = /(?<![\w-])id\s*=/i
 
         def postprocess_heading_ids(html : String) : String
           return html unless html.includes?("<!--HID:")

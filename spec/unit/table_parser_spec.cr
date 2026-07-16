@@ -801,5 +801,24 @@ describe Hwaro::Content::Processors::TableParser do
       out = Hwaro::Content::Processors::TableParser.process(md)
       out.should_not contain("<table")
     end
+
+    it "does not convert a table example inside a blockquoted fence" do
+      md = "> ```\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n> ```"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
+
+    it "does not convert a 4-space-indented table example after a blank line" do
+      # CommonMark renders this as an indented code block, not a table.
+      md = "Example:\n\n    | a | b |\n    |---|---|\n    | 1 | 2 |"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
+
+    it "still converts a 4-space-indented table inside a list item" do
+      md = "- item\n\n    | a | b |\n    |---|---|\n    | 1 | 2 |"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should contain("<table>")
+    end
   end
 end

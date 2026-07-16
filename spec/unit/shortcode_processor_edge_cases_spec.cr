@@ -225,6 +225,36 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("<span>live</span>")
     end
 
+    it "leaves shortcodes inside blockquoted fences untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # Markd opens a fence behind "> ```", so the example must stay raw.
+      content = "> ```\n> {% note %}body{% end %}\n> ```\n\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("{% note %}body{% end %}")
+      result.should contain("<span>live</span>")
+    end
+
+    it "keeps fence protection after an unbalanced opener in inline code" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # The literal `{% note %}` in backticks must not count as an open
+      # block tag — that used to pin block_depth > 0 and disable fence
+      # protection for every later fence in the document.
+      content = "Start with `{% note %}`.\n\n```\n{% note %}fenced{% end %}\n```"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("{% note %}fenced{% end %}")
+      result.should_not contain("<span>fenced</span>")
+    end
+
+    it "does not count a fence opener's info string toward block depth" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      content = "``` {% note %}\ncode\n```\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<span>live</span>")
+    end
+
     # Regression for https://github.com/hahwul/hwaro/issues/477
     # Single-backtick inline code spans should be opaque to the shortcode
     # processor, the same way fenced code blocks already are. The bug was

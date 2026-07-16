@@ -73,8 +73,31 @@ module Hwaro
 
         # Math span patterns — canonical home for the whole pipeline
         # (MarkdownExtensions aliases these, mirroring INLINE_STRIKETHROUGH_RE).
-        DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
-        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
+        #
+        # Display math must not cross a blank line (the tempered dot refuses
+        # to consume a newline that starts one, whitespace-only lines
+        # included): a stray unmatched `$$` would otherwise pair with a
+        # legitimate `$$` several paragraphs later and swallow all the prose
+        # in between. Blank lines are invalid inside LaTeX display math
+        # anyway, so no real formula is lost.
+        #
+        # Inline math admits backslash escapes in the body (`$x = \$5$`) and
+        # requires an unescaped, non-space-preceded closer. A body *ending*
+        # in a literal `\` won't close — meaningless in LaTeX at the end of
+        # a formula.
+        DISPLAY_MATH_RE = /\$\$((?:(?!\n[ \t\r]*\n).)*?)\$\$/m
+        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)((?:[^\n$\\]|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
+
+        # Placeholder comments left by `Core::Build::ShortcodeProcessor` for
+        # already-rendered shortcodes (canonical home here, next to the other
+        # inline patterns; the shortcode processor aliases it and emits the
+        # matching text). They must ride through `render` untouched: the
+        # HTML.escape at the top would otherwise turn them into
+        # `&lt;!--…--&gt;`, which the post-Markdown replacement pass cannot
+        # find — leaking the escaped comment into table cells, definition
+        # bodies, and footnotes.
+        SHORTCODE_PLACEHOLDER_RE = /<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/
+        SCPH_TOKEN_RE            = /\x00SCPH(\d+)\x00/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -89,6 +112,14 @@ module Hwaro
         # in addition to math — see `render(text, *, math:)` below, which is
         # the pre-F10 signature every existing caller/spec still uses.
         def render(text : String, *, flags : Flags) : String
+          placeholders = [] of String
+          if text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+            text = text.gsub(SHORTCODE_PLACEHOLDER_RE) do |comment|
+              placeholders << comment
+              "\x00SCPH#{placeholders.size - 1}\x00"
+            end
+          end
+
           result = HTML.escape(text)
 
           code_spans = [] of String
@@ -110,8 +141,15 @@ module Hwaro
           end
 
           result = result.gsub(INLINE_IMAGE_RE) do
-            alt = $1
-            url = $2
+            # Placeholder tokens landing in ATTRIBUTE values are restored in
+            # escaped form: substituting rendered shortcode HTML into an
+            # attribute after Markdown would break out of it (the same
+            # in-band channel the HID/footnote neutralization defends), and
+            # the escaped comment matches the pre-stash rendering here.
+            # Link TEXT below keeps raw restore — it's element content,
+            # consistent with paragraph text.
+            alt = escape_placeholder_tokens($1, placeholders)
+            url = escape_placeholder_tokens($2, placeholders)
             # `result` was already HTML.escaped at the top, so `url`/`alt` are
             # captured in their escaped form — emit them as-is (re-escaping here
             # would double-encode `&` into `&amp;amp;`). Matches the link branch
@@ -125,7 +163,7 @@ module Hwaro
 
           result = result.gsub(INLINE_LINK_RE) do
             link_text = $1
-            url = $2
+            url = escape_placeholder_tokens($2, placeholders)
             if safe_url?(url)
               %(<a href="#{url}">#{link_text}</a>)
             else
@@ -149,10 +187,34 @@ module Hwaro
           end
 
           code_spans.each_with_index do |content, idx|
-            result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{content}</code>")
+            # Tokens inside code spans restore ESCAPED, so a backticked
+            # placeholder displays literally instead of being substituted —
+            # the same thing Markd's own code-span escaping guarantees for
+            # paragraph text.
+            restored = escape_placeholder_tokens(content, placeholders)
+            result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{restored}</code>")
+          end
+
+          # Remaining tokens sit in element-content positions: restore the
+          # raw comment so the post-Markdown replacement pass resolves it
+          # (consistent with paragraph text, where the comment also rides
+          # through Markd verbatim).
+          placeholders.each_with_index do |comment, idx|
+            result = result.sub("\x00SCPH#{idx}\x00", comment)
           end
 
           result
+        end
+
+        # Replaces stashed placeholder tokens with the HTML-escaped comment
+        # text — for positions (attribute values, code spans) where the raw
+        # comment must NOT survive to the post-Markdown replacement pass.
+        private def escape_placeholder_tokens(text : String, placeholders : Array(String)) : String
+          return text if placeholders.empty? || !text.includes?('\u{0}')
+          text.gsub(SCPH_TOKEN_RE) do |token|
+            comment = $1.to_i?.try { |idx| placeholders[idx]? }
+            comment ? HTML.escape(comment) : token
+          end
         end
 
         # Pre-F10 signature — delegates to the `Flags` overload with every

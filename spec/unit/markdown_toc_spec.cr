@@ -72,5 +72,33 @@ describe Hwaro::Content::Processors::Markdown do
       # into HTML verbatim.
       toc[0].title.should eq("Tom &amp; Jerry &lt;3")
     end
+
+    it "does not mistake data-id for the heading's own id" do
+      html, toc = Hwaro::Content::Processors::Markdown.new.render(
+        %(<h2 data-id="tracker">Real Title</h2>\n\ntext)
+      )
+
+      toc[0].id.should eq("real-title")
+      html.should contain(%(data-id="tracker"))
+      html.should contain(%(id="real-title"))
+    end
+
+    it "keeps a quoted '>' in heading attributes out of the TOC title" do
+      html, toc = Hwaro::Content::Processors::Markdown.new.render(
+        %(<h2 title="a > b">Quoted</h2>\n\ntext)
+      )
+
+      toc[0].title.should eq("Quoted")
+      toc[0].id.should eq("quoted")
+      html.should contain(%(title="a > b"))
+    end
+
+    it "keeps a quoted '>' in inline HTML out of the TOC title" do
+      _, toc = Hwaro::Content::Processors::Markdown.new.render(
+        %(## Hello <img alt="Home > Docs" src="/x.png"> World\n\ntext)
+      )
+
+      toc[0].title.should eq("Hello  World")
+    end
   end
 end
