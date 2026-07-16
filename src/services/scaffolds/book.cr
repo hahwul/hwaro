@@ -195,7 +195,7 @@ module Hwaro
           <<-CSS
             #{font_face_css("../fonts")}
 
-            #{design_root("--header-h: 50px;\n--sidebar-w: 280px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4eee5, #151412);\n--radius: 6px;\n--radius-sm: 3px;")}
+            #{design_root("--header-h: 50px;\n--sidebar-w: 280px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4f0e8, #181513);\n--radius: 6px;\n--radius-sm: 3px;")}
 
             *,
             *::before,
@@ -212,7 +212,7 @@ module Hwaro
             body {
               font-family: var(--font-serif);
               font-size: 20px;
-              line-height: 1.9;
+              line-height: 1.75;
               color: var(--text);
               background: var(--bg);
               -webkit-font-smoothing: antialiased;
@@ -398,7 +398,7 @@ module Hwaro
               text-decoration: none;
               font-size: 0.84rem;
               line-height: 1.5;
-              transition: all 0.1s;
+              transition: color var(--transition), background var(--transition), border-color var(--transition);
               border-left: 2px solid transparent;
             }
 
@@ -414,7 +414,8 @@ module Hwaro
               background: color-mix(in srgb, var(--primary) 5%, transparent);
             }
 
-            .chapter-links a.active {
+            .chapter-links a.active,
+            .chapter-links a[aria-current="page"] {
               color: var(--primary-strong);
               background: var(--primary-tint);
               border-left-color: var(--primary);
@@ -547,8 +548,12 @@ module Hwaro
 
             .book-content p {
               margin-bottom: 1.35rem;
-              line-height: 1.9;
+              line-height: 1.75;
             }
+
+            /* Prose holds the measure; the wider container stays for code,
+               tables, and images (wide code, narrow prose). */
+            .book-content p, .book-content li { max-width: var(--measure); }
 
             .book-content ul,
             .book-content ol {
@@ -558,7 +563,7 @@ module Hwaro
 
             .book-content li {
               margin-bottom: 0.3rem;
-              line-height: 1.85;
+              line-height: 1.7;
             }
 
             .book-content li + li {
@@ -824,20 +829,22 @@ module Hwaro
               color: var(--text-muted);
               background: var(--bg);
               border: 1px solid var(--border);
-              transition: all 0.2s;
+              transition: all 0.2s var(--ease-out);
               z-index: 30;
               box-shadow: var(--shadow-sm);
             }
 
             .book-nav-arrow:hover {
-              color: var(--text);
-              border-color: var(--text-muted);
+              color: var(--primary);
+              border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+              background: var(--bg-raised);
               box-shadow: var(--shadow);
+              transform: translateY(-50%) scale(1.06);
               text-decoration: none;
             }
 
             .book-nav-arrow:active {
-              transform: translateY(-50%) scale(0.95);
+              transform: translateY(-50%) scale(0.94);
             }
 
             .book-nav-arrow svg {
@@ -848,7 +855,7 @@ module Hwaro
             .book-nav-arrow--prev {
               left: 16px;
               z-index: 60;
-              transition: left 0.25s ease, color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+              transition: left 0.25s ease, color 0.2s, border-color 0.2s, box-shadow 0.2s, background 0.2s, transform 0.2s var(--ease-out);
             }
 
             .book-nav-arrow--next {
@@ -937,7 +944,10 @@ module Hwaro
               width: 520px;
               max-width: 90vw;
               max-height: 70vh;
-              background: var(--bg);
+              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+              backdrop-filter: saturate(180%) blur(24px);
+              -webkit-backdrop-filter: saturate(180%) blur(24px);
+              border: 1px solid var(--border-subtle);
               border-radius: var(--radius);
               box-shadow: var(--shadow-lg);
               display: flex;
@@ -945,6 +955,17 @@ module Hwaro
               overflow: hidden;
               align-self: flex-start;
               font-family: var(--font-sans);
+            }
+            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
+
+            /* The palette settles into place when it opens. */
+            @media (prefers-reduced-motion: no-preference) {
+              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
+              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+              @starting-style {
+                .search-overlay.active { opacity: 0; }
+                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
+              }
             }
 
             .search-input-wrap {
@@ -1103,8 +1124,35 @@ module Hwaro
               transform: scale(0.92);
             }
 
+            /* Reading progress — a 2px ember thread across the top of the
+               page, driven entirely by CSS scroll-driven animation. Browsers
+               without animation-timeline (and reduced-motion readers) simply
+               never see it. */
+            .reading-progress { display: none; }
+            @supports (animation-timeline: scroll()) {
+              @media (prefers-reduced-motion: no-preference) {
+                .reading-progress {
+                  display: block;
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  height: 2px;
+                  z-index: 110;
+                  transform-origin: 0 50%;
+                  background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
+                  animation: reading-progress linear both;
+                  animation-timeline: scroll(root);
+                }
+                @keyframes reading-progress {
+                  from { transform: scaleX(0); }
+                  to { transform: scaleX(1); }
+                }
+              }
+            }
+
             @media (prefers-reduced-motion: reduce) {
-              *, *::before, *::after { transition-duration: 0.01ms !important; }
+              *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
               html { scroll-behavior: auto; }
             }
             CSS
@@ -1201,6 +1249,7 @@ module Hwaro
                   linkPath = linkPath.replace(/\/+$/, '') || '/';
                   if (linkPath === currentPath) {
                     links[i].classList.add('active');
+                    links[i].setAttribute('aria-current', 'page');
                     links[i].scrollIntoView({ block: 'center', behavior: 'instant' });
                   }
                 }
@@ -1416,6 +1465,7 @@ module Hwaro
                 #{theme_toggle_html}
               </div>
             </header>
+            <div class="reading-progress" aria-hidden="true"></div>
             HTML
         end
 
@@ -1567,7 +1617,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Introduction"
-            description = "Welcome to your book — overview and starting point."
+            description = "Welcome to your book: overview and starting point."
             weight = 0
             +++
 
@@ -1829,7 +1879,7 @@ module Hwaro
           <<-CONTENT
             +++
             title = "Advanced"
-            description = "Beyond the basics — power-user features and tips."
+            description = "Beyond the basics: power-user features and tips."
             weight = 3
             sort_by = "weight"
             +++

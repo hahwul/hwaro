@@ -174,5 +174,60 @@ describe Hwaro::Services::Scaffolds::Docs do
       ko_index.should contain(%(href="/ko/getting-started/"))
       ko_index.should_not contain(%(href="/getting-started/"))
     end
+
+    # Getting Started is the intended entry point; the first card carries
+    # an ember wash, and every card lifts on hover.
+    it "emphasizes the first link-card and lifts cards on hover" do
+      css = Hwaro::Services::Scaffolds::Docs.new.static_files["css/style.css"]
+      css.should contain(".link-cards a.link-card:first-child")
+      hover = css.partition("a.link-card:hover {")[2]
+      hover.partition("}")[0].should contain("transform: translateY(-2px);")
+    end
+  end
+
+  describe "wayfinding" do
+    # The sidebar CSS always shipped an .active style, but nothing ever
+    # applied the class — the "you are here" rail never rendered. The
+    # sidebar now marks the current page server-side via active_path.
+    it "marks the current page in the sidebar (server-rendered active state)" do
+      sidebar = Hwaro::Services::Scaffolds::Docs.new.template_files["partials/sidebar.html"].not_nil!
+      sidebar.should contain("active_path")
+      sidebar.should contain(%(aria-current="page"))
+      css = Hwaro::Services::Scaffolds::Docs.new.static_files["css/style.css"]
+      css.should contain(%(.sidebar-links a[aria-current="page"]))
+    end
+
+    # Docs read front to back: page.html closes with reading-order
+    # neighbours, deliberately unguarded by section so Quick Start flows
+    # into the Guide.
+    it "ships previous/next reading-order navigation on pages" do
+      tpl = Hwaro::Services::Scaffolds::Docs.new.template_files["page.html"].not_nil!
+      tpl.should contain(%(class="docs-page-nav"))
+      tpl.should contain("{{ base_url }}{{ page.lower.url }}")
+      tpl.should contain("{{ base_url }}{{ page.higher.url }}")
+      tpl.should contain(%(rel="prev"))
+      tpl.should contain(%(rel="next"))
+    end
+
+    # Heading anchors are appended client-side (ids are build-generated),
+    # revealed on hover by the stylesheet.
+    it "wires hover heading anchors through search.js and the stylesheet" do
+      scaffold = Hwaro::Services::Scaffolds::Docs.new
+      js = scaffold.static_files["js/search.js"]
+      js.should contain("heading-anchor")
+      js.should contain(".docs-main h2[id], .docs-main h3[id]")
+      css = scaffold.static_files["css/style.css"]
+      css.should contain(".heading-anchor {")
+      css.should contain(".docs-main h2:hover .heading-anchor")
+    end
+
+    # The search palette is a glass surface with a @starting-style entry
+    # reveal; both degrade gracefully (solid fallback, reduced-motion).
+    it "renders the search modal as glass with a guarded entry reveal" do
+      css = Hwaro::Services::Scaffolds::Docs.new.static_files["css/style.css"]
+      css.should contain("backdrop-filter: saturate(180%) blur(24px)")
+      css.should contain("@starting-style")
+      css.partition("@starting-style")[0].should contain("@media (prefers-reduced-motion: no-preference)")
+    end
   end
 end

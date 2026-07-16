@@ -188,8 +188,55 @@ describe Hwaro::Services::Scaffolds::Book do
       css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
       css.should contain("color-scheme: light dark;")
       css.should contain("--sidebar-w: 280px;")
-      css.should contain("--bg-sidebar: light-dark(#f4eee5, #151412);")
+      css.should contain("--bg-sidebar: light-dark(#f4f0e8, #181513);")
       css.should contain("linear-gradient(90deg, var(--rule-from), var(--rule-to))")
+    end
+
+    # The reading-progress thread is pure CSS scroll-driven animation:
+    # gated behind @supports and prefers-reduced-motion, no JS.
+    it "ships a guarded CSS reading-progress bar" do
+      scaffold = Hwaro::Services::Scaffolds::Book.new
+      nav = scaffold.template_files["partials/nav.html"].not_nil!
+      nav.should contain(%(class="reading-progress"))
+      css = scaffold.static_files["css/style.css"]
+      css.should contain("@supports (animation-timeline: scroll())")
+      css.should contain("animation-timeline: scroll(root)")
+      supports_block = css.partition("@supports (animation-timeline: scroll())")[2]
+      supports_block.should contain("@media (prefers-reduced-motion: no-preference)")
+    end
+
+    # The reading column caps prose at the shared measure while the wider
+    # container stays for code, tables, and images.
+    it "caps book prose at the shared measure" do
+      css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
+      css.should contain(".book-content p, .book-content li { max-width: var(--measure); }")
+    end
+
+    # Side arrows breathe on hover and press down on click; the base
+    # translateY(-50%) centering must survive both states.
+    it "gives the page arrows hover and press physics" do
+      css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
+      hover = css.partition(".book-nav-arrow:hover {")[2].partition("}")[0]
+      hover.should contain("transform: translateY(-50%) scale(1.06);")
+      active = css.partition(".book-nav-arrow:active {")[2].partition("}")[0]
+      active.should contain("transform: translateY(-50%) scale(0.94);")
+    end
+
+    # The sidebar active state is applied by book.js; aria-current keeps
+    # it accessible and the stylesheet matches both hooks.
+    it "marks the active chapter link with aria-current" do
+      scaffold = Hwaro::Services::Scaffolds::Book.new
+      scaffold.static_files["js/book.js"].should contain(%(setAttribute('aria-current', 'page')))
+      scaffold.static_files["css/style.css"].should contain(%(.chapter-links a[aria-current="page"]))
+    end
+
+    # The search palette is a glass surface with a @starting-style entry
+    # reveal; both degrade gracefully (solid fallback, reduced-motion).
+    it "renders the search modal as glass with a guarded entry reveal" do
+      css = Hwaro::Services::Scaffolds::Book.new.static_files["css/style.css"]
+      css.should contain("backdrop-filter: saturate(180%) blur(24px)")
+      css.should contain("@starting-style")
+      css.partition("@starting-style")[0].should contain("@media (prefers-reduced-motion: no-preference)")
     end
   end
 

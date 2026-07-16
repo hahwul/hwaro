@@ -20,8 +20,8 @@ Built-in scaffolds:
 |----------|-------------|
 | `simple` | Landing pages, small sites (default) |
 | `bare` | Minimal structure with semantic HTML only |
-| `blog` | Posts with tags and categories |
-| `docs` | Documentation with sidebar |
+| `blog` | Posts with tags, reading time, and older/newer post navigation |
+| `docs` | Documentation with sidebar and prev/next page navigation |
 | `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
 
 Every scaffold shares one design-token system built on CSS `light-dark()` pairs,
@@ -31,6 +31,11 @@ theme switcher in the header: it cycles auto → light → dark, persists the
 choice in `localStorage`, and applies it before first paint so there is no
 flash. To force one scheme permanently (a dark-only site), add
 `:root { color-scheme: dark; }` at the end of the generated `css/style.css`.
+
+The scaffolds also carry a quiet modern layer: a sticky glass header, native
+cross-document view transitions between pages, and (on blog posts and book
+pages) a CSS-only reading-progress thread. All of it degrades gracefully on
+older browsers and every animation respects `prefers-reduced-motion`.
 
 {% preview_gallery() %}
 <a class="preview-item" href="/images/scaffolds/scaffold-simple.png" target="_blank" rel="noopener"><img src="/images/scaffolds/scaffold-simple.png" alt="simple scaffold" width="1280" height="800" loading="lazy"><div class="preview-label"><code>simple</code> — Landing pages, small sites</div></a>

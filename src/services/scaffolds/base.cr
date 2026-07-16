@@ -221,13 +221,14 @@ module Hwaro
         # by editing the `currentColor`/`fill` values, and crisp at
         # any DPR. We use a neutral mark instead of the hwaro logo so
         # users don't have to remember to swap branding before
-        # publishing. The ember red matches the scaffold stylesheets'
-        # `--primary` token.
+        # publishing. The ember gradient matches the scaffold stylesheets'
+        # `--spark` mark, the same diamond the masthead and dividers carry.
         protected def default_favicon_svg : String
           <<-SVG
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-              <rect width="32" height="32" rx="6" fill="#b35454"/>
-              <path d="M9 8h3v7h8V8h3v16h-3v-7h-8v7H9z" fill="#ffffff"/>
+              <defs><linearGradient id="ember" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c46262"/><stop offset="1" stop-color="#8f4040"/></linearGradient></defs>
+              <rect width="32" height="32" rx="7" fill="url(#ember)"/>
+              <path d="M9 8h3v7h8V8h3v16h-3v-7h-8v7H9z" fill="#faf8f4"/>
             </svg>
             SVG
         end
@@ -482,7 +483,7 @@ module Hwaro
           # identically on `bare`, which ships no stylesheet and therefore
           # no tokens. `color: inherit` keeps the body on the theme palette.
           <<-HTML
-            <div class="alert" style="padding: 0.875rem 1.125rem; border: 1px solid color-mix(in srgb, var(--primary, #b35454) 30%, transparent); background-color: color-mix(in srgb, var(--primary, #b35454) 7%, transparent); border-radius: 6px; margin: 1rem 0; color: inherit;">
+            <div class="alert" style="padding: 0.9rem 1.15rem; border: 1px solid color-mix(in srgb, var(--primary, #b35454) 22%, transparent); border-left: 3px solid var(--primary, #b35454); background-color: color-mix(in srgb, var(--primary, #b35454) 6%, transparent); border-radius: var(--radius-sm, 6px); margin: 1.25rem 0; color: inherit;">
               <strong style="color: var(--primary, #b35454);">{{ type | upper }}:</strong> {{ body | markdownify }}
             </div>
             HTML
@@ -521,14 +522,16 @@ module Hwaro
             </head>
             <body data-section="{{ page.section }}">
               <a class="skip-link" href="#main">Skip to content</a>
-              <div class="site-wrapper">
-                <header class="site-header">
+              <header class="site-header">
+                <div class="site-header-inner">
                   <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title | e }}</a>
                   <div class="site-header-right">
                     #{navigation}
                     #{theme_toggle_html}
                   </div>
-                </header>
+                </div>
+              </header>
+              <div class="site-wrapper">
 
             HTML
         end
@@ -638,10 +641,30 @@ module Hwaro
               body { font-family: var(--font-sans); font-size: var(--step-0); line-height: 1.7; margin: 0; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
               ::selection { background: var(--selection); }
 
-              /* Layout. The masthead carries a small ember spark — the same
-                 diamond the favicon, dividers, and colophon share. */
-              .site-wrapper { max-width: var(--content-max-w); margin: 0 auto; padding: 0 var(--space-5); }
-              .site-header { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-6) 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); margin-bottom: var(--space-7); }
+              /* Motion. Cross-document view transitions give MPA navigation a
+                 native cross-fade (the masthead keeps its name, so it holds
+                 still while content fades); @starting-style settles the page
+                 into place on first render. Both are progressive enhancements
+                 and both collapse under prefers-reduced-motion. */
+              @view-transition { navigation: auto; }
+              @media (prefers-reduced-motion: reduce) {
+                @view-transition { navigation: none; }
+              }
+              @media (prefers-reduced-motion: no-preference) {
+                .site-main { transition: opacity var(--transition-slow), translate var(--transition-slow); }
+                @starting-style {
+                  .site-main { opacity: 0; translate: 0 0.4rem; }
+                }
+              }
+              [id] { scroll-margin-top: 5rem; }
+
+              /* Layout. The masthead is a sticky glass bar; it carries a small
+                 ember spark — the same diamond the favicon, dividers, and
+                 colophon share. */
+              .site-header { position: sticky; top: 0; z-index: 50; view-transition-name: site-header; background: var(--glass); -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter); border-bottom: 1px solid var(--border-subtle); }
+              @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .site-header { background: var(--bg); } }
+              .site-header-inner { max-width: var(--content-max-w); margin: 0 auto; padding: var(--space-3) var(--space-5); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+              .site-wrapper { max-width: var(--content-max-w); margin: 0 auto; padding: var(--space-7) var(--space-5) 0; }
               .site-logo { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-serif); font-weight: 700; font-size: var(--step-1); color: var(--heading); text-decoration: none; letter-spacing: -0.01em; }
               .site-logo::before { content: ""; width: 9px; height: 9px; flex: none; border-radius: 2px; transform: rotate(45deg); background: var(--spark); }
               .site-logo:hover { color: var(--primary); }
@@ -651,7 +674,7 @@ module Hwaro
               .site-header nav a:hover { color: var(--primary); }
               .site-header nav a[aria-current="page"] { color: var(--heading); border-bottom-color: var(--primary); }
               #{theme_toggle_css}
-              .site-main { min-height: calc(100vh - 260px); }
+              .site-main { min-height: calc(100vh - 260px); min-height: calc(100dvh - 16rem); }
 
               /* Footer as colophon: a centered spark over a serif italic
                  imprint line, like the last page of a well-set book. */
@@ -668,7 +691,8 @@ module Hwaro
               h1 { font-size: var(--step-4); margin-top: 0; letter-spacing: -0.022em; }
               h2 { font-size: var(--step-2); letter-spacing: -0.012em; }
               h3 { font-size: var(--step-1); }
-              p { margin: 1em 0; text-wrap: pretty; }
+              p { margin: 1em 0; }
+              p, li, blockquote, figcaption { text-wrap: pretty; }
               .site-main p, .site-main li { max-width: var(--measure); }
 
               /* Page title gets a short ember rule — the one mark every
@@ -698,13 +722,14 @@ module Hwaro
               .site-main > ol > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0.62rem; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; font-family: var(--font-serif); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primary); background: var(--primary-tint); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); border-radius: 50%; }
 
               code { background: var(--bg-code); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); overflow-wrap: break-word; }
-              pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius-sm); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+              kbd { font-family: var(--font-mono); font-size: 0.78em; padding: 0.15rem 0.45rem; background: var(--bg-raised); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); color: var(--text-secondary); }
+              pre { background: var(--bg-code); padding: var(--space-4) var(--space-5); border-radius: var(--radius); overflow-x: auto; border: 1px solid var(--border-subtle); line-height: 1.55; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
               /* Keep `.hljs` transparent so code sits on the warm well; if a
                  user switches to a CDN theme it won't repaint a clashing box.
                  `pre code.hljs` (0,1,2) outranks a theme's `.hljs` (0,1,0). */
               pre code, pre code.hljs { background: transparent; padding: 0; }
               #{highlight_theme_css}
-              img { max-width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--edge); outline-offset: -1px; }
+              img { max-width: 100%; height: auto; border-radius: var(--radius-sm); outline: 1px solid var(--edge); outline-offset: -1px; }
 
               /* Blockquote as pulled voice: a hanging ember quote instead of
                  a fence, set a touch larger in the serif italic. */
@@ -734,7 +759,7 @@ module Hwaro
               .taxonomy-desc { color: var(--text-muted); margin-bottom: var(--space-5); }
               nav.pagination { margin: var(--space-6) 0; }
               nav.pagination .pagination-list { list-style: none; padding: 0; margin: 0; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
-              nav.pagination a { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); transition: color var(--transition), border-color var(--transition), transform 0.1s ease; }
+              nav.pagination a { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); transition: color var(--transition), border-color var(--transition), transform 0.1s var(--ease-out); }
               nav.pagination a:hover { color: var(--primary); border-color: var(--primary); }
               nav.pagination a:active { transform: scale(0.96); }
               .pagination-current span { display: inline-block; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--primary); background: var(--primary-tint); color: var(--primary-strong); }
@@ -743,16 +768,16 @@ module Hwaro
               /* Responsive — the type scale is fluid, so only the frame
                  needs to adapt. */
               @media (max-width: 600px) {
-                .site-header { flex-direction: column; gap: 0.6rem; align-items: flex-start; }
-                .site-wrapper { padding: 0 var(--space-4); }
+                .site-header-inner { flex-wrap: wrap; row-gap: var(--space-1); padding: var(--space-2) var(--space-4); }
+                .site-wrapper { padding: var(--space-6) var(--space-4) 0; }
               }
 
               /* Accessibility */
-              :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+              :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
               .skip-link { position: absolute; top: -100px; left: 0; background: var(--primary); color: var(--bg); padding: var(--space-2) var(--space-4); z-index: 1000; border-radius: 0 0 var(--radius-sm) 0; }
               .skip-link:focus { top: 0; }
               @media (prefers-reduced-motion: reduce) {
-                *, *::before, *::after { transition-duration: 0.01ms !important; }
+                *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
               }
             </style>
             CSS

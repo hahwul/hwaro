@@ -22,8 +22,8 @@ module Hwaro
         # Exposed for specs and tooling that need the brand anchors.
         PRIMARY_LIGHT = "#b35454"
         PRIMARY_DARK  = "#ec7a66"
-        BG_LIGHT      = "#faf7f2"
-        BG_DARK       = "#0f0f0e"
+        BG_LIGHT      = "#faf8f4"
+        BG_DARK       = "#141110"
 
         # The full shared `:root` prelude: color tokens (light-dark pairs),
         # the fluid type scale, the 8px spacing scale, shape/depth/motion
@@ -59,18 +59,18 @@ module Hwaro
               --spark: linear-gradient(135deg, var(--rule-from), var(--rule-to));
 
               /* Ink — a three-step ramp. */
-              --heading:        light-dark(#241f1a, #f5f2ed);
-              --text:           light-dark(#2a241f, #dedad3);
-              --text-secondary: light-dark(#5c5248, #a7a199);
-              --text-muted:     light-dark(#6f6358, #7d776e);
+              --heading:        light-dark(#241f1a, #f7f2ea);
+              --text:           light-dark(#2a241f, #e3ddd4);
+              --text-secondary: light-dark(#5b544a, #aca396);
+              --text-muted:     light-dark(#6e675c, #857c72);
 
               /* Surfaces & edges. */
-              --bg:            light-dark(#faf7f2, #0f0f0e);
-              --bg-subtle:     light-dark(#f1eae0, #1a1917);
-              --bg-raised:     light-dark(#fffdf8, #1c1a18);
-              --bg-code:       light-dark(#f1eae0, #1e1c19);
-              --border:        light-dark(#e4dacd, #2b2926);
-              --border-subtle: light-dark(#efe8dd, #201e1c);
+              --bg:            light-dark(#faf8f4, #141110);
+              --bg-subtle:     light-dark(#f2ede4, #1d1917);
+              --bg-raised:     light-dark(#fffefb, #211c19);
+              --bg-code:       light-dark(#efe9df, #241e1a);
+              --border:        light-dark(#e3dbcf, #362e29);
+              --border-subtle: light-dark(#ece6dc, #292320);
               --edge:  color-mix(in srgb, var(--text) 8%, transparent);
               --glass: color-mix(in srgb, var(--bg) 85%, transparent);
               --scrim: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
@@ -97,6 +97,7 @@ module Hwaro
               --step-2:  clamp(1.44rem, 1.32rem + 0.61vw, 1.78rem);
               --step-3:  clamp(1.73rem, 1.53rem + 0.98vw, 2.28rem);
               --step-4:  clamp(2.07rem, 1.77rem + 1.52vw, 2.92rem);
+              --step-5:  clamp(2.49rem, 2.12rem + 1.84vw, 3.5rem);
 
               /* Space — 8px rhythm. */
               --space-1: 0.25rem;
@@ -115,7 +116,10 @@ module Hwaro
               --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
               --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
               --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
-              --transition: 0.15s ease;
+              --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+              --transition: 0.15s var(--ease-out);
+              --transition-slow: 0.45s var(--ease-out);
+              --glass-filter: saturate(150%) blur(16px);
 
               /* Faces. */
               --font-serif: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Noto Serif KR", serif;
@@ -138,16 +142,16 @@ module Hwaro
                 --rule-to: #8f4040;
                 --heading: #241f1a;
                 --text: #2a241f;
-                --text-secondary: #5c5248;
-                --text-muted: #6f6358;
-                --bg: #faf7f2;
-                --bg-subtle: #f1eae0;
-                --bg-raised: #fffdf8;
-                --bg-code: #f1eae0;
-                --border: #e4dacd;
-                --border-subtle: #efe8dd;
+                --text-secondary: #5b544a;
+                --text-muted: #6e675c;
+                --bg: #faf8f4;
+                --bg-subtle: #f2ede4;
+                --bg-raised: #fffefb;
+                --bg-code: #efe9df;
+                --border: #e3dbcf;
+                --border-subtle: #ece6dc;
                 --edge: rgba(42, 36, 31, 0.08);
-                --glass: rgba(250, 247, 242, 0.85);
+                --glass: rgba(250, 248, 244, 0.85);
                 --scrim: rgba(0, 0, 0, 0.4);
                 --warn: #b07d2e;
                 --ok: #5e8c61;
@@ -208,8 +212,9 @@ module Hwaro
         def self.theme_toggle_css : String
           <<-CSS
             /* Theme switcher — cycles auto → light → dark (script inlined in footer). */
-            .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--transition), border-color var(--transition); }
+            .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--transition), border-color var(--transition), transform 0.1s var(--ease-out); }
             .theme-toggle:hover { color: var(--primary); border-color: var(--primary); }
+            .theme-toggle:active { transform: scale(0.94); }
             .theme-toggle svg { display: none; }
             .theme-toggle[data-mode="auto"] .tt-auto,
             .theme-toggle[data-mode="light"] .tt-light,
