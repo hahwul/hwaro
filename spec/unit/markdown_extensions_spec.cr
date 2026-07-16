@@ -951,9 +951,9 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
         markdown_config: cfg,
       )
       html.should contain("“wow”") # curly quotes
-      html.should contain("–")         # en dash
-      html.should contain("…")         # ellipsis
-      html.should contain("—")         # em dash
+      html.should contain("–")     # en dash
+      html.should contain("…")     # ellipsis
+      html.should contain("—")     # em dash
     end
 
     it "stays byte-identical when disabled" do
@@ -983,6 +983,65 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
         markdown_config: cfg,
       )
       html.should contain("a -- b")
+    end
+  end
+
+  describe "task list classes (GFM)" do
+    it "adds item, checkbox, and list classes when enabled (tight list)" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a\n- [x] b", markdown_config: cfg)
+      html.should contain(%(<ul class="contains-task-list">))
+      html.scan(%(<li class="task-list-item">)).size.should eq(2)
+      html.should contain(%(<input type="checkbox" disabled class="task-list-item-checkbox"> a))
+      html.should contain(%(<input type="checkbox" checked disabled class="task-list-item-checkbox"> b))
+    end
+
+    it "handles loose lists" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a\n\n- [x] b", markdown_config: cfg)
+      html.should contain(%(<ul class="contains-task-list">))
+      html.should contain(%(<li class="task-list-item">\n<p><input type="checkbox" disabled class="task-list-item-checkbox">))
+    end
+
+    it "marks only the lists that contain task items" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "- plain\n- [ ] task\n\nother:\n\n- just\n- items",
+        markdown_config: cfg,
+      )
+      html.scan("contains-task-list").size.should eq(1)
+    end
+
+    it "marks nested task lists and their parents independently" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "- plain\n  - [ ] nested task",
+        markdown_config: cfg,
+      )
+      # Only the inner list directly contains a task item.
+      html.scan("contains-task-list").size.should eq(1)
+      html.should contain(%(<ul class="contains-task-list">\n<li class="task-list-item">))
+    end
+
+    it "is off by default (byte-identity)" do
+      cfg = make_config(task_lists: true)
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a", markdown_config: cfg)
+      html.should_not contain("task-list-item")
+      html.should_not contain("contains-task-list")
+    end
+
+    it "leaves fenced checkbox markup alone" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "```\n- [ ] a\n```",
+        markdown_config: cfg,
+      )
+      html.should_not contain("task-list-item")
     end
   end
 

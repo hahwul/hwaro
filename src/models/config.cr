@@ -658,6 +658,9 @@ module Hwaro
       property external_links_target_blank : Bool
       property external_links_no_follow : Bool
       property external_links_no_referrer : Bool
+      # If true, task-list markup gets GFM's classes (task-list-item /
+      # task-list-item-checkbox / contains-task-list) for CSS parity.
+      property task_list_classes : Bool
 
       def initialize
         @safe = false
@@ -680,6 +683,7 @@ module Hwaro
         @external_links_target_blank = false
         @external_links_no_follow = false
         @external_links_no_referrer = false
+        @task_list_classes = false
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -695,7 +699,7 @@ module Hwaro
           io << (@ins ? '1' : '0') << (@mark ? '1' : '0') << (@sub ? '1' : '0')
           io << (@sup ? '1' : '0') << (@attributes ? '1' : '0') << (@smart_punctuation ? '1' : '0')
           io << (@external_links_target_blank ? '1' : '0') << (@external_links_no_follow ? '1' : '0')
-          io << (@external_links_no_referrer ? '1' : '0')
+          io << (@external_links_no_referrer ? '1' : '0') << (@task_list_classes ? '1' : '0')
           io << @math_engine
         end
       end
@@ -1811,6 +1815,7 @@ module Hwaro
         config.markdown.external_links_target_blank = bool_value(s["external_links_target_blank"]?, config.markdown.external_links_target_blank)
         config.markdown.external_links_no_follow = bool_value(s["external_links_no_follow"]?, config.markdown.external_links_no_follow)
         config.markdown.external_links_no_referrer = bool_value(s["external_links_no_referrer"]?, config.markdown.external_links_no_referrer)
+        config.markdown.task_list_classes = bool_value(s["task_list_classes"]?, config.markdown.task_list_classes)
       end
 
       private def self.load_series(config : Config)
