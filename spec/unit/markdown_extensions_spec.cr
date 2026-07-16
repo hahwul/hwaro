@@ -986,6 +986,87 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "multi-line footnotes" do
+    it "joins indented continuation lines into one paragraph" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: first line\n    wrapped **bold** line",
+        markdown_config: cfg,
+      )
+      html.should contain("first line\nwrapped <strong>bold</strong> line")
+      html.scan("<p>").size.should eq(2) # body paragraph + one footnote <p>
+    end
+
+    it "renders blank-line-separated paragraphs with backrefs in the last" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: para one\n\n    para two",
+        markdown_config: cfg,
+      )
+      html.should contain("<p>para one</p>")
+      html.should contain(%(<p>para two <a href="#fnref-1" class="footnote-backref">))
+    end
+
+    it "ends collection at a blank line followed by unindented text" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: body\n\nregular paragraph",
+        markdown_config: cfg,
+      )
+      html.should contain("<p>regular paragraph</p>")
+      html.should contain("<p>body <a href=")
+    end
+
+    it "does not treat an unrelated indented code block as a continuation" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: body\n\nplain\n\n    indented code",
+        markdown_config: cfg,
+      )
+      html.should contain("<pre><code>indented code")
+    end
+
+    it "keeps single-line definitions byte-identical" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: simple note",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<p>simple note <a href="#fnref-1" class="footnote-backref">↩</a></p>))
+    end
+
+    it "handles CRLF continuations" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\r\n\r\n[^1]: first\r\n    second\r\n",
+        markdown_config: cfg,
+      )
+      html.should contain("first\nsecond")
+    end
+  end
+
+  describe "multi-line definition lists" do
+    it "joins indented continuation lines into the same dd" do
+      content = "Term\n: first part\n    wrapped part"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>first part wrapped part</dd>")
+    end
+
+    it "keeps an indented ': …' line a separate definition" do
+      content = "Term\n: one\n    : two"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>one</dd>")
+      result.should contain("<dd>two</dd>")
+    end
+
+    it "still ends the group at a blank line" do
+      content = "Term\n: def\n\n    indented code after"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>def</dd>")
+      result.should contain("    indented code after")
+    end
+  end
+
   describe "task list classes (GFM)" do
     it "adds item, checkbox, and list classes when enabled (tight list)" do
       cfg = make_config(task_lists: true)

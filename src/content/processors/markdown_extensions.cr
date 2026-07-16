@@ -402,8 +402,17 @@ module Hwaro
                 # Collect definitions for this term
                 while i < lines.size && !fenced[i] && lines[i].lstrip.starts_with?(": ")
                   definition = lines[i].lstrip.lchop(": ").strip
-                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
                   i += 1
+                  # PHP-Markdown-Extra soft wrap: 4-space/tab-indented
+                  # continuation lines join the same <dd> with a space. An
+                  # indented `: …` stays a new definition, and a blank line
+                  # still ends the group as before (multi-paragraph <dd> is
+                  # deliberately out of scope).
+                  while i < lines.size && !fenced[i] && dd_continuation?(lines[i])
+                    definition += " #{lines[i].strip}"
+                    i += 1
+                  end
+                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
                 end
 
                 # Skip one or more blank lines between term groups within the same dl
@@ -425,6 +434,12 @@ module Hwaro
           end
 
           result.join("\n")
+        end
+
+        private def dd_continuation?(line : String) : Bool
+          return false if line.strip.empty?
+          return false unless line.starts_with?("    ") || line.starts_with?('\t')
+          !line.lstrip.starts_with?(": ")
         end
 
         # --- Footnotes ---
@@ -474,12 +489,56 @@ module Hwaro
 
           # Extract and remove footnote definitions — but only OUTSIDE fenced code
           # blocks, so a ``` [^1]: ... ``` syntax example isn't silently eaten.
+          # A definition collects 4-space/tab-indented continuation lines
+          # (GFM/pandoc style), including blank-line-separated paragraphs:
+          # soft-wrapped lines join with "\n", a held blank line becomes a
+          # "\n\n" paragraph break when (and only when) the next non-blank
+          # line is indented too. Lazy (unindented) continuation is NOT
+          # supported — it would eat the regular paragraph after a
+          # definition. Consumed lines are replaced with bare "\n" so the
+          # surrounding CommonMark block structure is unchanged.
           footnotes = {} of String => String
-          cleaned = process_lines_fence_aware(content) do |line, _|
-            line.gsub(FOOTNOTE_DEF_RE) do |_|
-              # rstrip: on CRLF content the captured text carries a trailing \r
-              footnotes[$~[1]] = $~[2].rstrip
-              "" # Remove definition from content
+          pending_key = nil.as(String?)
+          pending_blank = false
+          cleaned = String.build do |io|
+            tracker = FenceTracker.new
+            content.each_line(chomp: false) do |line|
+              # Collection takes precedence over fence tracking: an indented
+              # continuation after a held blank would otherwise read as an
+              # indented-code run opener. Consumed lines are not fed to the
+              # tracker — they are all blank or indented, so at worst its
+              # blank/list state is stale-conservative (under-protective,
+              # matching pre-collection behavior) for the line that ends
+              # the collection.
+              if key = pending_key
+                if line.strip.empty?
+                  pending_blank = true
+                  io << line
+                  next
+                elsif line.starts_with?("    ") || line.starts_with?('\t')
+                  footnotes[key] += pending_blank ? "\n\n" : "\n"
+                  footnotes[key] += line.strip
+                  pending_blank = false
+                  io << "\n"
+                  next
+                end
+                pending_key = nil
+                pending_blank = false
+              end
+
+              if tracker.fence_line?(line)
+                io << line
+                next
+              end
+
+              if m = line.match(FOOTNOTE_DEF_RE)
+                # rstrip: on CRLF content the captured text carries a trailing \r
+                footnotes[m[1]] = m[2].rstrip
+                pending_key = m[1]
+                io << "\n"
+              else
+                io << line
+              end
             end
           end
 
@@ -522,9 +581,11 @@ module Hwaro
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1
-              # Escape --> in text to prevent premature comment close, and : to prevent parsing issues
+              # Escape --> in text to prevent premature comment close, : to
+              # prevent parsing issues, and newlines (multi-line bodies) so
+              # the comment stays single-line for FOOTNOTE_COMMENT_RE.
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
-              safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
+              safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;").gsub("\n", "&#10;")
               result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
             result += "<!--HWARO-FOOTNOTES-END-->\n"
@@ -553,7 +614,7 @@ module Hwaro
           html.scan(FOOTNOTE_COMMENT_RE) do |match|
             # Unescape the comment-safe encoding
             key = match[1].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
-            text = match[4].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
+            text = match[4].gsub("&#58;", ":").gsub("&#45;&#45;", "--").gsub("&#10;", "\n")
             num = match[2].to_i? || 0
             # Occurrence count is optional: older/hand-written 3-field comments
             # (no count) fall back to a single backref.
@@ -572,7 +633,6 @@ module Hwaro
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
               escaped_key = footnote_id_token(fn[:key])
-              rendered_text = InlineMarkdown.render(fn[:text], flags: flags)
               str << "<li id=\"fn-#{escaped_key}\">\n"
               # One backref per reference occurrence so every `fnref-\u2026` id is
               # reachable (cmark-gfm/pandoc behavior): \u21A9, \u21A92, \u21A93, \u2026
@@ -584,7 +644,19 @@ module Hwaro
                   b << "<a href=\"##{target}\" class=\"footnote-backref\">#{label}</a>"
                 end
               end
-              str << "<p>#{rendered_text} #{backrefs}</p>\n"
+              # Multi-paragraph bodies (blank-line-separated in the source)
+              # render one <p> each, backrefs inside the LAST one (GFM
+              # placement). A single-paragraph body produces exactly the
+              # pre-multi-line output.
+              paragraphs = fn[:text].split(/\n{2,}/)
+              paragraphs.each_with_index do |para, idx|
+                rendered_text = InlineMarkdown.render(para, flags: flags)
+                if idx == paragraphs.size - 1
+                  str << "<p>#{rendered_text} #{backrefs}</p>\n"
+                else
+                  str << "<p>#{rendered_text}</p>\n"
+                end
+              end
               str << "</li>\n"
             end
             str << "</ol>\n</section>\n"
