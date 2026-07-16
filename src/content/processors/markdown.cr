@@ -165,7 +165,8 @@ module Hwaro
 
           # Use SyntaxHighlighter for rendering with highlighting support.
           # Tables were already converted above — skip the redundant re-scan.
-          html = SyntaxHighlighter.render(processed, highlight, safe, tables_preprocessed: true, hooks: hooks)
+          smart = markdown_config.try(&.smart_punctuation) || false
+          html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, tables_preprocessed: true, hooks: hooks)
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config
@@ -1035,6 +1036,13 @@ module Hwaro
 
       # Create shared instance for module-level access
       @@instance = Content::Processors::Markdown.new
+
+      # The site's [markdown] config, published for template filters
+      # (currently `markdownify`) that have no per-call config access.
+      # Set once per build in Phases::Initialize — mirroring
+      # `SyntaxHighlighter.server_mode` — so `serve` config reloads
+      # propagate; nil in library/spec contexts keeps the bare defaults.
+      class_property filter_markdown_config : Models::MarkdownConfig? = nil
 
       # Renders Markdown to HTML and generates a Table of Contents
       # @param highlight - whether to enable syntax highlighting for code blocks

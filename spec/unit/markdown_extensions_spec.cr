@@ -942,6 +942,50 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "smart punctuation" do
+    it "typographs quotes, dashes, and ellipses when enabled" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(He said "wow" -- then... an em---dash),
+        markdown_config: cfg,
+      )
+      html.should contain("“wow”") # curly quotes
+      html.should contain("–")         # en dash
+      html.should contain("…")         # ellipsis
+      html.should contain("—")         # em dash
+    end
+
+    it "stays byte-identical when disabled" do
+      html, _ = Hwaro::Processor::Markdown.render(%(He said "wow" -- then...))
+      html.should contain("&quot;wow&quot;")
+      html.should contain("--")
+      html.should contain("...")
+    end
+
+    it "leaves code spans and fences untouched" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Use `a -- b` and:\n\n```\nx = \"y\" -- z\n```",
+        markdown_config: cfg,
+      )
+      html.should contain("a -- b")
+      html.should contain("&quot;y&quot; -- z")
+    end
+
+    it "leaves math bodies untouched with smart on" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      cfg.math = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Formula $a -- b$ here.",
+        markdown_config: cfg,
+      )
+      html.should contain("a -- b")
+    end
+  end
+
   describe "indented code blocks" do
     it "leaves transforms alone inside an indented code run" do
       config = make_config(math: true)

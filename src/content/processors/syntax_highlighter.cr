@@ -858,10 +858,13 @@ module Hwaro
         # @param content - markdown content to render
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
+        # @param smart - if true, markd's smart punctuation rewrites straight
+        #   quotes/dashes/ellipses in Text nodes (code spans, raw HTML, and the
+        #   \x00 placeholders the extension passes leave are untouched)
         # @param hooks - render-hook context (nil when no `templates/hooks/render-*`
         #   template is configured); when nil the renderer construction below is
         #   byte-identical to the pre-hooks code path.
-        def render(content : String, highlight : Bool = true, safe : Bool = false, *, tables_preprocessed : Bool = false,
+        def render(content : String, highlight : Bool = true, safe : Bool = false, *, smart : Bool = false, tables_preprocessed : Bool = false,
                    hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : String
           # Pre-process tables before passing to markd (markd doesn't support
           # GFM tables). Markdown#render already converts tables before the
@@ -870,7 +873,7 @@ module Hwaro
           # SyntaxHighlighter.render.
           processed_content = tables_preprocessed ? content : TableParser.process(content)
 
-          options = Markd::Options.new(safe: safe)
+          options = Markd::Options.new(safe: safe, smart: smart)
           document = Markd::Parser.parse(processed_content, options)
           renderer = if hooks
                        HookedRenderer.new(options, highlight, @@server_mode, hooks)

@@ -1566,6 +1566,21 @@ describe Hwaro::Models::Config do
       attributes_only.attributes = true
       attributes_only.cache_fingerprint.should_not eq(base_fp)
     end
+
+    it "loads smart_punctuation and includes it in cache_fingerprint" do
+      base_fp = Hwaro::Models::MarkdownConfig.new.cache_fingerprint
+
+      smart_only = Hwaro::Models::MarkdownConfig.new
+      smart_only.smart_punctuation = true
+      smart_only.cache_fingerprint.should_not eq(base_fp)
+
+      config = load_config(<<-TOML)
+        [markdown]
+        smart_punctuation = true
+        TOML
+      config.markdown.smart_punctuation.should be_true
+      Hwaro::Models::MarkdownConfig.new.smart_punctuation.should be_false
+    end
   end
 
   # ---------------------------------------------------------------------------

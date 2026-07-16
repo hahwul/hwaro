@@ -519,6 +519,13 @@ module Hwaro
         # div becomes an HTML block inside the blockquote).
         BARE_MATH_LINE_RE     = /\A\x00MATH\d+\x00\z/
         BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)+/
+        # Markd-active characters inside a math body rendered in normal
+        # inline context (see the branch comments in expand_math). Beyond
+        # emphasis/code/link chars, `-`, `.`, and both quotes are included
+        # so markd's opt-in smart punctuation can't rewrite `--`/`...`/
+        # quotes inside formulas; when smart is off the backslash escapes
+        # collapse to the same characters, so output is byte-identical.
+        MATH_BODY_MARKD_ACTIVE_RE = /[\\`*_\[\]\-."']/
 
         # One-shot math transform (stash + immediate expand). `preprocess`
         # itself uses the two phases separately so the combined pass runs in
@@ -671,7 +678,7 @@ module Hwaro
                   # Mid-paragraph display math (inline raw HTML): escape the
                   # body like the inline branch below, and double the
                   # delimiters' backslashes so `\\[` collapses to `\[`.
-                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
                   "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
                 elsif raw_context
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
@@ -687,7 +694,7 @@ module Hwaro
                   # the formula body verbatim to KaTeX/MathJax. (`~` is left
                   # alone: GFM strikethrough is handled by hwaro's own
                   # preprocessor, which already skips math spans.)
-                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
                   "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
                 end
               end
