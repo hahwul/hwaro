@@ -21,10 +21,21 @@ module Hwaro
       #   "```ruby" lines inside an open fence) verbatim.
       # - Lines indented 4+ spaces (or starting with a tab) are indented-code
       #   context where ```/~~~ is literal text, never a delimiter.
+      # - Fences inside blockquotes (`> ```) are tracked too: the leading
+      #   `>` markers are stripped before the opener/closer rules apply, and
+      #   the marker depth is remembered. Because CommonMark gives fenced
+      #   code no lazy continuation, a line missing the fence's markers ends
+      #   the quote — and the fence with it — and is re-evaluated as a
+      #   potential new opener. Inside an open fence, only the fence's own
+      #   marker depth is stripped, so a `> ```' line stays literal content
+      #   of a top-level fence. Known limits: fences at 4+ absolute indent
+      #   inside list items are still invisible, and tab-formed `>` markers
+      #   (`>\t`) are not recognized.
       class FenceTracker
         @in_fence = false
         @fence_char = '`'
         @fence_len = 0
+        @fence_bq_depth = 0
 
         # True while inside an open fence: after the opener line was fed,
         # until (and excluding) the line after the closer. Lets callers that
@@ -38,20 +49,62 @@ module Hwaro
         # Returns true when the line must pass through verbatim: a fence
         # delimiter or any line inside an open fence.
         def fence_line?(line : String) : Bool
-          eligible = !(line.starts_with?("    ") || line.starts_with?('\t'))
-          stripped = line.lstrip
-
           if @in_fence
-            @in_fence = false if eligible && closes_fence?(stripped)
-            true
-          elsif eligible && (run = opener_run(stripped))
+            content, depth = strip_blockquote_markers(line, @fence_bq_depth)
+            if depth == @fence_bq_depth
+              @in_fence = false if !indented?(content) && closes_fence?(content.lstrip)
+              return true
+            end
+            # The fence's blockquote marker is gone: the quote ends here
+            # and takes the fence with it (no lazy continuation for fenced
+            # code). Fall through so this same line can open a new fence.
+            @in_fence = false
+          end
+
+          content, depth = strip_blockquote_markers(line)
+          return false if indented?(content)
+          stripped = content.lstrip
+          if run = opener_run(stripped)
             @in_fence = true
             @fence_char = stripped[0]
             @fence_len = run
+            @fence_bq_depth = depth
             true
           else
             false
           end
+        end
+
+        private def indented?(content : String) : Bool
+          content.starts_with?("    ") || content.starts_with?('\t')
+        end
+
+        # Consumes up to `max_depth` leading blockquote markers (each up to
+        # 3 spaces, a `>`, and one optional space) and returns the remainder
+        # plus the number of markers consumed. Byte scan: every byte that
+        # can form a marker is ASCII, and ordinary lines exit on the first
+        # byte — this runs several times per line across the walkers.
+        private def strip_blockquote_markers(line : String, max_depth : Int32 = Int32::MAX) : {String, Int32}
+          slice = line.to_slice
+          pos = 0
+          depth = 0
+          while depth < max_depth
+            start = pos
+            spaces = 0
+            while pos < slice.size && slice[pos] === ' ' && spaces < 3
+              pos += 1
+              spaces += 1
+            end
+            unless pos < slice.size && slice[pos] === '>'
+              pos = start
+              break
+            end
+            pos += 1
+            pos += 1 if pos < slice.size && slice[pos] === ' '
+            depth += 1
+          end
+          return {line, 0} if depth.zero?
+          {line.byte_slice(pos, line.bytesize - pos), depth}
         end
 
         private def opener_run(stripped : String) : Int32?

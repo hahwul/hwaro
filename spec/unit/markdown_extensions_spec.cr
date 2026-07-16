@@ -796,6 +796,39 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "blockquoted fences" do
+    it "leaves transforms alone inside a > ``` fence" do
+      config = make_config(heading_ids: true, task_lists: true)
+      content = "> ```\n> ~~x~~\n> - [ ] task\n> ## H {#nope}\n> ```\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("~~x~~")
+      result.should contain("- [ ] task")
+      result.should_not contain("HID:nope")
+      result.should contain("<del>real</del>")
+    end
+
+    it "leaves $ and $$ alone inside a > ``` fence" do
+      content = "> ```make\n> echo $$PATH $HOME\n> ```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should eq(content)
+    end
+
+    it "still transforms blockquote text outside the quoted fence" do
+      content = "> ~~quoted~~\n> ```\n> ~~code~~\n> ```\n> ~~after~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<del>quoted</del>")
+      result.should contain("~~code~~")
+      result.should contain("<del>after</del>")
+    end
+
+    it "resumes transforms when an unclosed quoted fence ends with its blockquote" do
+      content = "> ```\n> ~~code~~\n\n~~real~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("~~code~~")
+      result.should contain("<del>real</del>")
+    end
+  end
+
   describe "math fence and code-span awareness" do
     it "leaves $$ inside fenced code blocks verbatim" do
       content = "```make\nall:\n\techo $$PATH\n\techo $$HOME\n```"

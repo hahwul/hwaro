@@ -801,5 +801,11 @@ describe Hwaro::Content::Processors::TableParser do
       out = Hwaro::Content::Processors::TableParser.process(md)
       out.should_not contain("<table")
     end
+
+    it "does not convert a table example inside a blockquoted fence" do
+      md = "> ```\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n> ```"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
   end
 end

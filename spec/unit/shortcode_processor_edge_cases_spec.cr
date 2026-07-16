@@ -225,6 +225,16 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("<span>live</span>")
     end
 
+    it "leaves shortcodes inside blockquoted fences untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # Markd opens a fence behind "> ```", so the example must stay raw.
+      content = "> ```\n> {% note %}body{% end %}\n> ```\n\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("{% note %}body{% end %}")
+      result.should contain("<span>live</span>")
+    end
+
     # Regression for https://github.com/hahwul/hwaro/issues/477
     # Single-backtick inline code spans should be opaque to the shortcode
     # processor, the same way fenced code blocks already are. The bug was
