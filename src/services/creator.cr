@@ -62,7 +62,22 @@ module Hwaro
           )
         end
 
-        full[root_prefix.size..]
+        relative = full[root_prefix.size..]
+
+        # Dot-leading segments (`.md`, `.hidden/foo.md`, `...`) are invisible
+        # to the build: content discovery globs `content/**/*`, which skips
+        # hidden entries. Creating one here would scaffold a page the site
+        # then silently never renders — reject it up front instead.
+        relative.split(PATH_SEP).each do |segment|
+          if segment.starts_with?('.')
+            raise ArgumentError.new(
+              "Path '#{raw}' contains a hidden segment '#{segment}' (leading dot). " \
+              "Hidden files are ignored by the build; use a name that does not start with '.'."
+            )
+          end
+        end
+
+        relative
       end
 
       # Path separator used by hwaro-managed content paths. Hwaro stores
@@ -122,9 +137,44 @@ module Hwaro
         title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
       end
 
+      # True when the build's front-matter date parser can produce a real
+      # `Time` from `value`. This mirrors `Processors::Markdown#parse_time`
+      # (format selection included — keep the two in sync) so `hwaro new`
+      # fails fast on a `--date` the build would silently drop (`2026-13-45`,
+      # `not-a-date`) or, worse, emit as an unquoted-but-invalid TOML
+      # datetime that breaks parsing of the whole generated file.
+      def self.parseable_content_date?(value : String) : Bool
+        str = value.strip
+        return false if str.empty?
+
+        fmt = if str.includes?('T')
+                if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
+                  begin
+                    Time.parse_rfc3339(str)
+                    return true
+                  rescue Time::Format::Error | ArgumentError
+                    "%Y-%m-%dT%H:%M:%S"
+                  end
+                else
+                  "%Y-%m-%dT%H:%M:%S"
+                end
+              elsif str.size > 10
+                "%Y-%m-%d %H:%M:%S"
+              else
+                "%Y-%m-%d"
+              end
+
+        begin
+          Time.parse(str, fmt, Time::Location.local)
+          true
+        rescue Time::Format::Error | ArgumentError
+          false
+        end
+      end
+
       private def self.sanitize_url_segment(segment : String) : String
         return segment if segment.empty?
-        String.build(segment.bytesize) do |io|
+        result = String.build(segment.bytesize) do |io|
           last_was_hyphen = false
           segment.each_char do |char|
             if url_safe_char?(char)
@@ -143,6 +193,14 @@ module Hwaro
           # hyphen that `strip('-')` cannot reach because the trailing char
           # is the extension, not the hyphen. Collapse both `-.` and `.-`.
           .gsub("-.", ".").gsub(".-", ".")
+
+        # Collapsing hyphens against dots can synthesize a pure-dot segment
+        # (`.>.` → `.-.` → `..`) — exactly the traversal shape the caller
+        # validated away BEFORE sanitizing, so it would escape content/
+        # unchecked. A segment left with only dots has no author-visible
+        # name at all; drop it like any other empty segment.
+        return "" if result.each_char.all? { |c| c == '.' }
+        result
       end
 
       private def self.url_safe_char?(char : Char) : Bool
@@ -155,7 +213,21 @@ module Hwaro
 
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
         path = options.path
-        title = options.title || ""
+        # Strip so a whitespace-only `--title "   "` falls back to deriving
+        # the title from the filename instead of scaffolding `title = "   "`.
+        title = (options.title || "").strip
+
+        # Fail fast on a date the build cannot parse — otherwise the page is
+        # created now and its date silently vanishes at build time.
+        if raw_date = options.date
+          unless Creator.parseable_content_date?(raw_date)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "Invalid --date '#{raw_date}': not a date the build can parse.",
+              hint: "Use YYYY-MM-DD, 'YYYY-MM-DD HH:MM:SS', ISO 8601 (2026-03-22T10:00:00), or RFC 3339 with offset.",
+            )
+          end
+        end
 
         # --section overrides the base directory
         if section = resolve_section(options.section, path)
@@ -244,6 +316,14 @@ module Hwaro
             base_dir = path || "content/drafts"
             base_dir = "content/#{base_dir}" unless base_dir.starts_with?("content/")
             full_path = nil
+            # `--bundle <dir-path>` means "the path IS the bundle directory",
+            # so derive the title from its last segment exactly like the flat
+            # heuristics above do. Without this, `hwaro new posts/foo --bundle`
+            # demanded --title while the config-driven `bundle = true` derived
+            # it — the explicit flag was strictly stricter than the default.
+            if title.empty? && path && options.bundle == true
+              title = File.basename(path).split("-").map(&.capitalize).join(" ")
+            end
           end
         end
 
@@ -289,7 +369,7 @@ module Hwaro
           full_path = File.join(base_dir, filename)
         end
 
-        Hwaro::Utils::FileSafe.mkdir_p(base_dir) unless Dir.exists?(base_dir)
+        ensure_dir!(base_dir)
 
         # Draft: CLI flag > path-based detection. Match a path SEGMENT, not a
         # raw substring — `base_dir.includes?("drafts")` flagged unrelated dirs
@@ -368,7 +448,7 @@ module Hwaro
           end
           full_path = candidate
           base_dir = File.dirname(full_path)
-          Hwaro::Utils::FileSafe.mkdir_p(base_dir) unless Dir.exists?(base_dir)
+          ensure_dir!(base_dir)
         end
 
         content = if archetype_content
@@ -411,9 +491,46 @@ module Hwaro
           end
         end
 
-        File.write(full_path, content)
+        # Mirror of the bundle-over-flat guard above: a flat `<name>.md` next
+        # to an existing `<name>/index.md` bundle (or `<name>/_index.md`
+        # section) renders to the same URL, and the build then drops one of
+        # them with only a warning. Refuse at creation time instead.
+        if base != "index" && base != "_index"
+          {File.join(dir, base, "index.md"), File.join(dir, base, "_index.md")}.each do |nested_sibling|
+            next unless File.exists?(nested_sibling)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create #{full_path}: would collide with existing #{nested_sibling} (both resolve to the same URL).",
+              hint: "Pick a different <path>, or edit #{nested_sibling} directly.",
+            )
+          end
+        end
+
+        begin
+          File.write(full_path, content)
+        rescue ex : IO::Error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Cannot write #{full_path}: #{ex.message}",
+            hint: "Check write permissions and that the filename is valid for this filesystem.",
+          )
+        end
         Logger.outcome("created", full_path)
         full_path
+      end
+
+      # `mkdir -p` with the failure surfaced as a classified error. Without
+      # this, a file squatting on a parent segment (`content/a.md` when
+      # creating `a.md/child.md`) unwound as a bare exception — no error
+      # code, exit taxonomy, or JSON payload in `--json` mode.
+      private def ensure_dir!(dir : String) : Nil
+        Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
+      rescue ex : IO::Error
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot create directory #{dir}: #{ex.message}",
+          hint: "A file may already occupy one of the parent path segments, or you may lack write permission.",
+        )
       end
 
       # Returns `{stripped_content, directives}`. When the archetype's first

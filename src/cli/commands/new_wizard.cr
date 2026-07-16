@@ -115,7 +115,9 @@ module Hwaro
         # IO hiccup) simply yields no hint rather than failing the wizard.
         private def detect_sections : Array(String)
           return [] of String unless Dir.exists?(CONTENT_DIR)
-          Dir.children(CONTENT_DIR).select { |c| Dir.exists?(File.join(CONTENT_DIR, c)) }.sort!
+          # Skip dot-dirs (.obsidian, .git worktrees, …) — they are ignored by
+          # the build, so suggesting them as sections would be misleading.
+          Dir.children(CONTENT_DIR).select { |c| !c.starts_with?('.') && Dir.exists?(File.join(CONTENT_DIR, c)) }.sort!
         rescue
           [] of String
         end

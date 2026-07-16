@@ -114,16 +114,6 @@ module Hwaro
           # Empty / absolute / content-escaping paths fail here with a
           # classified usage error instead of silently landing at an
           # unexpected filesystem location.
-          begin
-            normalized = Services::Creator.validate_and_normalize_path!(raw_path)
-          rescue ex : ArgumentError
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_USAGE,
-              message: ex.message || "Invalid <path> argument",
-              hint: "Usage: hwaro new <path> [options] — run 'hwaro new --help' for details.",
-            )
-          end
-
           # Auto-sanitize URL-unsafe characters (spaces, `!@#$%…`) in each
           # path segment so the on-disk directory also works as a clean URL
           # path once the site is built. CJK / Unicode letters, digits, and
@@ -131,7 +121,13 @@ module Hwaro
           # surface the rewrite via `Logger.info` so the author sees what
           # landed on disk — silent transformation would be confusing.
           begin
+            normalized = Services::Creator.validate_and_normalize_path!(raw_path)
             sanitized = Services::Creator.sanitize_url_path(normalized)
+            # Sanitizing rewrites characters, and the rewrite can change the
+            # path's *structure* (segments dropped, dots collapsing together),
+            # so the structural guard must run again on the result —
+            # sanitization must never be able to undo validation.
+            sanitized = Services::Creator.validate_and_normalize_path!(sanitized) if sanitized != normalized
           rescue ex : ArgumentError
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
@@ -141,6 +137,16 @@ module Hwaro
           end
           if sanitized != normalized
             Logger.info "Sanitized path: '#{normalized}' → '#{sanitized}' (URL-unsafe characters replaced)"
+          end
+
+          # A case-variant extension (`Foo.MD`) would slip past every
+          # `ends_with?(".md")` heuristic downstream and scaffold
+          # `Foo.MD.md`; the build's content scan only accepts exactly
+          # `.md`, so normalize the extension and tell the author.
+          if sanitized.size > 3 && sanitized[-3..].downcase == ".md" && !sanitized.ends_with?(".md")
+            fixed = sanitized[0...-3] + ".md"
+            Logger.info "Normalized extension: '#{sanitized}' → '#{fixed}'"
+            sanitized = fixed
           end
 
           # --section is joined to the on-disk path just like <path>, so it
@@ -260,8 +266,24 @@ module Hwaro
             parser.on("--json", "Emit machine-readable JSON output") { json_output = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
-            parser.unknown_args do |unknown|
-              path = unknown.first if unknown.present?
+            parser.unknown_args do |before_dash, after_dash|
+              # Accept the single <path> from either side of `--` (the latter
+              # lets authors create leading-dash filenames). Anything beyond
+              # one positional is almost always an unquoted multi-word title
+              # (`--title My Post`) — silently dropping the extras used to
+              # scaffold a file the author didn't ask for, so reject instead.
+              # Flag-looking leftovers (`--bogus`) are not positionals — leave
+              # them for OptionParser's invalid-option error, which names the
+              # actual offending flag.
+              positionals = before_dash.reject(&.starts_with?('-')) + after_dash
+              if positionals.size > 1
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{positionals[1..].join("', '")}'",
+                  hint: "hwaro new takes a single <path>. Quote multi-word values, e.g. --title \"My Post\".",
+                )
+              end
+              path = positionals.first?
             end
           end
 
