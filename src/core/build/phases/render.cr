@@ -58,36 +58,10 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Detect duplicate output paths (slug collisions and alias collisions)
-    # and pick a deterministic winner: the first claimant in source-path
-    # order. Losers skip writing that output — under parallel render the
-    # colliding file's bytes used to be whichever worker finished last,
-    # so a misconfigured slug flapped run-to-run.
-    seen_urls = Hash(String, String).new
-    suppressed = Hash(String, Set(String)).new
-    all_pages.sort_by(&.path).each do |page|
-      url = page.url
-      if prev_path = seen_urls[url]?
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
-        (suppressed[page.path] ||= Set(String).new) << url
-      else
-        seen_urls[url] = page.path
-      end
-      # Alias destinations also produce output files; a second page claiming the
-      # same alias (or an alias clashing with a real page URL) would otherwise
-      # overwrite silently and render-order-dependently.
-      page.aliases.each do |a|
-        norm = a.starts_with?("/") ? a : "/#{a}"
-        norm = "#{norm}/" unless norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
-        if prev_path = seen_urls[norm]?
-          Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
-          (suppressed[page.path] ||= Set(String).new) << norm
-        else
-          seen_urls[norm] = page.path
-        end
-      end
-    end
-    @collision_suppressed = suppressed.empty? ? nil : suppressed
+    # Claim a deterministic owner for every output URL (slug collisions and
+    # alias collisions) — under parallel render the colliding file's bytes
+    # used to be whichever worker finished last, flapping run-to-run.
+    @output_url_winners = compute_output_url_winners(all_pages)
 
     # Fast-start mode: render only homepage + most recent N pages on this
     # pass and stash the rest on the Builder so a background fiber in
@@ -440,8 +414,14 @@ module Hwaro::Core::Build::Phases::Render
   # `cache.update` call: computing page_template_hash costs a shortcode-regex
   # scan over the raw content plus an MD5 per page, so it must be skipped
   # entirely when the cache is off.
+  #
+  # A collision loser gets NO cache entry: its output file holds the
+  # winner's bytes, and recording it as up-to-date would let
+  # filter_changed_pages skip the page forever — even after the collision
+  # is resolved and it becomes the rightful writer.
   private def record_page_cache_entry(page : Models::Page, cache : Cache, templates : Hash(String, String), site : Models::Site, output_dir : String)
     return unless cache.enabled?
+    return if collision_suppressed?(page, page.url)
     source_path, output_path = cache_paths_for(page, output_dir)
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths)
@@ -821,8 +801,12 @@ module Hwaro::Core::Build::Phases::Render
       write_output(page, output_dir, final_html, verbose)
     end
 
-    render_output_formats(page, site, templates, output_dir, html_content, toc_html, toc_headers, verbose, global_vars,
-      crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+    # A collision loser must not write its sibling output-format files
+    # (index.json, index.md, …) either — they live at the same claimed URL.
+    unless collision_suppressed?(page, page.url)
+      render_output_formats(page, site, templates, output_dir, html_content, toc_html, toc_headers, verbose, global_vars,
+        crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
+    end
 
     generate_aliases(page, site, output_dir, verbose)
   end
@@ -848,15 +832,59 @@ module Hwaro::Core::Build::Phases::Render
     Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars, site.config.markdown.mermaid)
   end
 
-  # True when this page lost the output-path collision for `url_key` (see the
-  # duplicate-output detection in execute_render_phase) and must not write it.
-  private def collision_suppressed?(page : Models::Page, url_key : String) : Bool
-    if sup = @collision_suppressed
-      if urls = sup[page.path]?
-        return urls.includes?(url_key)
+  # Claim a deterministic owner (page.path) for every output URL. Two passes,
+  # both in source-path order so a collision resolves identically on every
+  # build: real page URLs claim first — a page's own content always beats a
+  # redirect stub, whatever the path order — then aliases claim what's left.
+  # Pages with render=false never write output and therefore claim nothing.
+  #
+  # Recomputed by the full build and by the incremental/rerender paths, so a
+  # collision resolved (or introduced) during a serve session doesn't leave
+  # a stale winner suppressing writes until restart.
+  private def compute_output_url_winners(all_pages : Array(Models::Page)) : Hash(String, String)
+    winners = Hash(String, String).new
+    writers = all_pages.select(&.render).sort_by!(&.path)
+
+    writers.each do |page|
+      url = page.url
+      if prev_path = winners[url]?
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
+      else
+        winners[url] = page.path
       end
     end
-    false
+
+    writers.each do |page|
+      page.aliases.each do |a|
+        norm = normalize_alias_url(a)
+        if prev_path = winners[norm]?
+          # An alias duplicating its OWN page's URL is silently ignored at
+          # write time (generate_aliases); only cross-page collisions warn.
+          unless prev_path == page.path
+            Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
+          end
+        else
+          winners[norm] = page.path
+        end
+      end
+    end
+
+    winners
+  end
+
+  # Shared by collision detection and alias writing so the suppression keys
+  # can never drift from the written paths.
+  private def normalize_alias_url(alias_path : String) : String
+    norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+    return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+    "#{norm}/"
+  end
+
+  # True when this page is not the deterministic owner of `url_key` (see
+  # compute_output_url_winners) and must not write it.
+  private def collision_suppressed?(page : Models::Page, url_key : String) : Bool
+    return false unless winners = @output_url_winners
+    (winner = winners[url_key]?) ? winner != page.path : false
   end
 
   private def generate_redirect_page(
@@ -946,6 +974,8 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool, paginate_path : String = "page")
+    # /page/N/ outputs live under the section's claimed URL.
+    return if collision_suppressed?(page, page.url)
     url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/").rstrip("/"))
     output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
     return unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
@@ -1000,10 +1030,12 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
+    own_url = normalize_alias_url(page.url)
     page.aliases.each do |alias_path|
-      # Same normalization as the collision detection in execute_render_phase.
-      norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
-      norm = "#{norm}/" unless norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+      norm = normalize_alias_url(alias_path)
+      # An alias pointing at the page's own URL would overwrite the real
+      # content with a redirect stub to itself.
+      next if norm == own_url
       next if collision_suppressed?(page, norm)
 
       alias_clean = Utils::PathUtils.sanitize_path(alias_path.lchop("/"))

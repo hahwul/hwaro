@@ -536,6 +536,51 @@ describe "Edge Cases: Duplicate output path detection" do
       html.should_not contain("/two/")
     end
   end
+
+  it "lets the real page beat an earlier page's alias for the same URL" do
+    # a-legacy.md sorts before guide.md, but a page's own content always
+    # outranks a redirect stub — real URLs claim before aliases.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "a-legacy.md" => "---\ntitle: Legacy\naliases:\n  - /guide/\n---\nLEGACY",
+        "guide.md"    => "---\ntitle: Guide\n---\nREAL-GUIDE-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/guide/index.html")
+      html.should contain("REAL-GUIDE-BODY")
+    end
+  end
+
+  it "does not let a render:false page claim a URL from a real page" do
+    # A headless page never writes output, so it must not suppress the
+    # real page that shares its URL.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "a-headless.md" => "---\ntitle: Headless\nrender: false\nslug: about\n---\nHIDDEN",
+        "z-about.md"    => "---\ntitle: About\nslug: about\n---\nREAL-ABOUT-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("REAL-ABOUT-BODY")
+    end
+  end
+
+  it "ignores an alias that duplicates the page's own URL" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "about.md" => "---\ntitle: About\naliases:\n  - /about/\n---\nOWN-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("OWN-BODY")
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------
