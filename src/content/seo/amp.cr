@@ -62,7 +62,7 @@ module Hwaro
             end
             dir = File.dirname(amp_output)
             Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
-            File.write(amp_output, amp_html)
+            Hwaro::Utils::FileSafe.atomic_write(amp_output, amp_html)
 
             # Inject <link rel="amphtml"> into the canonical page
             inject_amphtml_link(canonical_path, page, config, prefix)
@@ -260,7 +260,7 @@ module Hwaro
 
           if html.matches?(/<\/head>/i)
             updated = html.sub(/<\/head>/i, "#{link_tag}\n</head>")
-            File.write(canonical_path, updated)
+            Hwaro::Utils::FileSafe.atomic_write(canonical_path, updated)
           else
             Logger.warn "AMP: no </head> in #{canonical_path}; cannot inject rel=amphtml link."
           end

@@ -526,7 +526,7 @@ module Hwaro
         end
 
         Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
-        File.write(output_path, content)
+        Hwaro::Utils::FileSafe.atomic_write(output_path, content)
         Logger.action :create, output_path if verbose
       end
 

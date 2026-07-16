@@ -83,7 +83,7 @@ module Hwaro
         # Write search file
         filename = File.basename(config.search.filename)
         search_path = File.join(output_dir, filename)
-        File.write(search_path, content)
+        Hwaro::Utils::FileSafe.atomic_write(search_path, content)
         Logger.action :create, search_path if verbose
         Logger.info "  Generated search index with #{search_pages.size} pages." if verbose
       end

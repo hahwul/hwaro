@@ -56,7 +56,7 @@ module Hwaro
           end
 
           path = File.join(output_dir, "manifest.json")
-          File.write(path, manifest)
+          Hwaro::Utils::FileSafe.atomic_write(path, manifest)
           Logger.action :create, path if verbose
           Logger.info "  Generated manifest.json"
         end
@@ -165,7 +165,7 @@ module Hwaro
             JS
 
           path = File.join(output_dir, "sw.js")
-          File.write(path, sw_content)
+          Hwaro::Utils::FileSafe.atomic_write(path, sw_content)
           Logger.action :create, path if verbose
           Logger.info "  Generated sw.js"
         end

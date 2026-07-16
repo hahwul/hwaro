@@ -29,7 +29,7 @@ module Hwaro
 
           filename = File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
           file_path = File.join(output_dir, filename)
-          File.write(file_path, build_index(config, pages))
+          Hwaro::Utils::FileSafe.atomic_write(file_path, build_index(config, pages))
           Logger.action :create, file_path if verbose
           Logger.info "  Generated #{filename}" if verbose
 
@@ -146,7 +146,7 @@ module Hwaro
           content = build_full_document(pages, config)
           content += "\n" unless content.ends_with?("\n")
 
-          File.write(file_path, content)
+          Hwaro::Utils::FileSafe.atomic_write(file_path, content)
           Logger.action :create, file_path if verbose
           Logger.info "  Generated #{filename}" if verbose
         end

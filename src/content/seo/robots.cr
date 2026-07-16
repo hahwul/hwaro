@@ -47,7 +47,7 @@ module Hwaro
 
           filename = File.basename(config.robots.filename)
           file_path = File.join(output_dir, filename)
-          File.write(file_path, content)
+          Hwaro::Utils::FileSafe.atomic_write(file_path, content)
           Logger.action :create, file_path if verbose
           Logger.info "  Generated robots.txt" if verbose
         end

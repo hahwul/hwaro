@@ -24,7 +24,13 @@ module Hwaro
       class TemplateDeps
         # `{% extends "base.html" %}`, `{% include 'partials/head.html' %}`,
         # `{% import "macros.html" as m %}`, `{% from "macros.html" import x %}`
-        REFERENCE_TAG_RE = /\{%-?\s*(extends|include|import|from)\s+(.+?)\s*-?%\}/m
+        #
+        # `\b\s*` (not `\s+`) after the keyword: Crinja happily parses
+        # `{% include"x.html" %}` with no space, and a tag this regex fails
+        # to see entirely never reaches the safe `@dynamic = true` fallback —
+        # it just silently drops the dependency edge and the included
+        # template's edits stop re-rendering its dependents during serve.
+        REFERENCE_TAG_RE = /\{%-?\s*(extends|include|import|from)\b\s*(.+?)\s*-?%\}/m
 
         # Per-tag argument shapes where the template name is a plain string
         # literal. The literal must account for the ENTIRE argument (modulo
@@ -72,7 +78,9 @@ module Hwaro
             # `{% name key="v" %}`. Loose on purpose — an over-match only
             # causes an unnecessary rebuild, never a stale page.
             escaped = Regex.escape(name)
-            @shortcode_usage_patterns[name] = /\b#{escaped}\s*\(|\bshortcode\(\s*["']#{escaped}["']|\{%-?\s*#{escaped}\b/
+            # `shortcode\s*\(` — the processor tolerates space before the
+            # paren in the explicit-call form, so the scanner must too.
+            @shortcode_usage_patterns[name] = /\b#{escaped}\s*\(|\bshortcode\s*\(\s*["']#{escaped}["']|\{%-?\s*#{escaped}\b/
           end
 
           templates.each do |name, source|

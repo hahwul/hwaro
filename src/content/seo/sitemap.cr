@@ -116,7 +116,7 @@ module Hwaro
 
           filename = File.basename(site.config.sitemap.filename)
           sitemap_path = Path[output_dir, filename].to_s
-          File.write(sitemap_path, xml_content)
+          Hwaro::Utils::FileSafe.atomic_write(sitemap_path, xml_content)
           Logger.action :create, sitemap_path if verbose
           Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs." if verbose
         end

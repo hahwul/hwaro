@@ -154,7 +154,7 @@ module Hwaro::Core::Build::Phases::OutputFormats
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
-    File.write(output_path, content)
+    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
     Logger.action :create, output_path if verbose
   end
 

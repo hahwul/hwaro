@@ -170,7 +170,7 @@ module Hwaro
 
           # Write feed file (basename prevents path traversal via config filename)
           feed_path = File.join(output_dir, File.basename(filename))
-          File.write(feed_path, feed_content)
+          Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
         end
 

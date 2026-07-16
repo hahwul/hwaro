@@ -260,6 +260,11 @@ module Hwaro::Core::Build::Phases::Initialize
     # Built fresh and swapped in (never mutated in place) so a loader
     # holding the previous snapshot keeps a consistent pair of hashes.
     template_paths = {} of String => String
+    # Extension-shadowed variants (foo.j2 while foo.html won the slot).
+    # They never enter `templates`, but an explicit `{% include "foo.j2" %}`
+    # still reads them from disk via the loader fallback — so run_rerender's
+    # "did anything change?" diff must see their edits too (path → MD5).
+    shadowed_hashes = {} of String => String
     if Dir.exists?("templates")
       # Single glob for all supported template extensions.
       # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
@@ -274,7 +279,11 @@ module Hwaro::Core::Build::Phases::Initialize
         relative = Path[path].relative_to("templates")
         name = relative.to_s.gsub(Builder::TEMPLATE_EXTENSION_REGEX, "")
         # Don't overwrite if already loaded (higher priority extensions loaded first)
-        unless templates.has_key?(name)
+        if templates.has_key?(name)
+          if source = read_template_source(path)
+            shadowed_hashes[path] = Digest::MD5.hexdigest(source)
+          end
+        else
           if source = read_template_source(path)
             templates[name] = source
             template_paths[name] = path
@@ -292,6 +301,7 @@ module Hwaro::Core::Build::Phases::Initialize
       end
     end
     @template_paths = template_paths
+    @shadowed_template_hashes = shadowed_hashes
 
     # (Re)build the template dependency graph for selective invalidation
     @template_deps = TemplateDeps.new(templates)
@@ -383,6 +393,14 @@ module Hwaro::Core::Build::Phases::Initialize
   # Setup Crinja environment with custom filters, tests, and functions
   private def setup_crinja_env : Crinja
     env = Content::Processors::Template.engine.env
+
+    # The engine is a process-lifetime singleton and Crinja's InMemory
+    # template cache keys entries by (env, name, file, SOURCE) — every
+    # serve-mode template reload would add a fresh generation of compiled
+    # templates without ever evicting the previous one. Start each snapshot
+    # with a fresh cache so long serve sessions don't accumulate every
+    # historical template source in memory.
+    env.cache = Crinja::TemplateCache::InMemory.new
 
     # Set up template loader for template inheritance and includes
     if loader = build_template_loader
