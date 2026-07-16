@@ -191,6 +191,40 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("fenced2")
     end
 
+    # CommonMark fence semantics now come from the shared FenceTracker
+    # (same rules as the table/definition/math walkers and Markd itself).
+    # The three specs below pin the divergences the old ad-hoc regex had.
+    it "does not treat a 4-space-indented ``` as a fence opener (indented code is literal)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # In CommonMark "    ```" is indented-code content, not a delimiter —
+      # the old scanner opened a fence here and silently stopped expanding
+      # shortcodes for the rest of the document.
+      content = "    ```\n\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<span>live</span>")
+    end
+
+    it "closes a fence on a longer closer run (CommonMark closer-length rule)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # ```` validly closes a ``` fence; the old exact-length comparison
+      # never closed it, so everything below stayed unexpanded.
+      content = "```\nfenced\n````\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<span>live</span>")
+      result.should contain("fenced")
+    end
+
+    it "does not open a backtick fence whose info string contains a backtick" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      # CommonMark: "``` a`b" is not a fence opener (inline code instead).
+      content = "``` a`b\n{% note %}live{% end %}"
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<span>live</span>")
+    end
+
     # Regression for https://github.com/hahwul/hwaro/issues/477
     # Single-backtick inline code spans should be opaque to the shortcode
     # processor, the same way fenced code blocks already are. The bug was
@@ -472,6 +506,21 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       builder = Hwaro::Core::Build::Builder.new
       # The token is outside any fence or inline code
       builder.test_content_may_contain_shortcodes?(%({% codeblock(lang="crystal") %} `code` {% end %})).should be_true
+    end
+
+    # Pre-filter must agree with process_shortcodes_jinja's FenceTracker:
+    # the same CommonMark rules decide fencing in both, or the skip
+    # decision and the actual expansion drift apart.
+    it "returns true when a shortcode follows a 4-space-indented ``` line" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = "    ```\n\n{% note %}live{% end %}"
+      builder.test_content_may_contain_shortcodes?(content).should be_true
+    end
+
+    it "returns true when a shortcode follows a fence closed by a longer run" do
+      builder = Hwaro::Core::Build::Builder.new
+      content = "```\nfenced\n````\n{% note %}live{% end %}"
+      builder.test_content_may_contain_shortcodes?(content).should be_true
     end
   end
 end

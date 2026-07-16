@@ -12,6 +12,7 @@
 
 require "crinja"
 require "../../utils/logger"
+require "../../content/processors/fence_tracker"
 require "./builtin_shortcodes"
 
 module Hwaro
@@ -67,23 +68,13 @@ module Hwaro
         def content_may_contain_shortcodes?(content : String) : Bool
           return false unless content.includes?("{{") || content.includes?("{%")
 
-          in_fence = false
-          fence_marker = ""
+          # FenceTracker (shared with the table/definition/math walkers and,
+          # critically, process_shortcodes_jinja below) so the skip decision
+          # and the actual expansion can never disagree about what's fenced.
+          tracker = Content::Processors::FenceTracker.new
 
           content.each_line(chomp: false) do |line|
-            if in_fence
-              if fence_close_line?(line, fence_marker)
-                in_fence = false
-                fence_marker = ""
-              end
-              next
-            end
-
-            if match = line.match(/^\s*(`{3,}|~{3,})/)
-              in_fence = true
-              fence_marker = match[1]
-              next
-            end
+            next if tracker.fence_line?(line)
 
             # Outside fence: check whether any {{ or {% survives inline-code stripping
             if line.includes?("{{") || line.includes?("{%")
@@ -94,16 +85,6 @@ module Hwaro
           end
 
           false
-        end
-
-        # A fence-closing line is the opening marker alone, surrounded only by
-        # whitespace — equivalent to the previous per-fence compiled regex
-        # `^\s*MARKER\s*$` (Crystal regexes run with UCP, so `\s` and
-        # `String#strip` agree on Unicode whitespace). A longer run (e.g.
-        # ```` closing ```) does not match, same as before. The comparison
-        # replaces a PCRE2 compile per fenced block per page render.
-        private def fence_close_line?(line : String, fence_marker : String) : Bool
-          line.strip == fence_marker
         end
 
         private def has_shortcode_token_outside_inline_code?(line : String) : Bool
@@ -126,9 +107,13 @@ module Hwaro
         private def process_shortcodes_jinja(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil) : String
           # Avoid processing shortcodes inside fenced code blocks (``` / ~~~),
           # so documentation can show literal `{{ ... }}` examples safely.
+          # Fence semantics come from the shared CommonMark-faithful
+          # FenceTracker (indent rules, closer-length rule, backtick-in-info
+          # rule) — the previous ad-hoc regex opened on indented ``` (literal
+          # text in CommonMark) and never closed on a longer closer run,
+          # desyncing fence state for the rest of the document.
           String.build do |io|
-            in_fence = false
-            fence_marker = ""
+            tracker = Content::Processors::FenceTracker.new
             buffer = String::Builder.new
             # Nesting depth of open block shortcodes. While > 0 we must NOT treat
             # a fence line as a buffer boundary, otherwise a block shortcode whose
@@ -137,12 +122,9 @@ module Hwaro
             block_depth = 0
 
             content.each_line(chomp: false) do |line|
-              if in_fence
+              if tracker.in_fence?
+                tracker.fence_line?(line)
                 io << line
-                if fence_close_line?(line, fence_marker)
-                  in_fence = false
-                  fence_marker = ""
-                end
                 next
               end
 
@@ -161,11 +143,13 @@ module Hwaro
                 block_depth -= 1 if block_depth > 0
               end
 
-              if block_depth == 0 && (match = line.match(/^\s*(`{3,}|~{3,})/))
+              # The tracker is only fed outside block-shortcode bodies (the
+              # short-circuit below), mirroring the previous behaviour where
+              # a fence inside a block body is part of the body, not a chunk
+              # boundary.
+              if block_depth == 0 && tracker.fence_line?(line)
                 io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override)
                 buffer = String::Builder.new
-                in_fence = true
-                fence_marker = match[1]
                 io << line
               else
                 buffer << line
