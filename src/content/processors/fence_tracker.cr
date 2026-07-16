@@ -20,7 +20,18 @@ module Hwaro
       #   this is what keeps ``` examples nested inside ```` fences (and
       #   "```ruby" lines inside an open fence) verbatim.
       # - Lines indented 4+ spaces (or starting with a tab) are indented-code
-      #   context where ```/~~~ is literal text, never a delimiter.
+      #   context where ```/~~~ is literal text, never a delimiter. Whole
+      #   indented-code *runs* are tracked as verbatim too: a 4+-indented
+      #   non-blank line after a blank line opens a run — unless a list is
+      #   open, where the same indent is item continuation, not code — and
+      #   the run survives blanks until the first non-blank line back under
+      #   4 columns. The list heuristic is deliberately sticky (a marker
+      #   opens it; only a blank followed by a flush-left non-marker line
+      #   closes it): staying "in list" too long merely keeps today's
+      #   under-protective behavior, while leaving it too early would newly
+      #   skip transforms on real list content. Known limits: code indented
+      #   6+ columns inside list items is not recognized (unchanged), and
+      #   a fence closer followed directly by indented code opens no run.
       # - Fences inside blockquotes (`> ```) are tracked too: the leading
       #   `>` markers are stripped before the opener/closer rules apply, and
       #   the marker depth is remembered. Because CommonMark gives fenced
@@ -32,10 +43,19 @@ module Hwaro
       #   inside list items are still invisible, and tab-formed `>` markers
       #   (`>\t`) are not recognized.
       class FenceTracker
+        # A bullet or ordered-list marker at up to 3 spaces indent. The
+        # trailing space/tab is required — CommonMark's empty-item form
+        # (a bare "-") is intentionally not matched; a missed marker only
+        # keeps the list heuristic closed in a case too rare to matter.
+        LIST_MARKER_RE = /\A {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
+
         @in_fence = false
         @fence_char = '`'
         @fence_len = 0
         @fence_bq_depth = 0
+        @in_indented_code = false
+        @in_list = false
+        @prev_blank = true
 
         # True while inside an open fence: after the opener line was fed,
         # until (and excluding) the line after the closer. Lets callers that
@@ -53,6 +73,7 @@ module Hwaro
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
             if depth == @fence_bq_depth
               @in_fence = false if !indented?(content) && closes_fence?(content.lstrip)
+              @prev_blank = false
               return true
             end
             # The fence's blockquote marker is gone: the quote ends here
@@ -62,15 +83,45 @@ module Hwaro
           end
 
           content, depth = strip_blockquote_markers(line)
-          return false if indented?(content)
+          blank = content.blank?
+
+          if @in_indented_code
+            if blank
+              @prev_blank = true
+              return true
+            elsif indented?(content)
+              @prev_blank = false
+              return true
+            end
+            # First non-blank line back under 4 columns ends the run and
+            # is evaluated normally below.
+            @in_indented_code = false
+          end
+
+          if !blank && indented?(content) && @prev_blank && !@in_list
+            @in_indented_code = true
+            @prev_blank = false
+            return true
+          end
+
+          if LIST_MARKER_RE.matches?(content)
+            @in_list = true
+          elsif @in_list && @prev_blank && !blank && !content.starts_with?(' ') && !content.starts_with?('\t')
+            # A flush-left non-marker block after a blank line ends the
+            # list context; indented lines and lazy continuations keep it.
+            @in_list = false
+          end
+
           stripped = content.lstrip
-          if run = opener_run(stripped)
+          if !indented?(content) && (run = opener_run(stripped))
             @in_fence = true
             @fence_char = stripped[0]
             @fence_len = run
             @fence_bq_depth = depth
+            @prev_blank = false
             true
           else
+            @prev_blank = blank
             false
           end
         end

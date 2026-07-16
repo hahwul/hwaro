@@ -19,8 +19,10 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["``` `not a fence`", "text"]).should eq [false, false]
     end
 
-    it "does not open on 4-space-indented delimiters" do
-      feed(["    ```", "text"]).should eq [false, false]
+    it "treats a 4-space-indented delimiter as indented code, not a fence" do
+      # Verbatim as indented-code content — but no fence opens, so the
+      # following flush-left line is ordinary markdown again.
+      feed(["    ```", "text"]).should eq [true, false]
     end
 
     it "keeps a blockquoted delimiter literal inside an open top-level fence" do
@@ -59,8 +61,38 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["   > ```", "   > code", "   > ```"]).should eq [true, true, true]
     end
 
-    it "does not open on indented code inside a blockquote" do
+    it "does not open a fence on indented code inside a blockquote" do
       feed(["> mono:", ">     ```", "> text"]).should eq [false, false, false]
+    end
+  end
+
+  describe "indented code runs" do
+    it "opens after a blank line and survives interior blanks" do
+      feed(["para", "", "    code", "", "\tmore", "back"])
+        .should eq [false, false, true, true, true, false]
+    end
+
+    it "opens at the start of the document" do
+      feed(["    code", "text"]).should eq [true, false]
+    end
+
+    it "does not open without a preceding blank line" do
+      # Indented code cannot interrupt a paragraph (lazy continuation).
+      feed(["para", "    still para"]).should eq [false, false]
+    end
+
+    it "does not open inside an open list" do
+      feed(["- item", "", "    continuation"]).should eq [false, false, false]
+    end
+
+    it "opens again once a flush-left block has closed the list" do
+      feed(["- item", "", "para", "", "    code"])
+        .should eq [false, false, false, false, true]
+    end
+
+    it "keeps the list open across indented continuations" do
+      feed(["- item", "", "  wrapped", "", "    still list"])
+        .should eq [false, false, false, false, false]
     end
   end
 end

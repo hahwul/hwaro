@@ -829,6 +829,31 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "indented code blocks" do
+    it "leaves transforms alone inside an indented code run" do
+      config = make_config(math: true)
+      content = "Build:\n\n\techo ${A}/${B}\n\t~~x~~\n\n~~real~~ and $y$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.should contain("${A}/${B}")
+      result.should contain("~~x~~")
+      result.should contain("<del>real</del>")
+      result.should contain("math-inline")
+    end
+
+    it "still transforms 4-space list continuations" do
+      content = "- item\n\n    ~~strike~~ continues"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<del>strike</del>")
+    end
+
+    it "still converts nested task lists at 4-space indent" do
+      config = make_config(task_lists: true)
+      content = "- [ ] outer\n    - [ ] nested"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
+      result.scan("checkbox").size.should eq 2
+    end
+  end
+
   describe "math fence and code-span awareness" do
     it "leaves $$ inside fenced code blocks verbatim" do
       content = "```make\nall:\n\techo $$PATH\n\techo $$HOME\n```"
