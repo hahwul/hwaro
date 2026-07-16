@@ -159,6 +159,38 @@ describe "Cache: Cache with multiple files" do
   end
 end
 
+describe "Cache: i18n change invalidation" do
+  it "rebuilds pages when a translation file changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", BASIC_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("i18n")
+        File.write("content/page.md", "---\ntitle: Page\n---\nBody")
+        File.write("templates/page.html", %({{ "greeting" | t }}|{{ content }}))
+        File.write("i18n/en.toml", %(greeting = "Hello"))
+
+        builder1 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
+        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        File.read("public/page/index.html").should contain("Hello")
+
+        sleep 100.milliseconds
+        File.write("i18n/en.toml", %(greeting = "Bonjour"))
+
+        builder2 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
+        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+
+        html = File.read("public/page/index.html")
+        html.should contain("Bonjour")
+        html.should_not contain("Hello")
+      end
+    end
+  end
+end
+
 describe "Cache: Template change invalidation" do
   it "rebuilds all pages when templates change" do
     Dir.mktmpdir do |dir|
