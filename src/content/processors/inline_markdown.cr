@@ -73,8 +73,20 @@ module Hwaro
 
         # Math span patterns — canonical home for the whole pipeline
         # (MarkdownExtensions aliases these, mirroring INLINE_STRIKETHROUGH_RE).
-        DISPLAY_MATH_RE = /\$\$(.*?)\$\$/m
-        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/
+        #
+        # Display math must not cross a blank line (the tempered dot refuses
+        # to consume a newline that starts one, whitespace-only lines
+        # included): a stray unmatched `$$` would otherwise pair with a
+        # legitimate `$$` several paragraphs later and swallow all the prose
+        # in between. Blank lines are invalid inside LaTeX display math
+        # anyway, so no real formula is lost.
+        #
+        # Inline math admits backslash escapes in the body (`$x = \$5$`) and
+        # requires an unescaped, non-space-preceded closer. A body *ending*
+        # in a literal `\` won't close — meaningless in LaTeX at the end of
+        # a formula.
+        DISPLAY_MATH_RE = /\$\$((?:(?!\n[ \t\r]*\n).)*?)\$\$/m
+        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)((?:[^\n$\\]|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
 
         # Placeholder comments left by `Core::Build::ShortcodeProcessor` for
         # already-rendered shortcodes (canonical home here, next to the other

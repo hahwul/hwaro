@@ -418,6 +418,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(<div class="math math-display">\\[))
       html.should contain(%(\\]</div>))
     end
+
+    it "keeps an escaped dollar inside inline math" do
+      content = "The price $x = \\$5$ is fixed."
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.scan("math-inline").size.should eq(1)
+      # The whole formula (including the escaped dollar) lands in the span;
+      # nothing dangles after it.
+      result.should contain("$5")
+      result.should_not contain("5$")
+    end
+
+    it "leaves a body ending in a lone backslash unmatched" do
+      content = "literal $a\\$ text"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should_not contain("math-inline")
+    end
+
+    it "does not pair display math across a blank line" do
+      content = "before $$ stray\n\nprose here\n\n$$x$$"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should contain("$$ stray")
+      result.should contain("prose here")
+      result.scan("math-display").size.should eq(1)
+    end
+
+    it "does not pair display math across a whitespace-only line" do
+      content = "$$ stray\n \t\nprose"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result.should_not contain("math-display")
+    end
   end
 
   describe "mermaid (extended)" do
