@@ -391,3 +391,30 @@ describe "fence options rendering (server mode)" do
     reset_fence_options_state
   end
 end
+
+describe Hwaro::Content::Processors::ServerHighlighter do
+  describe ".highlight" do
+    it "escapes HTML special characters in highlighted output" do
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(%q(puts "<b>&"), "crystal")
+      html.should_not be_nil
+      html.not_nil!.should contain("&lt;b&gt;")
+      html.not_nil!.should_not contain("<b>")
+    end
+
+    it "sanitizes invalid UTF-8 in tokenized output to U+FFFD like HTML.escape" do
+      # The tokenizer's Error fallback emits unmatched input one BYTE at a
+      # time, so a multi-byte character no rule matches arrives as lone
+      # lead/continuation bytes — an invalid-UTF-8 token value. The old
+      # unconditional HTML.escape replaced those bytes with U+FFFD; the
+      # needs_html_escape? fast path must preserve that instead of copying
+      # the raw bytes into the output HTML.
+      code = String.new(Bytes[0x68_u8, 0x69_u8, 0x20_u8, 0xE2_u8, 0x0A_u8]) # "hi " + lone lead byte + "\n"
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(code, "json")
+      html.should_not be_nil
+      html.not_nil!.valid_encoding?.should be_true
+      # The lone 0xE2 must surface as U+FFFD — this both pins the
+      # sanitization and proves the invalid-byte path was exercised.
+      html.not_nil!.should contain("�")
+    end
+  end
+end

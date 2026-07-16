@@ -197,45 +197,66 @@ module Hwaro
         # code-span guard a cell like `` `a|b` `` gets split mid-span, which
         # corrupts the code span (dangling backticks) and pushes a stray extra
         # `<td>` past the column count.
+        # Scans BYTES rather than a materialized Array(Char): every byte the
+        # scanner branches on (`\`, `` ` ``, `|`) is ASCII, and in UTF-8 the
+        # bytes of a multi-byte character are all >= 0x80, so they can never
+        # be mistaken for a delimiter — non-special stretches are copied to
+        # the cell verbatim. This runs for every row of every table on a
+        # page; the per-row Array(Char) it replaces was one of the largest
+        # allocation sources under parallel rendering (the Boehm GC
+        # allocation lock is the contention point across workers).
         private def split_row(line : String) : Array(String)
+          # `strip` must stay a String op (it handles Unicode whitespace);
+          # it returns self when there is nothing to strip. The leading /
+          # trailing pipe trims are ASCII, so instead of lchop/rchop —
+          # which each heap-allocate a fresh String for the common
+          # `| a | b |` shape — narrow the slice view (subslicing copies
+          # nothing). Ordering matches the old sequential lchop-then-rchop:
+          # the trailing check runs on the remainder, so a lone "|" trims
+          # to "" exactly as before.
           stripped = line.strip
-
-          # Remove leading pipe if present
-          stripped = stripped.lchop('|') if stripped.starts_with?('|')
-
-          # Remove trailing pipe if present
-          stripped = stripped.rchop('|') if stripped.ends_with?('|')
+          bytes = stripped.to_slice
+          if bytes.size > 0 && bytes[0] == 0x7C_u8 # leading '|'
+            bytes = bytes[1, bytes.size - 1]
+          end
+          if bytes.size > 0 && bytes[bytes.size - 1] == 0x7C_u8 # trailing '|'
+            bytes = bytes[0, bytes.size - 1]
+          end
 
           cells = [] of String
           current = String::Builder.new
+          len = bytes.size
           i = 0
-          chars = stripped.chars
 
-          while i < chars.size
-            char = chars[i]
-            if char == '\\' && i + 1 < chars.size && chars[i + 1] == '|'
+          while i < len
+            byte = bytes[i]
+            if byte == 0x5C_u8 && i + 1 < len && bytes[i + 1] == 0x7C_u8 # '\' '|'
               # Escaped pipe - include literal pipe
               current << '|'
               i += 2
-            elsif char == '`'
+            elsif byte == 0x60_u8 # '`'
               # Inline code span: keep an interior `|` from splitting the cell.
               # An opening run of N backticks is closed by the next run of
               # exactly N; with no closer the backtick is literal and scanning
               # resumes from the next character. `\|` is still unescaped to a
               # bare pipe inside the span (GFM tables collapse it before the
               # code span is rendered — see the spec's `b `\|` az` example).
-              run_len = backtick_run_length(chars, i)
-              close = find_closing_backtick_run(chars, i + run_len, run_len)
+              run_len = backtick_run_length(bytes, i)
+              close = find_closing_backtick_run(bytes, i + run_len, run_len)
               if close
                 end_index = close + run_len
                 k = i
                 while k < end_index
-                  if chars[k] == '\\' && k + 1 < end_index && chars[k + 1] == '|'
+                  if bytes[k] == 0x5C_u8 && k + 1 < end_index && bytes[k + 1] == 0x7C_u8
                     current << '|'
                     k += 2
                   else
-                    current << chars[k]
+                    span_start = k
                     k += 1
+                    while k < end_index && bytes[k] != 0x5C_u8
+                      k += 1
+                    end
+                    current.write(bytes[span_start, k - span_start])
                   end
                 end
                 i = end_index
@@ -243,13 +264,20 @@ module Hwaro
                 run_len.times { current << '`' }
                 i += run_len
               end
-            elsif char == '|'
+            elsif byte == 0x7C_u8 # '|'
               cells << current.to_s
               current = String::Builder.new
               i += 1
             else
-              current << char
+              # Copy verbatim up to the next byte the scanner cares about.
+              span_start = i
               i += 1
+              while i < len
+                b = bytes[i]
+                break if b == 0x5C_u8 || b == 0x60_u8 || b == 0x7C_u8
+                i += 1
+              end
+              current.write(bytes[span_start, i - span_start])
             end
           end
           cells << current.to_s
@@ -258,9 +286,9 @@ module Hwaro
         end
 
         # Number of consecutive backticks starting at `start`.
-        private def backtick_run_length(chars : Array(Char), start : Int32) : Int32
+        private def backtick_run_length(bytes : Bytes, start : Int32) : Int32
           run = 0
-          while start + run < chars.size && chars[start + run] == '`'
+          while start + run < bytes.size && bytes[start + run] == 0x60_u8
             run += 1
           end
           run
@@ -270,11 +298,11 @@ module Hwaro
         # begins, scanning from `start`. Returns nil when the span is never
         # closed (the opening run is then treated as literal text). Runs of a
         # different length are skipped, per CommonMark's code-span rule.
-        private def find_closing_backtick_run(chars : Array(Char), start : Int32, run_len : Int32) : Int32?
+        private def find_closing_backtick_run(bytes : Bytes, start : Int32, run_len : Int32) : Int32?
           i = start
-          while i < chars.size
-            if chars[i] == '`'
-              run = backtick_run_length(chars, i)
+          while i < bytes.size
+            if bytes[i] == 0x60_u8
+              run = backtick_run_length(bytes, i)
               return i if run == run_len
               i += run
             else

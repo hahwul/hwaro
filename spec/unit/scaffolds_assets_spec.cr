@@ -59,10 +59,11 @@ describe "Scaffold embedded assets" do
   end
 
   describe "ember-warm syntax highlighting" do
-    # The default is client-side Highlight.js (`mode = "client"`): the
-    # server/Tartrazine path is not multi-thread-safe, and the release binary
-    # is built `-Dpreview_mt`, so a parallel `hwaro build` could corrupt
-    # highlighted output. The warm theme is inlined either way.
+    # The default is client-side Highlight.js (`mode = "client"`). The
+    # server/Tartrazine path is multi-thread-safe nowadays (see
+    # ext/tartrazine_mt_fix.cr), so this is a product default — zero
+    # build-time cost and full hljs theme compatibility — rather than a
+    # safety requirement. The warm theme is inlined either way.
     it "defaults to client-side highlighting (mode = \"client\")" do
       {
         Hwaro::Services::Scaffolds::Simple.new,
