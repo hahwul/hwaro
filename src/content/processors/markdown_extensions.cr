@@ -490,6 +490,10 @@ module Hwaro
         record MathSpan, display : Bool, body : String
 
         MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
+        # A line whose sole content is one math placeholder — the standalone
+        # display-math case, where the emitted <div> starts at line start and
+        # is a real CommonMark HTML block.
+        BARE_MATH_LINE_RE = /\A\x00MATH\d+\x00\z/
 
         # One-shot math transform (stash + immediate expand). `preprocess`
         # itself uses the two phases separately so the combined pass runs in
@@ -582,9 +586,15 @@ module Hwaro
 
         # Phase 2: expand stashed math spans into final HTML.
         #
-        # Display math always emits single-backslash `\[…\]`: its `<div>` is
-        # an HTML block, opaque to Markd in every context. Inline math
-        # delimiter escaping depends on block context:
+        # Display math emits single-backslash `\[…\]` in a `<div>` when the
+        # div actually lands in HTML-block position — on a line of its own,
+        # or inside a raw HTML block. Mid-paragraph `$$…$$` gets a `<span>`
+        # instead: there the tags are *inline* raw HTML, Markd inline-parses
+        # the content between them (collapsing `\[` to `[`, reading `*`/`_`
+        # as emphasis), and a div can't legally sit inside the paragraph
+        # anyway. KaTeX/MathJax auto-render keys display style off the
+        # `\[…\]` delimiters, not the wrapper tag. Inline math delimiter
+        # escaping depends on block context:
         #
         # - In normal inline context the `<span>` content participates in
         #   CommonMark inline parsing, so the delimiters need an extra
@@ -622,13 +632,20 @@ module Hwaro
               end
 
               raw_context = in_html_block
+              bare_display = line.strip.matches?(BARE_MATH_LINE_RE)
               io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
                 span = $~[1].to_i?.try { |idx| store[idx]? }
                 next match unless span
 
                 escaped = Utils::TextUtils.escape_xml(span.body)
-                if span.display
+                if span.display && (raw_context || bare_display)
                   "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+                elsif span.display
+                  # Mid-paragraph display math (inline raw HTML): escape the
+                  # body like the inline branch below, and double the
+                  # delimiters' backslashes so `\\[` collapses to `\[`.
+                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
                 elsif raw_context
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
                 else

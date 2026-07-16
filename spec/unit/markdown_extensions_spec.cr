@@ -448,6 +448,39 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
       result.should_not contain("math-display")
     end
+
+    it "renders mid-paragraph display math as an inline-safe span" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Euler: $$e_a * e_b$$ inline.",
+        markdown_config: cfg,
+      )
+      # Doubled delimiters and escaped `*`/`_` collapse back through Markd's
+      # inline parser — no emphasis, no dropped brackets, wrapper stays a
+      # span inside the paragraph.
+      html.should contain(%(<span class="math math-display">\\[e_a * e_b\\]</span>))
+      html.should_not contain("<em>")
+      html.should_not contain("<div class=\"math math-display\">")
+    end
+
+    it "keeps standalone display math as a div HTML block" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "before\n\n$$\nx * y\n$$\n\nafter",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[))
+      html.should_not contain("math-display\">\\\\[")
+    end
+
+    it "keeps display math in a table cell as a div (raw HTML context)" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "| f |\n|---|\n| $$x$$ |",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[x\\]</div>))
+    end
   end
 
   describe "mermaid (extended)" do
