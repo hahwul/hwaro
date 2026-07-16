@@ -253,7 +253,9 @@ module Hwaro
         # `hl_lines` is stored as (start, end) ranges — NEVER expanded into
         # a Set of individual line numbers, so a pathological
         # `hl_lines="1-100000"` costs a handful of bytes, not 100k Int32s.
-        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32} do
+        # `name` is the filename/title label (`{name="main.cr"}`, `title=`
+        # accepted as an alias) rendered above the code block.
+        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, name : String? = nil do
           def hl?(physical_line : Int32) : Bool
             hl_lines.any? { |(a, b)| physical_line >= a && physical_line <= b }
           end
@@ -304,10 +306,18 @@ module Hwaro
           linenos : Bool? = nil
           linenostart = 1
           hl_lines = [] of {Int32, Int32}
+          name : String? = nil
           recognized = 0
 
           pairs.each do |key, value|
             case key.downcase
+            when "name", "title"
+              # Zola's `name` and Hugo-familiar `title` set the same label;
+              # last one wins. Empty values are ignored (don't activate).
+              if label = value.presence
+                name = label
+                recognized += 1
+              end
             when "linenos"
               if BOOL_TRUE_RE.matches?(value)
                 linenos = true
@@ -338,7 +348,7 @@ module Hwaro
           return {legacy_lang, nil} if recognized == 0
 
           lang = stripped[0, brace_index].strip.split.first?.try(&.presence)
-          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines)}
+          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines, name: name)}
         end
 
         # Scans `key=value` pairs from the start of `inner`. Returns the
@@ -579,12 +589,20 @@ module Hwaro
             end
           end
 
+          # Filename/title label: a structural wrapper around the untouched
+          # <pre> so it composes with server-mode line wrapping AND the
+          # client-mode data-* attributes alike. Absent a name, the output
+          # below is byte-identical to the pre-label code path.
+          label = opts.try(&.name)
+
           newline
+          literal(%(<div class="code-block"><div class="code-filename">#{escape_lang(label)}</div>)) if label
           tag("pre", pre_tag_attrs) do
             tag("code", code_tag_attrs) do
               code_block_body(node, lang)
             end
           end
+          literal("</div>") if label
           newline
         end
 
@@ -760,7 +778,7 @@ module Hwaro
           return super unless @hooks.codeblock?
           return super if @disable_tag > 0
 
-          lang, _opts = FenceOptions.parse(node.fence_language.presence)
+          lang, opts = FenceOptions.parse(node.fence_language.presence)
 
           # `mermaid` fences stay on the existing pipeline (rendered as
           # stock `<pre><code class="language-mermaid...">`, later turned
@@ -786,6 +804,7 @@ module Hwaro
             options: escape(options_str),
             code: escape(node.text),
             highlighted: highlighted,
+            name: opts.try(&.name).try { |n| escape(n) } || "",
           ))
           newline
         end
@@ -858,10 +877,13 @@ module Hwaro
         # @param content - markdown content to render
         # @param highlight - whether to enable syntax highlighting for code blocks
         # @param safe - if true, raw HTML will not be passed through (replaced by comments)
+        # @param smart - if true, markd's smart punctuation rewrites straight
+        #   quotes/dashes/ellipses in Text nodes (code spans, raw HTML, and the
+        #   \x00 placeholders the extension passes leave are untouched)
         # @param hooks - render-hook context (nil when no `templates/hooks/render-*`
         #   template is configured); when nil the renderer construction below is
         #   byte-identical to the pre-hooks code path.
-        def render(content : String, highlight : Bool = true, safe : Bool = false, *, tables_preprocessed : Bool = false,
+        def render(content : String, highlight : Bool = true, safe : Bool = false, *, smart : Bool = false, tables_preprocessed : Bool = false,
                    hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : String
           # Pre-process tables before passing to markd (markd doesn't support
           # GFM tables). Markdown#render already converts tables before the
@@ -870,7 +892,7 @@ module Hwaro
           # SyntaxHighlighter.render.
           processed_content = tables_preprocessed ? content : TableParser.process(content)
 
-          options = Markd::Options.new(safe: safe)
+          options = Markd::Options.new(safe: safe, smart: smart)
           document = Markd::Parser.parse(processed_content, options)
           renderer = if hooks
                        HookedRenderer.new(options, highlight, @@server_mode, hooks)

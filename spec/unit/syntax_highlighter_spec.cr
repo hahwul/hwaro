@@ -190,6 +190,42 @@ describe Hwaro::Content::Processors::HighlightingRenderer do
     html.should_not contain("language-a<b>c")
     html.should contain("&lt;")
   end
+
+  it "wraps a named code block with a filename label" do
+    content = "```crystal {name=\"main.cr\"}\nputs 1\n```"
+    options = Markd::Options.new
+    document = Markd::Parser.parse(content, options)
+    renderer = Hwaro::Content::Processors::HighlightingRenderer.new(options, true)
+    html = renderer.render(document)
+
+    html.should contain(%(<div class="code-block"><div class="code-filename">main.cr</div>))
+    html.should contain("language-crystal")
+    html.should contain("</pre></div>")
+    # The label alone must not activate line wrapping or data-* attrs.
+    html.should_not contain("data-linenos")
+  end
+
+  it "HTML-escapes the filename label" do
+    content = "```crystal {name=x<b>y}\nputs 1\n```"
+    options = Markd::Options.new
+    document = Markd::Parser.parse(content, options)
+    renderer = Hwaro::Content::Processors::HighlightingRenderer.new(options, true)
+    html = renderer.render(document)
+
+    html.should contain("x&lt;b&gt;y")
+    html.should_not contain("<div class=\"code-filename\">x<b>")
+  end
+
+  it "renders unnamed code blocks without a wrapper" do
+    content = "```crystal\nputs 1\n```"
+    options = Markd::Options.new
+    document = Markd::Parser.parse(content, options)
+    renderer = Hwaro::Content::Processors::HighlightingRenderer.new(options, true)
+    html = renderer.render(document)
+
+    html.should_not contain("code-block")
+    html.should_not contain("code-filename")
+  end
 end
 
 private def reset_fence_options_state
@@ -224,6 +260,29 @@ describe Hwaro::Content::Processors::FenceOptions do
       lang, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {foo=1}")
       opts.should be_nil
       lang.should eq("crystal")
+    end
+
+    it "parses a quoted name label" do
+      lang, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {name="src/main file.cr"}))
+      lang.should eq("crystal")
+      opts.not_nil!.name.should eq("src/main file.cr")
+    end
+
+    it "accepts title as an alias for name" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {title=main.cr}))
+      opts.not_nil!.name.should eq("main.cr")
+    end
+
+    it "ignores an empty name value" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {name=""}))
+      opts.should be_nil
+    end
+
+    it "combines name with line options" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {name="x.cr", linenos=true}))
+      opts = opts.not_nil!
+      opts.name.should eq("x.cr")
+      opts.linenos.should be_true
     end
 
     it "returns nil opts for an unterminated brace" do

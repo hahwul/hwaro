@@ -13,9 +13,19 @@ module Hwaro
               Hwaro::Utils::TextUtils.strip_html(target.to_s)
             end
 
-            # Markdownify filter
+            # Markdownify filter. Honors the site's [markdown] safe and
+            # smart_punctuation settings (published once per build via
+            # Processor::Markdown.filter_markdown_config); with no site
+            # config — library/spec contexts — it keeps markd's bare
+            # defaults. The full extension pipeline (tables, heading ids,
+            # highlighting) is deliberately NOT applied here: routing it
+            # would change bytes for every existing `| markdownify` call.
             env.filters["markdownify"] = Crinja.filter do
-              Markd.to_html(target.to_s)
+              if cfg = Hwaro::Processor::Markdown.filter_markdown_config
+                Markd.to_html(target.to_s, Markd::Options.new(safe: cfg.safe, smart: cfg.smart_punctuation))
+              else
+                Markd.to_html(target.to_s)
+              end
             end
 
             # XML escape filter (single-pass via TextUtils)

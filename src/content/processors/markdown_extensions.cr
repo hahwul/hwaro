@@ -25,6 +25,12 @@ module Hwaro
           # into a stash phase before the combined pass and an expand phase
           # after it, so `$…$` inside already-escaped <td>/<dd> bodies still
           # gets wrapped while `~~`/`[ ]` inside formulas stays verbatim.
+          # Containers run FIRST: their ::: marker lines become raw-HTML
+          # wrapper lines, and everything between stays untouched for the
+          # passes below (and Markd) to parse as ordinary markdown. Not
+          # supported under safe mode — markd would strip the raw <div>
+          # wrappers (same class of limitation as custom heading ids).
+          result = preprocess_containers(result) if config.containers && !config.safe
           result = preprocess_definition_lists(result, flags: inline_flags(config)) if config.definition_lists
           result = preprocess_footnotes(result) if config.footnotes
 
@@ -204,8 +210,58 @@ module Hwaro
           result = postprocess_attributes(result) if config.attributes
           result = postprocess_footnotes(result, flags: inline_flags(config)) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
+          result = postprocess_task_list_classes(result) if config.task_lists && config.task_list_classes
+          # Last, so anchors from every producer above (markd, table cells,
+          # footnote sections) get the site's external-link policy.
+          result = postprocess_external_links(result, config)
 
           result
+        end
+
+        # --- External links ---
+        # Site-wide policy for absolute http(s) links (Zola parity):
+        # target="_blank" (+ rel="noopener", Zola's pairing), rel="nofollow",
+        # rel="noreferrer". Applied as an HTML pass because <a> tags come
+        # from four producers (markd, InlineMarkdown table cells/definitions,
+        # footnote sections, render-link hooks) — only postprocess sees them
+        # all. Merge semantics, not override: an anchor that already carries
+        # target= keeps it, and rel tokens are deduped into an existing
+        # rel="…" — so a render-link hook's explicit choices win. Applies to
+        # every absolute http(s) href, including ones pointing at the site's
+        # own domain (documented; matches Zola). Code blocks are immune:
+        # markd entity-escapes `<a` inside them.
+        EXTERNAL_ANCHOR_RE = /<a\s((?:[^>"']|"[^"]*"|'[^']*')*)>/i
+        EXTERNAL_HREF_RE   = /(?<![\w-])href\s*=\s*"https?:\/\//i
+        EXISTING_TARGET_RE = /(?<![\w-])target\s*=/i
+        EXISTING_REL_RE    = /(?<![\w-])rel\s*=\s*"([^"]*)"/i
+
+        def postprocess_external_links(html : String, config : Models::MarkdownConfig) : String
+          target_blank = config.external_links_target_blank
+          rel_tokens = [] of String
+          rel_tokens << "noopener" if target_blank
+          rel_tokens << "nofollow" if config.external_links_no_follow
+          rel_tokens << "noreferrer" if config.external_links_no_referrer
+          # Every active flag contributes a rel token, so empty ⇒ policy off.
+          return html if rel_tokens.empty?
+          return html unless html.includes?(%(href="http))
+
+          html.gsub(EXTERNAL_ANCHOR_RE) do |match|
+            attrs = $1
+            next match unless EXTERNAL_HREF_RE.matches?(attrs)
+
+            new_attrs = attrs
+            if target_blank && !EXISTING_TARGET_RE.matches?(new_attrs)
+              new_attrs = %(#{new_attrs.rstrip} target="_blank")
+            end
+            if rel_match = new_attrs.match(EXISTING_REL_RE)
+              existing = rel_match[1].split
+              merged = existing + rel_tokens.reject { |token| existing.includes?(token) }
+              new_attrs = new_attrs.sub(EXISTING_REL_RE, %(rel="#{merged.join(' ')}"))
+            else
+              new_attrs = %(#{new_attrs.rstrip} rel="#{rel_tokens.join(' ')}")
+            end
+            "<a #{new_attrs}>"
+          end
         end
 
         # --- Task Lists ---
@@ -222,6 +278,129 @@ module Hwaro
               "#{prefix}<input type=\"checkbox\" disabled>"
             end
           end
+        end
+
+        # --- Custom containers (opt-in) ---
+        # `:::type Optional Title` … `:::` blocks (markdown-it/remark
+        # style), emitted with the admonition markup so site CSS is shared:
+        #
+        #   <div class="admonition admonition-TYPE">
+        #   <p class="admonition-title">Title</p>
+        #   <blank line — ends the type-6 HTML block, so the body is
+        #   parsed as ordinary markdown, fences and task lists included>
+        #   …body…
+        #   </div>
+        #
+        # A bare `:{3,}` run closes the innermost open container, which
+        # gives natural nesting (`::::outer` / `:::inner` / `:::` /
+        # `::::`) with a plain counter. Unclosed containers auto-close at
+        # EOF (markdown-it behavior). Fence-aware: ::: lines inside code
+        # fences stay verbatim. The type token is class-safe by
+        # construction; the title is HTML-escaped plain text.
+        CONTAINER_OPEN_RE  = /\A {0,3}:{3,}([A-Za-z][\w-]*)[ \t]*(.*)\z/
+        CONTAINER_CLOSE_RE = /\A {0,3}:{3,}\z/
+
+        def preprocess_containers(content : String) : String
+          return content unless content.includes?(":::")
+
+          open_count = 0
+          String.build do |io|
+            tracker = FenceTracker.new
+            content.each_line(chomp: false) do |line|
+              if tracker.fence_line?(line)
+                io << line
+                next
+              end
+
+              stripped = line.rstrip
+              if m = CONTAINER_OPEN_RE.match(stripped)
+                type = m[1].downcase
+                title = m[2].presence.try { |t| HTML.escape(t) } || m[1].capitalize
+                open_count += 1
+                io << "<div class=\"admonition admonition-#{type}\">\n"
+                io << "<p class=\"admonition-title\">#{title}</p>\n\n"
+                next
+              end
+              if open_count > 0 && CONTAINER_CLOSE_RE.matches?(stripped)
+                open_count -= 1
+                io << "\n</div>\n"
+                next
+              end
+
+              io << line
+            end
+            # Auto-close unclosed containers at EOF (markdown-it behavior).
+            open_count.times { io << "\n</div>\n" }
+          end
+        end
+
+        # --- Task list classes (GFM markup, opt-in) ---
+        # preprocess_task_lists runs before Markd, when the <li> doesn't
+        # exist yet — so the GFM classes are added here, on the rendered
+        # HTML. Matches both list shapes markd emits: tight
+        # (`<li><input …`) and loose (`<li>\n<p><input …`). Code blocks
+        # are immune (their `<input` is entity-escaped).
+        TASK_LIST_ITEM_RE = /<li>(\n?(?:<p>)?)<input type="checkbox"( checked)? disabled>/
+
+        def postprocess_task_list_classes(html : String) : String
+          return html unless html.includes?(%(<input type="checkbox"))
+
+          result = html.gsub(TASK_LIST_ITEM_RE) do
+            %(<li class="task-list-item">#{$1}<input type="checkbox"#{$2?} disabled class="task-list-item-checkbox">)
+          end
+          return result unless result.includes?("task-list-item")
+
+          mark_containing_lists(result)
+        end
+
+        # Adds `contains-task-list` to every <ul>/<ol> that directly
+        # contains a task-list <li>. A linear byte scan with a stack of
+        # open list tags — a regex can't pair nested lists correctly
+        # (mixed lists, task item not first, task lists nested in plain
+        # lists). markd's list tags carry at most `start="N"`, no quoted
+        # '>' to worry about.
+        private def mark_containing_lists(html : String) : String
+          slice = html.to_slice
+          stack = [] of {Int32, Bool} # {insert offset (at the tag's '>'), marked}
+          insertions = [] of Int32
+
+          # Byte offsets throughout — every marker byte is ASCII, so the
+          # scan is UTF-8 safe (same rationale as apply_emoji's scanner).
+          pos = 0
+          while found = html.byte_index('<', pos)
+            pos = found + 1
+            if bytes_at?(slice, found, "<ul") || bytes_at?(slice, found, "<ol")
+              if close = html.byte_index('>', found)
+                stack << {close, false}
+                pos = close + 1
+              end
+            elsif bytes_at?(slice, found, "</ul>") || bytes_at?(slice, found, "</ol>")
+              if top = stack.pop?
+                insertions << top[0] if top[1]
+              end
+              pos = found + 5
+            elsif bytes_at?(slice, found, %(<li class="task-list-item")) && !stack.empty?
+              stack[-1] = {stack[-1][0], true}
+            end
+          end
+          return html if insertions.empty?
+
+          insertions.sort!
+          String.build(html.bytesize + insertions.size * 26) do |io|
+            prev = 0
+            insertions.each do |offset|
+              io.write(slice[prev, offset - prev])
+              io << %( class="contains-task-list")
+              prev = offset
+            end
+            io.write(slice[prev, slice.size - prev])
+          end
+        end
+
+        private def bytes_at?(slice : Bytes, offset : Int32, prefix : String) : Bool
+          bytes = prefix.to_slice
+          return false if offset + bytes.size > slice.size
+          slice[offset, bytes.size] == bytes
         end
 
         # --- Definition Lists ---
@@ -283,8 +462,17 @@ module Hwaro
                 # Collect definitions for this term
                 while i < lines.size && !fenced[i] && lines[i].lstrip.starts_with?(": ")
                   definition = lines[i].lstrip.lchop(": ").strip
-                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
                   i += 1
+                  # PHP-Markdown-Extra soft wrap: 4-space/tab-indented
+                  # continuation lines join the same <dd> with a space. An
+                  # indented `: …` stays a new definition, and a blank line
+                  # still ends the group as before (multi-paragraph <dd> is
+                  # deliberately out of scope).
+                  while i < lines.size && !fenced[i] && dd_continuation?(lines[i])
+                    definition += " #{lines[i].strip}"
+                    i += 1
+                  end
+                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
                 end
 
                 # Skip one or more blank lines between term groups within the same dl
@@ -306,6 +494,12 @@ module Hwaro
           end
 
           result.join("\n")
+        end
+
+        private def dd_continuation?(line : String) : Bool
+          return false if line.strip.empty?
+          return false unless line.starts_with?("    ") || line.starts_with?('\t')
+          !line.lstrip.starts_with?(": ")
         end
 
         # --- Footnotes ---
@@ -355,12 +549,56 @@ module Hwaro
 
           # Extract and remove footnote definitions — but only OUTSIDE fenced code
           # blocks, so a ``` [^1]: ... ``` syntax example isn't silently eaten.
+          # A definition collects 4-space/tab-indented continuation lines
+          # (GFM/pandoc style), including blank-line-separated paragraphs:
+          # soft-wrapped lines join with "\n", a held blank line becomes a
+          # "\n\n" paragraph break when (and only when) the next non-blank
+          # line is indented too. Lazy (unindented) continuation is NOT
+          # supported — it would eat the regular paragraph after a
+          # definition. Consumed lines are replaced with bare "\n" so the
+          # surrounding CommonMark block structure is unchanged.
           footnotes = {} of String => String
-          cleaned = process_lines_fence_aware(content) do |line, _|
-            line.gsub(FOOTNOTE_DEF_RE) do |_|
-              # rstrip: on CRLF content the captured text carries a trailing \r
-              footnotes[$~[1]] = $~[2].rstrip
-              "" # Remove definition from content
+          pending_key = nil.as(String?)
+          pending_blank = false
+          cleaned = String.build do |io|
+            tracker = FenceTracker.new
+            content.each_line(chomp: false) do |line|
+              # Collection takes precedence over fence tracking: an indented
+              # continuation after a held blank would otherwise read as an
+              # indented-code run opener. Consumed lines are not fed to the
+              # tracker — they are all blank or indented, so at worst its
+              # blank/list state is stale-conservative (under-protective,
+              # matching pre-collection behavior) for the line that ends
+              # the collection.
+              if key = pending_key
+                if line.strip.empty?
+                  pending_blank = true
+                  io << line
+                  next
+                elsif line.starts_with?("    ") || line.starts_with?('\t')
+                  footnotes[key] += pending_blank ? "\n\n" : "\n"
+                  footnotes[key] += line.strip
+                  pending_blank = false
+                  io << "\n"
+                  next
+                end
+                pending_key = nil
+                pending_blank = false
+              end
+
+              if tracker.fence_line?(line)
+                io << line
+                next
+              end
+
+              if m = line.match(FOOTNOTE_DEF_RE)
+                # rstrip: on CRLF content the captured text carries a trailing \r
+                footnotes[m[1]] = m[2].rstrip
+                pending_key = m[1]
+                io << "\n"
+              else
+                io << line
+              end
             end
           end
 
@@ -403,9 +641,11 @@ module Hwaro
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1
-              # Escape --> in text to prevent premature comment close, and : to prevent parsing issues
+              # Escape --> in text to prevent premature comment close, : to
+              # prevent parsing issues, and newlines (multi-line bodies) so
+              # the comment stays single-line for FOOTNOTE_COMMENT_RE.
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
-              safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
+              safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;").gsub("\n", "&#10;")
               result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
             result += "<!--HWARO-FOOTNOTES-END-->\n"
@@ -434,7 +674,7 @@ module Hwaro
           html.scan(FOOTNOTE_COMMENT_RE) do |match|
             # Unescape the comment-safe encoding
             key = match[1].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
-            text = match[4].gsub("&#58;", ":").gsub("&#45;&#45;", "--")
+            text = match[4].gsub("&#58;", ":").gsub("&#45;&#45;", "--").gsub("&#10;", "\n")
             num = match[2].to_i? || 0
             # Occurrence count is optional: older/hand-written 3-field comments
             # (no count) fall back to a single backref.
@@ -453,7 +693,6 @@ module Hwaro
             str << "<section class=\"footnotes\">\n<hr>\n<ol>\n"
             footnotes.sort_by { |fn| fn[:num] }.each do |fn|
               escaped_key = footnote_id_token(fn[:key])
-              rendered_text = InlineMarkdown.render(fn[:text], flags: flags)
               str << "<li id=\"fn-#{escaped_key}\">\n"
               # One backref per reference occurrence so every `fnref-\u2026` id is
               # reachable (cmark-gfm/pandoc behavior): \u21A9, \u21A92, \u21A93, \u2026
@@ -465,7 +704,19 @@ module Hwaro
                   b << "<a href=\"##{target}\" class=\"footnote-backref\">#{label}</a>"
                 end
               end
-              str << "<p>#{rendered_text} #{backrefs}</p>\n"
+              # Multi-paragraph bodies (blank-line-separated in the source)
+              # render one <p> each, backrefs inside the LAST one (GFM
+              # placement). A single-paragraph body produces exactly the
+              # pre-multi-line output.
+              paragraphs = fn[:text].split(/\n{2,}/)
+              paragraphs.each_with_index do |para, idx|
+                rendered_text = InlineMarkdown.render(para, flags: flags)
+                if idx == paragraphs.size - 1
+                  str << "<p>#{rendered_text} #{backrefs}</p>\n"
+                else
+                  str << "<p>#{rendered_text}</p>\n"
+                end
+              end
               str << "</li>\n"
             end
             str << "</ol>\n</section>\n"
@@ -519,6 +770,13 @@ module Hwaro
         # div becomes an HTML block inside the blockquote).
         BARE_MATH_LINE_RE     = /\A\x00MATH\d+\x00\z/
         BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)+/
+        # Markd-active characters inside a math body rendered in normal
+        # inline context (see the branch comments in expand_math). Beyond
+        # emphasis/code/link chars, `-`, `.`, and both quotes are included
+        # so markd's opt-in smart punctuation can't rewrite `--`/`...`/
+        # quotes inside formulas; when smart is off the backslash escapes
+        # collapse to the same characters, so output is byte-identical.
+        MATH_BODY_MARKD_ACTIVE_RE = /[\\`*_\[\]\-."']/
 
         # One-shot math transform (stash + immediate expand). `preprocess`
         # itself uses the two phases separately so the combined pass runs in
@@ -671,7 +929,7 @@ module Hwaro
                   # Mid-paragraph display math (inline raw HTML): escape the
                   # body like the inline branch below, and double the
                   # delimiters' backslashes so `\\[` collapses to `\[`.
-                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
                   "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
                 elsif raw_context
                   "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
@@ -687,7 +945,7 @@ module Hwaro
                   # the formula body verbatim to KaTeX/MathJax. (`~` is left
                   # alone: GFM strikethrough is handled by hwaro's own
                   # preprocessor, which already skips math spans.)
-                  inline_escaped = escaped.gsub(/[\\`*_\[\]]/) { |c| "\\#{c}" }
+                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
                   "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
                 end
               end

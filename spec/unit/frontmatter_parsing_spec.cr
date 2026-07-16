@@ -916,10 +916,23 @@ describe Hwaro::Content::Processors::Markdown do
       result[:in_search_index].should be_true
     end
 
-    it "defaults insert_anchor_links to false" do
+    it "defaults insert_anchor_links to nil (site config decides)" do
       raw = <<-MD
         ---
         title: Post
+        ---
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:insert_anchor_links].should be_nil
+    end
+
+    it "parses an explicit insert_anchor_links override" do
+      raw = <<-MD
+        ---
+        title: Post
+        insert_anchor_links: false
         ---
         Body
         MD

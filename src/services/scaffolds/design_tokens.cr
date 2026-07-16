@@ -202,6 +202,11 @@ module Hwaro
             /* Fence options: {linenos=true, hl_lines="..."} (server highlighting) */
             pre code .line.hl { display: inline-block; width: 100%; background: color-mix(in srgb, var(--code-keyword) 12%, transparent); }
             pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
+
+            /* Fence filename label: {name="main.cr"} / {title="..."} */
+            .code-block { margin: var(--space-md, 1rem) 0; }
+            .code-block > pre { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+            .code-filename { padding: 0.35rem 0.85rem; font-family: var(--font-mono, monospace); font-size: 0.78rem; color: var(--text-muted); background: color-mix(in srgb, var(--code-bg, var(--surface)) 88%, var(--text-muted)); border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
             CSS
         end
 

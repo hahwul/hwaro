@@ -58,6 +58,9 @@ module Hwaro::Core::Build::Phases::Initialize
       # build — read-only afterwards, including by parallel render fibers.
       Content::Processors::SyntaxHighlighter.server_mode = config.highlight.server?
       Content::Processors::SyntaxHighlighter.default_line_numbers = config.highlight.line_numbers
+      # Same pattern for the markdown options template filters consult
+      # (markdownify honors the site's safe/smart_punctuation settings).
+      Processor::Markdown.filter_markdown_config = config.markdown
 
       ctx.templates = load_templates
       @templates = ctx.templates

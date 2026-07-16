@@ -942,6 +942,330 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "smart punctuation" do
+    it "typographs quotes, dashes, and ellipses when enabled" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(He said "wow" -- then... an em---dash),
+        markdown_config: cfg,
+      )
+      html.should contain("“wow”") # curly quotes
+      html.should contain("–")     # en dash
+      html.should contain("…")     # ellipsis
+      html.should contain("—")     # em dash
+    end
+
+    it "stays byte-identical when disabled" do
+      html, _ = Hwaro::Processor::Markdown.render(%(He said "wow" -- then...))
+      html.should contain("&quot;wow&quot;")
+      html.should contain("--")
+      html.should contain("...")
+    end
+
+    it "leaves code spans and fences untouched" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Use `a -- b` and:\n\n```\nx = \"y\" -- z\n```",
+        markdown_config: cfg,
+      )
+      html.should contain("a -- b")
+      html.should contain("&quot;y&quot; -- z")
+    end
+
+    it "leaves math bodies untouched with smart on" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      cfg.math = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "Formula $a -- b$ here.",
+        markdown_config: cfg,
+      )
+      html.should contain("a -- b")
+    end
+  end
+
+  describe "custom containers" do
+    it "renders a basic container with a custom title" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::note My Title\nBody with **bold**.\n:::",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="admonition admonition-note">))
+      html.should contain(%(<p class="admonition-title">My Title</p>))
+      html.should contain("<strong>bold</strong>")
+      html.should contain("</div>")
+    end
+
+    it "defaults the title to the capitalized type" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::warning\ncareful\n:::", markdown_config: cfg)
+      html.should contain(%(<p class="admonition-title">Warning</p>))
+    end
+
+    it "nests containers with longer runs" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "::::outer\nabove\n:::inner\ninside\n:::\nbelow\n::::",
+        markdown_config: cfg,
+      )
+      html.scan("admonition-outer").size.should eq(1)
+      html.scan("admonition-inner").size.should eq(1)
+      html.scan("</div>").size.should eq(2)
+    end
+
+    it "keeps fences working inside a container and ::: inside fences literal" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::note\n```\n:::not-a-container\n```\n:::",
+        markdown_config: cfg,
+      )
+      html.should contain("admonition-note")
+      html.should contain(":::not-a-container")
+      # Exactly one container opened — the fenced ::: line spawned nothing.
+      html.scan(%(<div class="admonition)).size.should eq(1)
+      html.scan("</div>").size.should eq(1)
+    end
+
+    it "auto-closes at EOF" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::tip\nno closer", markdown_config: cfg)
+      html.should contain("admonition-tip")
+      html.should contain("</div>")
+    end
+
+    it "is off by default and skipped in safe mode" do
+      html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
+      html.should_not contain("admonition")
+
+      cfg = make_config
+      cfg.containers = true
+      cfg.safe = true
+      html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: cfg, safe: true)
+      html.should_not contain("admonition")
+    end
+  end
+
+  describe "multi-line footnotes" do
+    it "joins indented continuation lines into one paragraph" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: first line\n    wrapped **bold** line",
+        markdown_config: cfg,
+      )
+      html.should contain("first line\nwrapped <strong>bold</strong> line")
+      html.scan("<p>").size.should eq(2) # body paragraph + one footnote <p>
+    end
+
+    it "renders blank-line-separated paragraphs with backrefs in the last" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: para one\n\n    para two",
+        markdown_config: cfg,
+      )
+      html.should contain("<p>para one</p>")
+      html.should contain(%(<p>para two <a href="#fnref-1" class="footnote-backref">))
+    end
+
+    it "ends collection at a blank line followed by unindented text" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: body\n\nregular paragraph",
+        markdown_config: cfg,
+      )
+      html.should contain("<p>regular paragraph</p>")
+      html.should contain("<p>body <a href=")
+    end
+
+    it "does not treat an unrelated indented code block as a continuation" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: body\n\nplain\n\n    indented code",
+        markdown_config: cfg,
+      )
+      html.should contain("<pre><code>indented code")
+    end
+
+    it "keeps single-line definitions byte-identical" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: simple note",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<p>simple note <a href="#fnref-1" class="footnote-backref">↩</a></p>))
+    end
+
+    it "handles CRLF continuations" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\r\n\r\n[^1]: first\r\n    second\r\n",
+        markdown_config: cfg,
+      )
+      html.should contain("first\nsecond")
+    end
+  end
+
+  describe "multi-line definition lists" do
+    it "joins indented continuation lines into the same dd" do
+      content = "Term\n: first part\n    wrapped part"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>first part wrapped part</dd>")
+    end
+
+    it "keeps an indented ': …' line a separate definition" do
+      content = "Term\n: one\n    : two"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>one</dd>")
+      result.should contain("<dd>two</dd>")
+    end
+
+    it "still ends the group at a blank line" do
+      content = "Term\n: def\n\n    indented code after"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
+      result.should contain("<dd>def</dd>")
+      result.should contain("    indented code after")
+    end
+  end
+
+  describe "task list classes (GFM)" do
+    it "adds item, checkbox, and list classes when enabled (tight list)" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a\n- [x] b", markdown_config: cfg)
+      html.should contain(%(<ul class="contains-task-list">))
+      html.scan(%(<li class="task-list-item">)).size.should eq(2)
+      html.should contain(%(<input type="checkbox" disabled class="task-list-item-checkbox"> a))
+      html.should contain(%(<input type="checkbox" checked disabled class="task-list-item-checkbox"> b))
+    end
+
+    it "handles loose lists" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a\n\n- [x] b", markdown_config: cfg)
+      html.should contain(%(<ul class="contains-task-list">))
+      html.should contain(%(<li class="task-list-item">\n<p><input type="checkbox" disabled class="task-list-item-checkbox">))
+    end
+
+    it "marks only the lists that contain task items" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "- plain\n- [ ] task\n\nother:\n\n- just\n- items",
+        markdown_config: cfg,
+      )
+      html.scan("contains-task-list").size.should eq(1)
+    end
+
+    it "marks nested task lists and their parents independently" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "- plain\n  - [ ] nested task",
+        markdown_config: cfg,
+      )
+      # Only the inner list directly contains a task item.
+      html.scan("contains-task-list").size.should eq(1)
+      html.should contain(%(<ul class="contains-task-list">\n<li class="task-list-item">))
+    end
+
+    it "is off by default (byte-identity)" do
+      cfg = make_config(task_lists: true)
+      html, _ = Hwaro::Processor::Markdown.render("- [ ] a", markdown_config: cfg)
+      html.should_not contain("task-list-item")
+      html.should_not contain("contains-task-list")
+    end
+
+    it "leaves fenced checkbox markup alone" do
+      cfg = make_config(task_lists: true)
+      cfg.task_list_classes = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "```\n- [ ] a\n```",
+        markdown_config: cfg,
+      )
+      html.should_not contain("task-list-item")
+    end
+  end
+
+  describe "external link policy" do
+    it "adds target and noopener to absolute links when enabled" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ext](https://example.com) and [int](/docs/)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com" target="_blank" rel="noopener"))
+      html.should contain(%(<a href="/docs/">int</a>))
+    end
+
+    it "merges rel tokens into an existing rel without duplicating" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" rel="noopener me">x</a>), cfg
+      )
+      html.should contain(%(rel="noopener me nofollow"))
+      html.scan("noopener").size.should eq(1)
+    end
+
+    it "respects an existing target attribute" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" target="_self">x</a>), cfg
+      )
+      html.should contain(%(target="_self"))
+      html.should_not contain("_blank")
+    end
+
+    it "adds nofollow and noreferrer without target_blank" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      cfg.external_links_no_referrer = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="http://e.com">x</a>), cfg
+      )
+      html.should contain(%(rel="nofollow noreferrer"))
+      html.should_not contain("target=")
+    end
+
+    it "leaves links inside code blocks and mailto links alone" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "```\n<a href=\"https://e.com\">x</a>\n```\n\n[m](mailto:a@b.c)",
+        markdown_config: cfg,
+      )
+      html.should_not contain("_blank")
+    end
+
+    it "processes footnote-body links" do
+      cfg = make_config(footnotes: true)
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "text[^1]\n\n[^1]: see [ref](https://e.com)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(target="_blank"))
+    end
+
+    it "is off by default (byte-identity)" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ext](https://example.com)",
+        markdown_config: make_config,
+      )
+      html.should eq(%(<p><a href="https://example.com">ext</a></p>\n))
+    end
+  end
+
   describe "indented code blocks" do
     it "leaves transforms alone inside an indented code run" do
       config = make_config(math: true)

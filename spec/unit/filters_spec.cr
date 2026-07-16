@@ -560,6 +560,41 @@ describe "HtmlFilters" do
       result.should contain("<strong>bold</strong>")
     end
 
+    it "honors the site's safe mode when the build config is published" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.safe = true
+      Hwaro::Processor::Markdown.filter_markdown_config = cfg
+      begin
+        vars = {"md" => Crinja::Value.new("<script>x()</script>\n\ntext")}
+        result = render_filter("{{ md | markdownify }}", vars)
+        result.should_not contain("<script>")
+        result.should contain("text")
+      ensure
+        Hwaro::Processor::Markdown.filter_markdown_config = nil
+      end
+    end
+
+    it "honors the site's smart_punctuation setting" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.smart_punctuation = true
+      Hwaro::Processor::Markdown.filter_markdown_config = cfg
+      begin
+        vars = {"md" => Crinja::Value.new(%(say "hi" -- ok))}
+        result = render_filter("{{ md | markdownify }}", vars)
+        result.should contain("“hi”")
+        result.should contain("–")
+      ensure
+        Hwaro::Processor::Markdown.filter_markdown_config = nil
+      end
+    end
+
+    it "keeps bare defaults when no build config is published" do
+      Hwaro::Processor::Markdown.filter_markdown_config = nil
+      vars = {"md" => Crinja::Value.new(%(say "hi"))}
+      result = render_filter("{{ md | markdownify }}", vars)
+      result.should contain(%(&quot;hi&quot;))
+    end
+
     it "converts markdown headings" do
       vars = {"md" => Crinja::Value.new("# Title")}
       result = render_filter("{{ md | markdownify }}", vars)

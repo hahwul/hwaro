@@ -88,8 +88,10 @@ module Hwaro
       # New: In search index - whether to include in search index
       property in_search_index : Bool
 
-      # New: Insert anchor links - whether to add anchor links to headings
-      property insert_anchor_links : Bool
+      # New: Insert anchor links - whether to add anchor links to headings.
+      # Tri-state: nil (front matter silent) falls back to the site-wide
+      # `[markdown] insert_anchor_links` config; an explicit true/false wins.
+      property insert_anchor_links : Bool?
 
       # Fingerprint of the merged section [cascade] values applied to this
       # page (empty when none apply). Stored in the build cache so editing a
@@ -180,7 +182,7 @@ module Hwaro
         @summary = nil
         @summary_html = nil
         @in_search_index = true
-        @insert_anchor_links = false
+        @insert_anchor_links = nil
         @word_count = 0
         @reading_time = 0
         @permalink = nil
