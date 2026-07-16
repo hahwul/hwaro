@@ -570,6 +570,85 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    describe "stability guards" do
+      it "raises HWARO_E_USAGE for a --date the build cannot parse, writing nothing" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "T", date: "2026-13-45")
+            err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+            err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+            File.exists?("content/post.md").should be_false
+          end
+        end
+      end
+
+      it "derives the title from the filename when --title is whitespace-only" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(path: "my-post.md", title: "   ")
+            Hwaro::Services::Creator.new.run(options)
+            File.read("content/my-post.md").should contain(%(title = "My Post"))
+          end
+        end
+      end
+
+      it "derives the bundle title from the path's last segment when --bundle has no --title" do
+        # Parity: the config-driven `bundle = true` derived the title from the
+        # path, but the explicit `--bundle` flag demanded --title and errored.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(path: "posts/my-bundle", bundle: true)
+            result = Hwaro::Services::Creator.new.run(options)
+            result.should eq("content/posts/my-bundle/index.md")
+            File.read(result).should contain(%(title = "My Bundle"))
+          end
+        end
+      end
+
+      it "refuses a flat page whose URL collides with an existing bundle" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts/foo")
+            File.write("content/posts/foo/index.md", "+++\ntitle = \"F\"\n+++\n")
+            options = Hwaro::Config::Options::NewOptions.new(path: "posts/foo.md", title: "F2")
+            err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+            err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            File.exists?("content/posts/foo.md").should be_false
+          end
+        end
+      end
+
+      it "refuses a flat page whose URL collides with an existing section index" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/sec")
+            File.write("content/sec/_index.md", "+++\ntitle = \"S\"\n+++\n")
+            options = Hwaro::Config::Options::NewOptions.new(path: "sec.md", title: "S2")
+            err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+            err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            File.exists?("content/sec.md").should be_false
+          end
+        end
+      end
+
+      it "classifies a file squatting on a parent directory segment as HWARO_E_IO" do
+        # Previously this unwound as a bare File::AlreadyExistsError — no
+        # error code, no exit taxonomy, and an empty stdout in --json mode.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            File.write("content/blocker.md", "+++\ntitle = \"B\"\n+++\n")
+            options = Hwaro::Config::Options::NewOptions.new(path: "blocker.md/child.md", title: "C")
+            err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+            err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          end
+        end
+      end
+    end
+
     describe ".slugify" do
       it "lowercases and hyphenates a title" do
         Hwaro::Services::Creator.slugify("My First Post!").should eq("my-first-post")
@@ -1270,6 +1349,43 @@ describe Hwaro::Services::Creator do
       # foo/../bar.md resolves to bar.md which is still inside content/.
       Hwaro::Services::Creator.validate_and_normalize_path!("foo/../bar.md").should eq("bar.md")
     end
+
+    it "rejects hidden (dot-leading) segments the build would ignore" do
+      # Content discovery globs `content/**/*`, which skips hidden entries —
+      # a scaffolded `.md` / `.hidden/foo.md` would never render.
+      expect_raises(ArgumentError, /hidden segment/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!(".md")
+      end
+      expect_raises(ArgumentError, /hidden segment/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!(".hidden/foo.md")
+      end
+      expect_raises(ArgumentError, /hidden segment/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("posts/.hidden/foo.md")
+      end
+      expect_raises(ArgumentError, /hidden segment/) do
+        Hwaro::Services::Creator.validate_and_normalize_path!("...")
+      end
+    end
+  end
+
+  describe ".parseable_content_date?" do
+    it "accepts the formats the build's front-matter parser accepts" do
+      Hwaro::Services::Creator.parseable_content_date?("2026-03-22").should be_true
+      Hwaro::Services::Creator.parseable_content_date?("2026-03-22 10:30:00").should be_true
+      Hwaro::Services::Creator.parseable_content_date?("2026-03-22T10:30:00").should be_true
+      Hwaro::Services::Creator.parseable_content_date?("2026-03-22T10:30:00Z").should be_true
+      Hwaro::Services::Creator.parseable_content_date?("2026-03-22T10:30:00+09:00").should be_true
+    end
+
+    it "rejects out-of-range and garbage dates" do
+      # `2026-13-45` matches the TOML datetime *pattern* and used to be
+      # emitted unquoted — invalid TOML that broke the whole generated file.
+      Hwaro::Services::Creator.parseable_content_date?("2026-13-45").should be_false
+      Hwaro::Services::Creator.parseable_content_date?("2026-02-30").should be_false
+      Hwaro::Services::Creator.parseable_content_date?("not-a-date").should be_false
+      Hwaro::Services::Creator.parseable_content_date?("").should be_false
+      Hwaro::Services::Creator.parseable_content_date?("   ").should be_false
+    end
   end
 
   describe ".url_safe_path?" do
@@ -1342,6 +1458,14 @@ describe Hwaro::Services::Creator do
       expect_raises(ArgumentError, /no URL-safe characters/) do
         Hwaro::Services::Creator.sanitize_url_path("!!!/???")
       end
+    end
+
+    it "drops segments that sanitize to pure dots instead of synthesizing `..`" do
+      # `>.>.` → `-.-.` → hyphen/dot collapse → `..` — a traversal segment
+      # fabricated AFTER validate_and_normalize_path! already ran. It must
+      # vanish like any empty segment, never join the on-disk path.
+      Hwaro::Services::Creator.sanitize_url_path("posts/>.>./foo.md").should eq("posts/foo.md")
+      Hwaro::Services::Creator.sanitize_url_path("a/>.>./>.>./b.md").should eq("a/b.md")
     end
   end
 end

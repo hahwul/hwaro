@@ -124,6 +124,30 @@ describe Hwaro::CLI::Commands::NewCommand do
       _, json_output = cmd.parse_options(["post.md"])
       json_output.should be_false
     end
+
+    it "raises on extra positional arguments instead of silently dropping them" do
+      # `hwaro new post.md --title My Post` (unquoted title) used to scaffold
+      # `post.md` and silently discard `Post` — now it's a classified error.
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.parse_options(["a.md", "b.md"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      (err.message || "").should contain("b.md")
+    end
+
+    it "accepts a leading-dash path after `--`" do
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      options, _json = cmd.parse_options(["--", "-dash.md"])
+      options.path.should eq("-dash.md")
+    end
+
+    it "still reports unknown flags as invalid options, not extra arguments" do
+      cmd = Hwaro::CLI::Commands::NewCommand.new
+      expect_raises(OptionParser::InvalidOption) do
+        cmd.parse_options(["--bogus", "x.md"])
+      end
+    end
   end
 
   # A malformed `config.toml` must surface as the same classified
@@ -264,6 +288,56 @@ describe Hwaro::CLI::Commands::NewCommand do
           # No phantom dir from the stray slash.
           Dir.exists?("content/posts/").should be_true
           Dir.children("content/posts").includes?("").should be_false
+        end
+      end
+    end
+
+    it "rejects paths whose sanitized form would synthesize `..` (no file escapes content/)" do
+      # `.>.` is not `..`, so it survived the first structural validation —
+      # but sanitizing `>` → `-` and collapsing hyphens against dots turned it
+      # into `..`, and the file landed OUTSIDE the project directory.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
+          FileUtils.mkdir_p("content")
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["posts/.>./.>./.>./evil.md", "-t", "X"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+
+          File.exists?(File.join(dir, "evil.md")).should be_false
+          File.exists?(File.join(dir, "..", "evil.md")).should be_false
+        end
+      end
+    end
+
+    it "rejects a path that sanitizes to a hidden filename" do
+      # `!.md` sanitizes to `.md` — a dotfile the build's glob never sees.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
+          FileUtils.mkdir_p("content")
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::NewCommand.new.run(["!.md", "-t", "X"])
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should contain("hidden segment")
+          File.exists?("content/.md").should be_false
+        end
+      end
+    end
+
+    it "normalizes a case-variant .MD extension instead of double-suffixing" do
+      # `Foo.MD` slipped past every `ends_with?(".md")` heuristic and
+      # scaffolded `Foo.MD.md`.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = ""\n))
+          FileUtils.mkdir_p("content")
+          Hwaro::CLI::Commands::NewCommand.new.run(["Foo.MD", "-t", "T"])
+
+          File.exists?("content/Foo.md").should be_true
+          File.exists?("content/Foo.MD.md").should be_false
         end
       end
     end
