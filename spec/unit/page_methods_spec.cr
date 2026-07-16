@@ -200,6 +200,20 @@ describe Hwaro::Models::Page do
       summary.not_nil!.should eq("Summary text.")
     end
 
+    it "ignores a marker shown inside a fenced code block" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Intro.\n\n```html\n<!-- more -->\n```\n\nBody.\n\n<!-- more -->\n\nRest."
+      summary = page.extract_summary
+      summary.should_not be_nil
+      summary.not_nil!.should eq("Intro.\n\n```html\n<!-- more -->\n```\n\nBody.")
+    end
+
+    it "returns nil when the only marker sits inside a fence" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Docs example:\n\n```\n<!-- more -->\n```\n\nNo real marker."
+      page.extract_summary.should be_nil
+    end
+
     it "returns nil for empty content" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = ""

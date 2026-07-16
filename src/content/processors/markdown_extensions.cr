@@ -53,14 +53,34 @@ module Hwaro
           # passes this check transforms exactly as before.
           markers_present = (do_task_lists && (result.includes?("[ ]") || result.includes?("[x]") || result.includes?("[X]"))) ||
                             (do_strikethrough && result.includes?("~~")) ||
-                            (do_heading_ids && result.includes?("{#")) ||
+                            (do_heading_ids && (result.includes?("{#") || result.includes?("<!--HID:"))) ||
                             (do_ins && result.includes?("++")) || (do_mark && result.includes?("==")) ||
                             (do_sub && result.includes?('~')) || (do_sup && result.includes?('^')) ||
-                            (config.attributes && result.includes?('{'))
+                            (config.attributes && (result.includes?('{') || result.includes?("<!--HATTR:")))
 
           if markers_present
             result = process_lines_fence_aware(result) do |line, _in_fence|
               transformed = line
+
+              # Author-typed engine markers are neutralized before the
+              # branches below inject the real ones — same in-band-signaling
+              # protection footnotes get (see preprocess_footnotes), but
+              # per-line and code-span-safe: a literal `<!--HID:x-->` in
+              # inline code or a fenced example stays byte-identical (it's
+              # inert there — Markd entity-escapes it), while one typed in
+              # prose can no longer smuggle an id or attributes onto a
+              # heading.
+              if do_heading_ids && transformed.includes?("<!--HID:")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub("<!--HID:", "<!-- HID:")
+                end
+              end
+
+              if config.attributes && transformed.includes?("<!--HATTR:")
+                transformed = transform_outside_code_spans(transformed) do |stashed|
+                  stashed.gsub("<!--HATTR:", "<!-- HATTR:")
+                end
+              end
 
               if do_task_lists && !_in_fence &&
                  (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))

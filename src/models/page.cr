@@ -1,5 +1,6 @@
 require "html"
 require "../utils/text_utils"
+require "../content/processors/fence_tracker"
 
 module Hwaro
   module Models
@@ -326,12 +327,25 @@ module Hwaro
       # Extract summary from content using <!-- more --> marker
       # Returns content before the marker, or nil if no marker found
       # Note: @raw_content has front matter already stripped during parsing
-      MORE_MARKER_REGEX = /\A(.*?)<!--\s*more\s*-->/mi
+      #
+      # Fence-aware: a marker shown inside a fenced code block (a docs page
+      # demonstrating the feature) is literal text, not a split point. The
+      # per-line pattern no longer matches a marker whose parts sit on
+      # different lines — degenerate input the old multi-line `\s*` accepted.
+      MORE_MARKER_REGEX = /<!--\s*more\s*-->/i
 
       def extract_summary : String?
-        if match = @raw_content.match(MORE_MARKER_REGEX)
-          summary_md = match[1].strip
-          @summary = summary_md unless summary_md.empty?
+        return @summary unless @raw_content.includes?("<!--")
+
+        offset = 0
+        tracker = Content::Processors::FenceTracker.new
+        @raw_content.each_line(chomp: false) do |line|
+          if !tracker.fence_line?(line) && (match = line.match(MORE_MARKER_REGEX))
+            summary_md = @raw_content.byte_slice(0, offset + match.byte_begin(0)).strip
+            @summary = summary_md unless summary_md.empty?
+            return @summary
+          end
+          offset += line.bytesize
         end
         @summary
       end

@@ -679,6 +679,24 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain(%(id="wanted"))
     end
 
+    it "neutralizes an author-typed HID marker in prose" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "## Heading <!--HID:evil--> {#real}\n\ntext",
+        markdown_config: cfg,
+      )
+      html.should contain(%(id="real"))
+      html.should_not contain(%(id="evil"))
+    end
+
+    it "keeps author-typed markers verbatim in code spans and fences" do
+      cfg = make_config(heading_ids: true, attributes: true)
+      content = "Use `<!--HID:x-->` inline.\n\n```\n<!--HATTR:41-->\n```"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, cfg)
+      result.should contain("`<!--HID:x-->`")
+      result.should contain("\n<!--HATTR:41-->\n")
+    end
+
     it "resolves the marker on a heading with a quoted '>' attribute" do
       html = %(<h2 title="a > b">Heading <!--HID:wanted--></h2>)
       result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_heading_ids(html)
