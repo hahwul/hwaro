@@ -405,6 +405,12 @@ module Hwaro
             return
           end
 
+          # Re-render <!-- more --> summaries for the re-parsed pages with the
+          # body pipeline (parse_single_page reset summary_html to nil); the
+          # listing pages re-rendered below read it.
+          render_page_summaries(changed_pages, site, templates, highlight,
+            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
+
           # --- 2. Incrementally update relationships ---
           # Run taxonomy update on ALL re-parsed pages first (including those about
           # to be excluded), so excluded pages' old entries are properly removed.
@@ -761,6 +767,12 @@ module Hwaro
           if options.verbose && affected_templates && pages_to_render.size < renderable_pages.size
             Logger.info "  #{pages_to_render.size} of #{renderable_pages.size} pages affected."
           end
+
+          # Recompute <!-- more --> summaries for the render set with the
+          # reloaded templates: a shortcode template edit changes summary
+          # output too, and pages re-parsed by run_incremental_then_rerender
+          # arrive here with summary_html reset to nil.
+          render_page_summaries(pages_to_render, site, templates, highlight, link_targets: all_pages)
 
           global_vars = build_global_vars(site, options.cache_busting)
           @pages_by_path = build_pages_by_path(site)
