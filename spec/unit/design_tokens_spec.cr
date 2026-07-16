@@ -10,10 +10,11 @@ private CANONICAL_TOKENS = %w[
   --warn --ok
   --code-comment --code-keyword --code-string --code-number
   --code-func --code-type --code-variable --code-attr --code-symbol
-  --step--1 --step-0 --step-1 --step-2 --step-3 --step-4
+  --step--1 --step-0 --step-1 --step-2 --step-3 --step-4 --step-5
   --space-1 --space-2 --space-3 --space-4 --space-5 --space-6 --space-7 --space-8
   --measure --radius --radius-sm
-  --shadow-sm --shadow --shadow-lg --transition
+  --shadow-sm --shadow --shadow-lg
+  --ease-out --transition --transition-slow --glass-filter
   --font-serif --font-sans --font-mono
 ]
 
@@ -30,7 +31,7 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       css = Hwaro::Services::Scaffolds::DesignTokens.root_block
       css.should contain("color-scheme: light dark;")
       css.should contain("light-dark(#b35454, #ec7a66)")
-      css.should contain("light-dark(#faf7f2, #0f0f0e)")
+      css.should contain("light-dark(#faf8f4, #141110)")
     end
 
     it "ships the [data-theme] pin rules the theme switcher drives" do
@@ -45,7 +46,7 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       # color-mix-derived tokens are pinned statically too, so even
       # pre-color-mix browsers resolve them.
       css.should contain("--primary-tint: rgba(179, 84, 84, 0.08);")
-      css.should contain("--glass: rgba(250, 247, 242, 0.85);")
+      css.should contain("--glass: rgba(250, 248, 244, 0.85);")
     end
 
     it "injects layout lines inside :root" do

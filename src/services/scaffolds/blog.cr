@@ -72,7 +72,7 @@ module Hwaro
             "index.html"           => blog_home_template,
             "page.html"            => blog_page_template,
             "section.html"         => blog_section_template,
-            "post.html"            => post_template,
+            "post.html"            => post_template(skip_taxonomies),
             "archives.html"        => archives_template,
             "404.html"             => blog_not_found_template,
           }
@@ -558,6 +558,7 @@ module Hwaro
             .home-hero {
               padding: var(--space-6) 0 var(--space-5);
               margin-bottom: var(--space-5);
+              border-bottom: 1px solid var(--border-subtle);
             }
 
             .home-title {
@@ -642,11 +643,15 @@ module Hwaro
               display: grid;
               grid-template-columns: 6.5rem 1fr;
               gap: var(--space-4);
-              padding: var(--space-4) 0;
+              padding: var(--space-4) var(--space-3);
+              margin-inline: calc(-1 * var(--space-3));
+              border-radius: var(--radius-sm);
               border-bottom: 1px solid var(--border-subtle);
+              transition: background var(--transition);
             }
 
             .post-item:last-child { border-bottom: none; }
+            @media (hover: hover) { .post-item:hover { background: var(--primary-tint); } }
 
             .post-date {
               color: var(--text-muted);
@@ -714,6 +719,8 @@ module Hwaro
             }
 
             .post-header h1 { margin-bottom: 0.75rem; }
+            .post-meta-sep { color: var(--text-muted); }
+            .post-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.85rem; }
             .post-content { line-height: 1.8; }
 
             /* Prose holds the measure; the 860px container stays for code,
@@ -756,27 +763,54 @@ module Hwaro
             .related-posts a { color: var(--primary); text-decoration: none; }
             .related-posts a:hover { text-decoration: underline; }
 
+            /* Older/newer neighbours — a quiet card pair that warms on hover. */
+            .post-nav {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: var(--space-3);
+              margin-top: var(--space-6);
+              padding-top: var(--space-5);
+              border-top: 1px solid var(--border-subtle);
+            }
+            .post-nav-link {
+              display: flex;
+              flex-direction: column;
+              gap: 0.2rem;
+              padding: var(--space-3) var(--space-4);
+              border: 1px solid var(--border);
+              border-radius: var(--radius-sm);
+              text-decoration: none;
+              transition: border-color var(--transition), background var(--transition);
+            }
+            .post-nav-prev { grid-column: 1; }
+            .post-nav-next { grid-column: 2; text-align: right; }
+            .post-nav-link:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: var(--primary-tint); text-decoration: none; }
+            .post-nav-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+            .post-nav-title { font-family: var(--font-serif); font-weight: 700; color: var(--heading); }
+
             /* Section headings rely on scale and space, not fences — the
                ember punctuation (rule, sparks, markers) carries structure. */
             .post-content h2 { margin-top: 3rem; }
 
-            /* Tags */
+            /* Tags — quiet outline pills that take the ember tint on hover
+               instead of flipping to a solid fill. */
             .tag {
-              display: inline-block;
-              background: var(--bg-subtle);
-              padding: 0.2rem 0.6rem;
-              border-radius: 20px;
+              display: inline-flex;
+              align-items: center;
+              background: transparent;
+              padding: 0.15rem 0.7rem;
+              border-radius: 999px;
               font-size: 0.75rem;
               color: var(--text-secondary);
               text-decoration: none;
               border: 1px solid var(--border);
-              transition: all var(--transition);
+              transition: color var(--transition), border-color var(--transition), background var(--transition), transform 0.1s var(--ease-out);
             }
 
             .tag:hover {
-              background: var(--primary);
-              color: var(--bg);
-              border-color: var(--primary);
+              background: var(--primary-tint);
+              color: var(--primary-strong);
+              border-color: color-mix(in srgb, var(--primary) 45%, transparent);
               text-decoration: none;
             }
 
@@ -814,10 +848,14 @@ module Hwaro
               display: grid;
               grid-template-columns: 6.5rem 1fr;
               gap: var(--space-4);
-              padding: 0.55rem 0;
+              padding: 0.55rem var(--space-3);
+              margin-inline: calc(-1 * var(--space-3));
+              border-radius: var(--radius-sm);
               border-bottom: 1px solid var(--border-subtle);
+              transition: background var(--transition);
             }
             .archive-entry:first-child { border-top: 1px solid var(--border-subtle); }
+            @media (hover: hover) { .archive-entry:hover { background: var(--primary-tint); } }
             .archive-entry time {
               color: var(--text-muted);
               font-size: var(--step--1);
@@ -880,7 +918,8 @@ module Hwaro
               padding: 0.1rem 0.35rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               color: var(--text-muted);
               font-family: inherit;
               line-height: 1.4;
@@ -905,13 +944,27 @@ module Hwaro
               width: 560px;
               max-width: 90vw;
               max-height: 70vh;
-              background: var(--bg);
+              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+              backdrop-filter: saturate(180%) blur(24px);
+              -webkit-backdrop-filter: saturate(180%) blur(24px);
+              border: 1px solid var(--border-subtle);
               border-radius: var(--radius);
               box-shadow: var(--shadow-lg);
               display: flex;
               flex-direction: column;
               overflow: hidden;
               align-self: flex-start;
+            }
+            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
+
+            /* The palette settles into place when it opens. */
+            @media (prefers-reduced-motion: no-preference) {
+              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
+              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+              @starting-style {
+                .search-overlay.active { opacity: 0; }
+                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
+              }
             }
 
             .search-input-wrap {
@@ -945,7 +998,8 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               color: var(--text-muted);
               font-family: inherit;
               cursor: pointer;
@@ -985,14 +1039,42 @@ module Hwaro
               padding: 0 0.3rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               font-family: inherit;
               line-height: 1.4;
             }
 
             /* Search trigger press feedback */
-            .search-trigger { transition: border-color var(--transition), color var(--transition), transform 0.1s ease; }
+            .search-trigger { transition: border-color var(--transition), color var(--transition), transform 0.1s var(--ease-out); }
             .search-trigger:active { transform: scale(0.96); }
+
+            /* Reading progress — a 2px ember thread across the top of post
+               pages, driven entirely by CSS scroll-driven animation. Browsers
+               without animation-timeline (and reduced-motion readers) simply
+               never see it. */
+            .reading-progress { display: none; }
+            @supports (animation-timeline: scroll()) {
+              @media (prefers-reduced-motion: no-preference) {
+                .reading-progress {
+                  display: block;
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  height: 2px;
+                  z-index: 110;
+                  transform-origin: 0 50%;
+                  background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
+                  animation: reading-progress linear both;
+                  animation-timeline: scroll(root);
+                }
+                @keyframes reading-progress {
+                  from { transform: scaleX(0); }
+                  to { transform: scaleX(1); }
+                }
+              }
+            }
 
             /* Responsive — the type scale is fluid, so only the frame
                needs to adapt. The date rails stack above their entries. */
@@ -1002,10 +1084,12 @@ module Hwaro
               .home-hero { padding-top: var(--space-5); }
               .post-item, .archive-entry { grid-template-columns: 1fr; gap: 0.2rem; }
               .post-date, .archive-entry time { padding-top: 0; }
+              .post-nav { grid-template-columns: 1fr; }
+              .post-nav-next { grid-column: auto; text-align: left; }
             }
 
             @media (prefers-reduced-motion: reduce) {
-              *, *::before, *::after { transition-duration: 0.01ms !important; }
+              *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
             }
             CSS
         end
@@ -1273,19 +1357,33 @@ module Hwaro
         end
 
         # Blog-specific post template (Jinja2 syntax)
-        private def post_template : String
+        #
+        # The tag pills are omitted for `--skip-taxonomies` sites so posts
+        # never link to `/tags/…` pages that don't exist. `get_taxonomy_url`
+        # handles term slugs, base_url, and language prefixes.
+        private def post_template(skip_taxonomies : Bool = false) : String
+          tags_block = skip_taxonomies ? "" : <<-TAGS
+
+            {% if page.tags %}
+            <div class="post-tags">
+              {% for t in page.tags %}<a class="tag" href="{{ get_taxonomy_url(kind='tags', term=t) }}">{{ t | e }}</a>{% endfor %}
+            </div>
+            {% endif %}
+            TAGS
           <<-HTML
             {% include "header.html" %}
             {% include "partials/nav.html" %}
             {% include "partials/search.html" %}
+            <div class="reading-progress" aria-hidden="true"></div>
             <div class="blog-container">
               <main id="main" class="blog-main">
                 <article class="post">
                   <header class="post-header">
                     <h1>{{ page.title | e }}</h1>
                     <div class="post-meta">
-                      <time>{{ page.date }}</time>
-                    </div>
+                      <time datetime="{{ page.date }}">{{ page.date }}</time>
+                      {% if page.reading_time %}<span class="post-meta-sep">·</span> <span class="post-reading-time">{{ page.reading_time }} min read</span>{% endif %}
+                    </div>#{tags_block}
                   </header>
                   <div class="post-content">
                     {{ content }}
@@ -1322,6 +1420,28 @@ module Hwaro
                       {% endfor %}
                     </ul>
                   </aside>
+                  {% endif %}
+
+                  {# Older/newer neighbours. page.lower/page.higher are the
+                     flat reading chain, which for a date-sorted feed runs
+                     newest to oldest: lower is the newer post, higher the
+                     older one. Both links are guarded to stay inside this
+                     post's section and to skip _index. #}
+                  {% if (page.lower and page.lower.section == page.section and not page.lower.is_index) or (page.higher and page.higher.section == page.section and not page.higher.is_index) %}
+                  <nav class="post-nav" aria-label="More posts">
+                    {% if page.lower and page.lower.section == page.section and not page.lower.is_index %}
+                    <a class="post-nav-link post-nav-prev" href="{{ base_url }}{{ page.lower.url }}" rel="prev">
+                      <span class="post-nav-label">Newer</span>
+                      <span class="post-nav-title">{{ page.lower.title | e }}</span>
+                    </a>
+                    {% endif %}
+                    {% if page.higher and page.higher.section == page.section and not page.higher.is_index %}
+                    <a class="post-nav-link post-nav-next" href="{{ base_url }}{{ page.higher.url }}" rel="next">
+                      <span class="post-nav-label">Older</span>
+                      <span class="post-nav-title">{{ page.higher.title | e }}</span>
+                    </a>
+                    {% endif %}
+                  </nav>
                   {% endif %}
                 </article>
             {% include "footer.html" %}
@@ -1431,7 +1551,7 @@ module Hwaro
             # taxonomy archives. The recent-posts feed is rendered by the
             # `index.html` template, not by this content.
             if skip_taxonomies
-              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro) — a fast, lightweight static site generator.\n"
+              str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro), a fast and lightweight static site generator.\n"
             else
               str << "A blog powered by [Hwaro](https://github.com/hahwul/hwaro). Browse posts by [Tags](/tags/), [Categories](/categories/), or [Authors](/authors/).\n"
             end
@@ -1449,7 +1569,7 @@ module Hwaro
             title: "",
             body: body,
             skip_taxonomies: skip_taxonomies,
-            description: "A blog powered by Hwaro — posts, archives, and tags.",
+            description: "A blog powered by Hwaro: posts, archives, and tags.",
             tags: ["home"]
           )
         end
@@ -1590,7 +1710,7 @@ module Hwaro
             ## Links and Images
 
             Create a link with square brackets around the text and parentheses
-            around the URL — for example, [Hwaro on GitHub](https://github.com/hahwul/hwaro).
+            around the URL, for example [Hwaro on GitHub](https://github.com/hahwul/hwaro).
             Prefix the same form with `!` to embed an image instead.
 
             ## Tables

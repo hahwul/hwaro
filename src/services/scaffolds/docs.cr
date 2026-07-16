@@ -206,7 +206,7 @@ module Hwaro
           <<-CSS
             #{font_face_css("../fonts")}
 
-            #{design_root("--header-h: 52px;\n--sidebar-w: 260px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4eee5, #151412);")}
+            #{design_root("--header-h: 52px;\n--sidebar-w: 260px;\n--content-max-w: 780px;\n--bg-sidebar: light-dark(#f4f0e8, #181513);")}
 
             *,
             *::before,
@@ -333,6 +333,7 @@ module Hwaro
               padding: 1.25rem 0.75rem;
               overflow-y: auto;
               scrollbar-width: thin;
+              scrollbar-color: var(--border) transparent;
             }
 
             .docs-sidebar::-webkit-scrollbar {
@@ -372,11 +373,11 @@ module Hwaro
                the ember accent means "you are here", nothing else. */
             .sidebar-links a {
               display: block;
-              padding: 0.3rem 0.75rem;
+              padding: 0.34rem 0.75rem;
               color: var(--text-secondary);
               text-decoration: none;
               border-left: 2px solid transparent;
-              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+              border-radius: 0 999px 999px 0;
               font-size: 0.85rem;
               transition: all var(--transition);
               line-height: 1.4;
@@ -387,7 +388,8 @@ module Hwaro
               color: var(--text);
             }
 
-            .sidebar-links a.active {
+            .sidebar-links a.active,
+            .sidebar-links a[aria-current="page"] {
               background: var(--primary-tint);
               border-left-color: var(--primary);
               color: var(--primary);
@@ -456,7 +458,14 @@ module Hwaro
               border: 1px solid var(--border);
               border-radius: var(--radius);
               text-decoration: none;
-              transition: border-color var(--transition), box-shadow var(--transition);
+              transition: border-color var(--transition), box-shadow var(--transition), transform 0.18s var(--ease-out);
+            }
+
+            /* Getting Started is the intended entry point, so the first
+               card carries a faint ember wash the others don't. */
+            .link-cards a.link-card:first-child {
+              border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+              background-image: linear-gradient(135deg, var(--primary-tint), transparent 55%);
             }
 
             a.link-card strong {
@@ -487,15 +496,16 @@ module Hwaro
 
             a.link-card:hover {
               border-color: color-mix(in srgb, var(--primary) 45%, transparent);
-              box-shadow: var(--shadow-sm);
+              box-shadow: var(--shadow);
+              transform: translateY(-2px);
             }
 
             @media (hover: hover) {
               a.link-card:hover strong::after { opacity: 1; transform: translateX(0); }
             }
 
-            /* Feature grid — typography-led, no boxes: bold lead-ins over
-               quiet descriptions, two columns when there's room. */
+            /* Feature grid — typography-led, no boxes: a hairline rail
+               (the sidebar's structural language) carries each entry. */
             .feature-grid {
               display: grid;
               grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -503,8 +513,15 @@ module Hwaro
               margin: var(--space-5) 0;
             }
 
+            .feature {
+              padding-left: 0.9rem;
+              border-left: 2px solid var(--border-subtle);
+            }
+
             .feature strong {
               display: block;
+              font-family: var(--font-serif);
+              font-size: 1.02rem;
               color: var(--heading);
               margin-bottom: 0.15rem;
             }
@@ -889,7 +906,8 @@ module Hwaro
               padding: 0.1rem 0.35rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               color: var(--text-muted);
               font-family: inherit;
               line-height: 1.4;
@@ -916,13 +934,27 @@ module Hwaro
               width: 560px;
               max-width: 90vw;
               max-height: 70vh;
-              background: var(--bg);
+              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+              backdrop-filter: saturate(180%) blur(24px);
+              -webkit-backdrop-filter: saturate(180%) blur(24px);
+              border: 1px solid var(--border-subtle);
               border-radius: var(--radius);
               box-shadow: var(--shadow-lg);
               display: flex;
               flex-direction: column;
               overflow: hidden;
               align-self: flex-start;
+            }
+            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
+
+            /* The palette settles into place when it opens. */
+            @media (prefers-reduced-motion: no-preference) {
+              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
+              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+              @starting-style {
+                .search-overlay.active { opacity: 0; }
+                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
+              }
             }
 
             .search-input-wrap {
@@ -961,7 +993,8 @@ module Hwaro
               padding: 0.15rem 0.4rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               color: var(--text-muted);
               font-family: inherit;
               cursor: pointer;
@@ -1034,7 +1067,8 @@ module Hwaro
               padding: 0 0.3rem;
               border: 1px solid var(--border);
               border-radius: 3px;
-              background: var(--bg-subtle);
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
               font-family: inherit;
               line-height: 1.4;
             }
@@ -1043,6 +1077,47 @@ module Hwaro
             .search-trigger:active {
               transform: scale(0.96);
             }
+
+            /* Heading anchors — appended by search.js, visible on hover so
+               deep links are one click without cluttering the prose. */
+            .heading-anchor {
+              margin-left: 0.4rem;
+              font-family: var(--font-sans);
+              font-size: 0.8em;
+              font-weight: 400;
+              color: var(--text-muted);
+              text-decoration: none;
+              opacity: 0;
+              transition: opacity var(--transition), color var(--transition);
+            }
+            .docs-main h2:hover .heading-anchor,
+            .docs-main h3:hover .heading-anchor,
+            .heading-anchor:focus-visible { opacity: 1; }
+            .heading-anchor:hover { color: var(--primary); }
+
+            /* Reading-order neighbours — a quiet card pair that warms on hover. */
+            .docs-page-nav {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: var(--space-3);
+              margin-top: var(--space-6);
+              padding-top: var(--space-5);
+              border-top: 1px solid var(--border-subtle);
+            }
+            .page-nav-link {
+              display: flex;
+              flex-direction: column;
+              gap: 0.2rem;
+              padding: var(--space-3) var(--space-4);
+              border: 1px solid var(--border);
+              border-radius: var(--radius-sm);
+              text-decoration: none;
+              transition: border-color var(--transition), background var(--transition);
+            }
+            .page-nav-next { text-align: right; }
+            .page-nav-link:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: var(--primary-tint); text-decoration: none; }
+            .page-nav-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+            .page-nav-title { font-family: var(--font-serif); font-weight: 700; color: var(--heading); }
 
             /* Responsive */
             @media (max-width: 768px) {
@@ -1053,10 +1128,12 @@ module Hwaro
                 margin-left: 0;
                 padding: 1.5rem 1rem;
               }
+              .docs-page-nav { grid-template-columns: 1fr; }
+              .page-nav-next { text-align: left; }
             }
 
             @media (prefers-reduced-motion: reduce) {
-              *, *::before, *::after { transition-duration: 0.01ms !important; }
+              *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
             }
             CSS
         end
@@ -1211,6 +1288,17 @@ module Hwaro
                   }
                 });
               }
+
+              // Hover anchors for headings (ids are generated at build time).
+              var heads = document.querySelectorAll('.docs-main h2[id], .docs-main h3[id]');
+              for (var hi = 0; hi < heads.length; hi++) {
+                var anchor = document.createElement('a');
+                anchor.className = 'heading-anchor';
+                anchor.href = '#' + heads[hi].id;
+                anchor.setAttribute('aria-label', 'Link to this section');
+                anchor.textContent = '#';
+                heads[hi].appendChild(anchor);
+              }
             })();
             JS
         end
@@ -1288,9 +1376,9 @@ module Hwaro
               <div class="sidebar-section">
                 <div class="sidebar-title">{{ sec.title | e }}</div>
                 <ul class="sidebar-links">
-                  <li><a href="{{ base_url }}{{ sec.url }}">Overview</a></li>
+                  <li><a href="{{ base_url }}{{ sec.url }}"{% if sec.url | active_path %} class="active" aria-current="page"{% endif %}>Overview</a></li>
                   {% for p in sec.pages | sort(attribute="path") | sort(attribute="weight") %}{% if not p.is_index %}
-                  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
+                  <li><a href="{{ base_url }}{{ p.url }}"{% if p.url | active_path %} class="active" aria-current="page"{% endif %}>{{ p.title | e }}</a></li>
                   {% endif %}{% endfor %}
                 </ul>
               </div>
@@ -1316,6 +1404,26 @@ module Hwaro
                 {% if page.title is present %}<h1>{{ page.title | e }}</h1>{% endif %}
                 {% if toc %}<nav class="docs-toc" aria-label="On this page"><p class="docs-toc-title">On this page</p>{{ toc }}</nav>{% endif %}
                 {{ content }}
+
+                {# Reading-order neighbours (page.lower/page.higher). Docs
+                   deliberately cross section boundaries: Quick Start flows
+                   into the Guide the way a book flows into its next chapter. #}
+                {% if page.lower or page.higher %}
+                <nav class="docs-page-nav" aria-label="Pages">
+                  {% if page.lower %}
+                  <a class="page-nav-link page-nav-prev" href="{{ base_url }}{{ page.lower.url }}" rel="prev">
+                    <span class="page-nav-label">Previous</span>
+                    <span class="page-nav-title">{{ page.lower.title | e }}</span>
+                  </a>
+                  {% else %}<span></span>{% endif %}
+                  {% if page.higher %}
+                  <a class="page-nav-link page-nav-next" href="{{ base_url }}{{ page.higher.url }}" rel="next">
+                    <span class="page-nav-label">Next</span>
+                    <span class="page-nav-title">{{ page.higher.title | e }}</span>
+                  </a>
+                  {% endif %}
+                </nav>
+                {% endif %}
             {% include "footer.html" %}
             HTML
         end
@@ -1687,7 +1795,7 @@ module Hwaro
             |---------------|---------------|-------------|
             | `page_title` | `page.title` | Current page title |
             | `site_title` | `site.title` | Site title from config |
-            | `content` | — | Rendered page content |
+            | `content` | - | Rendered page content |
             | `base_url` | `site.base_url` | Site base URL |
 
             ## Template Inheritance
