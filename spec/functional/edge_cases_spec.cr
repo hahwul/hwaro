@@ -537,3 +537,35 @@ describe "Edge Cases: Duplicate output path detection" do
     end
   end
 end
+
+# ---------------------------------------------------------------------------
+# 14. Sequential render failure aggregation
+# ---------------------------------------------------------------------------
+describe "Edge Cases: sequential render failure aggregation" do
+  it "renders past a failing page and reports every failure once (no first-error abort)" do
+    # build_helper runs with parallel: false, so this exercises
+    # process_files_sequential. Two pages share a broken template; the loop
+    # must attempt both (grouped "Render failed for 2 pages" summary) instead
+    # of aborting on the first, and still fail loud with the classified error.
+    err = nil
+    log = with_captured_log do
+      err = expect_raises(Hwaro::HwaroError) do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {
+            "bad1.md" => "---\ntitle: B1\ntemplate: broken\n---\nx",
+            "bad2.md" => "---\ntitle: B2\ntemplate: broken\n---\nx",
+            "good.md" => "---\ntitle: Good\n---\nok",
+          },
+          template_files: {
+            "page.html"   => "{{ content }}",
+            "broken.html" => "{{ page.title.nonexistent_attr }}",
+          },
+        ) { }
+      end
+    end
+
+    err.not_nil!.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    log.should contain("Render failed for 2 pages")
+  end
+end

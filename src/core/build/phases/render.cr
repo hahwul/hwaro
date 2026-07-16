@@ -640,6 +640,15 @@ module Hwaro::Core::Build::Phases::Render
   ) : Int32
     count = 0
     safe = site.config.markdown.safe
+
+    # Mirror the parallel path's failure handling: render every page,
+    # accumulate failures, then fail loud once with the full picture.
+    # Aborting on the first bad page gave `--no-parallel` (the natural
+    # debugging flag) and incremental serve rebuilds *worse* diagnostics
+    # than the default build.
+    classified_error : Hwaro::HwaroError? = nil
+    failures = [] of NamedTuple(page_path: String, message: String)
+
     pages.each do |page|
       page_start = profiler ? Time.instant : nil
       render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars, error_overlay: error_overlay, profiler: profiler)
@@ -650,7 +659,31 @@ module Hwaro::Core::Build::Phases::Render
       end
       record_page_cache_entry(page, cache, templates, site, output_dir)
       count += 1
+    rescue ex : Hwaro::HwaroError
+      classified_error ||= ex
+      failures << {page_path: page.path, message: ex.message.to_s}
+    rescue ex
+      failures << {page_path: page.path, message: ex.message.to_s}
+      Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
     end
+
+    report_render_failures(failures, verbose) unless failures.empty?
+
+    # Same contract as process_files_parallel: surface the first classified
+    # error for the documented exit code, and promote generic exceptions so
+    # a crash can't report success.
+    if err = classified_error
+      raise err
+    end
+
+    unless failures.empty?
+      first = failures.first
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_TEMPLATE,
+        message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{first[:message]}",
+      )
+    end
+
     count
   end
 
