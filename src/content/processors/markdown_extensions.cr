@@ -514,8 +514,11 @@ module Hwaro
         MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
         # A line whose sole content is one math placeholder — the standalone
         # display-math case, where the emitted <div> starts at line start and
-        # is a real CommonMark HTML block.
-        BARE_MATH_LINE_RE = /\A\x00MATH\d+\x00\z/
+        # is a real CommonMark HTML block. Leading blockquote markers are
+        # stripped before the check: `> $$x$$` is block position too (the
+        # div becomes an HTML block inside the blockquote).
+        BARE_MATH_LINE_RE     = /\A\x00MATH\d+\x00\z/
+        BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)+/
 
         # One-shot math transform (stash + immediate expand). `preprocess`
         # itself uses the two phases separately so the combined pass runs in
@@ -654,7 +657,9 @@ module Hwaro
               end
 
               raw_context = in_html_block
-              bare_display = line.strip.matches?(BARE_MATH_LINE_RE)
+              bare_line = line.strip
+              bare_line = bare_line.sub(BLOCKQUOTE_MARKERS_RE, "") if bare_line.starts_with?('>')
+              bare_display = bare_line.matches?(BARE_MATH_LINE_RE)
               io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
                 span = $~[1].to_i?.try { |idx| store[idx]? }
                 next match unless span

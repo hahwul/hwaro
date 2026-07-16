@@ -463,6 +463,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("<div class=\"math math-display\">")
     end
 
+    it "keeps blockquoted standalone display math as a div" do
+      cfg = make_config(math: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> $$x$$",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="math math-display">\\[x\\]</div>))
+      html.should_not contain("math-display\">\\\\[")
+    end
+
     it "keeps standalone display math as a div HTML block" do
       cfg = make_config(math: true)
       html, _ = Hwaro::Processor::Markdown.render(

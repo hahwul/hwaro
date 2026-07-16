@@ -372,6 +372,27 @@ describe Hwaro::Core::Build::Builder do
       out.should contain("&lt;!-- more --&gt;")
     end
 
+    it "restores a backticked placeholder as literal code text" do
+      # A placeholder inside a code span must display literally — never be
+      # substituted with rendered HTML by the post-Markdown pass.
+      out = Hwaro::Content::Processors::InlineMarkdown.render(
+        "use `<!--HWARO-SHORTCODE-PLACEHOLDER-0-->` here"
+      )
+      out.should contain("<code>&lt;!--HWARO-SHORTCODE-PLACEHOLDER-0--&gt;</code>")
+      out.should_not contain("<code><!--")
+    end
+
+    it "does not restore raw placeholders into image/link attributes" do
+      # Raw comments inside alt/src/href would let the post-Markdown pass
+      # inject rendered HTML into an attribute value (in-band injection).
+      out = Hwaro::Content::Processors::InlineMarkdown.render(
+        "![<!--HWARO-SHORTCODE-PLACEHOLDER-0-->](a.png) [x](<!--HWARO-SHORTCODE-PLACEHOLDER-1-->)"
+      )
+      out.should contain(%(alt="&lt;!--HWARO-SHORTCODE-PLACEHOLDER-0--&gt;"))
+      out.should_not contain(%(alt="<!--))
+      out.should_not contain(%(href="<!--))
+    end
+
     it "resolves shortcodes inside table cells, definitions, and footnotes" do
       # End-to-end pipe: shortcode substitution → Markdown → placeholder
       # replace. The placeholder used to be HTML-escaped by the inline
