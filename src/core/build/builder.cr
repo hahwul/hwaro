@@ -205,6 +205,12 @@ module Hwaro
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
         @deferred_pages : Array(Models::Page)? = nil
+        # Output URLs each page must NOT write because an earlier page (in
+        # source-path order) already claimed them. Keyed by page.path. Under
+        # parallel render the colliding file's bytes were whichever worker
+        # finished last — run-to-run nondeterministic output. Nil when the
+        # build has no collisions (the common case).
+        @collision_suppressed : Hash(String, Set(String))? = nil
 
         def initialize
           @lifecycle = Lifecycle::Manager.new

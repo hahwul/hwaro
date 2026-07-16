@@ -474,4 +474,66 @@ describe "Edge Cases: Duplicate output path detection" do
 
     log.should contain("Duplicate alias output path")
   end
+
+  it "writes the first page in source-path order on a slug collision (deterministic winner)" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "posts/a.md" => "---\ntitle: A\nslug: dup\n---\nAAA-WINNER",
+        "posts/b.md" => "---\ntitle: B\nslug: dup\n---\nBBB-LOSER",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/posts/dup/index.html")
+      html.should contain("AAA-WINNER")
+      html.should_not contain("BBB-LOSER")
+    end
+  end
+
+  it "keeps the deterministic winner under parallel render too" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "posts/a.md" => "---\ntitle: A\nslug: dup\n---\nAAA-WINNER",
+        "posts/b.md" => "---\ntitle: B\nslug: dup\n---\nBBB-LOSER",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+      parallel: true,
+    ) do
+      html = File.read("public/posts/dup/index.html")
+      html.should contain("AAA-WINNER")
+      html.should_not contain("BBB-LOSER")
+    end
+  end
+
+  it "keeps the real page when a later page's alias collides with its URL" do
+    # zzz.md's alias points at /about/, which about.md already owns. The
+    # alias redirect must not stomp the real page's index.html.
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "about.md" => "---\ntitle: About\n---\nREAL-PAGE-BODY",
+        "zzz.md"   => "---\ntitle: Z\naliases:\n  - /about/\n---\nZ",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/about/index.html")
+      html.should contain("REAL-PAGE-BODY")
+    end
+  end
+
+  it "writes the alias redirect of the first claimant on alias collisions" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "one.md" => "---\ntitle: One\naliases:\n  - /shared/\n---\nOne",
+        "two.md" => "---\ntitle: Two\naliases:\n  - /shared/\n---\nTwo",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      html = File.read("public/shared/index.html")
+      html.should contain("/one/")
+      html.should_not contain("/two/")
+    end
+  end
 end

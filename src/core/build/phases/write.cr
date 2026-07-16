@@ -169,6 +169,9 @@ module Hwaro::Core::Build::Phases::Write
   end
 
   private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
+    # A page that lost an output-path collision renders normally (its content
+    # still feeds listings/feeds/search) but must not race the winner on disk.
+    return if collision_suppressed?(page, page.url)
     output_path = get_output_path(page, output_dir)
 
     ensure_dir(Path[output_path].dirname.to_s)

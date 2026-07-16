@@ -59,11 +59,17 @@ module Hwaro::Core::Build::Phases::Render
     error_overlay = ctx.options.error_overlay
 
     # Detect duplicate output paths (slug collisions and alias collisions)
+    # and pick a deterministic winner: the first claimant in source-path
+    # order. Losers skip writing that output — under parallel render the
+    # colliding file's bytes used to be whichever worker finished last,
+    # so a misconfigured slug flapped run-to-run.
     seen_urls = Hash(String, String).new
-    all_pages.each do |page|
+    suppressed = Hash(String, Set(String)).new
+    all_pages.sort_by(&.path).each do |page|
       url = page.url
       if prev_path = seen_urls[url]?
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' overwrites '#{prev_path}'"
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
+        (suppressed[page.path] ||= Set(String).new) << url
       else
         seen_urls[url] = page.path
       end
@@ -74,12 +80,14 @@ module Hwaro::Core::Build::Phases::Render
         norm = a.starts_with?("/") ? a : "/#{a}"
         norm = "#{norm}/" unless norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
         if prev_path = seen_urls[norm]?
-          Logger.warn "Duplicate alias output path '#{norm}' — '#{page.path}' overwrites '#{prev_path}'"
+          Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
+          (suppressed[page.path] ||= Set(String).new) << norm
         else
           seen_urls[norm] = page.path
         end
       end
     end
+    @collision_suppressed = suppressed.empty? ? nil : suppressed
 
     # Fast-start mode: render only homepage + most recent N pages on this
     # pass and stash the rest on the Builder so a background fiber in
@@ -807,6 +815,17 @@ module Hwaro::Core::Build::Phases::Render
     Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars, site.config.markdown.mermaid)
   end
 
+  # True when this page lost the output-path collision for `url_key` (see the
+  # duplicate-output detection in execute_render_phase) and must not write it.
+  private def collision_suppressed?(page : Models::Page, url_key : String) : Bool
+    if sup = @collision_suppressed
+      if urls = sup[page.path]?
+        return urls.includes?(url_key)
+      end
+    end
+    false
+  end
+
   private def generate_redirect_page(
     page : Models::Page,
     output_dir : String,
@@ -814,6 +833,7 @@ module Hwaro::Core::Build::Phases::Render
   )
     redirect_url = page.redirect_to
     return unless redirect_url
+    return if collision_suppressed?(page, page.url)
 
     url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
     candidate = File.join(output_dir, url_path, "index.html")
@@ -948,6 +968,11 @@ module Hwaro::Core::Build::Phases::Render
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
     page.aliases.each do |alias_path|
+      # Same normalization as the collision detection in execute_render_phase.
+      norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+      norm = "#{norm}/" unless norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+      next if collision_suppressed?(page, norm)
+
       alias_clean = Utils::PathUtils.sanitize_path(alias_path.lchop("/"))
       # An alias that already names an HTML file (`/legacy.html`,
       # `/old/index.html`) is written to that exact path; only "pretty"
