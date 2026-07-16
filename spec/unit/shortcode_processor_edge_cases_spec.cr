@@ -138,15 +138,17 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
   end
 
   describe "malformed shortcodes" do
-    it "returns empty string when the shortcode template has a Crinja error" do
+    it "returns a visible HTML-comment marker when the shortcode template has a Crinja error" do
       builder = Hwaro::Core::Build::Builder.new
-      # Unbalanced/invalid Jinja syntax in the template
+      # Unbalanced/invalid Jinja syntax in the template. Not an empty
+      # string: silently vanishing output made mid-edit template errors
+      # invisible during serve (the rebuild "succeeded").
       result = builder.test_sc_render_jinja(
         "{% if %}",
         {} of String => String,
         {} of String => Crinja::Value,
       )
-      result.should eq("")
+      result.should eq("<!-- hwaro: template error in shortcode -->")
     end
 
     it "treats a stray {% end %} preceding shortcodes as literal text" do

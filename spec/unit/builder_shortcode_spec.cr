@@ -21,8 +21,8 @@ module Hwaro::Core::Build
       replace_shortcode_placeholders(html, shortcode_results)
     end
 
-    def test_render_shortcode_jinja(template, args, context, crinja_env_override = nil)
-      render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override)
+    def test_render_shortcode_jinja(template, args, context, crinja_env_override = nil, warnings = nil)
+      render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, warnings: warnings)
     end
 
     def test_warn_hugo_shortcode_syntax(raw, path)
@@ -456,15 +456,27 @@ describe Hwaro::Core::Build::Builder do
       result.should eq("<span>Hello World</span>")
     end
 
-    it "returns empty string on template syntax error" do
+    it "returns a visible HTML-comment marker on template syntax error" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
       template = "{% if %}"
       args = {} of String => String
       context = {} of String => Crinja::Value
 
+      # Not an empty string: silently vanishing output made mid-edit
+      # template errors invisible during serve (the rebuild "succeeded").
       result = builder.test_render_shortcode_jinja(template, args, context, crinja_env_override: env)
-      result.should eq("")
+      result.should eq("<!-- hwaro: template error in shortcode -->")
+    end
+
+    it "records the template error in the warnings sink when provided" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      warnings = [] of String
+
+      builder.test_render_shortcode_jinja("{% if %}", {} of String => String, {} of String => Crinja::Value, crinja_env_override: env, warnings: warnings)
+      warnings.size.should eq(1)
+      warnings.first.should contain("Template error in shortcode")
     end
 
     it "args override context values" do

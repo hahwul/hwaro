@@ -71,4 +71,32 @@ describe Hwaro::Utils::FileSafe do
       end
     end
   end
+
+  describe ".atomic_write" do
+    it "writes content to a new file" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "index.html")
+        Hwaro::Utils::FileSafe.atomic_write(path, "<p>hello</p>")
+        File.read(path).should eq("<p>hello</p>")
+      end
+    end
+
+    it "replaces an existing file's content" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "index.html")
+        File.write(path, "old bytes")
+        Hwaro::Utils::FileSafe.atomic_write(path, "new bytes")
+        File.read(path).should eq("new bytes")
+      end
+    end
+
+    it "leaves no temp-file siblings behind" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "index.html")
+        Hwaro::Utils::FileSafe.atomic_write(path, "content")
+        Dir.glob(File.join(root, "*.tmp")).should be_empty
+        Dir.children(root).should eq(["index.html"])
+      end
+    end
+  end
 end
