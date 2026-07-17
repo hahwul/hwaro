@@ -1049,6 +1049,7 @@ describe Hwaro::Models::Config do
       config.highlight.theme.should eq("github")
       config.highlight.use_cdn.should be_true
       config.highlight.line_numbers.should be_false
+      config.highlight.mode.should eq("server")
     end
 
     it "can update highlight settings" do
@@ -1112,6 +1113,28 @@ describe Hwaro::Models::Config do
         TOML
 
       config.highlight.line_numbers.should be_false
+    end
+
+    it "loads highlight mode = \"client\" from TOML (overrides default server)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [highlight]
+        mode = "client"
+        TOML
+
+      config.highlight.mode.should eq("client")
+    end
+
+    it "keeps the server default on an unknown highlight mode" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [highlight]
+        mode = "browser"
+        TOML
+
+      config.highlight.mode.should eq("server")
     end
   end
 
@@ -2259,16 +2282,23 @@ describe Hwaro::Models::HighlightConfig do
   end
 
   describe "js_tag" do
-    it "returns CDN script when use_cdn is true" do
+    it "returns empty string in the default server mode" do
       config = Hwaro::Models::HighlightConfig.new
+      config.js_tag.should eq("")
+    end
+
+    it "returns CDN script when use_cdn is true (client mode)" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.js_tag.should contain("cdnjs.cloudflare.com")
       config.js_tag.should contain("highlight.min.js")
     end
   end
 
   describe "tags" do
-    it "returns both CSS and JS tags" do
+    it "returns both CSS and JS tags in client mode" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.tags.should contain("stylesheet")
       config.tags.should contain("highlight.min.js")
     end

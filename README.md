@@ -32,7 +32,7 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 - Jinja2 templates (inheritance, includes, macros)
 - Markdown extensions: task lists, footnotes, definition lists, math (KaTeX/MathJax), Mermaid diagrams, emoji, etc
 - Built-in shortcodes (YouTube, Vimeo, Gist, Alert, Figure, Tweet, CodePen) and custom shortcode support
-- Syntax highlighting via Highlight.js
+- Build-time syntax highlighting (Tartrazine, hljs-compatible classes; optional client mode via Highlight.js)
 - Table of contents (TOC) generation
 - Reading time and word count
 - Content summaries via `<!-- more -->` marker

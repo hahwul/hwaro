@@ -255,10 +255,12 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code block syntax highlighting using Highlight.js
+            # Code blocks are highlighted at build time (no JavaScript);
+            # set mode = "client" to highlight in the browser with Highlight.js
 
             # [highlight]
             # enabled = true
+            # mode = "server"
             # theme = "github"
             # use_cdn = true
             # line_numbers = false
@@ -270,15 +272,15 @@ module Hwaro
             # =============================================================================
             # Syntax Highlighting
             # =============================================================================
-            # Code blocks are highlighted in the browser by Highlight.js and themed by
-            # an inlined, ember-warm theme in the scaffold's CSS (so you recolor syntax
-            # by editing that CSS, not the `theme` below). `mode = "server"` can
-            # highlight at build time with no JS, but its Tartrazine backend isn't
-            # multi-thread-safe, so the scaffold default stays "client".
+            # Code blocks are highlighted at build time (hljs-compatible CSS classes,
+            # no JavaScript shipped) and themed by an inlined, ember-warm theme in the
+            # scaffold's CSS (so you recolor syntax by editing that CSS, not the
+            # `theme` below). Set `mode = "client"` to opt back into browser-side
+            # Highlight.js instead.
 
             [highlight]
             enabled = true
-            mode = "client"           # "client" = Highlight.js in the browser; "server" = build-time (no JS)
+            mode = "server"           # "server" = build-time (no JS); "client" = Highlight.js in the browser
             theme = "github"          # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
             use_cdn = true            # true loads Highlight.js from a CDN; false expects a self-hosted build
             line_numbers = false      # true adds line numbers to every fenced code block (override per-block with {linenos=false})

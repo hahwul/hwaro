@@ -45,12 +45,14 @@ describe Hwaro::Services::ConfigSnippets do
       commented = Hwaro::Services::ConfigSnippets.highlight(commented: true)
       commented.should contain("# [highlight]")
       commented.should contain("# enabled")
+      commented.should contain(%(# mode = "server"))
     end
 
     it "highlight: uncommented version has active values" do
       uncommented = Hwaro::Services::ConfigSnippets.highlight(commented: false)
       uncommented.should contain("[highlight]")
       uncommented.should contain("enabled = true")
+      uncommented.should contain(%(mode = "server"))
     end
 
     it "sitemap: commented version has all values commented out" do

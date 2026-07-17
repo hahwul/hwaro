@@ -31,11 +31,24 @@ private SELF_HOSTED_HIGHLIGHT_CONFIG = <<-TOML
   theme = "github"
   TOML
 
+# Client mode references the highlight.js script; in the default server mode
+# only the theme CSS is a self-hosted asset, so the JS check is skipped.
+private SELF_HOSTED_CLIENT_HIGHLIGHT_CONFIG = <<-TOML
+  title = "Test"
+  base_url = "http://localhost"
+
+  [highlight]
+  enabled = true
+  mode = "client"
+  use_cdn = false
+  theme = "github"
+  TOML
+
 describe "Highlight: self-hosted asset validation" do
-  it "warns when use_cdn = false but the local highlight assets are missing" do
+  it "warns when use_cdn = false but the local highlight assets are missing (client mode)" do
     logs = capture_build_logs do
       build_site(
-        SELF_HOSTED_HIGHLIGHT_CONFIG,
+        SELF_HOSTED_CLIENT_HIGHLIGHT_CONFIG,
         content_files: {"page.md" => "---\ntitle: P\n---\nBody"},
         template_files: {"page.html" => "{{ highlight_js }}{{ content }}"},
       ) { }
@@ -44,6 +57,21 @@ describe "Highlight: self-hosted asset validation" do
     logs.should contain("use_cdn = false")
     logs.should contain("/assets/js/highlight.min.js")
     logs.should contain("/assets/css/highlight/github.min.css")
+  end
+
+  it "reports only the theme CSS as missing in server mode (no JS is referenced)" do
+    logs = capture_build_logs do
+      build_site(
+        SELF_HOSTED_HIGHLIGHT_CONFIG,
+        content_files: {"page.md" => "---\ntitle: P\n---\nBody"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    logs.should contain("use_cdn = false")
+    logs.should contain("missing: /assets/css/highlight/github.min.css.")
+    # The missing list must not include the JS (the advice text still names it).
+    logs.should_not contain(", /assets/js/highlight.min.js")
   end
 
   it "does not warn when the self-hosted highlight assets are present" do

@@ -301,6 +301,7 @@ describe Hwaro::Models::HighlightConfig do
     config.enabled.should be_true
     config.theme.should eq("github")
     config.use_cdn.should be_true
+    config.mode.should eq("server")
   end
 
   describe "css_tag" do
@@ -325,8 +326,14 @@ describe Hwaro::Models::HighlightConfig do
   end
 
   describe "js_tag" do
+    it "returns empty string in server mode (default)" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.js_tag.should eq("")
+    end
+
     it "returns CDN script when use_cdn is true" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.js_tag.should contain("cdnjs.cloudflare.com")
       config.js_tag.should contain("highlight.min.js")
       config.js_tag.should contain("hljs.highlightAll()")
@@ -334,6 +341,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns local script when use_cdn is false" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.use_cdn = false
       config.js_tag.should contain("/assets/js/highlight.min.js")
       config.js_tag.should_not contain("cdnjs.cloudflare.com")
@@ -341,14 +349,23 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns empty string when disabled" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.enabled = false
       config.js_tag.should eq("")
     end
   end
 
   describe "tags" do
-    it "returns combined CSS and JS tags" do
+    it "returns only the CSS tag in server mode (default)" do
       config = Hwaro::Models::HighlightConfig.new
+      tags = config.tags
+      tags.should contain("stylesheet")
+      tags.should_not contain("highlight.min.js")
+    end
+
+    it "returns combined CSS and JS tags in client mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       tags = config.tags
       tags.should contain("stylesheet")
       tags.should contain("highlight.min.js")

@@ -311,8 +311,14 @@ describe Hwaro::Models::HighlightConfig do
   end
 
   describe "#js_tag" do
+    it "returns empty string in the default server mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.js_tag.should eq("")
+    end
+
     it "returns CDN script when use_cdn is true" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       tag = config.js_tag
       tag.should contain("cdnjs.cloudflare.com")
       tag.should contain("highlight.min.js")
@@ -322,6 +328,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns local script when use_cdn is false" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.use_cdn = false
       tag = config.js_tag
       tag.should contain("/assets/js/highlight.min.js")
@@ -332,6 +339,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns empty string when disabled" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.enabled = false
       tag = config.js_tag
       tag.should eq("")
@@ -339,6 +347,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "adds cache bust query parameter to local URL" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.use_cdn = false
       tag = config.js_tag("a1b2c3d4")
       tag.should contain("/assets/js/highlight.min.js?v=a1b2c3d4")
@@ -346,14 +355,23 @@ describe Hwaro::Models::HighlightConfig do
 
     it "does not add cache bust to CDN URL" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       tag = config.js_tag("a1b2c3d4")
       tag.should_not contain("?v=")
     end
   end
 
   describe "#tags" do
-    it "returns combined CSS and JS tags" do
+    it "returns only the CSS tag in the default server mode" do
       config = Hwaro::Models::HighlightConfig.new
+      combined = config.tags
+      combined.should contain("<link rel=\"stylesheet\"")
+      combined.should_not contain("<script")
+    end
+
+    it "returns combined CSS and JS tags in client mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       combined = config.tags
       combined.should contain("<link rel=\"stylesheet\"")
       combined.should contain("<script")
@@ -369,6 +387,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "contains both css_tag and js_tag output" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       css = config.css_tag
       js = config.js_tag
       combined = config.tags
@@ -377,6 +396,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "passes cache bust to both css_tag and js_tag" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.use_cdn = false
       combined = config.tags("a1b2c3d4")
       combined.should contain("?v=a1b2c3d4")

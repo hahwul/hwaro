@@ -1,11 +1,11 @@
 require "./support/build_helper"
 
 # =============================================================================
-# Build-time syntax highlighting ([highlight] mode = "server")
+# Build-time syntax highlighting ([highlight] mode = "server", the default)
 #
 # Tartrazine lexers tokenize fenced code blocks at build time and emit spans
 # with Highlight.js-compatible classes, so hljs theme CSS keeps working while
-# no JavaScript ships. mode = "client" (default) keeps the previous behavior.
+# no JavaScript ships. mode = "client" opts back into browser-side Highlight.js.
 # =============================================================================
 
 SERVER_HIGHLIGHT_CONFIG = <<-TOML
@@ -116,13 +116,14 @@ describe "Server-side syntax highlighting" do
     reset_highlight_mode
   end
 
-  it "client mode (default) keeps JS injection and emits no spans" do
+  it "client mode keeps JS injection and emits no spans" do
     config = <<-TOML
       title = "Test Site"
       base_url = "http://localhost"
 
       [highlight]
       enabled = true
+      mode = "client"
       TOML
 
     build_site(
@@ -138,7 +139,7 @@ describe "Server-side syntax highlighting" do
     end
   end
 
-  it "warns and falls back to client mode for an unknown mode value" do
+  it "warns and keeps the server default for an unknown mode value" do
     config = <<-TOML
       title = "Test Site"
       base_url = "http://localhost"
@@ -155,9 +156,11 @@ describe "Server-side syntax highlighting" do
       highlight: true,
     ) do
       html = File.read("public/index.html")
-      html.should contain("highlight.min.js")
-      html.should_not contain(%(<span class="hljs-))
+      html.should_not contain("highlight.min.js")
+      html.should contain(%(<span class="hljs-))
     end
+  ensure
+    reset_highlight_mode
   end
 end
 
@@ -290,6 +293,7 @@ describe "Fence options — server mode" do
 
       [highlight]
       enabled = true
+      mode = "client"
       TOML
 
     build_site(

@@ -49,7 +49,7 @@ Configure in `config.toml`:
 enabled = true
 theme = "github-dark"
 use_cdn = true
-mode = "client"
+mode = "server"
 ```
 
 | Key | Type | Default | Description |
@@ -57,20 +57,14 @@ mode = "client"
 | enabled | bool | true | Enable syntax highlighting |
 | theme | string | "github" | Highlight.js theme name |
 | use_cdn | bool | true | Load assets from CDN (false = local files) |
-| mode | string | "client" | `"client"` highlights in the browser via Highlight.js; `"server"` highlights at build time |
+| mode | string | "server" | `"server"` highlights at build time; `"client"` highlights in the browser via Highlight.js |
 | line_numbers | bool | false | Add line numbers to every fenced code block by default (see below) |
 
-## Server-Side Highlighting
+## Server-Side Highlighting (Default)
 
-With `mode = "server"`, code blocks are highlighted during the build —
-no JavaScript ships to the browser, and code is colored even with
-JavaScript disabled:
-
-```toml
-[highlight]
-mode = "server"
-theme = "github-dark"
-```
+With `mode = "server"` (the default), code blocks are highlighted during
+the build — no JavaScript ships to the browser, and code is colored even
+with JavaScript disabled.
 
 The build-time highlighter emits Highlight.js-compatible CSS classes, so
 every theme above keeps working unchanged: `{{ highlight_css }}` still
@@ -79,6 +73,21 @@ injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
 lexers, ported from Pygments/Chroma). Code blocks in languages without a
 lexer fall back to plain, unhighlighted output.
+
+## Client-Side Highlighting
+
+Set `mode = "client"` to highlight in the browser with Highlight.js
+instead:
+
+```toml
+[highlight]
+mode = "client"
+theme = "github-dark"
+```
+
+In client mode `{{ highlight_js }}` injects the Highlight.js script (from
+the CDN or your local assets, see below), and code blocks ship as plain
+`<pre><code class="language-...">` markup for the browser to colorize.
 
 ## Line Numbers and Highlighted Lines
 
@@ -125,10 +134,10 @@ opts back out.
 
 **Server vs client mode:**
 
-- `mode = "server"` renders the full result at build time: each line is
-  wrapped in its own element, so line numbers and highlighted lines
-  appear with no JavaScript.
-- `mode = "client"` (default) does not re-render the body — instead the
+- `mode = "server"` (default) renders the full result at build time: each
+  line is wrapped in its own element, so line numbers and highlighted
+  lines appear with no JavaScript.
+- `mode = "client"` does not re-render the body — instead the
   `<pre>` tag gets `data-linenos="true"`, `data-linenostart="N"` (when
   greater than 1), and/or `data-hl-lines="2-4 7"` attributes, so a
   client-side script or custom CSS can act on them. Hwaro ships no such
@@ -178,6 +187,8 @@ When `use_cdn = false`, assets are loaded from local paths:
 ```
 
 You must provide the local files yourself when using `use_cdn = false`.
+In the default server mode only the theme stylesheet is referenced — the
+`<script>` tags above appear only with `mode = "client"`.
 
 ## Template Integration
 

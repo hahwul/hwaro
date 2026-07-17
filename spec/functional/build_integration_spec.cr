@@ -976,7 +976,7 @@ end
 # 25. Highlight tags
 # ---------------------------------------------------------------------------
 describe "Build Integration: Highlight tags" do
-  it "renders highlight CSS/JS tags when highlight is enabled" do
+  it "renders the highlight theme CSS tag and no JS in the default server mode" do
     config = <<-TOML
       title = "Test"
       base_url = "http://localhost"
@@ -994,6 +994,29 @@ describe "Build Integration: Highlight tags" do
       html = File.read("public/index.html")
       html.should contain("highlight")
       html.should contain("github-dark")
+      html.should_not contain("hljs.highlightAll()")
+    end
+  end
+
+  it "renders highlight CSS and JS tags in client mode" do
+    config = <<-TOML
+      title = "Test"
+      base_url = "http://localhost"
+
+      [highlight]
+      enabled = true
+      mode = "client"
+      theme = "github-dark"
+      TOML
+
+    build_site(
+      config,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {"page.html" => "{{ highlight_css }}{{ highlight_js }}{{ content }}"},
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("github-dark")
+      html.should contain("hljs.highlightAll()")
     end
   end
 end

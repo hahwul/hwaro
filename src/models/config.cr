@@ -517,9 +517,10 @@ module Hwaro
       property enabled : Bool
       property theme : String
       property use_cdn : Bool
-      # "client" injects Highlight.js and highlights in the browser;
-      # "server" highlights at build time (Tartrazine lexers, hljs-compatible
-      # CSS classes) so no JavaScript ships — theme CSS keeps working either way.
+      # "server" (default) highlights at build time (Tartrazine lexers,
+      # hljs-compatible CSS classes) so no JavaScript ships; "client" injects
+      # Highlight.js and highlights in the browser — theme CSS keeps working
+      # either way.
       property mode : String
       # Global default for fence-level `linenos` (see FenceOptions): when
       # true, every fenced code block with a language gets line numbers
@@ -531,7 +532,7 @@ module Hwaro
         @enabled = true
         @theme = "github"
         @use_cdn = true
-        @mode = "client"
+        @mode = "server"
         @line_numbers = false
       end
 
@@ -1640,7 +1641,7 @@ module Hwaro
           if mode == "client" || mode == "server"
             config.highlight.mode = mode
           else
-            Logger.warn "Unknown highlight.mode '#{mode}' — expected \"client\" or \"server\". Using \"client\"."
+            Logger.warn "Unknown highlight.mode '#{mode}' — expected \"client\" or \"server\". Using \"server\"."
           end
         end
       end
