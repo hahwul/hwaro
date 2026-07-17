@@ -1094,6 +1094,7 @@ module Hwaro
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
+            next if @config.try(&.sass_source?(relative))
             dest_path = File.join(output_dir, relative)
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))

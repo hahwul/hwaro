@@ -204,6 +204,9 @@ module Hwaro::Core::Build::Phases::Initialize
 
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)
+      # SCSS sources compile via the sass:compile hook instead of
+      # publishing raw.
+      next if @config.try(&.sass_source?(relative))
 
       dest_path = File.join(output_dir, relative)
       # `info` from above already carries the source mtime — re-statting

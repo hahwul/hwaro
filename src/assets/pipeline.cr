@@ -9,6 +9,7 @@ require "../utils/css_minifier"
 require "../utils/js_minifier"
 require "../utils/logger"
 require "../models/config"
+require "./sass_compiler"
 
 module Hwaro
   module Assets
@@ -49,7 +50,13 @@ module Hwaro
               next
             end
             io << "\n" if i > 0
-            io << File.read(source)
+            content = File.read(source)
+            # `.scss` bundle entries compile before concatenation; naming
+            # one in a bundle is explicit intent, independent of [sass].
+            if file.downcase.ends_with?(".scss")
+              content = SassCompiler.compile_source(content, source)
+            end
+            io << content
           end
         end
 

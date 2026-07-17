@@ -826,6 +826,27 @@ module Hwaro
       end
     end
 
+    # Built-in Sass/SCSS compilation (pure Crystal, no external tools).
+    #
+    # When enabled, non-partial `*.scss` files under the static dir compile
+    # to sibling `.css` files in the output, `_*.scss` partials are only
+    # reachable via @use/@import, and raw `.scss` sources are excluded from
+    # the verbatim static copy.
+    #
+    # Config example (config.toml):
+    #   [sass]
+    #   enabled = true
+    #   minify = true
+    class SassConfig
+      property enabled : Bool
+      property minify : Bool
+
+      def initialize
+        @enabled = false
+        @minify = true
+      end
+    end
+
     # Image processing configuration
     #
     # Enables automatic image resizing during build using stb (statically linked).
@@ -1057,6 +1078,7 @@ module Hwaro
       property related : RelatedConfig
       property deployment : DeploymentConfig
       property assets : AssetsConfig
+      property sass : SassConfig
       property pwa : PwaConfig
       property amp : AmpConfig
       property image_processing : ImageProcessingConfig
@@ -1095,6 +1117,7 @@ module Hwaro
         @related = RelatedConfig.new
         @deployment = DeploymentConfig.new
         @assets = AssetsConfig.new
+        @sass = SassConfig.new
         @pwa = PwaConfig.new
         @amp = AmpConfig.new
         @image_processing = ImageProcessingConfig.new
@@ -1232,6 +1255,13 @@ module Hwaro
         end
       end
 
+      # True when built-in Sass compilation is on and `relative_path` is an
+      # SCSS source — such files compile to `.css` instead of publishing
+      # verbatim through the static copy.
+      def sass_source?(relative_path : String) : Bool
+        sass.enabled && relative_path.downcase.ends_with?(".scss")
+      end
+
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config
         config = new
 
@@ -1307,6 +1337,7 @@ module Hwaro
         load_related(config)
         load_permalinks(config)
         load_assets(config)
+        load_sass(config)
         load_pwa(config)
         load_amp(config)
         load_image_processing(config)
@@ -1901,6 +1932,13 @@ module Hwaro
             config.assets.bundles << AssetBundleConfig.new(name: name, files: files)
           end
         end
+      end
+
+      private def self.load_sass(config : Config)
+        return unless s = config.raw["sass"]?.try(&.as_h?)
+
+        config.sass.enabled = bool_value(s["enabled"]?, config.sass.enabled)
+        config.sass.minify = bool_value(s["minify"]?, config.sass.minify)
       end
 
       private def self.load_amp(config : Config)
