@@ -329,6 +329,19 @@ This is useful because you don't need to know the final URL — Hwaro calculates
 | `@/blog/_index.md` | `/blog/` |
 | `@/blog/post.md#section` | `/blog/post/#section` |
 
+#### Strict mode
+
+To fail the build instead of just warning, opt in via `config.toml`:
+
+```toml
+[links]
+broken_internal = "error"  # default: "warn"
+```
+
+In error mode the build collects every unresolved `@/` link across all pages and fails with a single aggregated list (`source.md → @/target (reason)`), mapping to exit code 5 for CI. During `hwaro serve` the failure appears in the error overlay and the server keeps running.
+
+Caveat with `--cache`: only re-rendered pages are re-checked on warm builds, so a broken link inside an unchanged page won't resurface until that page renders again. CI should run a cold build (no `--cache`) for a complete check.
+
 ### Blockquotes
 
 ```markdown

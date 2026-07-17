@@ -144,6 +144,21 @@ Notes:
 - An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page.
 - For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
 
+## Links
+
+Control how unresolved `@/path.md` internal links are treated during the build.
+
+```toml
+[links]
+broken_internal = "error"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| broken_internal | string | "warn" | `"warn"` logs each unresolved `@/` link and keeps the raw markup; `"error"` fails the build (exit code 5) with one aggregated list of every offender |
+
+See [Internal Links](/writing/pages/#internal-links) for the `@/` link syntax and the `--cache` caveat in strict mode.
+
 ## Taxonomies
 
 ```toml
@@ -249,6 +264,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
+| `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
 | `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |
