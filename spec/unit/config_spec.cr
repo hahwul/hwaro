@@ -1894,6 +1894,62 @@ describe Hwaro::Models::Config do
       config.permalinks.has_key?("/posts").should be_false
       config.permalinks["posts"].should eq("blog")
     end
+
+    it "preserves the interior of token patterns and only trims outer slashes" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [permalinks]
+        "posts" = "/:year/:month/:day/:slug/"
+        TOML
+
+      config.permalinks["posts"].should eq(":year/:month/:day/:slug")
+    end
+
+    it "raises a classified config error for a pattern with an unknown token" do
+      ex = expect_raises(Hwaro::HwaroError, /Unknown token ':tokne'/) do
+        load_config(<<-TOML)
+          title = "Test"
+
+          [permalinks]
+          "posts" = "/:year/:tokne/"
+          TOML
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Links
+  # ---------------------------------------------------------------------------
+
+  describe "links configuration" do
+    it "defaults broken_internal to warn" do
+      config = Hwaro::Models::Config.new
+      config.links.broken_internal.should eq("warn")
+    end
+
+    it "loads broken_internal = error" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_internal = "error"
+        TOML
+
+      config.links.broken_internal.should eq("error")
+    end
+
+    it "keeps the warn default for an unknown broken_internal value" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_internal = "explode"
+        TOML
+
+      config.links.broken_internal.should eq("warn")
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -1,5 +1,15 @@
 require "../spec_helper"
 
+# Reopen Builder so the taxonomy feed-template test can install a loaded
+# template set (feed_template_renderer is nil until templates are loaded).
+module Hwaro::Core::Build
+  class Builder
+    def test_set_taxonomy_templates(templates : Hash(String, String))
+      @templates = templates
+    end
+  end
+end
+
 describe Hwaro::Content::Taxonomies do
   describe ".generate" do
     it "does nothing when taxonomies are empty" do
@@ -41,6 +51,39 @@ describe Hwaro::Content::Taxonomies do
         }
         Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
         File.exists?(File.join(output_dir, "tags", "crystal", "rss.xml")).should be_true
+      end
+    end
+
+    it "renders per-term feeds through a user feed template when present" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+
+      site = Hwaro::Models::Site.new(config)
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/blog/post/"
+      page.tags = ["crystal"]
+      page.draft = false
+      page.generated = false
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+          "rss.xml"       => "TERM-FEED kind={{ feed.kind }} taxonomy={{ feed.taxonomy }} term={{ feed.term }} items={{ pages | length }}",
+        }
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_taxonomy_templates(templates)
+
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates, builder: builder)
+
+        content = File.read(File.join(output_dir, "tags", "crystal", "rss.xml"))
+        content.should eq("TERM-FEED kind=taxonomy taxonomy=tags term=crystal items=1")
       end
     end
 

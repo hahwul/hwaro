@@ -3,6 +3,7 @@ require "uri"
 require "./deployment"
 require "../utils/errors"
 require "../utils/text_utils"
+require "../utils/permalink_resolver"
 require "../utils/env_substitutor"
 require "../utils/path_utils"
 
@@ -111,6 +112,19 @@ module Hwaro
         @sections = [] of String
         @default_language_only = true
         @full_content = true
+      end
+    end
+
+    # Internal link handling configuration
+    class LinksConfig
+      # How unresolved `@/path.md` internal links are treated during the
+      # render phase: "warn" (default) logs a warning and leaves the markup
+      # unchanged; "error" fails the build with a single aggregated list of
+      # every offender. Unknown values fall back to "warn".
+      property broken_internal : String
+
+      def initialize
+        @broken_internal = "warn"
       end
     end
 
@@ -1119,6 +1133,7 @@ module Hwaro
       property doctor : DoctorConfig
       property static : StaticConfig
       property outputs : OutputsConfig
+      property links : LinksConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -1158,6 +1173,7 @@ module Hwaro
         @doctor = DoctorConfig.new
         @static = StaticConfig.new
         @outputs = OutputsConfig.new
+        @links = LinksConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1381,6 +1397,7 @@ module Hwaro
         load_static(config)
         load_deployment(config)
         load_outputs(config)
+        load_links(config)
 
         config
       end
@@ -1396,9 +1413,9 @@ module Hwaro
       KNOWN_TOP_LEVEL_KEYS = %w[
         title description base_url default_language
         amp assets auto_includes build content deployment doctor feeds
-        highlight image_processing languages llms markdown menus og outputs
-        pagination permalinks plugins pwa related robots sass search series
-        serve sitemap static taxonomies
+        highlight image_processing languages links llms markdown menus og
+        outputs pagination permalinks plugins pwa related robots sass search
+        series serve sitemap static taxonomies
       ]
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
@@ -1944,18 +1961,40 @@ module Hwaro
         end
       end
 
+      private def self.load_links(config : Config)
+        return unless s = config.raw["links"]?.try(&.as_h?)
+
+        if mode = s["broken_internal"]?.try(&.as_s?)
+          if mode == "warn" || mode == "error"
+            config.links.broken_internal = mode
+          else
+            Logger.warn "Unknown [links] broken_internal value '#{mode}' — expected \"warn\" or \"error\"; keeping \"warn\"."
+          end
+        end
+      end
+
       private def self.load_permalinks(config : Config)
         return unless s = config.raw["permalinks"]?.try(&.as_h?)
 
         s.each do |k, v|
           if target = v.as_s?
-            # Strip surrounding slashes from BOTH the source key and the target.
-            # resolve_permalink_dir matches against slash-free directory paths
-            # and interpolates the target as `/#{effective_dir}/`, so a key or
-            # target written with leading/trailing slashes (e.g. `"/blog/"`)
-            # would otherwise silently never match (source) or produce
-            # double-slash URLs like `http://host//blog//p/` (target).
-            config.permalinks[k.strip("/")] = target.strip("/")
+            if Utils::PermalinkResolver.pattern?(target)
+              # Token patterns (e.g. "/:year/:month/:slug/") rebuild whole
+              # URLs at resolve time. Validate tokens up front so a typo'd
+              # `:tokne` fails the config load instead of emitting literal
+              # `:tokne` path segments, and only normalize the OUTER slashes
+              # — the interior pattern structure must survive verbatim.
+              Utils::PermalinkResolver.validate_pattern!(k, target)
+              config.permalinks[k.strip("/")] = target.strip("/")
+            else
+              # Strip surrounding slashes from BOTH the source key and the target.
+              # resolve_permalink_dir matches against slash-free directory paths
+              # and interpolates the target as `/#{effective_dir}/`, so a key or
+              # target written with leading/trailing slashes (e.g. `"/blog/"`)
+              # would otherwise silently never match (source) or produce
+              # double-slash URLs like `http://host//blog//p/` (target).
+              config.permalinks[k.strip("/")] = target.strip("/")
+            end
           end
         end
       end

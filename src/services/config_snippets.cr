@@ -32,6 +32,7 @@ module Hwaro
         "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: -> { llms(commented: true) }},
         "feeds"            => {description: "RSS/Atom feed generation", snippet: -> { feeds(commented: true) }},
         "build"            => {description: "Build hooks (pre/post commands)", snippet: -> { build(commented: true) }},
+        "links"            => {description: "Internal link checking (broken @/ links)", snippet: -> { links(commented: true) }},
         "permalinks"       => {description: "URL path overrides", snippet: -> { permalinks(commented: true) }},
         "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: -> { auto_includes(commented: true) }},
         "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: -> { assets(commented: true) }},
@@ -448,6 +449,7 @@ module Hwaro
             # RSS/Atom Feeds
             # =============================================================================
             # Generates RSS or Atom feed for content syndication
+            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
 
             # [feeds]
             # enabled = true
@@ -464,6 +466,7 @@ module Hwaro
             # RSS/Atom Feeds
             # =============================================================================
             # Generates RSS or Atom feed for content syndication
+            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
 
             [feeds]
             enabled = true
@@ -508,6 +511,36 @@ module Hwaro
         end
       end
 
+      def self.links(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Links (Optional)
+            # =============================================================================
+            # How unresolved @/ internal links are treated during the build
+
+            # [links]
+            # broken_internal = "warn" # "error" fails the build listing every offender
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Links (Optional)
+            # =============================================================================
+            # How unresolved @/ internal links are treated during the build.
+            # "warn" (default) logs a warning and keeps the raw markup;
+            # "error" fails the build with an aggregated list of every offender.
+
+            # [links]
+            # broken_internal = "warn"
+
+            TOML
+        end
+      end
+
       def self.permalinks(commented : Bool = false) : String
         if commented
           <<-TOML
@@ -519,6 +552,7 @@ module Hwaro
 
             # [permalinks]
             # "old/posts" = "posts"
+            # "posts" = "/:year/:month/:day/:slug/"
 
             TOML
         else
@@ -530,9 +564,14 @@ module Hwaro
             # Remap a content directory to a different output path. The matched
             # directory prefix is rewritten and any deeper path is preserved
             # (e.g. "old/posts" => "posts" moves content/old/posts/x.md to /posts/x/).
+            # Targets with :tokens are Hugo-style patterns that rebuild the whole
+            # URL for leaf pages (:year/:month/:day/:slug/:title/:section/:filename).
+            # First matching rule wins (declaration order) — put specific prefixes
+            # before broad ones, and an "" catch-all last.
 
             # [permalinks]
             # "old/posts" = "posts"
+            # "posts" = "/:year/:month/:day/:slug/"
 
             TOML
         end

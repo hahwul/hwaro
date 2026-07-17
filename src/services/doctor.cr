@@ -217,7 +217,7 @@ module Hwaro
         # Advanced/optional image features
         "image_processing", "image_processing.lqip", "og.auto_image",
         # Power-user / deployment related
-        "build", "deployment", "permalinks", "auto_includes",
+        "build", "deployment", "permalinks", "auto_includes", "links",
         # Asset pipeline (many prefer manual or external bundlers)
         "assets",
         # Built-in Sass compilation (opt-in)

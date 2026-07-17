@@ -112,6 +112,53 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
+Rules are evaluated in declaration order and the **first** source that matches the page's directory (exactly or as a parent prefix) wins — later rules are never consulted for that page. Declare specific prefixes before broad ones (`"posts/tech"` before `"posts"`), or the broad rule shadows the specific one. This applies to token patterns too, and especially to the `""` catch-all: put it **last**, after every other rule.
+
+### Token patterns
+
+A target containing `:token` segments is a Hugo-style pattern that rebuilds the whole URL instead of remapping the directory:
+
+```toml
+[permalinks]
+"posts" = "/:year/:month/:day/:slug/"
+```
+
+With `content/posts/hello.md` dated `2026-03-05`, the page is published at `/2026/03/05/hello/`.
+
+| Token | Expands to |
+|-------|------------|
+| `:year` | Page date year (`2026`) |
+| `:month` | Page date month, zero-padded (`03`) |
+| `:day` | Page date day, zero-padded (`05`) |
+| `:slug` | Front-matter `slug`, or the filename stem when unset |
+| `:title` | Slugified front-matter `title` (falls back to `:slug` when it slugifies to nothing) |
+| `:section` | The page's section path (`posts/tech`); empty for root pages, collapsing the segment |
+| `:filename` | The filename stem, ignoring any `slug` override |
+
+Notes:
+
+- Tokens must be whole path segments; unknown tokens fail the config load.
+- Patterns apply to leaf pages only. Section `_index` and bundle `index` pages skip pattern rules (they keep their directory URL, or a later plain remap rule).
+- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens.
+- An explicit `path` in front matter always wins over any permalink rule.
+- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page — declare it last, since first-match ordering means it would shadow any rule after it.
+- For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
+
+## Links
+
+Control how unresolved `@/path.md` internal links are treated during the build.
+
+```toml
+[links]
+broken_internal = "error"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| broken_internal | string | "warn" | `"warn"` logs each unresolved `@/` link and keeps the raw markup; `"error"` fails the build (exit code 5) with one aggregated list of every offender |
+
+See [Internal Links](/writing/pages/#internal-links) for the `@/` link syntax and the `--cache` caveat in strict mode.
+
 ## Taxonomies
 
 ```toml
@@ -217,6 +264,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
+| `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
 | `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |
@@ -261,6 +309,7 @@ task_lists = true
 
 [permalinks]
 "old/posts" = "posts"
+"posts" = "/:year/:month/:day/:slug/"
 
 [plugins]
 processors = ["markdown"]

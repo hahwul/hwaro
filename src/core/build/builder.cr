@@ -218,6 +218,14 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Unresolved `@/` internal links collected during the render fan-out
+        # when `[links] broken_internal = "error"` (each entry is a formatted
+        # "source.md → @/target (reason)" line). Guarded by
+        # @broken_links_mutex — render workers append concurrently under
+        # -Dpreview_mt. Cleared at every build entry point and aggregated
+        # into one classified error by raise_on_broken_internal_links!.
+        @broken_internal_links : Array(String) = [] of String
+        @broken_links_mutex : Mutex = Mutex.new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -325,6 +333,33 @@ module Hwaro
           )
         end
 
+        # Drop unresolved-link records from the previous pass so a fixed
+        # link doesn't keep failing (and a new one is attributed to the
+        # right build). Called at every build entry point.
+        private def clear_broken_internal_links
+          @broken_links_mutex.synchronize { @broken_internal_links.clear }
+        end
+
+        # Fail the build with ONE aggregated error listing every unresolved
+        # `@/` internal link collected during the render fan-out. Only
+        # populated when `[links] broken_internal = "error"` — the default
+        # "warn" mode never appends, making this a no-op there. Raising
+        # HwaroError(HWARO_E_CONTENT) maps to exit code 5 for CI; under
+        # `serve` the watcher rescue surfaces it in the error overlay.
+        private def raise_on_broken_internal_links!
+          # Dedupe: the same broken @/target repeated within one page (or a
+          # page rendered twice in a pass) must produce one line, not N.
+          entries = @broken_links_mutex.synchronize { @broken_internal_links.sort.uniq! }
+          return if entries.empty?
+
+          label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "#{label}:\n  #{entries.join("\n  ")}",
+            hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
+          )
+        end
+
         # Incremental build: only re-parse and re-render pages whose source
         # files have been modified.  Falls back to a full build when the
         # necessary state from a previous build is not available.
@@ -348,6 +383,7 @@ module Hwaro
 
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
+          clear_broken_internal_links
 
           output_dir = options.output_dir
           minify = options.minify
@@ -629,6 +665,7 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
+          raise_on_broken_internal_links!
 
           cache.save if options.cache
 
@@ -792,6 +829,7 @@ module Hwaro
           end
 
           start_time = Time.instant
+          clear_broken_internal_links
 
           # Reload templates from disk & reset all runtime caches.
           # Keep the old sources so the dependency graph can diff them.
@@ -928,6 +966,16 @@ module Hwaro
           # may have introduced or resolved a slug/alias collision.
           @output_url_winners = compute_output_url_winners(all_pages)
 
+          # User feed templates (rss.xml/atom.xml overrides) are not entry
+          # templates for any page, so an edit to one — or to a partial they
+          # include (dependents_closure above already folded includes) —
+          # selects ZERO pages to re-render. The feed output still changed:
+          # force the SEO-surface refresh and per-term taxonomy feed
+          # regeneration below. Nil affected_templates means "anything may
+          # have changed", which both conditions already treat as affected.
+          feed_templates_affected = affected_templates.nil? ||
+                                    Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| affected_templates.includes?(key) }
+
           error_overlay = options.error_overlay
           count = if pages_to_render.empty?
                     0
@@ -936,6 +984,7 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
+          raise_on_broken_internal_links!
 
           # Re-generate 404 page with new template
           if affected_templates.nil? || affected_templates.includes?("404")
@@ -948,6 +997,7 @@ module Hwaro
           # pages may have changed taxonomy membership — regenerate then too.
           taxonomy_sections = if affected_templates.nil? ||
                                  (force_pages && !force_pages.empty?) ||
+                                 feed_templates_affected ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
                               else
@@ -958,8 +1008,10 @@ module Hwaro
           # (run_incremental_then_rerender) or shortcode/hook template edits
           # that rewrote the page.content / summary_html that sitemap, feeds,
           # search, and llms embed. Refresh those surfaces. A pure layout
-          # edit still skips this — template output doesn't feed them.
-          if summaries_affected
+          # edit still skips this — template output doesn't feed them —
+          # UNLESS the edit touched a user feed template, whose output IS a
+          # generated surface (see feed_templates_affected above).
+          if summaries_affected || feed_templates_affected
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
             regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
@@ -1054,6 +1106,13 @@ module Hwaro
                   else
                     process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   end
+          # Strict [links] broken_internal = "error": this pass continues the
+          # initial fast-start build (whose priority fan-out already raised
+          # for its own subset and left the accumulator empty), so don't
+          # clear here — just surface what the deferred pages collected. The
+          # server's fast-start fiber rescues this and routes it into the
+          # error overlay via notify_build_error; the server keeps running.
+          raise_on_broken_internal_links!
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index
@@ -1332,6 +1391,7 @@ module Hwaro
           @templates = nil
           @cache_manager.clear_runtime
           @created_dirs.clear
+          clear_broken_internal_links
 
           # Execute build phases through lifecycle. The live status region
           # animates the current phase on a TTY; `ensure` guarantees the
@@ -1404,6 +1464,33 @@ module Hwaro
           path.lchop("#{root}/")
         end
 
+        # Renderer over user feed templates (templates/rss.xml.jinja /
+        # atom.xml.jinja, loaded under the keys "rss.xml"/"atom.xml"). Nil
+        # when no override template exists so the feed generators keep the
+        # zero-cost programmatic path. The proc renders with a FRESH Crinja
+        # environment per call — the shared env is not MT-safe (with_scope
+        # mutates the env) and the SEO tasks that generate feeds run in
+        # parallel fibers. create_fresh_crinja_env carries the snapshot
+        # template loader, so `{% include %}` inside a feed template works.
+        def feed_template_renderer : Content::Seo::Feeds::Renderer?
+          return unless feed_template_present?
+
+          ->(source : String, context : Hash(String, Crinja::Value)) do
+            env = create_fresh_crinja_env
+            env.from_string(source).render(context)
+          end
+        end
+
+        # True when a user feed template override is loaded. Also consulted
+        # by the Generate phase's skip-if-unchanged gate: a template-only
+        # edit doesn't touch content, so a warm --cache build would keep the
+        # stale feed on disk if feeds were skipped.
+        def feed_template_present? : Bool
+          templates = @templates
+          return false unless templates
+          Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| templates.has_key?(key) }
+        end
+
         # Regenerate the lightweight SEO/search surfaces (sitemap, feeds, llms,
         # search index, optionally robots) for the given page set. Each
         # generator writes a distinct output file with no shared in-process
@@ -1418,7 +1505,7 @@ module Hwaro
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer); nil },
           ] of Proc(Nil)
           # Robots slots in right after Feeds — its original position in the
           # incremental path — so sequential (--no-parallel) output ordering is

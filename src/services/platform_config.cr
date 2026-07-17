@@ -316,7 +316,7 @@ module Hwaro
         relative_path = path.lchop("content/")
         basename = Path[path].basename
         language = extract_language_from_filename(basename)
-        target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language)
+        target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language, data[:date], data[:title])
 
         aliases.each do |alias_path|
           # Carry base_path so generated redirects match the build's own
@@ -329,54 +329,21 @@ module Hwaro
         end
       end
 
-      # Calculate the URL for a page, mirroring the ParseContent phase's
-      # calculate_page_url (src/core/build/phases/parse_content.cr).
-      # Handles slug overrides, custom_path, permalinks, and index pages.
-      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?, language : String? = nil) : String
-        directory_path = Path[relative_path].dirname.to_s
-
-        # Apply permalinks mapping from config
-        effective_dir = @config.resolve_permalink_dir(directory_path)
-
-        lang_prefix = if language && language != @config.default_language
-                        "/#{language}"
-                      else
-                        ""
-                      end
-
-        if custom_path
-          custom = custom_path.lchop("/")
-          url = "#{lang_prefix}/#{custom}"
-          url += "/" unless url.ends_with?("/")
-          return url
-        end
-
-        stem = Path[relative_path].stem
-
-        # Remove language suffix from stem if present in language
-        clean_stem = if language
-                       stem.chomp(".#{language}")
-                     else
-                       stem
-                     end
-
-        is_index = clean_stem == "_index" || clean_stem == "index"
-
-        if is_index
-          if effective_dir == "." || effective_dir.empty?
-            return lang_prefix.empty? ? "/" : "#{lang_prefix}/"
-          else
-            return "#{lang_prefix}/#{effective_dir}/"
-          end
-        end
-
-        leaf = slug || clean_stem
-
-        if effective_dir == "." || effective_dir.empty?
-          "#{lang_prefix}/#{leaf}/"
-        else
-          "#{lang_prefix}/#{effective_dir}/#{leaf}/"
-        end
+      # Calculate the URL for a page through the same shared resolver as the
+      # build pipeline (Utils::PermalinkResolver) so generated platform
+      # redirects always match the built site's canonical URLs. Handles slug
+      # overrides, custom_path, permalinks (remaps and token patterns), and
+      # index pages.
+      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?, language : String? = nil, date : Time? = nil, title : String = "") : String
+        Utils::PermalinkResolver.resolve_url(
+          relative_path,
+          @config,
+          slug: slug,
+          custom_path: custom_path,
+          language: language,
+          date: date,
+          title: title,
+        )
       end
     end
   end

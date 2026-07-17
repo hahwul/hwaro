@@ -22,10 +22,15 @@ module Hwaro::Core::Build::Phases::Generate
         skip_unchanged = ctx.options.cache && ctx.stats.pages_rendered == 0 &&
                          !ctx.page_or_section_set_changed
 
-        # Run independent SEO/search generators in parallel
+        # Run independent SEO/search generators in parallel.
+        # Feeds never join the skip when a user feed template exists: the
+        # skip's cache-hit signal only reflects content changes, so a
+        # template-only edit followed by a warm --cache build would keep
+        # serving the stale feed output forever.
+        skip_feeds = skip_unchanged && !feed_template_present?
         tasks = [
           -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, skip_if_unchanged: skip_unchanged); nil },
-          -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, skip_if_unchanged: skip_unchanged); nil },
+          -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, skip_if_unchanged: skip_feeds, templates: @templates, renderer: feed_template_renderer); nil },
           -> { Content::Seo::Robots.generate(site.config, output_dir); nil },
           -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, skip_if_unchanged: skip_unchanged); nil },
           -> { Content::Search.generate(all_pages, site.config, output_dir, skip_if_unchanged: skip_unchanged); nil },

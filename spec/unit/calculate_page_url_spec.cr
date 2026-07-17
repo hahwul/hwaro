@@ -305,6 +305,119 @@ describe Hwaro::Core::Build::Builder do
     end
 
     # -----------------------------------------------------------------------
+    # Token patterns (Hugo-style [permalinks] values)
+    # -----------------------------------------------------------------------
+    describe "token patterns" do
+      it "expands date tokens with zero padding" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:month/:day/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/hello.md")
+        page.date = Time.utc(2026, 3, 5)
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/2026/03/05/hello/")
+      end
+
+      it "uses the front-matter slug for :slug" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/long-name.md")
+        page.date = Time.utc(2026, 3, 5)
+        page.slug = "short"
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/2026/short/")
+      end
+
+      it "slugifies the title for :title and expands :section and :filename" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":section/:title/:filename"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/tech/my-file.md")
+        page.title = "Hello World"
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/posts/tech/hello-world/my-file/")
+      end
+
+      it "matches subdirectories under the rule source" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/tech/x.md")
+        page.date = Time.utc(2025, 12, 31)
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/2025/x/")
+      end
+
+      it "prefixes the language before the pattern output" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.default_language = "en"
+        config.permalinks = {"posts" => ":year/:month/:day/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/x.ko.md")
+        page.language = "ko"
+        page.date = Time.utc(2026, 3, 5)
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/ko/2026/03/05/x/")
+      end
+
+      it "custom_path takes priority over a pattern rule" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/x.md")
+        page.date = Time.utc(2026, 3, 5)
+        page.custom_path = "/pinned/"
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/pinned/")
+      end
+
+      it "skips pattern rules for index pages" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/_index.md")
+        page.is_index = true
+        builder.test_calculate_page_url(page)
+
+        page.url.should eq("/posts/")
+      end
+
+      it "raises a classified content error for a dateless page under a date pattern" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        page = Hwaro::Models::Page.new("posts/undated.md")
+        ex = expect_raises(Hwaro::HwaroError, /requires a date, but the page has none/) do
+          builder.test_calculate_page_url(page)
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      end
+    end
+
+    # -----------------------------------------------------------------------
     # Multilingual URL prefixing
     # -----------------------------------------------------------------------
     describe "multilingual URLs" do

@@ -40,11 +40,17 @@ module Hwaro
         # - `base_url` — site base_url, used to prepend the path component (e.g. "/noir")
         #   so links work when the site is served from a subpath. When empty or root,
         #   no prefix is added and behavior matches the previous output.
+        # - `misses` — optional accumulator for unresolved links. Each entry is
+        #   `{target, reason}` with reason "page not found" or "empty link".
+        #   Callers running under `[links] broken_internal = "error"` collect
+        #   them to fail the build after the render fan-out; warnings are
+        #   still logged either way. `nil` keeps warn-only behavior.
         def resolve(
           html : String,
           pages_by_path : Hash(String, Models::Page),
           source_path : String,
           base_url : String = "",
+          misses : Array({String, String})? = nil,
         ) : String
           return html unless html.includes?("@/")
 
@@ -76,6 +82,7 @@ module Hwaro
 
             if path_part.empty?
               Logger.warn "Empty internal link '@/' in '#{source_path}'"
+              misses << {content_path, "empty link"} if misses
               next match
             end
 
@@ -97,6 +104,7 @@ module Hwaro
               end
             else
               Logger.warn "Internal link '@/#{content_path}' in '#{source_path}' could not be resolved: page not found."
+              misses << {content_path, "page not found"} if misses
               match
             end
           end

@@ -340,6 +340,42 @@ describe Hwaro::Services::PlatformConfig do
         end
       end
 
+      # Parity proof: the redirect target must flow through the same
+      # PermalinkResolver token expansion as the build pipeline, otherwise
+      # generated platform redirects point at URLs that do not exist.
+      it "applies a token-pattern permalink for the redirect target URL" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/my-post.md", "---\ntitle: My Post\ndate: 2026-03-05\naliases:\n  - /old-url/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.permalinks["posts"] = ":year/:month/:day/:slug"
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should contain("to = \"/2026/03/05/my-post/\"")
+            result.should_not contain("to = \"/posts/my-post/\"")
+          end
+        end
+      end
+
+      it "expands :title and :section tokens in the redirect target URL" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts/tech")
+            File.write("content/posts/tech/entry.md", "---\ntitle: Hello World\naliases:\n  - /old-entry/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.permalinks["posts"] = ":section/:title"
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should contain("to = \"/posts/tech/hello-world/\"")
+          end
+        end
+      end
+
       it "maps a nested alias to root for an empty-target permalink without doubling slashes" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do

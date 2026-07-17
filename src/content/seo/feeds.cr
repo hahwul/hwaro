@@ -1,8 +1,10 @@
 require "file_utils"
 require "html"
+require "crinja"
 require "../../models/config"
 require "../../models/page"
 require "../../models/section"
+require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/text_utils"
 require "../../utils/sort_utils"
@@ -13,7 +15,19 @@ module Hwaro
   module Content
     module Seo
       class Feeds
-        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
+        # Builder-provided template renderer for user feed overrides:
+        # (template_source, context) -> rendered feed. Kept as a Proc so this
+        # generator stays decoupled from the builder's Crinja plumbing — the
+        # builder constructs it over a fresh env per call (the shared env is
+        # not MT-safe and SEO tasks run in parallel fibers).
+        alias Renderer = Proc(String, Hash(String, Crinja::Value), String)
+
+        # User template keys that override the built-in feed output, per feed
+        # type. `templates/rss.xml.jinja` loads under the key "rss.xml"
+        # (template keys strip only the final template extension).
+        FEED_TEMPLATE_KEYS = {"rss" => "rss.xml", "atom" => "atom.xml"}
+
+        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil)
           if skip_if_unchanged && config.feeds.enabled
             feed_file = config.feeds.filename.empty? ? (config.feeds.type == "atom" ? "atom.xml" : "rss.xml") : config.feeds.filename
             if File.exists?(File.join(output_dir, feed_file))
@@ -48,7 +62,8 @@ module Hwaro
               }
             end
 
-            process_feed(site_pages, config, output_dir, config.feeds.filename, config.title, "", verbose)
+            process_feed(site_pages, config, output_dir, config.feeds.filename, config.title, "", verbose,
+              templates: templates, renderer: renderer, kind: "main")
           end
 
           # 2. Generate Section Feeds — pre-group pages by section for O(1) lookup
@@ -70,19 +85,20 @@ module Hwaro
 
               feed_title = "#{config.title} - #{page.title}"
 
-              process_feed(section_pages, config, section_output_dir, "", feed_title, page.url, verbose)
+              process_feed(section_pages, config, section_output_dir, "", feed_title, page.url, verbose,
+                templates: templates, renderer: renderer, kind: "section", section_url: page.url)
             end
           end
 
           # 3. Generate Language-specific Feeds (for non-default languages)
           if config.multilingual?
-            generate_language_feeds(pages, config, output_dir, verbose)
+            generate_language_feeds(pages, config, output_dir, verbose, templates, renderer)
           end
         end
 
         # Generate per-language feeds for non-default languages.
         # Each language with generate_feed=true gets its own feed at /{lang}/rss.xml (or atom.xml).
-        private def self.generate_language_feeds(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
+        private def self.generate_language_feeds(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil)
           default_lang = config.default_language
 
           config.languages.each do |lang_code, lang_config|
@@ -120,7 +136,8 @@ module Hwaro
             # e.g., "/ko/" so the self-referencing link becomes base_url/ko/rss.xml
             base_path = "/#{lang_code}/"
 
-            process_feed(lang_pages, config, lang_output_dir, "", feed_title, base_path, verbose, lang_code)
+            process_feed(lang_pages, config, lang_output_dir, "", feed_title, base_path, verbose, lang_code,
+              templates: templates, renderer: renderer, kind: "language")
           end
         end
 
@@ -133,6 +150,12 @@ module Hwaro
           base_path : String = "",
           verbose : Bool = false,
           language : String? = nil,
+          templates : Hash(String, String)? = nil,
+          renderer : Renderer? = nil,
+          kind : String = "main",
+          section_url : String? = nil,
+          taxonomy : String? = nil,
+          term : String? = nil,
         )
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
@@ -160,18 +183,128 @@ module Hwaro
           # - truncate > 0 (strips HTML and truncates)
           is_text = !config.feeds.full_content || config.feeds.truncate > 0
 
-          # Generate feed content
-          feed_content = case feed_type
-                         when "atom"
-                           generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
+          # Generate feed content. A user template for the active feed type
+          # (templates/rss.xml.jinja or atom.xml.jinja) overrides the built-in
+          # output — the template file itself is the opt-in. When it's absent
+          # the programmatic path below stays byte-identical to before.
+          template_key = FEED_TEMPLATE_KEYS[feed_type]
+          template_source = templates.try(&.[template_key]?)
+
+          feed_content = if template_source && renderer
+                           context = build_template_context(
+                             pages, config, feed_type, filename, is_text, feed_title, base_path, language,
+                             kind: kind, section_url: section_url, taxonomy: taxonomy, term: term,
+                           )
+                           render_feed_template(template_key, template_source, renderer, context)
                          else
-                           generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
+                           case feed_type
+                           when "atom"
+                             generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
+                           else
+                             generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
+                           end
                          end
 
           # Write feed file (basename prevents path traversal via config filename)
           feed_path = File.join(output_dir, File.basename(filename))
           Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
+        end
+
+        # Render a user feed template, classifying any failure as a template
+        # error (exit code 4) that names the offending key and the escape
+        # hatch. Rendering happens at Generate time, far from the template's
+        # edit, so a bare Crinja backtrace would be hard to attribute.
+        private def self.render_feed_template(
+          template_key : String,
+          source : String,
+          renderer : Renderer,
+          context : Hash(String, Crinja::Value),
+        ) : String
+          renderer.call(source, context)
+        rescue ex : Hwaro::HwaroError
+          raise ex
+        rescue ex
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_TEMPLATE,
+            message: "Feed template '#{template_key}' failed to render: #{ex.message}",
+            hint: "Check templates/#{template_key}.jinja; delete it to fall back to the built-in feed.",
+          )
+        end
+
+        # Template context for user feed templates. Everything a feed body
+        # needs is precomputed here with the same helpers the programmatic
+        # generators use (URLs absolute + percent-encoded, dates normalized
+        # and preformatted), so a template never has to re-derive feed
+        # semantics — XML escaping via the `xml_escape` filter is the
+        # template author's job.
+        def self.build_template_context(
+          pages : Array(Models::Page),
+          config : Models::Config,
+          feed_type : String,
+          filename : String,
+          is_text : Bool,
+          feed_title : String,
+          base_path : String,
+          language : String?,
+          *,
+          kind : String,
+          section_url : String?,
+          taxonomy : String?,
+          term : String?,
+        ) : Hash(String, Crinja::Value)
+          base_url, feed_url = build_feed_url(config, base_path, filename)
+          home_url = feed_home_url(config, base_path)
+
+          # Deterministic feed timestamp: newest content date across entries
+          # (same rule as the Atom generator) so identical input renders
+          # byte-identical output.
+          newest = pages.compact_map { |p| p.updated || p.date }.max?
+          feed_updated = newest ? normalize_feed_time(newest) : Utils::SortUtils::FALLBACK_DATE
+          feed_author = config.title.empty? ? feed_title : config.title
+
+          page_values = pages.map do |page|
+            entry_src = page.updated || page.date
+            entry_updated = entry_src ? normalize_feed_time(entry_src) : Utils::SortUtils::FALLBACK_DATE
+            Crinja.value({
+              "title"           => page.title.empty? ? config.title : page.title,
+              "url"             => page_full_url(page, base_url),
+              "date"            => page.date,
+              "updated"         => page.updated,
+              "date_rfc822"     => page.date.try { |d| format_rfc822(d) },
+              "updated_rfc3339" => entry_updated.to_rfc3339,
+              "description"     => page.description,
+              "summary"         => summary_for_feed(page, config),
+              "content"         => get_content_for_feed(page, config),
+              "content_html"    => full_content_for_feed(page, config),
+              "content_is_html" => !is_text,
+              "authors"         => page.authors,
+              "categories"      => feed_categories(page),
+              "section"         => page.section,
+              "language"        => page.language,
+            })
+          end
+
+          {
+            "feed" => Crinja.value({
+              "type"            => feed_type,
+              "kind"            => kind,
+              "title"           => feed_title,
+              "description"     => config.description,
+              "url"             => feed_url,
+              "home_url"        => home_url,
+              "base_url"        => base_url,
+              "language"        => language,
+              "updated"         => feed_updated,
+              "updated_rfc3339" => feed_updated.to_rfc3339,
+              "updated_rfc822"  => format_rfc822(feed_updated),
+              "author"          => feed_author,
+              "section_url"     => section_url,
+              "taxonomy"        => taxonomy,
+              "term"            => term,
+            }),
+            "pages" => Crinja::Value.new(page_values),
+          } of String => Crinja::Value
         end
 
         # Build the self-referencing feed URL from config, base path, and filename.

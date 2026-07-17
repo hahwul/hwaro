@@ -136,6 +136,86 @@ generate_feed = false   # No /ja/rss.xml will be generated
 
 Language feeds share the same `sections`, `limit`, `truncate`, and `full_content` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, and Atom feeds include an `xml:lang` attribute. The feed title includes the language name (e.g., `"My Site (한국어)"`).
 
+### Custom Feed Templates
+
+To take full control of the feed markup, create a template named after the feed output:
+
+| Feed type | Template file | Loaded as key |
+|-----------|---------------|---------------|
+| RSS | `templates/rss.xml.jinja` | `rss.xml` |
+| Atom | `templates/atom.xml.jinja` | `atom.xml` |
+
+Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`, `.ecr`) — only the final extension is stripped, so `rss.xml.jinja` loads under the key `rss.xml`. The template file itself is the opt-in: when it's absent, Hwaro emits its built-in feed exactly as before, and deleting the template falls back to the built-in output. The override applies to **all four feed kinds** — the main feed, per-section feeds, per-language feeds, and per-taxonomy-term feeds — and a custom `[feeds] filename` still controls the output path.
+
+`{% include %}` works inside feed templates, and a broken template fails the build with a template error naming the file.
+
+#### Context variables
+
+`feed` — metadata about the feed being rendered:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `feed.type` | string | `"rss"` or `"atom"` (follows `[feeds] type`) |
+| `feed.kind` | string | `"main"`, `"section"`, `"language"`, or `"taxonomy"` |
+| `feed.title` | string | Feed title (site title, `Site - Section`, `Site (한국어)`, …) |
+| `feed.description` | string | Site description |
+| `feed.url` | string | Absolute, percent-encoded self URL of this feed file |
+| `feed.home_url` | string | Canonical HTML URL the feed represents (site root, section page, or language home) |
+| `feed.base_url` | string | `base_url` without a trailing slash |
+| `feed.language` | string? | Language code for per-language feeds, else none |
+| `feed.updated` | time | Newest entry date (deterministic; epoch when no entry has a date) |
+| `feed.updated_rfc3339` | string | `feed.updated` as RFC 3339 (Atom `<updated>`) |
+| `feed.updated_rfc822` | string | `feed.updated` as RFC 822 (RSS `<lastBuildDate>`/`<pubDate>` style) |
+| `feed.author` | string | Site title (falls back to the feed title) |
+| `feed.section_url` | string? | Section URL — section feeds only |
+| `feed.taxonomy` / `feed.term` | string? | Taxonomy name and term — taxonomy feeds only |
+
+`pages` — the sorted, limit-applied entry list. Each entry:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `title` | string | Page title (site title when the page title is empty) |
+| `url` | string | Absolute, percent-encoded page URL |
+| `date` / `updated` | time? | Raw front-matter dates (usable with the `date` filter) |
+| `date_rfc822` | string? | Preformatted RFC 822 date; none for dateless pages |
+| `updated_rfc3339` | string | RFC 3339 timestamp from `updated`/`date` (epoch fallback) |
+| `description` | string? | Front-matter description |
+| `summary` | string | Plain-text summary (description → `<!-- more -->` summary → excerpt) |
+| `content` | string | Body honoring `full_content`/`truncate` (plain text when truncating) |
+| `content_html` | string | Full HTML body with links absolutized for out-of-context readers |
+| `content_is_html` | bool | Whether `content` is HTML (`false` under `truncate`/`full_content = false`) |
+| `authors` | array | Front-matter authors |
+| `categories` | array | Taxonomy terms — `tags` first, then other taxonomies, deduplicated |
+| `section` | string | Page section path |
+| `language` | string? | Page language code |
+
+#### Example
+
+Values are **not** pre-escaped — applying `xml_escape` (or emitting CDATA) is the template author's job:
+
+```jinja
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>{{ feed.title | xml_escape }}</title>
+    <link>{{ feed.home_url | xml_escape }}</link>
+    <description>{{ feed.description | xml_escape }}</description>
+    {% if feed.language %}<language>{{ feed.language | xml_escape }}</language>{% endif %}
+    <atom:link href="{{ feed.url | xml_escape }}" rel="self" type="application/rss+xml" />
+    {% for p in pages %}
+    <item>
+      <title>{{ p.title | xml_escape }}</title>
+      <link>{{ p.url | xml_escape }}</link>
+      <guid>{{ p.url | xml_escape }}</guid>
+      <description>{{ p.summary | xml_escape }}</description>
+      {% if p.date_rfc822 %}<pubDate>{{ p.date_rfc822 }}</pubDate>{% endif %}
+      {% for term in p.categories %}<category>{{ term | xml_escape }}</category>{% endfor %}
+    </item>
+    {% endfor %}
+  </channel>
+</rss>
+```
+
 ### Template Links
 
 ```jinja
