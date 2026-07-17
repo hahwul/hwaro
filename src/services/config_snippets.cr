@@ -519,6 +519,7 @@ module Hwaro
 
             # [permalinks]
             # "old/posts" = "posts"
+            # "posts" = "/:year/:month/:day/:slug/"
 
             TOML
         else
@@ -530,9 +531,12 @@ module Hwaro
             # Remap a content directory to a different output path. The matched
             # directory prefix is rewritten and any deeper path is preserved
             # (e.g. "old/posts" => "posts" moves content/old/posts/x.md to /posts/x/).
+            # Targets with :tokens are Hugo-style patterns that rebuild the whole
+            # URL for leaf pages (:year/:month/:day/:slug/:title/:section/:filename).
 
             # [permalinks]
             # "old/posts" = "posts"
+            # "posts" = "/:year/:month/:day/:slug/"
 
             TOML
         end

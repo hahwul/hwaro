@@ -112,6 +112,38 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
+Rules are checked in order and the first source that matches the page's directory (exactly or as a parent prefix) wins.
+
+### Token patterns
+
+A target containing `:token` segments is a Hugo-style pattern that rebuilds the whole URL instead of remapping the directory:
+
+```toml
+[permalinks]
+"posts" = "/:year/:month/:day/:slug/"
+```
+
+With `content/posts/hello.md` dated `2026-03-05`, the page is published at `/2026/03/05/hello/`.
+
+| Token | Expands to |
+|-------|------------|
+| `:year` | Page date year (`2026`) |
+| `:month` | Page date month, zero-padded (`03`) |
+| `:day` | Page date day, zero-padded (`05`) |
+| `:slug` | Front-matter `slug`, or the filename stem when unset |
+| `:title` | Slugified front-matter `title` (falls back to `:slug` when it slugifies to nothing) |
+| `:section` | The page's section path (`posts/tech`); empty for root pages, collapsing the segment |
+| `:filename` | The filename stem, ignoring any `slug` override |
+
+Notes:
+
+- Tokens must be whole path segments; unknown tokens fail the config load.
+- Patterns apply to leaf pages only. Section `_index` and bundle `index` pages skip pattern rules (they keep their directory URL, or a later plain remap rule).
+- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens.
+- An explicit `path` in front matter always wins over any permalink rule.
+- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page.
+- For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
+
 ## Taxonomies
 
 ```toml
@@ -261,6 +293,7 @@ task_lists = true
 
 [permalinks]
 "old/posts" = "posts"
+"posts" = "/:year/:month/:day/:slug/"
 
 [plugins]
 processors = ["markdown"]
