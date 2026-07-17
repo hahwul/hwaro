@@ -1104,6 +1104,18 @@ module Hwaro
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
         end
 
+        # Recompile all SCSS entries into the output directory. Used by
+        # serve mode when a `.scss` source changes — such files publish as
+        # compiled `.css`, never verbatim. No-ops unless [sass] is enabled.
+        def recompile_sass(output_dir : String)
+          config = @config
+          return unless config && config.sass.enabled
+
+          compiler = Assets::SassCompiler.new(config.sass, config.static)
+          count = compiler.compile_all(output_dir)
+          Logger.outcome("compiled", "#{count} sass #{count == 1 ? "file" : "files"}") if count > 0
+        end
+
         # Republish non-Markdown content assets (images, etc.) to the output
         # directory, preserving their path relative to `content/`. Mirrors what
         # the full build does via the raw-files path in the Write phase, but

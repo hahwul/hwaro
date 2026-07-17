@@ -96,6 +96,31 @@ describe "Sass build integration" do
     end
   end
 
+  it "recompiles all entries when a partial changes (serve recompile path)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", SASS_CONFIG)
+        FileUtils.mkdir_p("content")
+        File.write("content/index.md", INDEX_MD)
+        FileUtils.mkdir_p("templates")
+        File.write("templates/index.html", PAGE_TEMPLATE)
+        File.write("templates/page.html", PAGE_TEMPLATE)
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/_vars.scss", "$primary: #111111;")
+        File.write("static/css/style.scss", "@use \"vars\";\n.app { color: vars.$primary; }")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        builder.run(output_dir: "public", verbose: false).should be_true
+        File.read("public/css/style.css").should contain("#111111")
+
+        File.write("static/css/_vars.scss", "$primary: #222222;")
+        builder.recompile_sass("public")
+        File.read("public/css/style.css").should contain("#222222")
+      end
+    end
+  end
+
   it "fails the build with a located content error on invalid scss" do
     ex = expect_raises(Hwaro::HwaroError) do
       build_site(
