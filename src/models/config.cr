@@ -596,6 +596,17 @@ module Hwaro
       property feed : Bool
       property sitemap : Bool
       property paginate_by : Int32?
+      # Ordering of pages within a term ("date", "title", "weight") —
+      # section semantics: date is newest-first, title/weight ascend, and
+      # `reverse` flips whichever order `sort_by` produced. Term FEEDS are
+      # exempt: RSS consumers assume reverse-chronological, so they stay
+      # date-desc regardless.
+      property sort_by : String = "date"
+      property reverse : Bool = false
+      # Ordering of the terms list (taxonomy index page + `get_taxonomy`
+      # items): "name" = alphabetical, "count" = page count descending
+      # (name-ascending tiebreak).
+      property terms_sort_by : String = "name"
 
       def initialize(@name : String)
         @feed = false
@@ -1780,6 +1791,21 @@ module Hwaro
           taxonomy.feed = bool_value(taxonomy_hash["feed"]?, taxonomy.feed)
           taxonomy.sitemap = bool_value(taxonomy_hash["sitemap"]?, taxonomy.sitemap)
           taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| int_or_nil(v) }
+          if sort_by = taxonomy_hash["sort_by"]?.try(&.as_s?)
+            if {"date", "title", "weight"}.includes?(sort_by)
+              taxonomy.sort_by = sort_by
+            else
+              Logger.warn "Unknown taxonomy sort_by '#{sort_by}' for '#{name}' — expected \"date\", \"title\" or \"weight\". Using \"date\"."
+            end
+          end
+          taxonomy.reverse = bool_value(taxonomy_hash["reverse"]?, taxonomy.reverse)
+          if terms_sort_by = taxonomy_hash["terms_sort_by"]?.try(&.as_s?)
+            if {"name", "count"}.includes?(terms_sort_by)
+              taxonomy.terms_sort_by = terms_sort_by
+            else
+              Logger.warn "Unknown taxonomy terms_sort_by '#{terms_sort_by}' for '#{name}' — expected \"name\" or \"count\". Using \"name\"."
+            end
+          end
           taxonomy
         end
       end

@@ -31,6 +31,40 @@ name = "authors"
 | `feed` | bool | false | Generate RSS feed for each term |
 | `sitemap` | bool | true | Include taxonomy pages in sitemap |
 | `paginate_by` | int | — | Items per page on term pages |
+| `sort_by` | string | "date" | Order of pages within a term: `"date"`, `"title"`, or `"weight"` (see [Sorting](#sorting)) |
+| `reverse` | bool | false | Flip whichever order `sort_by` produced |
+| `terms_sort_by` | string | "name" | Order of the terms list: `"name"` or `"count"` (see [Sorting](#sorting)) |
+
+## Sorting
+
+`sort_by` controls the order of pages within each term — on the written
+term pages, in `term.pages` from `get_taxonomy()`, and in per-term
+pagination. The semantics match section sorting exactly:
+
+- `"date"` (default) — newest first; `reverse = true` gives oldest first.
+- `"title"` — alphabetical ascending; `reverse = true` descends.
+- `"weight"` — lowest weight first; `reverse = true` descends.
+
+An invalid `sort_by` value logs a warning and keeps the `"date"` default.
+
+`terms_sort_by` controls the order of the terms list — on the taxonomy
+index page and in `get_taxonomy().items`:
+
+- `"name"` (default) — alphabetical ascending.
+- `"count"` — page count descending, name-ascending tiebreak. On a
+  multilingual site, each language's index uses that language's own page
+  counts.
+
+**Term feeds are exempt.** With `feed = true`, each term's RSS feed stays
+reverse-chronological regardless of `sort_by` — RSS consumers assume
+newest-first entries.
+
+```toml
+[[taxonomies]]
+name = "tags"
+sort_by = "title"
+terms_sort_by = "count"
+```
 
 ## Using Taxonomies
 

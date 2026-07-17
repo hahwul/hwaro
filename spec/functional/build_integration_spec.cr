@@ -658,6 +658,53 @@ describe "Build Integration: Taxonomy pages" do
       File.exists?("public/tags/web/index.html").should be_true
     end
   end
+
+  it "honors taxonomy sort_by/reverse/terms_sort_by in templates and written pages" do
+    config = <<-TOML
+      title = "Test"
+      base_url = "http://localhost"
+
+      [[taxonomies]]
+      name = "tags"
+      sort_by = "title"
+      terms_sort_by = "count"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\n---\n",
+        # Date order (Zulu newest) deliberately disagrees with title order.
+        "blog/post1.md" => "---\ntitle: Zulu\ndate: 2024-06-01\ntags:\n  - crystal\n  - web\n---\nZ",
+        "blog/post2.md" => "---\ntitle: Alpha\ndate: 2024-01-01\ntags:\n  - crystal\n---\nA",
+      },
+      template_files: {
+        "page.html"          => "{{ content }}",
+        "section.html"       => "{{ content }}",
+        "taxonomy.html"      => "{{ content }}",
+        "taxonomy_term.html" => <<-JINJA,
+          {{ content }}
+          {% set tax = get_taxonomy(kind=taxonomy_name) %}
+          ITEMS:{% for term in tax.items %}[{{ term.name }}]{% endfor %}
+          {% for term in tax.items if term.name == taxonomy_term %}
+          PAGES:{% for p in term.pages %}[{{ p.title }}]{% endfor %}
+          {% endfor %}
+          JINJA
+      },
+    ) do
+      # Term page listing honors sort_by = "title" (Alpha before Zulu).
+      crystal_html = File.read("public/tags/crystal/index.html")
+      crystal_html.index("Alpha").not_nil!.should be < crystal_html.index("Zulu").not_nil!
+      # get_taxonomy term.pages order matches.
+      crystal_html.should contain("PAGES:[Alpha][Zulu]")
+      # get_taxonomy items honor terms_sort_by = "count": crystal (2) first.
+      crystal_html.should contain("ITEMS:[crystal][web]")
+
+      # Index terms list is count-ordered too.
+      idx = File.read("public/tags/index.html")
+      idx.index(">crystal<").not_nil!.should be < idx.index(">web<").not_nil!
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

@@ -1314,6 +1314,43 @@ describe Hwaro::Models::Config do
       config.taxonomies[1].sitemap.should be_false
     end
 
+    it "defaults sorting to date / not reversed / name-ordered terms" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.sort_by.should eq("date")
+      tax.reverse.should be_false
+      tax.terms_sort_by.should eq("name")
+    end
+
+    it "loads taxonomy sort_by / reverse / terms_sort_by from TOML" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[taxonomies]]
+        name = "tags"
+        sort_by = "title"
+        reverse = true
+        terms_sort_by = "count"
+        TOML
+
+      config.taxonomies[0].sort_by.should eq("title")
+      config.taxonomies[0].reverse.should be_true
+      config.taxonomies[0].terms_sort_by.should eq("count")
+    end
+
+    it "warns and keeps the defaults on invalid sort_by / terms_sort_by values" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[taxonomies]]
+        name = "tags"
+        sort_by = "popularity"
+        terms_sort_by = "size"
+        TOML
+
+      config.taxonomies[0].sort_by.should eq("date")
+      config.taxonomies[0].terms_sort_by.should eq("name")
+    end
+
     it "loads taxonomy feed = true from TOML (overrides default false)" do
       config = load_config(<<-TOML)
         title = "Test"
@@ -2324,6 +2361,9 @@ describe Hwaro::Models::TaxonomyConfig do
     config.feed.should be_false
     config.sitemap.should be_true
     config.paginate_by.should be_nil
+    config.sort_by.should eq("date")
+    config.reverse.should be_false
+    config.terms_sort_by.should eq("name")
   end
 end
 

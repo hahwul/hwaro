@@ -566,6 +566,204 @@ describe Hwaro::Content::Taxonomies do
       end
     end
   end
+
+  describe "configurable sorting" do
+    # Three pages whose title order (Alpha, Bravo, Charlie) deliberately
+    # disagrees with their date order (Charlie newest) and weight order
+    # (Bravo lightest), so each sort mode produces a distinct listing.
+    tagged_pages = -> do
+      a = Hwaro::Models::Page.new("a.md")
+      a.title = "Alpha"
+      a.url = "/blog/alpha/"
+      a.tags = ["crystal"]
+      a.date = Time.utc(2024, 1, 2)
+      a.weight = 2
+
+      b = Hwaro::Models::Page.new("b.md")
+      b.title = "Bravo"
+      b.url = "/blog/bravo/"
+      b.tags = ["crystal"]
+      b.date = Time.utc(2024, 1, 1)
+      b.weight = 1
+
+      c = Hwaro::Models::Page.new("c.md")
+      c.title = "Charlie"
+      c.url = "/blog/charlie/"
+      c.tags = ["crystal"]
+      c.date = Time.utc(2024, 1, 3)
+      c.weight = 3
+
+      [a, b, c] of Hwaro::Models::Page
+    end
+
+    generate_term_html = ->(tax : Hwaro::Models::TaxonomyConfig, pages : Array(Hwaro::Models::Page)) do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+      site.pages = pages
+      html = ""
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        html = File.read(File.join(output_dir, "tags", "crystal", "index.html"))
+      end
+      html
+    end
+
+    it "orders a term's pages newest-first by default" do
+      html = generate_term_html.call(Hwaro::Models::TaxonomyConfig.new("tags"), tagged_pages.call)
+      html.index("Charlie").not_nil!.should be < html.index("Alpha").not_nil!
+      html.index("Alpha").not_nil!.should be < html.index("Bravo").not_nil!
+    end
+
+    it "orders a term's pages by title ascending with sort_by = \"title\"" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.sort_by = "title"
+      html = generate_term_html.call(tax, tagged_pages.call)
+      html.index("Alpha").not_nil!.should be < html.index("Bravo").not_nil!
+      html.index("Bravo").not_nil!.should be < html.index("Charlie").not_nil!
+    end
+
+    it "reverses the title order with reverse = true" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.sort_by = "title"
+      tax.reverse = true
+      html = generate_term_html.call(tax, tagged_pages.call)
+      html.index("Charlie").not_nil!.should be < html.index("Bravo").not_nil!
+      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
+    end
+
+    it "orders a term's pages by weight ascending with sort_by = \"weight\"" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.sort_by = "weight"
+      html = generate_term_html.call(tax, tagged_pages.call)
+      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
+      html.index("Alpha").not_nil!.should be < html.index("Charlie").not_nil!
+    end
+
+    it "flips date order to oldest-first with reverse = true" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.reverse = true
+      html = generate_term_html.call(tax, tagged_pages.call)
+      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
+      html.index("Alpha").not_nil!.should be < html.index("Charlie").not_nil!
+    end
+
+    it "orders index terms by count desc (name-asc tiebreak) with terms_sort_by = \"count\"" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.terms_sort_by = "count"
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+
+      pages = [
+        {"p1.md", ["alpha"]},
+        {"p2.md", ["beta", "gamma"]},
+        {"p3.md", ["beta", "gamma"]},
+      ].map do |(path, tags)|
+        p = Hwaro::Models::Page.new(path)
+        p.title = path
+        p.url = "/blog/#{path}/"
+        p.tags = tags
+        p
+      end
+      site.pages = pages
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        index = File.read(File.join(output_dir, "tags", "index.html"))
+        # count 2 terms first (beta before gamma by name), then alpha (count 1).
+        index.index(">beta<").not_nil!.should be < index.index(">gamma<").not_nil!
+        index.index(">gamma<").not_nil!.should be < index.index(">alpha<").not_nil!
+      end
+    end
+
+    it "keeps the term feed date-desc when sort_by = \"title\"" do
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.sort_by = "title"
+      tax.feed = true
+      config = Hwaro::Models::Config.new
+      config.base_url = "http://localhost"
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+
+      older = Hwaro::Models::Page.new("older.md")
+      older.title = "Aardvark (older)"
+      older.url = "/blog/older/"
+      older.tags = ["crystal"]
+      older.date = Time.utc(2024, 1, 1)
+
+      newer = Hwaro::Models::Page.new("newer.md")
+      newer.title = "Zebra (newer)"
+      newer.url = "/blog/newer/"
+      newer.tags = ["crystal"]
+      newer.date = Time.utc(2024, 6, 1)
+
+      site.pages = [older, newer]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        # The written term page honors sort_by = "title" (Aardvark first)…
+        term_html = File.read(File.join(output_dir, "tags", "crystal", "index.html"))
+        term_html.index("Aardvark").not_nil!.should be < term_html.index("Zebra").not_nil!
+
+        # …but the term FEED stays reverse-chronological (Zebra first).
+        feed = File.read(File.join(output_dir, "tags", "crystal", "rss.xml"))
+        feed.index("Zebra").not_nil!.should be < feed.index("Aardvark").not_nil!
+      end
+    end
+
+    it "exposes get_taxonomy items name-sorted by default and count-sorted when configured" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      p1 = Hwaro::Models::Page.new("p1.md")
+      p1.title = "P1"
+      p1.url = "/blog/p1/"
+      p1.tags = ["zeta", "alpha"]
+      p2 = Hwaro::Models::Page.new("p2.md")
+      p2.title = "P2"
+      p2.url = "/blog/p2/"
+      p2.tags = ["zeta"]
+      site.pages = [p1, p2]
+
+      extract_names = ->(vars : Hash(String, Crinja::Value)) do
+        tags = vars["__taxonomies__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"]
+        items = tags.raw.as(Hash(Crinja::Value, Crinja::Value))["items"].raw.as(Array(Crinja::Value))
+        items.map { |item| item.raw.as(Hash(Crinja::Value, Crinja::Value))["name"].to_s }
+      end
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        # Default: alphabetical, regardless of page-scan insertion order.
+        vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+        extract_names.call(vars).should eq(["alpha", "zeta"])
+
+        # count: zeta (2 pages) first.
+        config.taxonomies[0].terms_sort_by = "count"
+        vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+        extract_names.call(vars).should eq(["zeta", "alpha"])
+      end
+    end
+  end
 end
 
 describe Hwaro::Models::TaxonomyConfig do
