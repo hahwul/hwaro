@@ -574,13 +574,18 @@ module Hwaro
       end
 
       # Copy-to-clipboard runtime for `pre[data-copy]` blocks: one DOM pass
-      # on DOMContentLoaded wraps each block (position anchor), appends a
-      # button, and copies the code's textContent on click. Theme-neutral —
+      # on DOMContentLoaded, appends a button, and copies the code's text on
+      # click. An existing `.code-block` (named fences) or `.code-wrapper`
+      # parent is reused as the positioning anchor — inserting a new wrapper
+      # inside `.code-block` would break its `.code-block > pre` styling —
+      # otherwise the <pre> is wrapped in a fresh `.code-wrapper`. Copied
+      # text strips the baked-in `.ln` line-number gutter spans (server-mode
+      # `linenos`) so pasted code has no number prefixes. Theme-neutral —
       # currentColor only, revealed on hover/focus — and small enough to
       # inline, so no extra request in either highlight mode.
       COPY_SNIPPET = <<-HTML
-        <style>.code-wrapper{position:relative}.code-copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.25rem .6rem;font:inherit;font-size:.75rem;color:inherit;background:transparent;border:1px solid currentColor;border-radius:.25rem;opacity:0;cursor:pointer;transition:opacity .15s}.code-wrapper:hover .code-copy-btn,.code-copy-btn:focus-visible,.code-copy-btn.copied{opacity:.75}</style>
-        <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("pre[data-copy]").forEach(function(pre){var w=pre.parentNode;if(!w.classList||!w.classList.contains("code-wrapper")){w=document.createElement("div");w.className="code-wrapper";pre.parentNode.insertBefore(w,pre);w.appendChild(pre);}var b=document.createElement("button");b.type="button";b.className="code-copy-btn";b.textContent="Copy";b.setAttribute("aria-label","Copy code");b.addEventListener("click",function(){var c=pre.querySelector("code");navigator.clipboard.writeText(c?c.textContent:pre.textContent).then(function(){b.classList.add("copied");b.textContent="Copied!";setTimeout(function(){b.classList.remove("copied");b.textContent="Copy";},2000);});});w.appendChild(b);});});</script>
+        <style>.code-wrapper,.code-block{position:relative}.code-copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.25rem .6rem;font:inherit;font-size:.75rem;color:inherit;background:transparent;border:1px solid currentColor;border-radius:.25rem;opacity:0;cursor:pointer;transition:opacity .15s}.code-wrapper:hover .code-copy-btn,.code-block:hover .code-copy-btn,.code-copy-btn:focus-visible,.code-copy-btn.copied{opacity:.75}</style>
+        <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("pre[data-copy]").forEach(function(pre){var w=pre.parentNode;var l=w.classList;if(!l||!(l.contains("code-wrapper")||l.contains("code-block"))){w=document.createElement("div");w.className="code-wrapper";pre.parentNode.insertBefore(w,pre);w.appendChild(pre);}var b=document.createElement("button");b.type="button";b.className="code-copy-btn";b.textContent="Copy";b.setAttribute("aria-label","Copy code");b.addEventListener("click",function(){var c=pre.querySelector("code");var t;if(c){var k=c.cloneNode(true);k.querySelectorAll("span.ln").forEach(function(n){n.remove();});t=k.textContent;}else{t=pre.textContent;}navigator.clipboard.writeText(t).then(function(){b.classList.add("copied");b.textContent="Copied!";setTimeout(function(){b.classList.remove("copied");b.textContent="Copy";},2000);});});w.appendChild(b);});});</script>
         HTML
 
       # Generate both CSS and JS tags

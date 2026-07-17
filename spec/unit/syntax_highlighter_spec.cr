@@ -641,6 +641,20 @@ describe "copy button marker (data-copy)" do
   ensure
     reset_fence_options_state
   end
+
+  it "keeps <pre> a direct child of a named block's .code-block wrapper" do
+    # The copy runtime anchors the button on an existing .code-block instead
+    # of inserting a .code-wrapper between it and the <pre>, so the
+    # scaffold's `.code-block > pre` styling must keep matching — the
+    # emitted HTML places the marked <pre> directly inside the wrapper.
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```crystal {name=\"main.cr\"}\nputs 1\n```", highlight: true)
+    html.should contain(%(<div class="code-block"><div class="code-filename">main.cr</div>))
+    html.should contain(%(<pre data-copy="true">))
+  ensure
+    reset_fence_options_state
+  end
 end
 
 describe Hwaro::Content::Processors::ServerHighlighter do

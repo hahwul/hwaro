@@ -74,11 +74,15 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       css.should_not match(/#[0-9a-f]{3,8}/i)
     end
 
-    it "styles the copy button through tokens (overrides the inline runtime styles)" do
+    it "styles the copy button through tokens, more specific than the inline runtime styles" do
       css = Hwaro::Services::Scaffolds::DesignTokens.highlight_css
       css.should contain(".code-wrapper")
-      css.should contain(".code-copy-btn")
-      css.should contain(".code-copy-btn.copied")
+      # The inline snippet from {{ highlight_js }} ships in-body after this
+      # stylesheet, so equal-specificity rules would lose to it — the doubled
+      # class keeps every scaffold rule strictly more specific.
+      css.should contain(".code-copy-btn.code-copy-btn")
+      css.should contain(".code-block:hover .code-copy-btn.code-copy-btn")
+      css.should contain(".code-copy-btn.code-copy-btn.copied")
       css.should_not match(/#[0-9a-f]{3,8}/i)
     end
   end

@@ -340,6 +340,20 @@ describe Hwaro::Models::HighlightConfig do
       config.js_tag.should_not contain("highlight.min.js")
     end
 
+    it "copy runtime strips the .ln gutter from copied text and anchors on an existing code-block" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      tag = config.js_tag
+      # Server-mode linenos bake `<span class="ln">N </span>` into <code> —
+      # the click handler must remove them before reading textContent.
+      tag.should contain(%(querySelectorAll("span.ln")))
+      # A named fence's .code-block wrapper is reused as the positioning
+      # anchor instead of nesting a fresh .code-wrapper inside it (which
+      # would break the scaffold's `.code-block > pre` styling).
+      tag.should contain(%(contains("code-block")))
+      tag.should contain(".code-wrapper,.code-block{position:relative}")
+    end
+
     it "appends the copy runtime after the hljs scripts in client mode" do
       config = Hwaro::Models::HighlightConfig.new
       config.mode = "client"

@@ -110,7 +110,7 @@ def main():
 | `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
 | `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
 | `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
-| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode). Same syntax and physical-line semantics as `hl_lines`. |
+| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode only — see below). Same syntax and physical-line semantics as `hl_lines`. |
 | `copy` | `true` / `false` | Show a copy-to-clipboard button on this block. Overrides the `[highlight] copy` default. Ignored on `mermaid` fences. |
 | `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
 
@@ -141,6 +141,11 @@ unlike Zola, which renumbers the remaining lines. This keeps the
 documented invariant that `hl_lines` and `linenostart` always target the
 block's physical lines, hidden or not (highlighting a hidden line is
 simply a no-op).
+
+Only `mode = "server"` actually removes hidden lines from the HTML. In
+client mode `hide_lines` is presentational-only metadata (an inert
+`data-hide-lines` attribute) — the lines remain in the page source. Do
+**not** use `hide_lines` to redact secrets in client mode.
 
 **Server vs client mode:**
 
@@ -180,10 +185,13 @@ copy = true
 The markup contract: each opted-in block's `<pre>` gets a
 `data-copy="true"` attribute, and `{{ highlight_js }}` injects a small
 inline, dependency-free runtime (works in both server and client mode)
-that wraps each `pre[data-copy]` in a `<div class="code-wrapper">`,
-appends a `<button class="code-copy-btn">`, and copies the code's text
-on click. The inline styles are theme-neutral (currentColor,
-hover-reveal); scaffolded sites override them with token-based styles.
+that wraps each `pre[data-copy]` in a `<div class="code-wrapper">` —
+reusing an existing `.code-block` wrapper (named fences) as the anchor
+instead — appends a `<button class="code-copy-btn">`, and copies the
+code's text on click (server-mode `.ln` line-number gutters are stripped
+from the copied text). The inline styles are theme-neutral
+(currentColor, hover-reveal); scaffolded sites override them with
+token-based styles.
 
 `mermaid` fences never get the attribute — their `<pre>` shape is owned
 by the Mermaid pipeline.

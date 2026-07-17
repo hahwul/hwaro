@@ -204,15 +204,19 @@ module Hwaro
             pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
 
             /* Fence filename label: {name="main.cr"} / {title="..."} */
-            .code-block { margin: var(--space-md, 1rem) 0; }
+            .code-block { position: relative; margin: var(--space-md, 1rem) 0; }
             .code-block > pre { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
             .code-filename { padding: 0.35rem 0.85rem; font-family: var(--font-mono, monospace); font-size: 0.78rem; color: var(--text-muted); background: color-mix(in srgb, var(--code-bg, var(--surface)) 88%, var(--text-muted)); border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 
-            /* Copy button: [highlight] copy / {copy=true} — overrides the inline theme-neutral styles from {{ highlight_js }} */
+            /* Copy button: [highlight] copy / {copy=true}. The theme-neutral inline
+               styles from {{ highlight_js }} ship in-body AFTER this stylesheet, so
+               at equal specificity they would win — the doubled .code-copy-btn class
+               keeps every token-based rule here strictly more specific. Named blocks
+               anchor the button on .code-block itself (no extra wrapper). */
             .code-wrapper { position: relative; }
-            .code-copy-btn { position: absolute; top: 0.45rem; right: 0.45rem; padding: 0.25rem 0.6rem; font-family: var(--font-mono, monospace); font-size: 0.72rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); opacity: 0; cursor: pointer; transition: opacity 0.15s ease; }
-            .code-wrapper:hover .code-copy-btn, .code-copy-btn:focus-visible { opacity: 1; }
-            .code-copy-btn.copied { opacity: 1; color: var(--code-string); border-color: var(--code-string); }
+            .code-copy-btn.code-copy-btn { position: absolute; top: 0.45rem; right: 0.45rem; padding: 0.25rem 0.6rem; font-family: var(--font-mono, monospace); font-size: 0.72rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); opacity: 0; cursor: pointer; transition: opacity 0.15s ease; }
+            .code-wrapper:hover .code-copy-btn.code-copy-btn, .code-block:hover .code-copy-btn.code-copy-btn, .code-copy-btn.code-copy-btn:focus-visible { opacity: 1; }
+            .code-copy-btn.code-copy-btn.copied { opacity: 1; color: var(--code-string); border-color: var(--code-string); }
             CSS
         end
 
