@@ -64,7 +64,7 @@ checked: 50 links, 3 dead
 ```
 
 In a color terminal each dead link renders as a `✗ file` item with a `→ url
-status` detail line under an `● check-links` heading, closed by a `▴ checked`
+status` detail line under an `hwaro check-links` heading, closed by a `✦ checked`
 outcome (`checked: 50 links · all healthy` when everything resolves). The
 command exits non-zero when dead links are found, so it can gate CI.
 

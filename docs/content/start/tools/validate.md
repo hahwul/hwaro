@@ -52,8 +52,8 @@ content/about.md:
 checked: 0 errors, 2 warnings, 2 info
 ```
 
-In a color terminal the findings use `⚠`/`✗`/`ℹ` glyphs under an `● validate`
-heading, and the closing line is a severity-colored `▴ checked` outcome. The
+In a color terminal the findings use `⚠`/`✗`/`ℹ` glyphs under an `hwaro validate`
+heading, and the closing line is a severity-colored `✦ checked` outcome. The
 command exits non-zero when error-level issues are found, so it can gate CI.
 
 ## Rule IDs

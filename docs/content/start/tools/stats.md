@@ -46,8 +46,8 @@ monthly:
 counted: 42 files, 38 published, 4 drafts
 ```
 
-In a color terminal the same report renders as an `● stats` heading, aligned
-receipt rows, proportional bar charts, and a `▴ counted` outcome line. When
+In a color terminal the same report renders as an `hwaro stats` heading, aligned
+receipt rows, proportional bar charts, and a `✦ counted` outcome line. When
 there are more than 15 tags, only the top 15 are charted (`tags: top 15`).
 
 ## JSON Output
