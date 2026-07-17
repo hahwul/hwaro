@@ -224,6 +224,41 @@ describe Hwaro::Core::Build::Builder do
     end
   end
 
+  describe "#run_rerender feed templates" do
+    it "regenerates the feed when only the feed template changed (zero pages re-render)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", <<-TOML)
+            title = "T"
+            base_url = "http://localhost"
+
+            [feeds]
+            enabled = true
+            TOML
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\ndate: 2026-03-05\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+          File.write("templates/rss.xml.jinja", "FEED-V1 items={{ pages | length }}")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.read("public/rss.xml").should contain("FEED-V1 items=1")
+
+          # Edit ONLY the feed template. No page uses it as an entry
+          # template, so the selective re-render picks zero pages — but the
+          # feed output on disk must still refresh, or serve keeps shipping
+          # the stale bytes until an unrelated content edit.
+          File.write("templates/rss.xml.jinja", "FEED-V2 items={{ pages | length }}")
+          builder.run_rerender(options)
+
+          File.read("public/rss.xml").should contain("FEED-V2 items=1")
+        end
+      end
+    end
+  end
+
   describe "template snapshot consistency" do
     it "renders with the loaded template snapshot even when a partial changed on disk" do
       Dir.mktmpdir do |dir|

@@ -964,6 +964,16 @@ module Hwaro
           # may have introduced or resolved a slug/alias collision.
           @output_url_winners = compute_output_url_winners(all_pages)
 
+          # User feed templates (rss.xml/atom.xml overrides) are not entry
+          # templates for any page, so an edit to one — or to a partial they
+          # include (dependents_closure above already folded includes) —
+          # selects ZERO pages to re-render. The feed output still changed:
+          # force the SEO-surface refresh and per-term taxonomy feed
+          # regeneration below. Nil affected_templates means "anything may
+          # have changed", which both conditions already treat as affected.
+          feed_templates_affected = affected_templates.nil? ||
+                                    Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| affected_templates.includes?(key) }
+
           error_overlay = options.error_overlay
           count = if pages_to_render.empty?
                     0
@@ -985,6 +995,7 @@ module Hwaro
           # pages may have changed taxonomy membership — regenerate then too.
           taxonomy_sections = if affected_templates.nil? ||
                                  (force_pages && !force_pages.empty?) ||
+                                 feed_templates_affected ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
                               else
@@ -995,8 +1006,10 @@ module Hwaro
           # (run_incremental_then_rerender) or shortcode/hook template edits
           # that rewrote the page.content / summary_html that sitemap, feeds,
           # search, and llms embed. Refresh those surfaces. A pure layout
-          # edit still skips this — template output doesn't feed them.
-          if summaries_affected
+          # edit still skips this — template output doesn't feed them —
+          # UNLESS the edit touched a user feed template, whose output IS a
+          # generated surface (see feed_templates_affected above).
+          if summaries_affected || feed_templates_affected
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
             regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
@@ -1442,6 +1455,33 @@ module Hwaro
           path.lchop("#{root}/")
         end
 
+        # Renderer over user feed templates (templates/rss.xml.jinja /
+        # atom.xml.jinja, loaded under the keys "rss.xml"/"atom.xml"). Nil
+        # when no override template exists so the feed generators keep the
+        # zero-cost programmatic path. The proc renders with a FRESH Crinja
+        # environment per call — the shared env is not MT-safe (with_scope
+        # mutates the env) and the SEO tasks that generate feeds run in
+        # parallel fibers. create_fresh_crinja_env carries the snapshot
+        # template loader, so `{% include %}` inside a feed template works.
+        def feed_template_renderer : Content::Seo::Feeds::Renderer?
+          return nil unless feed_template_present?
+
+          ->(source : String, context : Hash(String, Crinja::Value)) do
+            env = create_fresh_crinja_env
+            env.from_string(source).render(context)
+          end
+        end
+
+        # True when a user feed template override is loaded. Also consulted
+        # by the Generate phase's skip-if-unchanged gate: a template-only
+        # edit doesn't touch content, so a warm --cache build would keep the
+        # stale feed on disk if feeds were skipped.
+        def feed_template_present? : Bool
+          templates = @templates
+          return false unless templates
+          Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| templates.has_key?(key) }
+        end
+
         # Regenerate the lightweight SEO/search surfaces (sitemap, feeds, llms,
         # search index, optionally robots) for the given page set. Each
         # generator writes a distinct output file with no shared in-process
@@ -1456,7 +1496,7 @@ module Hwaro
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose); nil },
+            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer); nil },
           ] of Proc(Nil)
           # Robots slots in right after Feeds — its original position in the
           # incremental path — so sequential (--no-parallel) output ordering is

@@ -440,3 +440,66 @@ describe "SEO: JSON-LD by page type" do
     end
   end
 end
+
+describe "SEO: Custom feed templates" do
+  it "renders the feed through templates/rss.xml.jinja for all feed surfaces" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [feeds]
+      enabled = true
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\ngenerate_feeds: true\n---\n",
+        "blog/post.md"   => "---\ntitle: My Post\ndate: 2026-03-05\n---\nBody",
+      },
+      template_files: {
+        "page.html"     => "{{ content }}",
+        "section.html"  => "{{ content }}",
+        "rss.xml.jinja" => "OVERRIDE kind={{ feed.kind }} first={{ pages[0].title | xml_escape }}",
+      },
+    ) do
+      File.read("public/rss.xml").should eq("OVERRIDE kind=main first=My Post")
+      File.read("public/blog/rss.xml").should eq("OVERRIDE kind=section first=My Post")
+    end
+  end
+
+  # Staleness regression: with --cache and zero re-rendered pages, the
+  # Generate phase used to skip feeds entirely. A feed-template-only edit
+  # between two warm builds must still refresh rss.xml.
+  it "regenerates the feed on a warm cache build after a template-only edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "Test Site"
+          base_url = "http://localhost"
+
+          [feeds]
+          enabled = true
+          TOML
+        FileUtils.mkdir_p("content")
+        File.write("content/post.md", "---\ntitle: Post\ndate: 2026-03-05\n---\nBody")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/rss.xml.jinja", "FEED-V1")
+
+        # Cold build (no hooks: exercises the Generate phase's default
+        # skip-if-unchanged path, which the hook-based CLI flow bypasses).
+        builder1 = Hwaro::Core::Build::Builder.new
+        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        File.read("public/rss.xml").should eq("FEED-V1")
+
+        # Template-only edit, then a warm build in a fresh process: every
+        # page is a cache hit (0 rendered), but the feed must not skip.
+        File.write("templates/rss.xml.jinja", "FEED-V2")
+        builder2 = Hwaro::Core::Build::Builder.new
+        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        File.read("public/rss.xml").should eq("FEED-V2")
+      end
+    end
+  end
+end

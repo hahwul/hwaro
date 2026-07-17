@@ -38,8 +38,13 @@ module Hwaro
           # Generate sitemap
           Content::Seo::Sitemap.generate(all_pages, site, ctx.output_dir, ctx.options.verbose)
 
-          # Generate feeds (RSS/Atom)
-          Content::Seo::Feeds.generate(all_pages, site.config, ctx.output_dir, ctx.options.verbose)
+          # Generate feeds (RSS/Atom). User feed templates (rss.xml/atom.xml
+          # keys) override the built-in output; the renderer comes from the
+          # builder so hook-based generation matches the default Generate
+          # phase.
+          Content::Seo::Feeds.generate(all_pages, site.config, ctx.output_dir, ctx.options.verbose,
+            templates: ctx.templates.empty? ? nil : ctx.templates,
+            renderer: ctx.builder.try(&.feed_template_renderer))
 
           # Generate robots.txt
           Content::Seo::Robots.generate(site.config, ctx.output_dir, ctx.options.verbose)
