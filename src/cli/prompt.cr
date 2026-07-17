@@ -11,7 +11,7 @@ module Hwaro
     #     Logger.io = IO::Memory.new
     #     Prompt.input = IO::Memory.new("My Title\n\n")
     #
-    # Every prompt is styled with the shared "ember" identity (the `◇` ready
+    # Every prompt is styled with the shared "ember" identity (the `◇` prompt
     # glyph + a dim default hint) and degrades to plain text under
     # `NO_COLOR` / non-TTY, so piped or captured output stays clean.
     #
@@ -63,7 +63,7 @@ module Hwaro
       # is capitalised in the `[Y/n]` / `[y/N]` hint. Returns `nil` on EOF.
       def self.confirm?(label : String, default : Bool = false) : Bool?
         suffix = default ? "[Y/n]" : "[y/N]"
-        Logger.io.print "  #{Logger.glyph(:ready)} #{Logger.paint(label, Logger::Role::Plain, bold: true)} #{Logger.paint(suffix, Logger::Role::Dim)} "
+        Logger.io.print "  #{Logger.glyph(:prompt)} #{Logger.paint(label, Logger::Role::Plain, bold: true)} #{Logger.paint(suffix, Logger::Role::Dim)} "
         Logger.io.flush
         line = @@input.gets
         return if line.nil?
@@ -79,7 +79,7 @@ module Hwaro
       def self.select(label : String, choices : Array(String), skip_hint : String = "Enter to skip") : String?
         return if choices.empty?
         loop do
-          Logger.io.puts "  #{Logger.glyph(:ready)} #{Logger.paint(label, Logger::Role::Plain, bold: true)} #{Logger.paint("(#{skip_hint})", Logger::Role::Dim)}"
+          Logger.io.puts "  #{Logger.glyph(:prompt)} #{Logger.paint(label, Logger::Role::Plain, bold: true)} #{Logger.paint("(#{skip_hint})", Logger::Role::Dim)}"
           choices.each_with_index do |choice, i|
             Logger.io.puts "      #{Logger.paint("#{i + 1})", Logger::Role::Dim)} #{choice}"
           end
@@ -101,7 +101,7 @@ module Hwaro
 
       private def self.emit_label(label : String, default : String?) : Nil
         hint = (default && !default.empty?) ? " #{Logger.paint("[#{default}]", Logger::Role::Dim)}" : ""
-        Logger.io.print "  #{Logger.glyph(:ready)} #{Logger.paint(label, Logger::Role::Plain, bold: true)}#{hint} "
+        Logger.io.print "  #{Logger.glyph(:prompt)} #{Logger.paint(label, Logger::Role::Plain, bold: true)}#{hint} "
         Logger.io.flush
       end
     end

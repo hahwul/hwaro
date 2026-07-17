@@ -100,5 +100,5 @@ exported: 38 files, 4 skipped
 ```
 
 An `errors` count is appended only when errors occurred. In a color terminal
-the same report renders as an `● export` heading with aligned rows and an
-`▴ exported` outcome line.
+the same report renders as an `hwaro export` heading with aligned rows and a
+`✦ exported` outcome line.

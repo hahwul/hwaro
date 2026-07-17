@@ -287,9 +287,8 @@ module Hwaro
       :warn      => {"⚠", "[warn]", Role::Warn},
       :err       => {"✗", "[err]", Role::Error},
       :info      => {"ℹ", "[info]", Role::Dim},
-      :result    => {"▴", "*", Role::Accent},
-      :heading   => {"●", "#", Role::Accent},
-      :ready     => {"◇", ">", Role::Accent},
+      :result    => {"✦", "*", Role::Accent},
+      :prompt    => {"◇", ">", Role::Accent},
       :watch     => {"↻", "~", Role::Accent},
       :bullet    => {"·", "-", Role::Dim},
       :arrow     => {"→", "->", Role::Dim},
@@ -313,11 +312,11 @@ module Hwaro
     end
 
     # A single body line inside a command's report: a glyph and a message on
-    # the 4-space grid (6 spaces for continuation detail under an item). The
+    # the 2-space grid (4 spaces for continuation detail under an item). The
     # glyph names the item's severity (`:ok`/`:warn`/`:err`/`:info`) or shape
     # (`:bullet` for neutral lists, `:arrow` for from→to detail). This is the
     # one way findings render, so doctor / validate / check-links agree.
-    def self.item(message : String, glyph glyph_key : Symbol = :bullet, indent : Int32 = 4) : Nil
+    def self.item(message : String, glyph glyph_key : Symbol = :bullet, indent : Int32 = 2) : Nil
       return if @@quiet
       clear_active_line
       @@io.puts "#{" " * indent}#{glyph(glyph_key)} #{message}"
@@ -330,7 +329,7 @@ module Hwaro
       return if @@quiet
       clear_active_line
       if color_enabled?
-        line = "    #{paint(label, Role::Dim, bold: true)}"
+        line = "  #{paint(label, Role::Dim, bold: true)}"
         line += "#{paint(" · ", Role::Dim)}#{paint(note, Role::Dim)}" if note
         @@io.puts line
       else
@@ -352,64 +351,62 @@ module Hwaro
       end
     end
 
-    # Total visible width of a receipt heading / divider rule.
-    RECEIPT_WIDTH = 48
-
-    # TTY form of a command heading: "  ● kind  title ───────". The glyph and
-    # rule are dim/ember; the trailing rule fills to RECEIPT_WIDTH. Used by
-    # `heading` and by `Receipt`.
+    # TTY form of a command heading: "hwaro build title" at column 0 — the
+    # ember-bold wordmark, the bold command word, and an optional dim title.
+    # No glyph and no trailing rule: the flat layout structures output with
+    # whitespace and alignment alone. Used by `heading` and by `Receipt`.
     def self.heading_str(kind : String, title : String? = nil) : String
-      head = "#{glyph(:heading)} #{paint(kind, Role::Dim, bold: true)}"
-      visible = 4 + kind.size # 2 indent + glyph + space + kind
+      head = "#{paint("hwaro", Role::Accent, bold: true)} #{paint(kind, Role::Plain, bold: true)}"
       if t = title
-        head = "#{head} #{paint(t, Role::Plain, bold: true)}"
-        visible += 1 + t.size
+        head = "#{head} #{paint(t, Role::Dim)}"
       end
-      fill = RECEIPT_WIDTH - visible - 1
-      fill > 0 ? "  #{head} #{paint("─" * fill, Role::Dim)}" : "  #{head}"
+      head
     end
 
-    # Print a command heading. No-ops in quiet; degrades to "hwaro: kind title"
-    # when color is off (no glyph, no rule; middots flattened like the other
-    # plain forms).
+    # Print a command heading followed by a blank line — the breathing room
+    # the flat layout leans on. No-ops in quiet; degrades to a single
+    # "hwaro: kind title" line when color is off (no blank line; middots
+    # flattened like the other plain forms).
     def self.heading(kind : String, title : String? = nil) : Nil
       return if @@quiet
       clear_active_line
       if color_enabled?
         @@io.puts heading_str(kind, title)
+        @@io.puts
       else
         @@io.puts(title ? "hwaro: #{kind} #{title.gsub(" · ", ", ")}" : "hwaro: #{kind}")
       end
     end
 
-    # Build the single outcome line. `col` left-pads the verb so it aligns with
-    # a receipt's row labels. Plain form is "verb: value[ in dur]" with the
-    # middot separators flattened to commas.
-    def self.outcome_str(verb : String, value : String, glyph : Symbol, ms : Float64?, col : Int32, plain : Bool) : String
+    # Build the single outcome line: "✦ verb value · dur" at column 0. Plain
+    # form is "verb: value[ in dur]" with the middot separators flattened to
+    # commas.
+    def self.outcome_str(verb : String, value : String, glyph : Symbol, ms : Float64?, plain : Bool) : String
       if plain
         line = "#{verb}: #{value.gsub(" · ", ", ")}"
         line += " in #{dur(ms)}" if ms
         line
       else
-        line = "  #{self.glyph(glyph)} #{paint(verb.ljust(col), Role::Accent, bold: true)}  #{value}"
-        line += "#{paint("  ·  ", Role::Dim)}#{paint(dur(ms), Role::Dim)}" if ms
+        line = "#{self.glyph(glyph)} #{paint(verb, Role::Accent, bold: true)} #{value}"
+        line += "#{paint(" · ", Role::Dim)}#{paint(dur(ms), Role::Dim)}" if ms
         line
       end
     end
 
     # Print a standalone outcome line — the one warm ember beat a command ends
-    # on (`▴ created  path`). The glyph signals severity (`:result` ember,
+    # on (`✦ created path`). The glyph signals severity (`:result` spark,
     # `:warn`/`:err` for problems) while the verb is always ember.
-    def self.outcome(verb : String, value : String, glyph : Symbol = :result, ms : Float64? = nil, col : Int32 = 0) : Nil
+    def self.outcome(verb : String, value : String, glyph : Symbol = :result, ms : Float64? = nil) : Nil
       return if @@quiet
       clear_active_line
-      @@io.puts outcome_str(verb, value, glyph, ms, col, !color_enabled?)
+      @@io.puts outcome_str(verb, value, glyph, ms, !color_enabled?)
     end
 
-    # A calm, aligned summary block: a heading, key/value rows, a divider, and
-    # one ember outcome line. Pure data → string, so it renders identically and
-    # testably without a live terminal. `render_tty` is emitted only when color
-    # is on; `render_plain` is the escape-free fallback for pipes / CI.
+    # A calm, aligned summary block: a heading, key/value rows, and one ember
+    # outcome line, separated by blank lines instead of rules. Pure data →
+    # string, so it renders identically and testably without a live terminal.
+    # `render_tty` is emitted only when color is on; `render_plain` is the
+    # escape-free fallback for pipes / CI.
     class Receipt
       private record Row,
         label : String,
@@ -448,19 +445,14 @@ module Hwaro
         io.puts(Logger.color_enabled? ? render_tty : render_plain)
       end
 
-      # Label column width: the longest row label, also covering the outcome
-      # verb so row values and the outcome value share one column.
+      # Label column width: the longest row label, so row values align.
       private def col : Int32
-        w = @rows.max_of?(&.label.size) || 0
-        if o = @outcome
-          w = {w, o[:verb].size}.max
-        end
-        w
+        @rows.max_of?(&.label.size) || 0
       end
 
       def render_tty : String
         width = col
-        lines = [Logger.heading_str(@kind, @title)]
+        lines = [Logger.heading_str(@kind, @title), ""]
         @rows.each do |r|
           cell = Logger.paint(r.value, r.role)
           if e = r.emphasis
@@ -469,11 +461,11 @@ module Hwaro
           if d = r.detail
             cell = "#{cell}#{Logger.paint(" · ", Role::Dim)}#{Logger.paint(d, Role::Dim)}"
           end
-          lines << "    #{Logger.paint(r.label.ljust(width), Role::Dim)}  #{cell}"
+          lines << "  #{Logger.paint(r.label.ljust(width), Role::Dim)}  #{cell}"
         end
         if o = @outcome
-          lines << "  #{Logger.paint("─" * (RECEIPT_WIDTH - 2), Role::Dim)}"
-          lines << Logger.outcome_str(o[:verb], o[:value], o[:glyph], o[:ms], width, false)
+          lines << ""
+          lines << Logger.outcome_str(o[:verb], o[:value], o[:glyph], o[:ms], false)
         end
         lines.join("\n")
       end
@@ -486,7 +478,7 @@ module Hwaro
           lines << "#{r.label}: #{val}"
         end
         if o = @outcome
-          lines << Logger.outcome_str(o[:verb], o[:value], o[:glyph], o[:ms], 0, true)
+          lines << Logger.outcome_str(o[:verb], o[:value], o[:glyph], o[:ms], true)
         end
         lines.join("\n")
       end

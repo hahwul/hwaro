@@ -91,7 +91,9 @@ module Hwaro
               return
             end
 
-            Logger.info ""
+            # TTY already gets its blank line from `heading`; keep the plain
+            # form's historical blank so piped output stays byte-identical.
+            Logger.info "" unless Logger.color_enabled?
 
             # Group by file: a dim file label, then one glyph item per issue.
             # Same severity glyphs as `tool doctor` so findings read the same
@@ -125,7 +127,7 @@ module Hwaro
                     when :warning then :warn
                     else               :info
                     end
-            Logger.item(issue.message, glyph: glyph, indent: 6)
+            Logger.item(issue.message, glyph: glyph, indent: 4)
           end
         end
       end

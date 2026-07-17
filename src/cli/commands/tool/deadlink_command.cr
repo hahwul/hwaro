@@ -177,24 +177,26 @@ module Hwaro
             links_noun = total == 1 ? "link" : "links"
 
             if dead_total == 0 && skipped_external.empty?
+              Logger.info "" if Logger.color_enabled?
               Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
             else
               Logger.info "" if dead_total > 0 || !skipped_external.empty?
               skipped_external.each do |result|
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :info)
                 detail = "#{sanitize_for_terminal(result.link.url)} — #{sanitize_for_terminal(result.error.to_s)}"
-                Logger.item(detail, glyph: :arrow, indent: 6)
+                Logger.item(detail, glyph: :arrow, indent: 4)
               end
               dead_external.each do |result|
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
                 detail = "#{sanitize_for_terminal(result.link.url)}  #{result.status}"
                 detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
-                Logger.item(detail, glyph: :arrow, indent: 6)
+                Logger.item(detail, glyph: :arrow, indent: 4)
               end
               dead_internal.each do |result|
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
-                Logger.item("#{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}", glyph: :arrow, indent: 6)
+                Logger.item("#{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}", glyph: :arrow, indent: 4)
               end
+              Logger.info "" if Logger.color_enabled?
               if dead_total == 0
                 Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
               else

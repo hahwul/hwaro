@@ -513,8 +513,8 @@ describe Hwaro::Logger do
 
     it "uses unicode glyphs when color is enabled" do
       Hwaro::Logger.color_enabled = true
-      Hwaro::Logger.glyph(:result).should contain("▴")
-      Hwaro::Logger.glyph(:heading).should contain("●")
+      Hwaro::Logger.glyph(:result).should contain("✦")
+      Hwaro::Logger.glyph(:prompt).should contain("◇")
     ensure
       Hwaro::Logger.color_enabled = nil
     end
@@ -539,16 +539,23 @@ describe Hwaro::Logger do
       out.should_not contain("\e[")
     end
 
-    it "includes the heading and outcome glyphs in the tty render" do
+    it "renders wordmark heading, blank-line rhythm, and a spark outcome on tty" do
       Hwaro::Logger.color_enabled = true
       r = Hwaro::Logger::Receipt.new("build")
       r.row("read", "x")
       r.row("generate", "y")
       r.outcome("built", "z")
       tty = r.render_tty
-      tty.should contain("●")
-      tty.should contain("▴")
-      tty.should contain("─")
+      lines = tty.lines
+      lines.first.should contain("hwaro")
+      lines.first.should contain("build")
+      lines[1].should eq("")
+      lines[-2].should eq("")
+      lines.last.should contain("✦")
+      lines.last.should contain("built")
+      tty.should_not contain("─")
+      tty.should_not contain("●")
+      tty.should_not contain("▴")
     ensure
       Hwaro::Logger.color_enabled = nil
     end
@@ -570,13 +577,49 @@ describe Hwaro::Logger do
     ensure
       Hwaro::Logger.quiet = false
     end
+
+    it "prints a column-0 spark line with a middot duration on tty" do
+      Hwaro::Logger.color_enabled = true
+      out = capture_logger_output { Hwaro::Logger.outcome("built", "42 pages", ms: 1180.5) }
+      out.should contain("✦")
+      out.should contain("built")
+      out.should contain("42 pages")
+      out.should contain("1.18s")
+      out.should_not start_with(" ") # the spark sits at column 0
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+  end
+
+  describe ".heading" do
+    it "prints `hwaro: kind title` when color is off" do
+      Hwaro::Logger.color_enabled = false
+      out = capture_logger_output { Hwaro::Logger.heading("build", "my-site") }
+      out.should eq("hwaro: build my-site\n")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
+
+    it "prints the wordmark heading followed by a blank line on tty" do
+      Hwaro::Logger.color_enabled = true
+      out = capture_logger_output { Hwaro::Logger.heading("build") }
+      lines = out.lines
+      lines.size.should eq(2)
+      lines.first.should contain("hwaro")
+      lines.first.should contain("build")
+      lines[1].should eq("")
+      out.should_not contain("●")
+      out.should_not contain("─")
+    ensure
+      Hwaro::Logger.color_enabled = nil
+    end
   end
 
   describe ".item" do
     it "prints an indented ascii-glyph line when color is off" do
       Hwaro::Logger.color_enabled = false
       out = capture_logger_output { Hwaro::Logger.item("posts/a.md is fine", glyph: :ok) }
-      out.should eq("    [ok] posts/a.md is fine\n")
+      out.should eq("  [ok] posts/a.md is fine\n")
       out.should_not contain("\e[")
     ensure
       Hwaro::Logger.color_enabled = nil
@@ -625,10 +668,11 @@ describe Hwaro::Logger do
       Hwaro::Logger.color_enabled = nil
     end
 
-    it "joins label and annotation with a middot on the 4-space grid in tty mode" do
+    it "joins label and annotation with a middot on the 2-space grid in tty mode" do
       Hwaro::Logger.color_enabled = true
       out = capture_logger_output { Hwaro::Logger.section("tags", "top 15") }
-      out.should start_with("    ")
+      out.should start_with("  ")
+      out.should_not start_with("    ")
       out.should contain("·")
       out.should contain("top 15")
     ensure

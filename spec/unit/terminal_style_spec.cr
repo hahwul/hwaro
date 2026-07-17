@@ -35,27 +35,30 @@ describe "terminal style lint" do
   end
 
   it "uses only GLYPHS-registry status glyphs in terminal output" do
-    banned = ["✔", "✘", "[DEAD]"]
-    # Tree connectors are registry glyphs (:tree_mid / :tree_last); a literal
-    # anywhere but the registry itself bypasses the ASCII fallback and the
-    # Dim paint, so it stays banned outside logger.cr.
-    connectors = ["├─", "└─"]
+    # ▴ and ● are retired Minimal Spark predecessors — they must not creep
+    # back in anywhere, not even logger.cr.
+    banned = ["✔", "✘", "[DEAD]", "▴", "●"]
+    # Registry glyphs (✦ via :result, tree connectors via :tree_mid /
+    # :tree_last); a literal anywhere but the registry itself bypasses the
+    # ASCII fallback and the role paint, so they stay banned outside logger.cr.
+    registry_only = ["✦", "├─", "└─"]
     offenders = output_surface_files.select do |path|
       content = File.read(path)
       next true if banned.any? { |glyph| content.includes?(glyph) }
-      path != "src/utils/logger.cr" && connectors.any? { |glyph| content.includes?(glyph) }
+      path != "src/utils/logger.cr" && registry_only.any? { |glyph| content.includes?(glyph) }
     end
     offenders.should be_empty
   end
 
-  it "does not hand-roll ASCII dash dividers" do
+  it "does not hand-roll ASCII or box-drawing dash dividers" do
     allowed = [
       # Profiler table borders are part of its spec-pinned layout.
       "src/utils/profiler.cr",
     ]
     offenders = output_surface_files.select do |path|
       next false if allowed.includes?(path)
-      File.read(path).includes?(%("-" *))
+      content = File.read(path)
+      content.includes?(%("-" *)) || content.includes?(%("─" *))
     end
     offenders.should be_empty
   end

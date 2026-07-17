@@ -69,7 +69,7 @@ imported: 42 files, 3 skipped
 
 An `errors` count is appended only when errors occurred, and a warning reminds
 you about `--force` when files were skipped. In a color terminal the same
-report renders as an `● import` heading with aligned rows and an `▴ imported`
+report renders as an `hwaro import` heading with aligned rows and a `✦ imported`
 outcome line.
 
 ## See Also

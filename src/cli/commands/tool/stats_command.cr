@@ -108,10 +108,10 @@ module Hwaro
               max_count = top_tags.max_of { |_, count| count }
               label_width = top_tags.max_of { |tag, _| tag.size }.clamp(0, 20)
               top_tags.each do |tag, count|
-                Logger.info "      #{truncate_label(tag, label_width).ljust(label_width)}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+                Logger.info "    #{truncate_label(tag, label_width).ljust(label_width)}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
               end
               if result.tags.size > 15
-                Logger.info "      … and #{result.tags.size - 15} more"
+                Logger.info "    … and #{result.tags.size - 15} more"
               end
             end
 
@@ -121,7 +121,7 @@ module Hwaro
               Logger.section("monthly")
               max_count = result.monthly.max_of { |_, count| count }
               result.monthly.each do |month, count|
-                Logger.info "      #{month}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+                Logger.info "    #{month}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
               end
             end
 

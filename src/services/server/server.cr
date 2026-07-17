@@ -663,7 +663,10 @@ module Hwaro
         serve_receipt.row("url", url, Logger::Role::Accent)
         serve_receipt.row("reload", live_reload ? "enabled" : "disabled")
         serve_receipt.row("watch", "content · templates · static · data · i18n · config")
-        serve_receipt.outcome("ready", "Ctrl+C to stop", :ready)
+        serve_receipt.outcome("ready", "Ctrl+C to stop")
+        # Blank line separates the serve block from the initial build's
+        # receipt above it (TTY rhythm only; plain output stays byte-stable).
+        Logger.info "" if Logger.color_enabled?
         serve_receipt.emit
 
         if open_browser
@@ -977,14 +980,14 @@ module Hwaro
           Logger.info "  Previous rebuild failed — running a full rebuild to recover."
           strategy = :full
         end
-        # Calm watch timeline: one "↻ changed <what> · time" event, then the
-        # rebuild's own "▴ rebuilt …" outcome line below it, both on the same
-        # 2-space grid so the verbs and values column-align. The strategy is
-        # implied by that outcome (incremental N/M, re-render, full).
+        # Calm watch timeline: one "↻ <what> · time" event at column 0 (the ↻
+        # glyph carries "changed"), then the rebuild's own spark "rebuilt …"
+        # outcome line below it. The strategy is implied by that outcome
+        # (incremental N/M, re-render, full).
         timestamp = Time.local.to_s("%H:%M:%S")
         if Logger.color_enabled?
-          Logger.info "\n  #{Logger.glyph(:watch)} #{Logger.paint("changed", Logger::Role::Dim, bold: true)}  " \
-                      "#{changeset.display}#{Logger.paint("  ·  ", Logger::Role::Dim)}#{Logger.paint(timestamp, Logger::Role::Dim)}"
+          Logger.info "\n#{Logger.glyph(:watch)} #{changeset.display}" \
+                      "#{Logger.paint(" · ", Logger::Role::Dim)}#{Logger.paint(timestamp, Logger::Role::Dim)}"
         else
           Logger.info "\n~ #{timestamp}  changed  #{changeset.display}"
         end

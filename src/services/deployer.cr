@@ -423,6 +423,7 @@ module Hwaro
           )
         end
 
+        Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", target.name)
         true
       end
@@ -484,6 +485,7 @@ module Hwaro
         end
 
         remove_empty_directories(dest_dir_expanded)
+        Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", "#{dest_dir_expanded} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
         {true, counts}
       end
@@ -545,6 +547,7 @@ module Hwaro
         end
 
         remove_empty_directories(dest_dir)
+        Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", "#{dest_dir} · #{summary.copied} copied · #{summary.deleted} deleted · #{summary.skipped} skipped")
         true
       end

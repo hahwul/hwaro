@@ -66,8 +66,8 @@ unused files:
 found: 4 unused assets
 ```
 
-In a color terminal this renders as an `● unused-assets` receipt with aligned
-rows and a `▴ found` outcome line (`found: no unused assets` when everything is
+In a color terminal this renders as an `hwaro unused-assets` receipt with aligned
+rows and a `✦ found` outcome line (`found: no unused assets` when everything is
 referenced). With `--delete` the outcome becomes `deleted: N files` after
 confirmation, or `cancelled: no files deleted`.
 

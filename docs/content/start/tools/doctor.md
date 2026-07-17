@@ -107,7 +107,7 @@ Tip: Use 'hwaro tool validate' for content checks
 ```
 
 In a color terminal the check lines use `✓`/`⚠`/`✗`/`ℹ` glyphs under an
-`● doctor` heading, and the summary is a severity-colored `▴ checked` outcome
+`hwaro doctor` heading, and the summary is a severity-colored `✦ checked` outcome
 line. A clean run ends with `checked: no issues found — your site looks great`.
 
 ## Ignoring Known Issues

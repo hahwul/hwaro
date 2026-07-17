@@ -180,6 +180,7 @@ module Hwaro
 
         summary = "#{converted} files · #{skipped} skipped"
         summary += " · #{errors} errors" if errors > 0
+        Logger.info "" if Logger.color_enabled?
         Logger.outcome("converted", summary, glyph: errors > 0 ? :err : :result)
 
         ConversionResult.new(

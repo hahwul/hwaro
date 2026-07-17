@@ -106,6 +106,7 @@ module Hwaro
               Logger.item(file, glyph: :bullet)
             end
             Logger.item("dynamic references (e.g. template variables) may cause false positives", glyph: :info)
+            Logger.info "" if Logger.color_enabled?
 
             unless delete_mode
               Logger.outcome("found", "#{result.unused_count} unused #{result.unused_count == 1 ? "asset" : "assets"}", glyph: :warn)
