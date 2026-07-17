@@ -109,6 +109,7 @@ def main():
 | `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
 | `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
 | `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
+| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode). Same syntax and physical-line semantics as `hl_lines`. |
 | `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
 
 A named block is wrapped for styling (the `<pre>` inside is unchanged):
@@ -132,6 +133,13 @@ Setting `[highlight] line_numbers = true` turns line numbers on for
 *every* fenced code block with a language — a per-block `{linenos=false}`
 opts back out.
 
+Hidden lines keep consuming their physical line numbers, so with
+`linenos=true` the gutter shows a **gap** where lines were elided —
+unlike Zola, which renumbers the remaining lines. This keeps the
+documented invariant that `hl_lines` and `linenostart` always target the
+block's physical lines, hidden or not (highlighting a hidden line is
+simply a no-op).
+
 **Server vs client mode:**
 
 - `mode = "server"` (default) renders the full result at build time: each
@@ -139,9 +147,11 @@ opts back out.
   lines appear with no JavaScript.
 - `mode = "client"` does not re-render the body — instead the
   `<pre>` tag gets `data-linenos="true"`, `data-linenostart="N"` (when
-  greater than 1), and/or `data-hl-lines="2-4 7"` attributes, so a
-  client-side script or custom CSS can act on them. Hwaro ships no such
-  script for client mode; full rendering requires `mode = "server"`.
+  greater than 1), `data-hl-lines="2-4 7"`, and/or
+  `data-hide-lines="1 9-12"` attributes, so a client-side script or
+  custom CSS can act on them. Hwaro ships no such script for client
+  mode; full rendering (and actual line hiding) requires
+  `mode = "server"`.
 
 Scaffold sites style the server-mode markup out of the box. For a
 non-scaffold site, or a custom theme, add:

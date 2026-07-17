@@ -234,8 +234,8 @@ module Hwaro
       end
 
       # Parses the Zola/Pandoc-ish `{linenos=true, hl_lines="2-4 7",
-      # linenostart=5}` fence-info suffix that can follow a fenced code
-      # block's language token.
+      # linenostart=5, hide_lines="1 9-12"}` fence-info suffix that can
+      # follow a fenced code block's language token.
       #
       # Grammar: an info string is `LANG`, `LANG {OPTS}`, `LANG{OPTS}`, or
       # `{OPTS}`. It only ACTIVATES the options path when the stripped info
@@ -250,14 +250,19 @@ module Hwaro
         extend self
 
         # A parsed `{...}` fence-options block.
-        # `hl_lines` is stored as (start, end) ranges — NEVER expanded into
-        # a Set of individual line numbers, so a pathological
-        # `hl_lines="1-100000"` costs a handful of bytes, not 100k Int32s.
+        # `hl_lines` and `hide_lines` are stored as (start, end) ranges —
+        # NEVER expanded into a Set of individual line numbers, so a
+        # pathological `hl_lines="1-100000"` costs a handful of bytes, not
+        # 100k Int32s.
         # `name` is the filename/title label (`{name="main.cr"}`, `title=`
         # accepted as an alias) rendered above the code block.
-        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, name : String? = nil do
+        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, name : String? = nil, hide_lines : Array({Int32, Int32}) = [] of {Int32, Int32} do
           def hl?(physical_line : Int32) : Bool
             hl_lines.any? { |(a, b)| physical_line >= a && physical_line <= b }
+          end
+
+          def hidden?(physical_line : Int32) : Bool
+            hide_lines.any? { |(a, b)| physical_line >= a && physical_line <= b }
           end
         end
 
@@ -306,6 +311,7 @@ module Hwaro
           linenos : Bool? = nil
           linenostart = 1
           hl_lines = [] of {Int32, Int32}
+          hide_lines = [] of {Int32, Int32}
           name : String? = nil
           recognized = 0
 
@@ -340,6 +346,12 @@ module Hwaro
                 hl_lines = ranges
                 recognized += 1
               end
+            when "hide_lines"
+              ranges = parse_hl_lines(value)
+              unless ranges.empty?
+                hide_lines = ranges
+                recognized += 1
+              end
             else
               # Unknown key — ignored, doesn't count toward activation.
             end
@@ -348,7 +360,7 @@ module Hwaro
           return {legacy_lang, nil} if recognized == 0
 
           lang = stripped[0, brace_index].strip.split.first?.try(&.presence)
-          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines, name: name)}
+          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines, name: name, hide_lines: hide_lines)}
         end
 
         # Scans `key=value` pairs from the start of `inner`. Returns the
@@ -469,14 +481,21 @@ module Hwaro
         # Wraps each physical line of already-highlighted `body` in a
         # `<span class="line">` (` hl` appended for highlighted lines),
         # optionally prefixing a `<span class="ln">` gutter number.
-        # `hl_lines` ranges are matched against the PHYSICAL 1-based line
-        # number — never shifted by `linenostart`.
+        # `hl_lines`/`hide_lines` ranges are matched against the PHYSICAL
+        # 1-based line number — never shifted by `linenostart`.
+        #
+        # Hidden lines are elided from the output but KEEP consuming their
+        # physical line numbers, so the gutter shows gaps (unlike Zola,
+        # which renumbers). This preserves the documented invariant that
+        # `hl_lines` and `linenostart` always target physical lines.
         def wrap(body : String, linenos : Bool, start : Int32, opts : FenceOptions::Options) : String
           lines = split_lines(body)
+          # Gutter width spans the full physical range, elided lines included.
           width = (start + lines.size - 1).to_s.size
 
           String.build do |io|
             lines.each_with_index do |line, i|
+              next if opts.hidden?(i + 1)
               hl = opts.hl?(i + 1)
               io << %(<span class="line) << (hl ? " hl" : "") << %(">)
               if linenos
@@ -533,7 +552,7 @@ module Hwaro
 
           if opts
             linenos = effective_linenos(opts)
-            active = linenos || !opts.hl_lines.empty?
+            active = linenos || !opts.hl_lines.empty? || !opts.hide_lines.empty?
 
             if active && @highlight_enabled && @server_mode
               body = highlight_lang && (highlighted = ServerHighlighter.highlight(node.text, highlight_lang)) ? highlighted : escape(node.text)
@@ -574,7 +593,7 @@ module Hwaro
 
           if opts
             linenos = effective_linenos(opts)
-            active = linenos || !opts.hl_lines.empty?
+            active = linenos || !opts.hl_lines.empty? || !opts.hide_lines.empty?
             # Client-side attrs only: server mode bakes line numbers/hl
             # directly into the body, so the <pre> tag stays untouched.
             if active && !@server_mode
@@ -585,6 +604,10 @@ module Hwaro
               end
               unless opts.hl_lines.empty?
                 pre_tag_attrs["data-hl-lines"] = serialize_hl_lines(opts.hl_lines)
+              end
+              # Documented inert: Hwaro ships no client script acting on it.
+              unless opts.hide_lines.empty?
+                pre_tag_attrs["data-hide-lines"] = serialize_hl_lines(opts.hide_lines)
               end
             end
           end
