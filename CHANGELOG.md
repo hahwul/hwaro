@@ -9,6 +9,10 @@
 - Markdown render hooks for blockquotes and tables: `templates/hooks/render-blockquote.html` (`text`) and `templates/hooks/render-table.html` (`html`, `header_html`, `body_html`). GitHub-style `> [!NOTE]` blockquotes keep the admonition pipeline while `[markdown] admonitions = true`; the codeblock hook gains `copy`
 - Taxonomy sorting: per-taxonomy `sort_by` (`date`/`title`/`weight`) and `reverse` order the pages within each term (section semantics — date is newest-first, `reverse` flips), `terms_sort_by` (`name`/`count`) orders the terms list. Term feeds stay reverse-chronological regardless
 
+- Hugo-style token permalinks: `[permalinks]` values may contain `:year`/`:month`/`:day`/`:slug`/`:title`/`:section`/`:filename` segments that rebuild the whole URL for leaf pages (`"posts" = "/:year/:month/:day/:slug/"`); plain values keep the existing directory-remap semantics, unknown tokens fail the config load, and a dateless page under a date-token pattern fails the build with a fix-it hint
+- `[links] broken_internal = "error"` fails the build (exit code 5) with one aggregated list of every unresolved `@/` internal link — `source.md → @/target (reason)` per line; the default `"warn"` keeps today's log-and-continue behavior
+- Custom feed templates: `templates/rss.xml.jinja` / `atom.xml.jinja` override the built-in feed markup for all feed kinds (main, per-section, per-language, per-taxonomy-term) with a precomputed context (absolute encoded URLs, RFC 822/3339 dates, summaries, absolutized HTML); the built-in output remains the fallback when no template exists, and feed-template edits refresh feeds on warm `--cache` builds and `serve` re-renders
+
 ### Changed
 - **Breaking:** `[highlight] mode` now defaults to `"server"` — code blocks are highlighted at build time (Tartrazine, same `hljs-*` classes, theme CSS keeps working) and `{{ highlight_js }}` renders empty by default. Set `mode = "client"` to restore browser-side Highlight.js; all pages re-render once after upgrading
 - `get_taxonomy().items` is now name-sorted (alphabetical) by default instead of unspecified insertion order; set `terms_sort_by = "count"` for count-descending
