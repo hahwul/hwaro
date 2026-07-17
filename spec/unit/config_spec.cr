@@ -1050,6 +1050,7 @@ describe Hwaro::Models::Config do
       config.highlight.use_cdn.should be_true
       config.highlight.line_numbers.should be_false
       config.highlight.mode.should eq("server")
+      config.highlight.copy.should be_false
     end
 
     it "can update highlight settings" do
@@ -1113,6 +1114,17 @@ describe Hwaro::Models::Config do
         TOML
 
       config.highlight.line_numbers.should be_false
+    end
+
+    it "loads highlight copy = true from TOML (overrides default false)" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [highlight]
+        copy = true
+        TOML
+
+      config.highlight.copy.should be_true
     end
 
     it "loads highlight mode = \"client\" from TOML (overrides default server)" do

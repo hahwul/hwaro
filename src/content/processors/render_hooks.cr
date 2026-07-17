@@ -280,8 +280,10 @@ module Hwaro
           # highlighting didn't apply — templates choose between
           # `{{ highlighted }}` and `{{ code }}`. `name` is the parsed
           # `{name=...}`/`{title=...}` label ("" when absent) so templates
-          # don't have to re-parse `options`.
-          def render_codeblock(lang : String, options : String, code : String, highlighted : String, name : String = "") : String
+          # don't have to re-parse `options`. `copy` is `"true"` when the
+          # copy button applies to this block ("" otherwise) — templates
+          # decide what markup, if any, to emit for it.
+          def render_codeblock(lang : String, options : String, code : String, highlighted : String, name : String = "", copy : String = "") : String
             hook = @registry.codeblock
             return stock_codeblock(lang, code) unless hook
 
@@ -291,6 +293,7 @@ module Hwaro
             vars["code"] = Crinja::Value.new(code)
             vars["highlighted"] = Crinja::Value.new(highlighted)
             vars["name"] = Crinja::Value.new(name)
+            vars["copy"] = Crinja::Value.new(copy)
             render_hook_template("hooks/render-codeblock", hook, SALT_CODEBLOCK, vars) { stock_codeblock(lang, code) }
           end
 

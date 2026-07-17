@@ -73,6 +73,14 @@ describe Hwaro::Services::Scaffolds::DesignTokens do
       css.should contain("var(--code-string)")
       css.should_not match(/#[0-9a-f]{3,8}/i)
     end
+
+    it "styles the copy button through tokens (overrides the inline runtime styles)" do
+      css = Hwaro::Services::Scaffolds::DesignTokens.highlight_css
+      css.should contain(".code-wrapper")
+      css.should contain(".code-copy-btn")
+      css.should contain(".code-copy-btn.copied")
+      css.should_not match(/#[0-9a-f]{3,8}/i)
+    end
   end
 
   describe ".theme_toggle_css" do

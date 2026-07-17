@@ -264,6 +264,7 @@ module Hwaro
             # theme = "github"
             # use_cdn = true
             # line_numbers = false
+            # copy = false
 
             TOML
         else
@@ -284,6 +285,7 @@ module Hwaro
             theme = "github"          # Highlight.js theme name; the scaffold's inlined CSS overrides its colors
             use_cdn = true            # true loads Highlight.js from a CDN; false expects a self-hosted build
             line_numbers = false      # true adds line numbers to every fenced code block (override per-block with {linenos=false})
+            copy = true               # copy-to-clipboard button on code blocks (default false; override per-block with {copy=...})
 
             TOML
         end

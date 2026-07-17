@@ -59,6 +59,7 @@ mode = "server"
 | use_cdn | bool | true | Load assets from CDN (false = local files) |
 | mode | string | "server" | `"server"` highlights at build time; `"client"` highlights in the browser via Highlight.js |
 | line_numbers | bool | false | Add line numbers to every fenced code block by default (see below) |
+| copy | bool | false | Add a copy-to-clipboard button to fenced code blocks (see below) |
 
 ## Server-Side Highlighting (Default)
 
@@ -110,6 +111,7 @@ def main():
 | `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
 | `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
 | `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode). Same syntax and physical-line semantics as `hl_lines`. |
+| `copy` | `true` / `false` | Show a copy-to-clipboard button on this block. Overrides the `[highlight] copy` default. Ignored on `mermaid` fences. |
 | `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
 
 A named block is wrapped for styling (the `<pre>` inside is unchanged):
@@ -163,6 +165,30 @@ pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
 
 (Swap `var(--code-keyword)` for any color that fits your theme if you
 aren't using the Hwaro Ember token system.)
+
+## Copy Button
+
+`[highlight] copy = true` adds a copy-to-clipboard button to every fenced
+code block; a per-fence `{copy=false}` (or `{copy=true}` with the global
+default off) overrides it:
+
+```toml
+[highlight]
+copy = true
+```
+
+The markup contract: each opted-in block's `<pre>` gets a
+`data-copy="true"` attribute, and `{{ highlight_js }}` injects a small
+inline, dependency-free runtime (works in both server and client mode)
+that wraps each `pre[data-copy]` in a `<div class="code-wrapper">`,
+appends a `<button class="code-copy-btn">`, and copies the code's text
+on click. The inline styles are theme-neutral (currentColor,
+hover-reveal); scaffolded sites override them with token-based styles.
+
+`mermaid` fences never get the attribute — their `<pre>` shape is owned
+by the Mermaid pipeline.
+
+New scaffolded sites enable `copy = true` out of the box.
 
 ## Themes
 

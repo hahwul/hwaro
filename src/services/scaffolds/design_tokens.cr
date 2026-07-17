@@ -207,6 +207,12 @@ module Hwaro
             .code-block { margin: var(--space-md, 1rem) 0; }
             .code-block > pre { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
             .code-filename { padding: 0.35rem 0.85rem; font-family: var(--font-mono, monospace); font-size: 0.78rem; color: var(--text-muted); background: color-mix(in srgb, var(--code-bg, var(--surface)) 88%, var(--text-muted)); border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+
+            /* Copy button: [highlight] copy / {copy=true} — overrides the inline theme-neutral styles from {{ highlight_js }} */
+            .code-wrapper { position: relative; }
+            .code-copy-btn { position: absolute; top: 0.45rem; right: 0.45rem; padding: 0.25rem 0.6rem; font-family: var(--font-mono, monospace); font-size: 0.72rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); opacity: 0; cursor: pointer; transition: opacity 0.15s ease; }
+            .code-wrapper:hover .code-copy-btn, .code-copy-btn:focus-visible { opacity: 1; }
+            .code-copy-btn.copied { opacity: 1; color: var(--code-string); border-color: var(--code-string); }
             CSS
         end
 

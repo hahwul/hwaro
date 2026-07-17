@@ -302,6 +302,7 @@ describe Hwaro::Models::HighlightConfig do
     config.theme.should eq("github")
     config.use_cdn.should be_true
     config.mode.should eq("server")
+    config.copy.should be_false
   end
 
   describe "css_tag" do
@@ -328,6 +329,31 @@ describe Hwaro::Models::HighlightConfig do
   describe "js_tag" do
     it "returns empty string in server mode (default)" do
       config = Hwaro::Models::HighlightConfig.new
+      config.js_tag.should eq("")
+    end
+
+    it "returns only the copy runtime in server mode when copy is enabled" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      config.js_tag.should contain("code-copy-btn")
+      config.js_tag.should contain("pre[data-copy]")
+      config.js_tag.should_not contain("highlight.min.js")
+    end
+
+    it "appends the copy runtime after the hljs scripts in client mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
+      config.copy = true
+      tag = config.js_tag
+      tag.should contain("hljs.highlightAll()")
+      tag.should contain("code-copy-btn")
+      tag.index("hljs.highlightAll()").not_nil!.should be < tag.index("code-copy-btn").not_nil!
+    end
+
+    it "omits the copy runtime when highlighting is disabled" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      config.enabled = false
       config.js_tag.should eq("")
     end
 

@@ -440,6 +440,7 @@ module Hwaro
             str << "mode = \"server\"\n"
             str << "theme = \"github\"\n"
             str << "use_cdn = true\n"
+            str << "copy = true\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"
               str << "name = \"tags\"\n"

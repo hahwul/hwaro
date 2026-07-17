@@ -231,6 +231,7 @@ end
 private def reset_fence_options_state
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
 end
 
 describe Hwaro::Content::Processors::FenceOptions do
@@ -365,6 +366,23 @@ describe Hwaro::Content::Processors::FenceOptions do
 
     it "returns nil opts when every hide_lines item is malformed" do
       _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="0 9-2"}))
+      opts.should be_nil
+    end
+
+    it "parses copy=true and copy=false" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=true}")
+      opts.not_nil!.copy.should be_true
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=false}")
+      opts.not_nil!.copy.should be_false
+    end
+
+    it "leaves copy nil when absent" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {linenos=true}")
+      opts.not_nil!.copy.should be_nil
+    end
+
+    it "ignores a non-boolean copy value (doesn't activate alone)" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=maybe}")
       opts.should be_nil
     end
   end
@@ -557,6 +575,69 @@ describe "fence options rendering (server mode)" do
     html.should_not contain("data-hide-lines")
     html.should_not contain(%(<span class="line"))
     html.should contain("graph LR")
+  ensure
+    reset_fence_options_state
+  end
+end
+
+describe "copy button marker (data-copy)" do
+  it "marks every fence when the global default is on — in both modes" do
+    content = "```python\npass\n```"
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    client = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    client.should contain(%(<pre data-copy="true"><code class="language-python hljs">))
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    server = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    server.should contain(%(<pre data-copy="true">))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "a per-fence {copy=false} opts out of the global default" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {copy=false}\npass\n```", highlight: true)
+    html.should_not contain("data-copy")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "a per-fence {copy=true} opts in with the global default off" do
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {copy=true}\npass\n```", highlight: true)
+    html.should contain(%(data-copy="true"))
+    # copy alone must not activate line wrapping or other data-* attrs.
+    html.should_not contain("data-linenos")
+    html.should_not contain(%(<span class="line))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "never marks mermaid fences (postprocess_mermaid anchors on a bare <pre>)" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```mermaid\ngraph LR\n  A --> B\n```", highlight: true)
+    html.should contain(%(<pre><code class="language-mermaid))
+    html.should_not contain("data-copy")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "is byte-identical to stock output when the feature is fully off" do
+    content = "```python\npass\n```"
+    baseline = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    baseline.should_not contain("data-copy")
+    baseline.should contain("<pre><code")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "composes with client-mode data-* line attributes on the same <pre>" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {linenos=true}\npass\n```", highlight: true)
+    html.should contain(%(data-linenos="true"))
+    html.should contain(%(data-copy="true"))
   ensure
     reset_fence_options_state
   end

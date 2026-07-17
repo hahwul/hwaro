@@ -256,7 +256,7 @@ module Hwaro
         # 100k Int32s.
         # `name` is the filename/title label (`{name="main.cr"}`, `title=`
         # accepted as an alias) rendered above the code block.
-        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, name : String? = nil, hide_lines : Array({Int32, Int32}) = [] of {Int32, Int32} do
+        record Options, linenos : Bool? = nil, linenostart : Int32 = 1, hl_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, name : String? = nil, hide_lines : Array({Int32, Int32}) = [] of {Int32, Int32}, copy : Bool? = nil do
           def hl?(physical_line : Int32) : Bool
             hl_lines.any? { |(a, b)| physical_line >= a && physical_line <= b }
           end
@@ -313,6 +313,7 @@ module Hwaro
           hl_lines = [] of {Int32, Int32}
           hide_lines = [] of {Int32, Int32}
           name : String? = nil
+          copy : Bool? = nil
           recognized = 0
 
           pairs.each do |key, value|
@@ -330,6 +331,14 @@ module Hwaro
                 recognized += 1
               elsif BOOL_FALSE_RE.matches?(value)
                 linenos = false
+                recognized += 1
+              end
+            when "copy"
+              if BOOL_TRUE_RE.matches?(value)
+                copy = true
+                recognized += 1
+              elsif BOOL_FALSE_RE.matches?(value)
+                copy = false
                 recognized += 1
               end
             when "linenostart"
@@ -360,7 +369,7 @@ module Hwaro
           return {legacy_lang, nil} if recognized == 0
 
           lang = stripped[0, brace_index].strip.split.first?.try(&.presence)
-          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines, name: name, hide_lines: hide_lines)}
+          {lang, Options.new(linenos: linenos, linenostart: linenostart, hl_lines: hl_lines, name: name, hide_lines: hide_lines, copy: copy)}
         end
 
         # Scans `key=value` pairs from the start of `inner`. Returns the
@@ -612,6 +621,16 @@ module Hwaro
             end
           end
 
+          # Copy button marker — BOTH modes (the inline runtime from
+          # `js_tag` targets `pre[data-copy]` regardless of who colored the
+          # code). Never on mermaid fences: `postprocess_mermaid`'s regex
+          # anchors on the bare `<pre><code class="language-mermaid...`
+          # shape, so any attribute on <pre> would break the rewrite.
+          if effective_copy(opts) && lang.try(&.downcase) != "mermaid"
+            pre_tag_attrs ||= {} of String => String
+            pre_tag_attrs["data-copy"] = "true"
+          end
+
           # Filename/title label: a structural wrapper around the untouched
           # <pre> so it composes with server-mode line wrapping AND the
           # client-mode data-* attributes alike. Absent a name, the output
@@ -675,6 +694,15 @@ module Hwaro
         private def effective_linenos(opts : FenceOptions::Options) : Bool
           explicit = opts.linenos
           explicit.nil? ? SyntaxHighlighter.default_line_numbers? : explicit
+        end
+
+        # Same override chain for the copy button (`{copy=...}` wins over
+        # `[highlight] copy`). `opts` can be nil here: unlike the line
+        # options, the global default applies to every fence, options
+        # block or not.
+        private def effective_copy(opts : FenceOptions::Options?) : Bool
+          explicit = opts.try(&.copy)
+          explicit.nil? ? SyntaxHighlighter.default_copy? : explicit
         end
       end
 
@@ -821,6 +849,8 @@ module Hwaro
 
           highlighted = (@highlight_enabled && @server_mode && lang) ? (ServerHighlighter.highlight(node.text, lang) || "") : ""
 
+          copy_active = effective_copy(opts) && lang.try(&.downcase) != "mermaid"
+
           newline
           literal(@hooks.render_codeblock(
             lang: lang ? escape(lang) : "",
@@ -828,6 +858,7 @@ module Hwaro
             code: escape(node.text),
             highlighted: highlighted,
             name: opts.try(&.name).try { |n| escape(n) } || "",
+            copy: copy_active ? "true" : "",
           ))
           newline
         end
@@ -891,9 +922,25 @@ module Hwaro
           @@default_line_numbers
         end
 
+        # Global default for the fence-level copy button (`[highlight]
+        # copy`), same lifecycle as `@@default_line_numbers`.
+        @@default_copy = false
+
+        def default_copy=(value : Bool)
+          @@default_copy = value
+        end
+
+        def default_copy? : Bool
+          @@default_copy
+        end
+
         # Fingerprint of module-level state that changes rendered body HTML.
         def body_fingerprint : String
-          String.build(2) { |io| io << (@@server_mode ? '1' : '0') << (@@default_line_numbers ? '1' : '0') }
+          String.build(3) do |io|
+            io << (@@server_mode ? '1' : '0')
+            io << (@@default_line_numbers ? '1' : '0')
+            io << (@@default_copy ? '1' : '0')
+          end
         end
 
         # Render markdown to HTML with syntax highlighting enabled

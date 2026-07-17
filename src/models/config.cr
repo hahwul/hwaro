@@ -527,6 +527,10 @@ module Hwaro
       # unless it opts out with a per-block `{linenos=false}`. Off by
       # default so existing output is unaffected.
       property line_numbers : Bool
+      # Adds a copy-to-clipboard button to fenced code blocks (per-block
+      # `{copy=false}`/`{copy=true}` overrides). Off by default so existing
+      # output is byte-identical.
+      property copy : Bool
 
       def initialize
         @enabled = true
@@ -534,6 +538,7 @@ module Hwaro
         @use_cdn = true
         @mode = "server"
         @line_numbers = false
+        @copy = false
       end
 
       # True when code is highlighted at build time (no client-side JS).
@@ -554,17 +559,29 @@ module Hwaro
       end
 
       # Generate the JS script tag for highlighting.
-      # Server-side highlighting needs no JavaScript at all.
+      # Server-side highlighting needs no JavaScript at all — unless the
+      # copy button is on, whose (dependency-free) runtime ships either way.
       def js_tag(cache_bust : String = "") : String
         return "" unless @enabled
-        return "" if server?
-        if @use_cdn
-          %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
-        else
-          suffix = Models.cache_bust_suffix(cache_bust)
-          %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
-        end
+        return copy ? COPY_SNIPPET : "" if server?
+        hljs = if @use_cdn
+                 %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+               else
+                 suffix = Models.cache_bust_suffix(cache_bust)
+                 %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
+               end
+        copy ? "#{hljs}\n#{COPY_SNIPPET}" : hljs
       end
+
+      # Copy-to-clipboard runtime for `pre[data-copy]` blocks: one DOM pass
+      # on DOMContentLoaded wraps each block (position anchor), appends a
+      # button, and copies the code's textContent on click. Theme-neutral —
+      # currentColor only, revealed on hover/focus — and small enough to
+      # inline, so no extra request in either highlight mode.
+      COPY_SNIPPET = <<-HTML
+        <style>.code-wrapper{position:relative}.code-copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.25rem .6rem;font:inherit;font-size:.75rem;color:inherit;background:transparent;border:1px solid currentColor;border-radius:.25rem;opacity:0;cursor:pointer;transition:opacity .15s}.code-wrapper:hover .code-copy-btn,.code-copy-btn:focus-visible,.code-copy-btn.copied{opacity:.75}</style>
+        <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("pre[data-copy]").forEach(function(pre){var w=pre.parentNode;if(!w.classList||!w.classList.contains("code-wrapper")){w=document.createElement("div");w.className="code-wrapper";pre.parentNode.insertBefore(w,pre);w.appendChild(pre);}var b=document.createElement("button");b.type="button";b.className="code-copy-btn";b.textContent="Copy";b.setAttribute("aria-label","Copy code");b.addEventListener("click",function(){var c=pre.querySelector("code");navigator.clipboard.writeText(c?c.textContent:pre.textContent).then(function(){b.classList.add("copied");b.textContent="Copied!";setTimeout(function(){b.classList.remove("copied");b.textContent="Copy";},2000);});});w.appendChild(b);});});</script>
+        HTML
 
       # Generate both CSS and JS tags
       def tags(cache_bust : String = "") : String
@@ -1637,6 +1654,7 @@ module Hwaro
         config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
         config.highlight.line_numbers = bool_value(s["line_numbers"]?, config.highlight.line_numbers)
+        config.highlight.copy = bool_value(s["copy"]?, config.highlight.copy)
         if mode = s["mode"]?.try(&.as_s?)
           if mode == "client" || mode == "server"
             config.highlight.mode = mode

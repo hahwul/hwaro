@@ -75,6 +75,17 @@ describe "Scaffold embedded assets" do
       end
     end
 
+    it "enables the copy button (copy = true)" do
+      {
+        Hwaro::Services::Scaffolds::Simple.new,
+        Hwaro::Services::Scaffolds::Blog.new,
+        Hwaro::Services::Scaffolds::Docs.new,
+        Hwaro::Services::Scaffolds::Book.new,
+      }.each do |scaffold|
+        scaffold.config_content.should contain(%(copy = true))
+      end
+    end
+
     it "inlines the syntax theme into the stylesheet (recolor without a theme link)" do
       css = Hwaro::Services::Scaffolds::Blog.new.static_files["css/style.css"]
       css.should contain(".hljs-keyword")

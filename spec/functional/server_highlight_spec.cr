@@ -32,6 +32,7 @@ HIGHLIGHT_TEMPLATE = "<head>{{ highlight_css }}{{ highlight_js }}</head><body>{{
 private def reset_highlight_mode
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
 end
 
 describe "Server-side syntax highlighting" do
@@ -310,6 +311,55 @@ describe "Fence options — server mode" do
       # Body stays exactly the plain escaped legacy text — no hljs spans at all
       # (client mode never tokenizes).
       html.should contain(%(<code class="language-python hljs">def main():))
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "[highlight] copy = true marks code blocks, ships the runtime once, and leaves mermaid alone" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [markdown]
+      mermaid = true
+
+      [highlight]
+      enabled = true
+      mode = "server"
+      copy = true
+      TOML
+
+    content = <<-MD
+      +++
+      title = "Code"
+      +++
+      ```python
+      def main():
+          return 42
+      ```
+
+      ```mermaid
+      graph LR
+        A --> B
+      ```
+      MD
+
+    build_site(
+      config,
+      content_files: {"index.md" => content},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<pre data-copy="true">))
+      # The inline runtime rides {{ highlight_js }} — exactly once per page.
+      html.scan("code-copy-btn").size.should be > 0
+      html.scan(%(pre[data-copy])).size.should eq(1)
+      html.should_not contain("highlight.min.js")
+      # Mermaid's <pre> stays bare, so postprocess_mermaid still rewrites it.
+      html.should contain(%(<div class="mermaid">))
+      html.should_not contain("language-mermaid")
     end
   ensure
     reset_highlight_mode
