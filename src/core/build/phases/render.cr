@@ -830,7 +830,8 @@ module Hwaro::Core::Build::Phases::Render
     cache = template_cache_override || @compiled_templates_cache
     cache_mutex = template_cache_override ? nil : @crinja_cache_mutex
     page_vars = Content::Processors::RenderHooks.page_vars(page, site.config)
-    Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars, site.config.markdown.mermaid)
+    Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars,
+      site.config.markdown.mermaid, site.config.markdown.admonitions)
   end
 
   # Claim a deterministic owner (page.path) for every output URL. Two passes,

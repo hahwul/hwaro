@@ -2,8 +2,9 @@
 #
 # User templates under `templates/hooks/` override how individual Markdown
 # elements render: `render-link.html`, `render-image.html`,
-# `render-heading.html`, `render-codeblock.html`. When none of those
-# templates exist, `RenderHooks.registry` is `nil` and the render path is
+# `render-heading.html`, `render-codeblock.html`, `render-blockquote.html`,
+# `render-table.html`. When none of those templates exist,
+# `RenderHooks.registry` is `nil` and the render path is
 # EXACTLY today's — `HighlightingRenderer` (see `syntax_highlighter.cr`)
 # never branches on hooks at all. `HookedRenderer` (a separate subclass)
 # only comes into play once a registry exists.
@@ -26,12 +27,8 @@ module Hwaro
       module RenderHooks
         extend self
 
-        # The four render hooks implemented today.
-        HOOK_NAMES = {"link", "image", "heading", "codeblock"}
-
-        # Recognized but not yet implemented — `configure` stays silent
-        # about these instead of warning "unknown render hook".
-        FUTURE_HOOK_NAMES = {"blockquote", "table"}
+        # The six render hooks implemented today.
+        HOOK_NAMES = {"link", "image", "heading", "codeblock", "blockquote", "table"}
 
         # One hook template's source plus its on-disk path (for Crinja error
         # locations); `disk_path` is nil only for templates not loaded from
@@ -49,6 +46,8 @@ module Hwaro
           getter image : HookEntry?
           getter heading : HookEntry?
           getter codeblock : HookEntry?
+          getter blockquote : HookEntry?
+          getter table : HookEntry?
 
           # MD5 over sorted "name=source" pairs — folded into the per-page
           # template hash (render.cr#page_template_hash) so editing a hook
@@ -56,7 +55,8 @@ module Hwaro
           getter fingerprint : String
 
           def initialize(@link : HookEntry?, @image : HookEntry?, @heading : HookEntry?,
-                         @codeblock : HookEntry?, @fingerprint : String)
+                         @codeblock : HookEntry?, @blockquote : HookEntry?, @table : HookEntry?,
+                         @fingerprint : String)
             @warned = Set(String).new
             @warned_mutex = Mutex.new
           end
@@ -91,6 +91,8 @@ module Hwaro
           image : HookEntry? = nil
           heading : HookEntry? = nil
           codeblock : HookEntry? = nil
+          blockquote : HookEntry? = nil
+          table : HookEntry? = nil
 
           templates.each_key do |key|
             next unless key.starts_with?("hooks/render-")
@@ -100,18 +102,18 @@ module Hwaro
             entry = {source: templates[key], disk_path: template_paths[key]?}
 
             case hook_name
-            when "link"      then link = entry
-            when "image"     then image = entry
-            when "heading"   then heading = entry
-            when "codeblock" then codeblock = entry
+            when "link"       then link = entry
+            when "image"      then image = entry
+            when "heading"    then heading = entry
+            when "codeblock"  then codeblock = entry
+            when "blockquote" then blockquote = entry
+            when "table"      then table = entry
             else
-              unless FUTURE_HOOK_NAMES.includes?(hook_name)
-                Logger.warn "unknown render hook '#{suffix}' — supported: link, image, heading, codeblock; blockquote/table are planned"
-              end
+              Logger.warn "unknown render hook '#{suffix}' — supported: #{HOOK_NAMES.join(", ")}"
             end
           end
 
-          if link.nil? && image.nil? && heading.nil? && codeblock.nil?
+          if link.nil? && image.nil? && heading.nil? && codeblock.nil? && blockquote.nil? && table.nil?
             @@registry = nil
             return
           end
@@ -121,9 +123,11 @@ module Hwaro
           pairs << "image=#{image[:source]}" if image
           pairs << "heading=#{heading[:source]}" if heading
           pairs << "codeblock=#{codeblock[:source]}" if codeblock
+          pairs << "blockquote=#{blockquote[:source]}" if blockquote
+          pairs << "table=#{table[:source]}" if table
           fingerprint = Digest::MD5.hexdigest(pairs.sort!.join(''))
 
-          @@registry = Registry.new(link, image, heading, codeblock, fingerprint)
+          @@registry = Registry.new(link, image, heading, codeblock, blockquote, table, fingerprint)
         end
 
         # --- Fallback rendering context for feeds/search ---
@@ -156,7 +160,8 @@ module Hwaro
             end
           end
 
-          HookRenderContext.new(reg, env, @@fallback_cache, @@fallback_mutex, page_vars(page, config), config.markdown.mermaid)
+          HookRenderContext.new(reg, env, @@fallback_cache, @@fallback_mutex, page_vars(page, config),
+            config.markdown.mermaid, config.markdown.admonitions)
         end
 
         # Shared page/config variable builder — exactly 6 leaf values, used
@@ -189,10 +194,12 @@ module Hwaro
         class HookRenderContext
           # Distinct per-hook salts — arbitrary, just pairwise distinct and
           # unlikely to collide with the shortcode cache's own salt.
-          SALT_LINK      = 0x4C494E4B_484F4F4B_u64
-          SALT_IMAGE     = 0x494D4147_484F4F4B_u64
-          SALT_HEADING   = 0x48454144_484F4F4B_u64
-          SALT_CODEBLOCK = 0x434F4445_484F4F4B_u64
+          SALT_LINK       = 0x4C494E4B_484F4F4B_u64
+          SALT_IMAGE      = 0x494D4147_484F4F4B_u64
+          SALT_HEADING    = 0x48454144_484F4F4B_u64
+          SALT_CODEBLOCK  = 0x434F4445_484F4F4B_u64
+          SALT_BLOCKQUOTE = 0x424C4F43_484F4F4B_u64
+          SALT_TABLE      = 0x5441424C_484F4F4B_u64
 
           def initialize(
             @registry : Registry,
@@ -201,6 +208,7 @@ module Hwaro
             @cache_mutex : Mutex?,
             @page_vars : Hash(String, Crinja::Value),
             @mermaid_bypass : Bool,
+            @admonition_bypass : Bool = false,
           )
           end
 
@@ -220,6 +228,14 @@ module Hwaro
             !@registry.codeblock.nil?
           end
 
+          def blockquote? : Bool
+            !@registry.blockquote.nil?
+          end
+
+          def table? : Bool
+            !@registry.table.nil?
+          end
+
           # Exposed so cache-key builders (e.g. `render_body_cached`) can
           # fold hook-template changes into their memo key without holding
           # a `Registry` reference of their own.
@@ -232,6 +248,14 @@ module Hwaro
           # codeblock hook when `[markdown] mermaid = true`.
           def mermaid_bypass? : Bool
             @mermaid_bypass
+          end
+
+          # Same idea for `> [!NOTE]`-style blockquotes: with `[markdown]
+          # admonitions = true` they keep rendering the stock shape so
+          # `postprocess_admonitions` can rewrite them, instead of going
+          # through the blockquote hook.
+          def admonition_bypass? : Bool
+            @admonition_bypass
           end
 
           # `destination`/`title` arrive already escaped by the caller
@@ -295,6 +319,38 @@ module Hwaro
             vars["name"] = Crinja::Value.new(name)
             vars["copy"] = Crinja::Value.new(copy)
             render_hook_template("hooks/render-codeblock", hook, SALT_CODEBLOCK, vars) { stock_codeblock(lang, code) }
+          end
+
+          # `text` is the captured, already-rendered inner HTML of the
+          # blockquote (block-level: paragraphs, lists, nested quotes...).
+          def render_blockquote(text : String) : String
+            hook = @registry.blockquote
+            return stock_blockquote(text) unless hook
+
+            vars = @page_vars.dup
+            vars["text"] = Crinja::Value.new(text)
+            render_hook_template("hooks/render-blockquote", hook, SALT_BLOCKQUOTE, vars) { stock_blockquote(text) }
+          end
+
+          # `html` is the complete stock `<table>...</table>` markup;
+          # `header_html`/`body_html` are its `<thead>`/`<tbody>` sections
+          # (body_html is "" for a header-only table) so templates can
+          # rebuild the table without re-parsing `html`. Blank lines are
+          # collapsed out of the result: table hooks run in the pre-markd
+          # line stream (TableParser), where markd ends an HTML block at
+          # the first blank line — a blank line in the hook output would
+          # split the table markup into a truncated HTML block plus
+          # escaped-text leftovers.
+          def render_table(html : String, header_html : String, body_html : String) : String
+            hook = @registry.table
+            return html unless hook
+
+            vars = @page_vars.dup
+            vars["html"] = Crinja::Value.new(html)
+            vars["header_html"] = Crinja::Value.new(header_html)
+            vars["body_html"] = Crinja::Value.new(body_html)
+            result = render_hook_template("hooks/render-table", hook, SALT_TABLE, vars) { html }
+            result.gsub(/\n[ \t]*\n(?:[ \t]*\n)*/, "\n")
           end
 
           private def render_hook_template(template_key : String, hook : HookEntry, salt : UInt64, vars : Hash(String, Crinja::Value), & : -> String) : String
@@ -380,6 +436,18 @@ module Hwaro
               "<pre><code class=\"language-#{lang}\">#{code}</code></pre>"
             end
           end
+
+          # Markd emits `<blockquote>\n` + children + `</blockquote>` with
+          # a newline flushed before the close tag; the captured `text`
+          # normally carries that trailing newline already.
+          private def stock_blockquote(text : String) : String
+            inner = text.ends_with?('\n') ? text : "#{text}\n"
+            "<blockquote>\n#{inner}</blockquote>"
+          end
+
+          # The table hook's stock fallback is the assembled `html` itself
+          # (see `render_table`) — TableParser builds it, so there is no
+          # shape to reconstruct here.
         end
       end
     end

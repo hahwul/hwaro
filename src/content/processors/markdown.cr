@@ -156,7 +156,8 @@ module Hwaro
           # sup) into cell rendering, alongside the existing math flag.
           processed = TableParser.process(
             content,
-            flags: markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new)
+            flags: markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new,
+            hooks: hooks)
 
           # Pre-process markdown extensions (task lists, footnotes, etc.)
           if md_cfg = markdown_config

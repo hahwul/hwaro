@@ -3,7 +3,7 @@ require "../../src/content/hooks/image_hooks"
 
 # =============================================================================
 # Functional coverage for Hugo-style Markdown render hooks
-# (templates/hooks/render-{link,image,heading,codeblock}.html).
+# (templates/hooks/render-{link,image,heading,codeblock,blockquote,table}.html).
 #
 # These drive the real Builder pipeline end to end (build_site) so the
 # interaction with everything downstream of the raw HTML — internal link
@@ -432,6 +432,83 @@ describe "Render hooks: feeds" do
     ) do
       feed = File.read("public/rss.xml")
       feed.should contain(%(class="hook"))
+    end
+  end
+end
+
+describe "Render hooks: blockquote and table" do
+  it "wraps a blockquote via the blockquote hook end to end" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      > quoted **bold** text
+      MD
+
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html"                    => "<body>{{ content }}</body>",
+        "hooks/render-blockquote.html" => %(<aside class="quote">{{ text }}</aside>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<aside class="quote"><p>quoted <strong>bold</strong> text</p>))
+      html.should_not contain("<blockquote>")
+    end
+  end
+
+  it "keeps admonitions on the admonition pipeline while the blockquote hook handles the rest" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      > plain quote
+
+      > [!NOTE]
+      > Something to note.
+      MD
+
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html"                    => "<body>{{ content }}</body>",
+        "hooks/render-blockquote.html" => %(<aside class="quote">{{ text }}</aside>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      # admonitions default to true — the [!NOTE] quote became an admonition div…
+      html.should contain(%(class="admonition admonition-note"))
+      # …while the ordinary quote went through the hook.
+      html.should contain(%(<aside class="quote"><p>plain quote</p>))
+    end
+  end
+
+  it "wraps a GFM table via the table hook end to end" do
+    content = <<-MD
+      +++
+      title = "Home"
+      +++
+      | Name | Value |
+      |------|-------|
+      | one  | 1     |
+      MD
+
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => content},
+      template_files: {
+        "page.html"               => "<body>{{ content }}</body>",
+        "hooks/render-table.html" => %(<div class="table-wrapper">{{ html }}</div>),
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<div class="table-wrapper"><table>))
+      html.should contain("<th>Name</th>")
+      html.should contain("<td>one</td>")
+      html.should contain("</table></div>")
     end
   end
 end

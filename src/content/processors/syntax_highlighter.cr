@@ -823,6 +823,34 @@ module Hwaro
           end
         end
 
+        # Matches the first paragraph of a rendered admonition blockquote
+        # (`> [!NOTE]` ...). Built from the same type list the postprocess
+        # regex uses, so the two can't drift apart.
+        ADMONITION_START_RE = /\A\s*<p>\[!(#{MarkdownExtensions::ADMONITION_TYPES.join('|')})\]/
+
+        def block_quote(node : Markd::Node, entering : Bool)
+          return super unless @hooks.blockquote?
+          return super if @disable_tag > 0
+
+          if entering
+            newline
+            push_capture
+          else
+            inner = pop_capture
+            # With `[markdown] admonitions = true`, a `> [!TYPE]` blockquote
+            # keeps the stock shape so ADMONITION_BLOCKQUOTE_RE (see
+            # `postprocess_admonitions`) still rewrites it — config decides
+            # who owns that blockquote, not the hook template.
+            if @hooks.admonition_bypass? && ADMONITION_START_RE.matches?(inner)
+              inner += "\n" unless inner.ends_with?('\n')
+              literal("<blockquote>\n#{inner}</blockquote>")
+            else
+              literal(@hooks.render_blockquote(text: inner))
+            end
+            newline
+          end
+        end
+
         # CodeBlock is a leaf — the walker yields exactly one (entering:
         # true) event for it, matching `HighlightingRenderer#code_block`.
         def code_block(node : Markd::Node, entering : Bool)
@@ -960,7 +988,7 @@ module Hwaro
           # extension passes and passes `tables_preprocessed: true` to skip the
           # redundant per-page scan — the default stays for direct callers of
           # SyntaxHighlighter.render.
-          processed_content = tables_preprocessed ? content : TableParser.process(content)
+          processed_content = tables_preprocessed ? content : TableParser.process(content, hooks: hooks)
 
           options = Markd::Options.new(safe: safe, smart: smart)
           document = Markd::Parser.parse(processed_content, options)
