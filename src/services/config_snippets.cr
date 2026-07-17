@@ -32,6 +32,7 @@ module Hwaro
         "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: -> { llms(commented: true) }},
         "feeds"            => {description: "RSS/Atom feed generation", snippet: -> { feeds(commented: true) }},
         "build"            => {description: "Build hooks (pre/post commands)", snippet: -> { build(commented: true) }},
+        "links"            => {description: "Internal link checking (broken @/ links)", snippet: -> { links(commented: true) }},
         "permalinks"       => {description: "URL path overrides", snippet: -> { permalinks(commented: true) }},
         "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: -> { auto_includes(commented: true) }},
         "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: -> { assets(commented: true) }},
@@ -503,6 +504,36 @@ module Hwaro
             # [build]
             # hooks.pre = ["npm install", "python scripts/preprocess.py"]
             # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
+
+            TOML
+        end
+      end
+
+      def self.links(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Links (Optional)
+            # =============================================================================
+            # How unresolved @/ internal links are treated during the build
+
+            # [links]
+            # broken_internal = "warn" # "error" fails the build listing every offender
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Links (Optional)
+            # =============================================================================
+            # How unresolved @/ internal links are treated during the build.
+            # "warn" (default) logs a warning and keeps the raw markup;
+            # "error" fails the build with an aggregated list of every offender.
+
+            # [links]
+            # broken_internal = "warn"
 
             TOML
         end

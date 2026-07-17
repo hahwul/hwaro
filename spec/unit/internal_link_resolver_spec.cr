@@ -36,6 +36,32 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="@/nonexistent.md">broken</a>)
     end
 
+    it "collects unresolved and empty links into the misses accumulator" do
+      pages = {} of String => Hwaro::Models::Page
+      html = %(<a href="@/nonexistent.md">broken</a> <a href="@/">empty</a>)
+      misses = [] of {String, String}
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", misses: misses)
+      # Markup stays unchanged — strict mode fails the build later, but the
+      # resolver itself never rewrites what it cannot resolve.
+      result.should eq html
+      misses.should eq [{"nonexistent.md", "page not found"}, {"", "empty link"}]
+    end
+
+    it "collects nothing for resolved links" do
+      pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
+      html = %(<a href="@/blog/post.md">link</a>)
+      misses = [] of {String, String}
+      Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", misses: misses)
+      misses.should be_empty
+    end
+
+    it "keeps warn-only behavior when no accumulator is passed" do
+      pages = {} of String => Hwaro::Models::Page
+      html = %(<a href="@/nonexistent.md">broken</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
+      result.should eq html
+    end
+
     it "passes through HTML without @/ links unchanged" do
       pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
       html = %(<a href="/about/">about</a><p>hello</p>)

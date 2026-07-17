@@ -123,6 +123,11 @@ module Hwaro::Core::Build::Phases::Render
                   process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                 end
         ctx.stats.pages_rendered = count
+        # Strict [links] broken_internal = "error": fail the phase with one
+        # aggregated error after the whole fan-out so every offender is
+        # listed. The lifecycle manager re-raises HwaroError unchanged
+        # (exit code 5 for build/CI; serve's watcher surfaces the overlay).
+        raise_on_broken_internal_links!
       ensure
         @crinja_caches_frozen = false
       end
@@ -747,7 +752,22 @@ module Hwaro::Core::Build::Phases::Render
 
     # Resolve internal @/ links to actual page URLs
     if pages_by_path = @pages_by_path
-      html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
+      if site.config.links.broken_internal == "error"
+        # Strict mode: collect unresolved links in a local array, then fold
+        # them into the builder-wide accumulator under the mutex (render
+        # workers run this concurrently under -Dpreview_mt). The aggregated
+        # error is raised AFTER the fan-out so one bad link doesn't hide
+        # the others.
+        misses = [] of {String, String}
+        html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url, misses: misses)
+        unless misses.empty?
+          @broken_links_mutex.synchronize do
+            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+          end
+        end
+      else
+        html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
+      end
     end
 
     # Prefix plain root-relative content links (e.g. `[Posts](/posts/)`) with the

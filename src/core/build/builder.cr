@@ -218,6 +218,14 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Unresolved `@/` internal links collected during the render fan-out
+        # when `[links] broken_internal = "error"` (each entry is a formatted
+        # "source.md → @/target (reason)" line). Guarded by
+        # @broken_links_mutex — render workers append concurrently under
+        # -Dpreview_mt. Cleared at every build entry point and aggregated
+        # into one classified error by raise_on_broken_internal_links!.
+        @broken_internal_links : Array(String) = [] of String
+        @broken_links_mutex : Mutex = Mutex.new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -325,6 +333,31 @@ module Hwaro
           )
         end
 
+        # Drop unresolved-link records from the previous pass so a fixed
+        # link doesn't keep failing (and a new one is attributed to the
+        # right build). Called at every build entry point.
+        private def clear_broken_internal_links
+          @broken_links_mutex.synchronize { @broken_internal_links.clear }
+        end
+
+        # Fail the build with ONE aggregated error listing every unresolved
+        # `@/` internal link collected during the render fan-out. Only
+        # populated when `[links] broken_internal = "error"` — the default
+        # "warn" mode never appends, making this a no-op there. Raising
+        # HwaroError(HWARO_E_CONTENT) maps to exit code 5 for CI; under
+        # `serve` the watcher rescue surfaces it in the error overlay.
+        private def raise_on_broken_internal_links!
+          entries = @broken_links_mutex.synchronize { @broken_internal_links.sort }
+          return if entries.empty?
+
+          label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "#{label}:\n  #{entries.join("\n  ")}",
+            hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
+          )
+        end
+
         # Incremental build: only re-parse and re-render pages whose source
         # files have been modified.  Falls back to a full build when the
         # necessary state from a previous build is not available.
@@ -348,6 +381,7 @@ module Hwaro
 
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
+          clear_broken_internal_links
 
           output_dir = options.output_dir
           minify = options.minify
@@ -629,6 +663,7 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
+          raise_on_broken_internal_links!
 
           cache.save if options.cache
 
@@ -792,6 +827,7 @@ module Hwaro
           end
 
           start_time = Time.instant
+          clear_broken_internal_links
 
           # Reload templates from disk & reset all runtime caches.
           # Keep the old sources so the dependency graph can diff them.
@@ -936,6 +972,7 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
+          raise_on_broken_internal_links!
 
           # Re-generate 404 page with new template
           if affected_templates.nil? || affected_templates.includes?("404")
@@ -1332,6 +1369,7 @@ module Hwaro
           @templates = nil
           @cache_manager.clear_runtime
           @created_dirs.clear
+          clear_broken_internal_links
 
           # Execute build phases through lifecycle. The live status region
           # animates the current phase on a TTY; `ensure` guarantees the

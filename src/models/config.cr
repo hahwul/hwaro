@@ -115,6 +115,19 @@ module Hwaro
       end
     end
 
+    # Internal link handling configuration
+    class LinksConfig
+      # How unresolved `@/path.md` internal links are treated during the
+      # render phase: "warn" (default) logs a warning and leaves the markup
+      # unchanged; "error" fails the build with a single aggregated list of
+      # every offender. Unknown values fall back to "warn".
+      property broken_internal : String
+
+      def initialize
+        @broken_internal = "warn"
+      end
+    end
+
     # Series configuration
     class SeriesConfig
       property enabled : Bool
@@ -1120,6 +1133,7 @@ module Hwaro
       property doctor : DoctorConfig
       property static : StaticConfig
       property outputs : OutputsConfig
+      property links : LinksConfig
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -1159,6 +1173,7 @@ module Hwaro
         @doctor = DoctorConfig.new
         @static = StaticConfig.new
         @outputs = OutputsConfig.new
+        @links = LinksConfig.new
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1382,6 +1397,7 @@ module Hwaro
         load_static(config)
         load_deployment(config)
         load_outputs(config)
+        load_links(config)
 
         config
       end
@@ -1397,9 +1413,9 @@ module Hwaro
       KNOWN_TOP_LEVEL_KEYS = %w[
         title description base_url default_language
         amp assets auto_includes build content deployment doctor feeds
-        highlight image_processing languages llms markdown menus og outputs
-        pagination permalinks plugins pwa related robots sass search series
-        serve sitemap static taxonomies
+        highlight image_processing languages links llms markdown menus og
+        outputs pagination permalinks plugins pwa related robots sass search
+        series serve sitemap static taxonomies
       ]
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
@@ -1942,6 +1958,18 @@ module Hwaro
         config.related.limit = int_value(s["limit"]?, config.related.limit).clamp(0, Int32::MAX)
         if taxonomies = s["taxonomies"]?.try(&.as_a?)
           config.related.taxonomies = taxonomies.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_links(config : Config)
+        return unless s = config.raw["links"]?.try(&.as_h?)
+
+        if mode = s["broken_internal"]?.try(&.as_s?)
+          if mode == "warn" || mode == "error"
+            config.links.broken_internal = mode
+          else
+            Logger.warn "Unknown [links] broken_internal value '#{mode}' — expected \"warn\" or \"error\"; keeping \"warn\"."
+          end
         end
       end
 

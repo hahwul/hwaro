@@ -1920,6 +1920,39 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
+  # Links
+  # ---------------------------------------------------------------------------
+
+  describe "links configuration" do
+    it "defaults broken_internal to warn" do
+      config = Hwaro::Models::Config.new
+      config.links.broken_internal.should eq("warn")
+    end
+
+    it "loads broken_internal = error" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_internal = "error"
+        TOML
+
+      config.links.broken_internal.should eq("error")
+    end
+
+    it "keeps the warn default for an unknown broken_internal value" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_internal = "explode"
+        TOML
+
+      config.links.broken_internal.should eq("warn")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Deployment
   # ---------------------------------------------------------------------------
 
