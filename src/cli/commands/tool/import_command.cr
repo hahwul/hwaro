@@ -124,6 +124,7 @@ module Hwaro
 
             summary = "#{result.imported_count} files · #{result.skipped_count} skipped"
             summary += " · #{result.error_count} errors" if result.error_count > 0
+            Logger.info "" if Logger.color_enabled?
             Logger.outcome("imported", summary, glyph: result.error_count > 0 ? :err : :result)
 
             if result.skipped_count > 0 && !options.force

@@ -77,6 +77,7 @@ module Hwaro
             if result.success
               summary = "#{result.exported_count} files · #{result.skipped_count} skipped"
               summary += " · #{result.error_count} errors" if result.error_count > 0
+              Logger.info "" if Logger.color_enabled?
               Logger.outcome("exported", summary, glyph: result.error_count > 0 ? :err : :result)
             else
               Logger.error "Export failed: #{result.message}"

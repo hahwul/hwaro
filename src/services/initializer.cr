@@ -105,12 +105,12 @@ module Hwaro
 
         # The wizard already rendered the heading and a scaffold/title receipt;
         # printing them again here would double the header beat. The TTY form
-        # sits on the 4-space grid with the tree below it; the plain form
+        # sits on the 2-space grid with the tree below it; the plain form
         # keeps its historical 2-space indent.
         unless from_wizard
           Logger.heading("init", target_path == "." ? nil : target_path)
           if Logger.color_enabled?
-            Logger.info "    #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
+            Logger.info "  #{Logger.paint("scaffold", Logger::Role::Dim)}  #{Logger.paint(scaffold.description, Logger::Role::Dim)}"
           else
             Logger.info "  scaffold  #{scaffold.description}"
           end
@@ -222,13 +222,13 @@ module Hwaro
         display_target = target_path == "." ? "." : "#{target_path}/"
         emit_scaffold_log(target_path)
         if Logger.color_enabled?
-          # Close the frame like a Receipt: dim rule, ember outcome, then
-          # hint rows whose labels align under the outcome verb.
-          Logger.info "  #{Logger.paint("─" * (Logger::RECEIPT_WIDTH - 2), Logger::Role::Dim)}"
+          # Close the block like a Receipt: a blank line, the ember spark
+          # outcome, then hint rows aligned with each other on the 2-space grid.
+          Logger.info ""
           Logger.outcome("created", "#{@created_count} files · #{display_target}")
-          hint_col = "created".size
-          Logger.info "    #{Logger.paint("next".ljust(hint_col), Logger::Role::Dim)}  hwaro build · hwaro serve to preview"
-          Logger.info "    #{Logger.paint("deploy".ljust(hint_col), Logger::Role::Dim)}  set base_url in config.toml first (defaults to http://localhost:3000)"
+          hint_col = "deploy".size
+          Logger.info "  #{Logger.paint("next".ljust(hint_col), Logger::Role::Dim)}  hwaro build · hwaro serve to preview"
+          Logger.info "  #{Logger.paint("deploy".ljust(hint_col), Logger::Role::Dim)}  set base_url in config.toml first (defaults to http://localhost:3000)"
         else
           Logger.outcome("created", "#{@created_count} files · #{display_target}")
           Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
@@ -292,7 +292,7 @@ module Hwaro
           end
           notes << "#{kept[name]} kept" if kept[name] > 0
           # Pad only when a note follows, so bare rows carry no trailing blanks.
-          line = "    #{connector} "
+          line = "  #{connector} "
           if notes.empty?
             line += display
           else

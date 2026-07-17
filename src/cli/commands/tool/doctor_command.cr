@@ -199,7 +199,9 @@ module Hwaro
             config_blocked = issues.any? { |i| i.id == "config-not-found" || i.id == "config-parse-error" }
 
             Logger.heading("doctor")
-            Logger.info ""
+            # TTY already gets its blank line from `heading`; keep the plain
+            # form's historical blank so piped output stays byte-identical.
+            Logger.info "" unless Logger.color_enabled?
             Services::CHECK_GROUPS.each do |group|
               heading = group.key == :config ? config_path : group.default_heading
               Logger.info "  #{heading}"
@@ -253,7 +255,7 @@ module Hwaro
             end
 
             # Summary — one severity-aware outcome line: the lead glyph reflects
-            # the worst level found (✗ error / ⚠ warning / ▴ clean).
+            # the worst level found (✗ error / ⚠ warning / spark when clean).
             errors = issues.count { |i| i.level == :error }
             warnings = issues.count { |i| i.level == :warning }
             infos = issues.count { |i| i.level == :info }

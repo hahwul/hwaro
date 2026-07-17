@@ -644,7 +644,7 @@ module Hwaro
           regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
 
           elapsed = Time.instant - start_time
-          Logger.outcome("rebuilt", "#{render_list.size} / #{all_pages.size} pages", :result, elapsed.total_milliseconds)
+          Logger.outcome("rebuilt", "#{render_list.size}/#{all_pages.size} pages", :result, elapsed.total_milliseconds)
           report_cache_stats(options.verbose)
           true
         end
