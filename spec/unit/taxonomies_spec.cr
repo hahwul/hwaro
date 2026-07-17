@@ -615,16 +615,16 @@ describe Hwaro::Content::Taxonomies do
 
     it "orders a term's pages newest-first by default" do
       html = generate_term_html.call(Hwaro::Models::TaxonomyConfig.new("tags"), tagged_pages.call)
-      html.index("Charlie").not_nil!.should be < html.index("Alpha").not_nil!
-      html.index("Alpha").not_nil!.should be < html.index("Bravo").not_nil!
+      html.index!("Charlie").should be < html.index!("Alpha")
+      html.index!("Alpha").should be < html.index!("Bravo")
     end
 
     it "orders a term's pages by title ascending with sort_by = \"title\"" do
       tax = Hwaro::Models::TaxonomyConfig.new("tags")
       tax.sort_by = "title"
       html = generate_term_html.call(tax, tagged_pages.call)
-      html.index("Alpha").not_nil!.should be < html.index("Bravo").not_nil!
-      html.index("Bravo").not_nil!.should be < html.index("Charlie").not_nil!
+      html.index!("Alpha").should be < html.index!("Bravo")
+      html.index!("Bravo").should be < html.index!("Charlie")
     end
 
     it "reverses the title order with reverse = true" do
@@ -632,24 +632,24 @@ describe Hwaro::Content::Taxonomies do
       tax.sort_by = "title"
       tax.reverse = true
       html = generate_term_html.call(tax, tagged_pages.call)
-      html.index("Charlie").not_nil!.should be < html.index("Bravo").not_nil!
-      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
+      html.index!("Charlie").should be < html.index!("Bravo")
+      html.index!("Bravo").should be < html.index!("Alpha")
     end
 
     it "orders a term's pages by weight ascending with sort_by = \"weight\"" do
       tax = Hwaro::Models::TaxonomyConfig.new("tags")
       tax.sort_by = "weight"
       html = generate_term_html.call(tax, tagged_pages.call)
-      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
-      html.index("Alpha").not_nil!.should be < html.index("Charlie").not_nil!
+      html.index!("Bravo").should be < html.index!("Alpha")
+      html.index!("Alpha").should be < html.index!("Charlie")
     end
 
     it "flips date order to oldest-first with reverse = true" do
       tax = Hwaro::Models::TaxonomyConfig.new("tags")
       tax.reverse = true
       html = generate_term_html.call(tax, tagged_pages.call)
-      html.index("Bravo").not_nil!.should be < html.index("Alpha").not_nil!
-      html.index("Alpha").not_nil!.should be < html.index("Charlie").not_nil!
+      html.index!("Bravo").should be < html.index!("Alpha")
+      html.index!("Alpha").should be < html.index!("Charlie")
     end
 
     it "orders index terms by count desc (name-asc tiebreak) with terms_sort_by = \"count\"" do
@@ -680,8 +680,8 @@ describe Hwaro::Content::Taxonomies do
         Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
         index = File.read(File.join(output_dir, "tags", "index.html"))
         # count 2 terms first (beta before gamma by name), then alpha (count 1).
-        index.index(">beta<").not_nil!.should be < index.index(">gamma<").not_nil!
-        index.index(">gamma<").not_nil!.should be < index.index(">alpha<").not_nil!
+        index.index!(">beta<").should be < index.index!(">gamma<")
+        index.index!(">gamma<").should be < index.index!(">alpha<")
       end
     end
 
@@ -717,11 +717,11 @@ describe Hwaro::Content::Taxonomies do
 
         # The written term page honors sort_by = "title" (Aardvark first)…
         term_html = File.read(File.join(output_dir, "tags", "crystal", "index.html"))
-        term_html.index("Aardvark").not_nil!.should be < term_html.index("Zebra").not_nil!
+        term_html.index!("Aardvark").should be < term_html.index!("Zebra")
 
         # …but the term FEED stays reverse-chronological (Zebra first).
         feed = File.read(File.join(output_dir, "tags", "crystal", "rss.xml"))
-        feed.index("Zebra").not_nil!.should be < feed.index("Aardvark").not_nil!
+        feed.index!("Zebra").should be < feed.index!("Aardvark")
       end
     end
 

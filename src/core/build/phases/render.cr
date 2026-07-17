@@ -1707,12 +1707,12 @@ module Hwaro::Core::Build::Phases::Render
       # name-ascending tiebreak.
       tax_cfg = config.taxonomies.find { |t| t.name == name }
       sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
-                            terms.keys.sort do |a, b|
+                            terms.keys.sort! do |a, b|
                               cmp = terms[b].size <=> terms[a].size
                               cmp == 0 ? (a <=> b) : cmp
                             end
                           else
-                            terms.keys.sort
+                            terms.keys.sort!
                           end
       terms_array = sorted_term_names.map do |term|
         term_pages = terms[term]

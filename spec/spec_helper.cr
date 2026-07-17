@@ -4,6 +4,17 @@ require "../src/hwaro"
 # Suppress Logger output during tests
 Hwaro::Logger.io = IO::Memory.new
 
+# [highlight] settings propagate into SyntaxHighlighter module state during
+# builds (Initialize phase: server_mode / default_line_numbers /
+# default_copy). Reset after every example so one spec's config — e.g. a
+# scaffold build's `mode = "server"` + `copy = true` — never leaks into a
+# later example that renders outside a build.
+Spec.after_each do
+  Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
+end
+
 # Helper for creating temp directories in tests
 class Dir
   def self.mktmpdir(&)

@@ -694,7 +694,7 @@ describe "Build Integration: Taxonomy pages" do
     ) do
       # Term page listing honors sort_by = "title" (Alpha before Zulu).
       crystal_html = File.read("public/tags/crystal/index.html")
-      crystal_html.index("Alpha").not_nil!.should be < crystal_html.index("Zulu").not_nil!
+      crystal_html.index!("Alpha").should be < crystal_html.index!("Zulu")
       # get_taxonomy term.pages order matches.
       crystal_html.should contain("PAGES:[Alpha][Zulu]")
       # get_taxonomy items honor terms_sort_by = "count": crystal (2) first.
@@ -702,7 +702,7 @@ describe "Build Integration: Taxonomy pages" do
 
       # Index terms list is count-ordered too.
       idx = File.read("public/tags/index.html")
-      idx.index(">crystal<").not_nil!.should be < idx.index(">web<").not_nil!
+      idx.index!(">crystal<").should be < idx.index!(">web<")
     end
   end
 end

@@ -4,6 +4,14 @@
 
 ### Added
 - Built-in Sass/SCSS compilation (`[sass]` config) — pure Crystal, no external tools: variables with `!default`/`!global`, nested rules with `&`, partials via `@use` (namespaces) / `@import`, mixins with defaults, keyword args and `@content`, `#{...}` interpolation, and `@media`/`@supports` bubbling. `static/**/*.scss` entries compile to sibling `.css`, `.scss` bundle entries compile before concatenation, and `hwaro serve` recompiles on change with errors in the browser overlay. Unsupported directives (`@if`, `@each`, `@function`, `@extend`, ...) fail the build with located errors instead of emitting broken CSS.
+- `hide_lines` fence option (`{hide_lines="1 9-12"}`): elide lines from a rendered code block in server mode. Hidden lines keep their physical line numbers, so a `linenos` gutter shows gaps (unlike Zola, which renumbers) — `hl_lines`/`linenostart` keep targeting physical lines; client mode emits an inert `data-hide-lines` attribute
+- `[highlight] copy = true`: copy-to-clipboard button on fenced code blocks via a small inline, dependency-free runtime in `{{ highlight_js }}` (both modes); per-fence `{copy=true|false}` overrides, mermaid fences excluded, byte-identical output when off. New scaffolds enable it
+- Markdown render hooks for blockquotes and tables: `templates/hooks/render-blockquote.html` (`text`) and `templates/hooks/render-table.html` (`html`, `header_html`, `body_html`). GitHub-style `> [!NOTE]` blockquotes keep the admonition pipeline while `[markdown] admonitions = true`; the codeblock hook gains `copy`
+- Taxonomy sorting: per-taxonomy `sort_by` (`date`/`title`/`weight`) and `reverse` order the pages within each term (section semantics — date is newest-first, `reverse` flips), `terms_sort_by` (`name`/`count`) orders the terms list. Term feeds stay reverse-chronological regardless
+
+### Changed
+- **Breaking:** `[highlight] mode` now defaults to `"server"` — code blocks are highlighted at build time (Tartrazine, same `hljs-*` classes, theme CSS keeps working) and `{{ highlight_js }}` renders empty by default. Set `mode = "client"` to restore browser-side Highlight.js; all pages re-render once after upgrading
+- `get_taxonomy().items` is now name-sorted (alphabetical) by default instead of unspecified insertion order; set `terms_sort_by = "count"` for count-descending
 
 ## v0.17.1
 

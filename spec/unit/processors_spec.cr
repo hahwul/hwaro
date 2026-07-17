@@ -347,7 +347,7 @@ describe Hwaro::Models::HighlightConfig do
       tag = config.js_tag
       tag.should contain("hljs.highlightAll()")
       tag.should contain("code-copy-btn")
-      tag.index("hljs.highlightAll()").not_nil!.should be < tag.index("code-copy-btn").not_nil!
+      tag.index!("hljs.highlightAll()").should be < tag.index!("code-copy-btn")
     end
 
     it "omits the copy runtime when highlighting is disabled" do
