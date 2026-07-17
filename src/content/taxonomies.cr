@@ -150,7 +150,7 @@ module Hwaro
                         else
                           terms_map.keys
                         end
-          render_taxonomy_index(index_page, index_terms.sort!, templates, site, output_dir, builder, verbose, global_vars, slug_map)
+          render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
           collected << index_page
 
           terms_map.each do |term, pages|
@@ -164,6 +164,35 @@ module Hwaro
 
             collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug_map[term], lang_prefix: lang_prefix, language: language)
           end
+        end
+      end
+
+      # Order the index page's terms list per the taxonomy's `terms_sort_by`:
+      # "name" (default) is alphabetical ascending; "count" is page count
+      # descending with a name-ascending tiebreak. Counts use the
+      # language-filtered page lists so a per-language index reflects that
+      # language's own term sizes.
+      private def self.sort_terms(
+        taxonomy : Models::TaxonomyConfig,
+        terms : Array(String),
+        terms_map : Hash(String, Array(Models::Page)),
+        language : String?,
+        default_language : String,
+      ) : Array(String)
+        return terms.sort unless taxonomy.terms_sort_by == "count"
+
+        counts = {} of String => Int32
+        terms.each do |term|
+          pages = terms_map[term]? || [] of Models::Page
+          counts[term] = if language
+                           pages.count { |p| (p.language || default_language) == language }
+                         else
+                           pages.size
+                         end
+        end
+        terms.sort do |a, b|
+          cmp = counts[b] <=> counts[a]
+          cmp == 0 ? (a <=> b) : cmp
         end
       end
 
@@ -197,12 +226,9 @@ module Hwaro
           end
         end
 
-        # Sort each term's pages by date (consistent with global behavior)
-        result.each_value do |terms|
-          terms.each_value do |pages|
-            pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
-          end
-        end
+        # Sort each term's pages per its taxonomy's configured order
+        # (consistent with global behavior)
+        sort_taxonomy_pages(result, site.config)
 
         result
       end
@@ -239,9 +265,20 @@ module Hwaro
           end
         end
 
-        site.taxonomies.each_value do |terms|
-          terms.each_value do |pages|
-            pages.sort! { |a, b| Utils::SortUtils.compare_by_date(a, b) }
+        sort_taxonomy_pages(site.taxonomies, config)
+      end
+
+      # Sort every term's page list per its taxonomy's sort_by/reverse
+      # (date-desc for taxonomies not in the config, matching the render
+      # phase's rebuild_taxonomies).
+      private def self.sort_taxonomy_pages(taxonomies : Hash(String, Hash(String, Array(Models::Page))), config : Models::Config)
+        tax_configs = config.taxonomies.index_by(&.name)
+        taxonomies.each do |name, terms|
+          cfg = tax_configs[name]?
+          sort_by = cfg.try(&.sort_by) || "date"
+          reverse = cfg.try(&.reverse) || false
+          terms.each_key do |term|
+            terms[term] = Utils::SortUtils.sort_pages(terms[term], sort_by, reverse)
           end
         end
       end

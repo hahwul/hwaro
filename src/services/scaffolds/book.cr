@@ -1854,7 +1854,7 @@ module Hwaro
             ```toml
             [highlight]
             enabled = true
-            mode = "client"   # Highlight.js in the browser; "server" highlights at build time
+            mode = "server"   # highlights at build time (no JS); "client" uses Highlight.js in the browser
             theme = "github"
             use_cdn = true
             ```

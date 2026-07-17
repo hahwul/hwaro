@@ -49,7 +49,7 @@ Configure in `config.toml`:
 enabled = true
 theme = "github-dark"
 use_cdn = true
-mode = "client"
+mode = "server"
 ```
 
 | Key | Type | Default | Description |
@@ -57,20 +57,15 @@ mode = "client"
 | enabled | bool | true | Enable syntax highlighting |
 | theme | string | "github" | Highlight.js theme name |
 | use_cdn | bool | true | Load assets from CDN (false = local files) |
-| mode | string | "client" | `"client"` highlights in the browser via Highlight.js; `"server"` highlights at build time |
+| mode | string | "server" | `"server"` highlights at build time; `"client"` highlights in the browser via Highlight.js |
 | line_numbers | bool | false | Add line numbers to every fenced code block by default (see below) |
+| copy | bool | false | Add a copy-to-clipboard button to fenced code blocks (see below) |
 
-## Server-Side Highlighting
+## Server-Side Highlighting (Default)
 
-With `mode = "server"`, code blocks are highlighted during the build —
-no JavaScript ships to the browser, and code is colored even with
-JavaScript disabled:
-
-```toml
-[highlight]
-mode = "server"
-theme = "github-dark"
-```
+With `mode = "server"` (the default), code blocks are highlighted during
+the build — no JavaScript ships to the browser, and code is colored even
+with JavaScript disabled.
 
 The build-time highlighter emits Highlight.js-compatible CSS classes, so
 every theme above keeps working unchanged: `{{ highlight_css }}` still
@@ -79,6 +74,21 @@ injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
 lexers, ported from Pygments/Chroma). Code blocks in languages without a
 lexer fall back to plain, unhighlighted output.
+
+## Client-Side Highlighting
+
+Set `mode = "client"` to highlight in the browser with Highlight.js
+instead:
+
+```toml
+[highlight]
+mode = "client"
+theme = "github-dark"
+```
+
+In client mode `{{ highlight_js }}` injects the Highlight.js script (from
+the CDN or your local assets, see below), and code blocks ship as plain
+`<pre><code class="language-...">` markup for the browser to colorize.
 
 ## Line Numbers and Highlighted Lines
 
@@ -100,6 +110,8 @@ def main():
 | `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
 | `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
 | `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
+| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode only — see below). Same syntax and physical-line semantics as `hl_lines`. |
+| `copy` | `true` / `false` | Show a copy-to-clipboard button on this block. Overrides the `[highlight] copy` default. Ignored on `mermaid` fences. |
 | `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
 
 A named block is wrapped for styling (the `<pre>` inside is unchanged):
@@ -123,16 +135,30 @@ Setting `[highlight] line_numbers = true` turns line numbers on for
 *every* fenced code block with a language — a per-block `{linenos=false}`
 opts back out.
 
+Hidden lines keep consuming their physical line numbers, so with
+`linenos=true` the gutter shows a **gap** where lines were elided —
+unlike Zola, which renumbers the remaining lines. This keeps the
+documented invariant that `hl_lines` and `linenostart` always target the
+block's physical lines, hidden or not (highlighting a hidden line is
+simply a no-op).
+
+Only `mode = "server"` actually removes hidden lines from the HTML. In
+client mode `hide_lines` is presentational-only metadata (an inert
+`data-hide-lines` attribute) — the lines remain in the page source. Do
+**not** use `hide_lines` to redact secrets in client mode.
+
 **Server vs client mode:**
 
-- `mode = "server"` renders the full result at build time: each line is
-  wrapped in its own element, so line numbers and highlighted lines
-  appear with no JavaScript.
-- `mode = "client"` (default) does not re-render the body — instead the
+- `mode = "server"` (default) renders the full result at build time: each
+  line is wrapped in its own element, so line numbers and highlighted
+  lines appear with no JavaScript.
+- `mode = "client"` does not re-render the body — instead the
   `<pre>` tag gets `data-linenos="true"`, `data-linenostart="N"` (when
-  greater than 1), and/or `data-hl-lines="2-4 7"` attributes, so a
-  client-side script or custom CSS can act on them. Hwaro ships no such
-  script for client mode; full rendering requires `mode = "server"`.
+  greater than 1), `data-hl-lines="2-4 7"`, and/or
+  `data-hide-lines="1 9-12"` attributes, so a client-side script or
+  custom CSS can act on them. Hwaro ships no such script for client
+  mode; full rendering (and actual line hiding) requires
+  `mode = "server"`.
 
 Scaffold sites style the server-mode markup out of the box. For a
 non-scaffold site, or a custom theme, add:
@@ -144,6 +170,33 @@ pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
 
 (Swap `var(--code-keyword)` for any color that fits your theme if you
 aren't using the Hwaro Ember token system.)
+
+## Copy Button
+
+`[highlight] copy = true` adds a copy-to-clipboard button to every fenced
+code block; a per-fence `{copy=false}` (or `{copy=true}` with the global
+default off) overrides it:
+
+```toml
+[highlight]
+copy = true
+```
+
+The markup contract: each opted-in block's `<pre>` gets a
+`data-copy="true"` attribute, and `{{ highlight_js }}` injects a small
+inline, dependency-free runtime (works in both server and client mode)
+that wraps each `pre[data-copy]` in a `<div class="code-wrapper">` —
+reusing an existing `.code-block` wrapper (named fences) as the anchor
+instead — appends a `<button class="code-copy-btn">`, and copies the
+code's text on click (server-mode `.ln` line-number gutters are stripped
+from the copied text). The inline styles are theme-neutral
+(currentColor, hover-reveal); scaffolded sites override them with
+token-based styles.
+
+`mermaid` fences never get the attribute — their `<pre>` shape is owned
+by the Mermaid pipeline.
+
+New scaffolded sites enable `copy = true` out of the box.
 
 ## Themes
 
@@ -178,6 +231,8 @@ When `use_cdn = false`, assets are loaded from local paths:
 ```
 
 You must provide the local files yourself when using `use_cdn = false`.
+In the default server mode only the theme stylesheet is referenced — the
+`<script>` tags above appear only with `mode = "client"`.
 
 ## Template Integration
 

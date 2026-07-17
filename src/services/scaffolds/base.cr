@@ -437,9 +437,10 @@ module Hwaro
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
             str << "\n[highlight]\n"
             str << "enabled = true\n"
-            str << "mode = \"client\"\n"
+            str << "mode = \"server\"\n"
             str << "theme = \"github\"\n"
             str << "use_cdn = true\n"
+            str << "copy = true\n"
             unless skip_taxonomies
               str << "\n[[taxonomies]]\n"
               str << "name = \"tags\"\n"

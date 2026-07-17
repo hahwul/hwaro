@@ -517,22 +517,28 @@ module Hwaro
       property enabled : Bool
       property theme : String
       property use_cdn : Bool
-      # "client" injects Highlight.js and highlights in the browser;
-      # "server" highlights at build time (Tartrazine lexers, hljs-compatible
-      # CSS classes) so no JavaScript ships — theme CSS keeps working either way.
+      # "server" (default) highlights at build time (Tartrazine lexers,
+      # hljs-compatible CSS classes) so no JavaScript ships; "client" injects
+      # Highlight.js and highlights in the browser — theme CSS keeps working
+      # either way.
       property mode : String
       # Global default for fence-level `linenos` (see FenceOptions): when
       # true, every fenced code block with a language gets line numbers
       # unless it opts out with a per-block `{linenos=false}`. Off by
       # default so existing output is unaffected.
       property line_numbers : Bool
+      # Adds a copy-to-clipboard button to fenced code blocks (per-block
+      # `{copy=false}`/`{copy=true}` overrides). Off by default so existing
+      # output is byte-identical.
+      property copy : Bool
 
       def initialize
         @enabled = true
         @theme = "github"
         @use_cdn = true
-        @mode = "client"
+        @mode = "server"
         @line_numbers = false
+        @copy = false
       end
 
       # True when code is highlighted at build time (no client-side JS).
@@ -553,17 +559,34 @@ module Hwaro
       end
 
       # Generate the JS script tag for highlighting.
-      # Server-side highlighting needs no JavaScript at all.
+      # Server-side highlighting needs no JavaScript at all — unless the
+      # copy button is on, whose (dependency-free) runtime ships either way.
       def js_tag(cache_bust : String = "") : String
         return "" unless @enabled
-        return "" if server?
-        if @use_cdn
-          %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
-        else
-          suffix = Models.cache_bust_suffix(cache_bust)
-          %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
-        end
+        return copy ? COPY_SNIPPET : "" if server?
+        hljs = if @use_cdn
+                 %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+               else
+                 suffix = Models.cache_bust_suffix(cache_bust)
+                 %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
+               end
+        copy ? "#{hljs}\n#{COPY_SNIPPET}" : hljs
       end
+
+      # Copy-to-clipboard runtime for `pre[data-copy]` blocks: one DOM pass
+      # on DOMContentLoaded, appends a button, and copies the code's text on
+      # click. An existing `.code-block` (named fences) or `.code-wrapper`
+      # parent is reused as the positioning anchor — inserting a new wrapper
+      # inside `.code-block` would break its `.code-block > pre` styling —
+      # otherwise the <pre> is wrapped in a fresh `.code-wrapper`. Copied
+      # text strips the baked-in `.ln` line-number gutter spans (server-mode
+      # `linenos`) so pasted code has no number prefixes. Theme-neutral —
+      # currentColor only, revealed on hover/focus — and small enough to
+      # inline, so no extra request in either highlight mode.
+      COPY_SNIPPET = <<-HTML
+        <style>.code-wrapper,.code-block{position:relative}.code-copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.25rem .6rem;font:inherit;font-size:.75rem;color:inherit;background:transparent;border:1px solid currentColor;border-radius:.25rem;opacity:0;cursor:pointer;transition:opacity .15s}.code-wrapper:hover .code-copy-btn,.code-block:hover .code-copy-btn,.code-copy-btn:focus-visible,.code-copy-btn.copied{opacity:.75}</style>
+        <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("pre[data-copy]").forEach(function(pre){var w=pre.parentNode;var l=w.classList;if(!l||!(l.contains("code-wrapper")||l.contains("code-block"))){w=document.createElement("div");w.className="code-wrapper";pre.parentNode.insertBefore(w,pre);w.appendChild(pre);}var b=document.createElement("button");b.type="button";b.className="code-copy-btn";b.textContent="Copy";b.setAttribute("aria-label","Copy code");b.addEventListener("click",function(){var c=pre.querySelector("code");var t;if(c){var k=c.cloneNode(true);k.querySelectorAll("span.ln").forEach(function(n){n.remove();});t=k.textContent;}else{t=pre.textContent;}navigator.clipboard.writeText(t).then(function(){b.classList.add("copied");b.textContent="Copied!";setTimeout(function(){b.classList.remove("copied");b.textContent="Copy";},2000);});});w.appendChild(b);});});</script>
+        HTML
 
       # Generate both CSS and JS tags
       def tags(cache_bust : String = "") : String
@@ -578,6 +601,17 @@ module Hwaro
       property feed : Bool
       property sitemap : Bool
       property paginate_by : Int32?
+      # Ordering of pages within a term ("date", "title", "weight") —
+      # section semantics: date is newest-first, title/weight ascend, and
+      # `reverse` flips whichever order `sort_by` produced. Term FEEDS are
+      # exempt: RSS consumers assume reverse-chronological, so they stay
+      # date-desc regardless.
+      property sort_by : String = "date"
+      property reverse : Bool = false
+      # Ordering of the terms list (taxonomy index page + `get_taxonomy`
+      # items): "name" = alphabetical, "count" = page count descending
+      # (name-ascending tiebreak).
+      property terms_sort_by : String = "name"
 
       def initialize(@name : String)
         @feed = false
@@ -1636,11 +1670,12 @@ module Hwaro
         config.highlight.theme = s["theme"]?.try(&.as_s?) || config.highlight.theme
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
         config.highlight.line_numbers = bool_value(s["line_numbers"]?, config.highlight.line_numbers)
+        config.highlight.copy = bool_value(s["copy"]?, config.highlight.copy)
         if mode = s["mode"]?.try(&.as_s?)
           if mode == "client" || mode == "server"
             config.highlight.mode = mode
           else
-            Logger.warn "Unknown highlight.mode '#{mode}' — expected \"client\" or \"server\". Using \"client\"."
+            Logger.warn "Unknown highlight.mode '#{mode}' — expected \"client\" or \"server\". Using \"server\"."
           end
         end
       end
@@ -1761,6 +1796,21 @@ module Hwaro
           taxonomy.feed = bool_value(taxonomy_hash["feed"]?, taxonomy.feed)
           taxonomy.sitemap = bool_value(taxonomy_hash["sitemap"]?, taxonomy.sitemap)
           taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| int_or_nil(v) }
+          if sort_by = taxonomy_hash["sort_by"]?.try(&.as_s?)
+            if {"date", "title", "weight"}.includes?(sort_by)
+              taxonomy.sort_by = sort_by
+            else
+              Logger.warn "Unknown taxonomy sort_by '#{sort_by}' for '#{name}' — expected \"date\", \"title\" or \"weight\". Using \"date\"."
+            end
+          end
+          taxonomy.reverse = bool_value(taxonomy_hash["reverse"]?, taxonomy.reverse)
+          if terms_sort_by = taxonomy_hash["terms_sort_by"]?.try(&.as_s?)
+            if {"name", "count"}.includes?(terms_sort_by)
+              taxonomy.terms_sort_by = terms_sort_by
+            else
+              Logger.warn "Unknown taxonomy terms_sort_by '#{terms_sort_by}' for '#{name}' — expected \"name\" or \"count\". Using \"name\"."
+            end
+          end
           taxonomy
         end
       end

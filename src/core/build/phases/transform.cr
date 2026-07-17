@@ -264,10 +264,15 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    # Sort pages in taxonomies in-place (default by date)
-    site.taxonomies.each_value do |terms|
+    # Sort pages in taxonomies in-place (per-taxonomy sort_by/reverse,
+    # default date-desc for unconfigured names)
+    tax_configs = site.config.taxonomies.index_by(&.name)
+    site.taxonomies.each do |name, terms|
+      cfg = tax_configs[name]?
+      sort_by = cfg.try(&.sort_by) || "date"
+      reverse = cfg.try(&.reverse) || false
       terms.each_key do |term|
-        terms[term] = Utils::SortUtils.sort_pages(terms[term], "date", false)
+        terms[term] = Utils::SortUtils.sort_pages(terms[term], sort_by, reverse)
       end
     end
   end
@@ -370,10 +375,12 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    # 3. Re-sort only affected terms
+    # 3. Re-sort only affected terms (same per-taxonomy order as the full rebuild)
+    tax_configs = site.config.taxonomies.index_by(&.name)
     affected_tax_keys.each do |(name, term)|
       if pages_list = site.taxonomies[name]?.try(&.[term]?)
-        site.taxonomies[name][term] = Utils::SortUtils.sort_pages(pages_list, "date", false)
+        cfg = tax_configs[name]?
+        site.taxonomies[name][term] = Utils::SortUtils.sort_pages(pages_list, cfg.try(&.sort_by) || "date", cfg.try(&.reverse) || false)
       end
     end
 

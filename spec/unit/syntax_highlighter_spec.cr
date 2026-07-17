@@ -231,6 +231,7 @@ end
 private def reset_fence_options_state
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
 end
 
 describe Hwaro::Content::Processors::FenceOptions do
@@ -340,6 +341,50 @@ describe Hwaro::Content::Processors::FenceOptions do
       _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hl_lines="1-100000"}))
       opts.not_nil!.hl_lines.should eq([{1, 100_000}])
     end
+
+    it "parses a single hide_lines value" do
+      lang, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="2"}))
+      lang.should eq("crystal")
+      opts.not_nil!.hide_lines.should eq([{2, 2}])
+    end
+
+    it "parses hide_lines ranges and mixed items" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="1 3-5, 8"}))
+      opts.not_nil!.hide_lines.should eq([{1, 1}, {3, 5}, {8, 8}])
+    end
+
+    it "drops malformed hide_lines items like hl_lines" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="0,x,9-2,3"}))
+      opts.not_nil!.hide_lines.should eq([{3, 3}])
+    end
+
+    it "hide_lines alone activates the options block" do
+      lang, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="2"}))
+      lang.should eq("crystal")
+      opts.should_not be_nil
+    end
+
+    it "returns nil opts when every hide_lines item is malformed" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse(%(crystal {hide_lines="0 9-2"}))
+      opts.should be_nil
+    end
+
+    it "parses copy=true and copy=false" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=true}")
+      opts.not_nil!.copy.should be_true
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=false}")
+      opts.not_nil!.copy.should be_false
+    end
+
+    it "leaves copy nil when absent" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {linenos=true}")
+      opts.not_nil!.copy.should be_nil
+    end
+
+    it "ignores a non-boolean copy value (doesn't activate alone)" do
+      _, opts = Hwaro::Content::Processors::FenceOptions.parse("crystal {copy=maybe}")
+      opts.should be_nil
+    end
   end
 end
 
@@ -394,6 +439,45 @@ describe Hwaro::Content::Processors::LineWrapper do
       result.should contain(%(<span class="line hl"><span class="ln" aria-hidden="true">5 </span>a</span>\n))
       result.should contain(%(<span class="line"><span class="ln" aria-hidden="true">6 </span>b</span>\n))
     end
+
+    it "elides hidden lines but keeps their gutter numbers consumed (gap, not renumber)" do
+      opts = Hwaro::Content::Processors::FenceOptions::Options.new(hide_lines: [{2, 2}])
+      result = Hwaro::Content::Processors::LineWrapper.wrap("a\nb\nc\n", true, 1, opts)
+      result.should contain(%(<span class="ln" aria-hidden="true">1 </span>a</span>\n))
+      result.should_not contain("b")
+      result.should_not contain(%(>2 </span>))
+      result.should contain(%(<span class="ln" aria-hidden="true">3 </span>c</span>\n))
+    end
+
+    it "hides physical lines independent of linenostart" do
+      opts = Hwaro::Content::Processors::FenceOptions::Options.new(hide_lines: [{1, 1}])
+      result = Hwaro::Content::Processors::LineWrapper.wrap("a\nb\n", true, 5, opts)
+      result.should_not contain("a</span>")
+      result.should contain(%(<span class="line"><span class="ln" aria-hidden="true">6 </span>b</span>\n))
+    end
+
+    it "keeps the gutter width computed over the full physical range, hidden tail included" do
+      opts = Hwaro::Content::Processors::FenceOptions::Options.new(hide_lines: [{10, 10}])
+      body = ("a\n" * 10)
+      result = Hwaro::Content::Processors::LineWrapper.wrap(body, true, 1, opts)
+      # 10 physical lines -> width 2, so line 1 is padded even though the
+      # only 2-digit line (10) is hidden.
+      result.should contain(%(<span class="ln" aria-hidden="true"> 1 </span>))
+      result.should_not contain(%(>10 </span>))
+    end
+
+    it "hl_lines on a hidden line is a no-op (the line never renders)" do
+      opts = Hwaro::Content::Processors::FenceOptions::Options.new(hl_lines: [{2, 2}], hide_lines: [{2, 2}])
+      result = Hwaro::Content::Processors::LineWrapper.wrap("a\nb\nc\n", true, 1, opts)
+      result.should_not contain(%(<span class="line hl"))
+      result.should_not contain("b")
+    end
+
+    it "wraps without a gutter when linenos is off but hide_lines is active" do
+      opts = Hwaro::Content::Processors::FenceOptions::Options.new(hide_lines: [{2, 2}])
+      result = Hwaro::Content::Processors::LineWrapper.wrap("a\nb\nc\n", false, 1, opts)
+      result.should eq(%(<span class="line">a</span>\n<span class="line">c</span>\n))
+    end
   end
 end
 
@@ -446,6 +530,128 @@ describe "fence options rendering (server mode)" do
     Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = true
     html = Hwaro::Content::Processors::SyntaxHighlighter.render("    indented code\n    more code\n", highlight: true)
     html.should_not contain(%(<span class="line"))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "elides hide_lines lines with gap gutter numbering end-to-end" do
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    content = "```python {linenos=true, hide_lines=\"2\"}\ndef f():\n    secret()\n    pass\n```"
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    html.should contain(%(<span class="ln" aria-hidden="true">1 </span>))
+    html.should contain(%(<span class="ln" aria-hidden="true">3 </span>))
+    html.should_not contain(%(>2 </span>))
+    html.should_not contain("secret")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "hide_lines alone (no linenos) activates line wrapping and elides the line" do
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    content = "```python {hide_lines=\"2\"}\ndef f():\n    secret()\n    pass\n```"
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    html.should contain(%(<span class="line">))
+    html.should_not contain("secret")
+    html.should_not contain(%(<span class="ln"))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "client mode emits an inert data-hide-lines attribute and keeps the body intact" do
+    content = "```python {hide_lines=\"2\"}\ndef f():\n    secret()\n    pass\n```"
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    html.should contain(%(data-hide-lines="2"))
+    html.should contain("secret")
+    html.should_not contain(%(<span class="line))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "leaves mermaid fences untouched by hide_lines" do
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    content = "```mermaid {hide_lines=\"1\"}\ngraph LR\n  A --> B\n```"
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    html.should contain("language-mermaid")
+    html.should_not contain("data-hide-lines")
+    html.should_not contain(%(<span class="line"))
+    html.should contain("graph LR")
+  ensure
+    reset_fence_options_state
+  end
+end
+
+describe "copy button marker (data-copy)" do
+  it "marks every fence when the global default is on — in both modes" do
+    content = "```python\npass\n```"
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    client = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    client.should contain(%(<pre data-copy="true"><code class="language-python hljs">))
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    server = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    server.should contain(%(<pre data-copy="true">))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "a per-fence {copy=false} opts out of the global default" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {copy=false}\npass\n```", highlight: true)
+    html.should_not contain("data-copy")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "a per-fence {copy=true} opts in with the global default off" do
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {copy=true}\npass\n```", highlight: true)
+    html.should contain(%(data-copy="true"))
+    # copy alone must not activate line wrapping or other data-* attrs.
+    html.should_not contain("data-linenos")
+    html.should_not contain(%(<span class="line))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "never marks mermaid fences (postprocess_mermaid anchors on a bare <pre>)" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```mermaid\ngraph LR\n  A --> B\n```", highlight: true)
+    html.should contain(%(<pre><code class="language-mermaid))
+    html.should_not contain("data-copy")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "is byte-identical to stock output when the feature is fully off" do
+    content = "```python\npass\n```"
+    baseline = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)
+    baseline.should_not contain("data-copy")
+    baseline.should contain("<pre><code")
+  ensure
+    reset_fence_options_state
+  end
+
+  it "composes with client-mode data-* line attributes on the same <pre>" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {linenos=true}\npass\n```", highlight: true)
+    html.should contain(%(data-linenos="true"))
+    html.should contain(%(data-copy="true"))
+  ensure
+    reset_fence_options_state
+  end
+
+  it "keeps <pre> a direct child of a named block's .code-block wrapper" do
+    # The copy runtime anchors the button on an existing .code-block instead
+    # of inserting a .code-wrapper between it and the <pre>, so the
+    # scaffold's `.code-block > pre` styling must keep matching — the
+    # emitted HTML places the marked <pre> directly inside the wrapper.
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```crystal {name=\"main.cr\"}\nputs 1\n```", highlight: true)
+    html.should contain(%(<div class="code-block"><div class="code-filename">main.cr</div>))
+    html.should contain(%(<pre data-copy="true">))
   ensure
     reset_fence_options_state
   end

@@ -1,11 +1,11 @@
 require "./support/build_helper"
 
 # =============================================================================
-# Build-time syntax highlighting ([highlight] mode = "server")
+# Build-time syntax highlighting ([highlight] mode = "server", the default)
 #
 # Tartrazine lexers tokenize fenced code blocks at build time and emit spans
 # with Highlight.js-compatible classes, so hljs theme CSS keeps working while
-# no JavaScript ships. mode = "client" (default) keeps the previous behavior.
+# no JavaScript ships. mode = "client" opts back into browser-side Highlight.js.
 # =============================================================================
 
 SERVER_HIGHLIGHT_CONFIG = <<-TOML
@@ -32,6 +32,7 @@ HIGHLIGHT_TEMPLATE = "<head>{{ highlight_css }}{{ highlight_js }}</head><body>{{
 private def reset_highlight_mode
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
+  Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
 end
 
 describe "Server-side syntax highlighting" do
@@ -116,13 +117,14 @@ describe "Server-side syntax highlighting" do
     reset_highlight_mode
   end
 
-  it "client mode (default) keeps JS injection and emits no spans" do
+  it "client mode keeps JS injection and emits no spans" do
     config = <<-TOML
       title = "Test Site"
       base_url = "http://localhost"
 
       [highlight]
       enabled = true
+      mode = "client"
       TOML
 
     build_site(
@@ -138,7 +140,7 @@ describe "Server-side syntax highlighting" do
     end
   end
 
-  it "warns and falls back to client mode for an unknown mode value" do
+  it "warns and keeps the server default for an unknown mode value" do
     config = <<-TOML
       title = "Test Site"
       base_url = "http://localhost"
@@ -155,9 +157,11 @@ describe "Server-side syntax highlighting" do
       highlight: true,
     ) do
       html = File.read("public/index.html")
-      html.should contain("highlight.min.js")
-      html.should_not contain(%(<span class="hljs-))
+      html.should_not contain("highlight.min.js")
+      html.should contain(%(<span class="hljs-))
     end
+  ensure
+    reset_highlight_mode
   end
 end
 
@@ -290,6 +294,7 @@ describe "Fence options — server mode" do
 
       [highlight]
       enabled = true
+      mode = "client"
       TOML
 
     build_site(
@@ -306,6 +311,55 @@ describe "Fence options — server mode" do
       # Body stays exactly the plain escaped legacy text — no hljs spans at all
       # (client mode never tokenizes).
       html.should contain(%(<code class="language-python hljs">def main():))
+    end
+  ensure
+    reset_highlight_mode
+  end
+
+  it "[highlight] copy = true marks code blocks, ships the runtime once, and leaves mermaid alone" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [markdown]
+      mermaid = true
+
+      [highlight]
+      enabled = true
+      mode = "server"
+      copy = true
+      TOML
+
+    content = <<-MD
+      +++
+      title = "Code"
+      +++
+      ```python
+      def main():
+          return 42
+      ```
+
+      ```mermaid
+      graph LR
+        A --> B
+      ```
+      MD
+
+    build_site(
+      config,
+      content_files: {"index.md" => content},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(<pre data-copy="true">))
+      # The inline runtime rides {{ highlight_js }} — exactly once per page.
+      html.scan("code-copy-btn").size.should be > 0
+      html.scan(%(pre[data-copy])).size.should eq(1)
+      html.should_not contain("highlight.min.js")
+      # Mermaid's <pre> stays bare, so postprocess_mermaid still rewrites it.
+      html.should contain(%(<div class="mermaid">))
+      html.should_not contain("language-mermaid")
     end
   ensure
     reset_highlight_mode

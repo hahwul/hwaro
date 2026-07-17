@@ -24,6 +24,7 @@
 require "html"
 require "./fence_tracker"
 require "./inline_markdown"
+require "./render_hooks"
 
 module Hwaro
   module Content
@@ -49,10 +50,13 @@ module Hwaro
 
           # Convert table to HTML. `math: true` keeps `$…$` spans in cells
           # untransformed for the later math pass (see InlineMarkdown.render).
-          def to_html(math : Bool = false, flags : InlineMarkdown::Flags? = nil) : String
+          # With a `hooks` context whose table hook is configured, the stock
+          # markup (plus its thead/tbody sections) is handed to
+          # `hooks.render_table` instead of returned directly.
+          def to_html(math : Bool = false, flags : InlineMarkdown::Flags? = nil, hooks : RenderHooks::HookRenderContext? = nil) : String
             effective = flags || InlineMarkdown::Flags.new(math: math)
-            html = String.build do |str|
-              str << "<table>\n"
+
+            header_html = String.build do |str|
               str << "<thead>\n<tr>\n"
 
               @headers.each_with_index do |header, i|
@@ -62,30 +66,38 @@ module Hwaro
               end
 
               str << "</tr>\n</thead>\n"
+            end
 
-              if @rows.present?
-                str << "<tbody>\n"
-                @rows.each do |row|
-                  str << "<tr>\n"
-                  row.each_with_index do |cell, i|
-                    alignment = @alignments[i]? || Alignment::Left
-                    align_attr = alignment_attr(alignment)
-                    str << "<td#{align_attr}>#{render_inline_markdown(cell.strip, effective)}</td>\n"
-                  end
-                  # Fill missing cells if row has fewer columns than headers
-                  if row.size < @headers.size
-                    (@headers.size - row.size).times do |j|
-                      alignment = @alignments[row.size + j]? || Alignment::Left
-                      align_attr = alignment_attr(alignment)
-                      str << "<td#{align_attr}></td>\n"
-                    end
-                  end
-                  str << "</tr>\n"
-                end
-                str << "</tbody>\n"
-              end
+            body_html = if @rows.present?
+                          String.build do |str|
+                            str << "<tbody>\n"
+                            @rows.each do |row|
+                              str << "<tr>\n"
+                              row.each_with_index do |cell, i|
+                                alignment = @alignments[i]? || Alignment::Left
+                                align_attr = alignment_attr(alignment)
+                                str << "<td#{align_attr}>#{render_inline_markdown(cell.strip, effective)}</td>\n"
+                              end
+                              # Fill missing cells if row has fewer columns than headers
+                              if row.size < @headers.size
+                                (@headers.size - row.size).times do |j|
+                                  alignment = @alignments[row.size + j]? || Alignment::Left
+                                  align_attr = alignment_attr(alignment)
+                                  str << "<td#{align_attr}></td>\n"
+                                end
+                              end
+                              str << "</tr>\n"
+                            end
+                            str << "</tbody>\n"
+                          end
+                        else
+                          ""
+                        end
 
-              str << "</table>"
+            html = "<table>\n#{header_html}#{body_html}</table>"
+
+            if hooks && hooks.table?
+              return hooks.render_table(html: html, header_html: header_html, body_html: body_html)
             end
             html
           end
@@ -112,8 +124,10 @@ module Hwaro
         # `math: true` keeps `$…$` spans in cells untransformed for the later
         # math pass. `flags` (when given) takes precedence over `math` and
         # also threads the F10 inline markup flags (ins/mark/sub/sup) into
-        # cell rendering.
-        def process(content : String, *, math : Bool = false, flags : InlineMarkdown::Flags? = nil) : String
+        # cell rendering. `hooks` routes each table through the render-table
+        # hook (see `Table#to_html`); nil keeps the stock output.
+        def process(content : String, *, math : Bool = false, flags : InlineMarkdown::Flags? = nil,
+                    hooks : RenderHooks::HookRenderContext? = nil) : String
           return content unless has_table?(content)
 
           effective = flags || InlineMarkdown::Flags.new(math: math)
@@ -138,7 +152,7 @@ module Hwaro
               # Try to parse the table
               table, consumed = parse_table(lines, i)
               if table
-                result << table.to_html(flags: effective)
+                result << table.to_html(flags: effective, hooks: hooks)
                 i += consumed
                 next
               end

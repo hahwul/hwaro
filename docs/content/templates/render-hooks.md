@@ -5,7 +5,7 @@ weight = 5
 toc = true
 +++
 
-Render hooks let you override how individual Markdown elements — links, images, headings, and fenced code blocks — turn into HTML, without touching hwaro's Markdown parser. Drop a template in `templates/hooks/`, and every matching element on every page renders through it instead of the built-in markup.
+Render hooks let you override how individual Markdown elements — links, images, headings, fenced code blocks, blockquotes, and tables — turn into HTML, without touching hwaro's Markdown parser. Drop a template in `templates/hooks/`, and every matching element on every page renders through it instead of the built-in markup.
 
 If you don't create any `templates/hooks/render-*` template, nothing changes: hwaro renders exactly as it always has.
 
@@ -14,15 +14,17 @@ If you don't create any `templates/hooks/render-*` template, nothing changes: hw
 ```
 templates/
 └── hooks/
-    ├── render-link.html       # [text](url "title")
-    ├── render-image.html      # ![alt](url "title")
-    ├── render-heading.html    # ## Heading
-    └── render-codeblock.html  # ```lang ... ```
+    ├── render-link.html        # [text](url "title")
+    ├── render-image.html       # ![alt](url "title")
+    ├── render-heading.html     # ## Heading
+    ├── render-codeblock.html   # ```lang ... ```
+    ├── render-blockquote.html  # > quoted
+    └── render-table.html       # | GFM | tables |
 ```
 
 Each file is independent — add only the ones you want to override. A site with just `render-image.html` gets a custom image wrapper and stock rendering for everything else.
 
-`blockquote` and `table` hooks are planned but not implemented yet; a `templates/hooks/render-blockquote.html` or `render-table.html` file is silently ignored today. Any other `hooks/render-*` name is unrecognized and logs a warning at build time.
+Any other `hooks/render-*` name is unrecognized and logs a warning at build time.
 
 ## Context Variables
 
@@ -60,10 +62,28 @@ All values are Crinja `Value`s and — like every other hwaro template — **alr
 | `options` | The raw Zola/Pandoc-style `{...}` options block after the language (see [Syntax Highlighting](/features/syntax-highlighting/)), or any trailing info-string text when there's no `{...}` block. Escaped |
 | `code` | The fence body, HTML-escaped |
 | `highlighted` | The server-mode syntax-highlighted body (hljs-class spans), or an empty string when `[highlight] mode` isn't `"server"`, highlighting is off, or the language has no lexer |
+| `name` | The parsed `{name=...}`/`{title=...}` filename label, escaped. Empty string when absent |
+| `copy` | `"true"` when the copy button applies to this block (`[highlight] copy` / per-fence `{copy=...}`, never for mermaid), empty string otherwise. The template decides what markup to emit for it |
+
+### `render-blockquote.html`
+
+| Variable | Description |
+|----------|--------------|
+| `text` | The already-rendered inner HTML of the blockquote — block-level content (paragraphs, lists, nested quotes), usually ending with a newline |
+
+### `render-table.html`
+
+| Variable | Description |
+|----------|--------------|
+| `html` | The complete stock `<table>...</table>` markup |
+| `header_html` | The table's `<thead>...</thead>` section |
+| `body_html` | The table's `<tbody>...</tbody>` section — empty string for a header-only table |
+
+All hook templates additionally see the standard `page` (`url`, `title`, `path`, `language`) and `config` (`base_url`, `title`) variables.
 
 ## Default-Equivalent Templates
 
-These four templates reproduce hwaro's stock output exactly — a useful starting point to modify from:
+These templates reproduce hwaro's stock output exactly — a useful starting point to modify from:
 
 ```jinja
 {# templates/hooks/render-link.html #}
@@ -83,6 +103,17 @@ These four templates reproduce hwaro's stock output exactly — a useful startin
 ```jinja
 {# templates/hooks/render-codeblock.html #}
 <pre><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>
+```
+
+```jinja
+{# templates/hooks/render-blockquote.html #}
+<blockquote>
+{{ text }}</blockquote>
+```
+
+```jinja
+{# templates/hooks/render-table.html #}
+{{ html }}
 ```
 
 Note `{% if title is present %}`, not a bare `{% if title %}` — Crinja's truthiness only treats `false`/`0`/nil as falsy, so a bare `{% if title %}` would render `title=""` even when there's no title. The custom `is present`/`is empty` tests (also used throughout hwaro's own templates) check for that correctly.
@@ -111,8 +142,10 @@ Every `![alt](src "caption")` in your Markdown now renders as a captioned `<figu
 2. **Keep conventional double-quoted `href`/`src` attributes.** Everything downstream — `@/internal-page.md` link resolution, subpath (`base_path`) prefixing of root-relative links, responsive-image `srcset`/`sizes` injection, and `loading="lazy"` — runs as a plain-text pass over the *final* HTML, matching on `href="..."` / `src="..."`. A hook that emits an unquoted or single-quoted attribute, or restructures the destination into something other than a normal attribute value, opts that element out of all of it. An `@/`-prefixed `destination` must land inside `href="..."` for `InternalLinkResolver` to find and resolve it.
 3. **`render-heading.html` must emit an `<hN id="{{ id }}">` element.** The TOC (`{{ toc }}` / `page.toc`) and `insert_anchor_links` both post-process the final HTML looking for `<h1>`–`<h6>` tags with an `id` attribute; a hook that renders something other than a heading tag, or drops `id`, silently falls out of both.
 4. **Don't transform `{{ text }}`.** It's already-rendered HTML, and on pages using shortcodes it may contain an internal placeholder comment (`<!--HWARO-SHORTCODE-PLACEHOLDER-N-->`) that gets swapped for the shortcode's output in a later pass — filtering, truncating, or re-escaping `text` can corrupt or strand that placeholder.
-5. **Mermaid owns its own fence.** With `[markdown] mermaid = true`, a `` ```mermaid `` fence always renders through the existing Mermaid pipeline (`<div class="mermaid">…</div>`), never through `render-codeblock.html` — that's the one config-decided exception to "every hook always applies to every matching element." Set `mermaid = false` to have your codeblock hook render mermaid fences like any other language instead.
-6. **Hooks don't apply inside table cells, footnote bodies, definition lists, or the front-matter `description`/summary text.** Those render through a separate, simpler inline-markdown path that never touches the main Markd parser hooks attach to. This is a known limitation, not a bug.
+5. **Mermaid owns its own fence.** With `[markdown] mermaid = true`, a `` ```mermaid `` fence always renders through the existing Mermaid pipeline (`<div class="mermaid">…</div>`), never through `render-codeblock.html` — a config-decided exception to "every hook always applies to every matching element." Set `mermaid = false` to have your codeblock hook render mermaid fences like any other language instead.
+6. **Admonitions own their blockquotes.** With `[markdown] admonitions = true` (the default), a `> [!NOTE]`-style blockquote keeps rendering through the admonition pipeline (`<div class="admonition admonition-note">…</div>`), never through `render-blockquote.html` — the same config-decided pattern as Mermaid. Set `admonitions = false` to route those quotes through your hook like any other blockquote.
+7. **No blank lines in `render-table.html` output.** Table hook output is spliced into the Markdown *before* the main parse, and an HTML block ends at the first blank line — anything after it would be re-parsed as Markdown. hwaro collapses blank lines out of the output as a safety net, so multi-line templates work, but don't rely on blank-line-sensitive markup.
+8. **Hooks don't apply inside table cells, footnote bodies, definition lists, or the front-matter `description`/summary text.** Those render through a separate, simpler inline-markdown path that never touches the main Markd parser hooks attach to (table *cells* keep that path even when `render-table.html` wraps the table itself). This is a known limitation, not a bug.
 
 ## Incremental Builds
 

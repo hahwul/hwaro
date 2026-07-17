@@ -12,16 +12,22 @@ private alias SyntaxHighlighter = Hwaro::Content::Processors::SyntaxHighlighter
 # below. `is present` (not a bare `{% if title %}`) matters: Crinja's
 # value truthiness only treats `false`/`0`/nil as falsy, NOT an empty
 # string, so a bare `{% if title %}` would always render the attribute.
-LINK_TPL      = %(<a href="{{ destination }}"{% if title is present %} title="{{ title }}"{% endif %}>{{ text }}</a>)
-IMAGE_TPL     = %(<img src="{{ destination }}" alt="{{ alt }}"{% if title is present %} title="{{ title }}"{% endif %} />)
-HEADING_TPL   = %(<h{{ level }} id="{{ id }}">{{ text }}</h{{ level }}>)
-CODEBLOCK_TPL = %(<pre><code{% if lang is present %} class="language-{{ lang }}"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>)
+LINK_TPL       = %(<a href="{{ destination }}"{% if title is present %} title="{{ title }}"{% endif %}>{{ text }}</a>)
+IMAGE_TPL      = %(<img src="{{ destination }}" alt="{{ alt }}"{% if title is present %} title="{{ title }}"{% endif %} />)
+HEADING_TPL    = %(<h{{ level }} id="{{ id }}">{{ text }}</h{{ level }}>)
+CODEBLOCK_TPL  = %(<pre><code{% if lang is present %} class="language-{{ lang }}"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>)
+BLOCKQUOTE_TPL = "<blockquote>\n{{ text }}</blockquote>"
+TABLE_TPL      = "{{ html }}"
+
+TABLE_MD = "| A | B |\n|---|---|\n| 1 | 2 |"
 
 private def make_registry(
   link : String? = nil,
   image : String? = nil,
   heading : String? = nil,
   codeblock : String? = nil,
+  blockquote : String? = nil,
+  table : String? = nil,
   fingerprint : String = "test",
 ) : RenderHooks::Registry
   RenderHooks::Registry.new(
@@ -29,6 +35,8 @@ private def make_registry(
     image ? {source: image, disk_path: nil} : nil,
     heading ? {source: heading, disk_path: nil} : nil,
     codeblock ? {source: codeblock, disk_path: nil} : nil,
+    blockquote ? {source: blockquote, disk_path: nil} : nil,
+    table ? {source: table, disk_path: nil} : nil,
     fingerprint,
   )
 end
@@ -40,12 +48,17 @@ private def make_hooks(
   image : String? = nil,
   heading : String? = nil,
   codeblock : String? = nil,
+  blockquote : String? = nil,
+  table : String? = nil,
   mermaid_bypass : Bool = false,
+  admonition_bypass : Bool = false,
 ) : RenderHooks::HookRenderContext
-  registry = make_registry(link: link, image: image, heading: heading, codeblock: codeblock)
+  registry = make_registry(link: link, image: image, heading: heading, codeblock: codeblock,
+    blockquote: blockquote, table: table)
   env = Hwaro::Content::Processors::TemplateEngine.new.env
   cache = {} of UInt64 => Crinja::Template
-  RenderHooks::HookRenderContext.new(registry, env, cache, nil, {} of String => Crinja::Value, mermaid_bypass)
+  RenderHooks::HookRenderContext.new(registry, env, cache, nil, {} of String => Crinja::Value,
+    mermaid_bypass, admonition_bypass)
 end
 
 describe RenderHooks do
@@ -93,17 +106,27 @@ describe RenderHooks do
       fp1.should_not eq(fp2)
     end
 
-    it "warns once about an unrecognized hook name but stays silent about planned ones" do
+    it "recognizes blockquote and table hooks" do
+      RenderHooks.configure(
+        {"hooks/render-blockquote" => "BQ", "hooks/render-table" => "TBL"},
+        {} of String => String,
+      )
+      reg = RenderHooks.registry.not_nil!
+      reg.blockquote.not_nil![:source].should eq("BQ")
+      reg.table.not_nil![:source].should eq("TBL")
+      reg.link.should be_nil
+    end
+
+    it "warns once about an unrecognized hook name" do
       log = with_captured_log do
         RenderHooks.configure(
-          {"hooks/render-foo" => "x", "hooks/render-blockquote" => "y"},
+          {"hooks/render-foo" => "x"},
           {} of String => String,
         )
       end
       log.should contain("unknown render hook 'render-foo'")
-      log.should contain("supported: link, image, heading, codeblock")
-      log.should_not contain("render-blockquote")
-      # Neither "foo" nor "blockquote" is a real hook, so no registry at all.
+      log.should contain("supported: link, image, heading, codeblock, blockquote, table")
+      # "foo" is not a real hook, so no registry at all.
       RenderHooks.registry.should be_nil
     end
 
@@ -252,6 +275,104 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
     end
   end
 
+  describe "blockquote" do
+    it "renders the captured inner HTML, nested inline markup included" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]")
+      html = SyntaxHighlighter.render("> quoted **bold** text", hooks: hooks)
+      html.should contain("BQ[<p>quoted <strong>bold</strong> text</p>")
+      html.should_not contain("<blockquote>")
+    end
+
+    it "handles a multi-paragraph blockquote as one hook call" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]")
+      html = SyntaxHighlighter.render("> first\n>\n> second", hooks: hooks)
+      html.should contain("BQ[<p>first</p>\n<p>second</p>")
+    end
+
+    it "bypasses the hook for an admonition blockquote when admonitions are enabled" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]", admonition_bypass: true)
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.admonitions = true
+      html, _ = Hwaro::Content::Processors::Markdown.new.render("> [!NOTE]\n> Watch out.", markdown_config: cfg, hooks: hooks)
+      html.should_not contain("BQ[")
+      # The stock shape survived to postprocess_admonitions and was rewritten.
+      html.should contain(%(class="admonition admonition-note"))
+    end
+
+    it "runs the hook on an admonition-shaped blockquote when admonitions are disabled" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]", admonition_bypass: false)
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.admonitions = false
+      html, _ = Hwaro::Content::Processors::Markdown.new.render("> [!NOTE]\n> Watch out.", markdown_config: cfg, hooks: hooks)
+      html.should contain("BQ[")
+      html.should_not contain("admonition-note")
+    end
+
+    it "leaves ordinary blockquotes on the hook while admonitions bypass it" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]", admonition_bypass: true)
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.admonitions = true
+      content = "> plain quote\n\n> [!TIP]\n> A tip."
+      html, _ = Hwaro::Content::Processors::Markdown.new.render(content, markdown_config: cfg, hooks: hooks)
+      html.should contain("BQ[<p>plain quote</p>")
+      html.should contain(%(class="admonition admonition-tip"))
+    end
+
+    it "falls back to the stock <blockquote> shape on a template error" do
+      hooks = make_hooks(blockquote: "{{ text")
+      html = ""
+      log = with_captured_log do
+        html = SyntaxHighlighter.render("> quoted", hooks: hooks)
+      end
+      html.should contain("<blockquote>\n<p>quoted</p>\n</blockquote>")
+      log.should contain("Template error in render hook 'hooks/render-blockquote'")
+    end
+  end
+
+  describe "table" do
+    it "wraps the stock table html via the hook" do
+      hooks = make_hooks(table: %(<div class="tbl">{{ html }}</div>))
+      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html.should contain(%(<div class="tbl"><table>))
+      html.should contain("</table></div>")
+    end
+
+    it "exposes header_html and body_html separately" do
+      hooks = make_hooks(table: "H[{{ header_html }}]B[{{ body_html }}]")
+      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html.should contain("H[<thead>")
+      html.should contain("<th>A</th>")
+      html.should contain("B[<tbody>")
+      html.should contain("<td>1</td>")
+    end
+
+    it "collapses blank lines in the hook output (markd html-block safety)" do
+      hooks = make_hooks(table: "<div>\n\n{{ html }}\n\n\n</div>")
+      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html.should_not match(/\n[ \t]*\n/)
+      html.should contain("<table>")
+      # No escaped leftovers — the whole table stayed one html block.
+      html.should_not contain("&lt;table&gt;")
+    end
+
+    it "falls back to the stock table markup on a template error" do
+      hooks = make_hooks(table: "{{ html")
+      html = ""
+      log = with_captured_log do
+        html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      end
+      html.should contain("<table>\n<thead>")
+      log.should contain("Template error in render hook 'hooks/render-table'")
+    end
+
+    it "renders the stock table byte-identically when no table hook is configured" do
+      hooks = make_hooks(link: "L[{{ text }}]") # some other hook active
+      stock = SyntaxHighlighter.render(TABLE_MD)
+      hooked = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      hooked.should eq(stock)
+    end
+  end
+
   it "empties the destination in safe mode for an unsafe protocol" do
     hooks = make_hooks(link: "D=[{{ destination }}]")
     html = SyntaxHighlighter.render("[text](javascript:alert(1))", safe: true, hooks: hooks)
@@ -299,6 +420,12 @@ describe "default-equivalent hook templates" do
       "```",
       "plain fence",
       "```",
+      "",
+      "> a quoted *paragraph*",
+      "",
+      "| A | B |",
+      "|---|---|",
+      "| 1 | 2 |",
     ].join("\n")
 
     cfg = Hwaro::Models::MarkdownConfig.new
@@ -306,7 +433,8 @@ describe "default-equivalent hook templates" do
 
     stock_html, _ = processor.render(content, highlight: false, markdown_config: cfg)
 
-    hooks = make_hooks(link: LINK_TPL, image: IMAGE_TPL, heading: HEADING_TPL, codeblock: CODEBLOCK_TPL)
+    hooks = make_hooks(link: LINK_TPL, image: IMAGE_TPL, heading: HEADING_TPL, codeblock: CODEBLOCK_TPL,
+      blockquote: BLOCKQUOTE_TPL, table: TABLE_TPL)
     hook_html, _ = processor.render(content, highlight: false, markdown_config: cfg, hooks: hooks)
 
     hook_html.should eq(stock_html)

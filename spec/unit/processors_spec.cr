@@ -301,6 +301,8 @@ describe Hwaro::Models::HighlightConfig do
     config.enabled.should be_true
     config.theme.should eq("github")
     config.use_cdn.should be_true
+    config.mode.should eq("server")
+    config.copy.should be_false
   end
 
   describe "css_tag" do
@@ -325,8 +327,53 @@ describe Hwaro::Models::HighlightConfig do
   end
 
   describe "js_tag" do
+    it "returns empty string in server mode (default)" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.js_tag.should eq("")
+    end
+
+    it "returns only the copy runtime in server mode when copy is enabled" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      config.js_tag.should contain("code-copy-btn")
+      config.js_tag.should contain("pre[data-copy]")
+      config.js_tag.should_not contain("highlight.min.js")
+    end
+
+    it "copy runtime strips the .ln gutter from copied text and anchors on an existing code-block" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      tag = config.js_tag
+      # Server-mode linenos bake `<span class="ln">N </span>` into <code> —
+      # the click handler must remove them before reading textContent.
+      tag.should contain(%(querySelectorAll("span.ln")))
+      # A named fence's .code-block wrapper is reused as the positioning
+      # anchor instead of nesting a fresh .code-wrapper inside it (which
+      # would break the scaffold's `.code-block > pre` styling).
+      tag.should contain(%(contains("code-block")))
+      tag.should contain(".code-wrapper,.code-block{position:relative}")
+    end
+
+    it "appends the copy runtime after the hljs scripts in client mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
+      config.copy = true
+      tag = config.js_tag
+      tag.should contain("hljs.highlightAll()")
+      tag.should contain("code-copy-btn")
+      tag.index!("hljs.highlightAll()").should be < tag.index!("code-copy-btn")
+    end
+
+    it "omits the copy runtime when highlighting is disabled" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.copy = true
+      config.enabled = false
+      config.js_tag.should eq("")
+    end
+
     it "returns CDN script when use_cdn is true" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.js_tag.should contain("cdnjs.cloudflare.com")
       config.js_tag.should contain("highlight.min.js")
       config.js_tag.should contain("hljs.highlightAll()")
@@ -334,6 +381,7 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns local script when use_cdn is false" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.use_cdn = false
       config.js_tag.should contain("/assets/js/highlight.min.js")
       config.js_tag.should_not contain("cdnjs.cloudflare.com")
@@ -341,14 +389,23 @@ describe Hwaro::Models::HighlightConfig do
 
     it "returns empty string when disabled" do
       config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       config.enabled = false
       config.js_tag.should eq("")
     end
   end
 
   describe "tags" do
-    it "returns combined CSS and JS tags" do
+    it "returns only the CSS tag in server mode (default)" do
       config = Hwaro::Models::HighlightConfig.new
+      tags = config.tags
+      tags.should contain("stylesheet")
+      tags.should_not contain("highlight.min.js")
+    end
+
+    it "returns combined CSS and JS tags in client mode" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.mode = "client"
       tags = config.tags
       tags.should contain("stylesheet")
       tags.should contain("highlight.min.js")

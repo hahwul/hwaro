@@ -830,7 +830,8 @@ module Hwaro::Core::Build::Phases::Render
     cache = template_cache_override || @compiled_templates_cache
     cache_mutex = template_cache_override ? nil : @crinja_cache_mutex
     page_vars = Content::Processors::RenderHooks.page_vars(page, site.config)
-    Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars, site.config.markdown.mermaid)
+    Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars,
+      site.config.markdown.mermaid, site.config.markdown.admonitions)
   end
 
   # Claim a deterministic owner (page.path) for every output URL. Two passes,
@@ -1700,7 +1701,21 @@ module Hwaro::Core::Build::Phases::Render
       end
       slug_map = Utils::TextUtils.disambiguated_slugs(written_terms)
       term_slug_values = {} of String => Crinja::Value
-      terms_array = terms.map do |term, term_pages|
+      # Term order matches the taxonomy's `terms_sort_by` (same rule the
+      # written index page uses): "name" = alphabetical (also the default
+      # for unconfigured taxonomy names), "count" = page count descending,
+      # name-ascending tiebreak.
+      tax_cfg = config.taxonomies.find { |t| t.name == name }
+      sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
+                            terms.keys.sort! do |a, b|
+                              cmp = terms[b].size <=> terms[a].size
+                              cmp == 0 ? (a <=> b) : cmp
+                            end
+                          else
+                            terms.keys.sort!
+                          end
+      terms_array = sorted_term_names.map do |term|
+        term_pages = terms[term]
         term_pages_array = term_pages.map do |tp|
           cached_page_crinja_value(tp, default_lang)
         end
