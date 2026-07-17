@@ -211,6 +211,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[pagination]` | [Pagination](/features/pagination/) | Section pagination |
 | `[auto_includes]` | [Auto Includes](/features/auto-includes/) | Auto-include CSS/JS files |
 | `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting |
+| `[sass]` | [Sass/SCSS](/features/sass/) | Built-in SCSS compilation (pure Crystal) |
 | `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
@@ -277,7 +278,7 @@ url = "/posts/"
 
 # Feature sections — see Feature Configuration Reference above
 # [feeds], [sitemap], [robots], [og], [search], [highlight],
-# [pagination], [auto_includes], [assets], [image_processing],
+# [pagination], [auto_includes], [assets], [sass], [image_processing],
 # [series], [related], [llms], [pwa], [amp], [deployment], etc.
 ```
 

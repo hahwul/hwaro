@@ -208,11 +208,16 @@ sites).
    `{{ asset(name='main.css') }}`; you get concatenation, minification, and
    content-hash fingerprinting (cache busting) for free.
 
-> **There is no built-in Sass/SCSS or Tailwind step, and no component
-> framework.** You write modern plain CSS (custom properties, nesting where
-> supported, `color-mix()`, `clamp()`), *or* run Sass/Tailwind/PostCSS yourself
-> via **build hooks** and point Hwaro at the compiled output. Don't assume a
-> preprocessor or an npm design system exists. When a brief names an aesthetic
+> **There is a built-in SCSS compiler (opt-in via `[sass] enabled = true`),
+> but no Tailwind step and no component framework.** The built-in compiler
+> covers the practical subset — variables, nesting/`&`, partials with
+> `@use`/`@import`, mixins with `@content`, interpolation — but NOT control
+> flow (`@if`/`@each`), arithmetic, or built-in functions (`lighten()` etc.),
+> so framework-grade SCSS won't compile. Default to modern plain CSS (custom
+> properties, nesting where supported, `color-mix()`, `clamp()`); use `[sass]`
+> when the brief calls for it, or run Tailwind/PostCSS/full dart-sass via
+> **build hooks** and point Hwaro at the compiled output. Don't assume an npm
+> design system exists. When a brief names an aesthetic
 > (glass, bento, brutalist, editorial, dark tech, aurora), that's a CSS
 > language you build honestly by hand — there is no official package for any of
 > them, on any stack.

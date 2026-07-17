@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Built-in Sass/SCSS compilation (`[sass]` config) — pure Crystal, no external tools: variables with `!default`/`!global`, nested rules with `&`, partials via `@use` (namespaces) / `@import`, mixins with defaults, keyword args and `@content`, `#{...}` interpolation, and `@media`/`@supports` bubbling. `static/**/*.scss` entries compile to sibling `.css`, `.scss` bundle entries compile before concatenation, and `hwaro serve` recompiles on change with errors in the browser overlay. Unsupported directives (`@if`, `@each`, `@function`, `@extend`, ...) fail the build with located errors instead of emitting broken CSS.
+
 ## v0.17.1
 
 ### Changed

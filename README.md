@@ -51,6 +51,7 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 - Incremental build caching
 - Streaming build mode with memory limits
 - Pre/post build hooks
+- Built-in Sass/SCSS compilation (pure Crystal, no external tools)
 - CSS/JS bundling, minification, and content-hash fingerprinting
 - Lazy loading images
 - Environment-specific config (`config.production.toml`, `config.staging.toml`, etc.)

@@ -1,7 +1,7 @@
 +++
 title = "Cache Busting"
 description = "Append content hashes to asset URLs for cache invalidation"
-weight = 17
+weight = 18
 toc = true
 +++
 

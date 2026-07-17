@@ -35,6 +35,7 @@ module Hwaro
         "permalinks"       => {description: "URL path overrides", snippet: -> { permalinks(commented: true) }},
         "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: -> { auto_includes(commented: true) }},
         "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: -> { assets(commented: true) }},
+        "sass"             => {description: "Built-in Sass/SCSS compilation", snippet: -> { sass(commented: true) }},
         "deployment"       => {description: "Deployment targets", snippet: -> { deployment(commented: true) }},
         "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: -> { image_processing(commented: true) }},
         "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: -> { pwa(commented: true) }},
@@ -850,6 +851,38 @@ module Hwaro
             # [[assets.bundles]]
             # name = "app.js"
             # files = ["js/util.js", "js/app.js"]
+
+            TOML
+        end
+      end
+
+      def self.sass(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Sass/SCSS Compilation (Optional)
+            # =============================================================================
+
+            # [sass]
+            # enabled = true
+            # minify = true
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Sass/SCSS Compilation (Optional)
+            # =============================================================================
+            # Compile static/**/*.scss to sibling .css files at build time.
+            # Pure Crystal — no external tools. Partials (_*.scss) are only
+            # reachable via @use/@import and never publish; raw .scss sources
+            # are excluded from the static copy while enabled.
+
+            # [sass]
+            # enabled = true
+            # minify = true
 
             TOML
         end

@@ -1,7 +1,7 @@
 +++
 title = "Asset Pipeline"
 description = "Built-in CSS/JS bundling, minification, and fingerprinting"
-weight = 16
+weight = 17
 toc = true
 +++
 
@@ -32,6 +32,8 @@ files = ["css/reset.css", "css/style.css"]
 name = "app.js"
 files = ["js/util.js", "js/app.js"]
 ```
+
+Bundle `files` may also name `.scss` sources — they compile through the [built-in Sass compiler](/features/sass/) before concatenation, then minify and fingerprint like any other CSS.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
