@@ -347,7 +347,9 @@ module Hwaro
         # HwaroError(HWARO_E_CONTENT) maps to exit code 5 for CI; under
         # `serve` the watcher rescue surfaces it in the error overlay.
         private def raise_on_broken_internal_links!
-          entries = @broken_links_mutex.synchronize { @broken_internal_links.sort }
+          # Dedupe: the same broken @/target repeated within one page (or a
+          # page rendered twice in a pass) must produce one line, not N.
+          entries = @broken_links_mutex.synchronize { @broken_internal_links.sort.uniq! }
           return if entries.empty?
 
           label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
@@ -1104,6 +1106,13 @@ module Hwaro
                   else
                     process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   end
+          # Strict [links] broken_internal = "error": this pass continues the
+          # initial fast-start build (whose priority fan-out already raised
+          # for its own subset and left the accumulator empty), so don't
+          # clear here — just surface what the deferred pages collected. The
+          # server's fast-start fiber rescues this and routes it into the
+          # error overlay via notify_build_error; the server keeps running.
+          raise_on_broken_internal_links!
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index

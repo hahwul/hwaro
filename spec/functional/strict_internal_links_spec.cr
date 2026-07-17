@@ -38,6 +38,63 @@ describe "Strict internal links: error mode" do
     ex.hint.not_nil!.should contain(%([links] broken_internal = "warn"))
   end
 
+  it "lists a repeated broken link once" do
+    ex = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        STRICT_LINKS_CONFIG,
+        content_files: {
+          "page.md" => "---\ntitle: Page\n---\n[one](@/nonexistent.md) and [two](@/nonexistent.md)",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    message = ex.message.not_nil!
+    message.should contain("1 broken internal link")
+    message.scan("page.md → @/nonexistent.md (page not found)").size.should eq(1)
+  end
+
+  # The fast-start deferred fan-out is the one render pass that runs outside
+  # the Render phase — it must surface strict-mode offenders too, or a
+  # broken link in a non-priority page silently ships during `serve
+  # --fast-start`. The server's deferred fiber rescues the raise and routes
+  # it into the error overlay.
+  it "raises from render_deferred when a deferred page has a broken link" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", STRICT_LINKS_CONFIG)
+        FileUtils.mkdir_p("content")
+        File.write("content/_index.md", "---\ntitle: Home\n---\nhome")
+        File.write("content/recent.md", "---\ntitle: Recent\ndate: 2026-06-01\n---\nclean body")
+        File.write("content/old-broken.md", "---\ntitle: Old\ndate: 2020-01-01\n---\nSee [missing](@/nope.md)")
+        File.write("content/old-clean.md", "---\ntitle: Old Two\ndate: 2020-01-02\n---\nfine")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/index.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public",
+          parallel: false,
+          fast_start: true,
+          fast_start_count: 1,
+        )
+
+        # The priority pass (home + most recent post) is clean, so the
+        # initial build succeeds and the broken page lands in the
+        # deferred bucket.
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+
+        ex = expect_raises(Hwaro::HwaroError) do
+          builder.render_deferred(options)
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+        ex.message.not_nil!.should contain("old-broken.md → @/nope.md (page not found)")
+      end
+    end
+  end
+
   it "does not flag resolvable links" do
     build_site(
       STRICT_LINKS_CONFIG,
