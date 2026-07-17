@@ -566,6 +566,8 @@ module Hwaro
             # (e.g. "old/posts" => "posts" moves content/old/posts/x.md to /posts/x/).
             # Targets with :tokens are Hugo-style patterns that rebuild the whole
             # URL for leaf pages (:year/:month/:day/:slug/:title/:section/:filename).
+            # First matching rule wins (declaration order) — put specific prefixes
+            # before broad ones, and an "" catch-all last.
 
             # [permalinks]
             # "old/posts" = "posts"

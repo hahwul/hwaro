@@ -112,7 +112,7 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
-Rules are checked in order and the first source that matches the page's directory (exactly or as a parent prefix) wins.
+Rules are evaluated in declaration order and the **first** source that matches the page's directory (exactly or as a parent prefix) wins — later rules are never consulted for that page. Declare specific prefixes before broad ones (`"posts/tech"` before `"posts"`), or the broad rule shadows the specific one. This applies to token patterns too, and especially to the `""` catch-all: put it **last**, after every other rule.
 
 ### Token patterns
 
@@ -141,7 +141,7 @@ Notes:
 - Patterns apply to leaf pages only. Section `_index` and bundle `index` pages skip pattern rules (they keep their directory URL, or a later plain remap rule).
 - A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens.
 - An explicit `path` in front matter always wins over any permalink rule.
-- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page.
+- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page — declare it last, since first-match ordering means it would shadow any rule after it.
 - For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
 
 ## Links
