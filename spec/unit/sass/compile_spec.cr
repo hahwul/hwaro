@@ -16,15 +16,15 @@ describe Hwaro::Assets::Sass do
     end
 
     it "shadows outer variables in nested rules" do
-      css = compile(<<-'SCSS')
-      $c: red;
-      .outer {
-        $c: blue;
-        color: $c;
-        .inner { color: $c; }
-      }
-      .after { color: $c; }
-      SCSS
+      css = compile(<<-SCSS)
+        $c: red;
+        .outer {
+          $c: blue;
+          color: $c;
+          .inner { color: $c; }
+        }
+        .after { color: $c; }
+        SCSS
       css.should contain(".outer {\n  color: blue;")
       css.should contain(".outer .inner {\n  color: blue;")
       css.should contain(".after {\n  color: red;")
@@ -37,20 +37,20 @@ describe Hwaro::Assets::Sass do
     end
 
     it "writes root scope with !global" do
-      css = compile(<<-'SCSS')
-      $c: red;
-      .a { $c: blue !global; }
-      .b { color: $c; }
-      SCSS
+      css = compile(<<-SCSS)
+        $c: red;
+        .a { $c: blue !global; }
+        .b { color: $c; }
+        SCSS
       css.should contain(".b {\n  color: blue;")
     end
 
     it "treats hyphens and underscores as equivalent in identifiers" do
-      css = compile(<<-'SCSS')
-      $brand-color: #123;
-      .a { color: $brand_color; }
-      .b { color: $brand-color; }
-      SCSS
+      css = compile(<<-SCSS)
+        $brand-color: #123;
+        .a { color: $brand_color; }
+        .b { color: $brand-color; }
+        SCSS
       css.should contain(".a {\n  color: #123;")
       css.should contain(".b {\n  color: #123;")
     end
@@ -83,7 +83,7 @@ describe Hwaro::Assets::Sass do
     end
 
     it "keeps & literal inside strings and attribute selectors" do
-      css = compile(%q{.a { [data-x="&"] { color: red; } }})
+      css = compile(%q(.a { [data-x="&"] { color: red; } }))
       css.should contain(".a [data-x=\"&\"]")
     end
 
@@ -104,16 +104,16 @@ describe Hwaro::Assets::Sass do
     # =========================================================================
     it "interpolates in selectors, property names, and values" do
       css = compile(<<-'SCSS')
-      $name: card;
-      $side: left;
-      .#{$name} {
-        margin-#{$side}: 4px;
-        content: "hello #{$name}";
-      }
-      SCSS
+        $name: card;
+        $side: left;
+        .#{$name} {
+          margin-#{$side}: 4px;
+          content: "hello #{$name}";
+        }
+        SCSS
       css.should contain(".card {")
       css.should contain("margin-left: 4px;")
-      css.should contain(%q{content: "hello card";})
+      css.should contain(%q(content: "hello card";))
     end
 
     it "interpolates in at-rule preludes and substitutes prelude variables" do
@@ -169,16 +169,16 @@ describe Hwaro::Assets::Sass do
     # Plain-CSS passthrough
     # =========================================================================
     it "passes through @font-face, custom properties, and data URIs" do
-      css = compile(<<-'SCSS')
-      @charset "utf-8";
-      :root { --brand: #f00; --gap:  4px   8px; }
-      @font-face { font-family: "X"; src: url(x.woff2) format("woff2"); }
-      .grid { background: url(data:image/png;base64,AAA/BBB==); }
-      SCSS
-      css.should contain(%q{@charset "utf-8";})
+      css = compile(<<-SCSS)
+        @charset "utf-8";
+        :root { --brand: #f00; --gap:  4px   8px; }
+        @font-face { font-family: "X"; src: url(x.woff2) format("woff2"); }
+        .grid { background: url(data:image/png;base64,AAA/BBB==); }
+        SCSS
+      css.should contain(%q(@charset "utf-8";))
       css.should contain("--brand: #f00;")
       css.should contain("--gap: 4px   8px;")
-      css.should contain(%q{src: url(x.woff2) format("woff2");})
+      css.should contain(%q(src: url(x.woff2) format("woff2");))
       css.should contain("url(data:image/png;base64,AAA/BBB==)")
     end
 
@@ -189,10 +189,10 @@ describe Hwaro::Assets::Sass do
     end
 
     it "passes through quoted braces, semicolons, and escapes" do
-      css = compile(<<-'SCSS')
-      a[href^="https://"]::after { content: " (ext, a{b;c})"; }
-      .q { content: "quote \" and brace {"; }
-      SCSS
+      css = compile(<<-SCSS)
+        a[href^="https://"]::after { content: " (ext, a{b;c})"; }
+        .q { content: "quote \\" and brace {"; }
+        SCSS
       css.should contain("content: \" (ext, a{b;c})\";")
       css.should contain("content: \"quote \\\" and brace {\";")
     end
@@ -216,26 +216,26 @@ describe Hwaro::Assets::Sass do
     end
 
     it "passes through grid-template-areas string stacks" do
-      css = compile(%q{.g { grid-template-areas: "a a" "b b"; }})
-      css.should contain(%q{grid-template-areas: "a a" "b b";})
+      css = compile(%q(.g { grid-template-areas: "a a" "b b"; }))
+      css.should contain(%q(grid-template-areas: "a a" "b b";))
     end
 
     it "passes through plain-CSS @import forms" do
-      css = compile(<<-'SCSS')
-      @import url(theme.css);
-      @import "https://example.com/x.css";
-      @import "print.css" print;
-      SCSS
+      css = compile(<<-SCSS)
+        @import url(theme.css);
+        @import "https://example.com/x.css";
+        @import "print.css" print;
+        SCSS
       css.should contain("@import url(theme.css);")
-      css.should contain(%q{@import "https://example.com/x.css";})
-      css.should contain(%q{@import "print.css" print;})
+      css.should contain(%q(@import "https://example.com/x.css";))
+      css.should contain(%q(@import "print.css" print;))
     end
 
     it "does not mis-unquote non-string @import arguments" do
       # `"a" + "b"` has matching first/last quotes but is not one string —
       # it must pass through instead of becoming an ImportNode for `a" + "b`.
-      css = compile(%q{@import "a" + "b";})
-      css.should contain(%q{@import "a" + "b";})
+      css = compile(%q(@import "a" + "b";))
+      css.should contain(%q(@import "a" + "b";))
     end
 
     it "does not wrap descriptor at-rules nested in rules with a selector" do
@@ -258,7 +258,7 @@ describe Hwaro::Assets::Sass do
 
     it "rejects @use with configuration" do
       expect_raises(Hwaro::Assets::Sass::SyntaxError, /with \(\.\.\.\) configuration is not supported/) do
-        compile(%q{@use "x" with ($a: 1);})
+        compile(%q(@use "x" with ($a: 1);))
       end
     end
 
@@ -273,7 +273,7 @@ describe Hwaro::Assets::Sass do
 
     it "reports unterminated strings" do
       expect_raises(Hwaro::Assets::Sass::SyntaxError, /unterminated string/) do
-        compile(%q{.a { content: "oops; }})
+        compile(%q(.a { content: "oops; }))
       end
     end
 

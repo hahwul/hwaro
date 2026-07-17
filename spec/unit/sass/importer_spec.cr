@@ -109,8 +109,8 @@ describe "Hwaro::Assets::Sass imports" do
         "sass/main.scss"  => "@use \"one\";\n@use \"two\";\n.app { color: green; }",
       }, "sass/main.scss")
       css.scan(/\.base \{/).size.should eq(1)
-      css.index(".base {").not_nil!.should be < css.index(".one {").not_nil!
-      css.index(".one {").not_nil!.should be < css.index(".app {").not_nil!
+      css.index!(".base {").should be < css.index!(".one {")
+      css.index!(".one {").should be < css.index!(".app {")
     end
 
     it "errors on undefined namespace members" do

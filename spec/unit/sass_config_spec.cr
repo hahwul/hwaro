@@ -18,13 +18,13 @@ describe Hwaro::Models::SassConfig do
 
   it "parses the [sass] section" do
     config = load_config(<<-TOML)
-    title = "T"
-    base_url = "https://example.com"
+      title = "T"
+      base_url = "https://example.com"
 
-    [sass]
-    enabled = true
-    minify = false
-    TOML
+      [sass]
+      enabled = true
+      minify = false
+      TOML
     config.sass.enabled.should be_true
     config.sass.minify.should be_false
   end

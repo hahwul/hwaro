@@ -22,7 +22,7 @@ module Hwaro
         include Loader
 
         def read(path : String) : String?
-          return nil unless File.file?(path)
+          return unless File.file?(path)
           File.read(path)
         end
 

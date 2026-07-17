@@ -479,9 +479,7 @@ module Hwaro
           first_colon = nil
           first_decl_colon = nil
 
-          until @s.eof?
-            c = @s.peek.not_nil!
-
+          while c = @s.peek
             if depth == 0 && stops.includes?(c)
               terminator = c
               break
@@ -573,13 +571,12 @@ module Hwaro
 
         # Quoted string with `#{...}` support (cursor on the opening quote).
         private def read_string_into(buf : Buf, pieces : Array(Ast::Piece)) : Nil
-          quote = @s.peek.not_nil!
           start_line = @s.line
           start_col = @s.column
+          quote = @s.peek || @s.error("expected string", start_line, start_col)
           buf << @s.advance
           loop do
-            @s.error("unterminated string", start_line, start_col) if @s.eof?
-            c = @s.peek.not_nil!
+            c = @s.peek || @s.error("unterminated string", start_line, start_col)
             if c == '\\'
               buf << @s.advance
               buf << @s.advance unless @s.eof?
@@ -603,8 +600,7 @@ module Hwaro
           start_col = @s.column
           buf << @s.advance # '('
           loop do
-            @s.error("unterminated url(", start_line, start_col) if @s.eof?
-            c = @s.peek.not_nil!
+            c = @s.peek || @s.error("unterminated url(", start_line, start_col)
             case c
             when ')'
               buf << @s.advance

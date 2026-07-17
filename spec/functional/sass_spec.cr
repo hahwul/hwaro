@@ -1,13 +1,13 @@
 require "./support/build_helper"
 
 private SASS_CONFIG = <<-TOML
-title = "Sass Test"
-base_url = "https://example.com"
+  title = "Sass Test"
+  base_url = "https://example.com"
 
-[sass]
-enabled = true
-minify = false
-TOML
+  [sass]
+  enabled = true
+  minify = false
+  TOML
 
 private INDEX_MD      = "# Hello\n"
 private PAGE_TEMPLATE = "<html><body>{{ content }}</body></html>"
@@ -49,9 +49,9 @@ describe "Sass build integration" do
 
   it "copies raw scss verbatim when [sass] is disabled (back-compat)" do
     config = <<-TOML
-    title = "No Sass"
-    base_url = "https://example.com"
-    TOML
+      title = "No Sass"
+      base_url = "https://example.com"
+      TOML
     build_site(
       config,
       content_files: {"index.md" => INDEX_MD},
@@ -65,21 +65,21 @@ describe "Sass build integration" do
 
   it "compiles scss entries referenced by asset bundles" do
     config = <<-TOML
-    title = "Bundle"
-    base_url = "https://example.com"
+      title = "Bundle"
+      base_url = "https://example.com"
 
-    [sass]
-    enabled = true
+      [sass]
+      enabled = true
 
-    [assets]
-    enabled = true
-    minify = false
-    fingerprint = false
+      [assets]
+      enabled = true
+      minify = false
+      fingerprint = false
 
-    [[assets.bundles]]
-    name = "main.css"
-    files = ["css/style.scss", "css/extra.css"]
-    TOML
+      [[assets.bundles]]
+      name = "main.css"
+      files = ["css/style.scss", "css/extra.css"]
+      TOML
     build_site(
       config,
       content_files: {"index.md" => INDEX_MD},
@@ -98,18 +98,18 @@ describe "Sass build integration" do
 
   it "concatenates bundle .scss entries verbatim when [sass] is disabled" do
     config = <<-TOML
-    title = "Bundle Verbatim"
-    base_url = "https://example.com"
+      title = "Bundle Verbatim"
+      base_url = "https://example.com"
 
-    [assets]
-    enabled = true
-    minify = false
-    fingerprint = false
+      [assets]
+      enabled = true
+      minify = false
+      fingerprint = false
 
-    [[assets.bundles]]
-    name = "main.css"
-    files = ["css/style.scss"]
-    TOML
+      [[assets.bundles]]
+      name = "main.css"
+      files = ["css/style.scss"]
+      TOML
     build_site(
       config,
       content_files: {"index.md" => INDEX_MD},

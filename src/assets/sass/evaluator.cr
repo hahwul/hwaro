@@ -333,8 +333,6 @@ module Hwaro
           content =
             if body = node.body
               ContentBlock.new(body, @env, @content, @path)
-            else
-              nil
             end
 
           saved_env = @env
